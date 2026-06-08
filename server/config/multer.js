@@ -1,9 +1,16 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+
+// 确保 images 目录存在
+const imagesDir = path.join(__dirname, '../images');
+if (!fs.existsSync(imagesDir)) {
+    fs.mkdirSync(imagesDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, path.join(__dirname, '../images'));
+        cb(null, imagesDir);
     },
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);

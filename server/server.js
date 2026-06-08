@@ -2,8 +2,23 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
+const fs = require('fs');
 const { WebSocket } = require('ws');
 require('dotenv').config();
+
+// 检查 .env 文件是否存在
+const envPath = path.join(__dirname, '..', '.env');
+const envExamplePath = path.join(__dirname, '..', '.env.example');
+if (!fs.existsSync(envPath)) {
+    console.error('\n[错误] 未找到 .env 配置文件！');
+    if (fs.existsSync(envExamplePath)) {
+        console.error('[提示] 请复制 .env.example 为 .env 并填写配置：');
+        console.error('       cp .env.example .env\n');
+    } else {
+        console.error('[提示] 请在项目根目录创建 .env 文件并填写配置\n');
+    }
+    process.exit(1);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;

@@ -5,6 +5,12 @@ const fs = require('fs');
 
 const dbFile = path.join(__dirname, '../../data/pve-panel.db');
 
+// 确保 data 目录存在
+const dataDir = path.dirname(dbFile);
+if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+}
+
 // 检查是否需要从旧JSON数据库迁移数据
 const jsonDbFile = path.join(__dirname, '../../db.json');
 let needMigration = false;
