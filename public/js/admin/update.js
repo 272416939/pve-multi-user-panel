@@ -3,11 +3,15 @@
     var Vue = window.Vue;
     var ref = Vue.ref;
 
+    // 从 meta 标签读取版本号
+    var versionMeta = document.querySelector('meta[name="app-version"]');
+    var defaultVersion = versionMeta ? versionMeta.getAttribute('content') : '';
+
     // State
     $.updateInfo = ref(null);
     $.updateChecking = ref(false);
     $.updateExecuting = ref(false);
-    $.currentVersion = ref('1.6.8');
+    $.currentVersion = ref(defaultVersion);
 
     // Functions
     $.checkUpdate = async function() {
@@ -46,9 +50,6 @@
 
     // initUpdate lifecycle
     $.initUpdate = function() {
-        // 尝试从 API 获取更准确的版本号
-        fetch('/api/version').then(function(r) { return r.json(); }).then(function(d) {
-            if (d.version) $.currentVersion.value = d.version;
-        }).catch(function() {});
+        // 版本号已从 meta 标签初始化，无需额外请求
     };
 })();
