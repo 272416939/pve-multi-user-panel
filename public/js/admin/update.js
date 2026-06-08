@@ -3,9 +3,8 @@
     var Vue = window.Vue;
     var ref = Vue.ref;
 
-    // 从 meta 标签读取版本号
-    var versionMeta = document.querySelector('meta[name="app-version"]');
-    var defaultVersion = versionMeta ? versionMeta.getAttribute('content') : '';
+    // 版本号（每次发版同步更新）
+    var defaultVersion = '1.6.9';
 
     // State
     $.updateInfo = ref(null);
