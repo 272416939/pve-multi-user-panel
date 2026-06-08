@@ -34,3 +34,6 @@ npm-debug.log*
 *.tmp
 *.swp
 *~
+
+# 开发文档（不需要推送）
+docs/
