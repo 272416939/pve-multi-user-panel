@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const path = require('path');
+const fs = require('fs');
 const { execSync } = require('child_process');
 const axios = require('axios');
 const db = require('../api/db-sqlite');
@@ -162,20 +163,27 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
 router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, async (req, res) => {
     const projectRoot = path.join(__dirname, '..', '..');
     try {
-        try {
-            execSync('git fetch origin', { cwd: projectRoot, timeout: 60000 });
-        } catch (error) {
-            return res.status(500).json({ error: '更新失败: git fetch 失败 - ' + error.message });
+        // 检查是否为 git 仓库
+        if (!fs.existsSync(path.join(projectRoot, '.git'))) {
+            return res.status(400).json({ error: '更新失败: 当前项目不是 git 仓库，无法使用在线更新。请手动下载最新版本覆盖更新。' });
         }
         try {
-            execSync('git reset --hard origin/main', { cwd: projectRoot, timeout: 60000 });
+            execSync('git fetch origin', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
         } catch (error) {
-            return res.status(500).json({ error: '更新失败: git reset 失败 - ' + error.message });
+            const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
+            return res.status(500).json({ error: '更新失败: git fetch 失败 - ' + stderr });
         }
         try {
-            execSync('npm install --production', { cwd: projectRoot, timeout: 120000 });
+            execSync('git reset --hard origin/main', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
         } catch (error) {
-            return res.status(500).json({ error: '更新失败: npm install 失败 - ' + error.message });
+            const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
+            return res.status(500).json({ error: '更新失败: git reset 失败 - ' + stderr });
+        }
+        try {
+            execSync('npm install --production', { cwd: projectRoot, timeout: 120000, stdio: 'pipe' });
+        } catch (error) {
+            const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
+            return res.status(500).json({ error: '更新失败: npm install 失败 - ' + stderr });
         }
         res.json({ message: '更新成功，服务正在重启...' });
         setTimeout(() => process.exit(0), 1000);
