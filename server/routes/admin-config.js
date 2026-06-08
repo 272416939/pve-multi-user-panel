@@ -190,6 +190,13 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             return res.status(400).json({ error: '更新失败: 当前项目不是 git 仓库，无法使用在线更新。请手动下载最新版本覆盖更新。' });
         }
 
+        // 添加 safe.directory 避免权限检测报错
+        try {
+            execSync(`git config --global --add safe.directory ${projectRoot}`, { timeout: 5000, stdio: 'pipe' });
+        } catch (e) {
+            // 忽略失败，继续执行
+        }
+
         // 确定更新源：优先 gitee，不可达则回退 origin
         let remote = 'origin';
         try {
