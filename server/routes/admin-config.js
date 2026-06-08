@@ -124,10 +124,31 @@ router.get('/version', (req, res) => {
 // 检查系统更新
 router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async (req, res) => {
     const githubRepo = process.env.GITHUB_REPO || '272416939/pve-multi-user-panel';
+    const giteeRepo = process.env.GITEE_REPO || 'Allen0528/pve-multi-user-panel';
+
+    // 尝试从 Gitee 获取（国内优先），失败则回退 GitHub
+    let response = null;
+    let source = 'gitee';
     try {
-        const response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, {
+        response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases/latest`, {
             timeout: 10000
         });
+    } catch (e) {
+        source = 'github';
+        try {
+            response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, {
+                timeout: 10000
+            });
+        } catch (e2) {
+            return res.json({
+                current_version: pkg.version,
+                has_update: false,
+                error: '无法连接更新服务器（Gitee / GitHub 均不可达）'
+            });
+        }
+    }
+
+    try {
         const tag = response.data.tag_name.replace(/^v/, '');
         const current = pkg.version.split('.').map(Number);
         const latest = tag.split('.').map(Number);
@@ -142,6 +163,7 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
             current_version: pkg.version,
             latest_version: tag,
             has_update: hasUpdate,
+            source: source,
             release: {
                 tag_name: response.data.tag_name,
                 name: response.data.name,
@@ -154,7 +176,7 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
         res.json({
             current_version: pkg.version,
             has_update: false,
-            error: '无法连接 GitHub'
+            error: '解析版本信息失败'
         });
     }
 });
@@ -167,14 +189,35 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
         if (!fs.existsSync(path.join(projectRoot, '.git'))) {
             return res.status(400).json({ error: '更新失败: 当前项目不是 git 仓库，无法使用在线更新。请手动下载最新版本覆盖更新。' });
         }
+
+        // 确定更新源：优先 gitee，不可达则回退 origin
+        let remote = 'origin';
         try {
-            execSync('git fetch origin', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
+            execSync('git remote get-url gitee', { cwd: projectRoot, timeout: 5000, stdio: 'pipe' });
+            remote = 'gitee';
+        } catch (e) {
+            // gitee 远程源不存在，使用 origin
+        }
+
+        try {
+            execSync(`git fetch ${remote}`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
         } catch (error) {
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
-            return res.status(500).json({ error: '更新失败: git fetch 失败 - ' + stderr });
+            // 如果 gitee 失败，尝试回退 origin
+            if (remote === 'gitee') {
+                try {
+                    execSync('git fetch origin', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
+                    remote = 'origin';
+                } catch (e2) {
+                    const stderr2 = e2.stderr ? e2.stderr.toString().trim() : e2.message;
+                    return res.status(500).json({ error: '更新失败: git fetch 失败（gitee: ' + stderr + ', origin: ' + stderr2 + '）' });
+                }
+            } else {
+                return res.status(500).json({ error: '更新失败: git fetch 失败 - ' + stderr });
+            }
         }
         try {
-            execSync('git reset --hard origin/main', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
+            execSync(`git reset --hard ${remote}/main`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
         } catch (error) {
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
             return res.status(500).json({ error: '更新失败: git reset 失败 - ' + stderr });

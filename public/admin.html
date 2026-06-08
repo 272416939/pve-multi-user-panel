@@ -1293,7 +1293,8 @@
                             <div class="card-body">
                                 <p class="text-muted mb-2">
                                     发布时间：{{ formatDate(updateInfo.release.published_at) }}
-                                    <a :href="updateInfo.release.html_url" target="_blank" class="ms-2">查看 GitHub Release</a>
+                                    <span class="badge bg-info ms-1">{{ updateInfo.source === 'gitee' ? 'Gitee' : 'GitHub' }}</span>
+                                    <a :href="updateInfo.release.html_url" target="_blank" class="ms-2">查看 Release</a>
                                 </p>
 
                                 <!-- 更新日志 -->
