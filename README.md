@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v1.6.3-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v1.6.4-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -310,6 +310,18 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v1.6.4</b> (2026-06-09) — 自动更新修复</summary>
+
+**Bug 修复：**
+- ✅ 修复非 git 仓库部署时更新报错：增加 `.git` 目录检测，非 git 仓库返回友好提示
+- ✅ 优化错误信息：使用 `stdio: 'pipe'` 捕获 stderr，返回具体错误而非 Node.js 内部报错
+
+**涉及文件：**
+`package.json` · `server/routes/admin-config.js`
+
+</details>
 
 <details>
 <summary><b>v1.6.3</b> (2026-06-09) — 自动更新系统</summary>
