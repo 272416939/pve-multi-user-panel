@@ -149,6 +149,8 @@ npm run dev
 | LXC 管理 | `VM.Audit`, `VM.Config`, `VM.PowerMgmt` |
 | VNC/终端 | `VM.Console` |
 
+> **提示：** 请使用 `root@pam` 用户创建 API Token。如果创建时未勾选"特权分离"，则无需单独设置以上权限，Token 自动继承 root 全部权限。
+
 ---
 
 ## 🏗️ 项目结构
