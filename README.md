@@ -126,7 +126,7 @@ npm run dev
 | 变量 | 说明 | 示例 |
 |------|------|------|
 | `PVE_HOST` | PVE 服务器地址 | `https://192.168.1.100:8006` |
-| `PVE_API_TOKEN` | PVE API 令牌，格式 `用户@认证域!令牌ID=UUID` | `root@pam!panel=xxxxxxxx-...` |
+| `PVE_API_TOKEN` | PVE API 令牌，请使用 `root@pam` 用户创建，格式 `用户@认证域!令牌ID=UUID`，未勾选特权分离则无需设置权限 | `root@pam!panel=xxxxxxxx-...` |
 | `PORT` | 面板服务端口 | `3002` |
 | `SITE_URL` | 外部访问域名（反向代理必填） | `https://your-domain.com` |
 | `JWT_SECRET` | JWT 签名密钥（生产环境请修改） | — |
