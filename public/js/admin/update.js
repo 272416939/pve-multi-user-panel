@@ -3,14 +3,11 @@
     var Vue = window.Vue;
     var ref = Vue.ref;
 
-    // 版本号（每次发版同步更新）
-    var defaultVersion = '1.6.9';
-
     // State
     $.updateInfo = ref(null);
     $.updateChecking = ref(false);
     $.updateExecuting = ref(false);
-    $.currentVersion = ref(defaultVersion);
+    $.currentVersion = ref('');
 
     // Functions
     $.checkUpdate = async function() {
@@ -49,6 +46,9 @@
 
     // initUpdate lifecycle
     $.initUpdate = function() {
-        // 版本号已从 meta 标签初始化，无需额外请求
+        // 从后端 API 获取版本号（与页脚方式一致）
+        fetch('/api/version').then(function(r) { return r.json(); }).then(function(d) {
+            if (d.version) $.currentVersion.value = d.version;
+        });
     };
 })();
