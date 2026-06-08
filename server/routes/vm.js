@@ -1,0 +1,503 @@
+const express = require('express');
+const router = express.Router();
+const db = require('../api/db-sqlite');
+const pveApi = require('../api/pve-api');
+const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const ikuaiApi = require('../api/ikuai-api');
+const { _applyRate } = require('../utils/pve-rate');
+const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { createDhcpStaticBinding, removeDhcpStaticBinding } = require('../services/dhcp');
+const dbg = require('../utils/debug');
+router.get('/pve/vms', authMiddleware, async (req, res) => {
+    try {
+        const vms = await pveApi.getVms();
+        
+        // 获取已分配的VMID
+        const assignedVms = db.vms.getAll();
+        const assignedVmIds = new Set(assignedVms.map(vm => vm.vm_id));
+        
+        // 将虚拟机分为待分配和已分配，并按VMID降序排序
+        const availableVms = vms
+            .filter(vm => !assignedVmIds.has(vm.vmid))
+            .sort((a, b) => b.vmid - a.vmid);
+        
+        const assignedVmsWithUsers = vms
+            .filter(vm => assignedVmIds.has(vm.vmid))
+            .sort((a, b) => b.vmid - a.vmid)
+            .map(vm => {
+                const assignment = assignedVms.find(a => a.vm_id === vm.vmid);
+                const user = assignment ? db.users.getById(assignment.user_id) : null;
+                return {
+                    ...vm,
+                    assigned_user: user ? user.username : null,
+                    assignment_id: assignment ? assignment.id : null
+                };
+            });
+        
+        res.json({
+            available: availableVms,
+            assigned: assignedVmsWithUsers
+        });
+    } catch (error) {
+        console.error('获取虚拟机列表错误:', error);
+        res.status(500).json({ error: '获取虚拟机列表失败: ' + error.message });
+    }
+});
+
+router.get('/user/vms', authMiddleware, async (req, res) => {
+    try {
+        let userVms;
+        if (req.user.role === 'admin') {
+            userVms = db.vms.getAll().map(vm => {
+                const user = db.users.getById(vm.user_id);
+                return { ...vm, username: user?.username };
+            });
+        } else {
+            userVms = db.vms.getByUserId(req.user.id);
+        }
+ 
+        // 先构建基础数据（不依赖 PVE 状态查询）
+        const vmsWithDetails = userVms.map(vm => ({
+            ...vm,
+            status: null,
+            config: null,
+            isExpired: vm.expiration_date ? new Date(vm.expiration_date) < new Date() : false,
+            destroyed: false,
+            error: null
+        }));
+ 
+        // 再尝试获取 PVE 状态，每个 VM 独立处理
+        for (const vmData of vmsWithDetails) {
+            try {
+                const [status, config] = await Promise.all([
+                    pveApi.getVmStatus(vmData.vm_id),
+                    pveApi.getVmConfig(vmData.vm_id)
+                ]);
+                vmData.status = _applyRate('vm:' + vmData.vm_id, status);
+                vmData.config = config;
+                vmData.error = null;
+            } catch (innerError) {
+                // 检查是否为 VM 已销毁（404 或配置文件不存在）
+                const errMsg = innerError?.response?.data?.message || innerError?.message || '';
+                if (innerError.response?.status === 404 || errMsg.includes('does not exist')) {
+                    vmData.destroyed = true;
+                } else {
+                    vmData.error = '获取虚拟机信息失败';
+                }
+            }
+        }
+ 
+        res.json(vmsWithDetails);
+    } catch (error) {
+        console.error('获取用户虚拟机列表失败:', error);
+        // 兜底返回数据库数据
+        try {
+            let userVms;
+            if (req.user.role === 'admin') {
+                userVms = db.vms.getAll();
+            } else {
+                userVms = db.vms.getByUserId(req.user.id);
+            }
+            return res.json(userVms.map(vm => ({
+                ...vm,
+                status: null,
+                config: null,
+                isExpired: vm.expiration_date ? new Date(vm.expiration_date) < new Date() : false,
+                destroyed: false
+            })));
+        } catch (e2) {
+            console.error('兜底返回也失败:', e2);
+            res.json([]);
+        }
+    }
+});
+
+router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
+    const { vm_id, user_id, name, expiration_date, renewal_price } = req.body;
+ 
+    if (!vm_id || !user_id) {
+        return res.status(400).json({ error: '请选择虚拟机和用户' });
+    }
+ 
+    const parsedVmId = parseInt(vm_id);
+    const parsedUserId = parseInt(user_id);
+ 
+    if (isNaN(parsedVmId) || isNaN(parsedUserId)) {
+        return res.status(400).json({ error: '无效的虚拟机或用户ID' });
+    }
+ 
+    const existingVms = db.vms.getAll();
+    if (existingVms.find(vm => vm.vm_id === parsedVmId && vm.user_id === parsedUserId)) {
+        return res.status(400).json({ error: '该虚拟机已分配给此用户' });
+    }
+ 
+    const newVm = db.vms.create({
+        vm_id: parsedVmId,
+        user_id: parsedUserId,
+        name,
+        expiration_date,
+        renewal_price: renewal_price || ''
+    });
+    
+    // DHCP 静态绑定：分配 IP
+    try {
+        const config = await pveApi.getVmConfig(parsedVmId);
+        if (config && config.net0) {
+            const macMatch = config.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+            if (macMatch) {
+                // 如果 VM 已有 dhcp_static_ip，优先使用
+                const existingVm = db.vms.getAll().find(v => v.vm_id === parsedVmId);
+                const preferredIp = existingVm?.dhcp_static_ip || '';
+                const ip = await createDhcpStaticBinding('vm', parsedVmId, macMatch[0], preferredIp);
+                if (ip) db.vms.update(newVm.id, { dhcp_static_ip: ip });
+            }
+        }
+    } catch (e) { console.error(`VM ${parsedVmId} DHCP 静态绑定失败:`, e.message); }
+    
+    // 发送站内消息通知
+    try {
+        const user = db.users.getById(parseInt(user_id));
+        db.messages.create({
+            uid: parseInt(user_id),
+            title: '虚拟机已开通',
+            content: `您的虚拟机 ${name || 'VM ' + vm_id} 已分配完成。${expiration_date ? '\n到期时间：' + new Date(expiration_date).toLocaleString('zh-CN') : ''}${renewal_price ? '\n续费价格：' + renewal_price : ''}`,
+            type: 2,
+            send_type: 1,
+            link_url: '',
+            link_text: ''
+        });
+    } catch (e) {}
+
+    const assignedUser = db.users.getById(parseInt(user_id));
+    if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
+        try {
+            const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
+            const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
+            const emailContent = `
+                <p>您好 <strong>${assignedUser.username}</strong>，</p>
+                <div class="info-box" style="border-left-color: #48bb78;">
+                    <p style="margin-bottom: 8px; font-size: 16px;">
+                        🎉 您的虚拟机已开通！
+                    </p>
+                </div>
+                <div class="info-box">
+                    <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
+                    <p style="margin-bottom: 4px;">名称：${name || 'VM ' + vm_id}</p>
+                    <p style="margin-bottom: 4px;">VMID：${vm_id}</p>
+                    <p style="margin-bottom: 4px;">到期时间：${expiryStr}</p>
+                    ${priceStr}
+                </div>
+                <div class="divider"></div>
+                <p>您可以前往「我的虚拟机」页面开始使用。如有问题请联系管理员。</p>
+            `;
+            await sendEmail(
+                assignedUser.email,
+                '虚拟机已开通 - PVE 管理面板',
+                createEmailTemplate('虚拟机开通通知', emailContent)
+            );
+        } catch (emailError) {
+            console.error(`发送 VM 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
+        }
+    }
+    
+    // 分配后尝试自动开机（如果虚拟机是停机状态）
+    try {
+        const currentStatus = await pveApi.getVmStatus(parseInt(vm_id));
+        if (currentStatus && currentStatus.status === 'stopped') {
+            await pveApi.startVm(parseInt(vm_id));
+            dbg(`虚拟机 ${vm_id} 已自动开机（分配后）`);
+        }
+    } catch (startError) {
+        console.error(`虚拟机 ${vm_id} 自动开机失败:`, startError.message);
+    }
+    
+    res.json(newVm);
+});
+
+router.put('/user/vms/:id', authMiddleware, async (req, res) => {
+    const vmId = parseInt(req.params.id);
+    const { name, expiration_date, renewal_price, user_id } = req.body;
+    
+    const vm = db.vms.getById(vmId);
+    if (!vm) {
+        return res.status(404).json({ error: '虚拟机不存在' });
+    }
+    
+    // 检查权限：管理员或所有者
+    const isAdmin = req.user.role === 'admin';
+    const isOwner = req.user.id === vm.user_id;
+    
+    if (!isAdmin && !isOwner) {
+        return res.status(403).json({ error: '无权限操作此虚拟机' });
+    }
+    
+    const updates = {};
+    
+    // 更新名称（所有用户都可以）
+    if (name !== undefined) {
+        updates.name = name;
+    }
+    
+    // 只有管理员可以修改到期时间和价格
+    if (isAdmin && expiration_date !== undefined) {
+        updates.expiration_date = expiration_date;
+        updates.reminderSent = false;
+        db.vms.reminders.clear(vmId);
+    }
+    
+    if (isAdmin && renewal_price !== undefined) {
+        updates.renewal_price = renewal_price;
+    }
+    
+    // 只有管理员可以重新分配给其他用户
+    if (isAdmin && user_id !== undefined && user_id !== vm.user_id) {
+        updates.user_id = parseInt(user_id);
+        updates.reminderSent = false;
+        db.vms.reminders.clear(vmId);
+    }
+    
+    db.vms.update(vmId, updates);
+    
+    // 管理员延长到期时间后，如果虚拟机之前因到期停机，尝试自动开机
+    if (isAdmin && expiration_date !== undefined) {
+        try {
+            const newExp = new Date(expiration_date);
+            if (newExp > new Date()) {
+                const currentStatus = await pveApi.getVmStatus(vm.vm_id);
+                if (currentStatus && currentStatus.status === 'stopped') {
+                    await pveApi.startVm(vm.vm_id);
+                    dbg(`虚拟机 ${vm.vm_id} 已自动开机（到期时间延长后）`);
+                }
+            }
+        } catch (startError) {
+            console.error(`虚拟机 ${vm.vm_id} 自动开机失败:`, startError.message);
+        }
+    }
+    
+    res.json({ message: '虚拟机信息更新成功' });
+});
+
+router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    const vmId = parseInt(req.params.id);
+    const vm = db.vms.getById(vmId);
+    let removedVmInfo = null;
+    if (vm) {
+        removedVmInfo = { name: vm.name, vm_id: vm.vm_id, user_id: vm.user_id };
+    }
+    // 检查虚拟机状态，必须关机才能移除
+    if (vm && vm.vm_id) {
+        try {
+            const status = await pveApi.getVmStatus(vm.vm_id);
+            if (status && status.status === 'running') {
+                return res.status(400).json({ error: '虚拟机正在运行，请先关机后再移除' });
+            }
+        } catch (e) {
+            console.warn(`[vm] 查询 ${vm.vm_id} 状态失败（继续执行移除）:`, e.message);
+        }
+    }
+    db.vms.reminders.clear(vmId);
+    // 级联清理端口转发
+    try {
+        const vmForwards = db.portForwards.getByVmId(removedVmInfo?.vm_id || vmId);
+        for (const fw of vmForwards) {
+            if (fw.ikuai_id) {
+                try { ikuaiApi.deletePortForward(fw.ikuai_id); } catch (e) {}
+            }
+        }
+        db.portForwards.deleteByDevice('vm', removedVmInfo?.vm_id || vmId);
+    } catch (e) { console.error('清理端口转发失败:', e.message); }
+    // 清理 DHCP 静态绑定
+    if (vm && vm.vm_id) {
+        removeDhcpStaticBinding('vm', vm.vm_id);
+    }
+    db.vms.delete(vmId);
+    // 发送移除通知
+    if (removedVmInfo) {
+        try {
+            db.messages.create({
+                uid: removedVmInfo.user_id,
+                title: '虚拟机已移除',
+                content: `您的虚拟机 ${removedVmInfo.name || 'VM ' + removedVmInfo.vm_id} 已被管理员移除。`,
+                type: 2,
+                send_type: 1
+            });
+        } catch (e) {}
+    }
+
+    if (removedVmInfo) {
+        const removedUser = db.users.getById(removedVmInfo.user_id);
+        if (removedUser && removedUser.email && removedUser.emailVerified) {
+            try {
+                const emailContent = `
+                    <p>您好 <strong>${removedUser.username}</strong>，</p>
+                    <div class="warning-box">
+                        <p style="margin-bottom: 8px; font-size: 16px;">
+                            ⚠️ 您的虚拟机已被移除
+                        </p>
+                    </div>
+                    <div class="info-box">
+                        <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
+                        <p style="margin-bottom: 4px;">名称：${removedVmInfo.name || 'VM ' + removedVmInfo.vm_id}</p>
+                        <p style="margin-bottom: 4px;">VMID：${removedVmInfo.vm_id}</p>
+                    </div>
+                    <div class="divider"></div>
+                    <p>如果对此操作有疑问，请联系管理员。</p>
+                `;
+                await sendEmail(
+                    removedUser.email,
+                    '虚拟机已被移除 - PVE 管理面板',
+                    createEmailTemplate('虚拟机移除通知', emailContent)
+                );
+            } catch (emailError) {
+                console.error(`发送 VM 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
+            }
+        }
+    }
+
+    res.json({ message: '虚拟机移除成功' });
+});
+
+router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+        const allVms = db.vms.getAll();
+        const vm = allVms.find(v => v.vm_id === vmid);
+        
+        if (vm) {
+            const isOwner = req.user.id === vm.user_id;
+            const isAdmin = req.user.role === 'admin';
+            
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ error: '无权限操作此虚拟机' });
+            }
+            
+            if (isOwner && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，无法开机' });
+            }
+        }
+        
+        await pveApi.startVm(vmid);
+        res.json({ message: '虚拟机启动成功' });
+    } catch (error) {
+        res.status(500).json({ error: '启动虚拟机失败' });
+    }
+});
+
+router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+        const allVms = db.vms.getAll();
+        const vm = allVms.find(v => v.vm_id === vmid);
+        
+        if (vm) {
+            const isOwner = req.user.id === vm.user_id;
+            const isAdmin = req.user.role === 'admin';
+            
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ error: '无权限操作此虚拟机' });
+            }
+        }
+        
+        await pveApi.shutdownVm(vmid);
+        res.json({ message: '虚拟机关机成功' });
+    } catch (error) {
+        res.status(500).json({ error: '关闭虚拟机失败' });
+    }
+});
+
+router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+        const allVms = db.vms.getAll();
+        const vm = allVms.find(v => v.vm_id === vmid);
+        
+        if (vm) {
+            const isOwner = req.user.id === vm.user_id;
+            const isAdmin = req.user.role === 'admin';
+            
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ error: '无权限操作此虚拟机' });
+            }
+        }
+        
+        await pveApi.stopVm(vmid);
+        res.json({ message: '虚拟机已强制停止' });
+    } catch (error) {
+        res.status(500).json({ error: '停止虚拟机失败' });
+    }
+});
+
+router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+        const allVms = db.vms.getAll();
+        const vm = allVms.find(v => v.vm_id === vmid);
+        
+        if (vm) {
+            const isOwner = req.user.id === vm.user_id;
+            const isAdmin = req.user.role === 'admin';
+            
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ error: '无权限操作此虚拟机' });
+            }
+        }
+        
+        await pveApi.rebootVm(vmid);
+        res.json({ message: '虚拟机重启成功' });
+    } catch (error) {
+        res.status(500).json({ error: '重启虚拟机失败' });
+    }
+});
+
+router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+        const allVms = db.vms.getAll();
+        const vm = allVms.find(v => v.vm_id === vmid);
+        
+        if (vm) {
+            const isOwner = req.user.id === vm.user_id;
+            const isAdmin = req.user.role === 'admin';
+            
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ error: '无权限操作此虚拟机' });
+            }
+        }
+        
+        // 先检查 VM 是否在运行
+        let vmStatus;
+        try {
+            vmStatus = await pveApi.getVmStatus(vmid);
+        } catch (e) {
+            return res.status(500).json({ error: '无法获取虚拟机状态' });
+        }
+        
+        if (!vmStatus || vmStatus.status !== 'running') {
+            return res.status(400).json({ error: '虚拟机未运行，请先开机' });
+        }
+        
+        // 获取 VNC proxy ticket
+        const result = await pveApi.getVncConsole(vmid);
+        
+        // 返回代理页面，通过我们的服务器转发 VNC 流量
+        const proxyUrl = `/vnc.html?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}`;
+        res.json({ proxyUrl });
+    } catch (error) {
+        console.error('获取 VNC 控制台失败:', error.message);
+        res.status(500).json({ error: '获取 VNC 控制台失败: ' + error.message });
+    }
+});
+
+router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
+    try {
+        const rawStatus = await pveApi.getVmStatus(req.params.vmid);
+        const status = _applyRate('vm:' + req.params.vmid, rawStatus);
+        const config = await pveApi.getVmConfig(req.params.vmid);
+        res.json({ status, config });
+    } catch (error) {
+        res.status(500).json({ error: '获取虚拟机状态失败' });
+    }
+});
+
+
+module.exports = router;

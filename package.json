@@ -1,0 +1,38 @@
+{
+  "name": "pve-multi-user-panel",
+  "version": "1.6.2",
+  "description": "Proxmox Virtual Environment 多用户控制面板",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js"
+  },
+  "keywords": [
+    "proxmox",
+    "pve",
+    "management",
+    "multi-tenant"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "better-sqlite3": "^12.10.0",
+    "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.3",
+    "lowdb": "^6.0.1",
+    "multer": "^1.4.5-lts.1",
+    "node-schedule": "^2.1.1",
+    "nodemailer": "^6.9.8",
+    "otplib": "^13.4.1",
+    "qrcode": "^1.5.4",
+    "ssh2": "^1.17.0",
+    "ws": "^8.20.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}

@@ -1,0 +1,108 @@
+const express = require('express');
+const router = express.Router();
+const CryptoJS = require('crypto-js');
+const db = require('../api/db-sqlite');
+const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+
+router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
+    const users = db.users.getAll().map(({ password, ...rest }) => rest);
+    res.json(users);
+});
+
+router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
+    const { username, password, role, email, emailVerified } = req.body;
+    const hashedPassword = CryptoJS.SHA256(password).toString();
+    
+    if (db.users.getByUsername(username)) {
+        return res.status(400).json({ error: '用户名已存在' });
+    }
+    
+    if (email) {
+        const allUsers = db.users.getAll();
+        if (allUsers.find(u => u.email === email)) {
+            return res.status(400).json({ error: '该邮箱已被使用' });
+        }
+    }
+    
+    const newUser = db.users.create({
+        username,
+        password: hashedPassword,
+        role: role || 'user',
+        email: email || '',
+        emailVerified: !!emailVerified
+    });
+    
+    const { password: _, ...safeUser } = newUser;
+    res.json(safeUser);
+});
+
+router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    const userId = parseInt(req.params.id);
+    
+    const userVms = db.vms.getByUserId(userId);
+    for (const vm of userVms) {
+        db.vms.delete(vm.id);
+    }
+    
+    const userMemos = db.memos.getByUserId(userId);
+    for (const memo of userMemos) {
+        db.memos.delete(memo.id);
+    }
+    
+    db.passwordResetTokens.deleteByUserId(userId);
+    
+    db.users.delete(userId);
+    res.json({ message: '用户删除成功' });
+});
+
+router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    const userId = parseInt(req.params.id);
+    const { username, password, role, email, emailVerified } = req.body;
+    
+    const user = db.users.getById(userId);
+    if (!user) {
+        return res.status(404).json({ error: '用户不存在' });
+    }
+    
+    const updates = {};
+    
+    if (username && username !== user.username) {
+        const allUsers = db.users.getAll();
+        if (allUsers.find(u => u.username === username)) {
+            return res.status(400).json({ error: '用户名已存在' });
+        }
+        updates.username = username;
+    }
+    
+    if (password) {
+        updates.password = CryptoJS.SHA256(password).toString();
+    }
+    
+    if (role) {
+        updates.role = role;
+    }
+    
+    if (email !== undefined) {
+        if (email && email !== user.email) {
+            const allUsers = db.users.getAll();
+            if (allUsers.find(u => u.email === email && u.id !== userId)) {
+                return res.status(400).json({ error: '该邮箱已被使用' });
+            }
+            updates.email = email;
+            updates.emailVerified = false;
+        } else if (email === '') {
+            updates.email = '';
+            updates.emailVerified = false;
+        }
+    }
+    
+    if (emailVerified !== undefined) {
+        updates.emailVerified = emailVerified;
+    }
+    
+    db.users.update(userId, updates);
+    
+    res.json({ message: '用户更新成功' });
+});
+
+module.exports = router;

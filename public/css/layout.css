@@ -1,0 +1,221 @@
+/* Navbar */
+.navbar {
+  background: rgba(15, 12, 41, 0.85) !important;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 1050;
+}
+
+.navbar-brand {
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 700;
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 1.5rem;
+  letter-spacing: 1px;
+}
+
+.navbar .dropdown-menu {
+  background: rgba(15, 12, 41, 0.98);
+  border: 1px solid var(--card-border);
+  -webkit-backdrop-filter: blur(15px);
+  backdrop-filter: blur(15px);
+  z-index: 2000;
+  position: absolute;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  margin-top: 8px;
+}
+
+.navbar .dropdown-item {
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+.navbar .dropdown-item:hover {
+  background: rgba(102, 126, 234, 0.25);
+  color: var(--text-primary);
+}
+
+.dropdown-toggle {
+  cursor: pointer;
+}
+
+.dropdown-divider {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Cards */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-lg);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  overflow: hidden;
+  color: var(--text-primary);
+}
+
+/* 虚拟机卡片内标签文字提亮 */
+.card .vm-label {
+  color: #cbd5e1 !important;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.5), var(--neon-glow);
+  border-color: rgba(102, 126, 234, 0.3);
+}
+
+.card-header {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--card-border);
+}
+
+/* Nav Tabs */
+.nav-tabs {
+  border-bottom: 1px solid var(--card-border);
+}
+
+.nav-tabs .nav-link {
+  color: var(--text-secondary);
+  border: none;
+  padding: 12px 24px;
+  font-weight: 500;
+  transition: color 0.3s ease;
+  position: relative;
+}
+
+.nav-tabs .nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary-gradient);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.nav-tabs .nav-link.active {
+  color: var(--text-primary);
+  background: transparent;
+}
+
+.nav-tabs .nav-link.active::after {
+  transform: scaleX(1);
+}
+
+.nav-tabs .nav-link:hover {
+  color: var(--text-primary);
+  border: none;
+}
+
+.nav-pills .nav-link {
+  color: var(--text-secondary);
+  border-radius: 20px;
+  padding: 5px 16px;
+  font-size: 13px;
+  transition: all 0.3s ease;
+  border: 1px solid transparent;
+}
+.nav-pills .nav-link:hover {
+  color: var(--text-primary);
+  border-color: rgba(102, 126, 234, 0.3);
+  background: rgba(102, 126, 234, 0.08);
+}
+.nav-pills .nav-link.active {
+  background: var(--primary-gradient);
+  color: white;
+  border-color: transparent;
+  box-shadow: 0 2px 12px rgba(102, 126, 234, 0.4);
+}
+
+/* Card body / header padding */
+.card-body {
+  padding: 24px;
+}
+
+.card-header {
+  padding: 16px 24px;
+}
+
+/* List Group */
+.list-group-item {
+  background: transparent;
+  border-color: var(--card-border);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  padding: 12px 20px;
+}
+
+.list-group-item:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.list-group-item.active {
+  background: var(--primary-gradient);
+  border-color: transparent;
+}
+
+/* Modal */
+.modal-content {
+  background: linear-gradient(135deg, rgba(15, 12, 41, 0.98) 0%, rgba(48, 43, 99, 0.98) 100%);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--card-border);
+}
+
+.modal-footer {
+  border-top: 1px solid var(--card-border);
+}
+
+.btn-close {
+  filter: brightness(0) invert(1);
+}
+
+.modal-header, .modal-body, .modal-footer {
+  padding: 20px 24px;
+}
+
+/* Global form and dropdown border radius */
+.dropdown-menu {
+  border-radius: 12px;
+}
+
+/* Navbar dropdown */
+.dropdown-menu.show {
+  display: block;
+}
+
+/* Alert */
+.alert {
+  border: none;
+  border-radius: 10px;
+}
+
+.alert-danger {
+  background: linear-gradient(135deg, rgba(245, 87, 108, 0.2) 0%, rgba(240, 147, 251, 0.2) 100%);
+  border: 1px solid rgba(245, 87, 108, 0.3);
+  color: #ffcdd2;
+}
+
+.alert-success {
+  background: linear-gradient(135deg, rgba(79, 172, 254, 0.2) 0%, rgba(0, 242, 254, 0.2) 100%);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  color: #b2ebf2;
+}

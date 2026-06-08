@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PVE 多用户控制面板 | 虚拟机管理系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/styles.css" rel="stylesheet">
+    <style>
+        body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .loading-spinner { text-align: center; }
+        .spinner { width: 40px; height: 40px; margin: 0 auto 16px; border: 3px solid rgba(255,255,255,0.1); border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="loading-spinner">
+        <div class="spinner"></div>
+        <p class="text-muted">正在跳转...</p>
+    </div>
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const resetTokenParam = urlParams.get('resetPassword');
+        
+        if (resetTokenParam) {
+            // 有重置密码 token，保留参数跳转到登录页
+            window.location.replace('login.html?resetPassword=' + resetTokenParam);
+        } else {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const payload = JSON.parse(atob(token.split('.')[1]));
+                    window.location.replace(payload.role === 'admin' ? 'admin.html' : 'dashboard.html');
+                } catch (e) {
+                    window.location.replace('dashboard.html');
+                }
+            } else {
+                window.location.replace('login.html');
+            }
+        }
+    </script>
+</body>
+</html>

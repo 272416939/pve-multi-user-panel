@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PVE 多用户控制面板 | 用户中心</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/styles.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>.modal-backdrop{z-index:1050!important}.modal{z-index:1055!important}</style>
+</head>
+<body>
+    <template id="appTemplate">
+        <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+            <div class="container">
+                <a class="navbar-brand" href="dashboard.html">PVE 多用户控制面板</a>
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item" v-for="item in navItems" :key="item.id">
+                        <a class="nav-link" :class="{ active: item.id === currentNavId }" :href="item.href">{{ item.label }}</a>
+                    </li>
+                </ul>
+                <div class="navbar-nav ms-auto align-items-center">
+                    <button class="btn btn-link text-white position-relative me-2 p-1" @click="activeSubTab = 'messages'; loadMessages()" aria-label="消息" title="消息" style="text-decoration:none;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        <span v-if="unreadCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:10px; min-width:16px;">
+                            {{ unreadCount > 99 ? '99+' : unreadCount }}
+                        </span>
+                    </button>
+                    <div class="dropdown" v-if="user">
+                        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <img v-if="user.avatar" :src="user.avatar" alt="" class="rounded-circle" style="width: 24px; height: 24px; object-fit: cover; margin-right: 5px;"/>
+                            <img v-else :src="getGeekAvatar(user.username)" alt="" class="rounded-circle" style="width: 24px; height: 24px; object-fit: cover; margin-right: 5px;"/>
+                            {{ user.username }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="dashboard.html">返回仪表盘</a></li>
+                            <li><hr class="dropdown-divider"/></li>
+                            <li><a class="dropdown-item" href="#" @click.prevent="logout">退出登录</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            <div v-if="!user" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-2 text-muted">正在验证登录状态...</p>
+            </div>
+
+            <div v-else>
+                <ul class="nav nav-tabs mb-4">
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: activeSubTab === 'settings' }" @click="activeSubTab = 'settings'">个人设置</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: activeSubTab === 'memos' }" @click="activeSubTab = 'memos'; loadMemos()">备忘录</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: activeSubTab === 'messages' }" @click="activeSubTab = 'messages'; loadMessages()">
+                            消息
+                            <span v-if="unreadCount > 0" class="badge bg-danger ms-1">{{ unreadCount }}</span>
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" :class="{ active: activeSubTab === 'security' }" @click="activeSubTab = 'security'; loadDevices(); loadTwofaStatus()">安全</button>
+                    </li>
+                </ul>
+
+                <div v-if="activeSubTab === 'settings'">
+                    <div class="row justify-content-center">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <div class="avatar-circle">
+                                                <img v-if="profileForm.avatar" :src="profileForm.avatar" class="avatar-img">
+                                                <img v-else :src="getGeekAvatar(profileForm.username || user?.username)" class="avatar-img">
+                                            </div>
+                                            <div>
+                                                <input type="file" class="form-control" accept=".jpg,.jpeg,.png" @change="handleAvatarUpload" style="max-width: 300px;">
+                                                <small class="text-muted">支持 JPG、PNG，建议大小 200x200，最大 2MB</small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label">邮箱</label>
+                                        <div class="d-flex gap-2">
+                                            <input type="email" class="form-control" v-model="profileForm.email" placeholder="请输入邮箱">
+                                            <button v-if="!profileForm.email || profileForm.email !== user.email" type="button" class="btn btn-outline-primary" @click="bindEmail">绑定</button>
+                                            <button v-else-if="!profileForm.emailVerified" type="button" class="btn btn-outline-secondary" @click="resendVerification">重发验证</button>
+                                        </div>
+                                        <div class="mt-1">
+                                            <small v-if="profileForm.emailVerified" class="text-success">✓ 已验证</small>
+                                            <small v-else-if="profileForm.email && profileForm.email === user.email" class="text-warning">● 未验证 - 请查收验证邮件</small>
+                                            <small v-else-if="profileForm.email" class="text-muted">点击「绑定」保存邮箱</small>
+                                        </div>
+                                    </div>
+
+                                    <form @submit.prevent="updateProfile">
+                                        <div class="mb-3">
+                                            <label class="form-label">用户名</label>
+                                            <input type="text" class="form-control" v-model="profileForm.username">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">新密码（留空则不修改）</label>
+                                            <input type="password" class="form-control" v-model="profileForm.password">
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label">个人简介</label>
+                                            <textarea class="form-control" rows="3" v-model="profileForm.bio" placeholder="介绍一下自己..."></textarea>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary">保存修改</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="activeSubTab === 'memos'">
+                    <div class="row justify-content-center">
+                        <div class="col-md-8">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h4 class="mb-0">备忘录</h4>
+                                <button class="btn btn-primary btn-sm" @click="addMemo">+ 新建</button>
+                            </div>
+                            <div v-if="memosLoading" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                            </div>
+                            <div v-else-if="memos.length === 0" class="text-muted text-center py-4">
+                                暂无备忘录，点击上方"新建"添加
+                            </div>
+                            <div v-else class="row g-3">
+                                <div v-for="memo in memos" :key="memo.id" class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-body d-flex flex-column">
+                                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 class="mb-0">{{ memo.title || '无标题' }}</h6>
+                                                <div class="btn-group btn-group-sm">
+                                                    <button class="btn btn-outline-secondary" @click="editMemo(memo)">编辑</button>
+                                                    <button class="btn btn-outline-danger" @click="deleteMemo(memo.id)">删除</button>
+                                                </div>
+                                            </div>
+                                            <p class="card-text text-muted small flex-grow-1">{{ memo.content || '无内容' }}</p>
+                                            <small class="text-muted">更新于: {{ formatDate(memo.updated_at) }}</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="activeSubTab === 'messages'">
+                    <div class="row justify-content-center">
+                        <div class="col-md-8">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h4 class="mb-0">消息</h4>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-primary btn-sm" @click="markAllRead">全部标已读</button>
+                                    <button class="btn btn-outline-danger btn-sm" @click="clearAllMessages">清空已读</button>
+                                </div>
+                            </div>
+                            <ul class="nav nav-pills mb-3">
+                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === 'all' }" @click="msgType = 'all'; loadMessages()">全部</button></li>
+                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '1' }" @click="msgType = '1'; loadMessages()">系统公告</button></li>
+                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '2' }" @click="msgType = '2'; loadMessages()">业务通知</button></li>
+                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '3' }" @click="msgType = '3'; loadMessages()">续费提醒</button></li>
+                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '5' }" @click="msgType = '5'; loadMessages()">客服私聊</button></li>
+                            </ul>
+                            <div v-if="messagesLoading" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">加载中...</span>
+                                </div>
+                            </div>
+                            <div v-else-if="messages.length === 0" class="text-muted text-center py-4">暂无消息</div>
+                            <div v-else class="message-list">
+                                <div v-for="msg in messages" :key="msg.id" class="message-item" :class="{ 'message-unread': !msg.is_read }" @click="viewMessage(msg)">
+                                    <div class="message-header">
+                                        <span class="message-type-badge" :class="'msg-type-' + msg.type">
+                                            {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[msg.type] || '消息' }}
+                                        </span>
+                                        <span class="d-flex align-items-center gap-2">
+                                            <span class="message-status-badge" :class="msg.is_read ? 'status-read' : 'status-unread'">{{ msg.is_read ? '已读' : '未读' }}</span>
+                                            <span class="message-time">{{ formatDate(msg.created_at) }}</span>
+                                        </span>
+                                    </div>
+                                    <div class="message-title">{{ msg.title }}</div>
+                                    <div class="message-preview">{{ trimContent(msg.content) }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="activeSubTab === 'security'">
+                    <div class="row justify-content-center">
+                        <div class="col-md-8">
+                            <div class="card mb-4">
+                                <div class="card-body">
+                                    <h5 class="card-title mb-3">登录设备管理</h5>
+                                    <div v-if="devicesLoading" class="text-center py-3">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                    </div>
+                                    <div v-else-if="devices.length === 0" class="text-muted text-center py-3">
+                                        暂无登录设备记录
+                                    </div>
+                                    <div v-else class="table-responsive">
+                                        <table class="table table-sm mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>设备</th>
+                                                    <th>IP</th>
+                                                    <th>登录时间</th>
+                                                    <th>操作</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr v-for="d in devices" :key="d.id">
+                                                    <td>
+                                                        <span>{{ d.device_name }}</span>
+                                                        <span v-if="d.id === currentDeviceId" class="badge bg-info ms-1" style="font-size:10px;">当前</span>
+                                                    </td>
+                                                    <td class="text-muted small">{{ d.ip }}</td>
+                                                    <td class="text-muted small">{{ formatDate(d.created_at) }}</td>
+                                                    <td>
+                                                        <button v-if="d.id !== currentDeviceId" class="btn btn-outline-danger btn-sm" @click="revokeDevice(d.id)">下线</button>
+                                                        <span v-else class="text-muted small">-</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div v-if="devices.length > 0" class="mt-2">
+                                        <button class="btn btn-outline-secondary btn-sm" @click="revokeOtherDevices">下线其他设备</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card-body">
+                                    <template v-if="!twofaEnabled">
+                                        <h5 class="card-title mb-1">二次验证（2FA）</h5>
+                                        <p class="text-muted small mb-2">启用两步验证，登录时除密码外还需输入动态验证码，进一步提升账号安全性</p>
+                                        <button class="btn btn-primary" @click="openTwofaSetup">绑定两步验证</button>
+                                        <p class="text-muted small mt-2 mb-0">提示：需先在手机安装 Google Authenticator 或 Authy 等 TOTP 应用</p>
+                                    </template>
+                                    <template v-else>
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <h5 class="card-title mb-1">二次验证（2FA）</h5>
+                                            <span class="badge bg-success" style="font-size:11px;">✅ 已启用</span>
+                                        </div>
+                                        <div class="d-flex gap-2 mb-2">
+                                            <button class="btn btn-outline-secondary btn-sm" @click="showRecoveryCodes">查看恢复码</button>
+                                            <button class="btn btn-outline-danger btn-sm" @click="openDisableTwofa">禁用二次验证</button>
+                                        </div>
+                                        <p class="text-muted small mb-0">剩余恢复码: {{ twofaRecoveryCount }} 个</p>
+                                    </template>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <Teleport to="body">
+
+        <div class="modal fade" id="memoModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ editMemoForm.id ? '编辑备忘录' : '新建备忘录' }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form @submit.prevent="saveMemo">
+                            <div class="mb-3">
+                                <label class="form-label">标题</label>
+                                <input type="text" class="form-control" v-model="editMemoForm.title" placeholder="输入标题...">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">内容</label>
+                                <textarea class="form-control" rows="5" v-model="editMemoForm.content" placeholder="输入内容..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-primary">保存</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="messageDetailModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">{{ currentMsg.title }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-2">
+                            <span class="badge bg-secondary me-2">
+                                {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[currentMsg.type] || '消息' }}
+                            </span>
+                            <span class="text-muted small">{{ formatDate(currentMsg.created_at) }}</span>
+                        </div>
+                        <div class="message-content markdown-body" style="white-space: pre-wrap;" v-html="parseMarkdown(currentMsg.content)"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-danger" @click="deleteMessage(currentMsg.id)">删除</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="customAlertModal" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-body text-center py-4">
+                        <div class="custom-alert-icon mb-3">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                            </svg>
+                        </div>
+                        <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customAlertMessage }}</p>
+                    </div>
+                    <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
+                        <button type="button" class="btn btn-primary px-4" @mousedown="(e) => e.target.blur()" data-bs-dismiss="modal">确定</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="customConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-body text-center py-4">
+                        <div class="custom-alert-icon mb-3">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ffc107" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                            </svg>
+                        </div>
+                        <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customConfirmMessage }}</p>
+                    </div>
+                    <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
+                        <button type="button" class="btn btn-outline-light px-3" @click="confirmCancel">取消</button>
+                        <button type="button" class="btn btn-primary px-3" @click="confirmOk">确定</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="twofaSetupModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">绑定两步验证</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">1. 使用 Authenticator 应用扫描下方二维码：</p>
+                        <div class="text-center mb-3">
+                            <img v-if="twofaQrcode" :src="twofaQrcode" alt="2FA QR Code" style="width:200px;height:200px;">
+                        </div>
+                        <p class="mb-1 small">或手动输入密钥：</p>
+                        <p class="mb-3"><code>{{ twofaSecret }}</code></p>
+                        <p class="mb-2">2. 输入应用显示的 6 位验证码：</p>
+                        <div class="input-group mb-0">
+                            <input type="text" class="form-control" v-model="twofaSetupCode" maxlength="6" placeholder="6 位验证码">
+                            <button class="btn btn-primary" @click="verifyTwofaSetup" :disabled="twofaSetupCode.length !== 6">验证并启用</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="twofaRecoveryModal" tabindex="-1">
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">恢复码</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+                            <svg class="me-2 flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            <span>请立即保存这些恢复码！每个恢复码只能使用一次，用于您丢失 Authenticator 应用时的紧急登录。</span>
+                        </div>
+                        <div class="d-flex gap-2 mb-3 flex-wrap">
+                            <button class="btn btn-outline-primary btn-sm" @click="copyRecoveryCodes">复制未使用的恢复码</button>
+                            <button class="btn btn-outline-primary btn-sm" @click="downloadRecoveryCodes">下载恢复码</button>
+                            <button class="btn btn-outline-warning btn-sm" @click="regenerateRecoveryCodes">重新生成</button>
+                        </div>
+                        <div class="table-responsive" style="max-height:360px;overflow-y:auto;">
+                            <table class="table table-striped mb-0 table-sm">
+                                <thead style="position:sticky;top:0;">
+                                    <tr>
+                                        <th style="width:40px;">#</th>
+                                        <th>恢复码</th>
+                                        <th style="width:100px;">状态</th>
+                                        <th style="width:170px;">创建时间</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(rc, idx) in twofaRecoveryCodes" :key="rc.id">
+                                        <td class="text-muted small">{{ idx + 1 }}</td>
+                                        <td><code class="user-select-all" style="cursor:pointer;font-size:13px;letter-spacing:1px;" @click="copySingleCode(rc.code)">{{ rc.code }}</code></td>
+                                        <td>
+                                            <span v-if="rc.used" class="badge bg-secondary">已使用</span>
+                                            <span v-else class="badge bg-success">未使用</span>
+                                        </td>
+                                        <td class="text-muted small">{{ rc.created_at ? formatDate(rc.created_at) : '-' }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="twofaDisableModal" tabindex="-1" data-bs-backdrop="static">
+            <div class="modal-dialog modal-sm">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">禁用二次验证</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="mb-2">请输入当前密码以确认禁用：</p>
+                        <input type="password" class="form-control" v-model="twofaDisablePassword" placeholder="当前密码">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-danger" @click="disableTwofa" :disabled="!twofaDisablePassword">确认禁用</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        </Teleport>
+
+        <div class="text-center py-4 mt-4 text-muted small">
+            <div>PVE 管理面板 <span id="appVersion"></span></div>
+        </div>
+    </template>
+    <div id="app"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/shared.js"></script>
+    <script>
+        const { createApp, ref, onMounted, onUnmounted, watch } = Vue;
+
+        const App = {
+            template: '#appTemplate',
+            setup() {
+                const user = ref(null);
+                const activeSubTab = ref(localStorage.getItem('ucenter_subtab') || 'settings');
+                const navItems = ref([]);
+                const currentNavId = ref('user-center');
+
+                const profileForm = ref({ username: '', password: '', bio: '', avatar: '', email: '', emailVerified: false });
+                const memos = ref([]);
+                const memosLoading = ref(false);
+                const editMemoForm = ref({ id: null, title: '', content: '' });
+                const unreadCount = ref(0);
+                const messages = ref([]);
+                const messagesLoading = ref(false);
+                const msgType = ref('all');
+                const currentMsg = ref({ title: '', content: '', type: 1, created_at: '' });
+
+                const devices = ref([]);
+                const devicesLoading = ref(false);
+                const currentDeviceId = ref(0);
+
+                const twofaEnabled = ref(false);
+                const twofaRecoveryCount = ref(0);
+                const twofaSecret = ref('');
+                const twofaQrcode = ref('');
+                const twofaSetupCode = ref('');
+                const twofaDisablePassword = ref('');
+                const twofaRecoveryCodes = ref([]);
+
+                const parseMarkdown = (text) => {
+                    if (!text) return '';
+                    try {
+                        return marked.parse(text);
+                    } catch {
+                        return text;
+                    }
+                };
+
+                const customAlertMessage = ref('');
+                const customConfirmMessage = ref('');
+                const customConfirmResolve = ref(null);
+
+                window.alert = (message) => {
+                    customAlertMessage.value = message;
+                    const el = document.getElementById('customAlertModal');
+                    if (el) {
+                        if (document.activeElement && document.activeElement !== document.body) {
+                            document.activeElement.blur();
+                        }
+                        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('padding-right');
+                        el.addEventListener('hide.bs.modal', function onHide() {
+                            if (document.activeElement && document.activeElement !== document.body) {
+                                document.activeElement.blur();
+                            }
+                        }, { once: true });
+                        bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                    }
+                };
+
+                window.customConfirm = (message) => {
+                    return new Promise((resolve) => {
+                        customConfirmMessage.value = message;
+                        customConfirmResolve.value = resolve;
+                        const el = document.getElementById('customConfirmModal');
+                        if (!el) { resolve(false); return; }
+                        if (document.activeElement && document.activeElement !== document.body) {
+                            document.activeElement.blur();
+                        }
+                        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('padding-right');
+                        el.addEventListener('hide.bs.modal', function onHide() {
+                            if (document.activeElement && document.activeElement !== document.body) {
+                                document.activeElement.blur();
+                            }
+                        }, { once: true });
+                        bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                    });
+                };
+
+                const confirmOk = () => {
+                    const resolve = customConfirmResolve.value;
+                    if (resolve) {
+                        customConfirmResolve.value = null;
+                        resolve(true);
+                    }
+                    if (document.activeElement && document.activeElement !== document.body) {
+                        document.activeElement.blur();
+                    }
+                    const el = document.getElementById('customConfirmModal');
+                    if (el) {
+                        const modal = bootstrap.Modal.getInstance(el);
+                        if (modal) modal.hide();
+                    }
+                };
+
+                const confirmCancel = () => {
+                    const resolve = customConfirmResolve.value;
+                    if (resolve) {
+                        customConfirmResolve.value = null;
+                        resolve(false);
+                    }
+                    if (document.activeElement && document.activeElement !== document.body) {
+                        document.activeElement.blur();
+                    }
+                    const el = document.getElementById('customConfirmModal');
+                    if (el) {
+                        const modal = bootstrap.Modal.getInstance(el);
+                        if (modal) modal.hide();
+                    }
+                };
+
+                const bsModalShow = (id) => {
+                    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                    if (document.activeElement && document.activeElement !== document.body) {
+                        document.activeElement.blur();
+                    }
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const modal = bootstrap.Modal.getOrCreateInstance(el, { focus: false });
+                    modal.show();
+                };
+                const bsModalHide = (id) => {
+                    if (document.activeElement && document.activeElement !== document.body) {
+                        document.activeElement.blur();
+                    }
+                    const el = document.getElementById(id);
+                    if (el) {
+                        const modal = bootstrap.Modal.getInstance(el);
+                        if (modal) modal.hide();
+                    }
+                };
+                let msgPolling = null;
+
+                const loadProfile = async () => {
+                    try {
+                        const profile = await api('/user/profile');
+                        profileForm.value = {
+                            username: profile.username,
+                            password: '',
+                            bio: profile.bio || '',
+                            avatar: profile.avatar || '',
+                            email: profile.email || '',
+                            emailVerified: profile.emailVerified || false
+                        };
+                        if (user.value) {
+                            user.value = { ...user.value, ...profile };
+                        }
+                    } catch (e) {
+                        console.error('加载用户资料失败', e);
+                    }
+                };
+
+                const loadMemos = async () => {
+                    memosLoading.value = true;
+                    try {
+                        memos.value = await api('/user/memos');
+                    } catch (e) {
+                        console.error('加载备忘录失败', e);
+                    } finally {
+                        memosLoading.value = false;
+                    }
+                };
+
+                const updateProfile = async () => {
+                    try {
+                        const data = {
+                            username: profileForm.value.username,
+                            bio: profileForm.value.bio
+                        };
+                        if (profileForm.value.password) {
+                            data.password = profileForm.value.password;
+                        }
+                        const result = await api('/user/profile', {
+                            method: 'PUT',
+                            body: JSON.stringify(data)
+                        });
+                        user.value = result.user;
+                        alert('资料更新成功！');
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const handleAvatarUpload = async (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        if (file.size > 2 * 1024 * 1024) {
+                            alert('头像文件大小不能超过2MB');
+                            e.target.value = '';
+                            return;
+                        }
+                        if (!['image/jpeg', 'image/png'].includes(file.type)) {
+                            alert('仅支持 JPG 和 PNG 格式');
+                            e.target.value = '';
+                            return;
+                        }
+                        try {
+                            const formData = new FormData();
+                            formData.append('avatar', file);
+                            const token = localStorage.getItem('token');
+                            const response = await fetch('/api/user/avatar', {
+                                method: 'POST',
+                                headers: {
+                                    'Authorization': `Bearer ${token}`
+                                },
+                                body: formData
+                            });
+                            if (!response.ok) {
+                                const data = await response.json();
+                                throw new Error(data.error || '上传失败');
+                            }
+                            const data = await response.json();
+                            profileForm.value.avatar = data.avatar;
+                            if (user.value) {
+                                user.value.avatar = data.avatar;
+                            }
+                            alert('头像上传成功！');
+                        } catch (e) {
+                            alert(e.message);
+                        }
+                    }
+                };
+
+                const bindEmail = async () => {
+                    try {
+                        const result = await api('/user/email', {
+                            method: 'PUT',
+                            body: JSON.stringify({ email: profileForm.value.email })
+                        });
+                        profileForm.value.emailVerified = false;
+                        user.value.email = result.user.email;
+                        user.value.emailVerified = false;
+                        alert(result.message);
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const resendVerification = async () => {
+                    try {
+                        const result = await api('/user/email', {
+                            method: 'PUT',
+                            body: JSON.stringify({ email: profileForm.value.email })
+                        });
+                        alert(result.message);
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const addMemo = () => {
+                    editMemoForm.value = { id: null, title: '', content: '' };
+                    bsModalShow('memoModal');
+                };
+
+                const editMemo = (memo) => {
+                    editMemoForm.value = { id: memo.id, title: memo.title, content: memo.content };
+                    bsModalShow('memoModal');
+                };
+
+                const saveMemo = async () => {
+                    try {
+                        if (editMemoForm.value.id) {
+                            await api(`/user/memos/${editMemoForm.value.id}`, {
+                                method: 'PUT',
+                                body: JSON.stringify({
+                                    title: editMemoForm.value.title,
+                                    content: editMemoForm.value.content
+                                })
+                            });
+                        } else {
+                            await api('/user/memos', {
+                                method: 'POST',
+                                body: JSON.stringify({
+                                    title: editMemoForm.value.title,
+                                    content: editMemoForm.value.content
+                                })
+                            });
+                        }
+                        bsModalHide('memoModal');
+                        await loadMemos();
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const deleteMemo = async (id) => {
+                    if (!await window.customConfirm('确定删除此备忘录？')) return;
+                    try {
+                        await api(`/user/memos/${id}`, { method: 'DELETE' });
+                        await loadMemos();
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const loadMessages = async () => {
+                    messagesLoading.value = true;
+                    try {
+                        const data = await api('/messages?type=' + msgType.value);
+                        messages.value = data.list || [];
+                    } catch (e) {
+                        console.error('加载消息失败', e);
+                    } finally {
+                        messagesLoading.value = false;
+                    }
+                };
+
+                const viewMessage = async (msg) => {
+                    try {
+                        const detail = await api('/messages/' + msg.id);
+                        currentMsg.value = detail;
+                        if (!msg.is_read) {
+                            msg.is_read = 1;
+                            loadUnreadCount();
+                        }
+                        bsModalShow('messageDetailModal');
+                    } catch (e) {
+                        alert('获取消息详情失败');
+                    }
+                };
+
+                const markAllRead = async () => {
+                    try {
+                        await api('/messages/read-all', { method: 'PUT' });
+                        messages.value.forEach(m => m.is_read = 1);
+                        unreadCount.value = 0;
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const deleteMessage = async (id) => {
+                    if (!await window.customConfirm('确定删除此消息？')) return;
+                    try {
+                        await api('/messages/' + id, { method: 'DELETE' });
+                        messages.value = messages.value.filter(m => m.id !== id);
+                        bsModalHide('messageDetailModal');
+                        loadUnreadCount();
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const clearAllMessages = async () => {
+                    if (!await window.customConfirm('确定清空所有已读消息？未读消息将保留。')) return;
+                    try {
+                        await api('/messages', { method: 'DELETE' });
+                        messages.value = messages.value.filter(m => !m.is_read);
+                        loadUnreadCount();
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const trimContent = (content) => {
+                    if (!content) return '';
+                    const text = content.replace(/<[^>]*>/g, '');
+                    return text.length > 100 ? text.substring(0, 100) + '...' : text;
+                };
+
+                const loadUnreadCount = async () => {
+                    try {
+                        const data = await api('/messages/unread-count');
+                        unreadCount.value = data.count;
+                    } catch (e) {}
+                };
+
+                const loadDevices = async () => {
+                    devicesLoading.value = true;
+                    try {
+                        const refreshToken = localStorage.getItem('refreshToken');
+                        const data = await api('/user/devices');
+                        devices.value = data;
+                        if (refreshToken) {
+                            const current = data.find(d => d.token === refreshToken);
+                            if (current) currentDeviceId.value = current.id;
+                        }
+                    } catch (e) {
+                    } finally {
+                        devicesLoading.value = false;
+                    }
+                };
+
+                const revokeDevice = async (id) => {
+                    if (await window.customConfirm('确定要将该设备下线吗？')) {
+                        try {
+                            await api(`/user/devices/${id}`, { method: 'DELETE' });
+                            devices.value = devices.value.filter(d => d.id !== id);
+                            alert('设备已下线');
+                        } catch (e) {
+                            alert(e.message);
+                        }
+                    }
+                };
+
+                const revokeOtherDevices = async () => {
+                    if (await window.customConfirm('确定要下线除当前设备外的所有设备吗？')) {
+                        try {
+                            const refreshToken = localStorage.getItem('refreshToken');
+                            await api('/user/devices', {
+                                method: 'DELETE',
+                                body: JSON.stringify({ refreshToken })
+                            });
+                            devices.value = devices.value.filter(d => d.id === currentDeviceId.value);
+                            alert('其他设备已下线');
+                        } catch (e) {
+                            alert(e.message);
+                        }
+                    }
+                };
+
+                const loadTwofaStatus = async () => {
+                    try {
+                        const data = await api('/user/2fa/status');
+                        twofaEnabled.value = data.enabled;
+                        twofaRecoveryCount.value = data.recovery_count || 0;
+                    } catch (e) {
+                        twofaEnabled.value = false;
+                        twofaRecoveryCount.value = 0;
+                    }
+                };
+
+                const openTwofaSetup = async () => {
+                    try {
+                        const data = await api('/user/2fa/setup', { method: 'POST' });
+                        twofaSecret.value = data.secret;
+                        twofaQrcode.value = data.qrcode;
+                        twofaSetupCode.value = '';
+                        await Vue.nextTick();
+                        await new Promise(r => setTimeout(r, 100));
+                        bsModalShow('twofaSetupModal');
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const verifyTwofaSetup = async () => {
+                    try {
+                        const data = await api('/user/2fa/verify', {
+                            method: 'POST',
+                            body: JSON.stringify({ code: twofaSetupCode.value })
+                        });
+                        bsModalHide('twofaSetupModal');
+                        twofaEnabled.value = true;
+                        twofaRecoveryCodes.value = (data.recovery_codes || []).map((code, i) => ({ id: i + 1, code, used: 0, created_at: new Date().toISOString() }));
+                        twofaRecoveryCount.value = twofaRecoveryCodes.value.length;
+                        setTimeout(() => bsModalShow('twofaRecoveryModal'), 300);
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const loadTwofaRecoveryCodes = async () => {
+                    try {
+                        const data = await api('/user/2fa/recovery-codes');
+                        twofaRecoveryCodes.value = data.codes || [];
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const showRecoveryCodes = async () => {
+                    await loadTwofaRecoveryCodes();
+                    bsModalShow('twofaRecoveryModal');
+                };
+
+                const copyRecoveryCodes = async () => {
+                    const codes = twofaRecoveryCodes.value.filter(rc => !rc.used).map(rc => rc.code);
+                    if (codes.length === 0) { alert('没有未使用的恢复码'); return; }
+                    const text = codes.join('\n');
+                    bsModalHide('twofaRecoveryModal');
+                    await new Promise(r => setTimeout(r, 300));
+                    try {
+                        await navigator.clipboard.writeText(text);
+                    } catch {
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    }
+                    const el = document.getElementById('customAlertModal');
+                    if (el) {
+                        el.addEventListener('hidden.bs.modal', function onHidden() {
+                            el.removeEventListener('hidden.bs.modal', onHidden);
+                            bsModalShow('twofaRecoveryModal');
+                        }, { once: true });
+                    }
+                    customAlertMessage.value = '未使用的恢复码已复制到剪贴板';
+                    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                    bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                };
+
+                const copySingleCode = async (code) => {
+                    bsModalHide('twofaRecoveryModal');
+                    await new Promise(r => setTimeout(r, 300));
+                    try {
+                        await navigator.clipboard.writeText(code);
+                    } catch {
+                        const ta = document.createElement('textarea');
+                        ta.value = code;
+                        document.body.appendChild(ta);
+                        ta.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(ta);
+                    }
+                    const el = document.getElementById('customAlertModal');
+                    if (el) {
+                        el.addEventListener('hidden.bs.modal', function onHidden() {
+                            el.removeEventListener('hidden.bs.modal', onHidden);
+                            bsModalShow('twofaRecoveryModal');
+                        }, { once: true });
+                    }
+                    customAlertMessage.value = '恢复码已复制';
+                    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                    bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                };
+
+                const downloadRecoveryCodes = () => {
+                    const text = twofaRecoveryCodes.value.map(rc => (rc.used ? '[已使用] ' : '') + rc.code).join('\n');
+                    const blob = new Blob([text], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'recovery-codes.txt';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                };
+
+                const regenerateRecoveryCodes = async () => {
+                    bsModalHide('twofaRecoveryModal');
+                    await new Promise(r => setTimeout(r, 300));
+                    if (!await window.customConfirm('确定要重新生成恢复码吗？当前的恢复码将全部作废。')) {
+                        bsModalShow('twofaRecoveryModal');
+                        return;
+                    }
+                    try {
+                        const data = await api('/user/2fa/recovery-codes/regenerate', { method: 'POST' });
+                        twofaRecoveryCodes.value = (data.recovery_codes || []).map((code, i) => ({ id: i + 1, code, used: 0, created_at: new Date().toISOString() }));
+                        twofaRecoveryCount.value = twofaRecoveryCodes.value.length;
+                        const el = document.getElementById('customAlertModal');
+                        if (el) {
+                            el.addEventListener('hidden.bs.modal', function onHidden() {
+                                el.removeEventListener('hidden.bs.modal', onHidden);
+                                bsModalShow('twofaRecoveryModal');
+                            }, { once: true });
+                        }
+                        customAlertMessage.value = '恢复码已重新生成';
+                        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('padding-right');
+                        bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                    } catch (e) {
+                        bsModalShow('twofaRecoveryModal');
+                        await new Promise(r => setTimeout(r, 300));
+                        alert('重新生成恢复码失败：' + e.message);
+                    }
+                };
+
+                const openDisableTwofa = () => {
+                    twofaDisablePassword.value = '';
+                    bsModalShow('twofaDisableModal');
+                };
+
+                const disableTwofa = async () => {
+                    try {
+                        await api('/user/2fa/disable', {
+                            method: 'POST',
+                            body: JSON.stringify({ password: twofaDisablePassword.value })
+                        });
+                        bsModalHide('twofaDisableModal');
+                        twofaEnabled.value = false;
+                        twofaRecoveryCount.value = 0;
+                        twofaDisablePassword.value = '';
+                        alert('二次验证已禁用');
+                    } catch (e) {
+                        alert(e.message);
+                    }
+                };
+
+                const loadNavItems = async () => {
+                    try {
+                        const res = await api('/user/nav');
+                        navItems.value = res.items || [];
+                    } catch (e) {
+                        navItems.value = [];
+                    }
+                };
+
+                onMounted(async () => {
+                    const userData = await authGuard();
+                    if (userData) {
+                        user.value = userData;
+                        await loadNavItems();
+                        await loadProfile();
+                        if (window.location.hash === '#messages' || activeSubTab.value === 'messages') {
+                            activeSubTab.value = 'messages';
+                            await loadMessages();
+                        } else if (activeSubTab.value === 'security') {
+                            await loadDevices();
+                            await loadTwofaStatus();
+                        } else {
+                            await loadMemos();
+                        }
+                        await loadUnreadCount();
+                        if (msgPolling) clearInterval(msgPolling);
+                        msgPolling = setInterval(loadUnreadCount, 30000);
+                    }
+                });
+
+                onUnmounted(() => {
+                    if (msgPolling) clearInterval(msgPolling);
+                });
+
+                watch(activeSubTab, (val) => {
+                    localStorage.setItem('ucenter_subtab', val);
+                });
+
+                return {
+                    user,
+                    activeSubTab,
+                    navItems,
+                    currentNavId,
+                    profileForm,
+                    memos,
+                    memosLoading,
+                    editMemoForm,
+                    unreadCount,
+                    messages,
+                    messagesLoading,
+                    msgType,
+                    currentMsg,
+                    parseMarkdown,
+                    customAlertMessage,
+                    customConfirmMessage,
+                    getGeekAvatar,
+                    formatDate,
+                    logout,
+                    loadProfile,
+                    loadMemos,
+                    updateProfile,
+                    handleAvatarUpload,
+                    bindEmail,
+                    resendVerification,
+                    addMemo,
+                    editMemo,
+                    saveMemo,
+                    deleteMemo,
+                    loadUnreadCount,
+                    loadMessages,
+                    viewMessage,
+                    markAllRead,
+                    deleteMessage,
+                    clearAllMessages,
+                    trimContent,
+                    confirmOk,
+                    confirmCancel,
+                    devices,
+                    devicesLoading,
+                    currentDeviceId,
+                    loadDevices,
+                    revokeDevice,
+                    revokeOtherDevices,
+                    twofaEnabled,
+                    twofaRecoveryCount,
+                    twofaSecret,
+                    twofaQrcode,
+                    twofaSetupCode,
+                    twofaDisablePassword,
+                    twofaRecoveryCodes,
+                    loadTwofaStatus,
+                    openTwofaSetup,
+                    verifyTwofaSetup,
+                    loadTwofaRecoveryCodes,
+                    showRecoveryCodes,
+                    copyRecoveryCodes,
+                    copySingleCode,
+                    downloadRecoveryCodes,
+                    regenerateRecoveryCodes,
+                    openDisableTwofa,
+                    disableTwofa
+                };
+            }
+        };
+
+        createApp(App).mount('#app');
+    </script>
+<script>fetch("/api/version").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("appVersion");if(el)el.textContent="v"+d.version})</script>
+</body>
+</html>

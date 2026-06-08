@@ -1,0 +1,162 @@
+const { Client } = require('ssh2');
+
+/**
+ * 通过 SSH 在 PVE 节点上执行命令
+ * @param {string} host - SSH 主机地址
+ * @param {string} username - SSH 用户名
+ * @param {string} password - SSH 密码
+ * @param {string} command - 要执行的命令
+ * @param {number} timeout - 超时时间（毫秒），默认 10 分钟
+ * @returns {Promise<{stdout: string, stderr: string, code: number}>}
+ */
+function execSSH(host, username, password, command, timeout = 600000) {
+    return new Promise((resolve, reject) => {
+        const conn = new Client();
+        let stdout = '';
+        let stderr = '';
+        let timedOut = false;
+
+        const timer = setTimeout(() => {
+            timedOut = true;
+            conn.end();
+            reject(new Error(`SSH 命令执行超时 (${timeout / 1000}s): ${command}`));
+        }, timeout);
+
+        conn.on('ready', () => {
+            conn.exec(command, (err, stream) => {
+                if (err) {
+                    clearTimeout(timer);
+                    conn.end();
+                    reject(err);
+                    return;
+                }
+                stream.on('data', (data) => { stdout += data.toString(); });
+                stream.stderr.on('data', (data) => { stderr += data.toString(); });
+                stream.on('close', (code) => {
+                    clearTimeout(timer);
+                    conn.end();
+                    if (!timedOut) {
+                        resolve({ stdout, stderr, code });
+                    }
+                });
+            });
+        });
+
+        conn.on('error', (err) => {
+            clearTimeout(timer);
+            reject(err);
+        });
+
+        conn.connect({
+            host,
+            username,
+            password,
+            readyTimeout: 10000,
+            keepaliveInterval: 10000,
+            keepaliveCountMax: 3
+        });
+    });
+}
+
+/**
+ * 通过 SSH 在 PVE 节点上执行 pct restore 命令（强制覆盖恢复 LXC 容器）
+ * @param {object} pveHost - PVE SSH 主机地址（从环境变量读取）
+ * @param {object} params
+ * @param {number} params.vmid - 容器 ID
+ * @param {string} params.volid - 备份文件路径 (storage:backup/filename)
+ * @param {string} params.storage - 目标存储（可选，不传则用备份中原存储）
+ * @returns {Promise<{stdout: string, stderr: string, code: number}>}
+ */
+async function restoreLxcBySSH(vmid, volid, storage) {
+    const host = process.env.PVE_SSH_HOST;
+    const username = 'root';
+    const password = process.env.PVE_SSH_PASSWORD;
+
+    if (!host || !password) {
+        throw new Error('SSH 配置不完整：请设置 PVE_SSH_HOST 和 PVE_SSH_PASSWORD');
+    }
+
+    let cmd = `pct restore ${vmid} ${volid} --force 1`;
+    if (storage) {
+        cmd += ` --storage ${storage}`;
+    }
+
+    return await execSSH(host, username, password, cmd);
+}
+
+/**
+ * 通过 SSH + PTY 创建 LXC 容器终端会话（交互式）
+ * 使用 conn.exec() 直接启动 lxc-console，跳过 bash shell 中间层，
+ * 避免宿主机 shell 提示符暴露给终端用户
+ * @param {string} host - SSH 主机地址
+ * @param {string} username - SSH 用户名
+ * @param {string} password - SSH 密码
+ * @param {number} vmid - 容器 ID
+ * @param {object} pty - PTY 尺寸 { rows, cols }
+ * @param {function} onData - 数据回调 (buffer)
+ * @param {function} onError - 错误回调 (err)
+ * @param {function} onClose - 关闭回调 ()
+ * @returns {object} - { conn, resize, write, close }
+ */
+function createTerminalPty(host, username, password, vmid, pty, onData, onError, onClose) {
+    const conn = new Client();
+    let shellStream = null;
+
+    conn.on('ready', () => {
+        // 直接用 exec 启动 lxc-console 并分配 PTY，不经过 shell 中转
+        conn.exec(`lxc-console -n ${vmid}`, {
+            pty: {
+                rows: pty.rows || 24,
+                cols: pty.cols || 80,
+                term: 'xterm-256color'
+            }
+        }, (err, stream) => {
+            if (err) {
+                conn.end();
+                onError(err);
+                return;
+            }
+            shellStream = stream;
+
+            stream.on('data', (data) => { onData(data); });
+            stream.stderr.on('data', (data) => { onData(data); });
+            stream.on('close', () => {
+                conn.end();
+                onClose();
+            });
+        });
+    });
+
+    conn.on('error', (err) => {
+        onError(err);
+    });
+
+    conn.connect({
+        host,
+        username,
+        password,
+        readyTimeout: 10000,
+        keepaliveInterval: 15000,
+        keepaliveCountMax: 3
+    });
+
+    return {
+        conn,
+        /** 调整终端窗口大小 */
+        resize: (rows, cols) => {
+            if (shellStream && shellStream.setWindow) {
+                shellStream.setWindow(rows, cols, 0, 0);
+            }
+        },
+        /** 写入数据到 SSH 流 */
+        write: (data) => {
+            if (shellStream && shellStream.writable) {
+                shellStream.write(data);
+            }
+        },
+        /** 关闭连接 */
+        close: () => { conn.end(); }
+    };
+}
+
+module.exports = { execSSH, restoreLxcBySSH, createTerminalPty };

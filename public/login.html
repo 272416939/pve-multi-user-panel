@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PVE 多用户控制面板 | 登录</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="css/styles.css" rel="stylesheet">
+    <style>
+        .modal-backdrop{z-index:1050!important}.modal{z-index:1055!important}
+        body {
+            background-image: url('https://cn-img.owoser.cn/images/2022/11/08/adc63889cad0409392e7e44ac0e48fd8.png') !important;
+            background-size: cover !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5) !important;
+            z-index: -1;
+            pointer-events: none;
+        }
+        .card-header {
+            text-align: center;
+        }
+        .login-field-error {
+            color: #ff6b72;
+            font-size: 0.82rem;
+            margin-top: 4px;
+            min-height: 20px;
+            display: block;
+            text-shadow: 0 0 8px rgba(255, 107, 114, 0.4), 0 0 16px rgba(255, 107, 114, 0.2);
+            transition: opacity 0.2s ease;
+        }
+        .login-form-error {
+            color: #ff6b72;
+            font-size: 0.85rem;
+            padding: 10px 14px;
+            background: rgba(255, 107, 114, 0.08);
+            border: 1px solid rgba(255, 107, 114, 0.25);
+            border-radius: 10px;
+            margin-bottom: 12px;
+            text-shadow: 0 0 8px rgba(255, 107, 114, 0.35), 0 0 16px rgba(255, 107, 114, 0.15);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <template id="appTemplate">
+        <div>
+            <nav class="navbar navbar-expand-lg navbar-dark">
+                <div class="container">
+                    <a class="navbar-brand" href="#">PVE 多用户控制面板</a>
+                </div>
+            </nav>
+
+            <div class="container">
+                <div v-if="!showResetPassword" class="row justify-content-center" style="margin-top: 80px;">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">登录</h5>
+                            </div>
+                            <div class="card-body">
+                                <div v-if="!showTwofaInput">
+                                    <form @submit.prevent="login" novalidate>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="login-username">用户名</label>
+                                            <input type="text" class="form-control" id="login-username" name="username" autocomplete="username" v-model="loginForm.username" @input="clearLoginErrors" required>
+                                            <span class="login-field-error" v-if="loginUsernameError">{{ loginUsernameError }}</span>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label" for="login-password">密码</label>
+                                            <input type="password" class="form-control" id="login-password" name="password" autocomplete="current-password" v-model="loginForm.password" @input="clearLoginErrors" required>
+                                            <span class="login-field-error" v-if="loginPasswordError">{{ loginPasswordError }}</span>
+                                        </div>
+                                        <div class="login-form-error" v-if="loginError">{{ loginError }}</div>
+                                        <button type="submit" class="btn btn-primary w-100">登录</button>
+                                    </form>
+                                    <div class="mt-3 text-center">
+                                        <button type="button" class="btn btn-link text-primary p-0" @click="showResetPassword = true">忘记密码？</button>
+                                    </div>
+                                </div>
+                                <div v-else>
+                                    <div class="text-center mb-3">
+                                        <h6 class="mb-1">双重验证</h6>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="twofa-code">验证码</label>
+                                        <input type="text" class="form-control" id="twofa-code" autocomplete="one-time-code" v-model="twofaCode" @input="twofaError = ''" @keyup="handleTwofaInput" @keydown.enter.prevent="verifyTwofa" ref="twofaInputRef" maxlength="30" placeholder="输入 6 位验证码或恢复码">
+                                        <span class="login-field-error" v-if="twofaError">{{ twofaError }}</span>
+                                    </div>
+                                    <p class="text-muted small text-center mb-3" style="font-size:0.82rem;line-height:1.5;">请输入身份验证器中的 6 位验证码，或使用恢复码登录</p>
+                                    <button type="button" class="btn btn-primary w-100 mb-2" @click="verifyTwofa">验证</button>
+                                    <button type="button" class="btn btn-outline-secondary w-100" @click="backToLogin">返回</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="row justify-content-center" style="margin-top: 80px;">
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="card-title mb-0">重置密码</h5>
+                            </div>
+                            <div class="card-body">
+                                <div v-if="!resetTokenValidated">
+                                    <form @submit.prevent="requestPasswordReset">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="reset-email">邮箱地址</label>
+                                        <input type="email" class="form-control" id="reset-email" name="email" autocomplete="email" v-model="resetEmail" required>
+                                        </div>
+                                        <div v-if="resetMessage" class="alert alert-success">{{ resetMessage }}</div>
+                                        <div class="d-flex gap-2">
+                                            <button type="submit" class="btn btn-primary">发送重置链接</button>
+                                            <button type="button" class="btn btn-outline-secondary" @click="showResetPassword = false">返回</button>
+                                        </div>
+                                    </form>
+                                </div>
+                                <div v-else>
+                                    <form @submit.prevent="resetPassword">
+                                        <div class="mb-3">
+                                            <label class="form-label" for="new-password">新密码</label>
+                                        <input type="password" class="form-control" id="new-password" name="new-password" autocomplete="new-password" v-model="newPassword" required minlength="6">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="confirm-password">确认密码</label>
+                                        <input type="password" class="form-control" id="confirm-password" name="confirm-password" autocomplete="new-password" v-model="confirmPassword" required minlength="6">
+                                        </div>
+                                        <div v-if="resetError" class="alert alert-danger">{{ resetError }}</div>
+                                        <div v-if="resetSuccess" class="alert alert-success">{{ resetSuccess }}</div>
+                                        <button type="submit" class="btn btn-primary w-100">重置密码</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <Teleport to="body">
+
+            <div class="modal fade" id="customAlertModal" tabindex="-1" data-bs-backdrop="static">
+                <div class="modal-dialog modal-sm modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-body text-center py-4">
+                            <div class="custom-alert-icon mb-3" aria-hidden="true">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                                </svg>
+                            </div>
+                            <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customAlertMessage }}</p>
+                        </div>
+                        <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
+                            <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal">确定</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="customConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-sm modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-body text-center py-4">
+                            <div class="custom-alert-icon mb-3" aria-hidden="true">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ffc107" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                                </svg>
+                            </div>
+                            <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customConfirmMessage }}</p>
+                        </div>
+                        <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
+                            <button type="button" class="btn btn-outline-light px-3" @click="confirmCancel">取消</button>
+                            <button type="button" class="btn btn-primary px-3" @click="confirmOk">确定</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            </Teleport>
+
+            <div class="text-center py-4 mt-4 text-muted small">
+                <div>PVE 管理面板 <span id="appVersion"></span></div>
+            </div>
+        </div>
+    </template>
+
+    <div id="app"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="js/shared.js"></script>
+    <script>
+        const { createApp, ref, onMounted, nextTick } = Vue;
+
+        function getDeviceName() {
+            const ua = navigator.userAgent;
+            let browser = '浏览器';
+            if (ua.includes('Edg')) browser = 'Edge';
+            else if (ua.includes('Chrome')) browser = 'Chrome';
+            else if (ua.includes('Firefox')) browser = 'Firefox';
+            else if (ua.includes('Safari')) browser = 'Safari';
+            let os = '';
+            if (ua.includes('HarmonyOS') || ua.includes('鸿蒙') || ua.includes('OpenHarmony')) os = '鸿蒙';
+            else if (ua.includes('Windows NT 11')) os = 'Win11';
+            else if (ua.includes('Windows NT 10')) os = 'Win10';
+            else if (ua.includes('Windows')) os = 'Windows';
+            else if (ua.includes('Mac OS X')) os = 'macOS';
+            else if (ua.includes('iPhone')) os = 'iPhone';
+            else if (ua.includes('iPad')) os = 'iPad';
+            else if (ua.includes('Android')) os = 'Android';
+            else if (ua.includes('Linux')) os = 'Linux';
+            return os ? browser + ' / ' + os : browser;
+        }
+
+        const App = {
+            template: '#appTemplate',
+            setup() {
+                const loginForm = ref({ username: '', password: '' });
+                const loginError = ref('');
+                const loginUsernameError = ref('');
+                const loginPasswordError = ref('');
+                const showResetPassword = ref(false);
+                const resetEmail = ref('');
+                const resetMessage = ref('');
+                const resetTokenValidated = ref(false);
+                const resetToken = ref('');
+                const newPassword = ref('');
+                const confirmPassword = ref('');
+                const resetError = ref('');
+                const resetSuccess = ref('');
+                const customAlertMessage = ref('');
+                const customConfirmMessage = ref('');
+                const customConfirmResolve = ref(null);
+
+                const showTwofaInput = ref(false);
+                const partialToken = ref('');
+                const pendingRefreshToken = ref('');
+                const twofaCode = ref('');
+                const twofaError = ref('');
+                const twofaInputRef = ref(null);
+
+                setupCustomAlert(customAlertMessage);
+                setupCustomConfirm(customConfirmMessage, customConfirmResolve);
+
+                const confirmOk = () => {
+                    const resolve = customConfirmResolve.value;
+                    if (resolve) {
+                        customConfirmResolve.value = null;
+                        resolve(true);
+                    }
+                    const el = document.getElementById('customConfirmModal');
+                    if (el) {
+                        const modal = bootstrap.Modal.getInstance(el);
+                        if (modal) modal.hide();
+                    }
+                };
+
+                const confirmCancel = () => {
+                    const resolve = customConfirmResolve.value;
+                    if (resolve) {
+                        customConfirmResolve.value = null;
+                        resolve(false);
+                    }
+                    const el = document.getElementById('customConfirmModal');
+                    if (el) {
+                        const modal = bootstrap.Modal.getInstance(el);
+                        if (modal) modal.hide();
+                    }
+                };
+
+                const login = async () => {
+                    loginError.value = '';
+                    loginUsernameError.value = '';
+                    loginPasswordError.value = '';
+                    // 前端空值校验
+                    let hasError = false;
+                    if (!loginForm.value.username.trim()) {
+                        loginUsernameError.value = '用户名不能为空';
+                        hasError = true;
+                    }
+                    if (!loginForm.value.password) {
+                        loginPasswordError.value = '登录密码不能为空';
+                        hasError = true;
+                    }
+                    if (hasError) return;
+                    try {
+                        const body = { ...loginForm.value };
+                        body.device_name = getDeviceName();
+                        const data = await api('/login', {
+                            method: 'POST',
+                            body: JSON.stringify(body)
+                        });
+                        if (data.twofa_required) {
+                            partialToken.value = data.partial_token;
+                            pendingRefreshToken.value = data.refresh_token || '';
+                            showTwofaInput.value = true;
+                            twofaCode.value = '';
+                            twofaError.value = '';
+                            await nextTick();
+                            const inputEl = document.getElementById('twofa-code');
+                            if (inputEl) inputEl.focus();
+                            return;
+                        }
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('refreshToken', data.refreshToken);
+                        
+                        // 获取用户信息，判断角色
+                        const userData = await api('/user/profile');
+                        if (userData.role === 'admin') {
+                            window.location.href = 'admin.html';
+                        } else {
+                            window.location.href = 'dashboard.html';
+                        }
+                    } catch (e) {
+                        if (e.message.includes('网络') || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
+                            loginError.value = '服务器连接异常，请稍后再试';
+                        } else {
+                            loginError.value = e.message;
+                        }
+                    }
+                };
+
+                const clearLoginErrors = () => {
+                    loginError.value = '';
+                    loginUsernameError.value = '';
+                    loginPasswordError.value = '';
+                };
+
+                const verifyTwofa = async () => {
+                    twofaError.value = '';
+                    const code = twofaCode.value.trim();
+                    if (!code) {
+                        twofaError.value = '请输入验证码';
+                        return;
+                    }
+                    try {
+                        const data = await api('/login/2fa', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                partial_token: partialToken.value,
+                                code: code,
+                                refresh_token: pendingRefreshToken.value
+                            })
+                        });
+                        localStorage.setItem('token', data.token);
+                        localStorage.setItem('refreshToken', data.refreshToken);
+                        const userData = await api('/user/profile');
+                        if (userData.role === 'admin') {
+                            window.location.href = 'admin.html';
+                        } else {
+                            window.location.href = 'dashboard.html';
+                        }
+                    } catch (e) {
+                        if (e.message.includes('网络') || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
+                            twofaError.value = '服务器连接异常，请稍后再试';
+                        } else {
+                            twofaError.value = e.message;
+                        }
+                    }
+                };
+
+                const backToLogin = () => {
+                    showTwofaInput.value = false;
+                    partialToken.value = '';
+                    pendingRefreshToken.value = '';
+                    twofaCode.value = '';
+                    twofaError.value = '';
+                };
+
+                const handleTwofaInput = (e) => {
+                    twofaCode.value = e.target.value;
+                };
+
+                const requestPasswordReset = async () => {
+                    try {
+                        await api('/auth/forgot-password', {
+                            method: 'POST',
+                            body: JSON.stringify({ email: resetEmail.value })
+                        });
+                        resetMessage.value = '如果该邮箱已绑定，重置链接已发送！';
+                    } catch (e) {
+                        resetMessage.value = '如果该邮箱已绑定，重置链接已发送！';
+                    }
+                };
+
+                const resetPassword = async () => {
+                    try {
+                        resetError.value = '';
+                        resetSuccess.value = '';
+                        if (newPassword.value !== confirmPassword.value) {
+                            resetError.value = '两次输入的密码不一致！';
+                            return;
+                        }
+                        await api('/auth/reset-password', {
+                            method: 'POST',
+                            body: JSON.stringify({ token: resetToken.value, newPassword: newPassword.value })
+                        });
+                        resetSuccess.value = '密码重置成功！';
+                        setTimeout(() => {
+                            showResetPassword.value = false;
+                            resetTokenValidated.value = false;
+                        }, 2000);
+                    } catch (e) {
+                        resetError.value = e.message;
+                    }
+                };
+
+                onMounted(() => {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const resetTokenParam = urlParams.get('resetPassword');
+
+                    if (resetTokenParam) {
+                        showResetPassword.value = true;
+                        resetToken.value = resetTokenParam;
+                        fetch('/api/auth/reset-password/' + resetTokenParam).then(res => {
+                            if (res.ok) {
+                                resetTokenValidated.value = true;
+                            } else {
+                                resetError.value = '链接无效或已过期';
+                            }
+                        }).catch(err => {
+                            resetError.value = '链接无效或已过期';
+                        });
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                        return;
+                    }
+
+                    // 检查是否已登录
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        window.location.href = 'dashboard.html';
+                        return;
+                    }
+                });
+
+                return {
+                    loginForm,
+                    loginError,
+                    loginUsernameError,
+                    loginPasswordError,
+                    showResetPassword,
+                    resetEmail,
+                    resetMessage,
+                    resetTokenValidated,
+                    resetToken,
+                    newPassword,
+                    confirmPassword,
+                    resetError,
+                    resetSuccess,
+                    customAlertMessage,
+                    customConfirmMessage,
+                    showTwofaInput,
+                    twofaCode,
+                    twofaError,
+                    twofaInputRef,
+                    login,
+                    clearLoginErrors,
+                    verifyTwofa,
+                    backToLogin,
+                    handleTwofaInput,
+                    requestPasswordReset,
+                    resetPassword,
+                    confirmOk,
+                    confirmCancel
+                };
+            }
+        };
+
+        createApp(App).mount('#app');
+    </script>
+<script>fetch("/api/version").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("appVersion");if(el)el.textContent="v"+d.version})</script>
+</body>
+</html>

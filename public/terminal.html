@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LXC 终端</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; overflow: hidden; height: 100vh; }
+        #terminal-container { height: 100vh; padding: 4px; }
+        .status-bar {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: #1a1a2e; color: #888; font-size: 12px;
+            padding: 4px 12px; font-family: monospace;
+            display: flex; justify-content: space-between;
+        }
+        .status-bar .error { color: #ff4444; }
+        .status-bar .connected { color: #44ff44; }
+    </style>
+</head>
+<body>
+    <div id="terminal-container"></div>
+    <div class="status-bar" id="statusBar">
+        <span id="statusText">正在连接...</span>
+        <span id="connInfo"></span>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+    <script>
+(function() {
+    const params = new URLSearchParams(location.search);
+    const vmid = params.get('vmid');
+
+    if (!vmid) {
+        document.getElementById('statusText').textContent = '参数缺失：vmid';
+        document.getElementById('statusText').className = 'error';
+        return;
+    }
+
+    document.getElementById('connInfo').textContent = 'CT ' + vmid;
+
+    const term = new Terminal({
+        cursorBlink: true,
+        cursorStyle: 'block',
+        fontSize: 14,
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        theme: { background: '#000000', foreground: '#d4d4d4' },
+        cols: 80,
+        rows: 24
+    });
+
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById('terminal-container'));
+    fitAddon.fit();
+
+    window.addEventListener('resize', () => fitAddon.fit());
+
+    const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = wsProto + '//' + location.host + '/term-proxy?vmid=' + encodeURIComponent(vmid);
+
+    let ws;
+    let wsConnected = false;
+
+    function connect() {
+        const statusEl = document.getElementById('statusText');
+        statusEl.textContent = '正在连接...';
+        statusEl.className = '';
+
+        ws = new WebSocket(wsUrl);
+        ws.binaryType = 'arraybuffer';
+
+        ws.onopen = function() {
+            wsConnected = true;
+            statusEl.textContent = '已连接';
+            statusEl.className = 'connected';
+            term.focus();
+
+            // 发送 resize 信息
+            sendResize();
+        };
+
+        ws.onmessage = function(evt) {
+            if (evt.data instanceof ArrayBuffer) {
+                term.write(new Uint8Array(evt.data));
+            }
+        };
+
+        ws.onclose = function() {
+            wsConnected = false;
+            statusEl.textContent = '连接已断开';
+            statusEl.className = 'error';
+        };
+
+        ws.onerror = function() {
+            if (!wsConnected) {
+                statusEl.textContent = '连接失败';
+                statusEl.className = 'error';
+            }
+        };
+    }
+
+    function sendResize() {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            const dims = fitAddon.proposeDimensions();
+            if (dims) {
+                // PVE xtermjs 通过 resize 消息调整
+                ws.send(JSON.stringify({ resize: { cols: dims.cols, rows: dims.rows } }));
+            }
+        }
+    }
+
+    // 终端输入 → WebSocket
+    term.onData(function(data) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(data);
+        }
+    });
+
+    // 窗口调整大小
+    let resizeTimer;
+    window.addEventListener('resize', function() {
+        fitAddon.fit();
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(sendResize, 200);
+    });
+
+    connect();
+})();
+    </script>
+</body>
+</html>

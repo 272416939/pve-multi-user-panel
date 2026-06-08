@@ -1,0 +1,36 @@
+# 环境配置（含密码和密钥，绝对不能提交）
+.env
+
+# SQLite 数据库文件
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# 用户上传的头像
+images/
+
+# 依赖
+node_modules/
+
+# 备份文件
+*.bak
+*.backup
+
+# IDE / 编辑器
+.vscode/
+.idea/
+.trae/
+
+# 操作系统
+Thumbs.db
+.DS_Store
+
+# 日志
+*.log
+npm-debug.log*
+
+# 临时文件
+*.tmp
+*.swp
+*~

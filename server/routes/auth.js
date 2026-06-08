@@ -1,0 +1,280 @@
+const express = require('express');
+const router = express.Router();
+const CryptoJS = require('crypto-js');
+const jwt = require('jsonwebtoken');
+const otplib = require('otplib');
+const db = require('../api/db-sqlite');
+const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateAccessToken, generateRefreshToken, generatePartialToken } = require('../utils/token');
+const getSiteUrl = require('../utils/site-url');
+const { createEmailTemplate, sendEmail } = require('../utils/email');
+
+router.post('/login', async (req, res) => {
+    const { username, password, device_name } = req.body;
+    const hashedPassword = CryptoJS.SHA256(password).toString();
+    
+    const user = db.users.getByUsername(username);
+    
+    if (!user || user.password !== hashedPassword) {
+        return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
+    }
+
+    const refreshToken = generateRefreshToken();
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    const ua = req.headers['user-agent'] || '';
+    
+    const record = db.refreshTokens.create({
+        user_id: user.id,
+        token: refreshToken,
+        device_name: device_name || ua.substring(0, 100),
+        ip,
+        user_agent: ua,
+        created_at: new Date().toISOString(),
+        expires_at: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000).toISOString()
+    });
+
+    if (db.twofa.isEnabled(user.id)) {
+        const partialToken = generatePartialToken(user);
+        const { password: _, ...safeUser } = user;
+        return res.json({
+            twofa_required: true,
+            partial_token: partialToken,
+            refresh_token: refreshToken,
+            user: safeUser
+        });
+    }
+    
+    const token = generateAccessToken(user, record.id);
+    
+    const { password: _, ...safeUser } = user;
+    res.json({ token, refreshToken, user: safeUser });
+});
+
+router.post('/login/2fa', async (req, res) => {
+    const { partial_token, code, refresh_token: reqRefreshToken } = req.body;
+    if (!partial_token || !code) {
+        return res.status(400).json({ error: '缺少参数' });
+    }
+
+    let decoded;
+    try {
+        decoded = jwt.verify(partial_token, JWT_SECRET);
+        if (!decoded.twofa_pending) {
+            return res.status(400).json({ error: '无效的令牌' });
+        }
+    } catch (err) {
+        return res.status(401).json({ error: '令牌已过期或无效，请重新登录' });
+    }
+
+    const user = db.users.getById(decoded.id);
+    if (!user) {
+        return res.status(404).json({ error: '用户不存在' });
+    }
+
+    let isValidTotp = false;
+    if (/^\d{6}$/.test(code)) {
+        const secret = db.twofa.getSecret(user.id);
+        if (secret) {
+            try {
+                isValidTotp = otplib.verifySync({ token: code, secret }).valid;
+            } catch {
+            }
+        }
+    }
+
+    if (isValidTotp) {
+        let record;
+        let refreshToken = reqRefreshToken;
+        if (refreshToken) {
+            record = db.refreshTokens.getByToken(refreshToken);
+        }
+        if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
+            const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+            const ua = req.headers['user-agent'] || '';
+            refreshToken = generateRefreshToken();
+            record = db.refreshTokens.create({
+                user_id: user.id,
+                token: refreshToken,
+                device_name: ua.substring(0, 100),
+                ip,
+                user_agent: ua,
+                created_at: new Date().toISOString(),
+                expires_at: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000).toISOString()
+            });
+        }
+
+        const token = generateAccessToken(user, record.id);
+        const { password: _, ...safeUser } = user;
+        return res.json({ token, refreshToken, user: safeUser });
+    }
+
+    const recoveryCodes = db.twofa.getUnusedRecoveryCodes(user.id);
+    for (const rc of recoveryCodes) {
+        if (code === rc.code) {
+            db.twofa.markRecoveryCodeUsed(code);
+            let record;
+            let refreshToken = reqRefreshToken;
+            if (refreshToken) {
+                record = db.refreshTokens.getByToken(refreshToken);
+            }
+            if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
+                const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+                const ua = req.headers['user-agent'] || '';
+                refreshToken = generateRefreshToken();
+                record = db.refreshTokens.create({
+                    user_id: user.id,
+                    token: refreshToken,
+                    device_name: ua.substring(0, 100),
+                    ip,
+                    user_agent: ua,
+                    created_at: new Date().toISOString(),
+                    expires_at: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000).toISOString()
+                });
+            }
+            const token = generateAccessToken(user, record.id);
+            const { password: _, ...safeUser } = user;
+            return res.json({ token, refreshToken, user: safeUser });
+        }
+    }
+
+    return res.status(401).json({ error: '验证码错误' });
+});
+
+router.post('/auth/refresh', async (req, res) => {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+        return res.status(400).json({ error: '缺少刷新令牌' });
+    }
+    
+    const record = db.refreshTokens.getByToken(refreshToken);
+    if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
+        return res.status(401).json({ error: '刷新令牌无效或已过期，请重新登录' });
+    }
+    
+    const user = db.users.getById(record.user_id);
+    if (!user) {
+        return res.status(404).json({ error: '用户不存在' });
+    }
+    
+    const token = generateAccessToken(user, record.id);
+    res.json({ token });
+});
+
+router.post('/logout', async (req, res) => {
+    const { refreshToken } = req.body;
+    if (refreshToken) {
+        const record = db.refreshTokens.getByToken(refreshToken);
+        if (record) {
+            db.refreshTokens.revoke(record.id);
+        }
+    }
+    res.json({ message: '登出成功' });
+});
+
+router.post('/auth/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ error: '请提供邮箱地址' });
+        }
+        
+        const allUsers = db.users.getAll();
+        const user = allUsers.find(u => u.email === email && u.emailVerified);
+        
+        if (!user) {
+            return res.json({ message: '如果邮箱已绑定，重置链接已发送' });
+        }
+        
+        const token = generateToken();
+        const expiresAt = new Date(Date.now() + 3600000);
+        
+        db.passwordResetTokens.deleteByType(user.id, 'password_reset');
+        
+        db.passwordResetTokens.create({
+            userId: user.id,
+            token: token,
+            type: 'password_reset',
+            expiresAt: expiresAt.toISOString()
+        });
+        
+        const resetUrl = `${getSiteUrl(req)}?resetPassword=${token}`;
+        const emailContent = `
+            <p>您好 <strong>${user.username}</strong>，</p>
+            <p>我们收到了您的密码重置请求。</p>
+            <p>请点击下方按钮重置您的密码：</p>
+            <p style="text-align: center;">
+                <a href="${resetUrl}" class="btn" target="_blank">重置密码</a>
+            </p>
+            <div class="divider"></div>
+            <p style="color: #718096; font-size: 14px;">
+                如果按钮无法点击，请复制以下链接到浏览器：<br>
+                <a href="${resetUrl}" style="word-break: break-all;">${resetUrl}</a>
+            </p>
+            <div class="info-box">
+                <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快操作。</p>
+            </div>
+            <div class="divider"></div>
+            <p style="color: #718096; font-size: 14px;">
+                <strong>如果您没有请求重置密码</strong>，请忽略此邮件，您的密码不会被修改。
+            </p>
+        `;
+        
+        await sendEmail(user.email, '密码重置', createEmailTemplate('密码重置请求', emailContent));
+        res.json({ message: '如果邮箱已绑定，重置链接已发送' });
+    } catch (error) {
+        res.status(500).json({ error: '请求失败' });
+    }
+});
+
+router.get('/auth/reset-password/:token', async (req, res) => {
+    try {
+        const { token } = req.params;
+        
+        const resetToken = db.passwordResetTokens.getByToken(token);
+        
+        if (!resetToken || resetToken.type !== 'password_reset' || new Date(resetToken.expiresAt) <= new Date()) {
+            return res.status(400).json({ error: '链接无效或已过期' });
+        }
+        
+        res.json({ valid: true });
+    } catch (error) {
+        res.status(500).json({ error: '验证失败' });
+    }
+});
+
+router.post('/auth/reset-password', async (req, res) => {
+    try {
+        const { token, newPassword } = req.body;
+        
+        if (!token || !newPassword) {
+            return res.status(400).json({ error: '缺少必要参数' });
+        }
+        
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: '密码至少需要 6 个字符' });
+        }
+        
+        const resetToken = db.passwordResetTokens.getByToken(token);
+        
+        if (!resetToken || resetToken.type !== 'password_reset' || new Date(resetToken.expiresAt) <= new Date()) {
+            return res.status(400).json({ error: '链接无效或已过期' });
+        }
+        
+        const user = db.users.getById(resetToken.user_id);
+        
+        if (!user) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+        
+        db.users.update(resetToken.user_id, {
+            password: CryptoJS.SHA256(newPassword).toString()
+        });
+        
+        db.passwordResetTokens.delete(resetToken.id);
+        
+        res.json({ message: '密码重置成功，请使用新密码登录' });
+    } catch (error) {
+        res.status(500).json({ error: '重置失败' });
+    }
+});
+
+module.exports = router;
