@@ -1,5 +1,8 @@
 const express = require('express');
 const router = express.Router();
+const path = require('path');
+const { execSync } = require('child_process');
+const axios = require('axios');
 const db = require('../api/db-sqlite');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
@@ -117,5 +120,68 @@ router.get('/version', (req, res) => {
     res.json({ version: pkg.version });
 });
 
+// 检查系统更新
+router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async (req, res) => {
+    const githubRepo = process.env.GITHUB_REPO || '272416939/pve-multi-user-panel';
+    try {
+        const response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, {
+            timeout: 10000
+        });
+        const tag = response.data.tag_name.replace(/^v/, '');
+        const current = pkg.version.split('.').map(Number);
+        const latest = tag.split('.').map(Number);
+        let hasUpdate = false;
+        for (let i = 0; i < Math.max(current.length, latest.length); i++) {
+            const c = current[i] || 0;
+            const l = latest[i] || 0;
+            if (l > c) { hasUpdate = true; break; }
+            if (l < c) { break; }
+        }
+        res.json({
+            current_version: pkg.version,
+            latest_version: tag,
+            has_update: hasUpdate,
+            release: {
+                tag_name: response.data.tag_name,
+                name: response.data.name,
+                body: response.data.body,
+                html_url: response.data.html_url,
+                published_at: response.data.published_at
+            }
+        });
+    } catch (error) {
+        res.json({
+            current_version: pkg.version,
+            has_update: false,
+            error: '无法连接 GitHub'
+        });
+    }
+});
+
+// 执行系统更新
+router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, async (req, res) => {
+    const projectRoot = path.join(__dirname, '..', '..');
+    try {
+        try {
+            execSync('git fetch origin', { cwd: projectRoot, timeout: 60000 });
+        } catch (error) {
+            return res.status(500).json({ error: '更新失败: git fetch 失败 - ' + error.message });
+        }
+        try {
+            execSync('git reset --hard origin/main', { cwd: projectRoot, timeout: 60000 });
+        } catch (error) {
+            return res.status(500).json({ error: '更新失败: git reset 失败 - ' + error.message });
+        }
+        try {
+            execSync('npm install --production', { cwd: projectRoot, timeout: 120000 });
+        } catch (error) {
+            return res.status(500).json({ error: '更新失败: npm install 失败 - ' + error.message });
+        }
+        res.json({ message: '更新成功，服务正在重启...' });
+        setTimeout(() => process.exit(0), 1000);
+    } catch (error) {
+        res.status(500).json({ error: '更新失败: ' + error.message });
+    }
+});
 
 module.exports = router;

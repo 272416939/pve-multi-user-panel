@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v1.6.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v1.6.3-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -266,6 +266,7 @@ npm run dev
 | **SMTP 配置** | 邮件服务器，到期提醒天数，备份快照配置 |
 | **CDK 管理** | 生成/分发/导出 CDK 兑换码 |
 | **消息管理** | 全体推送/指定用户发送站内消息 |
+| **系统更新** | 检查更新、查看更新日志、一键更新 |
 
 ### 普通用户功能
 
@@ -309,6 +310,27 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v1.6.3</b> (2026-06-09) — 自动更新系统</summary>
+
+**系统更新功能：**
+- ✅ 管理后台新增「系统更新」标签页
+- ✅ 检查更新：查询 GitHub Releases API，semver 版本比较
+- ✅ 更新日志：Markdown 渲染展示
+- ✅ 一键更新：`git pull` + `npm install` + 自动重启（依赖 PM2/systemd）
+- ✅ 更新前二次确认弹窗，更新中状态提示
+- ✅ 支持 `.env` 配置 `GITHUB_REPO`（默认 `272416939/pve-multi-user-panel`）
+
+**安全设计：**
+- ✅ 仅 admin 权限可访问更新 API
+- ✅ GitHub 不可达时返回友好提示而非 500 错误
+- ✅ 更新失败时不退出进程，返回具体错误信息
+
+**涉及文件：**
+`package.json` · `server/routes/admin-config.js` · `public/js/admin/update.js`（新增） · `public/admin.html` · `.env.example`
+
+</details>
 
 <details>
 <summary><b>v1.6.2</b> (2026-06-09) — LXC 重置 IP + 危险操作警告</summary>
