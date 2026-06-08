@@ -7,7 +7,7 @@
     $.updateInfo = ref(null);
     $.updateChecking = ref(false);
     $.updateExecuting = ref(false);
-    $.currentVersion = ref('1.6.7');
+    $.currentVersion = ref('1.6.8');
 
     // Functions
     $.checkUpdate = async function() {
