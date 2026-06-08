@@ -7,7 +7,6 @@
     $.updateInfo = ref(null);
     $.updateChecking = ref(false);
     $.updateExecuting = ref(false);
-    $.currentVersion = ref('');
 
     // Functions
     $.checkUpdate = async function() {
@@ -15,9 +14,6 @@
         try {
             var data = await api('/admin/system/update/check');
             $.updateInfo.value = data;
-            if (data.current_version) {
-                $.currentVersion.value = data.current_version;
-            }
         } catch (e) {
             console.error('检查更新失败', e);
             $.updateInfo.value = { has_update: false, error: e.message || '检查更新失败' };
@@ -32,9 +28,7 @@
         $.updateExecuting.value = true;
         try {
             await api('/admin/system/update/execute', { method: 'POST' });
-            // If we get here, the server is about to restart
             alert('更新成功，服务正在重启，请稍后刷新页面...');
-            // Wait and try to reload
             setTimeout(function() {
                 window.location.reload();
             }, 5000);
@@ -44,11 +38,7 @@
         }
     };
 
-    // initUpdate lifecycle
     $.initUpdate = function() {
-        // 从后端 API 获取版本号（与页脚方式一致）
-        fetch('/api/version').then(function(r) { return r.json(); }).then(function(d) {
-            if (d.version) $.currentVersion.value = d.version;
-        });
+        // 版本号已在 HTML 模板中硬编码
     };
 })();
