@@ -7,7 +7,7 @@
     $.updateInfo = ref(null);
     $.updateChecking = ref(false);
     $.updateExecuting = ref(false);
-    $.currentVersion = ref('');
+    $.currentVersion = ref('1.6.7');
 
     // Functions
     $.checkUpdate = async function() {
@@ -46,7 +46,7 @@
 
     // initUpdate lifecycle
     $.initUpdate = function() {
-        // 自动加载当前版本号
+        // 尝试从 API 获取更准确的版本号
         fetch('/api/version').then(function(r) { return r.json(); }).then(function(d) {
             if (d.version) $.currentVersion.value = d.version;
         }).catch(function() {});
