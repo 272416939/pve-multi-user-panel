@@ -3,6 +3,7 @@ const cors = require('cors');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
+const pkg = require('../package.json');
 const { WebSocket } = require('ws');
 require('dotenv').config();
 
@@ -55,6 +56,11 @@ app.use('/images', express.static(path.join(__dirname, '../images'), {
         res.setHeader('Cache-Control', 'public, max-age=3600');
     }
 }));
+
+// 版本号接口（无需认证）
+app.get('/api/version', (req, res) => {
+    res.json({ version: pkg.version });
+});
 
 app.use('/api', require('./routes/auth'));
 app.use('/api', require('./routes/user'));

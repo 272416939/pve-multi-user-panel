@@ -7,6 +7,7 @@
     $.updateInfo = ref(null);
     $.updateChecking = ref(false);
     $.updateExecuting = ref(false);
+    $.currentVersion = ref('');
 
     // Functions
     $.checkUpdate = async function() {
@@ -14,6 +15,9 @@
         try {
             var data = await api('/admin/system/update/check');
             $.updateInfo.value = data;
+            if (data.current_version) {
+                $.currentVersion.value = data.current_version;
+            }
         } catch (e) {
             console.error('检查更新失败', e);
             $.updateInfo.value = { has_update: false, error: e.message || '检查更新失败' };
@@ -42,6 +46,9 @@
 
     // initUpdate lifecycle
     $.initUpdate = function() {
-        // No special lifecycle logic - check is triggered manually
+        // 自动加载当前版本号
+        fetch('/api/version').then(function(r) { return r.json(); }).then(function(d) {
+            if (d.version) $.currentVersion.value = d.version;
+        }).catch(function() {});
     };
 })();
