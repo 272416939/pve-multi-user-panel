@@ -457,7 +457,7 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 
 ## 📄 许可证
 
-本项目基于 **MIT License** 开源。
+本项目基于 **MIT License** 开源。详见 [LICENSE](LICENSE) 文件。
 
 ---
 
