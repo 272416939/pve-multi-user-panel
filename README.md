@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v1.7.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v1.7.3-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -310,6 +310,21 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v1.7.3</b> (2026-06-09) — CDK 生成表单布局优化</summary>
+
+**优化：**
+- ✅ CDK 生成表单重新设计布局：续费时长按钮组改为 btn-group 横向紧凑排列
+- ✅ 自定义天数输入框与按钮组同行对齐，不再换行堆叠
+- ✅ 列宽比例调整：续费时长 7:5、有效期 5:7，更符合内容量
+- ✅ 标签统一为 small text-muted 风格，视觉更清爽
+- ✅ 提示文字精简，减少冗余
+
+**涉及文件：**
+`package.json` · `public/admin.html`
+
+</details>
 
 <details>
 <summary><b>v1.7.2</b> (2026-06-09) — 系统更新源选择功能</summary>
