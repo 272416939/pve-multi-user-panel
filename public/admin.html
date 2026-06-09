@@ -1266,16 +1266,35 @@
                         <!-- 当前版本 -->
                         <div class="card mb-3">
                             <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
                                     <div>
                                         <h5 class="mb-1">当前版本</h5>
-                                        <span class="fs-4 fw-bold text-primary">v1.7.1</span>
+                                        <span class="fs-4 fw-bold text-primary">v1.7.2</span>
                                     </div>
                                     <button class="btn btn-outline-primary" @click="checkUpdate" :disabled="updateChecking">
                                         <span v-if="updateChecking" class="spinner-border spinner-border-sm me-1"></span>
                                         <span v-else>🔍</span>
                                         检查更新
                                     </button>
+                                </div>
+
+                                <!-- 更新源选择 -->
+                                <div class="mt-3 pt-3 border-top border-secondary" style="border-color: rgba(255,255,255,0.08) !important;">
+                                    <label class="form-label text-muted small mb-2">更新源</label>
+                                    <select class="form-select form-select-sm bg-dark text-light border-secondary" style="max-width: 400px;" v-model="updateSource">
+                                        <option value="gitee">Gitee（推荐）— 国内访问速度快，服务器部署首选</option>
+                                        <option value="github">GitHub — 海外环境 / Gitee 不可达时使用</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-1">
+                                        <span v-if="updateSource === 'gitee'">
+                                            <i class="bi bi-info-circle"></i>
+                                            Gitee 国内镜像仓库，从 gitee.com 拉取代码，速度更快
+                                        </span>
+                                        <span v-else>
+                                            <i class="bi bi-info-circle"></i>
+                                            GitHub 官方仓库，海外服务器或网络特殊时选择
+                                        </span>
+                                    </small>
                                 </div>
                             </div>
                         </div>
@@ -2469,7 +2488,7 @@
     <script src="js/admin/lxc.js?v=20260609b"></script>
     <script src="js/admin/admin.js?v=20260609b"></script>
     <script src="js/admin/network.js?v=20260609b"></script>
-    <script src="js/admin/update.js?v=20260609d"></script>
+    <script src="js/admin/update.js?v=20260609e"></script>
 
     <script>
         var $ = window.__admin;

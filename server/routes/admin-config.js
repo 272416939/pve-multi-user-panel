@@ -126,25 +126,41 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
     const githubRepo = process.env.GITHUB_REPO || '272416939/pve-multi-user-panel';
     const giteeRepo = process.env.GITEE_REPO || 'Allen0528/pve-multi-user-panel';
 
-    // 尝试从 Gitee 获取（国内优先），失败则回退 GitHub
+    // 用户指定更新源（默认 gitee）
+    const userSource = req.query.source || 'gitee';
     let response = null;
-    let source = 'gitee';
+    let source = userSource;
+
     try {
-        response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases/latest`, {
-            timeout: 10000
-        });
+        if (source === 'gitee') {
+            response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases/latest`, { timeout: 10000 });
+        } else {
+            response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, { timeout: 10000 });
+        }
     } catch (e) {
-        source = 'github';
-        try {
-            response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, {
-                timeout: 10000
-            });
-        } catch (e2) {
-            return res.json({
-                current_version: pkg.version,
-                has_update: false,
-                error: '无法连接更新服务器（Gitee / GitHub 均不可达）'
-            });
+        // 指定源失败时尝试回退到另一个源
+        if (source === 'gitee') {
+            source = 'github';
+            try {
+                response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, { timeout: 10000 });
+            } catch (e2) {
+                return res.json({
+                    current_version: pkg.version,
+                    has_update: false,
+                    error: '无法连接更新服务器（Gitee / GitHub 均不可达）'
+                });
+            }
+        } else {
+            source = 'gitee';
+            try {
+                response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases/latest`, { timeout: 10000 });
+            } catch (e2) {
+                return res.json({
+                    current_version: pkg.version,
+                    has_update: false,
+                    error: '无法连接更新服务器（GitHub / Gitee 均不可达）'
+                });
+            }
         }
     }
 
@@ -184,6 +200,8 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
 // 执行系统更新
 router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, async (req, res) => {
     const projectRoot = path.join(__dirname, '..', '..');
+    const userSource = (req.body && req.body.source) || 'gitee';
+
     try {
         // 检查是否为 git 仓库
         if (!fs.existsSync(path.join(projectRoot, '.git'))) {
@@ -197,13 +215,15 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             // 忽略失败，继续执行
         }
 
-        // 确定更新源：优先 gitee，不可达则回退 origin
+        // 确定更新源：根据用户选择，不可达则回退
         let remote = 'origin';
-        try {
-            execSync('git remote get-url gitee', { cwd: projectRoot, timeout: 5000, stdio: 'pipe' });
-            remote = 'gitee';
-        } catch (e) {
-            // gitee 远程源不存在，使用 origin
+        if (userSource === 'gitee') {
+            try {
+                execSync('git remote get-url gitee', { cwd: projectRoot, timeout: 5000, stdio: 'pipe' });
+                remote = 'gitee';
+            } catch (e) {
+                // gitee 远程源不存在，使用 origin
+            }
         }
 
         try {

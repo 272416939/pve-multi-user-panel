@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v1.7.1-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v1.7.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -310,6 +310,20 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v1.7.2</b> (2026-06-09) — 系统更新源选择功能</summary>
+
+**新功能：**
+- ✅ 系统更新页面新增更新源下拉选择器（Gitee / GitHub）
+- ✅ 每个选项带说明文字：适用场景、访问速度、推荐程度
+- ✅ 选择后检查更新和执行更新均使用指定源
+- ✅ 指定源不可达时自动回退到另一源
+
+**涉及文件：**
+`package.json` · `public/js/admin/update.js` · `public/admin.html` · `server/routes/admin-config.js`
+
+</details>
 
 <details>
 <summary><b>v1.7.1</b> (2026-06-09) — 版本号显示最终修复</summary>

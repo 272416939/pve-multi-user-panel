@@ -7,12 +7,13 @@
     $.updateInfo = ref(null);
     $.updateChecking = ref(false);
     $.updateExecuting = ref(false);
+    $.updateSource = ref('gitee');
 
     // Functions
     $.checkUpdate = async function() {
         $.updateChecking.value = true;
         try {
-            var data = await api('/admin/system/update/check');
+            var data = await api('/admin/system/update/check?source=' + $.updateSource.value);
             $.updateInfo.value = data;
         } catch (e) {
             console.error('检查更新失败', e);
@@ -27,7 +28,11 @@
 
         $.updateExecuting.value = true;
         try {
-            await api('/admin/system/update/execute', { method: 'POST' });
+            await api('/admin/system/update/execute', {
+                method: 'POST',
+                body: JSON.stringify({ source: $.updateSource.value }),
+                headers: { 'Content-Type': 'application/json' }
+            });
             alert('更新成功，服务正在重启，请稍后刷新页面...');
             setTimeout(function() {
                 window.location.reload();
@@ -38,7 +43,5 @@
         }
     };
 
-    $.initUpdate = function() {
-        // 版本号已在 HTML 模板中硬编码
-    };
+    $.initUpdate = function() {};
 })();
