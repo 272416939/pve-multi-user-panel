@@ -849,10 +849,10 @@
                             <div class="card-body">
                                 <form @submit.prevent="generateCdkBatch">
                                     <!-- 第一行：续费时长 + 生成数量 -->
-                                    <div class="row g-3 mb-3">
+                                    <div class="row g-3 align-items-end mb-3">
                                         <div class="col-lg-7">
-                                            <label class="form-label text-muted small">续费时长</label>
-                                            <div class="d-flex align-items-center gap-2">
+                                            <label class="form-label text-muted small mb-1">续费时长</label>
+                                            <div class="d-flex gap-2">
                                                 <div class="btn-group" role="group">
                                                     <button type="button" class="btn btn-sm" :class="cdkForm.duration_days === 7 ? 'btn-primary' : 'btn-outline-secondary'" @click="cdkForm.duration_days = 7">7天</button>
                                                     <button type="button" class="btn btn-sm" :class="cdkForm.duration_days === 30 ? 'btn-primary' : 'btn-outline-secondary'" @click="cdkForm.duration_days = 30">30天</button>
@@ -860,35 +860,35 @@
                                                     <button type="button" class="btn btn-sm" :class="cdkForm.duration_days === 180 ? 'btn-primary' : 'btn-outline-secondary'" @click="cdkForm.duration_days = 180">半年</button>
                                                     <button type="button" class="btn btn-sm" :class="cdkForm.duration_days === 365 ? 'btn-primary' : 'btn-outline-secondary'" @click="cdkForm.duration_days = 365">1年</button>
                                                 </div>
-                                                <div class="input-group input-group-sm" style="max-width: 130px;">
-                                                    <input type="number" class="form-control" v-model.number="cdkForm.duration_days" min="1" placeholder="自定义">
+                                                <div class="input-group input-group-sm" style="width: 120px;">
+                                                    <input type="number" class="form-control form-control-sm" v-model.number="cdkForm.duration_days" min="1" placeholder="天数">
                                                     <span class="input-group-text">天</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="col-lg-5">
-                                            <label class="form-label text-muted small">生成数量</label>
+                                            <label class="form-label text-muted small mb-1">生成数量</label>
                                             <input type="number" class="form-control form-control-sm" v-model.number="cdkForm.count" min="1" max="1000" :disabled="cdkSelectedUsers.length > 0">
-                                            <small class="text-muted" v-if="cdkSelectedUsers.length === 0">最多 1000 个</small>
-                                            <small class="text-muted" v-else>已按选中用户数生成 {{ cdkSelectedUsers.length }} 个 CDK</small>
+                                            <small class="text-muted d-block mt-1" v-if="cdkSelectedUsers.length === 0">最多 1000 个</small>
+                                            <small class="text-muted d-block mt-1" v-else>已按选中用户数生成 {{ cdkSelectedUsers.length }} 个 CDK</small>
                                         </div>
                                     </div>
                                     <!-- 第二行：有效期 + 分配用户 -->
                                     <div class="row g-3 mb-3">
                                         <div class="col-md-5">
-                                            <label class="form-label text-muted small">CDK 有效期（可选）</label>
+                                            <label class="form-label text-muted small mb-1">CDK 有效期（可选）</label>
                                             <input type="datetime-local" class="form-control form-control-sm" v-model="cdkForm.expires_at" step="1" onfocus="this.showPicker?.()">
-                                            <small class="text-muted">留空则永不过期</small>
+                                            <small class="text-muted d-block mt-1">留空则永不过期</small>
                                         </div>
                                         <div class="col-md-7">
-                                            <label class="form-label text-muted small">分配给指定用户（可选）</label>
+                                            <label class="form-label text-muted small mb-1">分配给指定用户（可选）</label>
                                             <div class="tag-input-wrapper">
-                                                <div class="tag-list">
+                                                <div class="tag-list tag-list-sm">
                                                     <span v-for="(u, idx) in cdkSelectedUsers" :key="u.id" class="tag-item">
                                                         {{ u.username }}
                                                         <button type="button" class="tag-remove" @click="cdkSelectedUsers.splice(idx, 1)">&times;</button>
                                                     </span>
-                                                    <input type="text" class="tag-input-field" v-model="cdkUserSearch"
+                                                    <input type="text" class="tag-input-field tag-input-field-sm" v-model="cdkUserSearch"
                                                            @input="cdkUserSearchOpen = true"
                                                            @focus="cdkUserSearchOpen = true"
                                                            @blur="handleCdkSearchBlur"
@@ -902,7 +902,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            <small class="text-muted">搜索并选择用户，每人自动获得一个 CDK</small>
+                                            <small class="text-muted d-block mt-1">搜索并选择用户，每人自动获得一个 CDK</small>
                                         </div>
                                     </div>
                                     <button type="submit" class="btn btn-primary btn-sm px-4" formnovalidate :disabled="!cdkForm.duration_days || cdkForm.duration_days < 1">
@@ -1273,7 +1273,7 @@
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <div>
                                         <h5 class="mb-1">当前版本</h5>
-                                        <span class="fs-4 fw-bold text-primary">v1.7.3</span>
+                                        <span class="fs-4 fw-bold text-primary">v1.7.4</span>
                                     </div>
                                     <button class="btn btn-outline-primary" @click="checkUpdate" :disabled="updateChecking">
                                         <span v-if="updateChecking" class="spinner-border spinner-border-sm me-1"></span>

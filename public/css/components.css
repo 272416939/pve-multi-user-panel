@@ -510,6 +510,20 @@ input[type="file"]::file-selector-button {
 .tag-input-field::placeholder {
   color: #888;
 }
+/* sm 紧凑变体：与 form-control-sm 高度对齐 */
+.tag-list-sm {
+  padding: 4px 8px;
+  min-height: 31px;
+  gap: 4px;
+}
+.tag-list-sm .tag-item {
+  font-size: 12px;
+  padding: 1px 6px;
+}
+.tag-input-field-sm {
+  font-size: 13px;
+  padding: 1px 0;
+}
 .tag-dropdown {
   position: absolute;
   top: 100%;

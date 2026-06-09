@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v1.7.3-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v1.7.4-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -310,6 +310,20 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v1.7.4</b> (2026-06-09) — CDK 表单输入框高度统一</summary>
+
+**优化：**
+- ✅ 所有输入框统一使用 form-control-sm，高度一致（31px）
+- ✅ 标签输入框新增 sm 紧凑变体，与其他输入框对齐
+- ✅ 第一行使用 align-items-end 底部对齐，标签间距统一 mb-1
+- ✅ 提示文字统一 d-block mt-1，垂直间距规整
+
+**涉及文件：**
+`package.json` · `public/admin.html` · `public/css/components.css`
+
+</details>
 
 <details>
 <summary><b>v1.7.3</b> (2026-06-09) — CDK 生成表单布局优化</summary>
