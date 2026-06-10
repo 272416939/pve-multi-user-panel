@@ -2852,6 +2852,9 @@
         var App = {
             template: '#appTemplate',
             setup: function() {
+                // 兜底初始化：确保 IP 表单 ref 在模板渲染前一定存在（防止异步加载时序导致 ip_mode undefined 崩溃）
+                if (!$.vmIpForm) $.vmIpForm = Vue.ref({ ip_mode: 'dhcp', ip: '' });
+                if (!$.lxcIpForm) $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
                 $.initCore();
                 $.initVm();
                 $.initLxc();

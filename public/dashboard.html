@@ -1605,16 +1605,16 @@
                     <label class="form-label">IP 模式</label>
                     <div class="d-flex gap-3">
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="static" id="lxcIpStatic">
+                            <input class="form-check-input" type="radio" v-model="lxcIpForm?.ip_mode" value="static" id="lxcIpStatic">
                             <label class="form-check-label" for="lxcIpStatic">手动输入</label>
                         </div>
                         <div class="form-check">
-                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="dhcp" id="lxcIpDhcp">
+                            <input class="form-check-input" type="radio" v-model="lxcIpForm?.ip_mode" value="dhcp" id="lxcIpDhcp">
                             <label class="form-check-label" for="lxcIpDhcp">DHCP 自动获取</label>
                         </div>
                     </div>
                 </div>
-                <div v-if="lxcIpForm.ip_mode === 'static'" class="mb-3">
+                <div v-if="lxcIpForm?.ip_mode === 'static'" class="mb-3">
                     <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
                     <div class="input-group">
                         <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
@@ -1935,6 +1935,8 @@
     var App = {
         template: '#appTemplate',
         setup: function() {
+            // 兜底初始化：确保 IP 表单 ref 在模板渲染前一定存在
+            if (!$.lxcIpForm) $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
             $.initCore();
             $.initVm();
             $.initLxc();
