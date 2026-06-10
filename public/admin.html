@@ -1956,7 +1956,7 @@
                                                 <textarea class="form-control form-control-sm" v-model="snapshotForm.description" rows="2" placeholder="描述（可选）"></textarea>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <small :class="snapshotForm.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ snapshotForm.name.length }}/20</small>
+                                                <small :class="snapshotForm?.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ snapshotForm?.name.length }}/20</small>
                                                 <button class="btn btn-primary btn-sm" @click="createSnapshot(snapshotVmId)" :disabled="!isSnapshotNameValid || snapshotCreating">
                                                     <span v-if="snapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
                                                     创建快照
@@ -2361,7 +2361,7 @@
                                                 <textarea class="form-control form-control-sm" v-model="lxcSnapshotForm.description" rows="2" placeholder="描述（可选）"></textarea>
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center">
-                                                <small :class="lxcSnapshotForm.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ lxcSnapshotForm.name.length }}/20</small>
+                                                <small :class="lxcSnapshotForm?.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ lxcSnapshotForm?.name.length }}/20</small>
                                                 <button class="btn btn-primary btn-sm" @click="createLxcSnapshot(lxcSnapshotVmId)" :disabled="!isLxcSnapshotNameValid || lxcSnapshotCreating">
                                                     <span v-if="lxcSnapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
                                                     创建快照
@@ -2782,17 +2782,17 @@
 
             <!-- VM/LXC 操作确认弹窗 -->
             <Teleport to="body">
-            <div class="vm-detail-modal" :class="{ show: confirmState.vmId !== null || lxcConfirmState.ctId !== null }" @click.self="confirmState.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">
+            <div class="vm-detail-modal" :class="{ show: confirmState?.vmId !== null || lxcConfirmState?.ctId !== null }" @click.self="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">
                 <div class="modal-content" style="max-width:440px">
                     <div class="modal-header">
                         <h2 class="modal-title">操作确认</h2>
-                        <button class="modal-close" @click="confirmState.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">✕</button>
+                        <button class="modal-close" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">✕</button>
                     </div>
                     <div class="modal-body" style="padding:24px 28px;text-align:center">
-                        <p style="font-size:15px;color:var(--text-primary,#E5E7EB);line-height:1.6;margin:0 0 20px">{{ confirmState.vmId !== null ? confirmActionText : confirmLxcActionText }}</p>
+                        <p style="font-size:15px;color:var(--text-primary,#E5E7EB);line-height:1.6;margin:0 0 20px">{{ confirmState?.vmId !== null ? confirmActionText : confirmLxcActionText }}</p>
                         <div style="display:flex;gap:10px;justify-content:center">
-                            <button class="table-btn btn-danger" style="padding:8px 28px;font-size:14px" @click="confirmState.vmId !== null ? confirmAction(userVms.find(function(v){return v.id===confirmState.vmId})||userVms[0]) : confirmLxcAction(userLxcContainers.find(function(c){return c.id===lxcConfirmState.ctId})||userLxcContainers[0])">确认执行</button>
-                            <button class="table-btn" style="padding:8px 28px;font-size:14px" @click="confirmState.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">取消</button>
+                            <button class="table-btn btn-danger" style="padding:8px 28px;font-size:14px" @click="confirmState?.vmId !== null ? confirmAction(userVms.find(function(v){return v.id===confirmState.vmId})||userVms[0]) : confirmLxcAction(userLxcContainers.find(function(c){return c.id===lxcConfirmState.ctId})||userLxcContainers[0])">确认执行</button>
+                            <button class="table-btn" style="padding:8px 28px;font-size:14px" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">取消</button>
                         </div>
                     </div>
                 </div>
@@ -2852,9 +2852,13 @@
         var App = {
             template: '#appTemplate',
             setup: function() {
-                // 兜底初始化：确保 IP 表单 ref 在模板渲染前一定存在（防止异步加载时序导致 ip_mode undefined 崩溃）
+                // 兜底初始化：确保关键 ref 在模板渲染前一定存在（防止异步加载时序导致 undefined 崩溃）
                 if (!$.vmIpForm) $.vmIpForm = Vue.ref({ ip_mode: 'dhcp', ip: '' });
                 if (!$.lxcIpForm) $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
+                if (!$.confirmState) $.confirmState = Vue.ref({ vmId: null, action: null });
+                if (!$.lxcConfirmState) $.lxcConfirmState = Vue.ref({ ctId: null, action: null });
+                if (!$.snapshotForm) $.snapshotForm = Vue.ref({ name: '', description: '' });
+                if (!$.lxcSnapshotForm) $.lxcSnapshotForm = Vue.ref({ name: '', description: '' });
                 $.initCore();
                 $.initVm();
                 $.initLxc();
