@@ -2213,19 +2213,19 @@
                                     <label class="form-label">IP 模式</label>
                                     <div class="d-flex gap-3">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="static" id="lxcIpStatic">
+                                            <input class="form-check-input" type="radio" v-model="lxcIpForm?.ip_mode" value="static" id="lxcIpStatic">
                                             <label class="form-check-label" for="lxcIpStatic">手动输入</label>
                                         </div>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="dhcp" id="lxcIpDhcp">
+                                            <input class="form-check-input" type="radio" v-model="lxcIpForm?.ip_mode" value="dhcp" id="lxcIpDhcp">
                                             <label class="form-check-label" for="lxcIpDhcp">DHCP 自动获取</label>
                                         </div>
                                     </div>
                                 </div>
-                                <div v-if="lxcIpForm.ip_mode === 'static'" class="mb-3">
+                                <div v-if="lxcIpForm?.ip_mode === 'static'" class="mb-3">
                                     <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
                                     <div class="input-group">
-                                        <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
+                                        <input type="text" class="form-control" v-model="lxcIpForm?.ip" placeholder="10.0.0.150/24">
                                         <button class="btn btn-outline-info" type="button" @click="randomLxcIp" title="随机生成未绑定的 IP">🎲 随机</button>
                                     </div>
                                 </div>
@@ -2264,19 +2264,19 @@
                                     <label class="form-label">IP 模式</label>
                                     <div class="d-flex gap-3">
                                         <div class="form-check">
-                                            <input class="form-check-input" type="radio" v-model="vmIpForm.ip_mode" value="static" id="vmIpStatic">
+                                            <input class="form-check-input" type="radio" v-model="vmIpForm?.ip_mode" value="static" id="vmIpStatic">
                                             <label class="form-check-label" for="vmIpStatic">手动输入</label>
                                         </div>
                                         <div class="form-check">
-                                            <input class="form-check-input" type="radio" v-model="vmIpForm.ip_mode" value="dhcp" id="vmIpDhcp">
+                                            <input class="form-check-input" type="radio" v-model="vmIpForm?.ip_mode" value="dhcp" id="vmIpDhcp">
                                             <label class="form-check-label" for="vmIpDhcp">DHCP 自动获取</label>
                                         </div>
                                     </div>
                                 </div>
-                                <div v-if="vmIpForm.ip_mode === 'static'" class="mb-3">
+                                <div v-if="vmIpForm?.ip_mode === 'static'" class="mb-3">
                                     <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
                                     <div class="input-group">
-                                        <input type="text" class="form-control" v-model="vmIpForm.ip" placeholder="10.0.0.150/24">
+                                        <input type="text" class="form-control" v-model="vmIpForm?.ip" placeholder="10.0.0.150/24">
                                         <button class="btn btn-outline-info" type="button" @click="randomVmIp" title="随机生成未绑定的 IP">随机</button>
                                     </div>
                                 </div>
