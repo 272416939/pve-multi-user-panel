@@ -1524,7 +1524,7 @@
                                 <div class="d-flex justify-content-between align-items-center mb-3">
                                     <div>
                                         <h5 class="mb-1">当前版本</h5>
-                                        <span class="fs-4 fw-bold text-primary">v1.7.4</span>
+                                        <span class="fs-4 fw-bold text-primary" id="currentVersion">加载中...</span>
                                     </div>
                                     <button class="btn-glass" style="border-color:rgba(99,102,241,0.25);background:rgba(99,102,241,0.08);color:#A5B4FC;" @click="checkUpdate" :disabled="updateChecking">
                                         <span v-if="updateChecking" class="spinner-border spinner-border-sm me-1"></span>
@@ -3088,7 +3088,7 @@
 
           app.mount('#app');
     </script>
-    <script>fetch("/api/version").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("appVersion");if(el)el.textContent="v"+d.version})</script>
+    <script>fetch("/api/version").then(function(r){return r.json()}).then(function(d){var v="v"+d.version;var el=document.getElementById("appVersion");if(el)el.textContent=v;el=document.getElementById("currentVersion");if(el)el.textContent=v})</script>
 </main>
 
     <script>
