@@ -132,17 +132,21 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
     let source = userSource;
 
     try {
+        // 使用 per_page=1 获取最新 release（包括 prerelease），而非 /latest（仅正式版）
         if (source === 'gitee') {
-            response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases/latest`, { timeout: 10000 });
+            response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=1&sort=created&direction=desc`, { timeout: 10000 });
+            response.data = Array.isArray(response.data) ? response.data[0] : response.data;
         } else {
-            response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, { timeout: 10000 });
+            response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=1`, { timeout: 10000 });
+            response.data = Array.isArray(response.data) ? response.data[0] : response.data;
         }
     } catch (e) {
         // 指定源失败时尝试回退到另一个源
         if (source === 'gitee') {
             source = 'github';
             try {
-                response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases/latest`, { timeout: 10000 });
+                response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=1`, { timeout: 10000 });
+                response.data = Array.isArray(response.data) ? response.data[0] : response.data;
             } catch (e2) {
                 return res.json({
                     current_version: pkg.version,
@@ -153,7 +157,8 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
         } else {
             source = 'gitee';
             try {
-                response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases/latest`, { timeout: 10000 });
+                response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=1&sort=created&direction=desc`, { timeout: 10000 });
+                response.data = Array.isArray(response.data) ? response.data[0] : response.data;
             } catch (e2) {
                 return res.json({
                     current_version: pkg.version,
@@ -166,8 +171,14 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
 
     try {
         const tag = response.data.tag_name.replace(/^v/, '');
-        const current = pkg.version.split('.').map(Number);
-        const latest = tag.split('.').map(Number);
+        // 版本号比较：支持 1.7.5 / 1.7.5-beta1 / 1.7.5-UI-beta1 等格式
+        const parseVer = (v) => {
+            // 提取主版本号部分（去掉 -beta/-alpha/-rc 等后缀）
+            const main = v.split(/[-+]/)[0];
+            return main.split('.').map(Number);
+        };
+        const current = parseVer(pkg.version);
+        const latest = parseVer(tag);
         let hasUpdate = false;
         for (let i = 0; i < Math.max(current.length, latest.length); i++) {
             const c = current[i] || 0;
