@@ -676,10 +676,15 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         }
 
         let newIp = '';
+        // 从系统配置获取网关地址
+        const gateway = db.config.get('dhcp:gateway') || '10.0.0.1';
 
         if (ip_mode === 'dhcp') {
             newNet0Parts.push('ip=dhcp');
             newNet0Parts.push('ip6=dhcp');
+            // DHCP模式下也清除gw，让容器通过DHCP自动获取
+            const filteredGw = newNet0Parts.filter(p => !p.startsWith('gw='));
+            newNet0Parts = filteredGw;
         } else if (ip_mode === 'static') {
             if (!ip) {
                 return res.status(400).json({ error: '请输入 IP 地址' });
@@ -692,6 +697,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
             const cidr = ip.includes('/') ? ip : ip + '/24';
             newNet0Parts.push('ip=' + cidr);
             newNet0Parts.push('ip6=dhcp');
+            newNet0Parts.push('gw=' + gateway);
             newIp = ipBase;
         } else if (ip_mode === 'random') {
             const randomIp = await pickUnusedStaticIp();
@@ -700,6 +706,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
             }
             newNet0Parts.push('ip=' + randomIp + '/24');
             newNet0Parts.push('ip6=dhcp');
+            newNet0Parts.push('gw=' + gateway);
             newIp = randomIp;
         }
 

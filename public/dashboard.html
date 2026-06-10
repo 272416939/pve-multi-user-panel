@@ -1,771 +1,1457 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PVE 多用户控制面板 | 仪表盘</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="css/styles.css" rel="stylesheet">
-    <style>.modal-backdrop{z-index:1050!important}.modal{z-index:1055!important}</style>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>.modal-backdrop{z-index:1050!important}.modal{z-index:1055!important}
+
+    /* ===== Glassmorphism Layout ===== */
+    :root {
+        --header-height: 64px;
+        --sidebar-width: 220px;
+        --glass-bg: rgba(255, 255, 255, 0.06);
+        --glass-border: rgba(255, 255, 255, 0.12);
+        --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        --glass-blur: blur(16px);
+        --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --accent-glow: rgba(102, 126, 234, 0.4);
+    }
+
+    [data-theme="light"] {
+        --glass-bg: rgba(255, 255, 255, 0.7);
+        --glass-border: rgba(255, 255, 255, 0.5);
+        --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(135deg, #0c0c1d 0%, #1a1a2e 50%, #16213e 100%);
+        background-attachment: fixed;
+        min-height: 100vh;
+        overflow-x: hidden;
+    }
+
+    [data-theme="light"] body {
+        background: linear-gradient(135deg, #e8ecf3 0%, #d4dbe8 50%, #c9d1e3 100%);
+    }
+
+    /* ===== Page Header (Fixed Top) ===== */
+    .page-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: var(--header-height);
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 20px;
+        background: rgba(15, 15, 30, 0.75);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border-bottom: 1px solid var(--glass-border);
+        box-shadow: var(--glass-shadow);
+    }
+
+    [data-theme="light"] .page-header {
+        background: rgba(255, 255, 255, 0.75);
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .sidebar-toggle {
+        display: none;
+        background: none;
+        border: 1px solid var(--glass-border);
+        color: inherit;
+        font-size: 22px;
+        cursor: pointer;
+        padding: 6px 10px;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        line-height: 1;
+    }
+
+    .sidebar-toggle:hover {
+        background: var(--glass-bg);
+        color: #667eea;
+    }
+
+    .header-center {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .brand-logo {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: none;
+    }
+
+    .header-right {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .header-btn {
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--glass-border);
+        border-radius: 10px;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font-size: 16px;
+        transition: all 0.25s ease;
+        position: relative;
+    }
+
+    .header-btn:hover {
+        background: var(--glass-bg);
+        border-color: #667eea;
+        box-shadow: 0 0 12px var(--accent-glow);
+        transform: translateY(-1px);
+    }
+
+    .notification-wrapper {
+        position: relative;
+    }
+
+    .notification-badge {
+        position: absolute;
+        top: -2px;
+        right: -4px;
+        min-width: 17px;
+        height: 17px;
+        padding: 0 4px;
+        font-size: 10px;
+        font-weight: 600;
+        color: #fff;
+        background: linear-gradient(135deg, #ff416c, #ff4b2b);
+        border-radius: 999px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 8px rgba(255, 65, 108, 0.5);
+        animation: badgePulse 2s infinite;
+    }
+
+    @keyframes badgePulse {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.15); }
+    }
+
+    .user-info-dropdown {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 4px 12px 4px 6px;
+        border: 1px solid var(--glass-border);
+        border-radius: 24px;
+        background: var(--glass-bg);
+        transition: all 0.25s ease;
+    }
+
+    .user-info-dropdown:hover {
+        border-color: #667eea;
+        box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .header-user-avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid transparent;
+    }
+
+    .user-info-dropdown span {
+        font-size: 13px;
+        max-width: 80px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* ===== Sidebar (Fixed Left) ===== */
+    .sidebar {
+        position: fixed;
+        top: var(--header-height);
+        left: 0;
+        bottom: 0;
+        width: var(--sidebar-width);
+        z-index: 900;
+        background: rgba(15, 15, 30, 0.55);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border-right: 1px solid var(--glass-border);
+        padding: 16px 0;
+        overflow-y: auto;
+        transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    [data-theme="light"] .sidebar {
+        background: rgba(255, 255, 255, 0.55);
+    }
+
+    .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 0 10px;
+    }
+
+    .nav-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        color: rgba(200, 210, 230, 0.7);
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.28s ease;
+        border: 1px solid transparent;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .nav-item::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 12px;
+        background: var(--accent-gradient);
+        opacity: 0;
+        transition: opacity 0.28s ease;
+    }
+
+    .nav-item:hover {
+        color: #fff;
+        background: var(--glass-bg);
+        border-color: var(--glass-border);
+        transform: translateX(4px);
+    }
+
+    .nav-item.active {
+        color: #fff;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.2), rgba(118, 75, 162, 0.2));
+        border-color: rgba(102, 126, 234, 0.4);
+        box-shadow: 0 0 20px rgba(102, 126, 234, 0.15), inset 0 0 20px rgba(102, 126, 234, 0.05);
+    }
+
+    .nav-item.active::before {
+        opacity: 0.08;
+    }
+
+    .nav-icon {
+        font-size: 18px;
+        width: 24px;
+        text-align: center;
+        flex-shrink: 0;
+        position: relative;
+        z-index: 1;
+    }
+
+    .nav-text {
+        position: relative;
+        z-index: 1;
+    }
+
+    /* ===== Sidebar Overlay ===== */
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 899;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+    }
+
+    /* ===== Main Content ===== */
+    .main-wrap {
+        margin-left: var(--sidebar-width);
+        margin-top: var(--header-height);
+        padding: 24px;
+        min-height: calc(100vh - var(--header-height));
+        position: relative;
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 768px) {
+        .sidebar {
+            transform: translateX(-100%);
+        }
+        .sidebar.open {
+            transform: translateX(0);
+            box-shadow: 4px 0 32px rgba(0, 0, 0, 0.4);
+        }
+        .sidebar-toggle {
+            display: inline-flex !important;
+        }
+        .sidebar-overlay.show { left: var(--sidebar-width, 220px); }
+        .main-wrap {
+            margin-left: 0;
+            padding: 12px;
+        }
+        .brand-logo {
+            font-size: 14px;
+            letter-spacing: 1px;
+        }
+        .user-info-dropdown span {
+            display: none;
+        }
+        /* Mobile table optimization */
+        .table-container { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+        table { min-width: 600px; font-size: 12px; }
+        th, td { padding: 8px 10px !important; white-space: nowrap; }
+        .table-btn { padding: 3px 8px !important; font-size: 11px !important; }
+        /* Mobile module title */
+        .module-title { font-size: 16px !important; }
+        /* Mobile stat cards */
+        .stat-card { padding: 14px 16px; }
+        .stat-num { font-size: 28px !important; }
+        /* Mobile overview chart */
+        .overview-chart-card { padding: 16px; }
+        .circle-wrap svg { width: 120px !important; height: 120px !important; }
+        /* Mobile nav-tabs */
+        .nav-tabs { padding: 4px; gap: 2px; }
+        .nav-tabs .nav-link { padding: 6px 12px; font-size: 12px; }
+        /* Mobile header */
+        .page-header { padding: 0 12px; }
+        .header-btn { width: 32px; height: 32px; font-size: 14px; }
+    }
+    @media (max-width: 480px) {
+        .main-wrap { padding: 10px; }
+        .stat-num { font-size: 24px !important; }
+        .module-title { font-size: 15px !important; padding-left: 10px; }
+        .dropdown-table { margin-left: 2px; }
+        .page-header { padding: 0 10px; }
+        .header-center { display: none; }
+    }
+
+    /* ===== Card Glass Effect for VM/LXC Cards ===== */
+    .vm-card {
+        background: var(--glass-bg) !important;
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 16px !important;
+        box-shadow: var(--glass-shadow) !important;
+        transition: all 0.3s ease !important;
+    }
+
+    .vm-card:hover {
+        border-color: rgba(102, 126, 234, 0.4) !important;
+        box-shadow: 0 8px 40px rgba(102, 126, 234, 0.15), var(--glass-shadow) !important;
+        transform: translateY(-2px);
+    }
+
+    /* ===== Modal Glass Effect ===== */
+    .modal-content {
+        background: rgba(20, 20, 40, 0.92) !important;
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-border);
+        border-radius: 16px !important;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5) !important;
+    }
+
+    [data-theme="light"] .modal-content {
+        background: rgba(255, 255, 255, 0.92) !important;
+    }
+
+    .modal-header {
+        border-bottom: 1px solid var(--glass-border) !important;
+        border-radius: 16px 16px 0 0 !important;
+    }
+
+    .modal-footer {
+        border-top: 1px solid var(--glass-border) !important;
+        border-radius: 0 0 16px 16px !important;
+    }
+
+    /* Dropdown menu glass effect */
+    .dropdown-menu {
+        background: rgba(20, 20, 40, 0.95) !important;
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4) !important;
+        margin-top: 8px !important;
+    }
+
+    [data-theme="light"] .dropdown-menu {
+        background: rgba(255, 255, 255, 0.95) !important;
+    }
+
+    .dropdown-item {
+        color: rgba(200, 210, 230, 0.85) !important;
+        border-radius: 8px !important;
+        margin: 2px 4px !important;
+        transition: all 0.2s ease !important;
+    }
+
+    .dropdown-item:hover {
+        background: rgba(102, 126, 234, 0.15) !important;
+        color: #fff !important;
+    }
+
+    .dropdown-divider {
+        border-top-color: var(--glass-border) !important;
+        margin: 4px 8px !important;
+    }
+
+    /* Scrollbar styling */
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: rgba(102, 126, 234, 0.3); border-radius: 4px; }
+    .sidebar::-webkit-scrollbar-thumb:hover { background: rgba(102, 126, 234, 0.5); }
+
+    /* Status badges */
+    .status-running {
+        background: linear-gradient(135deg, rgba(40, 167, 69, 0.2), rgba(40, 167, 69, 0.1)) !important;
+        color: #28a745 !important;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid rgba(40, 167, 69, 0.3);
+    }
+
+    .status-stopped {
+        background: linear-gradient(135deg, rgba(108, 117, 125, 0.2), rgba(108, 117, 125, 0.1)) !important;
+        color: #6c757d !important;
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 600;
+        border: 1px solid rgba(108, 117, 125, 0.3);
+    }
+
+    /* ========== Overview 总览样式 ========== */
+    .stat-card { padding: 20px 24px; border-radius: 14px;
+        background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border); transition: transform 0.3s ease; }
+    .stat-card:hover { transform: translateY(-4px); box-shadow: 0 8px 32px rgba(102, 126, 234, 0.15); }
+    .stat-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .stat-icon { font-size: 22px; width: 38px; height: 38px; border-radius: 10px;
+        display: grid; place-items: center; flex-shrink: 0; }
+    .stat-icon-run { background: rgba(54, 211, 153, 0.15); }
+    .stat-icon-stop { background: rgba(107, 114, 128, 0.12); }
+    .stat-label { font-size: 14px; color: rgba(200, 210, 230, 0.7); }
+    .stat-num { font-size: 36px; font-weight: 700; line-height: 1.2; color: #e0e0e0 !important; }
+
+    .overview-chart-card { padding: 28px; border-radius: 14px; text-align: center;
+        background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--glass-border); }
+    .circle-wrap { position: relative; display: inline-block; margin-bottom: 16px; }
+    .circle-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+    .circle-num { font-size: 32px; font-weight: 700; line-height: 1; color: #e0e0e0; }
+    .circle-name { font-size: 13px; margin-top: 4px; color: rgba(200, 210, 230, 0.6); }
+    .circle-bg { fill: transparent; stroke: rgba(148, 163, 184, 0.15); stroke-width: 12;
+        stroke-linecap: round; }
+    .circle-progress { fill: transparent; stroke: #36D399; stroke-width: 12;
+        stroke-linecap: round; stroke-dasharray: 377; transition: stroke-dashoffset 0.6s ease; }
+    .chart-legend { display: flex; justify-content: center; gap: 18px; font-size: 13px; color: rgba(200, 210, 230, 0.6); }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+    .dot-run { background: #36D399; }
+    .dot-stop { background: #6b7280; }
+
+    .module-title { font-size: 18px; font-weight: 700; color: #e0e0e0;
+        letter-spacing: -0.3px; position: relative; padding-left: 14px; margin: 16px 0 20px; }
+    .module-title::before { content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+        width: 3px; height: 18px; border-radius: 2px; background: linear-gradient(180deg, #667eea, #764ba2); }
+
+    /* ========== 玻璃态按钮 ========== */
+    .btn-glass { padding: 7px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;
+        border: 1px solid rgba(99,102,241,0.3); cursor: pointer; transition: all 0.2s ease;
+        background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15));
+        color: #C7D2FE; box-shadow: 0 2px 10px rgba(99,102,241,0.15); }
+    .btn-glass:hover:not(:disabled) { background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.22));
+        color: #E0E7FF; box-shadow: 0 4px 16px rgba(99,102,241,0.25); transform: translateY(-1px); }
+    .btn-glass:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+    .btn-glass-success { border-color: rgba(54,211,153,0.35);
+        background: linear-gradient(135deg, rgba(54,211,153,0.2), rgba(34,197,94,0.12)); color: #6EE7B7; }
+    .btn-glass-success:hover:not(:disabled) { background: linear-gradient(135deg, rgba(54,211,153,0.32), rgba(34,197,94,0.22));
+        color: #A7F3D0; box-shadow: 0 4px 16px rgba(54,211,153,0.25); }
+
+    .btn-glass-warning { border-color: rgba(251,191,36,0.35);
+        background: linear-gradient(135deg, rgba(251,191,36,0.18), rgba(245,158,11,0.12)); color: #FCD34D; }
+    .btn-glass-warning:hover:not(:disabled) { background: linear-gradient(135deg, rgba(251,191,36,0.30), rgba(245,158,11,0.20));
+        color: #FDE68A; box-shadow: 0 4px 16px rgba(251,191,36,0.25); }
+
+    .btn-glass-danger { border-color: rgba(239,68,68,0.35);
+        background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(220,38,38,0.12)); color: #FCA5A5; }
+    .btn-glass-danger:hover:not(:disabled) { background: linear-gradient(135deg, rgba(239,68,68,0.30), rgba(220,38,38,0.20));
+        color: #FECACA; box-shadow: 0 4px 16px rgba(239,68,68,0.25); }
+
+    .btn-glass-info { border-color: rgba(59,130,246,0.35);
+        background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(99,102,241,0.12)); color: #93C5FD; }
+    .btn-glass-info:hover:not(:disabled) { background: linear-gradient(135deg, rgba(59,130,246,0.32), rgba(99,102,241,0.22));
+        color: #BFDBFE; box-shadow: 0 4px 16px rgba(59,130,246,0.25); }
+
+    /* ========== 表格样式（与 admin 统一） ========== */
+    .table-container { background: var(--glass-bg); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border); border-radius: 12px; overflow: visible; box-shadow: var(--glass-shadow); }
+    .table-scroll { overflow: visible; pointer-events: auto; }
+    .vm-table-wrap { margin-top: 0; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { padding: 11px 16px; text-align: left; font-weight: 600; color: rgba(200,210,230,0.6); font-size: 12px;
+        text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--glass-border);
+        background: rgba(255,255,255,0.02); white-space: nowrap; }
+    td { padding: 11px 16px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; color: #e0e0e0; font-size: 13px; }
+    tr:hover td { background: rgba(99,102,241,0.04); }
+
+    .tag-run { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+        color: #36D399; background: rgba(54,211,153,0.15); white-space: nowrap; }
+    .tag-stop { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
+        color: #6B7280; background: rgba(107,114,128,0.15); white-space: nowrap; }
+
+    .table-btn { padding: 4px 12px; font-size: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px;
+        cursor: pointer !important; transition: all 0.2s ease; background: rgba(255,255,255,0.04);
+        color: rgba(200,210,230,0.6); white-space: nowrap; line-height: 1.6;
+        position: relative; z-index: 10; display: inline-flex; align-items: center; }
+    .table-btn:hover { border-color: rgba(99,102,241,0.5); color: #e0e0e0; background: rgba(99,102,241,0.12); }
+    .table-btn.btn-primary { color: #818CF8; background: rgba(129,140,248,0.1); border-color: rgba(129,140,248,0.2); }
+    .table-btn.btn-primary:hover { background: rgba(129,140,248,0.2); color: #C7D2FE; }
+    .table-btn.btn-danger { color: #F87171; background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.18); }
+    .table-btn.btn-danger:hover { background: rgba(248,113,113,0.18); color: #FCA5A5; }
+
+    .btn-group-table { display: inline-flex; gap: 2px; vertical-align: middle; }
+    .dropdown-table { display: inline-block; position: relative; vertical-align: middle; margin-left: 4px; }
+    .dropdown-table .dropdown-toggle::after { display: none; }
+    .dropdown-menu-table { display: none; position: absolute; right: 0; top: 100%; z-index: 1000;
+        min-width: 120px; padding: 6px 0; background: rgba(15,17,27,0.95); backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border); border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4); list-style: none; margin-top: 4px; }
+    /* 确保表格元素不裁剪绝对定位的下拉菜单 */
+    .table-scroll { overflow: visible !important; }
+    .table-scroll table { overflow: visible; }
+    .table-scroll tbody { overflow: visible; }
+    .table-scroll tr { overflow: visible; }
+    .table-scroll td { overflow: visible !important; }
+    .dropdown-menu-table li .dropdown-item { display: block; padding: 6px 14px; font-size: 13px; color: #e0e0e0;
+        text-decoration: none; transition: background 0.15s; white-space: nowrap; cursor: pointer; }
+    .dropdown-menu-table li .dropdown-item:hover { background: rgba(99,102,241,0.15); color: #fff; }
+
+    /* 浮动下拉菜单（Teleport到body，不受表格overflow影响） */
+    .floating-dropdown-menu {
+        position: fixed; z-index: 9999;
+        min-width: 120px; padding: 6px 0;
+        background: rgba(15,17,27,0.95); backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border); border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        list-style: none;
+    }
+    .floating-dropdown-menu .dropdown-item {
+        display: block; padding: 6px 16px; font-size: 13px; color: #e0e0e0;
+        cursor: pointer; white-space: nowrap; transition: background 0.15s;
+    }
+    .floating-dropdown-menu .dropdown-item:hover { background: rgba(99,102,241,0.2); color: #fff; }
+
+    /* Form controls glass effect */
+    .form-control, .form-select {
+        background: rgba(255, 255, 255, 0.06) !important;
+        border-color: var(--glass-border) !important;
+        color: inherit !important;
+        border-radius: 10px !important;
+    }
+
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea !important;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2) !important;
+    }
+
+    /* Table styling */
+    .table-dark {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border-color: var(--glass-border) !important;
+    }
+
+    .table > thead {
+        background: rgba(102, 126, 234, 0.1) !important;
+    }
+
+    /* Buttons glow effect */
+    .btn-primary {
+        background: var(--accent-gradient) !important;
+        border: none !important;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+    }
+
+    .btn-primary:hover {
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45) !important;
+        transform: translateY(-1px);
+    }
+
+    /* Destroyed & Confirm overlays */
+    .destroyed-overlay, .confirm-overlay {
+        background: rgba(15, 15, 30, 0.85) !important;
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+    }
+
+    /* Custom select dropdown */
+    .custom-select-dropdown {
+        background: rgba(20, 20, 40, 0.97) !important;
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 10px !important;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    .custom-select .option:hover, .custom-select .option.selected {
+        background: rgba(102, 126, 234, 0.15) !important;
+    }
+
+    /* Card headers in modals */
+    .card-header {
+        background: rgba(102, 126, 234, 0.06) !important;
+        border-bottom: 1px solid var(--glass-border) !important;
+        border-radius: 12px 12px 0 0 !important;
+    }
+
+    .card {
+        background: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid var(--glass-border) !important;
+        border-radius: 12px !important;
+    }
+
+    .list-group-item {
+        background: transparent !important;
+        border-color: var(--glass-border) !important;
+        color: inherit !important;
+    }
+
+    .list-group-item:hover {
+        background: rgba(102, 126, 234, 0.08) !important;
+    }
+
+    .list-group-item-primary {
+        background: rgba(102, 126, 234, 0.12) !important;
+    }
+
+    /* Alert styling */
+    .alert-danger {
+        background: rgba(220, 53, 69, 0.12) !important;
+        border-color: rgba(220, 53, 69, 0.3) !important;
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+    }
+
+    .alert-success {
+        background: rgba(40, 167, 69, 0.12) !important;
+        border-color: rgba(40, 167, 69, 0.3) !important;
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+    }
+
+    /* Progress bar */
+    .progress {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-radius: 8px !important;
+    }
+
+    .progress-bar {
+        background: var(--accent-gradient) !important;
+        border-radius: 8px !important;
+    }
+
+    /* Badge styling */
+    .badge {
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+    }
+
+    .bg-warning {
+        background: linear-gradient(135deg, #f093fb, #f5576c) !important;
+    }
+
+    .bg-secondary {
+        background: rgba(108, 117, 125, 0.3) !important;
+    }
+
+    /* Message type badge */
+    .message-type-badge {
+        padding: 3px 10px;
+        border-radius: 8px;
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    /* Footer version */
+    .text-muted.small {
+        opacity: 0.5;
+    }
+
+    /* ========== 确认弹窗（全屏遮罩） ========== */
+    .vm-detail-modal { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center;
+        background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 20px; }
+    .vm-detail-modal.show { display: flex; }
+    .modal-close { width: 32px; height: 32px; border: 1px solid var(--glass-border);
+        border-radius: 8px; background: transparent; color: var(--text-secondary,#9CA3AF); font-size: 18px;
+        cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; }
+    .modal-close:hover { background: rgba(239,68,68,0.15); color: #FCA5A5; border-color: rgba(239,68,68,0.3); }
+    </style>
 </head>
 <body>
-    <template id="appTemplate">
-        <nav class="navbar navbar-expand-lg navbar-dark mb-4">
-            <div class="container">
-                <a class="navbar-brand" :href="user && user.role === 'admin' ? 'admin.html?section=vms' : 'dashboard.html'">PVE 多用户控制面板</a>
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item" v-for="item in navItems" :key="item.id">
-                        <a class="nav-link" :class="{ active: item.id === currentNavId }" :href="item.href">{{ item.label }}</a>
-                    </li>
-                </ul>
-                <div class="navbar-nav ms-auto align-items-center">
-                    <a v-if="user" class="btn btn-link text-white position-relative me-2 p-1" href="user-center.html#messages" aria-label="消息" title="消息" style="text-decoration:none;">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                        </svg>
-                        <span v-if="unreadCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:10px; min-width:16px;">
-                            {{ unreadCount > 99 ? '99+' : unreadCount }}
-                        </span>
-                    </a>
-                    <div class="dropdown" v-if="user">
-                        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            <img v-if="user.avatar" :src="user.avatar" alt="" class="rounded-circle" style="width: 24px; height: 24px; object-fit: cover; margin-right: 5px;"/>
-                            <img v-else :src="getGeekAvatar(user.username)" alt="" class="rounded-circle" style="width: 24px; height: 24px; object-fit: cover; margin-right: 5px;"/>
-                            {{ user.username }}
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="user-center.html">用户中心</a></li>
-                            <li><hr class="dropdown-divider"/></li>
-                            <li><a class="dropdown-item" href="#" @click.prevent="logout">退出登录</a></li>
-                        </ul>
+
+<!-- ===== 1. Page Header (Fixed Top 64px) ===== -->
+<header class="page-header">
+    <div class="header-left">
+        <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+        <span class="brand-logo">PVE 面板</span>
+    </div>
+    <div class="header-right">
+        <button class="header-btn" onclick="location.reload()" title="刷新">↻</button>
+        <button class="header-btn" id="themeToggle" title="主题切换">☾</button>
+        <div class="notification-wrapper">
+            <button class="header-btn" title="消息">🔔</button>
+            <span class="notification-badge" id="msgCount" style="display:none;">0</span>
+        </div>
+        <div class="dropdown">
+            <div class="user-info-dropdown" data-bs-toggle="dropdown">
+                <img class="header-user-avatar" id="headerAvatar" alt="" />
+                <span id="headerUsername">用户名</span>
+            </div>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item" href="/user-center.html"><i class="me-1">👤</i>用户中心</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li><a class="dropdown-item" href="#" onclick="logout()"><i class="me-1">🚪</i>退出登录</a></li>
+            </ul>
+        </div>
+    </div>
+</header>
+
+<!-- ===== 2. Sidebar (Fixed Left 220px) ===== -->
+<aside class="sidebar" id="sidebar">
+    <nav class="sidebar-nav">
+        <a class="nav-item active" data-section="overview" onclick="window.__dashboard.switchSection('overview');return false;"><span class="nav-icon">🏠</span><span class="nav-text">总览</span></a>
+        <a class="nav-item" data-section="vm" onclick="window.__dashboard.switchSection('vm');return false;"><span class="nav-icon">💻</span><span class="nav-text">虚拟机</span></a>
+        <a class="nav-item" data-section="lxc" onclick="window.__dashboard.switchSection('lxc');return false;"><span class="nav-icon">🗃</span><span class="nav-text">容器</span></a>
+    </nav>
+</aside>
+
+<!-- ===== 3. Sidebar Overlay (Mobile Mask) ===== -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+<!-- ===== 4. Main Content ===== -->
+<main class="main-wrap" id="mainContent">
+
+<template id="appTemplate">
+
+    <!-- 原来的 container 内容区域（移除了旧的 navbar） -->
+    <div v-if="!user" class="text-center py-5">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">加载中...</span>
+        </div>
+        <p class="mt-2 text-muted">正在验证登录状态...</p>
+    </div>
+
+    <div v-else>
+        <!-- Overview 总览 -->
+        <div v-show="activeSection === 'overview'">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="module-title mb-0">资源运行概况</h4>
+                <button class="btn-glass btn-glass-info" @click="openCdkRedeem">CDK 兑换</button>
+            </div>
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6 col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-card-head">
+                            <span class="stat-icon stat-icon-run">💻</span>
+                            <span class="stat-label">虚拟机运行中</span>
+                        </div>
+                        <div class="stat-num">{{ userVms.filter(v => v.status && v.status.status === 'running').length }}</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-card-head">
+                            <span class="stat-icon stat-icon-stop">💻</span>
+                            <span class="stat-label">虚拟机已停止</span>
+                        </div>
+                        <div class="stat-num">{{ userVms.filter(v => !v.status || v.status.status !== 'running').length }}</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-card-head">
+                            <span class="stat-icon stat-icon-run">🗃</span>
+                            <span class="stat-label">容器运行中</span>
+                        </div>
+                        <div class="stat-num">{{ userLxcContainers.filter(c => c.status && c.status.status === 'running').length }}</div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-md-3">
+                    <div class="stat-card">
+                        <div class="stat-card-head">
+                            <span class="stat-icon stat-icon-stop">🗃</span>
+                            <span class="stat-label">容器已停止</span>
+                        </div>
+                        <div class="stat-num">{{ userLxcContainers.filter(c => !c.status || c.status.status !== 'running').length }}</div>
                     </div>
                 </div>
             </div>
-        </nav>
 
-        <div class="container">
-            <div v-if="!user" class="text-center py-5">
+            <h4 class="module-title">资源分布</h4>
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <div class="overview-chart-card">
+                        <div class="circle-wrap">
+                            <svg width="160" height="160" viewBox="0 0 130 130">
+                                <circle class="circle-bg" cx="65" cy="65" r="60"></circle>
+                                <circle class="circle-progress" :style="{ strokeDashoffset: circleVmOffset }" cx="65" cy="65" r="60"></circle>
+                            </svg>
+                            <div class="circle-text">
+                                <div class="circle-num">{{ userVms.length }}</div>
+                                <div class="circle-name">虚拟机</div>
+                            </div>
+                        </div>
+                        <div class="chart-legend">
+                            <span class="legend-item"><span class="legend-dot dot-run"></span> 运行 {{ userVms.filter(v => v.status && v.status.status === 'running').length }}</span>
+                            <span class="legend-item"><span class="legend-dot dot-stop"></span> 停止 {{ userVms.filter(v => !v.status || v.status.status !== 'running').length }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="overview-chart-card">
+                        <div class="circle-wrap">
+                            <svg width="160" height="160" viewBox="0 0 130 130">
+                                <circle class="circle-bg" cx="65" cy="65" r="60"></circle>
+                                <circle class="circle-progress" :style="{ strokeDashoffset: circleCtOffset, stroke: userLxcContainers.length > 0 ? '#36D399' : '#6B7280' }" cx="65" cy="65" r="60"></circle>
+                            </svg>
+                            <div class="circle-text">
+                                <div class="circle-num">{{ userLxcContainers.length }}</div>
+                                <div class="circle-name">容器</div>
+                            </div>
+                        </div>
+                        <div class="chart-legend">
+                            <span class="legend-item"><span class="legend-dot dot-run"></span> 运行 {{ userLxcContainers.filter(c => c.status && c.status.status === 'running').length }}</span>
+                            <span class="legend-item"><span class="legend-dot dot-stop"></span> 停止 {{ userLxcContainers.filter(c => !c.status || c.status.status !== 'running').length }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VM Section -->
+        <div v-show="activeSection === 'vm'">
+            <h4 class="module-title">我的虚拟机</h4>
+            <div v-if="loading" class="text-center py-4">
                 <div class="spinner-border text-primary" role="status">
                     <span class="visually-hidden">加载中...</span>
                 </div>
-                <p class="mt-2 text-muted">正在验证登录状态...</p>
+                <p class="mt-2 text-muted">加载中...</p>
             </div>
-
-            <div v-else>
-                <!-- VM Section -->
-                <div v-show="activeSection === 'vm'">
-                    <div v-if="loading" class="text-center py-4">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">加载中...</span>
-                        </div>
-                        <p class="mt-2 text-muted">加载中...</p>
-                    </div>
-                    <div v-else class="row g-3">
-                        <div v-for="vm in userVms" :key="vm.id" class="col-md-6 d-flex">
-                            <div class="card vm-card h-100 w-100" :class="{ expired: vm.isExpired, destroyed: vm.destroyed }">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h5 class="card-title mb-0">{{ vm.name || 'VM ' + vm.vm_id }}</h5>
-                                        <span v-if="vm.status" :class="vm.status.status === 'running' ? 'status-running' : 'status-stopped'">
-                                            {{ vm.status.status === 'running' ? '运行中' : '已停止' }}
-                                        </span>
-                                    </div>
-                                    <div class="text-muted small mb-2">
-                                        <strong>VMID:</strong> {{ vm.vm_id }}
-                                        <span v-if="vm.status && vm.status.status === 'running' && vm.status.uptime !== undefined" class="ms-3">
-                                            <strong>运行时长:</strong> {{ formatUptime(vm.status.uptime) }}
-                                        </span>
-                                    </div>
-                                    <div v-if="vm.config" class="mb-2">
-                                        <div class="row">
-                                            <div class="col-6">
-                                                <small class="vm-label">CPU:</small> {{ vm.config.sockets || 1 }} x {{ vm.config.cores || 1 }} 核
-                                            </div>
-                                            <div class="col-6">
-                                                <small class="vm-label">内存:</small> {{ formatMemory(vm.config.memory) }}
-                                            </div>
+            <div v-else class="vm-table-wrap">
+                <div class="table-container">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>主机名称</th>
+                                    <th>内网IP</th>
+                                    <th>配置</th>
+                                    <th>系统</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="vm in userVms" :key="vm.id">
+                                    <td>{{ vm.vm_id }}</td>
+                                    <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
+                                    <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
+                                    <td>{{ (vm.config ? (vm.config.sockets||1) + '核' + (vm.config.cores||1) + 'G' : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
+                                    <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
+                                    <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
+                                    <td>
+                                        <button class="table-btn" @click="openDeviceForward(vm, 'vm')" title="端口转发">网络</button>
+                                        <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
+                                            <button class="table-btn" @click="openVncConsole(vm.vm_id)" title="VNC控制台">控制台</button>
+                                            <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
+                                            <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
+                                            <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
                                         </div>
-                                    </div>
-                                    <div v-if="vm.status" class="mb-2">
-                                        <div class="row">
-                                            <div class="col-6" v-if="vm.status.cpu !== undefined">
-                                                <small class="vm-label">CPU 使用率:</small> {{ (vm.status.cpu * 100).toFixed(1) }}%
-                                            </div>
-                                            <div class="col-6" v-if="vm.status.mem !== undefined && vm.config">
-                                                <small class="vm-label">内存使用率:</small> {{ ((vm.status.mem / (vm.config.memory * 1024 * 1024)) * 100).toFixed(1) }}%
-                                            </div>
+                                        <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
+                                            <button class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
                                         </div>
-                                    </div>
-                                    <div v-if="vm.status" class="mb-2">
-                                        <div class="row">
-                                            <div class="col-6" v-if="vm.status.netin !== undefined || vm.status.netout !== undefined">
-                                                <small class="vm-label">网络流量:</small>
-                                                <span v-if="vm.status.netin !== undefined">↓{{ formatBytes(vm.status.netin) }}/s 下载</span>
-                                                <span v-if="vm.status.netin !== undefined && vm.status.netout !== undefined"> / </span>
-                                                <span v-if="vm.status.netout !== undefined">↑{{ formatBytes(vm.status.netout) }}/s 上传</span>
-                                            </div>
-                                            <div class="col-6" v-if="vm.status.diskread !== undefined || vm.status.diskwrite !== undefined">
-                                                <small class="vm-label">磁盘IO:</small>
-                                                <span v-if="vm.status.diskread !== undefined">↓{{ formatBytes(vm.status.diskread) }}/s 读</span>
-                                                <span v-if="vm.status.diskread !== undefined && vm.status.diskwrite !== undefined"> / </span>
-                                                <span v-if="vm.status.diskwrite !== undefined">↑{{ formatBytes(vm.status.diskwrite) }}/s 写</span>
-                                            </div>
+                                        <div class="dropdown-table">
+                                            <button class="table-btn dropdown-toggle" @click.stop="toggleDropdown('vm-'+vm.id, $event.currentTarget, [
+                                                {label:'快照', action:function(){ openSnapshotPanel(vm) }},
+                                                {label:'备份', action:function(){ openBackupPanel(vm) }},
+                                                {label:'编辑', action:function(){ editVm(vm) }}
+                                            ])">更多</button>
                                         </div>
-                                    </div>
-                                    <div class="mb-2">
-                                        <small class="vm-label">到期时间:</small> {{ vm.expiration_date ? formatDate(vm.expiration_date) : '无限期' }}
-                                        <span v-if="vm.isExpired" class="badge bg-warning ms-2">已过期</span>
-                                    </div>
-                                    <div class="mb-2">
-                                        <small class="vm-label">续费价格:</small> {{ vm.renewal_price || '暂无' }}
-                                    </div>
-                                    <div class="d-flex gap-2 mt-auto flex-wrap align-items-center">
-                                        <!-- 电源控制 -->
-                                        <div class="btn-group">
-                                            <button class="btn btn-success btn-sm" @click="startVm(vm.vm_id)" :disabled="!vm.status || vm.status.status === 'running' || (vm.isExpired && (!user || user.role !== 'admin'))">启动</button>
-                                            <button class="btn btn-warning btn-sm text-white" @click="requestConfirm(vm.id, 'shutdown')" :disabled="!vm.status || vm.status.status !== 'running'" title="安全关机">关机</button>
-                                            <button class="btn btn-secondary btn-sm" @click="requestConfirm(vm.id, 'reboot')" :disabled="!vm.status || vm.status.status !== 'running'" title="重启">重启</button>
-                                            <button class="btn btn-danger btn-sm" @click="requestConfirm(vm.id, 'stop')" :disabled="!vm.status || vm.status.status !== 'running'" title="强制停止">停止</button>
-                                        </div>
-                                        <!-- VNC -->
-                                        <button class="btn btn-info btn-sm text-white" @click="openVncConsole(vm.vm_id)" :disabled="!vm.status || vm.status.status !== 'running'" title="打开 VNC 控制台">VNC</button>
-                                        <!-- 网络 -->
-                                        <button class="btn btn-outline-info btn-sm text-white" @click="openDeviceForward(vm, 'vm')" title="端口转发管理">网络</button>
-                                        <!-- 管理 -->
-                                        <div class="btn-group">
-                                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">管理</button>
-                                            <ul class="dropdown-menu">
-                                                <li><button class="dropdown-item" @click="openSnapshotPanel(vm)">快照</button></li>
-                                                <li><button class="dropdown-item" @click="openBackupPanel(vm)">备份</button></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><button class="dropdown-item" @click="editVm(vm)">编辑</button></li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div v-if="vm.destroyed" class="destroyed-overlay">
-                                    <div class="destroyed-overlay-content">
-                                        <svg class="destroyed-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="12" cy="12" r="10"/>
-                                            <line x1="12" y1="8" x2="12" y2="12"/>
-                                            <line x1="12" y1="16" x2="12.01" y2="16"/>
-                                        </svg>
-                                        <div class="destroyed-title">该虚拟机已被销毁</div>
-                                        <div class="destroyed-desc mb-3">请联系管理员处理</div>
-                                        <button v-if="user && user.role === 'admin'" class="btn btn-danger btn-sm" @click="removeVmById(vm.id)">移除此分配</button>
-                                    </div>
-                                </div>
-                                <div v-if="confirmState.vmId === vm.id" class="confirm-overlay">
-                                    <div class="confirm-overlay-content">
-                                        <svg class="confirm-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                                            <line x1="12" y1="9" x2="12" y2="13"/>
-                                            <line x1="12" y1="17" x2="12.01" y2="17"/>
-                                        </svg>
-                                        <div class="confirm-title">确认操作</div>
-                                        <div class="confirm-desc mb-3">{{ confirmActionText }}</div>
-                                        <div class="d-flex gap-2 justify-content-center">
-                                            <button class="btn btn-danger btn-sm" @click="confirmAction(vm)">确认</button>
-                                            <button class="btn btn-outline-light btn-sm" @click="cancelConfirm">取消</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div v-if="!loading && userVms.length === 0" class="text-muted text-center py-4">
-                        暂无虚拟机
-                    </div>
-                </div>
-
-                <!-- LXC Section -->
-                <div v-show="activeSection === 'lxc'">
-                    <div v-if="lxcLoading" class="text-center py-4">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">加载中...</span>
-                        </div>
-                        <p class="mt-2 text-muted">加载中...</p>
-                    </div>
-                    <div v-else class="row g-3">
-                        <div v-for="ct in userLxcContainers" :key="ct.id" class="col-md-6 d-flex">
-                            <div class="card vm-card h-100 w-100" :class="{ expired: ct.isExpired, destroyed: ct.destroyed }">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="d-flex justify-content-between align-items-start mb-2">
-                                        <h5 class="card-title mb-0">{{ ct.name || 'CT ' + ct.ct_id }}</h5>
-                                        <div>
-                                            <span v-if="ct.isExpired" class="badge bg-warning me-1">已到期</span>
-                                            <span v-if="ct.status" :class="ct.status.status === 'running' ? 'status-running' : 'status-stopped'">
-                                                {{ ct.status.status === 'running' ? '运行中' : '已停止' }}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="text-muted small mb-2">
-                                        <strong>CTID:</strong> {{ ct.ct_id }}
-                                        <span v-if="ct.status && ct.status.status === 'running' && ct.status.uptime !== undefined" class="ms-3">
-                                            <strong>运行时长:</strong> {{ formatLxcUptime(ct.status.uptime) }}
-                                        </span>
-                                    </div>
-                                    <div v-if="ct.config" class="mb-2">
-                                        <div class="row">
-                                            <div class="col-6">
-                                                <small class="vm-label">CPU:</small> {{ ct.config.cores || 1 }} 核
-                                            </div>
-                                            <div class="col-6">
-                                                <small class="vm-label">内存:</small> {{ formatMemory(ct.config.memory) }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div v-if="ct.config" class="mb-2">
-                                        <div class="row">
-                                            <div class="col-6">
-                                                <small class="vm-label">磁盘:</small> {{ formatMemory(ct.config.disk) || '-' }}
-                                            </div>
-                                            <div class="col-6" v-if="ct.config.swap">
-                                                <small class="vm-label">Swap:</small> {{ formatMemory(ct.config.swap) }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div v-if="ct.status" class="mb-2">
-                                        <div class="row">
-                                            <div class="col-6" v-if="ct.status.cpu !== undefined">
-                                                <small class="vm-label">CPU 使用率:</small> {{ getLxcCpuUsage(ct) }}%
-                                            </div>
-                                            <div class="col-6" v-if="ct.status.mem !== undefined && ct.config">
-                                                <small class="vm-label">内存使用率:</small> {{ getLxcMemUsage(ct) }}%
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div v-if="ct.status" class="mb-2">
-                                        <div class="row">
-                                            <div class="col-6" v-if="ct.status.netin !== undefined || ct.status.netout !== undefined">
-                                                <small class="vm-label">网络流量:</small>
-                                                <span v-if="ct.status.netin !== undefined">↓{{ formatBytes(ct.status.netin) }}/s 下载</span>
-                                                <span v-if="ct.status.netin !== undefined && ct.status.netout !== undefined"> / </span>
-                                                <span v-if="ct.status.netout !== undefined">↑{{ formatBytes(ct.status.netout) }}/s 上传</span>
-                                            </div>
-                                            <div class="col-6" v-if="ct.status.diskread !== undefined || ct.status.diskwrite !== undefined">
-                                                <small class="vm-label">磁盘IO:</small>
-                                                <span v-if="ct.status.diskread !== undefined">↓{{ formatBytes(ct.status.diskread) }}/s 读</span>
-                                                <span v-if="ct.status.diskread !== undefined && ct.status.diskwrite !== undefined"> / </span>
-                                                <span v-if="ct.status.diskwrite !== undefined">↑{{ formatBytes(ct.status.diskwrite) }}/s 写</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="mb-2">
-                                        <small class="vm-label">到期时间:</small> {{ ct.expiration_date ? formatDate(ct.expiration_date) : '无限期' }}
-                                        <span v-if="ct.isExpired" class="badge bg-warning ms-2">已过期</span>
-                                    </div>
-                                    <div class="mb-2">
-                                        <small class="vm-label">续费价格:</small> {{ ct.renewal_price || '暂无' }}
-                                    </div>
-                                    <div class="d-flex gap-2 mt-auto flex-wrap align-items-center">
-                                        <!-- 电源控制 -->
-                                        <div class="btn-group">
-                                            <button class="btn btn-success btn-sm" @click="startLxc(ct.ct_id)" :disabled="!ct.status || ct.status.status === 'running' || (ct.isExpired && (!user || user.role !== 'admin'))">启动</button>
-                                            <button class="btn btn-warning btn-sm text-white" @click="shutdownLxc(ct.ct_id)" :disabled="!ct.status || ct.status.status !== 'running'" title="安全关机">关机</button>
-                                            <button class="btn btn-secondary btn-sm" @click="rebootLxc(ct.ct_id)" :disabled="!ct.status || ct.status.status !== 'running'" title="重启">重启</button>
-                                            <button class="btn btn-danger btn-sm" @click="stopLxc(ct.ct_id)" :disabled="!ct.status || ct.status.status !== 'running'" title="强制停止">停止</button>
-                                        </div>
-                                        <!-- 终端 -->
-                                        <button class="btn btn-success btn-sm text-white" @click="openLxcTerminal(ct.ct_id)" :disabled="!ct.status || ct.status.status !== 'running'" title="打开终端">终端</button>
-                                        <!-- 网络 -->
-                                        <button class="btn btn-outline-info btn-sm text-white" @click="openDeviceForward(ct, 'lxc')" title="端口转发管理">网络</button>
-                                        <!-- 管理 -->
-                                        <div class="btn-group">
-                                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" data-bs-toggle="dropdown">管理</button>
-                                            <ul class="dropdown-menu">
-                                                <li><button class="dropdown-item" @click="openLxcSnapshotPanel(ct)">快照</button></li>
-                                                <li><button class="dropdown-item" @click="openLxcBackupPanel(ct)">备份</button></li>
-                                                <li><button class="dropdown-item" @click="openLxcPasswordReset(ct)" :disabled="!ct.status || ct.status.status !== 'running'">重置密码</button></li>
-                                                <li><button class="dropdown-item" @click="openResetLxcIpModal(ct)">重置 IP</button></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><button class="dropdown-item" @click="editLxc(ct)">编辑</button></li>
-                                            </ul>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div v-if="ct.destroyed" class="destroyed-overlay">
-                                    <div class="destroyed-overlay-content">
-                                        <svg class="destroyed-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                            <circle cx="12" cy="12" r="10"/>
-                                            <line x1="12" y1="8" x2="12" y2="12"/>
-                                            <line x1="12" y1="16" x2="12.01" y2="16"/>
-                                        </svg>
-                                        <div class="destroyed-title">该LXC容器已被销毁</div>
-                                        <div class="destroyed-desc mb-3">请联系管理员处理</div>
-                                        <button v-if="user && user.role === 'admin'" class="btn btn-danger btn-sm" @click="removeLxcById(ct.id)">移除此分配</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div v-if="!lxcLoading && userLxcContainers.length === 0" class="text-muted text-center py-4">
-                        暂无LXC容器
+                                    </td>
+                                </tr>
+                                <tr v-if="userVms.length === 0">
+                                    <td colspan="7" class="text-center text-muted py-4">暂无虚拟机</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
 
-        <Teleport to="body">
-
-        <div class="modal fade" id="deviceForwardModal" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-centered">
-                <div class="modal-content" style="background:#1a1a2e;color:#e0e0e0;">
-                    <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
-                        <h5 class="modal-title">{{ currentDevice.name || (currentDevice.type === 'vm' ? 'VM ' + currentDevice.deviceId : 'CT ' + currentDevice.deviceId) }} - 端口转发管理</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body" style="min-height:150px;">
-
-                        <!-- 规则列表 -->
-                        <template v-if="!showDeviceForm">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <div><span class="text-muted small">共 {{ deviceRules.length }} 条规则</span><span class="text-muted small ms-3">剩余可用 {{ forwardConfig.remaining }} 条</span></div>
-                                <button class="btn btn-primary btn-sm" @click="openDeviceFormModal">添加端口转发</button>
-                            </div>
-                            <div v-if="deviceRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>
-                            <div v-else class="table-responsive mb-0">
-                                <table class="table table-dark table-striped table-hover mb-0">
-                                    <thead><tr>
-                                        <th>名称</th><th>目标 IP</th><th>内网端口</th><th>外网端口</th><th>协议</th><th>状态</th><th>操作</th>
-                                    </tr></thead>
-                                    <tbody>
-                                        <tr v-for="rule in deviceRules" :key="rule.id" :class="{ 'text-muted': rule.sync_status === 'orphan' }">
-                                            <td>{{ rule.name || '-' }}</td>
-                                            <td>{{ rule.ip }}</td>
-                                            <td>{{ rule.internal_port }}</td>
-                                            <td>{{ rule.external_port }}</td>
-                                            <td>{{ (rule.protocol || '').toUpperCase() }}</td>
-                                            <td><span :class="rule.enabled ? 'text-success' : 'text-muted'">{{ rule.enabled ? '启用' : '禁用' }}</span></td>
-                                            <td>
-                                                <button class="btn btn-sm btn-outline-light me-1" @click="openDeviceEditModal(rule)" title="编辑">编辑</button>
-                                                <button class="btn btn-sm btn-outline-danger" @click="deleteDeviceRule(rule)" title="删除">删除</button>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-                        </template>
-
-                        <!-- 添加/编辑表单 -->
-                        <template v-if="showDeviceForm">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="mb-0">{{ editingDeviceRuleId ? '编辑端口转发' : '添加端口转发' }}</h6>
-                                <button class="btn btn-sm btn-outline-light" @click="cancelDeviceForm">返回</button>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">规则名称</label>
-                                <input type="text" class="form-control bg-dark text-light border-secondary" v-model="deviceForm.name" placeholder="如 SSH 转发">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">目标 IP</label>
-                                <input type="text" class="form-control bg-dark text-light border-secondary" :value="availableIps[0]?.ip || ''" readonly>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">协议</label>
-                                <select class="form-select bg-dark text-light border-secondary" v-model="deviceForm.protocol">
-                                    <option value="tcp">TCP</option>
-                                    <option value="udp">UDP</option>
-                                    <option value="tcp+udp">TCP+UDP</option>
-                                </select>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">内网端口</label>
-                                    <input type="number" class="form-control bg-dark text-light border-secondary" v-model.number="deviceForm.internal_port" min="1" max="65535">
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">外网端口</label>
-                                    <div class="input-group">
-                                        <input type="number" class="form-control bg-dark text-light border-secondary" :class="{ 'is-invalid': deviceCheckResult === false }" v-model.number="deviceForm.external_port" min="1" max="65535">
-                                        <button class="btn btn-outline-secondary" type="button" @click="randomDevicePort" title="随机端口">🎲</button>
-                                    </div>
-                                    <small class="text-muted">可用范围: {{ forwardConfig.port_range_start }}-{{ forwardConfig.port_range_end }}</small>
-                                    <div v-if="deviceCheckResult === true" class="text-success small mt-1">✅ 端口可用</div>
-                                    <div v-else-if="deviceCheckResult === false" class="text-danger small mt-1">❌ 端口已被占用</div>
-                                </div>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-primary" @click="submitDeviceRule" :disabled="!deviceForm.internal_port || !deviceForm.external_port || deviceCheckResult === false">{{ editingDeviceRuleId ? '保存修改' : '提交' }}</button>
-                                <button class="btn btn-secondary" @click="cancelDeviceForm">取消</button>
-                            </div>
-                        </template>
-
+        <!-- LXC Section -->
+        <div v-show="activeSection === 'lxc'">
+            <h4 class="module-title">我的容器</h4>
+            <div v-if="lxcLoading" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-2 text-muted">加载中...</p>
+            </div>
+            <div v-else class="vm-table-wrap">
+                <div class="table-container">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>容器名称</th>
+                                    <th>内网IP</th>
+                                    <th>配置</th>
+                                    <th>镜像</th>
+                                    <th>状态</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="ct in userLxcContainers" :key="ct.id">
+                                    <td>{{ ct.ct_id }}</td>
+                                    <td>{{ ct.name || ('CT ' + ct.ct_id) }}</td>
+                                    <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
+                                    <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.status && ct.status.maxdisk ? '/ ' + Math.round(ct.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
+                                    <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
+                                    <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
+                                    <td>
+                                        <button class="table-btn" @click="openDeviceForward(ct, 'lxc')" title="端口转发">网络</button>
+                                        <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
+                                            <button class="table-btn" @click="openLxcTerminal(ct.ct_id)">终端</button>
+                                            <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
+                                            <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
+                                            <button class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
+                                        </div>
+                                        <div class="btn-group-table" v-if="!ct.status || ct.status.status !== 'running'">
+                                            <button class="table-btn btn-primary" @click="startLxc(ct.ct_id)">启动</button>
+                                        </div>
+                                        <div class="dropdown-table">
+                                            <button class="table-btn dropdown-toggle" @click.stop="toggleDropdown('lxc-'+ct.id, $event.currentTarget, [
+                                                {label:'快照', action:function(){ openLxcSnapshotPanel(ct) }},
+                                                {label:'备份', action:function(){ openLxcBackupPanel(ct) }},
+                                                {label:'编辑', action:function(){ editLxc(ct) }},
+                                                {label:'重置IP', action:function(){ openResetLxcIpModal(ct) }, cls:'text-warning'},
+                                                {label:'重置密码', action:function(){ openLxcPasswordReset(ct) }, cls:'text-warning'}
+                                            ])">更多</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr v-if="userLxcContainers.length === 0">
+                                    <td colspan="7" class="text-center text-muted py-4">暂无容器</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="modal fade" id="editVmModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">编辑虚拟机</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<Teleport to="body">
+
+<div class="modal fade" id="deviceForwardModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="background:#1a1a2e;color:#e0e0e0;">
+            <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+                <h5 class="modal-title">{{ currentDevice.name || (currentDevice.type === 'vm' ? 'VM ' + currentDevice.deviceId : 'CT ' + currentDevice.deviceId) }} - 端口转发管理</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="min-height:150px;">
+
+                <!-- 规则列表 -->
+                <template v-if="!showDeviceForm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div><span class="text-muted small">共 {{ deviceRules.length }} 条规则</span><span class="text-muted small ms-3">剩余可用 {{ forwardConfig.remaining }} 条</span></div>
+                        <button class="btn btn-primary btn-sm" @click="openDeviceFormModal">添加端口转发</button>
                     </div>
-                    <div class="modal-body">
-                        <form @submit.prevent="updateVm" novalidate>
-                            <div class="mb-3">
-                                <label class="form-label">名称</label>
-                                <input type="text" class="form-control" v-model="editVmForm.name">
+                    <div v-if="deviceRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>
+                    <div v-else class="table-responsive mb-0">
+                        <table class="table table-dark table-striped table-hover mb-0">
+                            <thead><tr>
+                                <th>名称</th><th>目标 IP</th><th>内网端口</th><th>外网端口</th><th>协议</th><th>状态</th><th>操作</th>
+                            </tr></thead>
+                            <tbody>
+                                <tr v-for="rule in deviceRules" :key="rule.id" :class="{ 'text-muted': rule.sync_status === 'orphan' }">
+                                    <td>{{ rule.name || '-' }}</td>
+                                    <td>{{ rule.ip }}</td>
+                                    <td>{{ rule.internal_port }}</td>
+                                    <td>{{ rule.external_port }}</td>
+                                    <td>{{ (rule.protocol || '').toUpperCase() }}</td>
+                                    <td><span :class="rule.enabled ? 'text-success' : 'text-muted'">{{ rule.enabled ? '启用' : '禁用' }}</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-light me-1" @click="openDeviceEditModal(rule)" title="编辑">编辑</button>
+                                        <button class="btn btn-sm btn-outline-danger" @click="deleteDeviceRule(rule)" title="删除">删除</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </template>
+
+                <!-- 添加/编辑表单 -->
+                <template v-if="showDeviceForm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0">{{ editingDeviceRuleId ? '编辑端口转发' : '添加端口转发' }}</h6>
+                        <button class="btn btn-sm btn-outline-light" @click="cancelDeviceForm">返回</button>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">规则名称</label>
+                        <input type="text" class="form-control bg-dark text-light border-secondary" v-model="deviceForm.name" placeholder="如 SSH 转发">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">目标 IP</label>
+                        <input type="text" class="form-control bg-dark text-light border-secondary" :value="availableIps[0]?.ip || ''" readonly>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">协议</label>
+                        <select class="form-select bg-dark text-light border-secondary" v-model="deviceForm.protocol">
+                            <option value="tcp">TCP</option>
+                            <option value="udp">UDP</option>
+                            <option value="tcp+udp">TCP+UDP</option>
+                        </select>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">内网端口</label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary" v-model.number="deviceForm.internal_port" min="1" max="65535">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">外网端口</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control bg-dark text-light border-secondary" :class="{ 'is-invalid': deviceCheckResult === false }" v-model.number="deviceForm.external_port" min="1" max="65535">
+                                <button class="btn btn-outline-secondary" type="button" @click="randomDevicePort" title="随机端口">🎲</button>
                             </div>
-                            <div class="mb-3" v-if="user && user.role === 'admin'">
-                                <label class="form-label">分配给</label>
-                                <select class="form-select" v-model="editVmForm.user_id">
-                                    <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
-                                </select>
+                            <small class="text-muted">可用范围: {{ forwardConfig.port_range_start }}-{{ forwardConfig.port_range_end }}</small>
+                            <div v-if="deviceCheckResult === true" class="text-success small mt-1">✅ 端口可用</div>
+                            <div v-else-if="deviceCheckResult === false" class="text-danger small mt-1">❌ 端口已被占用</div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-primary" @click="submitDeviceRule" :disabled="!deviceForm.internal_port || !deviceForm.external_port || deviceCheckResult === false">{{ editingDeviceRuleId ? '保存修改' : '提交' }}</button>
+                        <button class="btn btn-secondary" @click="cancelDeviceForm">取消</button>
+                    </div>
+                </template>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="editVmModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑虚拟机</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form @submit.prevent="updateVm" novalidate>
+                    <div class="mb-3">
+                        <label class="form-label">名称</label>
+                        <input type="text" class="form-control" v-model="editVmForm.name">
+                    </div>
+                    <div class="mb-3" v-if="user && user.role === 'admin'">
+                        <label class="form-label">分配给</label>
+                        <select class="form-select" v-model="editVmForm.user_id">
+                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" v-if="user && user.role === 'admin'">
+                        <label class="form-label">到期时间</label>
+                        <input type="datetime-local" class="form-control" v-model="editVmForm.expiration_date" step="1" onfocus="this.showPicker?.()">
+                    </div>
+                    <div class="mb-3" v-if="user && user.role === 'admin'">
+                        <label class="form-label">续费价格（可选）</label>
+                        <input type="text" class="form-control" v-model="editVmForm.renewal_price" placeholder="如: ¥50/月">
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" formnovalidate>保存</button>
+                        <button type="button" v-if="user && user.role === 'admin'" class="btn btn-outline-danger" @click="removeVm">移除</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="cdkRedeemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">CDK 兑换</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" @click="cdkVmDropdownOpen = false; cdkLxcDropdownOpen = false">
+                <div v-if="cdkRedeemStep === 'input'">
+                    <div class="mb-3">
+                        <label class="form-label">CDK 兑换码</label>
+                        <input type="text" class="form-control" v-model="cdkRedeemForm.code" placeholder="输入 CDK 码，如 PVE-XXXX-XXXX-XXXX" style="text-transform: uppercase;" @input="cdkRedeemForm.code = cdkRedeemForm.code.toUpperCase()">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">资源类型</label>
+                        <div class="d-flex gap-3">
+                            <label class="form-check-label d-flex align-items-center gap-1" style="cursor:pointer;">
+                                <input type="radio" class="form-check-input" value="vm" v-model="cdkRedeemType">
+                                虚拟机
+                            </label>
+                            <label class="form-check-label d-flex align-items-center gap-1" style="cursor:pointer;">
+                                <input type="radio" class="form-check-input" value="lxc" v-model="cdkRedeemType">
+                                LXC容器
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3" v-if="cdkRedeemType === 'vm'">
+                        <label class="form-label" id="cdk-vm-label">选择要续费的虚拟机</label>
+                        <div class="custom-select" :class="{ open: cdkVmDropdownOpen }" @click.stop>
+                            <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-vm-label"
+                                 @click="cdkVmDropdownOpen = !cdkVmDropdownOpen"
+                                 @keydown.enter.prevent="cdkVmDropdownOpen = !cdkVmDropdownOpen"
+                                 @keydown.space.prevent="cdkVmDropdownOpen = !cdkVmDropdownOpen"
+                                 @keydown.esc="cdkVmDropdownOpen = false">
+                                <span v-if="cdkRedeemForm.vm_id">
+                                    {{ getRedeemableVmName(cdkRedeemForm.vm_id) }}
+                                </span>
+                                <span v-else class="custom-select-placeholder">请选择要续费的虚拟机</span>
                             </div>
-                            <div class="mb-3" v-if="user && user.role === 'admin'">
-                                <label class="form-label">到期时间</label>
-                                <input type="datetime-local" class="form-control" v-model="editVmForm.expiration_date" step="1" onfocus="this.showPicker?.()">
+                            <div class="custom-select-dropdown" role="listbox">
+                                <div v-for="vm in userVms" :key="vm.id" class="option" role="option"
+                                     :class="{ selected: cdkRedeemForm.vm_id == vm.id }"
+                                     @click="cdkRedeemForm.vm_id = vm.id; cdkVmDropdownOpen = false;">
+                                    {{ vm.name || 'VM ' + vm.vm_id }}（到期: {{ vm.expiration_date ? formatDate(vm.expiration_date) : '未设置' }}）
+                                </div>
                             </div>
-                            <div class="mb-3" v-if="user && user.role === 'admin'">
-                                <label class="form-label">续费价格（可选）</label>
-                                <input type="text" class="form-control" v-model="editVmForm.renewal_price" placeholder="如: ¥50/月">
+                        </div>
+                    </div>
+                    <div class="mb-3" v-if="cdkRedeemType === 'lxc'">
+                        <label class="form-label" id="cdk-lxc-label">选择要续费的LXC容器</label>
+                        <div class="custom-select" :class="{ open: cdkLxcDropdownOpen }" @click.stop>
+                            <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-lxc-label"
+                                 @click="cdkLxcDropdownOpen = !cdkLxcDropdownOpen"
+                                 @keydown.enter.prevent="cdkLxcDropdownOpen = !cdkLxcDropdownOpen"
+                                 @keydown.space.prevent="cdkLxcDropdownOpen = !cdkLxcDropdownOpen"
+                                 @keydown.esc="cdkLxcDropdownOpen = false">
+                                <span v-if="cdkRedeemForm.container_id">
+                                    {{ getRedeemableLxcName(cdkRedeemForm.container_id) }}
+                                </span>
+                                <span v-else class="custom-select-placeholder">请选择要续费的LXC容器</span>
                             </div>
-                            <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary" formnovalidate>保存</button>
-                                <button type="button" v-if="user && user.role === 'admin'" class="btn btn-outline-danger" @click="removeVm">移除</button>
+                            <div class="custom-select-dropdown" role="listbox">
+                                <div v-for="ct in userLxcContainers" :key="ct.id" class="option" role="option"
+                                     :class="{ selected: cdkRedeemForm.container_id == ct.id }"
+                                     @click="cdkRedeemForm.container_id = ct.id; cdkLxcDropdownOpen = false;">
+                                    {{ ct.name || 'CT ' + ct.ct_id }}（到期: {{ ct.expiration_date ? formatDate(ct.expiration_date) : '未设置' }}）
+                                </div>
                             </div>
-                        </form>
+                        </div>
+                    </div>
+                    <div v-if="cdkRedeemError" class="alert alert-danger">{{ cdkRedeemError }}</div>
+                </div>
+                <div v-if="cdkRedeemStep === 'result'">
+                    <div class="alert alert-success">
+                        <strong>兑换成功！</strong>
+                        <p class="mb-0 mt-2">{{ cdkRedeemMessage }}</p>
                     </div>
                 </div>
             </div>
+            <div class="modal-footer" v-if="cdkRedeemStep === 'input'">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" @click="redeemCdk" :disabled="!cdkRedeemForm.code || (cdkRedeemType === 'vm' && !cdkRedeemForm.vm_id) || (cdkRedeemType === 'lxc' && !cdkRedeemForm.container_id)">确认兑换</button>
+            </div>
+            <div class="modal-footer" v-if="cdkRedeemStep === 'result'">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="cdkRedeemStep = 'input'">完成</button>
+            </div>
         </div>
+    </div>
+</div>
 
-        <div class="modal fade" id="cdkRedeemModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">CDK 兑换</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<div class="modal fade" id="messageDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ currentMsg.title }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <span class="message-type-badge" :class="'msg-type-' + currentMsg.type">
+                        {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[currentMsg.type] || '消息' }}
+                    </span>
+                    <span class="text-muted ms-2 small">{{ formatDate(currentMsg.created_at) }}</span>
+                </div>
+                <div class="message-detail-content" style="white-space:pre-wrap;line-height:1.7;">{{ currentMsg.content }}</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger btn-sm" @click="deleteMessage(currentMsg.id)">删除</button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="customAlertModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="custom-alert-icon mb-3">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                    </svg>
+                </div>
+                <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customAlertMessage }}</p>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
+                <button type="button" class="btn btn-primary px-4" @mousedown="(e) => e.target.blur()" data-bs-dismiss="modal">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="customConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center py-4">
+                <div class="custom-alert-icon mb-3">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ffc107" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </div>
+                <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;" v-html="customConfirmMessage"></p>
+            </div>
+            <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
+                <button type="button" class="btn btn-outline-light px-3" @click="confirmCancel">取消</button>
+                <button type="button" class="btn btn-primary px-3" @click="confirmOk">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="snapshotModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">快照管理 - {{ snapshotVmName }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div v-if="snapshotLoading" class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
                     </div>
-                    <div class="modal-body" @click="cdkVmDropdownOpen = false; cdkLxcDropdownOpen = false">
-                        <div v-if="cdkRedeemStep === 'input'">
-                            <div class="mb-3">
-                                <label class="form-label">CDK 兑换码</label>
-                                <input type="text" class="form-control" v-model="cdkRedeemForm.code" placeholder="输入 CDK 码，如 PVE-XXXX-XXXX-XXXX" style="text-transform: uppercase;" @input="cdkRedeemForm.code = cdkRedeemForm.code.toUpperCase()">
+                    <p class="mt-2 text-muted small">加载快照列表...</p>
+                </div>
+                <div v-else>
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">创建快照</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <input type="text" class="form-control form-control-sm" v-model="snapshotForm.name" placeholder="快照名称（英文、数字、-、_，最少2字符）" @input="filterSnapshotName">
                             </div>
-                            <div class="mb-3">
-                                <label class="form-label">资源类型</label>
-                                <div class="d-flex gap-3">
-                                    <label class="form-check-label d-flex align-items-center gap-1" style="cursor:pointer;">
-                                        <input type="radio" class="form-check-input" value="vm" v-model="cdkRedeemType">
-                                        虚拟机
-                                    </label>
-                                    <label class="form-check-label d-flex align-items-center gap-1" style="cursor:pointer;">
-                                        <input type="radio" class="form-check-input" value="lxc" v-model="cdkRedeemType">
-                                        LXC容器
-                                    </label>
-                                </div>
+                            <div class="mb-2">
+                                <textarea class="form-control form-control-sm" v-model="snapshotForm.description" rows="2" placeholder="描述（可选）"></textarea>
                             </div>
-                            <div class="mb-3" v-if="cdkRedeemType === 'vm'">
-                                <label class="form-label" id="cdk-vm-label">选择要续费的虚拟机</label>
-                                <div class="custom-select" :class="{ open: cdkVmDropdownOpen }" @click.stop>
-                                    <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-vm-label"
-                                         @click="cdkVmDropdownOpen = !cdkVmDropdownOpen"
-                                         @keydown.enter.prevent="cdkVmDropdownOpen = !cdkVmDropdownOpen"
-                                         @keydown.space.prevent="cdkVmDropdownOpen = !cdkVmDropdownOpen"
-                                         @keydown.esc="cdkVmDropdownOpen = false">
-                                        <span v-if="cdkRedeemForm.vm_id">
-                                            {{ getRedeemableVmName(cdkRedeemForm.vm_id) }}
-                                        </span>
-                                        <span v-else class="custom-select-placeholder">请选择要续费的虚拟机</span>
-                                    </div>
-                                    <div class="custom-select-dropdown" role="listbox">
-                                        <div v-for="vm in userVms" :key="vm.id" class="option" role="option"
-                                             :class="{ selected: cdkRedeemForm.vm_id == vm.id }"
-                                             @click="cdkRedeemForm.vm_id = vm.id; cdkVmDropdownOpen = false;">
-                                            {{ vm.name || 'VM ' + vm.vm_id }}（到期: {{ vm.expiration_date ? formatDate(vm.expiration_date) : '未设置' }}）
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small :class="snapshotForm.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ snapshotForm.name.length }}/20</small>
+                                <button class="btn btn-primary btn-sm" @click="createSnapshot(snapshotVmId)" :disabled="!isSnapshotNameValid || snapshotCreating">
+                                    <span v-if="snapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
+                                    创建快照
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="checkbox" class="form-check-input m-0" :checked="isAllSnapshotsSelected" @change="toggleSelectAllSnapshots" :disabled="snapshots.length === 0" style="cursor:pointer">
+                                <h6 class="mb-0">现有快照</h6>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <button v-if="isAnySnapshotSelected" class="btn btn-danger btn-sm" @click="batchDeleteSnapshots(snapshotVmId)" :disabled="snapshotDeleting">
+                                    <span v-if="snapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
+                                    批量删除 ({{ snapshotSelected.size }})
+                                </button>
+                                <span class="badge bg-secondary">{{ snapshots.length }} 个</span>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div v-if="snapshots.length === 0" class="text-center text-muted py-4 small">
+                                暂无快照
+                            </div>
+                            <div v-else class="list-group list-group-flush">
+                                <div v-for="snap in snapshots" :key="snap.name" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" :class="snapshotSelected.has(snap.name) ? 'list-group-item-primary' : ''">
+                                    <div class="d-flex align-items-center gap-2 me-3" style="min-width:0">
+                                        <input type="checkbox" class="form-check-input m-0 flex-shrink-0" :checked="snapshotSelected.has(snap.name)" @change="toggleSnapshotSelect(snap.name)" style="cursor:pointer">
+                                        <div style="min-width:0">
+                                            <div class="fw-bold small text-truncate">{{ snap.name }}</div>
+                                            <div class="text-muted small">
+                                                <span v-if="snap.description" class="me-2">{{ snap.description }}</span>
+                                                <span>{{ formatSnapshotDate(snap.snaptime) }}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-                            <div class="mb-3" v-if="cdkRedeemType === 'lxc'">
-                                <label class="form-label" id="cdk-lxc-label">选择要续费的LXC容器</label>
-                                <div class="custom-select" :class="{ open: cdkLxcDropdownOpen }" @click.stop>
-                                    <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-lxc-label"
-                                         @click="cdkLxcDropdownOpen = !cdkLxcDropdownOpen"
-                                         @keydown.enter.prevent="cdkLxcDropdownOpen = !cdkLxcDropdownOpen"
-                                         @keydown.space.prevent="cdkLxcDropdownOpen = !cdkLxcDropdownOpen"
-                                         @keydown.esc="cdkLxcDropdownOpen = false">
-                                        <span v-if="cdkRedeemForm.container_id">
-                                            {{ getRedeemableLxcName(cdkRedeemForm.container_id) }}
-                                        </span>
-                                        <span v-else class="custom-select-placeholder">请选择要续费的LXC容器</span>
-                                    </div>
-                                    <div class="custom-select-dropdown" role="listbox">
-                                        <div v-for="ct in userLxcContainers" :key="ct.id" class="option" role="option"
-                                             :class="{ selected: cdkRedeemForm.container_id == ct.id }"
-                                             @click="cdkRedeemForm.container_id = ct.id; cdkLxcDropdownOpen = false;">
-                                            {{ ct.name || 'CT ' + ct.ct_id }}（到期: {{ ct.expiration_date ? formatDate(ct.expiration_date) : '未设置' }}）
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div v-if="cdkRedeemError" class="alert alert-danger">{{ cdkRedeemError }}</div>
-                        </div>
-                        <div v-if="cdkRedeemStep === 'result'">
-                            <div class="alert alert-success">
-                                <strong>兑换成功！</strong>
-                                <p class="mb-0 mt-2">{{ cdkRedeemMessage }}</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer" v-if="cdkRedeemStep === 'input'">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="button" class="btn btn-primary" @click="redeemCdk" :disabled="!cdkRedeemForm.code || (cdkRedeemType === 'vm' && !cdkRedeemForm.vm_id) || (cdkRedeemType === 'lxc' && !cdkRedeemForm.container_id)">确认兑换</button>
-                    </div>
-                    <div class="modal-footer" v-if="cdkRedeemStep === 'result'">
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" @click="cdkRedeemStep = 'input'">完成</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal fade" id="messageDetailModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">{{ currentMsg.title }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <span class="message-type-badge" :class="'msg-type-' + currentMsg.type">
-                                {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[currentMsg.type] || '消息' }}
-                            </span>
-                            <span class="text-muted ms-2 small">{{ formatDate(currentMsg.created_at) }}</span>
-                        </div>
-                        <div class="message-detail-content" style="white-space:pre-wrap;line-height:1.7;">{{ currentMsg.content }}</div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-danger btn-sm" @click="deleteMessage(currentMsg.id)">删除</button>
-                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal fade" id="customAlertModal" tabindex="-1" data-bs-backdrop="static">
-            <div class="modal-dialog modal-sm modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-body text-center py-4">
-                        <div class="custom-alert-icon mb-3">
-                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                            </svg>
-                        </div>
-                        <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customAlertMessage }}</p>
-                    </div>
-                    <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                        <button type="button" class="btn btn-primary px-4" @mousedown="(e) => e.target.blur()" data-bs-dismiss="modal">确定</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal fade" id="customConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-            <div class="modal-dialog modal-sm modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-body text-center py-4">
-                        <div class="custom-alert-icon mb-3">
-                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ffc107" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                            </svg>
-                        </div>
-                        <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;" v-html="customConfirmMessage"></p>
-                    </div>
-                    <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
-                        <button type="button" class="btn btn-outline-light px-3" @click="confirmCancel">取消</button>
-                        <button type="button" class="btn btn-primary px-3" @click="confirmOk">确定</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="modal fade" id="snapshotModal" tabindex="-1" data-bs-backdrop="static">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">快照管理 - {{ snapshotVmName }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div v-if="snapshotLoading" class="text-center py-3">
-                            <div class="spinner-border spinner-border-sm text-primary" role="status">
-                                <span class="visually-hidden">加载中...</span>
-                            </div>
-                            <p class="mt-2 text-muted small">加载快照列表...</p>
-                        </div>
-                        <div v-else>
-                            <div class="card mb-3">
-                                <div class="card-header">
-                                    <h6 class="mb-0">创建快照</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="mb-2">
-                                        <input type="text" class="form-control form-control-sm" v-model="snapshotForm.name" placeholder="快照名称（英文、数字、-、_，最少2字符）" @input="filterSnapshotName">
-                                    </div>
-                                    <div class="mb-2">
-                                        <textarea class="form-control form-control-sm" v-model="snapshotForm.description" rows="2" placeholder="描述（可选）"></textarea>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <small :class="snapshotForm.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ snapshotForm.name.length }}/20</small>
-                                        <button class="btn btn-primary btn-sm" @click="createSnapshot(snapshotVmId)" :disabled="!isSnapshotNameValid || snapshotCreating">
-                                            <span v-if="snapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
-                                            创建快照
+                                    <div class="d-flex gap-1 flex-shrink-0">
+                                        <button class="btn btn-outline-warning btn-sm" @click="rollbackSnapshot(snapshotVmId, snap.name)" title="回滚到此快照">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                                            </svg>
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" @click="deleteSnapshot(snapshotVmId, snap.name)" title="删除快照">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                            </svg>
                                         </button>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
 
-                            <div class="card mb-3">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <input type="checkbox" class="form-check-input m-0" :checked="isAllSnapshotsSelected" @change="toggleSelectAllSnapshots" :disabled="snapshots.length === 0" style="cursor:pointer">
-                                        <h6 class="mb-0">现有快照</h6>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <button v-if="isAnySnapshotSelected" class="btn btn-danger btn-sm" @click="batchDeleteSnapshots(snapshotVmId)" :disabled="snapshotDeleting">
-                                            <span v-if="snapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
-                                            批量删除 ({{ snapshotSelected.size }})
-                                        </button>
-                                        <span class="badge bg-secondary">{{ snapshots.length }} 个</span>
-                                    </div>
-                                </div>
-                                <div class="card-body p-0">
-                                    <div v-if="snapshots.length === 0" class="text-center text-muted py-4 small">
-                                        暂无快照
-                                    </div>
-                                    <div v-else class="list-group list-group-flush">
-                                        <div v-for="snap in snapshots" :key="snap.name" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" :class="snapshotSelected.has(snap.name) ? 'list-group-item-primary' : ''">
-                                            <div class="d-flex align-items-center gap-2 me-3" style="min-width:0">
-                                                <input type="checkbox" class="form-check-input m-0 flex-shrink-0" :checked="snapshotSelected.has(snap.name)" @change="toggleSnapshotSelect(snap.name)" style="cursor:pointer">
-                                                <div style="min-width:0">
-                                                    <div class="fw-bold small text-truncate">{{ snap.name }}</div>
-                                                    <div class="text-muted small">
-                                                        <span v-if="snap.description" class="me-2">{{ snap.description }}</span>
-                                                        <span>{{ formatSnapshotDate(snap.snaptime) }}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="d-flex gap-1 flex-shrink-0">
-                                                <button class="btn btn-outline-warning btn-sm" @click="rollbackSnapshot(snapshotVmId, snap.name)" title="回滚到此快照">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                                                    </svg>
-                                                </button>
-                                                <button class="btn btn-outline-danger btn-sm" @click="deleteSnapshot(snapshotVmId, snap.name)" title="删除快照">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                                    </svg>
-                                                </button>
-                                            </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">快照限制信息</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center g-2">
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <div class="small text-muted">当前快照数</div>
+                                        <div class="fw-bold" :class="snapshotLimits.current >= snapshotLimits.max ? 'text-danger' : ''">
+                                            {{ snapshotLimits.current }} / {{ snapshotLimits.max }}
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0">快照限制信息</h6>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <div class="small text-muted">今日创建</div>
+                                        <div class="fw-bold" :class="snapshotLimits.today_creates >= snapshotLimits.max_creates ? 'text-danger' : ''">
+                                            {{ snapshotLimits.today_creates }} / {{ snapshotLimits.max_creates }}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="card-body">
-                                    <div class="row text-center g-2">
-                                        <div class="col-4">
-                                            <div class="border rounded p-2">
-                                                <div class="small text-muted">当前快照数</div>
-                                                <div class="fw-bold" :class="snapshotLimits.current >= snapshotLimits.max ? 'text-danger' : ''">
-                                                    {{ snapshotLimits.current }} / {{ snapshotLimits.max }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-4">
-                                            <div class="border rounded p-2">
-                                                <div class="small text-muted">今日创建</div>
-                                                <div class="fw-bold" :class="snapshotLimits.today_creates >= snapshotLimits.max_creates ? 'text-danger' : ''">
-                                                    {{ snapshotLimits.today_creates }} / {{ snapshotLimits.max_creates }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-4">
-                                            <div class="border rounded p-2">
-                                                <div class="small text-muted">今日恢复</div>
-                                                <div class="fw-bold" :class="snapshotLimits.today_rollbacks >= snapshotLimits.max_rollbacks ? 'text-danger' : ''">
-                                                    {{ snapshotLimits.today_rollbacks }} / {{ snapshotLimits.max_rollbacks }}
-                                                </div>
-                                            </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <div class="small text-muted">今日恢复</div>
+                                        <div class="fw-bold" :class="snapshotLimits.today_rollbacks >= snapshotLimits.max_rollbacks ? 'text-danger' : ''">
+                                            {{ snapshotLimits.today_rollbacks }} / {{ snapshotLimits.max_rollbacks }}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button>
                     </div>
                 </div>
             </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button>
+            </div>
         </div>
+    </div>
+</div>
 
-        <div class="modal fade" id="backupModal" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">备份管理 - {{ backupVmName }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="card mb-3">
-                            <div class="card-header"><h6 class="mb-0">创建备份</h6></div>
-                            <div class="card-body">
-                                <div class="mb-2">
-                                    <textarea class="form-control form-control-sm" v-model="backupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
-                                     <small :style="'display:block;text-align:right;margin-top:2px;color:' + (backupForm.notes.length >= 50 ? '#ff4444' : 'var(--text-muted)')">{{ backupForm.notes.length || 0 }}/50</small>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <small class="text-muted">使用停止模式备份，压缩算法：zstd</small>
-                                    <button class="btn btn-primary btn-sm" @click="createBackup(backupVmId)" :disabled="backupCreating">
-                                        <span v-if="backupCreating" class="spinner-border spinner-border-sm me-1"></span>
-                                        立即备份
-                                    </button>
-                                </div>
-                            </div>
+<div class="modal fade" id="backupModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">备份管理 - {{ backupVmName }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="card mb-3">
+                    <div class="card-header"><h6 class="mb-0">创建备份</h6></div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <textarea class="form-control form-control-sm" v-model="backupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
+                             <small :style="'display:block;text-align:right;margin-top:2px;color:' + (backupForm.notes.length >= 50 ? '#ff4444' : 'var(--text-muted)')">{{ backupForm.notes.length || 0 }}/50</small>
                         </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">使用停止模式备份，压缩算法：zstd</small>
+                            <button class="btn btn-primary btn-sm" @click="createBackup(backupVmId)" :disabled="backupCreating">
+                                <span v-if="backupCreating" class="spinner-border spinner-border-sm me-1"></span>
+                                立即备份
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center gap-2">
-                                    <input type="checkbox" class="form-check-input m-0" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer">
-                                    <h6 class="mb-0">备份历史</h6>
-                                </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <button v-if="isAnyBackupSelected" class="btn btn-danger btn-sm" @click="batchDeleteBackups(backupVmId)" :disabled="backupDeleting">
-                                        <span v-if="backupDeleting" class="spinner-border spinner-border-sm me-1"></span>
-                                        批量删除 ({{ backupSelected.size }})
-                                    </button>
-                                    <span class="badge bg-secondary">{{ backups.length }} 个</span>
-                                </div>
-                            </div>
-                            <div class="card-body p-0">
-                                <div v-if="backups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
-                                <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
-                                    <table class="table table-striped mb-0 table-sm">
-                                        <thead style="position:sticky;top:0;">
-                                            <tr>
-                                                <th style="width:40px;"><input type="checkbox" class="form-check-input" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer"></th>
-                                                <th style="width:40px;">#</th>
-                                                <th>备份时间</th>
-                                                <th>大小</th>
-                                                <th>备注</th>
-                                                <th style="width:100px;">状态</th>
-                                                <th style="width:60px;">操作</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="(b, idx) in backups" :key="b.id" :style="backupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="checkbox" class="form-check-input m-0" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer">
+                            <h6 class="mb-0">备份历史</h6>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button v-if="isAnyBackupSelected" class="btn btn-danger btn-sm" @click="batchDeleteBackups(backupVmId)" :disabled="backupDeleting">
+                                <span v-if="backupDeleting" class="spinner-border spinner-border-sm me-1"></span>
+                                批量删除 ({{ backupSelected.size }})
+                            </button>
+                            <span class="badge bg-secondary">{{ backups.length }} 个</span>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div v-if="backups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
+                        <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
+                            <table class="table table-striped mb-0 table-sm">
+                                <thead style="position:sticky;top:0;">
+                                    <tr>
+                                        <th style="width:40px;"><input type="checkbox" class="form-check-input" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer"></th>
+                                        <th style="width:40px;">#</th>
+                                        <th>备份时间</th>
+                                        <th>大小</th>
+                                        <th>备注</th>
+                                        <th style="width:100px;">状态</th>
+                                        <th style="width:60px;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(b, idx) in backups" :key="b.id" :style="backupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
                                                         <td><input type="checkbox" class="form-check-input" :checked="backupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleBackupSelect(b.id)" style="cursor:pointer"></td>
                                                         <td class="text-muted small">{{ idx + 1 }}</td>
                                                         <td class="small">{{ formatDate(b.created_at) }}</td>
@@ -789,40 +1475,38 @@
                                                                 </button>
                                                             </div>
                                                         </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div v-if="backups.some(b => b.status === 'running')" class="card-footer">
-                                <div v-for="b in backups.filter(b => b.status === 'running')" :key="'prog-'+b.id" class="mb-1">
-                                    <small class="text-muted d-flex justify-content-between"><span>备份中...</span><span>{{ b.progress }}%</span></small>
-                                    <div class="progress" style="height:8px;">
-                                        <div class="progress-bar progress-bar-striped progress-bar-animated" :style="{width: b.progress + '%'}"></div>
-                                    </div>
-                                </div>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div v-if="backups.some(b => b.status === 'running')" class="card-footer">
+                        <div v-for="b in backups.filter(b => b.status === 'running')" :key="'prog-'+b.id" class="mb-1">
+                            <small class="text-muted d-flex justify-content-between"><span>备份中...</span><span>{{ b.progress }}%</span></small>
+                            <div class="progress" style="height:8px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" :style="{width: b.progress + '%' }"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="card mt-3">
-                            <div class="card-header"><h6 class="mb-0">备份限制信息</h6></div>
-                            <div class="card-body">
-                                <div class="row text-center g-2">
-                                    <div class="col-6">
-                                        <div class="border rounded p-2">
-                                            <div class="small text-muted">当前备份数</div>
-                                            <div class="fw-bold" :class="backupLimits.current >= backupLimits.max_per_vm ? 'text-danger' : ''">
-                                                {{ backupLimits.current }} / {{ backupLimits.max_per_vm }}
-                                            </div>
-                                        </div>
+                <div class="card mt-3">
+                    <div class="card-header"><h6 class="mb-0">备份限制信息</h6></div>
+                    <div class="card-body">
+                        <div class="row text-center g-2">
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="small text-muted">当前备份数</div>
+                                    <div class="fw-bold" :class="backupLimits.current >= backupLimits.max_per_vm ? 'text-danger' : ''">
+                                        {{ backupLimits.current }} / {{ backupLimits.max_per_vm }}
                                     </div>
-                                    <div class="col-6">
-                                        <div class="border rounded p-2">
-                                            <div class="small text-muted">今日创建</div>
-                                            <div class="fw-bold" :class="backupLimits.today_creates >= backupLimits.daily_limit ? 'text-danger' : ''">
-                                                {{ backupLimits.today_creates }} / {{ backupLimits.daily_limit }}
-                                            </div>
-                                        </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="small text-muted">今日创建</div>
+                                    <div class="fw-bold" :class="backupLimits.today_creates >= backupLimits.daily_limit ? 'text-danger' : ''">
+                                        {{ backupLimits.today_creates }} / {{ backupLimits.daily_limit }}
                                     </div>
                                 </div>
                             </div>
@@ -831,306 +1515,308 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- LXC Edit Modal -->
-        <div class="modal fade" id="editLxcModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">编辑LXC容器</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- LXC Edit Modal -->
+<div class="modal fade" id="editLxcModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">编辑LXC容器</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form @submit.prevent="updateLxc" novalidate>
+                    <div class="mb-3">
+                        <label class="form-label">名称</label>
+                        <input type="text" class="form-control" v-model="editLxcForm.name">
                     </div>
-                    <div class="modal-body">
-                        <form @submit.prevent="updateLxc" novalidate>
-                            <div class="mb-3">
-                                <label class="form-label">名称</label>
-                                <input type="text" class="form-control" v-model="editLxcForm.name">
-                            </div>
-                            <div class="mb-3" v-if="user && user.role === 'admin'">
-                                <label class="form-label">分配给</label>
-                                <select class="form-select" v-model="editLxcForm.user_id">
-                                    <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
-                                </select>
-                            </div>
-                            <div class="mb-3" v-if="user && user.role === 'admin'">
-                                <label class="form-label">到期时间</label>
-                                <input type="datetime-local" class="form-control" v-model="editLxcForm.expiration_date" step="1" onfocus="this.showPicker?.()">
-                            </div>
-                            <div class="mb-3" v-if="user && user.role === 'admin'">
-                                <label class="form-label">续费价格（可选）</label>
-                                <input type="text" class="form-control" v-model="editLxcForm.renewal_price" placeholder="如: ¥50/月">
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary" formnovalidate>保存</button>
-                                <button type="button" v-if="user && user.role === 'admin'" class="btn btn-outline-danger" @click="removeLxc">移除</button>
-                            </div>
-                        </form>
+                    <div class="mb-3" v-if="user && user.role === 'admin'">
+                        <label class="form-label">分配给</label>
+                        <select class="form-select" v-model="editLxcForm.user_id">
+                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
+                        </select>
                     </div>
-                </div>
+                    <div class="mb-3" v-if="user && user.role === 'admin'">
+                        <label class="form-label">到期时间</label>
+                        <input type="datetime-local" class="form-control" v-model="editLxcForm.expiration_date" step="1" onfocus="this.showPicker?.()">
+                    </div>
+                    <div class="mb-3" v-if="user && user.role === 'admin'">
+                        <label class="form-label">续费价格（可选）</label>
+                        <input type="text" class="form-control" v-model="editLxcForm.renewal_price" placeholder="如: ¥50/月">
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" formnovalidate>保存</button>
+                        <button type="button" v-if="user && user.role === 'admin'" class="btn btn-outline-danger" @click="removeLxc">移除</button>
+                    </div>
+                </form>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- LXC Password Reset Modal -->
-        <div class="modal fade" id="lxcPasswordResetModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">重置密码 - {{ lxcPasswordResetCtName }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form @submit.prevent="submitLxcPasswordReset" novalidate>
-                            <div class="mb-3">
-                                <label class="form-label">新密码</label>
-                                <input type="password" class="form-control" v-model="lxcPasswordForm.password" placeholder="输入新密码">
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">确认密码</label>
-                                <input type="password" class="form-control" v-model="lxcPasswordForm.confirm" placeholder="再次输入新密码">
-                            </div>
-                            <div v-if="lxcPasswordError" class="alert alert-danger">{{ lxcPasswordError }}</div>
-                            <div class="d-flex gap-2">
-                                <button type="submit" class="btn btn-primary" :disabled="!lxcPasswordForm.password || !lxcPasswordForm.confirm || lxcPasswordForm.password !== lxcPasswordForm.confirm">确认重置</button>
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+<!-- LXC Password Reset Modal -->
+<div class="modal fade" id="lxcPasswordResetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重置密码 - {{ lxcPasswordResetCtName }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-        </div>
-
-        <!-- 重置 LXC IP 弹窗 -->
-        <div class="modal fade" id="resetLxcIpModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">重置 IP - {{ lxcPasswordResetCtName }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-body">
+                <form @submit.prevent="submitLxcPasswordReset" novalidate>
+                    <div class="mb-3">
+                        <label class="form-label">新密码</label>
+                        <input type="password" class="form-control" v-model="lxcPasswordForm.password" placeholder="输入新密码">
                     </div>
-                    <div class="modal-body">
-                        <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" style="background:rgba(220,53,69,0.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(220,53,69,0.3);">
-                            <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
-                            <div>
-                                <strong>危险操作</strong><br>
-                                <span style="opacity:0.9">修改 IP 需要重启容器，容器将短暂关机后自动重启。正在运行的服务会中断，请确保已保存重要数据。</span>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">IP 模式</label>
-                            <div class="d-flex gap-3">
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="static" id="lxcIpStatic">
-                                    <label class="form-check-label" for="lxcIpStatic">手动输入</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="dhcp" id="lxcIpDhcp">
-                                    <label class="form-check-label" for="lxcIpDhcp">DHCP 自动获取</label>
-                                </div>
-                            </div>
-                        </div>
-                        <div v-if="lxcIpForm.ip_mode === 'static'" class="mb-3">
-                            <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
-                            <div class="input-group">
-                                <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
-                                <button class="btn btn-outline-info" type="button" @click="randomLxcIp" title="随机生成未绑定的 IP">🎲 随机</button>
-                            </div>
-                        </div>
-                        <div v-if="lxcIpError" class="alert alert-danger py-2">{{ lxcIpError }}</div>
+                    <div class="mb-3">
+                        <label class="form-label">确认密码</label>
+                        <input type="password" class="form-control" v-model="lxcPasswordForm.confirm" placeholder="再次输入新密码">
                     </div>
-                    <div class="modal-footer">
+                    <div v-if="lxcPasswordError" class="alert alert-danger">{{ lxcPasswordError }}</div>
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" :disabled="!lxcPasswordForm.password || !lxcPasswordForm.confirm || lxcPasswordForm.password !== lxcPasswordForm.confirm">确认重置</button>
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="button" class="btn btn-danger" @click="confirmResetLxcIp" :disabled="lxcIpLoading">
-                            <span v-if="lxcIpLoading" class="spinner-border spinner-border-sm me-1"></span>
-                            保存
-                        </button>
                     </div>
-                </div>
+                </form>
             </div>
         </div>
+    </div>
+</div>
 
-        <!-- LXC Snapshot Modal -->
-        <div class="modal fade" id="lxcSnapshotModal" tabindex="-1" data-bs-backdrop="static">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">快照管理 - {{ lxcSnapshotCtName }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- 重置 LXC IP 弹窗 -->
+<div class="modal fade" id="resetLxcIpModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重置 IP - {{ lxcPasswordResetCtName }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" style="background:rgba(220,53,69,0.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(220,53,69,0.3);">
+                    <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
+                    <div>
+                        <strong>危险操作</strong><br>
+                        <span style="opacity:0.9">修改 IP 需要重启容器，容器将短暂关机后自动重启。正在运行的服务会中断，请确保已保存重要数据。</span>
                     </div>
-                    <div class="modal-body">
-                        <div v-if="lxcSnapshotLoading" class="text-center py-3">
-                            <div class="spinner-border spinner-border-sm text-primary" role="status">
-                                <span class="visually-hidden">加载中...</span>
-                            </div>
-                            <p class="mt-2 text-muted small">加载快照列表...</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">IP 模式</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="static" id="lxcIpStatic">
+                            <label class="form-check-label" for="lxcIpStatic">手动输入</label>
                         </div>
-                        <div v-else>
-                            <div class="card mb-3">
-                                <div class="card-header">
-                                    <h6 class="mb-0">创建快照</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="mb-2">
-                                        <input type="text" class="form-control form-control-sm" v-model="lxcSnapshotForm.name" placeholder="快照名称（英文、数字、-、_，最少2字符）" @input="filterLxcSnapshotName">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="dhcp" id="lxcIpDhcp">
+                            <label class="form-check-label" for="lxcIpDhcp">DHCP 自动获取</label>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="lxcIpForm.ip_mode === 'static'" class="mb-3">
+                    <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
+                        <button class="btn btn-outline-info" type="button" @click="randomLxcIp" title="随机生成未绑定的 IP">🎲 随机</button>
+                    </div>
+                </div>
+                <div v-if="lxcIpError" class="alert alert-danger py-2">{{ lxcIpError }}</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-danger" @click="confirmResetLxcIp" :disabled="lxcIpLoading">
+                    <span v-if="lxcIpLoading" class="spinner-border spinner-border-sm me-1"></span>
+                    保存
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- LXC Snapshot Modal -->
+<div class="modal fade" id="lxcSnapshotModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">快照管理 - {{ lxcSnapshotCtName }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div v-if="lxcSnapshotLoading" class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">加载中...</span>
+                    </div>
+                    <p class="mt-2 text-muted small">加载快照列表...</p>
+                </div>
+                <div v-else>
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">创建快照</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-2">
+                                <input type="text" class="form-control form-control-sm" v-model="lxcSnapshotForm.name" placeholder="快照名称（英文、数字、-、_，最少2字符）" @input="filterLxcSnapshotName">
+                            </div>
+                            <div class="mb-2">
+                                <textarea class="form-control form-control-sm" v-model="lxcSnapshotForm.description" rows="2" placeholder="描述（可选）"></textarea>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small :class="lxcSnapshotForm.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ lxcSnapshotForm.name.length }}/20</small>
+                                <button class="btn btn-primary btn-sm" @click="createLxcSnapshot()" :disabled="!isLxcSnapshotNameValid || lxcSnapshotCreating">
+                                    <span v-if="lxcSnapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
+                                    创建快照
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <div class="d-flex align-items-center gap-2">
+                                <input type="checkbox" class="form-check-input m-0" :checked="isAllLxcSnapshotsSelected" @change="toggleSelectAllLxcSnapshots" :disabled="lxcSnapshots.length === 0" style="cursor:pointer">
+                                <h6 class="mb-0">现有快照</h6>
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                <button v-if="isAnyLxcSnapshotSelected" class="btn btn-danger btn-sm" @click="batchDeleteLxcSnapshots()" :disabled="lxcSnapshotDeleting">
+                                    <span v-if="lxcSnapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
+                                    批量删除 ({{ lxcSnapshotSelected.size }})
+                                </button>
+                                <span class="badge bg-secondary">{{ lxcSnapshots.length }} 个</span>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div v-if="lxcSnapshots.length === 0" class="text-center text-muted py-4 small">
+                                暂无快照
+                            </div>
+                            <div v-else class="list-group list-group-flush">
+                                <div v-for="snap in lxcSnapshots" :key="snap.name" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" :class="lxcSnapshotSelected.has(snap.name) ? 'list-group-item-primary' : ''">
+                                    <div class="d-flex align-items-center gap-2 me-3" style="min-width:0">
+                                        <input type="checkbox" class="form-check-input m-0 flex-shrink-0" :checked="lxcSnapshotSelected.has(snap.name)" @change="toggleLxcSnapshotSelect(snap.name)" style="cursor:pointer">
+                                        <div style="min-width:0">
+                                            <div class="fw-bold small text-truncate">{{ snap.name }}</div>
+                                            <div class="text-muted small">
+                                                <span v-if="snap.description" class="me-2">{{ snap.description }}</span>
+                                                <span>{{ formatSnapshotDate(snap.snaptime) }}</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="mb-2">
-                                        <textarea class="form-control form-control-sm" v-model="lxcSnapshotForm.description" rows="2" placeholder="描述（可选）"></textarea>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <small :class="lxcSnapshotForm.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ lxcSnapshotForm.name.length }}/20</small>
-                                        <button class="btn btn-primary btn-sm" @click="createLxcSnapshot()" :disabled="!isLxcSnapshotNameValid || lxcSnapshotCreating">
-                                            <span v-if="lxcSnapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
-                                            创建快照
+                                    <div class="d-flex gap-1 flex-shrink-0">
+                                        <button class="btn btn-outline-warning btn-sm" @click="rollbackLxcSnapshot(snap.name)" title="回滚到此快照">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                                            </svg>
+                                        </button>
+                                        <button class="btn btn-outline-danger btn-sm" @click="deleteLxcSnapshot(snap.name)" title="删除快照">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                            </svg>
                                         </button>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
 
-                            <div class="card mb-3">
-                                <div class="card-header d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <input type="checkbox" class="form-check-input m-0" :checked="isAllLxcSnapshotsSelected" @change="toggleSelectAllLxcSnapshots" :disabled="lxcSnapshots.length === 0" style="cursor:pointer">
-                                        <h6 class="mb-0">现有快照</h6>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2">
-                                        <button v-if="isAnyLxcSnapshotSelected" class="btn btn-danger btn-sm" @click="batchDeleteLxcSnapshots()" :disabled="lxcSnapshotDeleting">
-                                            <span v-if="lxcSnapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
-                                            批量删除 ({{ lxcSnapshotSelected.size }})
-                                        </button>
-                                        <span class="badge bg-secondary">{{ lxcSnapshots.length }} 个</span>
-                                    </div>
-                                </div>
-                                <div class="card-body p-0">
-                                    <div v-if="lxcSnapshots.length === 0" class="text-center text-muted py-4 small">
-                                        暂无快照
-                                    </div>
-                                    <div v-else class="list-group list-group-flush">
-                                        <div v-for="snap in lxcSnapshots" :key="snap.name" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" :class="lxcSnapshotSelected.has(snap.name) ? 'list-group-item-primary' : ''">
-                                            <div class="d-flex align-items-center gap-2 me-3" style="min-width:0">
-                                                <input type="checkbox" class="form-check-input m-0 flex-shrink-0" :checked="lxcSnapshotSelected.has(snap.name)" @change="toggleLxcSnapshotSelect(snap.name)" style="cursor:pointer">
-                                                <div style="min-width:0">
-                                                    <div class="fw-bold small text-truncate">{{ snap.name }}</div>
-                                                    <div class="text-muted small">
-                                                        <span v-if="snap.description" class="me-2">{{ snap.description }}</span>
-                                                        <span>{{ formatSnapshotDate(snap.snaptime) }}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div class="d-flex gap-1 flex-shrink-0">
-                                                <button class="btn btn-outline-warning btn-sm" @click="rollbackLxcSnapshot(snap.name)" title="回滚到此快照">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                                                    </svg>
-                                                </button>
-                                                <button class="btn btn-outline-danger btn-sm" @click="deleteLxcSnapshot(snap.name)" title="删除快照">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                                    </svg>
-                                                </button>
-                                            </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h6 class="mb-0">快照限制信息</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center g-2">
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <div class="small text-muted">当前快照数</div>
+                                        <div class="fw-bold" :class="lxcSnapshotLimits.current >= lxcSnapshotLimits.max ? 'text-danger' : ''">
+                                            {{ lxcSnapshotLimits.current }} / {{ lxcSnapshotLimits.max }}
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="mb-0">快照限制信息</h6>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <div class="small text-muted">今日创建</div>
+                                        <div class="fw-bold" :class="lxcSnapshotLimits.today_creates >= lxcSnapshotLimits.max_creates ? 'text-danger' : ''">
+                                            {{ lxcSnapshotLimits.today_creates }} / {{ lxcSnapshotLimits.max_creates }}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div class="card-body">
-                                    <div class="row text-center g-2">
-                                        <div class="col-4">
-                                            <div class="border rounded p-2">
-                                                <div class="small text-muted">当前快照数</div>
-                                                <div class="fw-bold" :class="lxcSnapshotLimits.current >= lxcSnapshotLimits.max ? 'text-danger' : ''">
-                                                    {{ lxcSnapshotLimits.current }} / {{ lxcSnapshotLimits.max }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-4">
-                                            <div class="border rounded p-2">
-                                                <div class="small text-muted">今日创建</div>
-                                                <div class="fw-bold" :class="lxcSnapshotLimits.today_creates >= lxcSnapshotLimits.max_creates ? 'text-danger' : ''">
-                                                    {{ lxcSnapshotLimits.today_creates }} / {{ lxcSnapshotLimits.max_creates }}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-4">
-                                            <div class="border rounded p-2">
-                                                <div class="small text-muted">今日恢复</div>
-                                                <div class="fw-bold" :class="lxcSnapshotLimits.today_rollbacks >= lxcSnapshotLimits.max_rollbacks ? 'text-danger' : ''">
-                                                    {{ lxcSnapshotLimits.today_rollbacks }} / {{ lxcSnapshotLimits.max_rollbacks }}
-                                                </div>
-                                            </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <div class="small text-muted">今日恢复</div>
+                                        <div class="fw-bold" :class="lxcSnapshotLimits.today_rollbacks >= lxcSnapshotLimits.max_rollbacks ? 'text-danger' : ''">
+                                            {{ lxcSnapshotLimits.today_rollbacks }} / {{ lxcSnapshotLimits.max_rollbacks }}
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button>
                     </div>
                 </div>
             </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button>
+            </div>
         </div>
+    </div>
+</div>
 
-        <!-- LXC Backup Modal -->
-        <div class="modal fade" id="lxcBackupModal" tabindex="-1">
-            <div class="modal-dialog modal-lg modal-dialog-scrollable">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">备份管理 - {{ lxcBackupCtName }}</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="card mb-3">
-                            <div class="card-header"><h6 class="mb-0">创建备份</h6></div>
-                            <div class="card-body">
-                                <div class="mb-2">
-                                    <textarea class="form-control form-control-sm" v-model="lxcBackupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
-                                     <small :style="'display:block;text-align:right;margin-top:2px;color:' + (lxcBackupForm.notes.length >= 50 ? '#ff4444' : 'var(--text-muted)')">{{ lxcBackupForm.notes.length || 0 }}/50</small>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <small class="text-muted">使用停止模式备份，压缩算法：zstd</small>
-                                    <button class="btn btn-primary btn-sm" @click="createLxcBackup()" :disabled="lxcBackupCreating">
-                                        <span v-if="lxcBackupCreating" class="spinner-border spinner-border-sm me-1"></span>
-                                        立即备份
-                                    </button>
-                                </div>
-                            </div>
+<!-- LXC Backup Modal -->
+<div class="modal fade" id="lxcBackupModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">备份管理 - {{ lxcBackupCtName }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="card mb-3">
+                    <div class="card-header"><h6 class="mb-0">创建备份</h6></div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <textarea class="form-control form-control-sm" v-model="lxcBackupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
+                             <small :style="'display:block;text-align:right;margin-top:2px;color:' + (lxcBackupForm.notes.length >= 50 ? '#ff4444' : 'var(--text-muted)')">{{ lxcBackupForm.notes.length || 0 }}/50</small>
                         </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <small class="text-muted">使用停止模式备份，压缩算法：zstd</small>
+                            <button class="btn btn-primary btn-sm" @click="createLxcBackup()" :disabled="lxcBackupCreating">
+                                <span v-if="lxcBackupCreating" class="spinner-border spinner-border-sm me-1"></span>
+                                立即备份
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center gap-2">
-                                    <input type="checkbox" class="form-check-input m-0" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer">
-                                    <h6 class="mb-0">备份历史</h6>
-                                </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <button v-if="isAnyLxcBackupSelected" class="btn btn-danger btn-sm" @click="batchDeleteLxcBackups()" :disabled="lxcBackupDeleting">
-                                        <span v-if="lxcBackupDeleting" class="spinner-border spinner-border-sm me-1"></span>
-                                        批量删除 ({{ lxcBackupSelected.size }})
-                                    </button>
-                                    <span class="badge bg-secondary">{{ lxcBackups.length }} 个</span>
-                                </div>
-                            </div>
-                            <div class="card-body p-0">
-                                <div v-if="lxcBackups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
-                                <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
-                                    <table class="table table-striped mb-0 table-sm">
-                                        <thead style="position:sticky;top:0;">
-                                            <tr>
-                                                <th style="width:40px;"><input type="checkbox" class="form-check-input" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer"></th>
-                                                <th style="width:40px;">#</th>
-                                                <th>备份时间</th>
-                                                <th>大小</th>
-                                                <th>备注</th>
-                                                <th style="width:100px;">状态</th>
-                                                <th style="width:60px;">操作</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="(b, idx) in lxcBackups" :key="b.id" :style="lxcBackupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="checkbox" class="form-check-input m-0" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer">
+                            <h6 class="mb-0">备份历史</h6>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <button v-if="isAnyLxcBackupSelected" class="btn btn-danger btn-sm" @click="batchDeleteLxcBackups()" :disabled="lxcBackupDeleting">
+                                <span v-if="lxcBackupDeleting" class="spinner-border spinner-border-sm me-1"></span>
+                                批量删除 ({{ lxcBackupSelected.size }})
+                            </button>
+                            <span class="badge bg-secondary">{{ lxcBackups.length }} 个</span>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        <div v-if="lxcBackups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
+                        <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
+                            <table class="table table-striped mb-0 table-sm">
+                                <thead style="position:sticky;top:0;">
+                                    <tr>
+                                        <th style="width:40px;"><input type="checkbox" class="form-check-input" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer"></th>
+                                        <th style="width:40px;">#</th>
+                                        <th>备份时间</th>
+                                        <th>大小</th>
+                                        <th>备注</th>
+                                        <th style="width:100px;">状态</th>
+                                        <th style="width:60px;">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="(b, idx) in lxcBackups" :key="b.id" :style="lxcBackupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
                                                 <td><input type="checkbox" class="form-check-input" :checked="lxcBackupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleLxcBackupSelect(b.id)" style="cursor:pointer"></td>
                                                 <td class="text-muted small">{{ idx + 1 }}</td>
                                                 <td class="small">{{ formatDate(b.created_at) }}</td>
@@ -1152,40 +1838,38 @@
                                                         </button>
                                                     </div>
                                                 </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div v-if="lxcBackups.some(b => b.status === 'running')" class="card-footer">
-                                <div v-for="b in lxcBackups.filter(b => b.status === 'running')" :key="'prog-'+b.id" class="mb-1">
-                                    <small class="text-muted d-flex justify-content-between"><span>备份中...</span><span>{{ b.progress }}%</span></small>
-                                    <div class="progress" style="height:8px;">
-                                        <div class="progress-bar progress-bar-striped progress-bar-animated" :style="{width: b.progress + '%'}"></div>
-                                    </div>
-                                </div>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div v-if="lxcBackups.some(b => b.status === 'running')" class="card-footer">
+                        <div v-for="b in lxcBackups.filter(b => b.status === 'running')" :key="'prog-'+b.id" class="mb-1">
+                            <small class="text-muted d-flex justify-content-between"><span>备份中...</span><span>{{ b.progress }}%</span></small>
+                            <div class="progress" style="height:8px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" :style="{width: b.progress + '%'}"></div>
                             </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div class="card mt-3">
-                            <div class="card-header"><h6 class="mb-0">备份限制信息</h6></div>
-                            <div class="card-body">
-                                <div class="row text-center g-2">
-                                    <div class="col-6">
-                                        <div class="border rounded p-2">
-                                            <div class="small text-muted">当前备份数</div>
-                                            <div class="fw-bold" :class="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm ? 'text-danger' : ''">
-                                                {{ lxcBackupLimits.current }} / {{ lxcBackupLimits.max_per_vm }}
-                                            </div>
-                                        </div>
+                <div class="card mt-3">
+                    <div class="card-header"><h6 class="mb-0">备份限制信息</h6></div>
+                    <div class="card-body">
+                        <div class="row text-center g-2">
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="small text-muted">当前备份数</div>
+                                    <div class="fw-bold" :class="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm ? 'text-danger' : ''">
+                                        {{ lxcBackupLimits.current }} / {{ lxcBackupLimits.max_per_vm }}
                                     </div>
-                                    <div class="col-6">
-                                        <div class="border rounded p-2">
-                                            <div class="small text-muted">今日创建</div>
-                                            <div class="fw-bold" :class="lxcBackupLimits.today_creates >= lxcBackupLimits.daily_limit ? 'text-danger' : ''">
-                                                {{ lxcBackupLimits.today_creates }} / {{ lxcBackupLimits.daily_limit }}
-                                            </div>
-                                        </div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="small text-muted">今日创建</div>
+                                    <div class="fw-bold" :class="lxcBackupLimits.today_creates >= lxcBackupLimits.daily_limit ? 'text-danger' : ''">
+                                        {{ lxcBackupLimits.today_creates }} / {{ lxcBackupLimits.daily_limit }}
                                     </div>
                                 </div>
                             </div>
@@ -1194,43 +1878,110 @@
                 </div>
             </div>
         </div>
+    </div>
+</div>
 
-        </Teleport>
-
-        <div class="text-center py-4 mt-4 text-muted small">
-            <div>PVE 管理面板 <span id="appVersion"></span></div>
+<!-- VM/LXC 操作确认弹窗 -->
+<div class="vm-detail-modal" :class="{ show: confirmState.vmId !== null || lxcConfirmState.ctId !== null }" @click.self="confirmState.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">
+    <div class="modal-content" style="max-width:440px">
+        <div class="modal-header">
+            <h2 class="modal-title">操作确认</h2>
+            <button class="modal-close" @click="confirmState.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">✕</button>
         </div>
+        <div class="modal-body" style="padding:24px 28px;text-align:center">
+            <p style="font-size:15px;color:var(--text-primary,#E5E7EB);line-height:1.6;margin:0 0 20px">{{ confirmState.vmId !== null ? confirmActionText : confirmLxcActionText }}</p>
+            <div style="display:flex;gap:10px;justify-content:center">
+                <button class="table-btn btn-danger" style="padding:8px 28px;font-size:14px" @click="confirmState.vmId !== null ? confirmAction(userVms.find(function(v){return v.id===confirmState.vmId})||userVms[0]) : confirmLxcAction(userLxcContainers.find(function(c){return c.id===lxcConfirmState.ctId})||userLxcContainers[0])">确认执行</button>
+                <button class="table-btn" style="padding:8px 28px;font-size:14px" @click="confirmState.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 浮动下拉菜单（Teleport到body，避免表格overflow裁剪） -->
+<div v-if="openDropdownId !== null" class="floating-dropdown-menu"
+     :style="{ top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
+     @click.stop>
+    <template v-for="(item, idx) in dropdownItems" :key="idx">
+        <span class="dropdown-item" :class="item.cls || ''" @click="execDropdownAction(item.action)">{{ item.label }}</span>
     </template>
-    <div id="app"></div>
+</div>
 
-    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/shared.js"></script>
-    <script>
-        window.__dashboard = {};
-    </script>
-    <!-- Dashboard 模块 -->
-    <script src="js/dashboard/core.js?v=20260609b"></script>
-    <script src="js/dashboard/vm.js?v=20260609b"></script>
-    <script src="js/dashboard/lxc.js?v=20260609b"></script>
-    <script src="js/dashboard/forward.js?v=20260609b"></script>
-    <script src="js/dashboard/message.js?v=20260609b"></script>
+</Teleport>
 
-    <script>
-        var $ = window.__dashboard;
-        var App = {
-            template: '#appTemplate',
-            setup: function() {
-                $.initCore();
-                $.initVm();
-                $.initLxc();
-                $.initForward();
-                $.initMessage();
-                return $;
-            }
-        };
-        Vue.createApp(App).mount('#app');
-    </script>
+<div class="text-center py-4 mt-4 text-muted small">
+    <div>PVE 管理面板 <span id="appVersion"></span></div>
+</div>
+</template>
+<div id="app"></div>
+
+</main><!-- /main-wrap -->
+
+<script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="js/shared.js"></script>
+<script>
+    window.__dashboard = {};
+</script>
+<!-- Dashboard 模块 -->
+<script src="js/dashboard/core.js?v=20260609b"></script>
+<script src="js/dashboard/vm.js?v=20260609b"></script>
+<script src="js/dashboard/lxc.js?v=20260609b"></script>
+<script src="js/dashboard/forward.js?v=20260609b"></script>
+<script src="js/dashboard/message.js?v=20260609b"></script>
+
+<script>
+    var $ = window.__dashboard;
+    var App = {
+        template: '#appTemplate',
+        setup: function() {
+            $.initCore();
+            $.initVm();
+            $.initLxc();
+            $.initForward();
+            $.initMessage();
+            return $;
+        }
+    };
+    Vue.createApp(App).mount('#app');
+</script>
 <script>fetch("/api/version").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("appVersion");if(el)el.textContent="v"+d.version})</script>
+
+<!-- Sidebar toggle script -->
+<script>
+function toggleSidebar() {
+    var sb = document.getElementById('sidebar');
+    var ol = document.getElementById('sidebarOverlay');
+    if (sb && ol) {
+        sb.classList.toggle('open');
+        ol.style.display = sb.classList.contains('open') ? 'block' : 'none';
+    }
+}
+
+// 主题切换
+(function() {
+    var btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    var saved = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', saved);
+    btn.innerHTML = saved === 'light' ? '☀' : '☾';
+    btn.addEventListener('click', function() {
+        var current = document.documentElement.getAttribute('data-theme');
+        var next = current === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        this.innerHTML = next === 'light' ? '☀' : '☾';
+    });
+})();
+
+// 注意：侧边栏导航点击已由 Vue switchSection() 统一处理（含移动端自动收起），无需重复绑定原生事件
+
+// 点击页面空白处关闭下拉菜单
+document.addEventListener('click', function() {
+    if (window.__dashboard && window.__dashboard.closeDropdown) {
+        window.__dashboard.closeDropdown();
+    }
+});
+</script>
 </body>
 </html>

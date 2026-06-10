@@ -6,7 +6,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
-const { createDhcpStaticBinding, removeDhcpStaticBinding } = require('../services/dhcp');
+const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 router.get('/pve/vms', authMiddleware, async (req, res) => {
     try {
@@ -496,6 +496,76 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
         res.json({ status, config });
     } catch (error) {
         res.status(500).json({ error: '获取虚拟机状态失败' });
+    }
+});
+
+// VM IP 重置相关路由（通过修改爱快DHCP绑定实现，PVE虚拟机不支持直接设置IP）
+router.get('/vm/random-ip', authMiddleware, async (req, res) => {
+    try {
+        const ip = await pickUnusedStaticIp();
+        if (!ip) return res.status(400).json({ error: '无可用 IP' });
+        res.json({ ip });
+    } catch (error) {
+        res.status(500).json({ error: '获取随机 IP 失败' });
+    }
+});
+
+router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+        const { ip_mode, ip } = req.body;
+
+        // 权限检查（用正确的查询方法）
+        const allVms = db.vms.getAll();
+        const vmRecord = allVms.find(v => v.vm_id === vmid);
+        if (vmRecord) {
+            const isOwner = req.user.id === vmRecord.user_id;
+            const isAdmin = req.user.role === 'admin';
+            if (!isOwner && !isAdmin) return res.status(403).json({ error: '无权限操作此虚拟机' });
+        }
+
+        if (ip_mode === 'dhcp') {
+            // DHCP模式：删除爱快静态绑定（如果有），VM将自动从爱快获取动态IP
+            await removeDhcpStaticBinding('vm', vmid);
+            if (vmRecord) db.vms.update(vmRecord.id, { dhcp_static_ip: '' });
+            return res.json({ success: true, ip: null, message: '已切换为DHCP模式' });
+        }
+
+        // static 或 random 模式：更新/创建爱快DHCP静态绑定
+        let targetIp = '';
+        if (ip_mode === 'static') {
+            if (!ip) return res.status(400).json({ error: '请输入 IP 地址' });
+            const ipBase = ip.split('/')[0];
+            if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ipBase)) return res.status(400).json({ error: 'IP 格式不正确' });
+            targetIp = ipBase;
+        } else if (ip_mode === 'random') {
+            targetIp = await pickUnusedStaticIp();
+            if (!targetIp) return res.status(400).json({ error: '无可用 IP，请手动输入' });
+        }
+
+        // 获取VM的MAC地址用于创建/更新DHCP绑定
+        const config = await pveApi.getVmConfig(vmid);
+        if (!config || !config.net0) return res.status(400).json({ error: '无法获取虚拟机配置' });
+        const macMatch = config.net0.match(/([0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5})/);
+        if (!macMatch) return res.status(400).json({ error: '无法解析虚拟机 MAC 地址' });
+
+        // 更新爱快DHCP绑定（先尝试更新已有绑定，不存在则创建）
+        let finalIp = targetIp;
+        const updated = await updateDhcpStaticBindingIp('vm', vmid, finalIp);
+        if (!updated) {
+            // 没有已有绑定，创建新的
+            const boundIp = await createDhcpStaticBinding('vm', vmid, macMatch[1], finalIp);
+            finalIp = boundIp || finalIp;
+        }
+        if (!finalIp) return res.status(500).json({ error: '设置DHCP绑定失败' });
+
+        // 更新数据库记录
+        if (vmRecord) db.vms.update(vmRecord.id, { dhcp_static_ip: finalIp });
+
+        res.json({ success: true, ip: finalIp, message: `已设置静态IP ${finalIp}（通过爱快DHCP绑定）` });
+    } catch (error) {
+        dbg('[vm/reset-ip]', error.message);
+        res.status(500).json({ error: '重置 IP 失败：' + error.message });
     }
 });
 

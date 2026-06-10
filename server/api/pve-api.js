@@ -64,6 +64,24 @@ class PveApi {
     return response.data.data;
   }
 
+  async updateVmConfig(vmid, params) {
+    if (!this.node) {
+      await this.detectNode();
+    }
+    const searchParams = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') {
+        searchParams.append(key, String(value));
+      }
+    }
+    const response = await this.axiosInstance.put(
+      `${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/config`,
+      searchParams.toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    return response.data;
+  }
+
   async startVm(vmid) {
     if (!this.node) {
       await this.detectNode();

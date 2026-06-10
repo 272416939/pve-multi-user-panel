@@ -1,5 +1,6 @@
 # 环境配置（含密码和密钥，绝对不能提交）
 .env
+.config
 
 # SQLite 数据库文件
 data/
@@ -37,3 +38,6 @@ npm-debug.log*
 
 # 开发文档（不需要推送）
 docs/
+
+# E2E 测试脚本（本地验证用，含测试mock数据）
+tests/

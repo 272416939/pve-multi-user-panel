@@ -553,6 +553,65 @@
     };
 
     // ==================== initVm ====================
+    $.selectedVm = ref(null);
+    $.vmIpForm = ref({ ip_mode: 'dhcp', ip: '' });
+    $.vmIpError = ref('');
+    $.vmIpLoading = ref(false);
+
+    $.openResetVmIpModal = function(vm) {
+        $.selectedVm.value = vm;
+        let currentIp = vm.dhcp_static_ip || '';
+        if (!currentIp && vm.config && vm.config.net0) {
+            const m = vm.config.net0.match(/ip=([0-9.]+)/);
+            if (m) currentIp = m[1];
+        }
+        $.vmIpForm.value = { ip_mode: currentIp ? 'static' : 'dhcp', ip: currentIp };
+        $.vmIpError.value = '';
+        $.bsModalShow('resetVmIpModal');
+    };
+
+    $.randomVmIp = async function() {
+        try {
+            var data = await api('/vm/random-ip');
+            $.vmIpForm.value.ip = data.ip + '/24';
+            $.vmIpForm.value.ip_mode = 'static';
+        } catch (e) {
+            alert('获取随机 IP 失败：' + e.message);
+        }
+    };
+
+    $.confirmResetVmIp = async function() {
+        var f = $.vmIpForm.value;
+        if (f.ip_mode === 'static' && !f.ip) { $.vmIpError.value = '请输入 IP 地址'; return; }
+        var vm = $.selectedVm.value;
+        if (!vm) return;
+        var confirmed = await window.customConfirm('确认修改 VM ' + vm.vm_id + ' 的 IP？');
+        if (!confirmed) return;
+        await $.resetVmIp();
+    };
+
+    $.resetVmIp = async function() {
+        var f = $.vmIpForm.value;
+        if (f.ip_mode === 'static' && !f.ip) { $.vmIpError.value = '请输入 IP 地址'; return; }
+        var vm = $.selectedVm.value;
+        if (!vm) return;
+        $.vmIpLoading.value = true;
+        try {
+            var result = await api('/vm/' + vm.vm_id + '/reset-ip', {
+                method: 'POST',
+                body: JSON.stringify({ ip_mode: f.ip_mode, ip: f.ip })
+            });
+            $.vmIpLoading.value = false;
+            $.bsModalHide('resetVmIpModal');
+            alert('IP 重置成功：' + (result.ip || 'DHCP'));
+            await $.loadData();
+            await $.loadAssignData();
+        } catch (e) {
+            $.vmIpLoading.value = false;
+            $.vmIpError.value = e.message;
+        }
+    };
+
     $.initVm = function() {
         watch(function() { return $.activeTabVm.value; }, function(val) {
             if (val === 'network') $.loadForwardRules('vm');

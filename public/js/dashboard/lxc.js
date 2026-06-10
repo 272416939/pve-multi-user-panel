@@ -7,6 +7,7 @@
     // ===== 状态 =====
     $.lxcLoading = ref(false);
     $.userLxcContainers = ref([]);
+    $.lxcConfirmState = ref({ ctId: null, action: null });
     $.editLxcForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', user_id: null });
     $.lxcPasswordForm = ref({ password: '', confirm: '' });
     $.lxcPasswordError = ref('');
@@ -60,6 +61,32 @@
     $.isAnyLxcBackupSelected = computed(function() {
         return $.lxcBackupSelected.value.size > 0;
     });
+
+    // LXC 确认弹窗
+    $.confirmLxcActionText = computed(function() {
+        var msgs = {
+            shutdown: '这将发送安全关机信号，关闭 LXC 容器。',
+            reboot: 'LXC 容器将重新启动。',
+            stop: '将立即强制停止 LXC 容器，未保存的数据将会丢失。'
+        };
+        return msgs[$.lxcConfirmState.value.action] || '';
+    });
+
+    $.requestLxcConfirm = function(ctId, action) {
+        $.lxcConfirmState.value = { ctId: ctId, action: action };
+    };
+
+    $.cancelLxcConfirm = function() {
+        $.lxcConfirmState.value = { ctId: null, action: null };
+    };
+
+    $.confirmLxcAction = function(ct) {
+        var action = $.lxcConfirmState.value.action;
+        if (action === 'shutdown') $.shutdownLxc(ct.ct_id);
+        else if (action === 'reboot') $.rebootLxc(ct.ct_id);
+        else if (action === 'stop') $.stopLxc(ct.ct_id);
+        $.lxcConfirmState.value = { ctId: null, action: null };
+    };
 
     // ===== LXC 操作函数 =====
     $.loadLxcContainers = async function() {

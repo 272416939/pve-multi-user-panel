@@ -17,9 +17,12 @@
     $.customConfirmMessage = ref('');
     $.customConfirmResolve = ref(null);
     $.unreadCount = ref(0);
-    $.activeSection = ref(new URLSearchParams(window.location.search).get('section') || 'vm');
+    $.activeSection = ref(new URLSearchParams(window.location.search).get('section') || 'overview');
     $.navItems = ref([]);
     $.users = ref([]);
+    $.openDropdownId = ref(null); // 当前打开的下拉菜单ID，格式 'vm-123' 或 'lxc-456'
+    $.dropdownItems = ref([]); // 当前下拉菜单的 [{label, action, cls}]
+    $.dropdownPos = ref({ top: 0, left: 0 });
 
     // computed
     $.currentNavId = computed(function() { return $.activeSection.value === 'vm' ? 'vms' : 'lxc'; });
@@ -32,6 +35,34 @@
     $.trimContent = trimContent;
     $.getGeekAvatar = getGeekAvatar;
     $.formatDateTimeLocal = formatDateTimeLocal;
+
+    // ===== 用户数据变化时同步 Header 头像/用户名 =====
+    watch($.user, function(u) {
+        if (!u) return;
+        var avatarEl = document.getElementById('headerAvatar');
+        var nameEl = document.getElementById('headerUsername');
+        if (avatarEl) {
+            if (u.avatar) {
+                avatarEl.src = u.avatar;
+            } else {
+                avatarEl.src = getGeekAvatar(u.username || '用户');
+            }
+        }
+        if (nameEl) nameEl.textContent = u.username || '用户';
+    }, { immediate: true });
+
+    // 环形图偏移计算（周长 377 = 2 * PI * 60）
+    var CIRCLE_CIRCUMFERENCE = 377;
+    $.circleVmOffset = Vue.computed(function() {
+        if (!$.userVms.value || $.userVms.value.length === 0) return CIRCLE_CIRCUMFERENCE;
+        var running = $.userVms.value.filter(function(v) { return v.status && v.status.status === 'running'; }).length;
+        return CIRCLE_CIRCUMFERENCE - (running / $.userVms.value.length) * CIRCLE_CIRCUMFERENCE;
+    });
+    $.circleCtOffset = Vue.computed(function() {
+        if (!$.userLxcContainers.value || $.userLxcContainers.value.length === 0) return CIRCLE_CIRCUMFERENCE;
+        var running = $.userLxcContainers.value.filter(function(c) { return c.status && c.status.status === 'running'; }).length;
+        return CIRCLE_CIRCUMFERENCE - (running / $.userLxcContainers.value.length) * CIRCLE_CIRCUMFERENCE;
+    });
 
     $.formatLxcUptime = function(uptime) {
         if (uptime === undefined || uptime === null) return '-';
@@ -108,6 +139,41 @@
     // ===== 导航/用户函数 =====
     $.switchSection = function(section) {
         $.activeSection.value = section;
+        // Update sidebar active state
+        document.querySelectorAll('.nav-item').forEach(function(el) {
+            el.classList.toggle('active', el.getAttribute('data-section') === section);
+        });
+        // Close sidebar on mobile
+        if (window.innerWidth <= 768) {
+            document.getElementById('sidebar')?.classList.remove('open');
+            var overlay = document.getElementById('sidebarOverlay');
+            if (overlay) { overlay.style.display = 'none'; }
+        }
+    };
+
+    // ===== 下拉菜单（Teleport到body，避免表格overflow裁剪） =====
+    $.toggleDropdown = function(id, target, items) {
+        if ($.openDropdownId.value === id) {
+            $.openDropdownId.value = null;
+            $.dropdownItems.value = [];
+            return;
+        }
+        // 计算按钮位置，用于定位浮动菜单
+        var rect = target.getBoundingClientRect();
+        $.dropdownPos.value = {
+            top: rect.bottom + window.scrollY + 4,
+            left: rect.left + window.scrollX
+        };
+        $.openDropdownId.value = id;
+        $.dropdownItems.value = items || [];
+    };
+    $.closeDropdown = function() {
+        $.openDropdownId.value = null;
+        $.dropdownItems.value = [];
+    };
+    $.execDropdownAction = function(fn) {
+        fn();
+        $.closeDropdown();
     };
 
     $.loadUserData = async function() {

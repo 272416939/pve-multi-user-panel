@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,265 +8,488 @@
     <link href="css/styles.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>.modal-backdrop{z-index:1050!important}.modal{z-index:1055!important}</style>
+
+    <!-- ========== Glassmorphism Style Overrides (与admin/dashboard统一) ========== -->
+    <style>
+        :root {
+            --glass-bg: rgba(15, 17, 27, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --header-height: 64px;
+            --sidebar-width: 220px;
+            --glass-accent: rgba(99, 102, 241, 0.6);
+            --glass-accent-hover: rgba(99, 102, 241, 0.85);
+            --glass-text: rgba(255, 255, 255, 0.9);
+            --glass-text-muted: rgba(255, 255, 255, 0.5);
+            --glass-surface: rgba(20, 22, 35, 0.75);
+        }
+        [data-theme="light"] {
+            --glass-bg: rgba(255, 255, 255, 0.78);
+            --glass-border: rgba(0, 0, 0, 0.08);
+            --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            --glass-accent: rgba(79, 70, 229, 0.7);
+            --glass-accent-hover: rgba(79, 70, 229, 0.95);
+            --glass-text: rgba(15, 17, 27, 0.92);
+            --glass-text-muted: rgba(15, 17, 27, 0.5);
+            --glass-surface: rgba(248, 250, 252, 0.8);
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; padding: 0;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--glass-text); overflow-x: hidden;
+        }
+        [data-theme="light"] body {
+            background: linear-gradient(135deg, #e8ecf4 0%, #d4dfee 50%, #c5cee0 100%);
+        }
+
+        /* Card 玻璃态覆盖 */
+        .main-wrap .card, .main-wrap .card-body {
+            background: var(--glass-surface) !important;
+            backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+            border: 1px solid var(--glass-border) !important; border-radius: 14px !important;
+        }
+        .main-wrap .card:hover {
+            transform: none !important; box-shadow: var(--glass-shadow) !important;
+            border-color: rgba(99,102,241,0.2) !important;
+        }
+
+        /* Nav Tabs 药丸风格（与admin一致） */
+        .nav-tabs {
+            display: flex; gap: 4px; padding: 6px 8px;
+            background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border, rgba(255,255,255,0.06));
+            border-radius: 10px; list-style: none; margin-bottom: 20px !important; flex-wrap: wrap;
+            border-bottom: none !important;
+        }
+        .nav-tabs .nav-item { margin-bottom: 0; }
+        .nav-tabs .nav-link {
+            padding: 7px 18px; font-size: 13px; font-weight: 500; color: var(--text-secondary,#9CA3AF);
+            background: transparent; border: none; border-radius: 7px; transition: all 0.2s ease; cursor: pointer;
+            white-space: nowrap; position: relative;
+        }
+        .nav-tabs .nav-link::after { display: none !important; }
+        .nav-tabs .nav-link:hover { color: #E5E7EB; background: rgba(99,102,241,0.08); }
+        .nav-tabs .nav-link.active {
+            color: #fff; background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.15));
+            box-shadow: 0 2px 12px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600;
+        }
+
+        /* Nav Pills 微调 */
+        .nav-pills { gap: 4px; padding: 4px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: 10px; }
+        .nav-pills .nav-link { border-radius: 8px; }
+
+        /* 标题样式 */
+        h4 { font-size: 20px !important; font-weight: 700 !important; color: var(--text-primary,#E5E7EB) !important;
+            letter-spacing: -0.3px; position: relative; padding-left: 14px; margin-bottom: 20px !important; }
+        h4::before {
+            content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+            width: 3px; height: 20px; border-radius: 2px;
+            background: linear-gradient(180deg, #6366F1, #8B5CF6);
+        }
+        h5.card-title { color: var(--text-primary,#E5E7EB) !important; }
+
+        /* 表格玻璃态 */
+        .table { color: var(--text-primary,#E5E7EB) !important; border-collapse: collapse; }
+        .table th { background: rgba(255,255,255,0.02) !important; color: var(--text-secondary,#9CA3AF) !important;
+            font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--glass-border, rgba(255,255,255,0.06)) !important; }
+        .table td { border-bottom: 1px solid rgba(255,255,255,0.03) !important; color: var(--text-primary,#E5E7EB) !important; }
+        .table tbody tr:hover td { background: rgba(99,102,241,0.04) !important; }
+
+        /* Badge 玻璃态色调 */
+        .badge { padding: 3px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; border: none; }
+        .bg-success { color: #34D399; background: rgba(52,211,153,0.12) !important; }
+        .bg-warning { color: #FBBF24; background: rgba(251,191,36,0.12) !important; }
+        .bg-primary { color: #818CF8; background: rgba(129,140,248,0.12) !important; }
+        .bg-secondary { color: #9CA3AF; background: rgba(156,163,175,0.1) !important; }
+        .bg-info { color: #38BDF8; background: rgba(56,189,248,0.12) !important; }
+        .bg-danger { color: #F87171; background: rgba(248,113,113,0.12) !important; }
+
+        /* 按钮微调 */
+        .btn-outline-light {
+            border: 1px solid rgba(255,255,255,0.15); color: var(--glass-text);
+            background: rgba(255,255,255,0.05);
+        }
+        .btn-outline-light:hover {
+            background: rgba(255,255,255,0.12); color: #fff;
+        }
+
+        /* Modal 增强 */
+        .modal-content {
+            background: var(--glass-bg, rgba(15,17,27,0.92)) !important;
+            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-border, rgba(255,255,255,0.1)) !important;
+        }
+        [data-theme="light"] .modal-content {
+            background: var(--glass-bg, rgba(255,255,255,0.92)) !important;
+        }
+
+        /* Alert 覆盖 */
+        .alert-warning {
+            background: rgba(251,191,36,0.1) !important;
+            border: 1px solid rgba(251,191,36,0.25) !important;
+            color: #FBBF24 !important;
+        }
+        .alert-warning .svg-icon { color: #FBBF24; }
+
+        /* 分页文字颜色 */
+        .text-muted { color: var(--glass-text-muted) !important; }
+        .text-success { color: #34D399 !important; }
+        .text-warning { color: #FBBF24 !important; }
+
+        /* Header Avatar (img标签) */
+        .header-user-avatar { width: 28px; height: 28px; border-radius: 50%;
+            object-fit: cover; border: 1px solid var(--glass-border, rgba(255,255,255,0.1));
+            flex-shrink: 0; cursor: pointer; transition: border-color 0.3s ease; }
+        .header-user-avatar:hover { border-color: var(--glass-accent); }
+
+        /* ===== Sidebar 子导航项样式（UC Tab迁移到侧边栏） ===== */
+
+        /* 分组标签 */
+        .nav-group-label {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 20px 6px;
+            font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 1px;
+            color: var(--glass-text-muted);
+            pointer-events: none; user-select: none;
+        }
+
+        /* 子导航项 - 缩进 + 字体稍小 */
+        .sub-nav-item {
+            padding-left: 36px !important;
+            font-size: 13px !important;
+            height: 40px !important;
+        }
+        .sub-nav-item .nav-icon {
+            width: 16px; height: 16px;
+            font-size: 14px;
+        }
+
+        /* 子导航项 active 状态 */
+        .sub-nav-item.active {
+            background: rgba(99, 102, 241, 0.12) !important;
+            border-left: 3px solid #6366F1 !important;
+            color: #818CF8 !important;
+            font-weight: 500;
+        }
+
+        /* 导航项上的 Badge（未读数） */
+        .nav-badge {
+            margin-left: auto;
+            min-width: 18px; height: 18px;
+            border-radius: 9px;
+            background: #EF4444;
+            color: #fff;
+            font-size: 10px; font-weight: 700;
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 0 5px; line-height: 1;
+        }
+
+        /* Sidebar Toggle (与dashboard一致) */
+        .sidebar-toggle {
+            display: none; background: none; border: 1px solid var(--glass-border);
+            color: inherit; font-size: 22px; cursor: pointer;
+            padding: 6px 10px; border-radius: 8px; transition: all 0.3s ease; line-height: 1;
+        }
+        .sidebar-toggle:hover { background: var(--glass-bg); color: #667eea; }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); position: fixed; top: var(--header-height, 64px); bottom: 0; left: 0; z-index: 1040; width: var(--sidebar-width, 220px); }
+            .sidebar.open { transform: translateX(0); box-shadow: 4px 0 32px rgba(0, 0, 0, 0.4); }
+            .sidebar-toggle { display: inline-flex !important; }
+            .main-wrap { margin-left: 0 !important; padding: 12px; }
+            .page-header { padding: 0 12px; }
+            .nav-tabs { padding: 4px; gap: 2px; }
+            .nav-tabs .nav-link { padding: 6px 12px; font-size: 12px; }
+            h4 { font-size: 17px !important; }
+            .card { border-radius: 12px !important; }
+            .avatar-circle { width: 60px; height: 60px; }
+            .avatar-img { width: 60px; height: 60px; }
+            .sidebar-overlay.show { left: var(--sidebar-width, 220px); }
+        }
+        @media (max-width: 576px) {
+            .main-wrap { padding: 10px; } .page-header { padding: 0 10px; }
+            .nav-tabs .nav-link { padding: 5px 10px; font-size: 11px; }
+            h4 { font-size: 16px !important; }
+        }
+    </style>
 </head>
 <body>
+
+  <!-- ========== 1. Page Header (Fixed Top Bar 64px) ========== -->
+  <header class="page-header">
+    <div class="header-left">
+      <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+      <span class="brand-logo navbar-brand">PVE 面板</span>
+    </div>
+    <div class="header-right">
+      <button class="header-btn" onclick="location.reload()" title="刷新">↻</button>
+      <button class="header-btn" id="themeToggle" title="主题切换">☾</button>
+      <div class="notification-wrapper">
+        <button class="header-btn" title="消息">🔔</button>
+        <span class="notification-badge" id="msgCount" style="display:none;">0</span>
+      </div>
+      <div class="dropdown">
+        <div class="user-info-dropdown" data-bs-toggle="dropdown">
+          <img class="header-user-avatar" id="headerAvatar" alt="" />
+          <span id="headerUsername">用户名</span>
+        </div>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="/dashboard.html"><i class="me-1">🏠</i>仪表盘</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" href="#" onclick="logout()"><i class="me-1">🚪</i>退出登录</a></li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <!-- ========== 2. Sidebar (Fixed Left 220px) ========== -->
+  <aside class="sidebar" id="sidebar">
+    <nav class="sidebar-nav" id="sidebarNav">
+      <!-- 仪表盘：外部链接，不走Vue -->
+      <a class="nav-item" href="/dashboard.html"><span class="nav-icon">🏠</span><span class="nav-text">仪表盘</span></a>
+      <!-- 用户中心分组（Vue template 内渲染） -->
+      <div id="sidebarSubNav"></div>
+    </nav>
+  </aside>
+
+  <!-- ========== 3. Sidebar Overlay (Mobile) ========== -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+  <!-- ========== 4. Main Content ========== -->
+  <main class="main-wrap" id="mainContent">
+
     <template id="appTemplate">
-        <nav class="navbar navbar-expand-lg navbar-dark mb-4">
-            <div class="container">
-                <a class="navbar-brand" href="dashboard.html">PVE 多用户控制面板</a>
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item" v-for="item in navItems" :key="item.id">
-                        <a class="nav-link" :class="{ active: item.id === currentNavId }" :href="item.href">{{ item.label }}</a>
-                    </li>
-                </ul>
-                <div class="navbar-nav ms-auto align-items-center">
-                    <button class="btn btn-link text-white position-relative me-2 p-1" @click="activeSubTab = 'messages'; loadMessages()" aria-label="消息" title="消息" style="text-decoration:none;">
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                        </svg>
-                        <span v-if="unreadCount > 0" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:10px; min-width:16px;">
-                            {{ unreadCount > 99 ? '99+' : unreadCount }}
-                        </span>
-                    </button>
-                    <div class="dropdown" v-if="user">
-                        <button class="btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                            <img v-if="user.avatar" :src="user.avatar" alt="" class="rounded-circle" style="width: 24px; height: 24px; object-fit: cover; margin-right: 5px;"/>
-                            <img v-else :src="getGeekAvatar(user.username)" alt="" class="rounded-circle" style="width: 24px; height: 24px; object-fit: cover; margin-right: 5px;"/>
-                            {{ user.username }}
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="dashboard.html">返回仪表盘</a></li>
-                            <li><hr class="dropdown-divider"/></li>
-                            <li><a class="dropdown-item" href="#" @click.prevent="logout">退出登录</a></li>
-                        </ul>
+
+        <div v-if="!user" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">加载中...</span>
+            </div>
+            <p class="mt-2 text-muted">正在验证登录状态...</p>
+        </div>
+
+        <div v-else>
+            <!-- 侧边栏子导航（通过Teleport渲染到#sidebarSubNav） -->
+            <Teleport to="#sidebarSubNav">
+                <div class="nav-group-label"><span class="nav-icon">👤</span>用户中心</div>
+                <a class="nav-item sub-nav-item" :class="{ active: activeSubTab === 'settings' }"
+                   @click.prevent="switchSubTab('settings')">
+                    <span class="nav-icon">⚙️</span><span class="nav-text">个人设置</span>
+                </a>
+                <a class="nav-item sub-nav-item" :class="{ active: activeSubTab === 'memos' }"
+                   @click.prevent="switchSubTab('memos')">
+                    <span class="nav-icon">📝</span><span class="nav-text">备忘录</span>
+                </a>
+                <a class="nav-item sub-nav-item" :class="{ active: activeSubTab === 'messages' }"
+                   @click.prevent="switchSubTab('messages')">
+                    <span class="nav-icon">📬</span><span class="nav-text">消息</span>
+                    <span v-if="unreadCount > 0" class="nav-badge">{{ unreadCount }}</span>
+                </a>
+                <a class="nav-item sub-nav-item" :class="{ active: activeSubTab === 'security' }"
+                   @click.prevent="switchSubTab('security')">
+                    <span class="nav-icon">🔒</span><span class="nav-text">安全</span>
+                </a>
+            </Teleport>
+
+            <div v-if="activeSubTab === 'settings'">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="avatar-circle">
+                                            <img v-if="profileForm.avatar" :src="profileForm.avatar" class="avatar-img">
+                                            <img v-else :src="getGeekAvatar(profileForm.username || user?.username)" class="avatar-img">
+                                        </div>
+                                        <div>
+                                            <input type="file" class="form-control" accept=".jpg,.jpeg,.png" @change="handleAvatarUpload" style="max-width: 300px;">
+                                            <small class="text-muted">支持 JPG、PNG，建议大小 200x200，最大 2MB</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label">邮箱</label>
+                                    <div class="d-flex gap-2">
+                                        <input type="email" class="form-control" v-model="profileForm.email" placeholder="请输入邮箱">
+                                        <button v-if="!profileForm.email || profileForm.email !== user.email" type="button" class="btn btn-outline-primary" @click="bindEmail">绑定</button>
+                                        <button v-else-if="!profileForm.emailVerified" type="button" class="btn btn-outline-secondary" @click="resendVerification">重发验证</button>
+                                    </div>
+                                    <div class="mt-1">
+                                        <small v-if="profileForm.emailVerified" class="text-success">✓ 已验证</small>
+                                        <small v-else-if="profileForm.email && profileForm.email === user.email" class="text-warning">● 未验证 - 请查收验证邮件</small>
+                                        <small v-else-if="profileForm.email" class="text-muted">点击「绑定」保存邮箱</small>
+                                    </div>
+                                </div>
+
+                                <form @submit.prevent="updateProfile">
+                                    <div class="mb-3">
+                                        <label class="form-label">用户名</label>
+                                        <input type="text" class="form-control" v-model="profileForm.username">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">新密码（留空则不修改）</label>
+                                        <input type="password" class="form-control" v-model="profileForm.password">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">个人简介</label>
+                                        <textarea class="form-control" rows="3" v-model="profileForm.bio" placeholder="介绍一下自己..."></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">保存修改</button>
+                                </form>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
-        </nav>
 
-        <div class="container">
-            <div v-if="!user" class="text-center py-5">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">加载中...</span>
-                </div>
-                <p class="mt-2 text-muted">正在验证登录状态...</p>
-            </div>
-
-            <div v-else>
-                <ul class="nav nav-tabs mb-4">
-                    <li class="nav-item">
-                        <button class="nav-link" :class="{ active: activeSubTab === 'settings' }" @click="activeSubTab = 'settings'">个人设置</button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link" :class="{ active: activeSubTab === 'memos' }" @click="activeSubTab = 'memos'; loadMemos()">备忘录</button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link" :class="{ active: activeSubTab === 'messages' }" @click="activeSubTab = 'messages'; loadMessages()">
-                            消息
-                            <span v-if="unreadCount > 0" class="badge bg-danger ms-1">{{ unreadCount }}</span>
-                        </button>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link" :class="{ active: activeSubTab === 'security' }" @click="activeSubTab = 'security'; loadDevices(); loadTwofaStatus()">安全</button>
-                    </li>
-                </ul>
-
-                <div v-if="activeSubTab === 'settings'">
-                    <div class="row justify-content-center">
-                        <div class="col-md-8">
-                            <div class="card">
-                                <div class="card-body">
-                                    <div class="mb-3">
-                                        <div class="d-flex align-items-center gap-3">
-                                            <div class="avatar-circle">
-                                                <img v-if="profileForm.avatar" :src="profileForm.avatar" class="avatar-img">
-                                                <img v-else :src="getGeekAvatar(profileForm.username || user?.username)" class="avatar-img">
-                                            </div>
-                                            <div>
-                                                <input type="file" class="form-control" accept=".jpg,.jpeg,.png" @change="handleAvatarUpload" style="max-width: 300px;">
-                                                <small class="text-muted">支持 JPG、PNG，建议大小 200x200，最大 2MB</small>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label">邮箱</label>
-                                        <div class="d-flex gap-2">
-                                            <input type="email" class="form-control" v-model="profileForm.email" placeholder="请输入邮箱">
-                                            <button v-if="!profileForm.email || profileForm.email !== user.email" type="button" class="btn btn-outline-primary" @click="bindEmail">绑定</button>
-                                            <button v-else-if="!profileForm.emailVerified" type="button" class="btn btn-outline-secondary" @click="resendVerification">重发验证</button>
-                                        </div>
-                                        <div class="mt-1">
-                                            <small v-if="profileForm.emailVerified" class="text-success">✓ 已验证</small>
-                                            <small v-else-if="profileForm.email && profileForm.email === user.email" class="text-warning">● 未验证 - 请查收验证邮件</small>
-                                            <small v-else-if="profileForm.email" class="text-muted">点击「绑定」保存邮箱</small>
-                                        </div>
-                                    </div>
-
-                                    <form @submit.prevent="updateProfile">
-                                        <div class="mb-3">
-                                            <label class="form-label">用户名</label>
-                                            <input type="text" class="form-control" v-model="profileForm.username">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">新密码（留空则不修改）</label>
-                                            <input type="password" class="form-control" v-model="profileForm.password">
-                                        </div>
-                                        <div class="mb-3">
-                                            <label class="form-label">个人简介</label>
-                                            <textarea class="form-control" rows="3" v-model="profileForm.bio" placeholder="介绍一下自己..."></textarea>
-                                        </div>
-                                        <button type="submit" class="btn btn-primary">保存修改</button>
-                                    </form>
-                                </div>
+            <div v-if="activeSubTab === 'memos'">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="mb-0">备忘录</h4>
+                            <button class="btn btn-primary btn-sm" @click="addMemo">+ 新建</button>
+                        </div>
+                        <div v-if="memosLoading" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
                             </div>
                         </div>
-                    </div>
-                </div>
-
-                <div v-if="activeSubTab === 'memos'">
-                    <div class="row justify-content-center">
-                        <div class="col-md-8">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h4 class="mb-0">备忘录</h4>
-                                <button class="btn btn-primary btn-sm" @click="addMemo">+ 新建</button>
-                            </div>
-                            <div v-if="memosLoading" class="text-center py-4">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">加载中...</span>
-                                </div>
-                            </div>
-                            <div v-else-if="memos.length === 0" class="text-muted text-center py-4">
-                                暂无备忘录，点击上方"新建"添加
-                            </div>
-                            <div v-else class="row g-3">
-                                <div v-for="memo in memos" :key="memo.id" class="col-md-6">
-                                    <div class="card h-100">
-                                        <div class="card-body d-flex flex-column">
-                                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                                <h6 class="mb-0">{{ memo.title || '无标题' }}</h6>
-                                                <div class="btn-group btn-group-sm">
-                                                    <button class="btn btn-outline-secondary" @click="editMemo(memo)">编辑</button>
-                                                    <button class="btn btn-outline-danger" @click="deleteMemo(memo.id)">删除</button>
-                                                </div>
-                                            </div>
-                                            <p class="card-text text-muted small flex-grow-1">{{ memo.content || '无内容' }}</p>
-                                            <small class="text-muted">更新于: {{ formatDate(memo.updated_at) }}</small>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                        <div v-else-if="memos.length === 0" class="text-muted text-center py-4">
+                            暂无备忘录，点击上方"新建"添加
                         </div>
-                    </div>
-                </div>
-
-                <div v-if="activeSubTab === 'messages'">
-                    <div class="row justify-content-center">
-                        <div class="col-md-8">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h4 class="mb-0">消息</h4>
-                                <div class="d-flex gap-2">
-                                    <button class="btn btn-outline-primary btn-sm" @click="markAllRead">全部标已读</button>
-                                    <button class="btn btn-outline-danger btn-sm" @click="clearAllMessages">清空已读</button>
-                                </div>
-                            </div>
-                            <ul class="nav nav-pills mb-3">
-                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === 'all' }" @click="msgType = 'all'; loadMessages()">全部</button></li>
-                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '1' }" @click="msgType = '1'; loadMessages()">系统公告</button></li>
-                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '2' }" @click="msgType = '2'; loadMessages()">业务通知</button></li>
-                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '3' }" @click="msgType = '3'; loadMessages()">续费提醒</button></li>
-                                <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '5' }" @click="msgType = '5'; loadMessages()">客服私聊</button></li>
-                            </ul>
-                            <div v-if="messagesLoading" class="text-center py-4">
-                                <div class="spinner-border text-primary" role="status">
-                                    <span class="visually-hidden">加载中...</span>
-                                </div>
-                            </div>
-                            <div v-else-if="messages.length === 0" class="text-muted text-center py-4">暂无消息</div>
-                            <div v-else class="message-list">
-                                <div v-for="msg in messages" :key="msg.id" class="message-item" :class="{ 'message-unread': !msg.is_read }" @click="viewMessage(msg)">
-                                    <div class="message-header">
-                                        <span class="message-type-badge" :class="'msg-type-' + msg.type">
-                                            {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[msg.type] || '消息' }}
-                                        </span>
-                                        <span class="d-flex align-items-center gap-2">
-                                            <span class="message-status-badge" :class="msg.is_read ? 'status-read' : 'status-unread'">{{ msg.is_read ? '已读' : '未读' }}</span>
-                                            <span class="message-time">{{ formatDate(msg.created_at) }}</span>
-                                        </span>
-                                    </div>
-                                    <div class="message-title">{{ msg.title }}</div>
-                                    <div class="message-preview">{{ trimContent(msg.content) }}</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div v-if="activeSubTab === 'security'">
-                    <div class="row justify-content-center">
-                        <div class="col-md-8">
-                            <div class="card mb-4">
-                                <div class="card-body">
-                                    <h5 class="card-title mb-3">登录设备管理</h5>
-                                    <div v-if="devicesLoading" class="text-center py-3">
-                                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-                                    </div>
-                                    <div v-else-if="devices.length === 0" class="text-muted text-center py-3">
-                                        暂无登录设备记录
-                                    </div>
-                                    <div v-else class="table-responsive">
-                                        <table class="table table-sm mb-0">
-                                            <thead>
-                                                <tr>
-                                                    <th>设备</th>
-                                                    <th>IP</th>
-                                                    <th>登录时间</th>
-                                                    <th>操作</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr v-for="d in devices" :key="d.id">
-                                                    <td>
-                                                        <span>{{ d.device_name }}</span>
-                                                        <span v-if="d.id === currentDeviceId" class="badge bg-info ms-1" style="font-size:10px;">当前</span>
-                                                    </td>
-                                                    <td class="text-muted small">{{ d.ip }}</td>
-                                                    <td class="text-muted small">{{ formatDate(d.created_at) }}</td>
-                                                    <td>
-                                                        <button v-if="d.id !== currentDeviceId" class="btn btn-outline-danger btn-sm" @click="revokeDevice(d.id)">下线</button>
-                                                        <span v-else class="text-muted small">-</span>
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    <div v-if="devices.length > 0" class="mt-2">
-                                        <button class="btn btn-outline-secondary btn-sm" @click="revokeOtherDevices">下线其他设备</button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="card">
-                                <div class="card-body">
-                                    <template v-if="!twofaEnabled">
-                                        <h5 class="card-title mb-1">二次验证（2FA）</h5>
-                                        <p class="text-muted small mb-2">启用两步验证，登录时除密码外还需输入动态验证码，进一步提升账号安全性</p>
-                                        <button class="btn btn-primary" @click="openTwofaSetup">绑定两步验证</button>
-                                        <p class="text-muted small mt-2 mb-0">提示：需先在手机安装 Google Authenticator 或 Authy 等 TOTP 应用</p>
-                                    </template>
-                                    <template v-else>
+                        <div v-else class="row g-3">
+                            <div v-for="memo in memos" :key="memo.id" class="col-md-6">
+                                <div class="card h-100">
+                                    <div class="card-body d-flex flex-column">
                                         <div class="d-flex justify-content-between align-items-start mb-2">
-                                            <h5 class="card-title mb-1">二次验证（2FA）</h5>
-                                            <span class="badge bg-success" style="font-size:11px;">✅ 已启用</span>
+                                            <h6 class="mb-0">{{ memo.title || '无标题' }}</h6>
+                                            <div class="btn-group btn-group-sm">
+                                                <button class="btn btn-outline-secondary" @click="editMemo(memo)">编辑</button>
+                                                <button class="btn btn-outline-danger" @click="deleteMemo(memo.id)">删除</button>
+                                            </div>
                                         </div>
-                                        <div class="d-flex gap-2 mb-2">
-                                            <button class="btn btn-outline-secondary btn-sm" @click="showRecoveryCodes">查看恢复码</button>
-                                            <button class="btn btn-outline-danger btn-sm" @click="openDisableTwofa">禁用二次验证</button>
-                                        </div>
-                                        <p class="text-muted small mb-0">剩余恢复码: {{ twofaRecoveryCount }} 个</p>
-                                    </template>
+                                        <p class="card-text text-muted small flex-grow-1">{{ memo.content || '无内容' }}</p>
+                                        <small class="text-muted">更新于: {{ formatDate(memo.updated_at) }}</small>
+                                    </div>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="activeSubTab === 'messages'">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="mb-0">消息</h4>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm" @click="markAllRead">全部标已读</button>
+                                <button class="btn btn-outline-danger btn-sm" @click="clearAllMessages">清空已读</button>
+                            </div>
+                        </div>
+                        <ul class="nav nav-pills mb-3">
+                            <li class="nav-item"><button class="nav-link" :class="{ active: msgType === 'all' }" @click="msgType = 'all'; loadMessages()">全部</button></li>
+                            <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '1' }" @click="msgType = '1'; loadMessages()">系统公告</button></li>
+                            <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '2' }" @click="msgType = '2'; loadMessages()">业务通知</button></li>
+                            <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '3' }" @click="msgType = '3'; loadMessages()">续费提醒</button></li>
+                            <li class="nav-item"><button class="nav-link" :class="{ active: msgType === '5' }" @click="msgType = '5'; loadMessages()">客服私聊</button></li>
+                        </ul>
+                        <div v-if="messagesLoading" class="text-center py-4">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">加载中...</span>
+                            </div>
+                        </div>
+                        <div v-else-if="messages.length === 0" class="text-muted text-center py-4">暂无消息</div>
+                        <div v-else class="message-list">
+                            <div v-for="msg in messages" :key="msg.id" class="message-item" :class="{ 'message-unread': !msg.is_read }" @click="viewMessage(msg)">
+                                <div class="message-header">
+                                    <span class="message-type-badge" :class="'msg-type-' + msg.type">
+                                        {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[msg.type] || '消息' }}
+                                    </span>
+                                    <span class="d-flex align-items-center gap-2">
+                                        <span class="message-status-badge" :class="msg.is_read ? 'status-read' : 'status-unread'">{{ msg.is_read ? '已读' : '未读' }}</span>
+                                        <span class="message-time">{{ formatDate(msg.created_at) }}</span>
+                                    </span>
+                                </div>
+                                <div class="message-title">{{ msg.title }}</div>
+                                <div class="message-preview">{{ trimContent(msg.content) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-if="activeSubTab === 'security'">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <h5 class="card-title mb-3">登录设备管理</h5>
+                                <div v-if="devicesLoading" class="text-center py-3">
+                                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                </div>
+                                <div v-else-if="devices.length === 0" class="text-muted text-center py-3">
+                                    暂无登录设备记录
+                                </div>
+                                <div v-else class="table-responsive">
+                                    <table class="table table-sm mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>设备</th>
+                                                <th>IP</th>
+                                                <th>登录时间</th>
+                                                <th>操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="d in devices" :key="d.id">
+                                                <td>
+                                                    <span>{{ d.device_name }}</span>
+                                                    <span v-if="d.id === currentDeviceId" class="badge bg-info ms-1" style="font-size:10px;">当前</span>
+                                                </td>
+                                                <td class="text-muted small">{{ d.ip }}</td>
+                                                <td class="text-muted small">{{ formatDate(d.created_at) }}</td>
+                                                <td>
+                                                    <button v-if="d.id !== currentDeviceId" class="btn btn-outline-danger btn-sm" @click="revokeDevice(d.id)">下线</button>
+                                                    <span v-else class="text-muted small">-</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div v-if="devices.length > 0" class="mt-2">
+                                    <button class="btn btn-outline-secondary btn-sm" @click="revokeOtherDevices">下线其他设备</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-body">
+                                <template v-if="!twofaEnabled">
+                                    <h5 class="card-title mb-1">二次验证（2FA）</h5>
+                                    <p class="text-muted small mb-2">启用两步验证，登录时除密码外还需输入动态验证码，进一步提升账号安全性</p>
+                                    <button class="btn btn-primary" @click="openTwofaSetup">绑定两步验证</button>
+                                    <p class="text-muted small mt-2 mb-0">提示：需先在手机安装 Google Authenticator 或 Authy 等 TOTP 应用</p>
+                                </template>
+                                <template v-else>
+                                    <div class="d-flex justify-content-between align-items-start mb-2">
+                                        <h5 class="card-title mb-1">二次验证（2FA）</h5>
+                                        <span class="badge bg-success" style="font-size:11px;">✅ 已启用</span>
+                                    </div>
+                                    <div class="d-flex gap-2 mb-2">
+                                        <button class="btn btn-outline-secondary btn-sm" @click="showRecoveryCodes">查看恢复码</button>
+                                        <button class="btn btn-outline-danger btn-sm" @click="openDisableTwofa">禁用二次验证</button>
+                                    </div>
+                                    <p class="text-muted small mb-0">剩余恢复码: {{ twofaRecoveryCount }} 个</p>
+                                </template>
                             </div>
                         </div>
                     </div>
@@ -351,7 +574,7 @@
                                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                             </svg>
                         </div>
-                        <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customConfirmMessage }}</p>
+                        <p class="custom-confirm-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customConfirmMessage }}</p>
                     </div>
                     <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
                         <button type="button" class="btn btn-outline-light px-3" @click="confirmCancel">取消</button>
@@ -459,6 +682,8 @@
         </div>
     </template>
     <div id="app"></div>
+
+  </main><!-- /main-wrap -->
 
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
@@ -604,6 +829,23 @@
                     }
                 };
                 let msgPolling = null;
+
+                // 统一子Tab切换方法（侧边栏导航调用）
+                const switchSubTab = async (tab) => {
+                    activeSubTab.value = tab;
+                    // 根据tab懒加载数据
+                    if (tab === 'memos') await loadMemos();
+                    if (tab === 'messages') await loadMessages();
+                    if (tab === 'security') { await loadDevices(); await loadTwofaStatus(); }
+                    // settings 数据在 onMounted 时已通过 loadProfile 加载
+                    // 移动端自动收起侧边栏
+                    if (window.innerWidth <= 768) {
+                        var sb = document.getElementById('sidebar');
+                        var ol = document.getElementById('sidebarOverlay');
+                        if (sb) sb.classList.remove('open');
+                        if (ol) ol.style.display = 'none';
+                    }
+                };
 
                 const loadProfile = async () => {
                     try {
@@ -1067,10 +1309,25 @@
                     }
                 };
 
+                // 同步 header 用户信息
+                const syncHeaderUser = () => {
+                    const avatarEl = document.getElementById('headerAvatar');
+                    const usernameEl = document.getElementById('headerUsername');
+                    if (user.value && avatarEl && usernameEl) {
+                        usernameEl.textContent = user.value.username;
+                        if (user.value.avatar) {
+                            avatarEl.src = user.value.avatar;
+                        } else {
+                            avatarEl.src = getGeekAvatar(user.value.username);
+                        }
+                    }
+                };
+
                 onMounted(async () => {
                     const userData = await authGuard();
                     if (userData) {
                         user.value = userData;
+                        syncHeaderUser();
                         await loadNavItems();
                         await loadProfile();
                         if (window.location.hash === '#messages' || activeSubTab.value === 'messages') {
@@ -1096,11 +1353,17 @@
                     localStorage.setItem('ucenter_subtab', val);
                 });
 
+                // 监听 user 变化同步 header
+                watch(user, () => {
+                    syncHeaderUser();
+                }, { deep: true });
+
                 return {
                     user,
                     activeSubTab,
                     navItems,
                     currentNavId,
+                    switchSubTab,
                     profileForm,
                     memos,
                     memosLoading,
@@ -1165,6 +1428,56 @@
 
         createApp(App).mount('#app');
     </script>
+
+    <!-- Sidebar Toggle & Theme Switch Script -->
+    <script>
+    function toggleSidebar() {
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
+        if (sidebar && overlay) {
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('show');
+        }
+    }
+
+    // Theme toggle
+    (function() {
+        var btn = document.getElementById('themeToggle');
+        if (!btn) return;
+        var saved = localStorage.getItem('theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', saved);
+        btn.innerHTML = saved === 'light' ? '☀' : '☾';
+        btn.addEventListener('click', function() {
+            var current = document.documentElement.getAttribute('data-theme') || 'dark';
+            var next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            btn.innerHTML = next === 'light' ? '☀' : '☾';
+        });
+    })();
+    </script>
+
+    <!-- Sidebar nav auto-close on mobile (与dashboard统一: 768px阈值) -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.sidebar .nav-item').forEach(function(item) {
+            item.addEventListener('click', function(e) {
+                if (window.innerWidth <= 768) {
+                    var sb = document.getElementById('sidebar');
+                    var ol = document.getElementById('sidebarOverlay');
+                    if (sb) sb.classList.remove('open');
+                    if (ol) ol.style.display = 'none';
+                    // 如果是<a>标签且有href，延迟导航确保先关闭
+                    if (item.tagName === 'A' && item.href && item.href !== window.location.href) {
+                        e.preventDefault();
+                        setTimeout(function() { window.location.href = item.href; }, 300);
+                    }
+                }
+            });
+        });
+    });
+    </script>
+
 <script>fetch("/api/version").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("appVersion");if(el)el.textContent="v"+d.version})</script>
 </body>
 </html>
