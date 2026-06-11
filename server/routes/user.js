@@ -341,7 +341,7 @@ router.post('/user/avatar', authMiddleware, upload.single('avatar'), async (req,
 
         const avatarPath = `/images/${req.file.filename}`;
         db.users.update(req.user.id, { avatar: avatarPath });
-        console.log('[avatar] 上传成功:', req.file.path, '→', avatarPath);
+        if (process.env.DEBUG) console.log('[avatar] 上传成功:', req.file.path, '→', avatarPath);
 
         const updatedUser = db.users.getById(req.user.id);
         const { password: _, ...safeUser } = updatedUser;
