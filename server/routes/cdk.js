@@ -12,6 +12,23 @@ function safeError(e) {
     return '操作失败，请稍后重试';
 }
 
+// M-6 修复：CDK 兑换速率限制（每用户每分钟最多 5 次）
+const cdkRateLimit = new Map();
+function checkCdkRateLimit(userId, ip) {
+    const key = `${userId}:${ip}`;
+    const now = Date.now();
+    const record = cdkRateLimit.get(key);
+    if (!record || now - record.resetTime > 60000) {
+        cdkRateLimit.set(key, { count: 1, resetTime: now + 60000 });
+        return true;
+    }
+    if (record.count >= 5) {
+        return false;
+    }
+    record.count++;
+    return true;
+}
+
 router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { duration_days, expires_at } = req.body;
@@ -291,6 +308,11 @@ router.get('/user/cdk/redeemable-vms', authMiddleware, async (req, res) => {
 
 router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
     try {
+        // M-6 速率限制检查
+        if (!checkCdkRateLimit(req.user.id, req.ip)) {
+            return res.status(429).json({ error: 'CDK 兑换操作过于频繁，请稍后再试' });
+        }
+
         const { code, vm_id, container_id } = req.body;
  
         if (!code || (!vm_id && !container_id)) {

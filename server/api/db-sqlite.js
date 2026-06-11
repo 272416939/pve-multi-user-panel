@@ -710,9 +710,15 @@ module.exports = {
             return db.prepare('SELECT * FROM users WHERE id = ?').get(lastInsertRowid);
         },
         update: (id, updates) => {
+            // M-9: 列名白名单防 SQL 注入
+            const allowedColumns = ['username', 'email', 'password', 'salt', 'avatar', 'role', 'is_active',
+                'must_change_password', '2fa_secret', '2fa_enabled', 'recovery_codes', 'emailVerified'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
             const fields = [];
             const values = [];
-            
+
             for (const [key, value] of Object.entries(updates)) {
                 if (key === 'emailVerified') {
                     fields.push('emailVerified = ?');
@@ -750,6 +756,12 @@ module.exports = {
             return db.prepare('SELECT * FROM vms WHERE id = ?').get(lastInsertRowid);
         },
         update: (id, updates) => {
+            // M-9: 列名白名单防 SQL 注入
+            const allowedColumns = ['name', 'vm_id', 'user_id', 'username', 'expiration_date',
+                'renewal_price', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
             const fields = [];
             const values = [];
 
@@ -905,9 +917,14 @@ module.exports = {
             return db.prepare('SELECT * FROM memos WHERE id = ?').get(lastInsertRowid);
         },
         update: (id, updates) => {
+            // M-9: 列名白名单防 SQL 注入
+            const allowedColumns = ['title', 'content', 'user_id'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
             const fields = [];
             const values = [];
-            
+
             for (const [key, value] of Object.entries(updates)) {
                 fields.push(`${key} = ?`);
                 values.push(value);
@@ -1258,6 +1275,12 @@ module.exports = {
             return db.prepare('SELECT * FROM lxc_containers WHERE id = ?').get(lastInsertRowid);
         },
         update: (id, updates) => {
+            // M-9: 列名白名单防 SQL 注入
+            const allowedColumns = ['name', 'ct_id', 'user_id', 'username', 'expiration_date',
+                'renewal_price', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
             const fields = [];
             const values = [];
 
