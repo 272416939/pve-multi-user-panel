@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5-UI-beta18] - 2026-06-11
+
+### Fixed
+- fix(api): **LXC 重置 IP 仍失败 "duplicate key: gw"** — 根因：静态/随机 IP 模式下，原始 net0 已包含 `gw=xxx`，代码又 push 了新的 `gw=`，导致 PVE 报重复键错误。现改为**统一在解析阶段移除 ip/ip6/gw/firewall 四类参数**，再根据模式按需添加，彻底避免重复
+- 涉及文件：server/routes/lxc.js
+
+---
+
 ## [1.7.5-UI-beta17] - 2026-06-11
 
 ### Fixed

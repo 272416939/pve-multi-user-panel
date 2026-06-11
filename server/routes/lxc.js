@@ -679,17 +679,17 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         }
         const mac = macMatch[1];
 
-        // 解析 net0 中除 ip/ip6/gw 之外的其他参数
+        // 解析 net0 中除 ip/ip6/gw/firewall 之外的其他参数（统一移除，避免重复）
         let net0Parts = config.net0.split(',');
         let newNet0Parts = [];
         let hasFirewall = false;
         for (const part of net0Parts) {
-            if (!part.startsWith('ip=') && !part.startsWith('ip6=')) {
-                // DHCP 模式下也移除 gw，让容器通过 DHCP 自动获取
-                // 同时检测是否有防火墙配置
-                if (part.startsWith('firewall=')) hasFirewall = true;
+            // 统一移除 ip/ip6/gw/firewall，后面根据模式重新添加
+            if (!part.startsWith('ip=') && !part.startsWith('ip6=')
+                && !part.startsWith('gw=') && !part.startsWith('firewall=')) {
                 newNet0Parts.push(part);
             }
+            if (part.startsWith('firewall=')) hasFirewall = true;
         }
 
         let newIp = '';
@@ -699,9 +699,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         if (ip_mode === 'dhcp') {
             newNet0Parts.push('ip=dhcp');
             newNet0Parts.push('ip6=dhcp');
-            // DHCP模式下清除 gw 和 firewall（PVE 不允许 firewall=1 + ip=dhcp）
-            const filteredGw = newNet0Parts.filter(p => !p.startsWith('gw=') && !p.startsWith('firewall='));
-            newNet0Parts = filteredGw;
+            // DHCP 模式不添加 gw 和 firewall
         } else if (ip_mode === 'static') {
             if (!ip) {
                 return res.status(400).json({ error: '请输入 IP 地址' });
