@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.5-UI-beta17] - 2026-06-11
+
+### Fixed
+- fix(api): **LXC 重置 IP 仍然失败（PVE 400）** — 根因：容器 net0 包含 `firewall=1` 时，PVE 不允许设置 `ip=dhcp`（防火墙模式要求静态 IP）。DHCP 模式下现同时移除 `firewall` 和 `gw` 参数
+- 改进 PVE 错误信息透传：提取 response.data 中的具体错误详情（之前只显示 "status code 400"）
+- 增加 net0 构建调试日志（原始值 + 新值），方便排查问题
+- 涉及文件：server/routes/lxc.js
+
+---
+
 ## [1.7.5-UI-beta16] - 2026-06-11
 
 ### Fixed

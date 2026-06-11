@@ -679,11 +679,15 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         }
         const mac = macMatch[1];
 
-        // 解析 net0 中除 ip/ip6 之外的其他参数
+        // 解析 net0 中除 ip/ip6/gw 之外的其他参数
         let net0Parts = config.net0.split(',');
         let newNet0Parts = [];
+        let hasFirewall = false;
         for (const part of net0Parts) {
             if (!part.startsWith('ip=') && !part.startsWith('ip6=')) {
+                // DHCP 模式下也移除 gw，让容器通过 DHCP 自动获取
+                // 同时检测是否有防火墙配置
+                if (part.startsWith('firewall=')) hasFirewall = true;
                 newNet0Parts.push(part);
             }
         }
@@ -695,8 +699,8 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         if (ip_mode === 'dhcp') {
             newNet0Parts.push('ip=dhcp');
             newNet0Parts.push('ip6=dhcp');
-            // DHCP模式下也清除gw，让容器通过DHCP自动获取
-            const filteredGw = newNet0Parts.filter(p => !p.startsWith('gw='));
+            // DHCP模式下清除 gw 和 firewall（PVE 不允许 firewall=1 + ip=dhcp）
+            const filteredGw = newNet0Parts.filter(p => !p.startsWith('gw=') && !p.startsWith('firewall='));
             newNet0Parts = filteredGw;
         } else if (ip_mode === 'static') {
             if (!ip) {
@@ -729,6 +733,10 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
 
         const newNet0 = newNet0Parts.join(',');
 
+        // 调试日志：输出构建的 net0 值
+        console.log(`[reset-ip] LXC ${vmid} 原始 net0: ${config.net0}`);
+        console.log(`[reset-ip] LXC ${vmid} 新 net0: ${newNet0} (mode=${ip_mode})`);
+
         // 检查容器状态，运行中需要先关机
         let wasRunning = false;
         try {
@@ -751,12 +759,20 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         try {
             await pveApi.updateLxcConfig(vmid, { net0: newNet0 });
         } catch (pveErr) {
-            console.error(`LXC ${vmid} 更新网络配置失败:`, pveErr.message);
+            // 提取 PVE API 的详细错误信息
+            let pveDetail = pveErr.message || '未知错误';
+            if (pveErr.response && pveErr.response.data) {
+                const rd = pveErr.response.data;
+                if (typeof rd === 'string') pveDetail = rd;
+                else if (rd.errors) pveDetail = JSON.stringify(rd.errors);
+                else pveDetail = JSON.stringify(rd);
+            }
+            console.error(`LXC ${vmid} 更新网络配置失败:`, pveDetail);
             // 如果之前关机了，尝试恢复开机
             if (wasRunning) {
                 try { await pveApi.startLxc(vmid); } catch (_) {}
             }
-            return res.status(500).json({ error: 'PVE 配置更新失败: ' + (pveErr.message || '未知错误') });
+            return res.status(500).json({ error: `PVE 配置更新失败 (${pveErr.response?.status || 500}): ${pveDetail}` });
         }
 
         // 如果之前是运行状态，重新开机
