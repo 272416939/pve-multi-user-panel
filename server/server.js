@@ -92,6 +92,18 @@ app.use(express.static(path.join(__dirname, '../public'), {
         }
     }
 }));
+// 自动注入JS缓存版本号：HTML中 ?v=xxx 统一替换为当前 package.json 版本
+app.use((req, res, next) => {
+    if (!req.path.endsWith('.html')) return next();
+    const origSend = res.send.bind(res);
+    res.send = function (body) {
+        if (typeof body === 'string' && body.includes('<script')) {
+            body = body.replace(/\?v=[^"'\s]*/g, '?v=' + pkg.version);
+        }
+        return origSend(body);
+    };
+    next();
+});
 app.use('/images', express.static(path.join(__dirname, '../images'), {
     setHeaders: (res) => {
         res.removeHeader('Expires');
