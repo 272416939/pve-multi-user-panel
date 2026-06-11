@@ -11,7 +11,8 @@
         port_range_end: 60000,
         default_protocol: 'tcp',
         wan_interface: 'wan1',
-        max_per_user: 10
+        max_per_user: 10,
+        cname_domain: ''
     });
     $.ifaceList = ref([]);
     $.ifaceUpdateTime = ref('');

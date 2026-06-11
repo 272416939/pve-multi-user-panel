@@ -23,6 +23,7 @@
     $.openDropdownId = ref(null); // 当前打开的下拉菜单ID，格式 'vm-123' 或 'lxc-456'
     $.dropdownItems = ref([]); // 当前下拉菜单的 [{label, action, cls}]
     $.dropdownPos = ref({ top: 0, left: 0 });
+    $.cnameDomain = ref('');
 
     // ===== 详情弹窗状态 =====
     $.showVmDetail = ref(false);
@@ -275,6 +276,13 @@
         } catch (e) {}
     };
 
+    $.loadCnameDomain = async function() {
+        try {
+            var data = await api('/api/cname');
+            $.cnameDomain.value = data.cname_domain || '';
+        } catch (e) {}
+    };
+
     $.logout = function() {
         var refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
@@ -454,6 +462,7 @@
                 await $.loadNavItems();
                 await $.loadData();
                 await $.loadLxcContainers();
+                await $.loadCnameDomain();
                 await $.loadUnreadCount();
                 if ($.msgPolling) clearInterval($.msgPolling);
                 $.msgPolling = setInterval($.loadUnreadCount, 30000);

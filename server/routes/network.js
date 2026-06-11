@@ -28,7 +28,8 @@ router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req,
             dhcp_interface: db.config.get('dhcp:interface') || 'lan2',
             dhcp_gateway: db.config.get('dhcp:gateway') || '10.0.0.1',
             dhcp_dns1: db.config.get('dhcp:dns1') || '119.29.29.29',
-            dhcp_dns2: db.config.get('dhcp:dns2') || '223.5.5.5'
+            dhcp_dns2: db.config.get('dhcp:dns2') || '223.5.5.5',
+            cname_domain: db.config.get('cname:domain') || ''
         });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -38,7 +39,8 @@ router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req,
 router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { port_range_start, port_range_end, default_protocol, wan_interface, max_per_user,
-                dhcp_ip_range_start, dhcp_ip_range_end, dhcp_interface, dhcp_gateway, dhcp_dns1, dhcp_dns2 } = req.body;
+                dhcp_ip_range_start, dhcp_ip_range_end, dhcp_interface, dhcp_gateway, dhcp_dns1, dhcp_dns2,
+                cname_domain } = req.body;
         const setConfig = db.config.set;
         setConfig('forward:port_range_start', String(port_range_start ?? 50000));
         setConfig('forward:port_range_end', String(port_range_end ?? 60000));
@@ -51,7 +53,18 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         setConfig('dhcp:gateway', dhcp_gateway || '10.0.0.1');
         setConfig('dhcp:dns1', dhcp_dns1 || '119.29.29.29');
         setConfig('dhcp:dns2', dhcp_dns2 || '223.5.5.5');
+        setConfig('cname:domain', (cname_domain || '').trim());
         res.json({ message: '网络配置已更新' });
+    } catch (e) {
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+// CNAME 域名配置：所有已登录用户可读取，仅管理员可写入
+router.get('/api/cname', authMiddleware, async (req, res) => {
+    try {
+        const domain = db.config.get('cname:domain') || '';
+        res.json({ cname_domain: domain });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
     }

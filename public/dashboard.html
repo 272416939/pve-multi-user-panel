@@ -836,6 +836,7 @@
                                     <th>ID</th>
                                     <th>主机名称</th>
                                     <th>内网IP</th>
+                                    <th>CNAME域名</th>
                                     <th>配置</th>
                                     <th>系统</th>
                                     <th>状态</th>
@@ -872,7 +873,7 @@
                                     </td>
                                 </tr>
                                 <tr v-if="userVms.length === 0">
-                                    <td colspan="7" class="text-center text-muted py-4">暂无虚拟机</td>
+                                    <td colspan="8" class="text-center text-muted py-4">暂无虚拟机</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -899,6 +900,7 @@
                                     <th>ID</th>
                                     <th>容器名称</th>
                                     <th>内网IP</th>
+                                    <th>CNAME域名</th>
                                     <th>配置</th>
                                     <th>镜像</th>
                                     <th>状态</th>
@@ -910,6 +912,7 @@
                                     <td>{{ ct.ct_id }}</td>
                                     <td>{{ ct.name || ('CT ' + ct.ct_id) }}</td>
                                     <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
+                                    <td><span v-if="cnameDomain" class="text-primary">{{ ct.ct_id }}.{{ cnameDomain }}</span><span v-else class="text-muted">-</span></td>
                                     <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.status && ct.status.maxdisk ? '/ ' + Math.round(ct.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
                                     <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                     <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
@@ -936,7 +939,7 @@
                                     </td>
                                 </tr>
                                 <tr v-if="userLxcContainers.length === 0">
-                                    <td colspan="7" class="text-center text-muted py-4">暂无容器</td>
+                                    <td colspan="8" class="text-center text-muted py-4">暂无容器</td>
                                 </tr>
                             </tbody>
                         </table>
