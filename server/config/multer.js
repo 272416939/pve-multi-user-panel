@@ -2,8 +2,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// 确保 images 目录存在
-const imagesDir = path.join(__dirname, '../images');
+// 确保 images 目录存在（项目根目录下的 images/）
+const imagesDir = path.join(__dirname, '../../images');
 if (!fs.existsSync(imagesDir)) {
     fs.mkdirSync(imagesDir, { recursive: true });
 }
