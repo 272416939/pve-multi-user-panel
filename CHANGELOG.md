@@ -18,6 +18,7 @@
 - fix(ui): 解决明亮模式刺眼问题 — 纯白背景替换为柔和浅紫色调
 - fix(ui): 统一四页面的主题切换体验（之前 login.html 无主题切换功能）
 - fix(ui): 主题状态跨页面同步（localStorage 持久化 + 防闪烁脚本统一初始化）
+- fix(ui): **主题切换按钮不可见** — moon SVG 内联 `style="display:none"` 覆盖 CSS 规则优先级，导致明亮模式下太阳/月亮图标同时隐藏。移除内联 style，完全由 CSS 类控制显示/隐藏
 
 ---
 
