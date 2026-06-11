@@ -515,13 +515,13 @@
     .table-dark { background: var(--bg-hover) !important; border-color: var(--border-color) !important; }
     .table > thead { background: rgba(102, 126, 234, 0.1) !important; }
 
-    /* Buttons glow effect */
-    .btn-primary {
+    /* Buttons glow effect - 仅主操作按钮，不影响表格小按钮 */
+    .btn-primary:not(.table-btn) {
         background: var(--accent-gradient) !important;
         border: none !important;
         box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
     }
-    .btn-primary:hover {
+    .btn-primary:not(.table-btn):hover {
         box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45) !important;
         transform: translateY(-1px);
     }
