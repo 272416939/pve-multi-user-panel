@@ -1,5 +1,6 @@
 const Database = require('better-sqlite3');
 const path = require('path');
+const crypto = require('crypto');
 const CryptoJS = require('crypto-js');
 const fs = require('fs');
 
@@ -494,7 +495,7 @@ function createDefaultAdmin() {
     if (!adminExists) {
         // C-2R 修复：优先读取环境变量，否则自动生成强随机密码
         const defaultAdminPassword = process.env.DEFAULT_ADMIN_PASSWORD || generateRandomPassword(16);
-        const adminSalt = CryptoJS.lib.WordArray.random(16).toString();
+        const adminSalt = crypto.randomBytes(16).toString('hex');
         const hashedPassword = CryptoJS.SHA256(adminSalt + defaultAdminPassword).toString();
 
         db.prepare(`
@@ -503,7 +504,7 @@ function createDefaultAdmin() {
         `).run('admin', hashedPassword, 'admin', '', '', '', 0, 1, adminSalt, new Date().toISOString());
 
         console.log('================================================');
-        console.log('  默认管理员账号已创建:');
+        console.log('  ⚠ 默认管理员账号已创建（此信息仅显示一次）');
         console.log(`  用户名: admin`);
         console.log(`  密码:   ${defaultAdminPassword}`);
         console.log('  ⚠ 请立即登录并修改密码！');
@@ -1063,6 +1064,7 @@ module.exports = {
             ORDER BY created_at DESC
         `).all(userId),
         revoke: (id) => db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE id = ?').run(id),
+        deleteByToken: (token) => db.prepare('DELETE FROM refresh_tokens WHERE token = ?').run(token),
         revokeByUserId: (userId, excludeId) => {
             if (excludeId) {
                 db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND id != ?').run(userId, excludeId);
@@ -1382,6 +1384,13 @@ module.exports = {
             return db.prepare('SELECT * FROM port_forwards WHERE id = ?').get(result.lastInsertRowid);
         },
         update: (id, data) => {
+            // M-9 修复：列名白名单
+            const allowedColumns = ['name', 'type', 'vm_id', 'ct_id', 'ip', 'mac', 'internal_port', 'external_port', 'protocol', 'enabled', 'source', 'sync_status', 'ikuai_id'];
+            for (const key of Object.keys(data)) {
+                if (!allowedColumns.includes(key)) {
+                    delete data[key];
+                }
+            }
             const fields = [];
             const values = [];
             for (const [key, value] of Object.entries(data)) {

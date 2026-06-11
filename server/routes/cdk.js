@@ -1,10 +1,17 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const db = require('../api/db-sqlite');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { generateUniqueCdkCode } = require('../utils/cdk-generator');
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
+// H-9 修复：生产环境隐藏详细错误信息
+function safeError(e) {
+    const isDebug = process.env.DEBUG === 'true';
+    if (isDebug) return e.response?.data?.message || e.message || String(e);
+    return '操作失败，请稍后重试';
+}
+
 router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { duration_days, expires_at } = req.body;
@@ -152,7 +159,7 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
         });
     } catch (error) {
         console.error('批量生成 CDK 失败:', error);
-        res.status(500).json({ error: '批量生成 CDK 失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -295,20 +302,25 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
         if (!cdk) {
             return res.status(400).json({ error: 'CDK 码不存在' });
         }
- 
-        // 检查是否已使用
-        if (cdk.is_used) {
-            return res.status(400).json({ error: '该 CDK 已被使用' });
-        }
- 
+
         // 检查有效期
         if (cdk.expires_at && new Date(cdk.expires_at) <= new Date()) {
             return res.status(400).json({ error: '该 CDK 已过期' });
         }
- 
+
         // 检查分配限制：指定用户的 CDK 仅允许该用户使用
         if (cdk.target_user_id && cdk.target_user_id !== req.user.id) {
             return res.status(403).json({ error: '该 CDK 已被指定给其他用户，无法使用' });
+        }
+
+        // M-5 修复：原子 CAS 操作防并发重复兑换
+        // 先用 UPDATE ... WHERE id=? AND is_used=0 原子锁定 CDK，避免 TOCTOU 竞态
+        const affected = db.cdkCodes.db.prepare(
+            'UPDATE cdk_codes SET is_used=1, used_by=?, used_at=? WHERE id=? AND is_used=0'
+        ).run(req.user.id, new Date().toISOString(), cdk.id);
+
+        if (affected.changes === 0) {
+            return res.status(400).json({ error: 'CDK 已被使用或无效' });
         }
  
         let targetName, targetId, targetType, renewalPrice;
@@ -348,8 +360,10 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             });
             db.lxcContainers.reminders.clear(targetId);
  
-            // 标记 CDK 为已使用
-            db.cdk.markAsUsed(cdk.id, req.user.id, null, targetId);
+            // M-5: CDK 已被原子 CAS 标记为已用，此处仅补充关联信息
+            db.cdkCodes.db.prepare(
+                'UPDATE cdk_codes SET used_ct_id = ? WHERE id = ?'
+            ).run(targetId, cdk.id);
  
             // 续费后尝试自动开机
             try {
@@ -439,8 +453,10 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             });
             db.vms.reminders.clear(vm.id);
  
-            // 标记 CDK 为已使用
-            db.cdk.markAsUsed(cdk.id, req.user.id, vm.id);
+            // M-5: CDK 已被原子 CAS 标记为已用，此处仅补充关联信息
+            db.cdkCodes.db.prepare(
+                'UPDATE cdk_codes SET used_vm_id = ? WHERE id = ?'
+            ).run(vm.id, cdk.id);
  
             // 发送续费成功邮件和站内信
             const redeemer = db.users.getById(req.user.id);

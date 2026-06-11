@@ -8,6 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="css/styles.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="js/lib/dompurify.min.js"></script>
     <style>.modal-backdrop{z-index:1050!important}.modal{z-index:1055!important}</style>
 
     <!-- ========== 统一双主题CSS变量系统 ========== -->
@@ -886,7 +887,7 @@
                 const parseMarkdown = (text) => {
                     if (!text) return '';
                     try {
-                        return marked.parse(text);
+                        return DOMPurify.sanitize(marked.parse(text));
                     } catch {
                         return text;
                     }

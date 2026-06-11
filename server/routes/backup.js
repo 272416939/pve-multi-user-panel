@@ -5,6 +5,12 @@ const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const dbg = require('../utils/debug');
 const { startLxcBackupPolling, sendLxcRestoreNotification, startBackupPolling, startRestorePolling } = require('../services/backup-polling');
+// H-9 修复：生产环境隐藏详细错误信息
+function safeError(e) {
+    const isDebug = process.env.DEBUG === 'true';
+    if (isDebug) return e.response?.data?.message || e.message || String(e);
+    return '操作失败，请稍后重试';
+}
 router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
@@ -29,7 +35,7 @@ router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
  
         res.json({ backups, limits });
     } catch (error) {
-        res.status(500).json({ error: '获取备份列表失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -118,7 +124,7 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         res.json({ id: backupId, message: '备份任务已提交' });
     } catch (error) {
         console.error('创建 LXC 备份失败:', error.response?.data || error.message);
-        res.status(500).json({ error: '创建备份失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -152,7 +158,7 @@ router.delete('/lxc/:vmid/backups/:id', authMiddleware, async (req, res) => {
         res.json({ message: '备份已删除' });
     } catch (error) {
         console.error('删除备份失败:', error);
-        res.status(500).json({ error: '删除备份失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -239,7 +245,7 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
         res.json({ id: restoreRecord.id, message: '恢复任务已提交' });
     } catch (error) {
         console.error('恢复备份失败:', error.response?.data || error.message);
-        res.status(500).json({ error: '恢复备份失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -316,11 +322,11 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
             startBackupPolling(backup.id, upid);
         } catch (e) {
             db.backups.fail(backup.id, e.response?.data?.message || e.message);
-            return res.status(500).json({ error: '创建备份任务失败: ' + (e.response?.data?.message || e.message) });
+            return res.status(500).json({ error: safeError(e) });
         }
         res.json({ message: '备份任务已创建', backup_id: backup.id });
     } catch (error) {
-        res.status(500).json({ error: '创建备份失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -460,11 +466,11 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
             startRestorePolling(restore.id, upid);
         } catch (e) {
             db.restoreTasks.fail(restore.id, e.response?.data?.message || e.message);
-            return res.status(500).json({ error: '创建恢复任务失败: ' + (e.response?.data?.message || e.message) });
+            return res.status(500).json({ error: safeError(e) });
         }
         res.json({ message: '恢复任务已创建，完成后将通过站内信和邮件通知您' });
     } catch (error) {
-        res.status(500).json({ error: '恢复失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -501,7 +507,7 @@ router.post('/admin/backups/cleanup', authMiddleware, adminMiddleware, async (re
         res.json({ message: `已清理 ${deleted} 条备份记录` });
     } catch (error) {
         console.error('清理备份记录失败:', error);
-        res.status(500).json({ error: '清理失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 

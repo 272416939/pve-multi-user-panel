@@ -10,12 +10,18 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { loadSentRemindersFromDb, checkExpiredVms, checkExpiredLxc } = require('../services/expiry-check');
 const pkg = require('../../package.json');
+// H-9 修复：生产环境隐藏详细错误信息
+function safeError(e) {
+    const isDebug = process.env.DEBUG === 'true';
+    if (isDebug) return e.response?.data?.message || e.message || String(e);
+    return '操作失败，请稍后重试';
+}
 router.get('/admin/storage', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const storages = await pveApi.getStorageList();
         res.json(storages.map(s => ({ id: s.storage, type: s.type, path: s.path, content: s.content })));
     } catch (error) {
-        res.status(500).json({ error: '获取存储列表失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -86,7 +92,7 @@ router.post('/admin/smtp/test', authMiddleware, adminMiddleware, async (req, res
         res.json({ message: '测试邮件发送成功' });
     } catch (error) {
         console.error('测试 SMTP 配置失败:', error);
-        res.status(500).json({ error: '测试失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -273,7 +279,7 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
         res.json({
             current_version: pkg.version,
             has_update: false,
-            error: '解析版本信息失败: ' + error.message
+            error: '解析版本信息失败: ' + safeError(error)
         });
     }
 });
@@ -340,7 +346,7 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
         console.log('\n[系统更新] 自动更新完成，服务即将重启（此为正常行为，非异常崩溃）\n');
         setTimeout(() => process.exit(0), 1000);
     } catch (error) {
-        res.status(500).json({ error: '更新失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 

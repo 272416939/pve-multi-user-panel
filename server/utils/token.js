@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const CryptoJS = require('crypto-js');
 const fs = require('fs');
@@ -27,11 +28,21 @@ if (!JWT_SECRET) {
         }
     }
 }
+// M-10 修复：检测示例/危险 JWT_SECRET 值
+const DANGEROUS_SECRETS = ['your-secret-key-change-this-in-production', 'secret', 'jwt-secret', 'change-me', 'default-secret', '', 'undefined', 'null'];
+if (DANGEROUS_SECRETS.includes(JWT_SECRET)) {
+    console.error('');
+    console.error('╔════════════════════════════════════════╗');
+    console.error('║  🚨 安全警告：JWT_SECRET 使用了示例值！     ║');
+    console.error('║  请立即设置为随机密钥！                ║');
+    console.error('╚════════════════════════════════════════╝');
+    console.error('');
+}
 const JWT_EXPIRES_IN = '15m';
 const REFRESH_TOKEN_DAYS = 7;
 
 function generateToken() {
-    return CryptoJS.lib.WordArray.random(32).toString();
+    return crypto.randomBytes(32).toString('hex');
 }
 
 function generateAccessToken(user, deviceId) {
@@ -41,7 +52,7 @@ function generateAccessToken(user, deviceId) {
 }
 
 function generateRefreshToken() {
-    return CryptoJS.lib.WordArray.random(32).toString();
+    return crypto.randomBytes(32).toString('hex');
 }
 
 function generatePartialToken(user) {

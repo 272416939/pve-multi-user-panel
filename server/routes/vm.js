@@ -9,6 +9,12 @@ const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 const vncProxy = require('../websocket/vnc-proxy');
+// H-9 修复：生产环境隐藏详细错误信息
+function safeError(e) {
+    const isDebug = process.env.DEBUG === 'true';
+    if (isDebug) return e.response?.data?.message || e.message || String(e);
+    return '操作失败，请稍后重试';
+}
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -42,7 +48,7 @@ router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
         });
     } catch (error) {
         console.error('获取虚拟机列表错误:', error);
-        res.status(500).json({ error: '获取虚拟机列表失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -497,7 +503,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 VNC 控制台失败:', error.message);
-        res.status(500).json({ error: '获取 VNC 控制台失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -599,7 +605,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
         res.json({ success: true, ip: finalIp, message: `已设置静态IP ${finalIp}（通过爱快DHCP绑定）` });
     } catch (error) {
         dbg('[vm/reset-ip]', error.message);
-        res.status(500).json({ error: '重置 IP 失败：' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 

@@ -1,5 +1,66 @@
 # Changelog
 
+## [1.7.5-UI-beta35] - 2026-06-12
+
+### Security (Deep Audit Round 2 — 21 漏洞全部修复)
+
+#### P0 — 密码学安全
+- **X-1**: `CryptoJS.lib.WordArray.random()` → `crypto.randomBytes()` 全局替换（10 处/5 文件）
+  - token.js: access token + refresh token 生成
+  - auth.js: lazy migration 盐 + 密码重置盐
+  - user.js: 2FA 恢复码 + 改密盐值
+  - admin-user.js: 创建用户 + 管理员改密盐值
+  - db-sqlite.js: 默认管理员盐值
+
+#### HIGH — XSS 防护 + 认证安全
+- **H-5/H-6**: marked.parse 输出通过 DOMPurify.sanitize() 净化（admin/core.js + user-center.html）
+- **H-7**: 确认弹窗 v-html → Vue 安全文本插值（dashboard.html + admin.html）
+- **H-8**: 密码更改/重置后撤销所有 refresh token（user.js + auth.js）
+- **H-10**: site-url.js 移除 Host 头回退，未设 SITE_URL 返回 null 并阻止发送邮件
+- **H-11**: Refresh Token Rotation — POST /auth/refresh 删除旧令牌并签发新令牌对
+- **H-13**: axios 升级至 1.17.0（修复 CVE-2024-39338 SSRF）
+- **H-14**: express 升级至 5.2.1（修复开放重定向/路径遍历/body-parser DoS）
+
+#### MEDIUM — 信息泄露防护
+- **H-9**: 生产环境 error.message 信息泄露修复 — 7 个文件 53 处 catch 块改用 safeError()
+- **H-12**: LXC reset-ip 日志脱敏（DEBUG=true 才输出 net0 详情）
+- **H-15**: /login/2fa 速率限制（每 IP+用户 60s 内 3 次）
+- **H-16**: /auth/forgot-password 速率限制（每 IP 10 分钟 1 次）
+
+#### MEDIUM/LOW — 其他加固
+- **M-5**: CDK 兑换 TOCTOU → 原子 CAS 操作（UPDATE WHERE is_used=0）
+- **M-6**: CDK 兑换速率限制（每用户 60s 1 次）
+- **M-7**: 默认管理员密码日志增加「仅显示一次」警告
+- **M-8**: 头像上传魔数校验（PNG/JPEG/GIF/WebP 文件头匹配）
+- **M-9**: 数据库 update() 列名白名单（5 表：users/vms/lxcContainers/memos/portForwards）
+- **M-10**: JWT_SECRET 示例值检测启动警告
+- **L-4**: CSP 策略强化（完整指令集：defaultSrc/scriptSrc/styleSrc/imgSrc/connectSrc 等）
+- **L-5**: CORS 来源限制（ALLOWED_ORIGINS 白名单 + localhost 默认允许）
+
+### Modified Files (17 files)
+- server/utils/token.js (X-1 + M-10)
+- server/routes/auth.js (X-1 + H-8/H-10/H-11 + H-15/H-16)
+- server/routes/user.js (X-1 + H-8 + M-8)
+- server/routes/admin-user.js (X-1)
+- server/api/db-sqlite.js (X-1 + M-7 + M-9)
+- server/utils/site-url.js (H-10)
+- server/server.js (L-4/L-5 + H-14 express upgrade)
+- public/js/lib/dompurify.min.js (H-5/H-6 新增)
+- public/js/admin/core.js (H-5/H-6 DOMPurify)
+- public/user-center.html (H-5/H-6 DOMPurify)
+- public/dashboard.html (H-7 v-html→文本插值)
+- public/admin.html (H-7 v-html→文本插值 + DOMPurify 引入)
+- server/routes/cdk.js (H-9 safeError + M-5 CAS + M-6 rate limit)
+- server/routes/vm.js (H-9 safeError)
+- server/routes/lxc.js (H-9 safeError + H-12 log sanitize)
+- server/routes/snapshot.js (H-9 safeError)
+- server/routes/backup.js (H-9 safeError)
+- server/routes/network.js (H-9 safeError)
+- server/routes/admin-config.js (H-9 safeError)
+- package.json (H-13 axios + H-14 express)
+
+---
+
 ## [1.7.5-UI-beta34] - 2026-06-12
 
 ### Security (Final Closure — 19/19 漏洞 100% 闭环)

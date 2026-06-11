@@ -24,7 +24,20 @@ if (!fs.existsSync(envPath)) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(cors({
+    origin: function (origin, callback) {
+        const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+        allowedOrigins.push('http://localhost:3002');
+        allowedOrigins.push('http://127.0.0.1:3002');
+
+        if (!origin || allowedOrigins.some(o => origin === o.trim())) {
+            callback(null, true);
+        } else {
+            callback(new Error('CORS policy: Origin not allowed'));
+        }
+    },
+    credentials: true
+}));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -36,7 +49,18 @@ app.use((req, res, next) => {
     };
     res.removeHeader('X-Frame-Options');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+    // L-4 修复：强化 CSP 策略
+    res.setHeader('Content-Security-Policy', [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https:",
+        "connect-src 'self' ws: wss:",
+        "frame-ancestors 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'"
+    ].join('; '));
     next();
 });
 

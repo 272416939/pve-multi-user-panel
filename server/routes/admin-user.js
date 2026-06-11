@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const CryptoJS = require('crypto-js');
 const db = require('../api/db-sqlite');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
@@ -11,7 +12,7 @@ router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     const { username, password, role, email, emailVerified } = req.body;
-    const salt = CryptoJS.lib.WordArray.random(16).toString();
+    const salt = crypto.randomBytes(16).toString('hex');
     const hashedPassword = CryptoJS.SHA256(salt + password).toString();
     
     if (db.users.getByUsername(username)) {
@@ -83,7 +84,7 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     }
     
     if (password) {
-        const salt = CryptoJS.lib.WordArray.random(16).toString();
+        const salt = crypto.randomBytes(16).toString('hex');
         updates.password = CryptoJS.SHA256(salt + password).toString();
         updates.password_salt = salt;
     }

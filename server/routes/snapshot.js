@@ -3,6 +3,12 @@ const router = express.Router();
 const db = require('../api/db-sqlite');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+// H-9 修复：生产环境隐藏详细错误信息
+function safeError(e) {
+    const isDebug = process.env.DEBUG === 'true';
+    if (isDebug) return e.response?.data?.message || e.message || String(e);
+    return '操作失败，请稍后重试';
+}
 router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
@@ -71,7 +77,7 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
         if (error.response?.status === 500 && error.response?.data?.errors?.snapname) {
             return res.status(400).json({ error: '快照名称已存在' });
         }
-        res.status(500).json({ error: '创建快照失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -109,7 +115,7 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
         db.snapshotLogs.add(req.user.id, req.params.vmid, 'restore');
         res.json({ message: '快照恢复成功，请稍后启动容器' });
     } catch (error) {
-        res.status(500).json({ error: '恢复快照失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -133,7 +139,7 @@ router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res)
         await pveApi.deleteLxcSnapshot(req.params.vmid, req.params.snapname);
         res.json({ message: '快照已删除' });
     } catch (error) {
-        res.status(500).json({ error: '删除快照失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -208,7 +214,7 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
         if (error.response?.status === 500 && error.response?.data?.errors?.snapname) {
             return res.status(400).json({ error: '快照名称已存在' });
         }
-        res.status(500).json({ error: '创建快照失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -246,7 +252,7 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
         db.snapshotLogs.add(req.user.id, req.params.vmid, 'restore');
         res.json({ message: '快照恢复成功，请稍后启动虚拟机' });
     } catch (error) {
-        res.status(500).json({ error: '恢复快照失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -270,7 +276,7 @@ router.delete('/vm/:vmid/snapshots/:snapname', authMiddleware, async (req, res) 
         await pveApi.deleteSnapshot(req.params.vmid, req.params.snapname);
         res.json({ message: '快照已删除' });
     } catch (error) {
-        res.status(500).json({ error: '删除快照失败: ' + (error.response?.data?.message || error.message) });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 

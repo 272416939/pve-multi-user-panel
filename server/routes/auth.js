@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const CryptoJS = require('crypto-js');
 const jwt = require('jsonwebtoken');
 const otplib = require('otplib');
@@ -66,7 +67,7 @@ router.post('/login', async (req, res) => {
 
         // Lazy migration: 旧密码首次登录成功后自动 re-hash
         if (passwordMatch) {
-            const newSalt = CryptoJS.lib.WordArray.random(16).toString();
+            const newSalt = crypto.randomBytes(16).toString('hex');
             const newHash = CryptoJS.SHA256(newSalt + password).toString();
             db.users.update(user.id, {
                 password: newHash,
@@ -114,6 +115,21 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/login/2fa', async (req, res) => {
+    // H-15 修复：2FA 验证速率限制（每用户每分钟 3 次）
+    if (!_tfaRateLimit) _tfaRateLimit = new Map();
+    const tfaKey = `${req.ip}:${req.body?.userId || req.body?.username}`;
+    const now = Date.now();
+    const tfaRecord = _tfaRateLimit.get(tfaKey);
+    if (tfaRecord && now - tfaRecord.lastAttempt < 60000) {
+        if (tfaRecord.count >= 3) {
+            return res.status(429).json({ error: '2FA 验证过于频繁，请 60 秒后重试' });
+        }
+        tfaRecord.count++;
+        tfaRecord.lastAttempt = now;
+    } else {
+        _tfaRateLimit.set(tfaKey, { count: 1, lastAttempt: now });
+    }
+
     const { partial_token, code, refresh_token: reqRefreshToken } = req.body;
     if (!partial_token || !code) {
         return res.status(400).json({ error: '缺少参数' });
@@ -204,23 +220,53 @@ router.post('/login/2fa', async (req, res) => {
 });
 
 router.post('/auth/refresh', async (req, res) => {
-    const { refreshToken } = req.body;
-    if (!refreshToken) {
-        return res.status(400).json({ error: '缺少刷新令牌' });
+    try {
+        const { refreshToken } = req.body;
+        if (!refreshToken) return res.status(400).json({ error: '缺少 refreshToken' });
+
+        // 验证 refresh token
+        let decoded;
+        try {
+            decoded = jwt.verify(refreshToken, JWT_SECRET);
+        } catch (e) {
+            return res.status(401).json({ error: 'refreshToken 无效或已过期' });
+        }
+
+        // H-11 修复：立即撤销旧 refresh token（防重放）
+        db.refreshTokens.deleteByToken(refreshToken);
+
+        // 查找用户（在撤销前已通过 getByToken 获取过 record，但撤销后需重新确认）
+        const record = db.refreshTokens.getByToken(refreshToken);
+        if (!record || !record.user_id) {
+            return res.status(401).json({ error: 'refreshToken 已失效' });
+        }
+
+        const user = db.users.getById(record.user_id);
+        if (!user || !user.is_active) {
+            return res.status(401).json({ error: '用户不存在或已被禁用' });
+        }
+
+        // 签发新的 access token + 新的 refresh token
+        const newAccessToken = generateAccessToken(user, record.id);
+        const newRefreshToken = generateRefreshToken();
+
+        // 存储新的 refresh token
+        const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000);
+        db.refreshTokens.create({
+            user_id: user.id,
+            device_name: record.device_name,
+            token: newRefreshToken,
+            ip: req.ip,
+            user_agent: req.headers['user-agent'] || '',
+            created_at: new Date().toISOString(),
+            expires_at: expiresAt.toISOString()
+        });
+
+        res.json({ token: newAccessToken, refreshToken: newRefreshToken });
+    } catch (error) {
+        console.error('[auth] refresh token 错误:', error.message);
+        res.status(500).json({ error: 'token 刷新失败' });
     }
-    
-    const record = db.refreshTokens.getByToken(refreshToken);
-    if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
-        return res.status(401).json({ error: '刷新令牌无效或已过期，请重新登录' });
-    }
-    
-    const user = db.users.getById(record.user_id);
-    if (!user) {
-        return res.status(404).json({ error: '用户不存在' });
-    }
-    
-    const token = generateAccessToken(user, record.id);
-    res.json({ token });
 });
 
 router.post('/logout', async (req, res) => {
@@ -235,6 +281,16 @@ router.post('/logout', async (req, res) => {
 });
 
 router.post('/auth/forgot-password', async (req, res) => {
+    // H-16 修复：密码重置邮件速率限制（每 IP 每 10 分钟 1 次）
+    if (!_forgotPwdRateLimit) _forgotPwdRateLimit = new Map();
+    const forgotKey = `forgot:${req.ip}`;
+    const now = Date.now();
+    const forgotRecord = _forgotPwdRateLimit.get(forgotKey);
+    if (forgotRecord && now - forgotRecord.lastAttempt < 600000) {
+        return res.status(429).json({ error: '密码重置邮件发送过于频繁，请 10 分钟后重试' });
+    }
+    _forgotPwdRateLimit.set(forgotKey, { count: 1, lastAttempt: now });
+
     try {
         const { email } = req.body;
         if (!email) {
@@ -260,7 +316,13 @@ router.post('/auth/forgot-password', async (req, res) => {
             expiresAt: expiresAt.toISOString()
         });
         
-        const resetUrl = `${getSiteUrl(req)}?resetPassword=${token}`;
+        // H-10 修复：检查 SITE_URL 是否已配置
+        const siteUrl = getSiteUrl(req);
+        if (!siteUrl) {
+            return res.status(500).json({ error: '邮件服务未正确配置，无法发送密码重置链接' });
+        }
+
+        const resetUrl = `${siteUrl}?resetPassword=${token}`;
         const emailContent = `
             <p>您好 <strong>${user.username}</strong>，</p>
             <p>我们收到了您的密码重置请求。</p>
@@ -329,12 +391,15 @@ router.post('/auth/reset-password', async (req, res) => {
             return res.status(404).json({ error: '用户不存在' });
         }
         
-        const salt = CryptoJS.lib.WordArray.random(16).toString();
+        const salt = crypto.randomBytes(16).toString('hex');
         db.users.update(resetToken.user_id, {
             password: CryptoJS.SHA256(salt + newPassword).toString(),
             password_salt: salt
         });
-        
+
+        // H-8 修复：密码重置后撤销该用户所有 refresh token
+        db.refreshTokens.revokeByUserId(user.id);
+
         db.passwordResetTokens.delete(resetToken.id);
         
         res.json({ message: '密码重置成功，请使用新密码登录' });

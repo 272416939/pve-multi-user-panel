@@ -6,6 +6,12 @@ const ikuaiApi = require('../api/ikuai-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, getWanInterface } = require('../services/dhcp');
 const dbg = require('../utils/debug');
+// H-9 修复：生产环境隐藏详细错误信息
+function safeError(e) {
+    const isDebug = process.env.DEBUG === 'true';
+    if (isDebug) return e.response?.data?.message || e.message || String(e);
+    return '操作失败，请稍后重试';
+}
 router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         let ifaceList = [];
@@ -25,7 +31,7 @@ router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req,
             dhcp_dns2: db.config.get('dhcp:dns2') || '223.5.5.5'
         });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -47,7 +53,7 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         setConfig('dhcp:dns2', dhcp_dns2 || '223.5.5.5');
         res.json({ message: '网络配置已更新' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -73,7 +79,7 @@ router.get('/ikuai/interfaces', authMiddleware, adminMiddleware, async (req, res
         
         res.json(interfaces);
     } catch (e) {
-        res.status(500).json({ error: '获取接口列表失败: ' + e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -121,7 +127,7 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
         console.log(`[sync-dhcp] 同步完成: 更新 ${updated}, 跳过 ${skipped}, 错误 ${errors}`);
         res.json({ updated, skipped, errors, total: bindings.length });
     } catch (e) {
-        res.status(500).json({ error: '同步 DHCP 静态绑定失败: ' + e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -138,7 +144,7 @@ router.get('/port-forwards', authMiddleware, async (req, res) => {
         }
         res.json(rules);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -235,7 +241,7 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         }
         res.json(rule);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -303,7 +309,7 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                 } catch (_) {}
             } catch (e) {
                 db.portForwards.update(id, { sync_status: 'failed' });
-                return res.status(500).json({ error: '同步到 ikuai 失败，数据已保留: ' + e.message });
+                return res.status(500).json({ error: safeError(e) });
             }
         }
         const updates = {};
@@ -320,7 +326,7 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         const updated = db.portForwards.update(id, updates);
         res.json(updated);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -360,7 +366,7 @@ router.delete('/port-forwards/:id', authMiddleware, async (req, res) => {
         db.portForwards.delete(id);
         res.json({ message: '规则已删除' });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -390,7 +396,7 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
         }
         res.json(results);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -418,7 +424,7 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
         const randomPort = available[Math.floor(Math.random() * available.length)];
         res.json({ port: randomPort });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -442,7 +448,7 @@ router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
         }
         res.json({ available: true });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -540,7 +546,7 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
         }
         res.json(devices);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 

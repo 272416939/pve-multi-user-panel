@@ -311,7 +311,7 @@ watch($.user, function(u) {
     $.parseMarkdown = function(text) {
         if (!text) return '';
         try {
-            return marked.parse(text);
+            return DOMPurify.sanitize(marked.parse(text));
         } catch (e) {
             return text;
         }

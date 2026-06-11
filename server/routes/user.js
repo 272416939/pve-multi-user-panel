@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const CryptoJS = require('crypto-js');
 const QRCode = require('qrcode');
 const otplib = require('otplib');
@@ -50,7 +51,7 @@ router.post('/user/2fa/verify', authMiddleware, async (req, res) => {
 
         const codes = [];
         for (let i = 0; i < 8; i++) {
-            codes.push(CryptoJS.lib.WordArray.random(5).toString().toUpperCase());
+            codes.push(crypto.randomBytes(10).toString('hex').toUpperCase());
         }
         db.twofa.deleteRecoveryCodes(req.user.id);
         db.twofa.addRecoveryCodes(req.user.id, codes);
@@ -108,7 +109,7 @@ router.post('/user/2fa/recovery-codes/regenerate', authMiddleware, async (req, r
     try {
         const newCodes = [];
         for (let i = 0; i < 8; i++) {
-            newCodes.push(CryptoJS.lib.WordArray.random(5).toString().toUpperCase());
+            newCodes.push(crypto.randomBytes(10).toString('hex').toUpperCase());
         }
         db.twofa.deleteRecoveryCodes(req.user.id);
         db.twofa.addRecoveryCodes(req.user.id, newCodes);
@@ -209,11 +210,13 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         }
         
         if (password) {
-            const salt = CryptoJS.lib.WordArray.random(16).toString();
+            const salt = crypto.randomBytes(16).toString('hex');
             updates.password = CryptoJS.SHA256(salt + password).toString();
             updates.password_salt = salt;
             // C-2 修复：用户主动改密后清除强制改密标记
             updates.must_change_password = 0;
+            // H-8 修复：密码变更后撤销该用户所有 refresh token
+            db.refreshTokens.revokeByUserId(req.user.id);
         }
         
         if (bio !== undefined) {
@@ -296,6 +299,27 @@ router.post('/user/avatar', authMiddleware, upload.single('avatar'), async (req,
     try {
         if (!req.file) {
             return res.status(400).json({ error: '请选择要上传的图片' });
+        }
+
+        // M-8: 上传后校验文件头魔数，防止伪造扩展名的恶意文件
+        try {
+            const fd = fs.openSync(req.file.path, 'r');
+            const buf = Buffer.alloc(4);
+            fs.readSync(fd, buf, 0, 4, 0);
+            fs.closeSync(fd);
+
+            const header = Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+            const validHeaders = ['89504E47', 'FFD8FF', '47494638', '52494646']; // PNG, JPEG, GIF, WebP
+            if (!validHeaders.includes(header)) {
+                fs.unlinkSync(req.file.path);
+                return res.status(400).json({ error: '文件格式不合法（魔数不匹配）' });
+            }
+        } catch (e) {
+            // 读不到文件时删除并报错
+            if (req.file.path && fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
+            return res.status(400).json({ error: '文件校验失败，请重新上传' });
         }
 
         const user = db.users.getById(req.user.id);
