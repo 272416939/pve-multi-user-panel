@@ -106,6 +106,17 @@ router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res)
 
 router.get('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
     try {
+        const vmid = req.params.vmid;
+        // 权限校验
+        const isAdmin = req.user.role === 'admin';
+        if (!isAdmin) {
+            const userVms = db.vms.getByUserId(req.user.id);
+            const owned = userVms.some(v => v.vm_id == vmid);
+            if (!owned) {
+                return res.status(403).json({ error: '无权操作此虚拟机' });
+            }
+        }
+
         const snapshots = await pveApi.getSnapshots(req.params.vmid);
         const cfg = db.snapshotConfig.get();
         const dailyCreate = db.snapshotLogs.getDailyCount(req.user.id, 'create');

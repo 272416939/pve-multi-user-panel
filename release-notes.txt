@@ -1,8 +1,11 @@
 ## 更新内容
 
-### Bug 修复
-- **fix(lxc): 修复 lxc.js 语法错误导致服务崩溃** — beta27 权限修复时，lxc.js 中 reset-password 和 reset-ip 两个端点遗留了多余的 `)` 括号，导致 Node.js SyntaxError 无法启动服务器
-- 涉及文件：server/routes/lxc.js（2处多余括号已移除）
+### 安全修复（全面权限审计）
+- **fix(security): 全面权限审计修复 8 处安全漏洞** — 对全部 11 个路由文件进行完整审计
+- **HIGH（4处）**：backup.js(2) + snapshot.js(2) 权限绕过/无校验漏洞修复
+- **MEDIUM（3处）**：network.js 敏感配置暴露/IDOR/信息泄露修复
+- **LOW（1处）**：message.js IDOR 漏洞修复
+- 涉及文件：server/routes/backup.js, snapshot.js, network.js, message.js
 
 ---
 **完整更新日志**: [CHANGELOG.md](https://github.com/272416939/pve-multi-user-panel/blob/main/CHANGELOG.md)

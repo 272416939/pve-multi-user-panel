@@ -6,7 +6,7 @@ const ikuaiApi = require('../api/ikuai-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, getWanInterface } = require('../services/dhcp');
 const dbg = require('../utils/debug');
-router.get('/admin/network/config', authMiddleware, async (req, res) => {
+router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         let ifaceList = [];
         try { ifaceList = JSON.parse(db.config.get('forward:iface_list') || '[]'); } catch (_) {}
@@ -143,6 +143,7 @@ router.get('/port-forwards', authMiddleware, async (req, res) => {
 
 router.post('/port-forwards', authMiddleware, async (req, res) => {
     try {
+        const isAdmin = req.user.role === 'admin';
         const { type, vm_id, ct_id, name, ip, internal_port, external_port, protocol } = req.body;
         if (!type || !ip || !internal_port || !external_port) {
             return res.status(400).json({ error: '缺少必要参数' });
@@ -163,6 +164,21 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             const count = db.portForwards.getCountByUserId(req.user.id);
             if (count >= config.max_per_user) {
                 return res.status(400).json({ error: `转发规则数量已达上限（${config.max_per_user} 条），如需新增请联系管理员` });
+            }
+        }
+        // 新增：校验目标资源归属
+        if (vm_id && !isAdmin) {
+            const userVms = db.vms.getByUserId(req.user.id);
+            const ownedVm = userVms.some(v => v.vm_id == vm_id);
+            if (!ownedVm) {
+                return res.status(403).json({ error: '无权为此虚拟机创建转发规则' });
+            }
+        }
+        if (ct_id && !isAdmin) {
+            const userCts = db.lxcContainers.getByUserId(req.user.id);
+            const ownedCt = userCts.some(c => c.ct_id == ct_id);
+            if (!ownedCt) {
+                return res.status(403).json({ error: '无权为此容器创建转发规则' });
             }
         }
         // 校验端口冲突（本地 + ikuai）
@@ -434,8 +450,8 @@ router.get('/port-forwards/config', authMiddleware, async (req, res) => {
 router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
     try {
         const devices = [];
-        const allVms = db.vms.getAll();
-        const allCts = db.lxcContainers.getAll();
+        const myVms = db.vms.getByUserId(req.user.id);
+        const myCts = db.lxcContainers.getByUserId(req.user.id);
         let dhcpLeases = [];
         let lanIps = [];
         if (ikuaiApi.isConfigured()) {
@@ -454,7 +470,7 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
             }
             return '';
         }
-        for (const vm of allVms) {
+        for (const vm of myVms) {
             const user = db.users.getById(vm.user_id);
             let ip = '';
             // 优先使用数据库存储的 DHCP 静态绑定 IP
@@ -478,7 +494,7 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
                 ip, mac: '', user: user?.username || ''
             });
         }
-        for (const ct of allCts) {
+        for (const ct of myCts) {
             const user = db.users.getById(ct.user_id);
             let ip = '';
             // 优先使用数据库存储的 DHCP 静态绑定 IP

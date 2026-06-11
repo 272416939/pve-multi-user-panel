@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.7.5-UI-beta29] - 2026-06-11
+
+### Security
+- **fix(security): 全面权限审计修复 8 处安全漏洞** — 对全部 11 个路由文件进行完整安全审计，发现并修复 backup.js/snapshot.js/network.js/message.js 中残留的权限缺陷
+- **HIGH（4处）**：
+  - backup.js: `GET /lxc/:vmid/backups` 和 `POST /lxc/:vmid/backups/:id/restore` 使用旧版 `if(ct){check}` 模式，未分配资源时跳过权限检查 → 统一为 `else if(!isAdmin)` 模式
+  - snapshot.js: `GET /lxc/:vmid/snapshots` 和 `GET /vm/:vmid/snapshots` 完全无权限校验 → 新增归属校验 + 管理员放行
+- **MEDIUM（3处）**：
+  - network.js: `GET /admin/network/config` 缺少 adminMiddleware → 已添加
+  - network.js: `POST /port-forwards` 未校验 vm_id/ct_id 归属（IDOR）→ 新增所有权验证
+  - network.js: `GET /port-forwards/extract-ips` 返回所有用户设备信息 → 过滤为仅当前用户资源
+- **LOW（1处）**：message.js: `PUT /messages/:id/read` 未校验消息归属（IDOR）→ 新增 uid 校验
+
+---
+
 ## [1.7.5-UI-beta28] - 2026-06-11
 
 ### Fixed

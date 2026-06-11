@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const router = express.Router();
 const db = require('../api/db-sqlite');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
@@ -38,7 +38,13 @@ router.get('/messages/:id', authMiddleware, async (req, res) => {
 
 router.put('/messages/:id/read', authMiddleware, async (req, res) => {
     try {
-        db.messages.markRead(parseInt(req.params.id));
+        const msgId = parseInt(req.params.id);
+        const msg = db.messages.getById(msgId);
+        if (!msg) return res.status(404).json({ error: '消息不存在' });
+        if (msg.uid !== 0 && msg.uid !== req.user.id) {
+            return res.status(403).json({ error: '无权限' });
+        }
+        db.messages.markRead(msgId);
         res.json({ message: '已标记已读' });
     } catch (error) {
         res.status(500).json({ error: '标记已读失败' });

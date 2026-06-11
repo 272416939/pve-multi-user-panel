@@ -161,15 +161,17 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
  
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
- 
+
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+        } else if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: '无权限操作此容器' });
         }
- 
+
         const backup = db.backups.getById(backupId);
         if (!backup || backup.type !== 'lxc') {
             return res.status(404).json({ error: '备份不存在' });
