@@ -521,6 +521,11 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const { ip_mode, ip } = req.body;
 
+        // 参数校验
+        if (!ip_mode || !['dhcp', 'static', 'random'].includes(ip_mode)) {
+            return res.status(400).json({ error: '无效的 IP 模式，请选择 DHCP、静态 IP 或随机' });
+        }
+
         // 权限检查（用正确的查询方法）
         const allVms = db.vms.getAll();
         const vmRecord = allVms.find(v => v.vm_id === vmid);

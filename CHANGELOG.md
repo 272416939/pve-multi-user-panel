@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5-UI-beta16] - 2026-06-11
+
+### Fixed
+- fix(api): **LXC/VM 重置 IP 失败 "Parameter verification failed"** — reset-ip 路由缺少 `ip_mode` 参数校验，当值为空或非法时构建的 net0 配置不完整导致 PVE API 拒绝。现增加参数校验 + fallback 分支（默认 DHCP）+ PVE 错误透传（失败时自动恢复开机）
+- 涉及文件：server/routes/lxc.js, server/routes/vm.js
+
+---
+
 ## [1.7.5-UI-beta15] - 2026-06-11
 
 ### Fixed

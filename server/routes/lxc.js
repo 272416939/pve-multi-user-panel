@@ -650,6 +650,11 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const { ip_mode, ip } = req.body; // ip_mode: 'dhcp' 或 'static'
 
+        // 参数校验
+        if (!ip_mode || !['dhcp', 'static', 'random'].includes(ip_mode)) {
+            return res.status(400).json({ error: '无效的 IP 模式，请选择 DHCP、静态 IP 或随机' });
+        }
+
         // 权限检查
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
@@ -716,6 +721,10 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
             newNet0Parts.push('ip6=dhcp');
             newNet0Parts.push('gw=' + gateway);
             newIp = randomIp;
+        } else {
+            // fallback: 默认 DHCP
+            newNet0Parts.push('ip=dhcp');
+            newNet0Parts.push('ip6=dhcp');
         }
 
         const newNet0 = newNet0Parts.join(',');
@@ -739,7 +748,16 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         }
 
         // 更新 PVE 容器网络配置
-        await pveApi.updateLxcConfig(vmid, { net0: newNet0 });
+        try {
+            await pveApi.updateLxcConfig(vmid, { net0: newNet0 });
+        } catch (pveErr) {
+            console.error(`LXC ${vmid} 更新网络配置失败:`, pveErr.message);
+            // 如果之前关机了，尝试恢复开机
+            if (wasRunning) {
+                try { await pveApi.startLxc(vmid); } catch (_) {}
+            }
+            return res.status(500).json({ error: 'PVE 配置更新失败: ' + (pveErr.message || '未知错误') });
+        }
 
         // 如果之前是运行状态，重新开机
         if (wasRunning) {
