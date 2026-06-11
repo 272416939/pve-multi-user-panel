@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.5-UI-beta19] - 2026-06-11
+
+### Fixed
+- fix(ui): **dashboard 消息按钮改为 SVG 铃铛图标 + 添加点击跳转** — 原来使用 🔔 emoji 且无点击事件，现替换为 SVG bell 图标并链接到 user-center.html#messages
+- fix(ui): **user-center 移除 header 消息按钮** — 用户中心已有完整消息列表页，header 重复的 🔔 按钮已删除
+- 涉及文件：public/dashboard.html, public/user-center.html
+
+---
+
 ## [1.7.5-UI-beta18] - 2026-06-11
 
 ### Fixed
