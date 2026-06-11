@@ -178,7 +178,7 @@ function initDb() {
         )
     `);
 
-    // 创建站内消息表
+    // 创建站内消息表（utf8mb4 支持 emoji 等四字节字符）
     execute(`
         CREATE TABLE IF NOT EXISTS messages (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -195,7 +195,7 @@ function initDb() {
             INDEX idx_messages_uid (uid),
             INDEX idx_messages_unread (uid, is_read),
             INDEX idx_messages_created (created_at)
-        )
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
     // 创建刷新令牌表
@@ -243,7 +243,7 @@ function initDb() {
             user_id INT NOT NULL,
             storage VARCHAR(100) NOT NULL,
             filename VARCHAR(500) DEFAULT '',
-            size INT DEFAULT 0,
+            size BIGINT DEFAULT 0,
             status VARCHAR(20) NOT NULL DEFAULT 'pending',
             pve_upid VARCHAR(200) DEFAULT '',
             progress INT DEFAULT 0,
@@ -499,6 +499,10 @@ function migrateFromSQLite() {
 
     console.log('[迁移] 检测到 SQLite 数据库，开始迁移到 MySQL...');
 
+    // 3. 预处理：修复已创建的表结构问题（首次建表时可能缺少这些设置）
+    try { execute('ALTER TABLE messages CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch(e) {}
+    try { execute('ALTER TABLE backups MODIFY COLUMN size BIGINT DEFAULT 0'); } catch(e) {}
+
     let sqliteDb;
     try {
         const Database = require('better-sqlite3');
@@ -510,23 +514,29 @@ function migrateFromSQLite() {
 
     let totalMigrated = 0;
 
+    // 特殊表配置：列名需要反引号包裹（MySQL 保留字）或特殊类型转换
+    const tableConfig = {
+        config: { backtickColumns: ['key'] },
+        backups: { intToBigInt: ['size'] },   // SQLite 无类型限制，size 可能超 INT 范围
+    };
+
     try {
         // 需要迁移的表列表（按依赖顺序：用户表优先）
         const tables = [
             'users',           // 用户表（其他表依赖 user_id）
-            'config',          // 配置表
+            'config',          // 配置表（key 是保留字）
             'cdk_codes',       // CDK 兑换码
             'vms',             // 虚拟机
             'vm_reminders',    // VM 提醒记录
             'lxc_containers',  // LXC 容器
             'lxc_reminders',   // LXC 提醒记录
             'memos',           // 备忘录
-            'messages',        // 站内消息
+            'messages',        // 站内消息（utf8mb4 已在上面 ALTER 过）
             'password_reset_tokens', // 密码重置令牌
             'refresh_tokens',  // 刷新令牌
             'snapshot_logs',   // 快照日志
             'recovery_codes',  // 恢复码
-            'backups',         // 备份
+            'backups',         // 备份（size 已改为 BIGINT）
             'backup_logs',     // 备份日志
             'restore_tasks',   // 恢复任务
             'port_forwards',   // 端口转发
@@ -542,8 +552,6 @@ function migrateFromSQLite() {
                 const rows = sqliteDb.prepare(`SELECT * FROM ${table}`).all();
                 if (!rows || rows.length === 0) continue;
 
-                // 获取列名
-                if (rows.length === 0) continue;
                 const columns = Object.keys(rows[0]);
 
                 // 跳过 users 表中的默认管理员（MySQL 已创建）
@@ -551,12 +559,15 @@ function migrateFromSQLite() {
                 if (table === 'users') {
                     rowsToMigrate = rows.filter(r => r.username !== 'admin');
                 }
-
                 if (rowsToMigrate.length === 0) continue;
 
-                // 批量插入 MySQL（逐行，处理日期格式转换）
+                // 构建列名：对保留字列加反引号
+                const cfg = tableConfig[table] || {};
+                const colNames = columns.map(col => {
+                    return (cfg.backtickColumns && cfg.backtickColumns.includes(col)) ? `\`${col}\`` : col;
+                }).join(', ');
+
                 const placeholders = columns.map(() => '?').join(', ');
-                const colNames = columns.join(', ');
                 const stmt = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders})`;
 
                 for (const row of rowsToMigrate) {
@@ -569,6 +580,10 @@ function migrateFromSQLite() {
                         // 处理 Buffer 类型（SQLite BLOB）
                         if (Buffer.isBuffer(val)) {
                             val = val.toString('binary');
+                        }
+                        // 处理超大数值（SQLite 无类型限制，MySQL INT/BIGINT 有范围）
+                        if (cfg.intToBigInt && cfg.intToBigInt.includes(col) && typeof val === 'number') {
+                            val = Math.floor(val); // 确保整数
                         }
                         return val;
                     });
@@ -589,6 +604,20 @@ function migrateFromSQLite() {
         }
     } finally {
         sqliteDb.close();
+        // 迁移结束后强制重建连接（迁移过程可能产生大量临时连接或异常状态）
+        // 确保后续正常操作使用一个全新的干净连接
+        if (_connection) {
+            try { _connection.destroy(); } catch (e) { /* ignore */ }
+            _connection = null;
+        }
+        _connection = new mysql({
+            host: process.env.MYSQL_HOST || 'localhost',
+            port: parseInt(process.env.MYSQL_PORT || '3306'),
+            user: process.env.MYSQL_USER || 'root',
+            password: process.env.MYSQL_PASSWORD || '',
+            database: process.env.MYSQL_DATABASE || 'pve_panel',
+        });
+        console.log('[迁移] 连接已重建，可正常使用');
     }
 }
 
