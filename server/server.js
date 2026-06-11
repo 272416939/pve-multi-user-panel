@@ -100,6 +100,7 @@ app.get('*', (req, res) => {
 
 httpServer.listen(PORT, async () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);
+    console.log(`[system] 当前系统版本：v${pkg.version}`);
 
     try {
         const pveApi = require('./api/pve-api');

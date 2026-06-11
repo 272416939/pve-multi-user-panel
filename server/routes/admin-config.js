@@ -190,36 +190,58 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
 
     try {
         const tag = response.data.tag_name.replace(/^v/, '');
-        // 版本号比较：支持 1.7.5 / 1.7.5-beta1 / 1.7.5-UI-beta1 等格式
-        // 完整解析含后缀的版本号（旧逻辑只取 - 前面的主版本，导致 beta4==beta5 无法区分）
+        // 版本号比较：支持任意后缀格式（1.7.5 / 1.7.5-beta1 / 1.7.5-UI-beta4 / 1.7.8-MD-sy-01 等）
         const parseVer = (v) => {
             v = String(v).replace(/^v/, '');
-            const segs = v.split(/[-+]/);
-            const main = (segs[0] || '').split('.').map(n => isNaN(parseInt(n)) ? 0 : parseInt(n));
-            let suffix = null;
-            if (segs.length > 1) {
-                const rest = segs.slice(1).join('-');
-                const m = rest.match(/(beta|alpha|rc|preview)(\d*)/i);
-                if (m) { suffix = { type: m[1].toLowerCase(), num: parseInt(m[2]) || 0 }; }
+            const dashIdx = v.indexOf('-');
+            const mainStr = dashIdx === -1 ? v : v.substring(0, dashIdx);
+            const main = mainStr.split('.').map(n => isNaN(parseInt(n)) ? 0 : parseInt(n));
+            const rawSuffix = dashIdx === -1 ? '' : v.substring(dashIdx + 1);
+
+            if (!rawSuffix) return { main, suffix: { type: 'release', num: Infinity, raw: '' } };
+
+            // 尝试匹配已知类型后缀（beta/alpha/rc/preview）
+            const m = rawSuffix.match(/^(.*)-(beta|alpha|rc|preview)(\d*)$/i);
+            if (m) {
+                return { main, suffix: { type: m[2].toLowerCase(), num: parseInt(m[3]) || 0, prefix: m[1], raw: rawSuffix } };
             }
-            // 正式版(无后缀) > rc > beta > alpha
-            const typeOrder = { release: 4, rc: 3, preview: 2, beta: 1, alpha: 0 };
-            return { main, suffix: suffix || { type: 'release', num: Infinity } };
+
+            // 未知后缀格式（如 MD-sy-01）：整体作为字符串比较
+            return { main, suffix: { type: 'custom', num: 0, raw: rawSuffix } };
         };
 
         const compareVer = (a, b) => {
-            // 先比较主版本号
+            // 1. 比较主版本号
             const maxLen = Math.max(a.main.length, b.main.length);
             for (let i = 0; i < maxLen; i++) {
                 const av = a.main[i] || 0, bv = b.main[i] || 0;
-                if (av !== bv) return av < bv ? 1 : -1; // 返回 1 表示 b 更新
+                if (av !== bv) return av < bv ? 1 : -1;
             }
-            // 主版本相同时比较后缀类型
-            const typeOrder = { release: 4, rc: 3, preview: 2, beta: 1, alpha: 0 };
-            const at = typeOrder[a.suffix.type] ?? 0;
-            const bt = typeOrder[b.suffix.type] ?? 0;
+            // 2. 都是无后缀的正式版 → 相等
+            if (a.suffix.type === 'release' && b.suffix.type === 'release') return 0;
+            // 3. 有后缀 vs 无后缀：无后缀(正式版) 更高
+            if (a.suffix.type === 'release') return -1;
+            if (b.suffix.type === 'release') return 1;
+
+            // 4. 已知类型排序：rc > preview > beta > alpha > custom
+            const typeOrder = { rc: 5, preview: 4, beta: 3, alpha: 2, custom: 1 };
+            const at = typeOrder[a.suffix.type] ?? 1;
+            const bt = typeOrder[b.suffix.type] ?? 1;
             if (at !== bt) return at < bt ? 1 : -1;
-            // 同类型比较数字
+
+            // 5. 同类型比较：
+            //    - custom 类型：字符串比较整个后缀
+            //    - 已知类型(beta/alpha等)：先比前缀(如 UI)，再比数字
+            if (a.suffix.type === 'custom') {
+                if (a.suffix.raw < b.suffix.raw) return 1;
+                if (a.suffix.raw > b.suffix.raw) return -1;
+                return 0;
+            }
+            // 已知类型：先比前缀部分（如 "UI"）
+            if ((a.suffix.prefix || '') !== (b.suffix.prefix || '')) {
+                return (a.suffix.prefix || '') < (b.suffix.prefix || '') ? 1 : -1;
+            }
+            // 最后比数字
             if (a.suffix.num !== b.suffix.num) return a.suffix.num < b.suffix.num ? 1 : -1;
             return 0;
         };
@@ -312,6 +334,7 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             return res.status(500).json({ error: '更新失败: npm install 失败 - ' + stderr });
         }
         res.json({ message: '更新成功，服务正在重启...' });
+        console.log('\n[系统更新] 自动更新完成，服务即将重启（此为正常行为，非异常崩溃）\n');
         setTimeout(() => process.exit(0), 1000);
     } catch (error) {
         res.status(500).json({ error: '更新失败: ' + error.message });
