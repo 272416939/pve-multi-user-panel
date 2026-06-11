@@ -232,14 +232,14 @@ router.post('/auth/refresh', async (req, res) => {
             return res.status(401).json({ error: 'refreshToken 无效或已过期' });
         }
 
-        // H-11 修复：立即撤销旧 refresh token（防重放）
-        db.refreshTokens.deleteByToken(refreshToken);
-
-        // 查找用户（在撤销前已通过 getByToken 获取过 record，但撤销后需重新确认）
+        // H-11 修复：先查后删，防止先删后查导致永远401
         const record = db.refreshTokens.getByToken(refreshToken);
         if (!record || !record.user_id) {
             return res.status(401).json({ error: 'refreshToken 已失效' });
         }
+
+        // 立即撤销旧 refresh token（防重放）
+        db.refreshTokens.deleteByToken(refreshToken);
 
         const user = db.users.getById(record.user_id);
         if (!user || !user.is_active) {
