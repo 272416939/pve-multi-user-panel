@@ -18,6 +18,14 @@ function generateRandomPassword(length = 16) {
     return result;
 }
 
+// MySQL 5.7 兼容的日期格式: YYYY-MM-DD HH:MM:SS（非 ISO 8601）
+function mysqlNow() {
+    return new Date().toISOString().slice(0, 19).replace('T', ' ');
+}
+function mysqlToday() {
+    return mysqlNow().slice(0, 10);
+}
+
 // 单例连接（Node.js 单线程，单连接足够）
 let _connection = null;
 function getConnection() {
@@ -59,14 +67,14 @@ function initDb() {
             username VARCHAR(255) UNIQUE NOT NULL,
             password TEXT NOT NULL,
             role VARCHAR(20) NOT NULL DEFAULT 'user',
-            avatar TEXT DEFAULT '',
-            bio TEXT DEFAULT '',
+            avatar TEXT,
+            bio TEXT,
             email VARCHAR(255) DEFAULT '',
             emailVerified INT DEFAULT 0,
-            totp_secret TEXT DEFAULT '',
+            totp_secret TEXT,
             totp_enabled INT DEFAULT 0,
             must_change_password INT DEFAULT 0,
-            password_salt TEXT DEFAULT '',
+            password_salt TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
@@ -105,7 +113,7 @@ function initDb() {
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
             title VARCHAR(500) DEFAULT '',
-            content TEXT DEFAULT '',
+            content TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -156,7 +164,7 @@ function initDb() {
             id INT AUTO_INCREMENT PRIMARY KEY,
             uid INT NOT NULL,
             title VARCHAR(500) NOT NULL DEFAULT '',
-            content TEXT NOT NULL DEFAULT '',
+            content TEXT NOT NULL,
             type INT NOT NULL DEFAULT 1,
             is_read INT NOT NULL DEFAULT 0,
             send_type INT NOT NULL DEFAULT 1,
@@ -219,13 +227,13 @@ function initDb() {
             status VARCHAR(20) NOT NULL DEFAULT 'pending',
             pve_upid VARCHAR(200) DEFAULT '',
             progress INT DEFAULT 0,
-            notes TEXT DEFAULT '',
+            notes TEXT,
             type VARCHAR(10) DEFAULT 'vm',
             ct_id INT,
             rootfs_storage VARCHAR(100) DEFAULT '',
             created_at DATETIME NOT NULL DEFAULT NOW(),
             completed_at DATETIME,
-            error_msg TEXT DEFAULT '',
+            error_msg TEXT,
             INDEX idx_backups_vm_id (vm_id),
             INDEX idx_backups_status (status)
         )
@@ -254,7 +262,7 @@ function initDb() {
             status VARCHAR(20) NOT NULL DEFAULT 'pending',
             created_at DATETIME NOT NULL DEFAULT NOW(),
             completed_at DATETIME,
-            error_msg TEXT DEFAULT '',
+            error_msg TEXT,
             INDEX idx_restore_tasks_vm_id (vm_id),
             INDEX idx_restore_tasks_status (status)
         )
@@ -332,17 +340,17 @@ function migrateSchema() {
         }
     }
 
-    safeAlter('vms', 'renewal_price', "TEXT DEFAULT ''");
+    safeAlter('vms', 'renewal_price', "TEXT");
     safeAlter('cdk_codes', 'target_user_id', 'INT');
-    safeAlter('users', 'totp_secret', "TEXT DEFAULT ''");
+    safeAlter('users', 'totp_secret', "TEXT");
     safeAlter('users', 'totp_enabled', 'INT DEFAULT 0');
-    safeAlter('vms', 'backup_storage', "TEXT DEFAULT ''");
+    safeAlter('vms', 'backup_storage', "TEXT");
     safeAlter('backups', "type", "VARCHAR(10) DEFAULT 'vm'");
     safeAlter('backups', 'ct_id', 'INT');
     safeAlter('cdk_codes', 'used_ct_id', 'INT');
-    safeAlter('backups', 'rootfs_storage', "TEXT DEFAULT ''");
-    safeAlter('vms', 'dhcp_static_ip', "TEXT DEFAULT ''");
-    safeAlter('lxc_containers', 'dhcp_static_ip', "TEXT DEFAULT ''");
+    safeAlter('backups', 'rootfs_storage', "TEXT");
+    safeAlter('vms', 'dhcp_static_ip', "TEXT");
+    safeAlter('lxc_containers', 'dhcp_static_ip', "TEXT");
 
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {
@@ -421,7 +429,7 @@ function createDefaultAdmin() {
         execute(
             `INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, must_change_password, password_salt, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            ['admin', hashedPassword, 'admin', '', '', '', 0, 1, adminSalt, new Date().toISOString()]
+            ['admin', hashedPassword, 'admin', '', '', '', 0, 1, adminSalt, mysqlNow()]
         );
 
         console.log('================================================');
@@ -441,7 +449,7 @@ function createDefaultAdmin() {
 
     // 兼容旧数据库：添加 password_salt 字段（如果不存在）
     try {
-        execute("ALTER TABLE users ADD COLUMN password_salt TEXT DEFAULT ''");
+        execute("ALTER TABLE users ADD COLUMN password_salt TEXT");
     } catch (e) {
         // 字段已存在，忽略错误
     }
@@ -469,7 +477,7 @@ module.exports = {
                     user.bio || '',
                     user.email || '',
                     user.emailVerified ? 1 : 0,
-                    user.created_at || new Date().toISOString()
+                    user.created_at || mysqlNow()
                 ]
             );
             return queryOne('SELECT * FROM users WHERE id = ?', [result.insertId]);
@@ -515,7 +523,7 @@ module.exports = {
                     vm.name || '',
                     vm.expiration_date || null,
                     vm.renewal_price || '',
-                    new Date().toISOString()
+                    mysqlNow()
                 ]
             );
             return queryOne('SELECT * FROM vms WHERE id = ?', [result.insertId]);
@@ -553,7 +561,7 @@ module.exports = {
             add: (vmId, days) => {
                 execute(
                     'INSERT INTO vm_reminders (vm_id, days, sent_at) VALUES (?, ?, ?)',
-                    [vmId, days, new Date().toISOString()]
+                    [vmId, days, mysqlNow()]
                 );
             },
             clear: (vmId) => execute('DELETE FROM vm_reminders WHERE vm_id = ?', [vmId]),
@@ -566,14 +574,14 @@ module.exports = {
                 return result?.count || 0;
             },
             getTodayExpired: () => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = mysqlToday();
                 return queryAll(
                     "SELECT vm_id FROM vm_reminders WHERE days = 0 AND sent_at LIKE ?",
                     [today + '%']
                 );
             },
             getTodayAll: () => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = mysqlToday();
                 return queryAll(
                     'SELECT * FROM vm_reminders WHERE sent_at LIKE ?',
                     [today + '%']
@@ -615,7 +623,7 @@ module.exports = {
                     cdk.duration_days,
                     cdk.created_by,
                     cdk.target_user_id || null,
-                    cdk.created_at || new Date().toISOString(),
+                    cdk.created_at || mysqlNow(),
                     cdk.expires_at || null,
                     cdk.batch_id || null
                 ]
@@ -627,13 +635,13 @@ module.exports = {
                 execute(
                     `UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_ct_id = ?, used_at = ?
                      WHERE id = ?`,
-                    [userId, vmId, ctId, new Date().toISOString(), id]
+                    [userId, vmId, ctId, mysqlNow(), id]
                 );
             } else {
                 execute(
                     `UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_at = ?
                      WHERE id = ?`,
-                    [userId, vmId, new Date().toISOString(), id]
+                    [userId, vmId, mysqlNow(), id]
                 );
             }
             return queryOne('SELECT * FROM cdk_codes WHERE id = ?', [id]);
@@ -676,8 +684,8 @@ module.exports = {
                     memo.user_id,
                     memo.title || '',
                     memo.content || '',
-                    new Date().toISOString(),
-                    new Date().toISOString()
+                    mysqlNow(),
+                    mysqlNow()
                 ]
             );
             return queryOne('SELECT * FROM memos WHERE id = ?', [result.insertId]);
@@ -695,7 +703,7 @@ module.exports = {
                 values.push(value);
             }
             fields.push('updated_at = ?');
-            values.push(new Date().toISOString());
+            values.push(mysqlNow());
             values.push(id);
 
             execute(`UPDATE memos SET ${fields.join(', ')} WHERE id = ?`, values);
@@ -745,7 +753,7 @@ module.exports = {
                     data.link_url || '',
                     data.link_text || '',
                     data.batch_id || '',
-                    new Date().toISOString()
+                    mysqlNow()
                 ]
             );
             return queryOne('SELECT * FROM messages WHERE id = ?', [result.insertId]);
@@ -843,7 +851,7 @@ module.exports = {
                     data.device_name || '',
                     data.ip || '',
                     data.user_agent || '',
-                    data.created_at || new Date().toISOString(),
+                    data.created_at || mysqlNow(),
                     data.expires_at
                 ]
             );
@@ -887,11 +895,11 @@ module.exports = {
         add: (userId, vmId, action) => {
             execute(
                 'INSERT INTO snapshot_logs (user_id, vm_id, action, created_at) VALUES (?, ?, ?, ?)',
-                [userId, vmId, action, new Date().toISOString()]
+                [userId, vmId, action, mysqlNow()]
             );
         },
         getDailyCount: (userId, action) => {
-            const today = new Date().toISOString().split('T')[0];
+            const today = mysqlToday();
             const result = queryOne(
                 `SELECT COUNT(*) as count FROM snapshot_logs
                  WHERE user_id = ? AND action = ? AND created_at >= ?`,
@@ -1041,7 +1049,7 @@ module.exports = {
             [userId, vmId, action]
         ),
         getDailyCount: (userId) => {
-            const today = new Date().toISOString().split('T')[0];
+            const today = mysqlToday();
             const result = queryOne(
                 `SELECT COUNT(*) as count FROM backup_logs WHERE user_id = ? AND action = 'create' AND created_at >= ?`,
                 [userId, today]
@@ -1126,7 +1134,7 @@ module.exports = {
                     ct.name || '',
                     ct.expiration_date || null,
                     ct.renewal_price || '',
-                    new Date().toISOString()
+                    mysqlNow()
                 ]
             );
             return queryOne('SELECT * FROM lxc_containers WHERE id = ?', [result.insertId]);
@@ -1164,7 +1172,7 @@ module.exports = {
             add: (ctId, days) => {
                 execute(
                     'INSERT INTO lxc_reminders (ct_id, days, sent_at) VALUES (?, ?, ?)',
-                    [ctId, days, new Date().toISOString()]
+                    [ctId, days, mysqlNow()]
                 );
             },
             clear: (ctId) => execute('DELETE FROM lxc_reminders WHERE ct_id = ?', [ctId]),
@@ -1177,14 +1185,14 @@ module.exports = {
                 return result?.count || 0;
             },
             getTodayExpired: () => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = mysqlToday();
                 return queryAll(
                     "SELECT ct_id FROM lxc_reminders WHERE days = 0 AND sent_at LIKE ?",
                     [today + '%']
                 );
             },
             getTodayAll: () => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = mysqlToday();
                 return queryAll(
                     'SELECT * FROM lxc_reminders WHERE sent_at LIKE ?',
                     [today + '%']
@@ -1283,8 +1291,8 @@ module.exports = {
                     data.source || 'panel',
                     data.sync_status || 'pending',
                     data.ikuai_id || '',
-                    new Date().toISOString(),
-                    new Date().toISOString()
+                    mysqlNow(),
+                    mysqlNow()
                 ]
             );
             return queryOne('SELECT * FROM port_forwards WHERE id = ?', [result.insertId]);
@@ -1302,7 +1310,7 @@ module.exports = {
                 fields.push(`${key} = ?`);
                 values.push(value);
             }
-            values.push(new Date().toISOString(), id);
+            values.push(mysqlNow(), id);
             execute(`UPDATE port_forwards SET ${fields.join(', ')}, updated_at = ? WHERE id = ?`, values);
             return queryOne('SELECT * FROM port_forwards WHERE id = ?', [id]);
         },
