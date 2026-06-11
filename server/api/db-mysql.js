@@ -550,7 +550,7 @@ function migrateFromSQLite() {
 
     console.log('[迁移] 检测到 SQLite 数据库，开始迁移到 MySQL...');
 
-    // 3. 预处理：修复已创建的表结构问题（首次建表时可能缺少这些设置）
+    // 3. 预处理：修复已创建的表结构问题
     try { execute('ALTER TABLE messages CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch(e) {}
     try { execute('ALTER TABLE backups MODIFY COLUMN size BIGINT DEFAULT 0'); } catch(e) {}
 
@@ -565,62 +565,53 @@ function migrateFromSQLite() {
 
     let totalMigrated = 0;
 
-    // 特殊表配置：列名需要反引号包裹（MySQL 保留字）或特殊类型转换
+    // 特殊表配置
     const tableConfig = {
         config: { backtickColumns: ['key'] },
-        backups: { intToBigInt: ['size'] },   // SQLite 无类型限制，size 可能超 INT 范围
+        backups: { intToBigInt: ['size'] },
     };
 
+    // ===== 迁移专用裸查询（无重试机制，避免连接雪崩）=====
+    function migrateQuery(sql, params) {
+        // 直接使用当前连接查询，不经过 execute 的重试逻辑
+        // 迁移过程中连接错误直接抛出，由外层 catch 跳过该表
+        return getConnection().query(sql, sanitizeParams(params));
+    }
+    // =====================================================
+
     try {
-        // 需要迁移的表列表（按依赖顺序：用户表优先）
         const tables = [
-            'users',           // 用户表（其他表依赖 user_id）
-            'config',          // 配置表（key 是保留字）
-            'cdk_codes',       // CDK 兑换码
-            'vms',             // 虚拟机
-            'vm_reminders',    // VM 提醒记录
-            'lxc_containers',  // LXC 容器
-            'lxc_reminders',   // LXC 提醒记录
-            'memos',           // 备忘录
-            'messages',        // 站内消息（utf8mb4 已在上面 ALTER 过）
-            'password_reset_tokens', // 密码重置令牌
-            'refresh_tokens',  // 刷新令牌
-            'snapshot_logs',   // 快照日志
-            'recovery_codes',  // 恢复码
-            'backups',         // 备份（size 已改为 BIGINT）
-            'backup_logs',     // 备份日志
-            'restore_tasks',   // 恢复任务
-            'port_forwards',   // 端口转发
+            'users', 'config', 'cdk_codes', 'vms', 'vm_reminders',
+            'lxc_containers', 'lxc_reminders', 'memos', 'messages',
+            'password_reset_tokens', 'refresh_tokens', 'snapshot_logs',
+            'recovery_codes', 'backups', 'backup_logs', 'restore_tasks',
+            'port_forwards',
         ];
 
         for (const table of tables) {
             try {
-                // 检查 SQLite 表是否存在
                 const tblInfo = sqliteDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table);
                 if (!tblInfo) continue;
 
-                // 从 SQLite 读取所有数据
                 const rows = sqliteDb.prepare(`SELECT * FROM ${table}`).all();
                 if (!rows || rows.length === 0) continue;
 
                 const columns = Object.keys(rows[0]);
 
-                // 跳过 users 表中的默认管理员（MySQL 已创建）
                 let rowsToMigrate = rows;
                 if (table === 'users') {
                     rowsToMigrate = rows.filter(r => r.username !== 'admin');
                 }
                 if (rowsToMigrate.length === 0) continue;
 
-                // 构建列名：对保留字列加反引号
                 const cfg = tableConfig[table] || {};
-                const colNames = columns.map(col => {
-                    return (cfg.backtickColumns && cfg.backtickColumns.includes(col)) ? `\`${col}\`` : col;
-                }).join(', ');
+                const colNames = columns.map(col =>
+                    (cfg.backtickColumns && cfg.backtickColumns.includes(col)) ? `\`${col}\`` : col
+                ).join(', ');
 
                 const placeholders = columns.map(() => '?').join(', ');
-                // 有唯一键/主键的表用 ON DUPLICATE KEY UPDATE 避免重复插入错误
                 const hasUniqueKey = ['config', 'users', 'cdk_codes', 'port_forwards', 'refresh_tokens', 'password_reset_tokens', 'recovery_codes'].includes(table);
+
                 let stmt;
                 if (hasUniqueKey) {
                     const updatePart = columns.map(col => {
@@ -632,30 +623,34 @@ function migrateFromSQLite() {
                     stmt = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders})`;
                 }
 
-                for (const row of rowsToMigrate) {
-                    const values = columns.map(col => {
-                        let val = row[col];
-                        // 将 SQLite 的 ISO 日期字符串转为 MySQL DATETIME 格式
-                        if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
-                            val = val.slice(0, 19).replace('T', ' ');
-                        }
-                        // 处理 Buffer 类型（SQLite BLOB）
-                        if (Buffer.isBuffer(val)) {
-                            val = val.toString('binary');
-                        }
-                        // 处理超大数值（SQLite 无类型限制，MySQL INT/BIGINT 有范围）
-                        if (cfg.intToBigInt && cfg.intToBigInt.includes(col) && typeof val === 'number') {
-                            val = Math.floor(val); // 确保整数
-                        }
-                        return val;
-                    });
-                    execute(stmt, values);
+                // 批量 INSERT：每批 50 行，减少连接往返次数
+                const BATCH_SIZE = 50;
+                for (let i = 0; i < rowsToMigrate.length; i += BATCH_SIZE) {
+                    const batch = rowsToMigrate.slice(i, i + BATCH_SIZE);
+                    const batchValues = batch.map(row =>
+                        columns.map(col => {
+                            let val = row[col];
+                            if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+                                val = val.slice(0, 19).replace('T', ' ');
+                            }
+                            if (Buffer.isBuffer(val)) { val = val.toString('binary'); }
+                            if (cfg.intToBigInt && cfg.intToBigInt.includes(col) && typeof val === 'number') {
+                                val = Math.floor(val);
+                            }
+                            return val;
+                        })
+                    );
+                    // 多行 INSERT: VALUES (?),(?),(?)...
+                    const batchPlaceholders = batch.map(() => `(${placeholders})`).join(', ');
+                    const batchStmt = stmt.replace(`VALUES (${placeholders})`, `VALUES ${batchPlaceholders}`);
+                    migrateQuery(batchStmt, batchValues.flat());
                 }
 
                 totalMigrated += rowsToMigrate.length;
                 console.log(`[迁移] ${table}: 迁移 ${rowsToMigrate.length} 条数据`);
             } catch (e) {
                 console.warn(`[迁移] 表 ${table} 迁移失败:`, e.message);
+                // 不重试！避免连接雪崩。该表数据可稍后手动补入。
             }
         }
 
@@ -666,12 +661,15 @@ function migrateFromSQLite() {
         }
     } finally {
         sqliteDb.close();
-        // 迁移结束后强制重建连接（迁移过程可能产生大量临时连接或异常状态）
-        // 确保后续正常操作使用一个全新的干净连接
+
+        // 销毁迁移过程中可能变脏的连接，等待 MySQL 服务端回收僵尸连接后重建
         if (_connection) {
             try { _connection.destroy(); } catch (e) { /* ignore */ }
             _connection = null;
         }
+        // 延迟 2 秒让 MySQL 服务端清理 TIME_WAIT 状态的旧连接
+        const start = Date.now();
+        while (Date.now() - start < 2000) { /* busy wait - Node.js sync context */ }
         _connection = new mysql(getConnectionConfig());
         console.log('[迁移] 连接已重建，可正常使用');
     }
