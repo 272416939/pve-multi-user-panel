@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.7.5-UI-beta33] - 2026-06-12
+
+### Security (Final Audit — 6 项残留漏洞全部闭环)
+- **P0-B-1: 备份恢复未绑定目标机器** — restore 端点只校验目标归属，不校验 backup 本身
+  - backup.js LXC restore: 新增 `backup.ct_id !== vmid` → 400 拒绝
+  - backup.js VM restore: 新增 `backup.vm_id != vmid` → 400 拒绝
+- **P0-B-2: 批量删除备份用原始 ids** — 循环中 continue 跳过但 deleteBatch 用全量 ID
+  - backup.js batch-delete: 改用 `deletableIds[]` 收集通过校验的 ID，仅删除有权限项
+- **P1-C-2R: 默认密码硬编码根除** — admin 密码仍为 `'admin123'` 字面量
+  - db-sqlite.js: 新增 `generateRandomPassword(16)` 函数（密码学安全随机）
+  - createDefaultAdmin(): 优先读 `DEFAULT_ADMIN_PASSWORD` 环境变量，未设置则自动生成强随机密码
+  - 控制台醒目输出完整密码（分隔线框格式），首次登录必须可见
+- **P2-V-1: VNC 端点权限模式修正**
+  - vm.js + lxc.js VNC: 未分配 VM/CT 时管理员允许继续（运维用途），普通用户返回 403（非 404）
+- **P3-M-2: JWT_SECRET 持久化** — 重启后 token 失效问题
+  - token.js: 读取优先级 环境变量 → `.jwt-secret` 文件 → 自动生成并持久化
+  - 密钥强度从 256bit 提升到 512bit (`crypto.randomBytes(64)`)
+  - .gitignore 新增 `.jwt-secret` 条目防止密钥泄露
+- **P3-L-2: 端口转发 IP 校验**
+  - network.js: IPv4 合法性正则校验，非法 IP 返回 400
+  - 普通用户禁止内网保留地址段（10.x / 172.16-31.x / 192.168.x / 127.x）
+
+### Modified Files
+- server/routes/backup.js (B-1: restore绑定; B-2: deletableIds过滤)
+- server/api/db-sqlite.js (C-2R: generateRandomPassword + 环境变量)
+- server/routes/vm.js (V-1: VNC权限模式)
+- server/routes/lxc.js (V-1: VNC权限模式)
+- server/utils/token.js (M-2: JWT_SECRET持久化)
+- server/routes/network.js (L-2: IP校验+内网限制)
+
+---
+
 ## [1.7.5-UI-beta32] - 2026-06-12
 
 ### Security (Final — 3 项残留漏洞全部闭环)

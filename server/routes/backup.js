@@ -178,6 +178,10 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
         if (!backup || backup.type !== 'lxc') {
             return res.status(404).json({ error: '备份不存在' });
         }
+        // B-1 修复：校验备份是否属于目标容器
+        if (backup.ct_id !== parseInt(vmid)) {
+            return res.status(400).json({ error: '备份不属于目标容器' });
+        }
         if (backup.status !== 'completed' || !backup.filename) {
             return res.status(400).json({ error: '备份文件不完整，无法恢复' });
         }
@@ -348,6 +352,8 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
     try {
         const { ids } = req.body;
         if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: '请选择要删除的备份' });
+        // B-2 修复：收集有权限删除的 ID，而非使用原始 ids
+        const deletableIds = [];
         for (const id of ids) {
             const backup = db.backups.getById(id);
             if (!backup) continue;
@@ -364,6 +370,7 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
                 }
                 if (backup.status === 'running' || backup.status === 'pending') continue;
             }
+            deletableIds.push(id);
             if (backup.filename && backup.status === 'completed') {
                 try {
                     const volid = backup.type === 'lxc' ? `${backup.storage}:backup/${backup.filename}` : backup.filename;
@@ -371,11 +378,13 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
                 } catch (e) { console.error('删除备份文件失败:', e.message); }
             }
         }
-        for (const id of ids) {
-            db.restoreTasks.deleteByBackupId(id);
+        if (deletableIds.length > 0) {
+            for (const id of deletableIds) {
+                db.restoreTasks.deleteByBackupId(id);
+            }
+            db.backups.deleteBatch(deletableIds);
         }
-        db.backups.deleteBatch(ids);
-        res.json({ message: `已删除 ${ids.length} 个备份` });
+        res.json({ message: `已删除 ${deletableIds.length} 个备份` });
     } catch (error) {
         res.status(500).json({ error: '批量删除失败' });
     }
@@ -422,6 +431,10 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
         const backupId = req.params.id;
         const backup = db.backups.getById(backupId);
         if (!backup) return res.status(404).json({ error: '备份不存在' });
+        // B-1 修复：校验备份是否属于目标虚拟机
+        if (backup.vm_id != vmid) {
+            return res.status(400).json({ error: '备份不属于目标虚拟机' });
+        }
         if (backup.status !== 'completed' || !backup.filename) {
             return res.status(400).json({ error: '备份文件不完整，无法恢复' });
         }

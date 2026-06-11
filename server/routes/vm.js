@@ -459,16 +459,19 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allVms = db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
-
-        // 安全修复：VM 不在数据库中也必须拒绝（防止绕过权限检查连接任意机器）
-        if (!vm) {
-            return res.status(404).json({ error: '虚拟机不存在' });
-        }
-
-        const isOwner = req.user.id === vm.user_id;
         const isAdmin = req.user.role === 'admin';
-        if (!isOwner && !isAdmin) {
-            return res.status(403).json({ error: '无权限操作此虚拟机' });
+
+        // V-1 修复：统一权限模式 — 管理员可连接未分配 VM 进行运维
+        if (!vm) {
+            if (!isAdmin) {
+                return res.status(403).json({ error: '虚拟机未分配，无权限' });
+            }
+            // 管理员允许继续（用于运维未分配的 VM）
+        } else {
+            const isOwner = req.user.id === vm.user_id;
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ error: '无权操作此虚拟机' });
+            }
         }
         
         // 先检查 VM 是否在运行

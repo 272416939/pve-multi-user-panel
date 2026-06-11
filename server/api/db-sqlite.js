@@ -3,6 +3,22 @@ const path = require('path');
 const CryptoJS = require('crypto-js');
 const fs = require('fs');
 
+/**
+ * 生成指定长度的随机强密码
+ * @param {number} length - 密码长度，默认 16
+ * @returns {string} 随机密码字符串
+ */
+function generateRandomPassword(length = 16) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&*';
+    const array = new Uint8Array(length);
+    crypto.getRandomValues(array);
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars[array[i] % chars.length];
+    }
+    return result;
+}
+
 const dbFile = path.join(__dirname, '../../data/pve-panel.db');
 
 // 确保 data 目录存在
@@ -476,13 +492,22 @@ function initDefaultConfig() {
 function createDefaultAdmin() {
     const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
     if (!adminExists) {
+        // C-2R 修复：优先读取环境变量，否则自动生成强随机密码
+        const defaultAdminPassword = process.env.DEFAULT_ADMIN_PASSWORD || generateRandomPassword(16);
         const adminSalt = CryptoJS.lib.WordArray.random(16).toString();
-        const hashedPassword = CryptoJS.SHA256(adminSalt + 'admin123').toString();
+        const hashedPassword = CryptoJS.SHA256(adminSalt + defaultAdminPassword).toString();
+
         db.prepare(`
             INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, must_change_password, password_salt, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).run('admin', hashedPassword, 'admin', '', '', '', 0, 1, adminSalt, new Date().toISOString());
-        console.log('默认管理员账号已创建: admin / admin123（首次登录需强制改密）');
+
+        console.log('================================================');
+        console.log('  默认管理员账号已创建:');
+        console.log(`  用户名: admin`);
+        console.log(`  密码:   ${defaultAdminPassword}`);
+        console.log('  ⚠ 请立即登录并修改密码！');
+        console.log('================================================');
     }
 
     // 兼容旧数据库：添加 must_change_password 字段（如果不存在）

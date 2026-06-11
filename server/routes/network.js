@@ -152,6 +152,26 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         if (internal_port < 1 || internal_port > 65535 || external_port < 1 || external_port > 65535) {
             return res.status(400).json({ error: '端口必须在 1-65535 之间' });
         }
+
+        // L-2 修复：IPv4 格式合法性校验
+        if (!/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip)) {
+            return res.status(400).json({ error: '无效的 IP 地址格式' });
+        }
+
+        // 普通用户禁止内网保留地址段
+        if (!isAdmin) {
+            const parts = ip.split('.').map(Number);
+            const isPrivate = (
+                (parts[0] === 10) ||
+                (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+                (parts[0] === 192 && parts[1] === 168) ||
+                (parts[0] === 127)
+            );
+            if (isPrivate) {
+                return res.status(400).json({ error: '不允许指向内网保留 IP 地址' });
+            }
+        }
+
         const config = {
             port_range_start: parseInt(db.config.get('forward:port_range_start')) || 50000,
             port_range_end: parseInt(db.config.get('forward:port_range_end')) || 60000,
