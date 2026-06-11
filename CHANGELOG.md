@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.5-UI-beta27] - 2026-06-11
+
+### Security
+- **fix(security): 修复 VM/LXC 操作端点权限绕过漏洞（高危）** — 14 个端点的权限校验存在逻辑缺陷：当资源（VM/CT）不在数据库中时，`if (vm) / if (ct)` 条件为 false，整个权限检查块被跳过，任何已登录普通用户均可对未入库的 PVE 资源执行 start/stop/reboot/reset-ip/reset-password/status/terminal 等操作
+- **修复方案**：统一改为 `if (resource) { check owner } else if (!isAdmin) { return 403 }` 模式，非管理员用户操作未分配资源时返回 403，管理员仍可管理任意 PVE 资源
+- **受影响端点**：
+  - vm.js (6个): POST start/shutdown/stop/reboot/reset-ip + GET status（status 原完全无权限检查）
+  - lxc.js (8个): POST start/shutdown/stop/reboot/terminal/reset-password/reset-ip + GET status（status 原完全无权限检查）
+- 涉及文件：server/routes/vm.js, server/routes/lxc.js
+
+---
+
 ## [1.7.5-UI-beta26] - 2026-06-11
 
 ### Added

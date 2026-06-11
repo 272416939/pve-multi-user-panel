@@ -1,8 +1,10 @@
 ## 更新内容
 
-### 新增功能
-- **feat(dashboard): 虚拟机/容器列表新增"详情"按钮** — VM 和 CT 操作列首位置新增蓝色"详情"按钮，点击弹出详情监控弹窗。弹窗包含：基本信息卡片（ID/内网IP/硬件配置/操作系统或镜像/运行状态/运行时长）+ 4 个 Chart.js 实时监控图表（CPU使用率、内存使用率、网络流量上行下行、磁盘IO读取写入），运行中实例每 3 秒自动刷新监控数据
-- 涉及文件：public/dashboard.html、public/js/dashboard/core.js
+### 安全修复（高危）
+- **fix(security): 修复 VM/LXC 操作端点权限绕过漏洞** — 14 个端点的权限校验存在逻辑缺陷：当资源不在数据库中时，整个权限检查块被跳过，任何已登录普通用户均可对未入库的 PVE 资源执行操作
+- 修复方案：非管理员操作未分配资源时返回 403，管理员仍可管理任意 PVE 资源
+- 受影响端点：vm.js 6个 + lxc.js 8个（含2个原完全无权限检查的 status 端点）
+- 涉及文件：server/routes/vm.js, server/routes/lxc.js
 
 ---
 **完整更新日志**: [CHANGELOG.md](https://github.com/272416939/pve-multi-user-panel/blob/main/CHANGELOG.md)

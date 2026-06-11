@@ -363,20 +363,20 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allVms = db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
-        
+        const isAdmin = req.user.role === 'admin';
+
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
-            const isAdmin = req.user.role === 'admin';
-            
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
-            
             if (isOwner && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '虚拟机已到期，无法开机' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
         }
-        
+
         await pveApi.startVm(vmid);
         res.json({ message: '虚拟机启动成功' });
     } catch (error) {
@@ -389,16 +389,17 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allVms = db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
-        
+        const isAdmin = req.user.role === 'admin';
+
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
-            const isAdmin = req.user.role === 'admin';
-            
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
         }
-        
+
         await pveApi.shutdownVm(vmid);
         res.json({ message: '虚拟机关机成功' });
     } catch (error) {
@@ -411,16 +412,17 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allVms = db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
-        
+        const isAdmin = req.user.role === 'admin';
+
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
-            const isAdmin = req.user.role === 'admin';
-            
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
         }
-        
+
         await pveApi.stopVm(vmid);
         res.json({ message: '虚拟机已强制停止' });
     } catch (error) {
@@ -433,16 +435,17 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allVms = db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
-        
+        const isAdmin = req.user.role === 'admin';
+
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
-            const isAdmin = req.user.role === 'admin';
-            
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
         }
-        
+
         await pveApi.rebootVm(vmid);
         res.json({ message: '虚拟机重启成功' });
     } catch (error) {
@@ -496,7 +499,21 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
 
 router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
     try {
-        const rawStatus = await pveApi.getVmStatus(req.params.vmid);
+        const vmid = parseInt(req.params.vmid);
+        const allVms = db.vms.getAll();
+        const vm = allVms.find(v => v.vm_id === vmid);
+        const isAdmin = req.user.role === 'admin';
+
+        if (vm) {
+            const isOwner = req.user.id === vm.user_id;
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ error: '无权限查看此虚拟机状态' });
+            }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限查看此虚拟机状态，资源未分配' });
+        }
+
+        const rawStatus = await pveApi.getVmStatus(vmid);
         const status = _applyRate('vm:' + req.params.vmid, rawStatus);
         const config = await pveApi.getVmConfig(req.params.vmid);
         res.json({ status, config });
@@ -529,10 +546,12 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
         // 权限检查（用正确的查询方法）
         const allVms = db.vms.getAll();
         const vmRecord = allVms.find(v => v.vm_id === vmid);
+        const isAdmin = req.user.role === 'admin';
         if (vmRecord) {
             const isOwner = req.user.id === vmRecord.user_id;
-            const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) return res.status(403).json({ error: '无权限操作此虚拟机' });
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
         }
 
         if (ip_mode === 'dhcp') {

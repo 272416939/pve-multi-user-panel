@@ -353,20 +353,20 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
- 
+        const isAdmin = req.user.role === 'admin';
+
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
-            const isAdmin = req.user.role === 'admin';
- 
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
- 
             if (isOwner && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '容器已到期，无法开机' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
- 
+
         await pveApi.startLxc(vmid);
         res.json({ message: 'LXC 容器启动成功' });
     } catch (error) {
@@ -379,15 +379,17 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
- 
+        const isAdmin = req.user.role === 'admin';
+
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
-            const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
- 
+
         await pveApi.shutdownLxc(vmid);
         res.json({ message: 'LXC 容器关机命令已发送' });
     } catch (error) {
@@ -400,15 +402,17 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
- 
+        const isAdmin = req.user.role === 'admin';
+
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
-            const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
- 
+
         await pveApi.stopLxc(vmid);
         res.json({ message: 'LXC 容器已强制停止' });
     } catch (error) {
@@ -421,15 +425,17 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
- 
+        const isAdmin = req.user.role === 'admin';
+
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
-            const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
- 
+
         await pveApi.rebootLxc(vmid);
         res.json({ message: 'LXC 容器重启命令已发送' });
     } catch (error) {
@@ -483,13 +489,15 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
+        const isAdmin = req.user.role === 'admin';
 
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
-            const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
 
         let ctStatus;
@@ -513,8 +521,22 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
 
 router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
     try {
+        const vmid = parseInt(req.params.vmid);
+        const allCts = db.lxcContainers.getAll();
+        const ct = allCts.find(c => c.ct_id === vmid);
+        const isAdmin = req.user.role === 'admin';
+
+        if (ct) {
+            const isOwner = req.user.id === ct.user_id;
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ error: '无权限查看此容器状态' });
+            }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限查看此容器状态，资源未分配' });
+        }
+
         const [rawStatus, config] = await Promise.all([
-            pveApi.getLxcStatus(req.params.vmid),
+            pveApi.getLxcStatus(vmid),
             pveApi.getLxcConfig(req.params.vmid)
         ]);
         const status = _applyRate('lxc:' + req.params.vmid, rawStatus);
@@ -598,15 +620,17 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
  
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
- 
+        const isAdmin = req.user.role === 'admin');
+
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
-            const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
- 
+
         // 检查容器状态
         const status = await pveApi.getLxcStatus(vmid);
         if (status.status !== 'running') {
@@ -658,12 +682,14 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         // 权限检查
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
+        const isAdmin = req.user.role === 'admin');
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
-            const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
 
         // 获取当前配置
