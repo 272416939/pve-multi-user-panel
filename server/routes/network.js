@@ -158,20 +158,6 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '无效的 IP 地址格式' });
         }
 
-        // 普通用户禁止内网保留地址段
-        if (!isAdmin) {
-            const parts = ip.split('.').map(Number);
-            const isPrivate = (
-                (parts[0] === 10) ||
-                (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
-                (parts[0] === 192 && parts[1] === 168) ||
-                (parts[0] === 127)
-            );
-            if (isPrivate) {
-                return res.status(400).json({ error: '不允许指向内网保留 IP 地址' });
-            }
-        }
-
         const config = {
             port_range_start: parseInt(db.config.get('forward:port_range_start')) || 50000,
             port_range_end: parseInt(db.config.get('forward:port_range_end')) || 60000,
@@ -263,6 +249,14 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             if (!userRules.find(r => r.id === id)) return res.status(403).json({ error: '无权限' });
         }
         const { name, ip, internal_port, external_port, protocol } = req.body;
+
+        // L-2🔶 修复：修改 IP 时同步格式校验（与 POST 端点一致）
+        if (ip !== undefined && ip !== null) {
+            if (!/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip)) {
+                return res.status(400).json({ error: '无效的 IP 地址格式' });
+            }
+        }
+
         if (external_port) {
             const config = {
                 port_range_start: parseInt(db.config.get('forward:port_range_start')) || 50000,

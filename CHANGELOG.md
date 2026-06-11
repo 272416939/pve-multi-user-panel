@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.5-UI-beta34] - 2026-06-12
+
+### Security (Final Closure — 19/19 漏洞 100% 闭环)
+- **L-2🔶**: PUT /port-forwards/:id 同步 IP 校验 — 修改 IP 时增加 IPv4 格式正则校验（端口转发本身指向内网，不限制内网地址段）
+
+### Modified Files
+- server/routes/network.js (L-2🔶: PUT端点IP校验)
+
+---
+
 ## [1.7.5-UI-beta33] - 2026-06-12
 
 ### Security (Final Audit — 6 项残留漏洞全部闭环)
