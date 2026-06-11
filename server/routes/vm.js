@@ -559,7 +559,7 @@ router.get('/vm/random-ip', authMiddleware, async (req, res) => {
     }
 });
 
-router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
+router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         const { ip_mode, ip } = req.body;

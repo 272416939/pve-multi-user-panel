@@ -723,7 +723,7 @@ router.get('/lxc/random-ip', authMiddleware, async (req, res) => {
     }
 });
 
-router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
+router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         const { ip_mode, ip } = req.body; // ip_mode: 'dhcp' 或 'static'
