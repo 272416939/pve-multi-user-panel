@@ -130,6 +130,7 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
     const userSource = req.query.source || 'gitee';
     let response = null;
     let source = userSource;
+    let fallbackNote = '';
 
     try {
         // 使用 per_page=1 获取最新 release
@@ -154,9 +155,9 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
             throw new Error(source === 'gitee' ? 'Gitee 未找到任何 Release，请确认仓库已发布' : 'GitHub 未找到任何 Release');
         }
     } catch (e) {
-        // 指定源失败时尝试回退到另一个源
+        // 指定源失败时尝试回退到另一个源（但 source 保持用户选择）
         if (source === 'gitee') {
-            source = 'github';
+            fallbackNote = '（Gitee 不可达，已回退到 GitHub）';
             try {
                 const [rr, prr] = await Promise.allSettled([
                     axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=1`, { timeout: 10000 }),
@@ -174,7 +175,7 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
                 });
             }
         } else {
-            source = 'gitee';
+            fallbackNote = '（GitHub 不可达，已回退到 Gitee）';
             try {
                 response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=1&sort=created&direction=desc`, { timeout: 10000 });
                 response.data = Array.isArray(response.data) ? response.data[0] : response.data;
@@ -254,6 +255,7 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
             latest_version: tag,
             has_update: hasUpdate,
             source: source,
+            fallback_note: fallbackNote || undefined,
             release: {
                 tag_name: response.data.tag_name,
                 name: response.data.name,

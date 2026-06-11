@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5-UI-beta25] - 2026-06-11
+
+### Fixed
+- fix(api): **检查更新切换 Gitee 后 source 仍显示 github** — 根因：Gitee API 请求失败时后端静默回退到 GitHub 并将 `source` 字段改为 `'github'`。现修复为：`source` 始终保持用户选择的渠道不变，回退时通过新增的 `fallback_note` 字段提示（如"Gitee 不可达，已回退到 GitHub"）
+- 涉及文件：server/routes/admin-config.js
+
+---
+
 ## [1.7.5-UI-beta24] - 2026-06-11
 
 ### Fixed
