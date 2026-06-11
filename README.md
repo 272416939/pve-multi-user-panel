@@ -309,6 +309,20 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 
 ---
 
+## 🔄 手动更新
+
+当「系统更新」功能无法使用时，SSH 进入项目目录执行：
+
+```bash
+git fetch origin && git reset --hard origin/main && npm install --production
+```
+
+然后重启服务（PM2 / systemd / 手动重启均可）。
+
+> 如需回滚：`git reflog` 查找旧 commit hash，`git reset --hard <hash>` 回滚。
+
+---
+
 ## 🔄 更新日志
 
 <details>
