@@ -17,6 +17,8 @@ router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限查看此容器备份' });
             }
+        } else if (req.user.role !== 'admin') {
+            return res.status(403).json({ error: '资源未分配，无权限' });
         }
  
         const backups = db.backups.getByCtId(vmid);

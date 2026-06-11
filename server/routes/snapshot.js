@@ -5,6 +5,14 @@ const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
     try {
+        const vmid = parseInt(req.params.vmid);
+        const isAdmin = req.user.role === 'admin';
+        if (!isAdmin) {
+            const userCts = db.lxcContainers.getByUserId(req.user.id);
+            const owned = userCts.some(c => c.ct_id === vmid);
+            if (!owned) return res.status(403).json({ error: '无权操作此容器' });
+        }
+
         const snapshots = await pveApi.getLxcSnapshots(req.params.vmid);
         const cfg = db.snapshotConfig.get();
         const dailyCreate = db.snapshotLogs.getDailyCount(req.user.id, 'create');

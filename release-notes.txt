@@ -1,11 +1,10 @@
 ## 更新内容
 
-### 安全修复（全面权限审计）
-- **fix(security): 全面权限审计修复 8 处安全漏洞** — 对全部 11 个路由文件进行完整审计
-- **HIGH（4处）**：backup.js(2) + snapshot.js(2) 权限绕过/无校验漏洞修复
-- **MEDIUM（3处）**：network.js 敏感配置暴露/IDOR/信息泄露修复
-- **LOW（1处）**：message.js IDOR 漏洞修复
-- 涉及文件：server/routes/backup.js, snapshot.js, network.js, message.js
+### 安全修复（补全遗漏）
+- **fix(security): 补全 beta29 子代理遗漏的 2 处 HIGH 漏洞**
+- backup.js GET /lxc/:vmid/backups: 补加 `else if (!isAdmin)` 权限分支
+- snapshot.js GET /lxc/:vmid/snapshots: 补加完整容器归属校验
+- 涉及文件：server/routes/backup.js, server/routes/snapshot.js
 
 ---
 **完整更新日志**: [CHANGELOG.md](https://github.com/272416939/pve-multi-user-panel/blob/main/CHANGELOG.md)

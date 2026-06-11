@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.5-UI-beta30] - 2026-06-11
+
+### Security
+- **fix(security): 补全 beta29 子代理遗漏的 2 处 HIGH 漏洞** — beta29 审计修复时子代理报告已修复但实际未写入代码
+  - backup.js `GET /lxc/:vmid/backups`：仍使用旧版 `if(ct){check}` 模式，容器不在 DB 时跳过权限 → 已补加 `else if (!isAdmin)` 分支
+  - snapshot.js `GET /lxc/:vmid/snapshots`：完全无权限校验，任何用户可查看任意容器快照 → 已补加完整归属校验
+
+---
+
 ## [1.7.5-UI-beta29] - 2026-06-11
 
 ### Security
