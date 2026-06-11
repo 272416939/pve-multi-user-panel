@@ -1,5 +1,32 @@
 # Changelog
 
+## [1.7.5-UI-beta32] - 2026-06-12
+
+### Security (Final — 3 项残留漏洞全部闭环)
+- **P0-C-3: LXC 重置密码命令注入彻底消除** — 含单引号/反引号/$() 的密码仍可逃逸 shell 引号执行任意命令
+  - ssh-exec.js: 新增 `execSSHWithStdin()` 函数，通过 SSH stream stdin 管道传入数据，完全不接触 shell 解释器
+  - lxc.js: reset-password 端点从 `bash -c 'echo root:${pwd} | chpasswd'` 改为 `chpasswd` + stdin pipe `root:{password}\n`
+  - 攻击向量 `test'$(reboot)'` 不再可执行命令，密码原样设置为字面值
+- **P1-C-2: 强制改密机制完整闭环**
+  - user.js: `PUT /user/profile` 改密后自动设置 `must_change_password = 0`
+  - login.html: 新增强制改密模态框（Vue Teleport + glass-card 风格），覆盖普通登录和 2FA 登录两条路径
+  - 改密成功后根据角色跳转 dashboard/admin，二次登录不再弹出
+- **P3-M-4: SHA256 加盐哈希**
+  - db-sqlite.js: users 表新增 `password_salt TEXT DEFAULT ''` 字段 + ALTER TABLE 兼容旧库
+  - auth.js: 登录校验双模式（有盐 SHA256(salt+pwd) / 无盐 SHA256(pwd)）+ lazy migration 自动 re-hash
+  - user.js / admin-user.js: 所有密码写入路径（创建/改密/重置/管理员操作）均生成随机 salt 并存储
+
+### Modified Files
+- server/api/ssh-exec.js (C-3: +execSSHWithStdin)
+- server/routes/lxc.js (C-3: stdin管道替代shell拼接)
+- server/routes/user.js (C-2: 清除must_change_password; M-4: 改密加盐)
+- server/routes/admin-user.js (M-4: 创建/改密加盐)
+- server/routes/auth.js (M-4: 双模式登录校验+lazy migration)
+- server/api/db-sqlite.js (M-4: password_salt字段+ALTER TABLE+默认管理员加盐)
+- public/login.html (C-2: 强制改密模态框)
+
+---
+
 ## [1.7.5-UI-beta31] - 2026-06-12
 
 ### Security (Critical/High — 10 漏洞修复)

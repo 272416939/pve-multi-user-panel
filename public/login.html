@@ -337,6 +337,20 @@
             </div>
 
             </Teleport>
+
+            <!-- C-2 修复：强制改密模态框 -->
+            <Teleport to="body">
+            <div v-if="showForceChangePwd" class="modal-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1060">
+                <div class="glass-card" style="max-width:420px;margin:15vh auto;padding:24px;border-radius:16px;text-align:center;background:var(--login-bg-card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)">
+                    <h3 style="margin-bottom:12px;color:var(--login-text-input)">首次登录 - 强制修改密码</h3>
+                    <p style="color:var(--login-text-label);margin-bottom:16px;font-size:13px">为了账户安全，请设置一个新的登录密码</p>
+                    <input type="password" v-model="forceNewPassword" placeholder="新密码（至少8位）" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup.enter="submitForceChangePwd" />
+                    <input type="password" v-model="forceConfirmPassword" placeholder="确认新密码" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup.enter="submitForceChangePwd" />
+                    <div v-if="forcePwdError" style="color:var(--login-color-error);font-size:12px;margin-bottom:12px">{{ forcePwdError }}</div>
+                    <button type="button" @click="submitForceChangePwd" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--login-gradient-primary);color:#fff;font-size:14px;cursor:pointer;font-weight:600">确认修改</button>
+                </div>
+            </div>
+            </Teleport>
         </div>
     </template>
 
@@ -397,6 +411,12 @@
                 const twofaCode = ref('');
                 const twofaError = ref('');
                 const twofaInputRef = ref(null);
+
+                // C-2 修复：强制改密状态
+                const showForceChangePwd = ref(false);
+                const forceNewPassword = ref('');
+                const forceConfirmPassword = ref('');
+                const forcePwdError = ref('');
 
                 setupCustomAlert(customAlertMessage);
                 setupCustomConfirm(customConfirmMessage, customConfirmResolve);
@@ -462,7 +482,16 @@
                         }
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('refreshToken', data.refreshToken);
-                        
+
+                        // C-2 修复：强制改密检查
+                        if (data.must_change_password) {
+                            showForceChangePwd.value = true;
+                            forceNewPassword.value = '';
+                            forceConfirmPassword.value = '';
+                            forcePwdError.value = '';
+                            return;
+                        }
+
                         // 获取用户信息，判断角色
                         const userData = await api('/user/profile');
                         if (userData.role === 'admin') {
@@ -503,6 +532,16 @@
                         });
                         localStorage.setItem('token', data.token);
                         localStorage.setItem('refreshToken', data.refreshToken);
+
+                        // C-2 修复：强制改密检查（2FA 登录）
+                        if (data.must_change_password) {
+                            showForceChangePwd.value = true;
+                            forceNewPassword.value = '';
+                            forceConfirmPassword.value = '';
+                            forcePwdError.value = '';
+                            return;
+                        }
+
                         const userData = await api('/user/profile');
                         if (userData.role === 'admin') {
                             window.location.href = 'admin.html';
@@ -564,6 +603,39 @@
                     }
                 };
 
+                // C-2 修复：提交强制改密
+                const submitForceChangePwd = async () => {
+                    forcePwdError.value = '';
+                    const newPwd = forceNewPassword.value;
+                    const confirmPwd = forceConfirmPassword.value;
+
+                    if (!newPwd || newPwd.length < 8) {
+                        forcePwdError.value = '密码长度至少8位';
+                        return;
+                    }
+                    if (newPwd !== confirmPwd) {
+                        forcePwdError.value = '两次输入的密码不一致';
+                        return;
+                    }
+
+                    try {
+                        await api('/user/profile', {
+                            method: 'PUT',
+                            body: JSON.stringify({ password: newPwd })
+                        });
+                        // 改密成功，获取角色信息后跳转
+                        const userData = await api('/user/profile');
+                        showForceChangePwd.value = false;
+                        if (userData.role === 'admin') {
+                            window.location.href = 'admin.html';
+                        } else {
+                            window.location.href = 'dashboard.html';
+                        }
+                    } catch (e) {
+                        forcePwdError.value = e.message || '修改失败，请重试';
+                    }
+                };
+
                 onMounted(() => {
                     const urlParams = new URLSearchParams(window.location.search);
                     const resetTokenParam = urlParams.get('resetPassword');
@@ -612,6 +684,11 @@
                     twofaCode,
                     twofaError,
                     twofaInputRef,
+                    // C-2 修复：强制改密
+                    showForceChangePwd,
+                    forceNewPassword,
+                    forceConfirmPassword,
+                    forcePwdError,
                     login,
                     clearLoginErrors,
                     verifyTwofa,
@@ -619,6 +696,7 @@
                     handleTwofaInput,
                     requestPasswordReset,
                     resetPassword,
+                    submitForceChangePwd,
                     confirmOk,
                     confirmCancel
                 };

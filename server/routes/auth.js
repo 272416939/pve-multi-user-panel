@@ -48,8 +48,34 @@ router.post('/login', async (req, res) => {
     }
     
     const user = db.users.getByUsername(username);
-    
-    if (!user || user.password !== hashedPassword) {
+
+    if (!user) {
+        return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
+    }
+
+    let passwordMatch = false;
+
+    if (user.password_salt && user.password_salt.length > 0) {
+        // 有盐模式：SHA256(salt + password)
+        const saltedHash = CryptoJS.SHA256(user.password_salt + password).toString();
+        passwordMatch = (user.password === saltedHash);
+    } else {
+        // 兼容无盐旧模式：SHA256(password)
+        const legacyHash = CryptoJS.SHA256(password).toString();
+        passwordMatch = (user.password === legacyHash);
+
+        // Lazy migration: 旧密码首次登录成功后自动 re-hash
+        if (passwordMatch) {
+            const newSalt = CryptoJS.lib.WordArray.random(16).toString();
+            const newHash = CryptoJS.SHA256(newSalt + password).toString();
+            db.users.update(user.id, {
+                password: newHash,
+                password_salt: newSalt
+            });
+        }
+    }
+
+    if (!passwordMatch) {
         return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
     }
 
@@ -303,8 +329,10 @@ router.post('/auth/reset-password', async (req, res) => {
             return res.status(404).json({ error: '用户不存在' });
         }
         
+        const salt = CryptoJS.lib.WordArray.random(16).toString();
         db.users.update(resetToken.user_id, {
-            password: CryptoJS.SHA256(newPassword).toString()
+            password: CryptoJS.SHA256(salt + newPassword).toString(),
+            password_salt: salt
         });
         
         db.passwordResetTokens.delete(resetToken.id);

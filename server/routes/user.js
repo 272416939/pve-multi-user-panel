@@ -68,8 +68,15 @@ router.post('/user/2fa/disable', authMiddleware, async (req, res) => {
         if (!password) return res.status(400).json({ error: '需要验证密码' });
 
         const user = db.users.getById(req.user.id);
-        const hashedPassword = CryptoJS.SHA256(password).toString();
-        if (user.password !== hashedPassword) {
+        let passwordMatch = false;
+        if (user.password_salt && user.password_salt.length > 0) {
+            const saltedHash = CryptoJS.SHA256(user.password_salt + password).toString();
+            passwordMatch = (user.password === saltedHash);
+        } else {
+            const legacyHash = CryptoJS.SHA256(password).toString();
+            passwordMatch = (user.password === legacyHash);
+        }
+        if (!passwordMatch) {
             return res.status(401).json({ error: '密码错误' });
         }
 
@@ -202,7 +209,11 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         }
         
         if (password) {
-            updates.password = CryptoJS.SHA256(password).toString();
+            const salt = CryptoJS.lib.WordArray.random(16).toString();
+            updates.password = CryptoJS.SHA256(salt + password).toString();
+            updates.password_salt = salt;
+            // C-2 修复：用户主动改密后清除强制改密标记
+            updates.must_change_password = 0;
         }
         
         if (bio !== undefined) {

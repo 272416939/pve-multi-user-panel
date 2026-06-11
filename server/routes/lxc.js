@@ -9,7 +9,7 @@ const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp } = require('../services/dhcp');
-const { execSSH, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
+const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
 const dbg = require('../utils/debug');
 const vncProxy = require('../websocket/vnc-proxy');
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
@@ -656,17 +656,19 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '容器未运行，请先开机再重置密码' });
         }
  
-        const escapedPassword = password.replace(/'/g, "'\\''");
+        // C-3 最终修复：使用 stdin 管道传密码，彻底消除 shell 注入
         const host = process.env.PVE_SSH_HOST;
-        if (!host) {
-            return res.status(500).json({ error: 'SSH 配置不完整：未设置 PVE_SSH_HOST' });
-        }
+        if (!host) { return res.status(500).json({ error: 'SSH 配置不完整：未设置 PVE_SSH_HOST' }); }
         const sshPassword = process.env.PVE_SSH_PASSWORD;
-        if (!sshPassword) {
-            return res.status(500).json({ error: 'SSH 配置不完整：未设置 PVE_SSH_PASSWORD' });
-        }
-        const { code, stderr } = await execSSH(host, 'root', sshPassword,
-            `lxc-attach -n ${vmid} -- bash -c 'echo root:${escapedPassword} | chpasswd'`, 30000);
+        if (!sshPassword) { return res.status(500).json({ error: 'SSH 配置不完整：未设置 PVE_SSH_PASSWORD' }); }
+
+        // 密码通过 stdin 传入 chpasswd，完全不接触 shell 解释器
+        const { code, stderr } = await execSSHWithStdin(
+            host, 'root', sshPassword,
+            `lxc-attach -n ${vmid} -- chpasswd`,
+            `root:${password}\n`,
+            30000
+        );
         if (code !== 0) {
             return res.status(500).json({ error: '密码重置失败: ' + (stderr || 'lxc-attach 命令执行出错') });
         }

@@ -39,6 +39,7 @@ function initDb() {
             totp_secret TEXT DEFAULT '',
             totp_enabled INTEGER DEFAULT 0,
             must_change_password INTEGER DEFAULT 0,
+            password_salt TEXT DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     `);
@@ -475,17 +476,25 @@ function initDefaultConfig() {
 function createDefaultAdmin() {
     const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
     if (!adminExists) {
-        const hashedPassword = CryptoJS.SHA256('admin123').toString();
+        const adminSalt = CryptoJS.lib.WordArray.random(16).toString();
+        const hashedPassword = CryptoJS.SHA256(adminSalt + 'admin123').toString();
         db.prepare(`
-            INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, must_change_password, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run('admin', hashedPassword, 'admin', '', '', '', 0, 1, new Date().toISOString());
+            INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, must_change_password, password_salt, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run('admin', hashedPassword, 'admin', '', '', '', 0, 1, adminSalt, new Date().toISOString());
         console.log('默认管理员账号已创建: admin / admin123（首次登录需强制改密）');
     }
 
     // 兼容旧数据库：添加 must_change_password 字段（如果不存在）
     try {
         db.prepare(`ALTER TABLE users ADD COLUMN must_change_password INTEGER DEFAULT 0`).run();
+    } catch (e) {
+        // 字段已存在，忽略错误
+    }
+
+    // 兼容旧数据库：添加 password_salt 字段（如果不存在）
+    try {
+        db.prepare(`ALTER TABLE users ADD COLUMN password_salt TEXT DEFAULT ''`).run();
     } catch (e) {
         // 字段已存在，忽略错误
     }

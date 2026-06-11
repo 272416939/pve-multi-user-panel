@@ -11,7 +11,8 @@ router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     const { username, password, role, email, emailVerified } = req.body;
-    const hashedPassword = CryptoJS.SHA256(password).toString();
+    const salt = CryptoJS.lib.WordArray.random(16).toString();
+    const hashedPassword = CryptoJS.SHA256(salt + password).toString();
     
     if (db.users.getByUsername(username)) {
         return res.status(400).json({ error: '用户名已存在' });
@@ -27,6 +28,7 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     const newUser = db.users.create({
         username,
         password: hashedPassword,
+        password_salt: salt,
         role: role || 'user',
         email: email || '',
         emailVerified: !!emailVerified
@@ -81,7 +83,9 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     }
     
     if (password) {
-        updates.password = CryptoJS.SHA256(password).toString();
+        const salt = CryptoJS.lib.WordArray.random(16).toString();
+        updates.password = CryptoJS.SHA256(salt + password).toString();
+        updates.password_salt = salt;
     }
     
     if (role) {

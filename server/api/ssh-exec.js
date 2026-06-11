@@ -159,4 +159,68 @@ function createTerminalPty(host, username, password, vmid, pty, onData, onError,
     };
 }
 
-module.exports = { execSSH, restoreLxcBySSH, createTerminalPty };
+/**
+ * 通过 SSH 执行命令并通过 stdin 传入数据（避免 shell 字符串拼接注入）
+ * @param {string} host - SSH 主机地址
+ * @param {string} username - SSH 用户名
+ * @param {string} password - SSH 密码
+ * @param {string} command - 要执行的命令（不包含用户输入）
+ * @param {string} stdinData - 通过 stdin 传入的数据
+ * @param {number} timeout - 超时时间（毫秒），默认 30 秒
+ * @returns {Promise<{stdout: string, stderr: string, code: number}>}
+ */
+function execSSHWithStdin(host, username, password, command, stdinData, timeout = 30000) {
+    return new Promise((resolve, reject) => {
+        const conn = new Client();
+        let stdout = '';
+        let stderr = '';
+        let timedOut = false;
+
+        const timer = setTimeout(() => {
+            timedOut = true;
+            conn.end();
+            reject(new Error(`SSH 命令执行超时 (${timeout / 1000}s): ${command}`));
+        }, timeout);
+
+        conn.on('ready', () => {
+            conn.exec(command, (err, stream) => {
+                if (err) {
+                    clearTimeout(timer);
+                    conn.end();
+                    reject(err);
+                    return;
+                }
+                // 关键：通过 stdin 写入数据，而非拼入命令字符串
+                if (stdinData) {
+                    stream.stdin.write(stdinData);
+                    stream.stdin.end();
+                }
+                stream.on('data', (data) => { stdout += data.toString(); });
+                stream.stderr.on('data', (data) => { stderr += data.toString(); });
+                stream.on('close', (code) => {
+                    clearTimeout(timer);
+                    conn.end();
+                    if (!timedOut) {
+                        resolve({ stdout, stderr, code });
+                    }
+                });
+            });
+        });
+
+        conn.on('error', (err) => {
+            clearTimeout(timer);
+            reject(err);
+        });
+
+        conn.connect({
+            host,
+            username,
+            password,
+            readyTimeout: 10000,
+            keepaliveInterval: 10000,
+            keepaliveCountMax: 3
+        });
+    });
+}
+
+module.exports = { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty };
