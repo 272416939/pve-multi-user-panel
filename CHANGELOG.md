@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5-UI-beta23] - 2026-06-11
+
+### Fixed
+- fix(ui): **dashboard 管理后台按钮不显示** — 根因：仅依赖 Vue watch 控制显示，可能因时序问题未触发。现改为**双重保险**：watch 回调 + onMounted 赋值后立即显式控制 `style.display`，确保管理员登录后按钮一定可见
+- 涉及文件：public/js/dashboard/core.js
+
+---
+
 ## [1.7.5-UI-beta22] - 2026-06-11
 
 ### Fixed
