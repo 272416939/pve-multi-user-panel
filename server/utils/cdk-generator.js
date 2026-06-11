@@ -1,4 +1,4 @@
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 
 const CDK_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 

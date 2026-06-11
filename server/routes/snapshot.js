@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 // H-9 修复：生产环境隐藏详细错误信息

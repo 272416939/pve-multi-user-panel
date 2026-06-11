@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const CryptoJS = require('crypto-js');
 const fs = require('fs');
 const path = require('path');
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 
 // 尝试从多个来源获取 JWT_SECRET
 let JWT_SECRET = process.env.JWT_SECRET;

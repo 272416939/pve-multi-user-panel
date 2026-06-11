@@ -1,4 +1,4 @@
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const ikuaiApi = require('../api/ikuai-api');
 

@@ -1,5 +1,5 @@
 const ikuaiApi = require('../api/ikuai-api');
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 
 async function pickUnusedStaticIp() {
     if (!ikuaiApi.isConfigured()) return '';

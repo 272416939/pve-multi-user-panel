@@ -1,4 +1,4 @@
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const dbg = require('../utils/debug');

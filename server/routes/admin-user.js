@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const CryptoJS = require('crypto-js');
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {

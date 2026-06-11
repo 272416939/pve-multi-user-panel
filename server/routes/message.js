@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 router.get('/messages', authMiddleware, async (req, res) => {

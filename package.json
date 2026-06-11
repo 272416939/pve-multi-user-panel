@@ -1,6 +1,6 @@
 {
   "name": "pve-multi-user-panel",
-  "version": "1.7.5-UI-beta60",
+  "version": "1.7.5-UI-beta61",
   "description": "Proxmox Virtual Environment 多用户控制面板",
   "main": "server/server.js",
   "scripts": {
@@ -25,6 +25,7 @@
     "jsonwebtoken": "^9.0.3",
     "lowdb": "^6.0.1",
     "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.11.0",
     "node-schedule": "^2.1.1",
     "nodemailer": "^6.9.8",
     "otplib": "^13.4.1",

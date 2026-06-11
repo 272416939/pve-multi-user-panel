@@ -1,4 +1,4 @@
-const db = require('./db-sqlite.js');
+const db = require('./db');
 
 class IkuaiApi {
     constructor() {

@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 
 function createEmailTemplate(title, content) {
     return `

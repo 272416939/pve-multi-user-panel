@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../api/db-sqlite');
+const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const ikuaiApi = require('../api/ikuai-api');
