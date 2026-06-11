@@ -310,7 +310,7 @@ router.post('/user/avatar', authMiddleware, upload.single('avatar'), async (req,
 
             const header = Array.from(buf).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
             const validHeaders = ['89504E47', 'FFD8FF', '47494638', '52494646']; // PNG, JPEG, GIF, WebP
-            if (!validHeaders.includes(header)) {
+            if (!validHeaders.some(h => header.startsWith(h))) {
                 fs.unlinkSync(req.file.path);
                 return res.status(400).json({ error: '文件格式不合法（魔数不匹配）' });
             }
