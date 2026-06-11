@@ -6,6 +6,46 @@ const crypto = require('crypto');
 const pveApi = require('../api/pve-api');
 const dbg = require('../utils/debug');
 
+// VNC Ticket 安全校验：防止任意用户通过伪造ticket连接他人机器的控制台
+// ticket → { vmid, userId, createdAt }
+const TICKET_TTL_MS = 5 * 60 * 1000; // 5分钟有效期（PVE自身ticket也是短期的）
+const ticketRegistry = new Map();
+
+/**
+ * 注册一个 VNC ticket（由 API 路程在获取 PVE ticket 后调用）
+ * @param {string} ticket - PVE 返回的 vncticket
+ * @param {string|number} vmid - 虚拟机/容器 ID
+ * @param {string|number} userId - 请求用户的 ID
+ */
+function registerTicket(ticket, vmid, userId) {
+    // 清理过期 ticket（懒清理，每次注册时执行）
+    const now = Date.now();
+    for (const [t, info] of ticketRegistry) {
+        if (now - info.createdAt > TICKET_TTL_MS) ticketRegistry.delete(t);
+    }
+    ticketRegistry.set(ticket, { vmid: String(vmid), userId: String(userId), createdAt: now });
+}
+
+/**
+ * 校验 ticket 是否合法且未过期
+ * @param {string} ticket
+ * @param {string} vmid - 请求连接的 vmid
+ * @returns {{ valid: boolean, reason?: string }}
+ */
+function validateTicket(ticket, vmid) {
+    if (!ticket || !vmid) return { valid: false, reason: '缺少参数' };
+    const info = ticketRegistry.get(ticket);
+    if (!info) return { valid: false, reason: 'ticket不存在或已过期' };
+    if (Date.now() - info.createdAt > TICKET_TTL_MS) {
+        ticketRegistry.delete(ticket);
+        return { valid: false, reason: 'ticket已过期' };
+    }
+    if (info.vmid !== String(vmid)) {
+        return { valid: false, reason: 'ticket与目标VM不匹配' };
+    }
+    return { valid: true };
+}
+
 const vncProxy = new WebSocketServer({ noServer: true });
 
 vncProxy.on('connection', (clientWs, request) => {
@@ -18,6 +58,14 @@ vncProxy.on('connection', (clientWs, request) => {
 
     if (!node || !vmid || !port || !ticket) {
         clientWs.close(4000, '缺少参数');
+        return;
+    }
+
+    // 安全修复：校验 ticket 合法性，防止伪造 ticket 连接任意机器
+    const ticketCheck = validateTicket(ticket, vmid);
+    if (!ticketCheck.valid) {
+        console.warn('[VNC Proxy] 拒绝非法连接:', ticketCheck.reason, '| vmid:', vmid);
+        clientWs.close(4001, '无效的VNC票据: ' + ticketCheck.reason);
         return;
     }
 
@@ -362,3 +410,4 @@ function handleLxcVncTcpProxy(clientWs, pveHost, port, ticket) {
 }
 
 module.exports = vncProxy;
+module.exports.registerTicket = registerTicket;

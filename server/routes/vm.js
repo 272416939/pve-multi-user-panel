@@ -8,6 +8,7 @@ const { _applyRate } = require('../utils/pve-rate');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
+const vncProxy = require('../websocket/vnc-proxy');
 router.get('/pve/vms', authMiddleware, async (req, res) => {
     try {
         const vms = await pveApi.getVms();
@@ -454,14 +455,16 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allVms = db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
-        
-        if (vm) {
-            const isOwner = req.user.id === vm.user_id;
-            const isAdmin = req.user.role === 'admin';
-            
-            if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此虚拟机' });
-            }
+
+        // 安全修复：VM 不在数据库中也必须拒绝（防止绕过权限检查连接任意机器）
+        if (!vm) {
+            return res.status(404).json({ error: '虚拟机不存在' });
+        }
+
+        const isOwner = req.user.id === vm.user_id;
+        const isAdmin = req.user.role === 'admin';
+        if (!isOwner && !isAdmin) {
+            return res.status(403).json({ error: '无权限操作此虚拟机' });
         }
         
         // 先检查 VM 是否在运行
@@ -478,6 +481,9 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         
         // 获取 VNC proxy ticket
         const result = await pveApi.getVncConsole(vmid);
+
+        // 安全修复：注册 ticket 到校验存储，WebSocket 代理连接时会校验
+        vncProxy.registerTicket(result.ticket, vmid, req.user.id);
         
         // 返回代理页面，通过我们的服务器转发 VNC 流量
         const proxyUrl = `/vnc.html?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}`;

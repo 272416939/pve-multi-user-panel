@@ -9,6 +9,7 @@ const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp } = require('../services/dhcp');
 const { execSSH, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
 const dbg = require('../utils/debug');
+const vncProxy = require('../websocket/vnc-proxy');
 router.get('/pve/lxc', authMiddleware, async (req, res) => {
     try {
         const containers = await pveApi.getLxcContainers();
@@ -441,13 +442,16 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
- 
-        if (ct) {
-            const isOwner = req.user.id === ct.user_id;
-            const isAdmin = req.user.role === 'admin';
-            if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此容器' });
-            }
+
+        // 安全修复：容器不在数据库中也必须拒绝（防止绕过权限检查连接任意容器）
+        if (!ct) {
+            return res.status(404).json({ error: '容器不存在' });
+        }
+
+        const isOwner = req.user.id === ct.user_id;
+        const isAdmin = req.user.role === 'admin';
+        if (!isOwner && !isAdmin) {
+            return res.status(403).json({ error: '无权限操作此容器' });
         }
  
         // 检查容器是否在运行
@@ -462,6 +466,10 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         }
  
         const result = await pveApi.getLxcVncConsole(vmid);
+
+        // 安全修复：注册 ticket 到校验存储，WebSocket 代理连接时会校验
+        vncProxy.registerTicket(result.ticket, vmid, req.user.id);
+
         const proxyUrl = `/vnc.html?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&type=lxc`;
         res.json({ proxyUrl });
     } catch (error) {
