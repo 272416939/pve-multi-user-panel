@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5-UI-beta20] - 2026-06-11
+
+### Fixed
+- fix(ui): **管理员访问用户中心后无法返回管理页面** — user-center header 新增"返回管理后台"按钮（SVG 左箭头图标），仅当 `user.role === 'admin'` 时显示，普通用户不可见
+- 涉及文件：public/user-center.html
+
+---
+
 ## [1.7.5-UI-beta19] - 2026-06-11
 
 ### Fixed
