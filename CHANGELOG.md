@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5-UI-beta24] - 2026-06-11
+
+### Fixed
+- fix(ui): **dashboard 管理后台按钮仍不显示（根因：JS 缓存）** — dashboard.html 和 admin.html 的 JS 文件缓存破坏参数 `?v=` 仍是旧日期（20260609），浏览器加载了旧 core.js，新代码从未执行。现统一更新为 `?v=20260611b` 强制刷新。同时增加 console.log 调试输出方便排查
+- 涉及文件：public/dashboard.html, public/admin.html, public/js/dashboard/core.js
+
+---
+
 ## [1.7.5-UI-beta23] - 2026-06-11
 
 ### Fixed

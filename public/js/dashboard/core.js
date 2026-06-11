@@ -280,6 +280,7 @@
                 // 立即同步管理员入口显示（不依赖 watch 时序）
                 var adminLink = document.getElementById('dashboardAdminLink');
                 if (adminLink) adminLink.style.display = userData.role === 'admin' ? '' : 'none';
+                console.log('[dashboard] 用户角色:', userData.role, '管理员链接显示:', adminLink ? adminLink.style.display : '未找到元素');
                 await $.loadNavItems();
                 await $.loadData();
                 await $.loadLxcContainers();
