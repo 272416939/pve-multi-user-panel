@@ -23,26 +23,28 @@ router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const containers = await pveApi.getLxcContainers();
  
-        const assignedCts = db.lxcContainers.getAll();
+        const assignedCts = await db.lxcContainers.getAll();
         const assignedCtIds = new Set(assignedCts.map(ct => ct.ct_id));
  
         const available = containers
             .filter(ct => !assignedCtIds.has(ct.vmid))
             .sort((a, b) => b.vmid - a.vmid);
  
-        const assigned = containers
+        const assigned = await Promise.all(
+            containers
             .filter(ct => assignedCtIds.has(ct.vmid))
             .sort((a, b) => b.vmid - a.vmid)
-            .map(ct => {
+            .map(async ct => {
                 const assignment = assignedCts.find(a => a.ct_id === ct.vmid);
-                const user = assignment ? db.users.getById(assignment.user_id) : null;
+                const user = assignment ? await db.users.getById(assignment.user_id) : null;
                 return {
                     ...ct,
                     name: assignment?.name || ct.name,
                     assigned_user: user ? user.username : null,
                     assignment_id: assignment ? assignment.id : null
                 };
-            });
+            })
+        );
  
         res.json({ available, assigned });
     } catch (error) {
@@ -55,12 +57,12 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
     try {
         let userCts;
         if (req.user.role === 'admin') {
-            userCts = db.lxcContainers.getAll().map(ct => {
-                const user = db.users.getById(ct.user_id);
+            userCts = await Promise.all((await db.lxcContainers.getAll()).map(async ct => {
+                const user = await db.users.getById(ct.user_id);
                 return { ...ct, username: user?.username };
-            });
+            }));
         } else {
-            userCts = db.lxcContainers.getByUserId(req.user.id);
+            userCts = await db.lxcContainers.getByUserId(req.user.id);
         }
  
         const ctsWithDetails = userCts.map(ct => ({
@@ -97,9 +99,9 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
         try {
             let userCts;
             if (req.user.role === 'admin') {
-                userCts = db.lxcContainers.getAll();
+                userCts = await db.lxcContainers.getAll();
             } else {
-                userCts = db.lxcContainers.getByUserId(req.user.id);
+                userCts = await db.lxcContainers.getByUserId(req.user.id);
             }
             return res.json(userCts.map(ct => ({
                 ...ct,
@@ -129,12 +131,12 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         return res.status(400).json({ error: '无效的容器或用户ID' });
     }
  
-    const existingCts = db.lxcContainers.getAll();
+    const existingCts = await db.lxcContainers.getAll();
     if (existingCts.find(ct => ct.ct_id === parsedCtId && ct.user_id === parsedUserId)) {
         return res.status(400).json({ error: '该容器已分配给此用户' });
     }
  
-    const newCt = db.lxcContainers.create({
+    const newCt = await db.lxcContainers.create({
         ct_id: parsedCtId,
         user_id: parsedUserId,
         name,
@@ -143,8 +145,8 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     });
  
     try {
-        const user = db.users.getById(parseInt(user_id));
-        db.messages.create({
+        const user = await db.users.getById(parseInt(user_id));
+        await db.messages.create({
             uid: parseInt(user_id),
             title: 'LXC 容器已开通',
             content: `您的 LXC 容器 ${name || 'CT ' + ct_id} 已分配完成。${expiration_date ? '\n到期时间：' + new Date(expiration_date).toLocaleString('zh-CN') : ''}${renewal_price ? '\n续费价格：' + renewal_price : ''}`,
@@ -155,7 +157,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         });
     } catch (e) {}
 
-    const assignedUser = db.users.getById(parseInt(user_id));
+    const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
         try {
             const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
@@ -210,7 +212,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
                     manualIp = ipMatch[1];
                 }
                 const ip = await createDhcpStaticBinding('lxc', parsedCtId, macMatch[0], manualIp);
-                if (ip) db.lxcContainers.update(newCt.id, { dhcp_static_ip: ip });
+                if (ip) await db.lxcContainers.update(newCt.id, { dhcp_static_ip: ip });
             }
         }
     } catch (e) { console.error(`LXC ${parsedCtId} DHCP 静态绑定失败:`, e.message); }
@@ -222,7 +224,7 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     const ctId = parseInt(req.params.id);
     const { name, expiration_date, renewal_price, user_id } = req.body;
  
-    const ct = db.lxcContainers.getById(ctId);
+    const ct = await db.lxcContainers.getById(ctId);
     if (!ct) {
         return res.status(404).json({ error: 'LXC 容器不存在' });
     }
@@ -243,7 +245,7 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     if (isAdmin && expiration_date !== undefined) {
         updates.expiration_date = expiration_date;
         updates.reminderSent = false;
-        db.lxcContainers.reminders.clear(ctId);
+        await db.lxcContainers.reminders.clear(ctId);
     }
  
     if (isAdmin && renewal_price !== undefined) {
@@ -258,9 +260,9 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
         updates.user_id = newUserId;
  
         try {
-            const newUser = db.users.getById(newUserId);
+            const newUser = await db.users.getById(newUserId);
             if (newUser) {
-                db.messages.create({
+                await db.messages.create({
                     uid: newUserId,
                     title: 'LXC 容器已转移',
                     content: `LXC 容器 ${ct.name || 'CT ' + ct.ct_id} 已被管理员转移给您。${expiration_date ? '\n到期时间：' + new Date(expiration_date).toLocaleString('zh-CN') : ''}`,
@@ -271,7 +273,7 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
         } catch (e) {}
     }
  
-    db.lxcContainers.update(ctId, updates);
+    await db.lxcContainers.update(ctId, updates);
  
     // 换绑后尝试自动开机
     if (isAdmin && user_id !== undefined && user_id !== ct.user_id) {
@@ -291,30 +293,30 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
 
 router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res) => {
     const ctId = parseInt(req.params.id);
-    const ct = db.lxcContainers.getById(ctId);
+    const ct = await db.lxcContainers.getById(ctId);
     let removedCtInfo = null;
     if (ct) {
         removedCtInfo = { name: ct.name, ct_id: ct.ct_id, user_id: ct.user_id };
     }
-    db.lxcContainers.reminders.clear(ctId);
+    await db.lxcContainers.reminders.clear(ctId);
     // 级联清理端口转发
     try {
-        const lxcForwards = db.portForwards.getByCtId(removedCtInfo?.ct_id || ctId);
+        const lxcForwards = await db.portForwards.getByCtId(removedCtInfo?.ct_id || ctId);
         for (const fw of lxcForwards) {
             if (fw.ikuai_id) {
                 try { ikuaiApi.deletePortForward(fw.ikuai_id); } catch (e) {}
             }
         }
-        db.portForwards.deleteByDevice('lxc', removedCtInfo?.ct_id || ctId);
+        await db.portForwards.deleteByDevice('lxc', removedCtInfo?.ct_id || ctId);
     } catch (e) { console.error('清理端口转发失败:', e.message); }
     // 清理 DHCP 静态绑定
     if (ct && ct.ct_id) {
         removeDhcpStaticBinding('lxc', ct.ct_id);
     }
-    db.lxcContainers.delete(ctId);
+    await db.lxcContainers.delete(ctId);
     if (removedCtInfo) {
         try {
-            db.messages.create({
+            await db.messages.create({
                 uid: removedCtInfo.user_id,
                 title: 'LXC 容器已移除',
                 content: `您的 LXC 容器 ${removedCtInfo.name || 'CT ' + removedCtInfo.ct_id} 已被管理员移除。`,
@@ -325,7 +327,7 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
     }
 
     if (removedCtInfo) {
-        const removedUser = db.users.getById(removedCtInfo.user_id);
+        const removedUser = await db.users.getById(removedCtInfo.user_id);
         if (removedUser && removedUser.email && removedUser.emailVerified) {
             try {
                 const emailContent = `
@@ -360,7 +362,7 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
 router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allCts = db.lxcContainers.getAll();
+        const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -390,7 +392,7 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allCts = db.lxcContainers.getAll();
+        const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -417,7 +419,7 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allCts = db.lxcContainers.getAll();
+        const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -444,7 +446,7 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allCts = db.lxcContainers.getAll();
+        const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -471,7 +473,7 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allCts = db.lxcContainers.getAll();
+        const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -515,7 +517,7 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allCts = db.lxcContainers.getAll();
+        const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -565,7 +567,7 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
 router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allCts = db.lxcContainers.getAll();
+        const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -666,7 +668,7 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '密码长度至少 8 位' });
         }
  
-        const allCts = db.lxcContainers.getAll();
+        const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -734,7 +736,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
         }
 
         // 权限检查
-        const allCts = db.lxcContainers.getAll();
+        const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
         if (ct) {
@@ -778,7 +780,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
 
         let newIp = '';
         // 从系统配置获取网关地址
-        const gateway = db.config.get('dhcp:gateway') || '10.0.0.1';
+        const gateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
 
         if (ip_mode === 'dhcp') {
             newNet0Parts.push('ip=dhcp');
@@ -897,15 +899,15 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
 
         // 更新数据库中的 dhcp_static_ip
         if (ct) {
-            db.lxcContainers.update(ct.id, { dhcp_static_ip: newIp || '' });
+            await db.lxcContainers.update(ct.id, { dhcp_static_ip: newIp || '' });
         }
 
         // 更新端口转发规则中的 IP
         if (newIp) {
             try {
-                const rules = db.portForwards.getByCtId(vmid);
+                const rules = await db.portForwards.getByCtId(vmid);
                 for (const rule of rules) {
-                    db.portForwards.update(rule.id, { ip: newIp });
+                    await db.portForwards.update(rule.id, { ip: newIp });
                     // 同步更新 ikuai 端口映射
                     if (rule.ikuai_id) {
                         try {
@@ -915,7 +917,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
                                 external_port: rule.external_port,
                                 protocol: rule.protocol,
                                 comment: rule.name || '',
-                                interface: db.config.get('forward:wan_interface') || ''
+                                interface: await db.config.get('forward:wan_interface') || ''
                             });
                         } catch (e) {
                             console.error(`端口转发 ${rule.id} ikuai 同步失败:`, e.message);
@@ -949,24 +951,24 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
         }
         
         // 先解除分配记录
-        const assignedCts = db.lxcContainers.getByCtId(vmid);
+        const assignedCts = await db.lxcContainers.getByCtId(vmid);
         for (const ct of assignedCts) {
-            db.lxcContainers.reminders.clear(ct.id);
+            await db.lxcContainers.reminders.clear(ct.id);
             // 级联清理端口转发
             try {
-                const lxcForwards = db.portForwards.getByCtId(ct.ct_id);
+                const lxcForwards = await db.portForwards.getByCtId(ct.ct_id);
                 for (const fw of lxcForwards) {
                     if (fw.ikuai_id) {
                         try { ikuaiApi.deletePortForward(fw.ikuai_id); } catch (e) {}
                     }
                 }
-                db.portForwards.deleteByDevice('lxc', ct.ct_id);
+                await db.portForwards.deleteByDevice('lxc', ct.ct_id);
             } catch (e) { console.error('清理端口转发失败:', e.message); }
             // 清理 DHCP 静态绑定
             if (ct && ct.ct_id) {
                 removeDhcpStaticBinding('lxc', ct.ct_id);
             }
-            db.lxcContainers.delete(ct.id);
+            await db.lxcContainers.delete(ct.id);
         }
  
         // 在 PVE 上销毁

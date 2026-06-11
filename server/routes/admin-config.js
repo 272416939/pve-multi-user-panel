@@ -38,7 +38,7 @@ router.post('/check-expired', authMiddleware, adminMiddleware, async (req, res) 
 
 router.get('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const config = db.config.getSmtp();
+        const config = await db.config.getSmtp();
         const { password, ...configWithoutPassword } = config;
         res.json(configWithoutPassword);
     } catch (error) {
@@ -50,18 +50,19 @@ router.get('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
 router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { host, port, secure, user, password, from, enabled } = req.body;
-        
-        db.config.setSmtp({
+
+        const existingSmtp = await db.config.getSmtp();
+        await db.config.setSmtp({
             host: host || '',
             port: port || 587,
             secure: !!secure,
             user: user || '',
-            password: password !== undefined ? password : db.config.getSmtp().password,
+            password: password !== undefined ? password : existingSmtp.password,
             from: from || '',
             enabled: !!enabled
         });
-        
-        const { password: _, ...configWithoutPassword } = db.config.getSmtp();
+
+        const { password: _, ...configWithoutPassword } = await db.config.getSmtp();
         res.json({ message: '配置更新成功', config: configWithoutPassword });
     } catch (error) {
         console.error('更新 SMTP 配置失败:', error);

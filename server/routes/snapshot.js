@@ -14,15 +14,15 @@ router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const isAdmin = req.user.role === 'admin';
         if (!isAdmin) {
-            const userCts = db.lxcContainers.getByUserId(req.user.id);
+            const userCts = await db.lxcContainers.getByUserId(req.user.id);
             const owned = userCts.some(c => c.ct_id === vmid);
             if (!owned) return res.status(403).json({ error: '无权操作此容器' });
         }
 
         const snapshots = await pveApi.getLxcSnapshots(req.params.vmid);
-        const cfg = db.snapshotConfig.get();
-        const dailyCreate = db.snapshotLogs.getDailyCount(req.user.id, 'create');
-        const dailyRestore = db.snapshotLogs.getDailyCount(req.user.id, 'restore');
+        const cfg = await db.snapshotConfig.get();
+        const dailyCreate = await db.snapshotLogs.getDailyCount(req.user.id, 'create');
+        const dailyRestore = await db.snapshotLogs.getDailyCount(req.user.id, 'restore');
         res.json({
             snapshots,
             max_per_vm: cfg.max_per_vm,

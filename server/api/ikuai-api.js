@@ -270,10 +270,10 @@ class IkuaiApi {
 
     // DHCP 静态绑定：编辑（修改 IP）
     async editDhcpStaticBinding(bindingId, mac, newIp, comment, iface, gateway, dns1, dns2) {
-        const cfgGateway = db.config.get('dhcp:gateway') || '10.0.0.1';
-        const cfgInterface = db.config.get('dhcp:interface') || 'lan2';
-        const cfgDns1 = db.config.get('dhcp:dns1') || '119.29.29.29';
-        const cfgDns2 = db.config.get('dhcp:dns2') || '223.5.5.5';
+        const cfgGateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
+        const cfgInterface = await db.config.get('dhcp:interface') || 'lan2';
+        const cfgDns1 = await db.config.get('dhcp:dns1') || '119.29.29.29';
+        const cfgDns2 = await db.config.get('dhcp:dns2') || '223.5.5.5';
         const result = await this._call('dhcp_static', 'edit', {
             id: Number(bindingId),
             ip_addr: newIp,

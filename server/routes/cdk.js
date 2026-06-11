@@ -38,7 +38,7 @@ router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, 
         }
  
         const code = generateUniqueCdkCode();
-        const newCdk = db.cdk.create({
+        const newCdk = await db.cdk.create({
             code,
             duration_days: parseInt(duration_days),
             created_by: req.user.id,
@@ -64,7 +64,7 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
         const targetUserIds = Array.isArray(target_user_ids) ? target_user_ids.filter(id => id).map(id => parseInt(id)) : [];
         const targetUsers = [];
         for (const uid of targetUserIds) {
-            const user = db.users.getById(uid);
+            const user = await db.users.getById(uid);
             if (!user) {
                 return res.status(400).json({ error: `用户 ID ${uid} 不存在` });
             }
@@ -81,7 +81,7 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
         for (let i = 0; i < num; i++) {
             const code = generateUniqueCdkCode();
             const assignedUserId = targetUsers.length > 0 ? targetUsers[i % targetUsers.length].id : null;
-            const newCdk = db.cdk.create({
+            const newCdk = await db.cdk.create({
                 code,
                 duration_days: parseInt(duration_days),
                 created_by: req.user.id,

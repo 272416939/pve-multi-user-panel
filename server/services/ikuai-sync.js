@@ -10,15 +10,15 @@ async function syncPortForwardsFromIkuai() {
             console.log('[ikuai] 启动同步: ikuai 无规则，跳过');
             return;
         }
-        const localRules = db.portForwards.getAll();
+        const localRules = await db.portForwards.getAll();
         const localKeys = new Map();
         localRules.forEach(r => {
             const key = `${r.ip}:${r.internal_port}:${r.external_port}:${r.protocol}`;
             localKeys.set(key, r.id);
         });
         const ipToDevice = new Map();
-        const allVms = db.vms.getAll();
-        const allCts = db.lxcContainers.getAll();
+        const allVms = await db.vms.getAll();
+        const allCts = await db.lxcContainers.getAll();
         let dhcpLeases = [];
         let lanIps = [];
         if (ikuaiApi.isConfigured()) {
@@ -70,7 +70,7 @@ async function syncPortForwardsFromIkuai() {
             if (localRule.vm_id || localRule.ct_id) continue;
             if (localRule.ip && ipToDevice.has(localRule.ip)) {
                 const dev = ipToDevice.get(localRule.ip);
-                db.portForwards.update(localRule.id, {
+                await db.portForwards.update(localRule.id, {
                     type: dev.type,
                     vm_id: dev.type === 'vm' ? dev.device_id : null,
                     ct_id: dev.type === 'lxc' ? dev.device_id : null,
@@ -112,7 +112,7 @@ async function syncPortForwardsFromIkuai() {
                 deviceName = dev.name;
             }
             try {
-                db.portForwards.create({
+                await db.portForwards.create({
                     type: deviceType || 'vm',
                     vm_id: deviceType === 'vm' ? deviceId : null,
                     ct_id: deviceType === 'lxc' ? deviceId : null,
@@ -133,7 +133,7 @@ async function syncPortForwardsFromIkuai() {
         }
         for (const r of localRules) {
             if (!matchedLocalIds.has(r.id)) {
-                db.portForwards.update(r.id, { sync_status: 'orphan' });
+                await db.portForwards.update(r.id, { sync_status: 'orphan' });
                 orphaned++;
             }
         }

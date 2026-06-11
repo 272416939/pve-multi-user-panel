@@ -14,7 +14,7 @@ function generateCdkCode() {
     return `PVE-${sections.join('-')}`;
 }
 
-function generateUniqueCdkCode() {
+async function generateUniqueCdkCode() {
     let code;
     let attempts = 0;
     do {
@@ -23,7 +23,7 @@ function generateUniqueCdkCode() {
         if (attempts > 100) {
             throw new Error('无法生成唯一的 CDK 码，请重试');
         }
-    } while (db.cdk.getByCode(code));
+    } while (await db.cdk.getByCode(code));
     return code;
 }
 

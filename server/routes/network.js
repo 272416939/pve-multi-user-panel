@@ -15,10 +15,10 @@ function safeError(e) {
 router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         let ifaceList = [];
-        try { ifaceList = JSON.parse(db.config.get('forward:iface_list') || '[]'); } catch (_) {}
+        try { ifaceList = JSON.parse(await db.config.get('forward:iface_list') || '[]'); } catch (_) {}
         res.json({
-            port_range_start: parseInt(db.config.get('forward:port_range_start')) || 50000,
-            port_range_end: parseInt(db.config.get('forward:port_range_end')) || 60000,
+            port_range_start: parseInt(await db.config.get('forward:port_range_start')) || 50000,
+            port_range_end: parseInt(await db.config.get('forward:port_range_end')) || 60000,
             default_protocol: db.config.get('forward:default_protocol') || 'tcp',
             wan_interface: db.config.get('forward:wan_interface') || '',
             max_per_user: parseInt(db.config.get('forward:max_per_user')) || 10,

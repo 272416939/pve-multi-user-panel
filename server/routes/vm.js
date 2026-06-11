@@ -21,7 +21,7 @@ router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
         const vms = await pveApi.getVms();
         
         // 获取已分配的VMID
-        const assignedVms = db.vms.getAll();
+        const assignedVms = await db.vms.getAll();
         const assignedVmIds = new Set(assignedVms.map(vm => vm.vm_id));
         
         // 将虚拟机分为待分配和已分配，并按VMID降序排序
@@ -29,18 +29,20 @@ router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
             .filter(vm => !assignedVmIds.has(vm.vmid))
             .sort((a, b) => b.vmid - a.vmid);
         
-        const assignedVmsWithUsers = vms
+        const assignedVmsWithUsers = await Promise.all(
+            vms
             .filter(vm => assignedVmIds.has(vm.vmid))
             .sort((a, b) => b.vmid - a.vmid)
-            .map(vm => {
+            .map(async vm => {
                 const assignment = assignedVms.find(a => a.vm_id === vm.vmid);
-                const user = assignment ? db.users.getById(assignment.user_id) : null;
+                const user = assignment ? await db.users.getById(assignment.user_id) : null;
                 return {
                     ...vm,
                     assigned_user: user ? user.username : null,
                     assignment_id: assignment ? assignment.id : null
                 };
-            });
+            })
+        );
         
         res.json({
             available: availableVms,
@@ -56,12 +58,12 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
     try {
         let userVms;
         if (req.user.role === 'admin') {
-            userVms = db.vms.getAll().map(vm => {
-                const user = db.users.getById(vm.user_id);
+            userVms = await Promise.all((await db.vms.getAll()).map(async vm => {
+                const user = await db.users.getById(vm.user_id);
                 return { ...vm, username: user?.username };
-            });
+            }));
         } else {
-            userVms = db.vms.getByUserId(req.user.id);
+            userVms = await db.vms.getByUserId(req.user.id);
         }
  
         // 先构建基础数据（不依赖 PVE 状态查询）
@@ -102,9 +104,9 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
         try {
             let userVms;
             if (req.user.role === 'admin') {
-                userVms = db.vms.getAll();
+                userVms = await db.vms.getAll();
             } else {
-                userVms = db.vms.getByUserId(req.user.id);
+                userVms = await db.vms.getByUserId(req.user.id);
             }
             return res.json(userVms.map(vm => ({
                 ...vm,
@@ -134,12 +136,12 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         return res.status(400).json({ error: '无效的虚拟机或用户ID' });
     }
  
-    const existingVms = db.vms.getAll();
+    const existingVms = await db.vms.getAll();
     if (existingVms.find(vm => vm.vm_id === parsedVmId && vm.user_id === parsedUserId)) {
         return res.status(400).json({ error: '该虚拟机已分配给此用户' });
     }
  
-    const newVm = db.vms.create({
+    const newVm = await db.vms.create({
         vm_id: parsedVmId,
         user_id: parsedUserId,
         name,
@@ -154,18 +156,18 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
             const macMatch = config.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (macMatch) {
                 // 如果 VM 已有 dhcp_static_ip，优先使用
-                const existingVm = db.vms.getAll().find(v => v.vm_id === parsedVmId);
+                const existingVm = (await db.vms.getAll()).find(v => v.vm_id === parsedVmId);
                 const preferredIp = existingVm?.dhcp_static_ip || '';
                 const ip = await createDhcpStaticBinding('vm', parsedVmId, macMatch[0], preferredIp);
-                if (ip) db.vms.update(newVm.id, { dhcp_static_ip: ip });
+                if (ip) await db.vms.update(newVm.id, { dhcp_static_ip: ip });
             }
         }
     } catch (e) { console.error(`VM ${parsedVmId} DHCP 静态绑定失败:`, e.message); }
     
     // 发送站内消息通知
     try {
-        const user = db.users.getById(parseInt(user_id));
-        db.messages.create({
+        const user = await db.users.getById(parseInt(user_id));
+        await db.messages.create({
             uid: parseInt(user_id),
             title: '虚拟机已开通',
             content: `您的虚拟机 ${name || 'VM ' + vm_id} 已分配完成。${expiration_date ? '\n到期时间：' + new Date(expiration_date).toLocaleString('zh-CN') : ''}${renewal_price ? '\n续费价格：' + renewal_price : ''}`,
@@ -176,7 +178,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         });
     } catch (e) {}
 
-    const assignedUser = db.users.getById(parseInt(user_id));
+    const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
         try {
             const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
@@ -226,7 +228,7 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     const vmId = parseInt(req.params.id);
     const { name, expiration_date, renewal_price, user_id } = req.body;
     
-    const vm = db.vms.getById(vmId);
+    const vm = await db.vms.getById(vmId);
     if (!vm) {
         return res.status(404).json({ error: '虚拟机不存在' });
     }
@@ -250,7 +252,7 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     if (isAdmin && expiration_date !== undefined) {
         updates.expiration_date = expiration_date;
         updates.reminderSent = false;
-        db.vms.reminders.clear(vmId);
+        await db.vms.reminders.clear(vmId);
     }
     
     if (isAdmin && renewal_price !== undefined) {
@@ -261,10 +263,10 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     if (isAdmin && user_id !== undefined && user_id !== vm.user_id) {
         updates.user_id = parseInt(user_id);
         updates.reminderSent = false;
-        db.vms.reminders.clear(vmId);
+        await db.vms.reminders.clear(vmId);
     }
     
-    db.vms.update(vmId, updates);
+    await db.vms.update(vmId, updates);
     
     // 管理员延长到期时间后，如果虚拟机之前因到期停机，尝试自动开机
     if (isAdmin && expiration_date !== undefined) {
@@ -287,7 +289,7 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
 
 router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res) => {
     const vmId = parseInt(req.params.id);
-    const vm = db.vms.getById(vmId);
+    const vm = await db.vms.getById(vmId);
     let removedVmInfo = null;
     if (vm) {
         removedVmInfo = { name: vm.name, vm_id: vm.vm_id, user_id: vm.user_id };
@@ -303,26 +305,26 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
             console.warn(`[vm] 查询 ${vm.vm_id} 状态失败（继续执行移除）:`, e.message);
         }
     }
-    db.vms.reminders.clear(vmId);
+    await db.vms.reminders.clear(vmId);
     // 级联清理端口转发
     try {
-        const vmForwards = db.portForwards.getByVmId(removedVmInfo?.vm_id || vmId);
+        const vmForwards = await db.portForwards.getByVmId(removedVmInfo?.vm_id || vmId);
         for (const fw of vmForwards) {
             if (fw.ikuai_id) {
                 try { ikuaiApi.deletePortForward(fw.ikuai_id); } catch (e) {}
             }
         }
-        db.portForwards.deleteByDevice('vm', removedVmInfo?.vm_id || vmId);
+        await db.portForwards.deleteByDevice('vm', removedVmInfo?.vm_id || vmId);
     } catch (e) { console.error('清理端口转发失败:', e.message); }
     // 清理 DHCP 静态绑定
     if (vm && vm.vm_id) {
         removeDhcpStaticBinding('vm', vm.vm_id);
     }
-    db.vms.delete(vmId);
+    await db.vms.delete(vmId);
     // 发送移除通知
     if (removedVmInfo) {
         try {
-            db.messages.create({
+            await db.messages.create({
                 uid: removedVmInfo.user_id,
                 title: '虚拟机已移除',
                 content: `您的虚拟机 ${removedVmInfo.name || 'VM ' + removedVmInfo.vm_id} 已被管理员移除。`,
@@ -333,7 +335,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     }
 
     if (removedVmInfo) {
-        const removedUser = db.users.getById(removedVmInfo.user_id);
+        const removedUser = await db.users.getById(removedVmInfo.user_id);
         if (removedUser && removedUser.email && removedUser.emailVerified) {
             try {
                 const emailContent = `
@@ -368,7 +370,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
 router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allVms = db.vms.getAll();
+        const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -398,7 +400,7 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allVms = db.vms.getAll();
+        const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -425,7 +427,7 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allVms = db.vms.getAll();
+        const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -452,7 +454,7 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allVms = db.vms.getAll();
+        const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -479,7 +481,7 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allVms = db.vms.getAll();
+        const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -526,7 +528,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
 router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        const allVms = db.vms.getAll();
+        const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
 
@@ -570,7 +572,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
         }
 
         // 权限检查（用正确的查询方法）
-        const allVms = db.vms.getAll();
+        const allVms = await db.vms.getAll();
         const vmRecord = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
         if (vmRecord) {
@@ -583,7 +585,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
         if (ip_mode === 'dhcp') {
             // DHCP模式：删除爱快静态绑定（如果有），VM将自动从爱快获取动态IP
             await removeDhcpStaticBinding('vm', vmid);
-            if (vmRecord) db.vms.update(vmRecord.id, { dhcp_static_ip: '' });
+            if (vmRecord) await db.vms.update(vmRecord.id, { dhcp_static_ip: '' });
             return res.json({ success: true, ip: null, message: '已切换为DHCP模式' });
         }
 
@@ -616,7 +618,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
         if (!finalIp) return res.status(500).json({ error: '设置DHCP绑定失败' });
 
         // 更新数据库记录
-        if (vmRecord) db.vms.update(vmRecord.id, { dhcp_static_ip: finalIp });
+        if (vmRecord) await db.vms.update(vmRecord.id, { dhcp_static_ip: finalIp });
 
         res.json({ success: true, ip: finalIp, message: `已设置静态IP ${finalIp}（通过爱快DHCP绑定）` });
     } catch (error) {

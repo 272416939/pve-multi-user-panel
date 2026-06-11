@@ -53,7 +53,7 @@ router.post('/login', async (req, res) => {
         });
     }
     
-    const user = db.users.getByUsername(username);
+    const user = await db.users.getByUsername(username);
 
     if (!user) {
         return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
@@ -74,7 +74,7 @@ router.post('/login', async (req, res) => {
         if (passwordMatch) {
             const newSalt = crypto.randomBytes(16).toString('hex');
             const newHash = CryptoJS.SHA256(newSalt + password).toString();
-            db.users.update(user.id, {
+            await db.users.update(user.id, {
                 password: newHash,
                 password_salt: newSalt
             });
@@ -88,7 +88,7 @@ router.post('/login', async (req, res) => {
     const refreshToken = generateRefreshToken();
     const ua = req.headers['user-agent'] || '';
     
-    const record = db.refreshTokens.create({
+    const record = await db.refreshTokens.create({
         user_id: user.id,
         token: refreshToken,
         device_name: device_name || ua.substring(0, 100),
@@ -98,7 +98,7 @@ router.post('/login', async (req, res) => {
         expires_at: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000).toISOString()
     });
 
-    if (db.twofa.isEnabled(user.id)) {
+    if (await db.twofa.isEnabled(user.id)) {
         const partialToken = generatePartialToken(user);
         const { password: _, ...safeUser } = user;
         return res.json({
@@ -150,14 +150,14 @@ router.post('/login/2fa', async (req, res) => {
         return res.status(401).json({ error: '令牌已过期或无效，请重新登录' });
     }
 
-    const user = db.users.getById(decoded.id);
+    const user = await db.users.getById(decoded.id);
     if (!user) {
         return res.status(404).json({ error: '用户不存在' });
     }
 
     let isValidTotp = false;
     if (/^\d{6}$/.test(code)) {
-        const secret = db.twofa.getSecret(user.id);
+        const secret = await db.twofa.getSecret(user.id);
         if (secret) {
             try {
                 isValidTotp = otplib.verifySync({ token: code, secret }).valid;
@@ -170,14 +170,14 @@ router.post('/login/2fa', async (req, res) => {
         let record;
         let refreshToken = reqRefreshToken;
         if (refreshToken) {
-            record = db.refreshTokens.getByToken(refreshToken);
+            record = await db.refreshTokens.getByToken(refreshToken);
         }
         if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
             // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
     const ip = req.ip;
             const ua = req.headers['user-agent'] || '';
             refreshToken = generateRefreshToken();
-            record = db.refreshTokens.create({
+            record = await db.refreshTokens.create({
                 user_id: user.id,
                 token: refreshToken,
                 device_name: ua.substring(0, 100),
@@ -193,21 +193,21 @@ router.post('/login/2fa', async (req, res) => {
         return res.json({ token, refreshToken, user: safeUser });
     }
 
-    const recoveryCodes = db.twofa.getUnusedRecoveryCodes(user.id);
+    const recoveryCodes = await db.twofa.getUnusedRecoveryCodes(user.id);
     for (const rc of recoveryCodes) {
         if (code === rc.code) {
-            db.twofa.markRecoveryCodeUsed(code);
+            await db.twofa.markRecoveryCodeUsed(code);
             let record;
             let refreshToken = reqRefreshToken;
             if (refreshToken) {
-                record = db.refreshTokens.getByToken(refreshToken);
+                record = await db.refreshTokens.getByToken(refreshToken);
             }
             if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
                 // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
     const ip = req.ip;
                 const ua = req.headers['user-agent'] || '';
                 refreshToken = generateRefreshToken();
-                record = db.refreshTokens.create({
+                record = await db.refreshTokens.create({
                     user_id: user.id,
                     token: refreshToken,
                     device_name: ua.substring(0, 100),
@@ -232,15 +232,15 @@ router.post('/auth/refresh', async (req, res) => {
         if (!refreshToken) return res.status(400).json({ error: '缺少 refreshToken' });
 
         // R3-1 修复：refreshToken 是纯随机字符串（非 JWT），直接用 DB 查询校验，移除无效的 jwt.verify
-        const record = db.refreshTokens.getByToken(refreshToken);
+        const record = await db.refreshTokens.getByToken(refreshToken);
         if (!record || !record.user_id) {
             return res.status(401).json({ error: 'refreshToken 已失效' });
         }
 
         // 立即撤销旧 refresh token（防重放）
-        db.refreshTokens.deleteByToken(refreshToken);
+        await db.refreshTokens.deleteByToken(refreshToken);
 
-        const user = db.users.getById(record.user_id);
+        const user = await db.users.getById(record.user_id);
         if (!user || !user.is_active) {
             return res.status(401).json({ error: '用户不存在或已被禁用' });
         }
@@ -251,7 +251,7 @@ router.post('/auth/refresh', async (req, res) => {
 
         // 存储新的 refresh token
         const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000);
-        db.refreshTokens.create({
+        await db.refreshTokens.create({
             user_id: user.id,
             device_name: record.device_name,
             token: newRefreshToken,
@@ -271,9 +271,9 @@ router.post('/auth/refresh', async (req, res) => {
 router.post('/logout', async (req, res) => {
     const { refreshToken } = req.body;
     if (refreshToken) {
-        const record = db.refreshTokens.getByToken(refreshToken);
+        const record = await db.refreshTokens.getByToken(refreshToken);
         if (record) {
-            db.refreshTokens.revoke(record.id);
+            await db.refreshTokens.revoke(record.id);
         }
     }
     res.json({ message: '登出成功' });
@@ -296,7 +296,7 @@ router.post('/auth/forgot-password', async (req, res) => {
             return res.status(400).json({ error: '请提供邮箱地址' });
         }
         
-        const allUsers = db.users.getAll();
+        const allUsers = await db.users.getAll();
         const user = allUsers.find(u => u.email === email && u.emailVerified);
         
         if (!user) {
@@ -306,9 +306,9 @@ router.post('/auth/forgot-password', async (req, res) => {
         const token = generateToken();
         const expiresAt = new Date(Date.now() + 3600000);
         
-        db.passwordResetTokens.deleteByType(user.id, 'password_reset');
+        await db.passwordResetTokens.deleteByType(user.id, 'password_reset');
         
-        db.passwordResetTokens.create({
+        await db.passwordResetTokens.create({
             userId: user.id,
             token: token,
             type: 'password_reset',
@@ -354,7 +354,7 @@ router.get('/auth/reset-password/:token', async (req, res) => {
     try {
         const { token } = req.params;
         
-        const resetToken = db.passwordResetTokens.getByToken(token);
+        const resetToken = await db.passwordResetTokens.getByToken(token);
         
         if (!resetToken || resetToken.type !== 'password_reset' || new Date(resetToken.expiresAt) <= new Date()) {
             return res.status(400).json({ error: '链接无效或已过期' });
@@ -378,28 +378,28 @@ router.post('/auth/reset-password', async (req, res) => {
             return res.status(400).json({ error: '密码至少需要 6 个字符' });
         }
         
-        const resetToken = db.passwordResetTokens.getByToken(token);
+        const resetToken = await db.passwordResetTokens.getByToken(token);
         
         if (!resetToken || resetToken.type !== 'password_reset' || new Date(resetToken.expiresAt) <= new Date()) {
             return res.status(400).json({ error: '链接无效或已过期' });
         }
         
-        const user = db.users.getById(resetToken.user_id);
+        const user = await db.users.getById(resetToken.user_id);
         
         if (!user) {
             return res.status(404).json({ error: '用户不存在' });
         }
         
         const salt = crypto.randomBytes(16).toString('hex');
-        db.users.update(resetToken.user_id, {
+        await db.users.update(resetToken.user_id, {
             password: CryptoJS.SHA256(salt + newPassword).toString(),
             password_salt: salt
         });
 
         // H-8 修复：密码重置后撤销该用户所有 refresh token
-        db.refreshTokens.revokeByUserId(user.id);
+        await db.refreshTokens.revokeByUserId(user.id);
 
-        db.passwordResetTokens.delete(resetToken.id);
+        await db.passwordResetTokens.delete(resetToken.id);
         
         res.json({ message: '密码重置成功，请使用新密码登录' });
     } catch (error) {

@@ -6,7 +6,7 @@ const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
-    const users = db.users.getAll().map(({ password, ...rest }) => rest);
+    const users = (await db.users.getAll()).map(({ password, ...rest }) => rest);
     res.json(users);
 });
 
@@ -15,18 +15,18 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     const salt = crypto.randomBytes(16).toString('hex');
     const hashedPassword = CryptoJS.SHA256(salt + password).toString();
     
-    if (db.users.getByUsername(username)) {
+    if (await db.users.getByUsername(username)) {
         return res.status(400).json({ error: '用户名已存在' });
     }
     
     if (email) {
-        const allUsers = db.users.getAll();
+        const allUsers = await db.users.getAll();
         if (allUsers.find(u => u.email === email)) {
             return res.status(400).json({ error: '该邮箱已被使用' });
         }
     }
     
-    const newUser = db.users.create({
+    const newUser = await db.users.create({
         username,
         password: hashedPassword,
         password_salt: salt,
@@ -42,25 +42,25 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
 router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     const userId = parseInt(req.params.id);
 
-    const userVms = db.vms.getByUserId(userId);
+    const userVms = await db.vms.getByUserId(userId);
     for (const vm of userVms) {
-        db.vms.delete(vm.id);
+        await db.vms.delete(vm.id);
     }
 
     // M-3 修复：删除用户时同步清理 LXC 容器分配记录
-    const userCts = db.lxcContainers.getByUserId(userId);
+    const userCts = await db.lxcContainers.getByUserId(userId);
     for (const ct of userCts) {
-        db.lxcContainers.delete(ct.id);
+        await db.lxcContainers.delete(ct.id);
     }
 
-    const userMemos = db.memos.getByUserId(userId);
+    const userMemos = await db.memos.getByUserId(userId);
     for (const memo of userMemos) {
-        db.memos.delete(memo.id);
+        await db.memos.delete(memo.id);
     }
 
-    db.passwordResetTokens.deleteByUserId(userId);
+    await db.passwordResetTokens.deleteByUserId(userId);
 
-    db.users.delete(userId);
+    await db.users.delete(userId);
     res.json({ message: '用户删除成功' });
 });
 
@@ -68,7 +68,7 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     const userId = parseInt(req.params.id);
     const { username, password, role, email, emailVerified } = req.body;
     
-    const user = db.users.getById(userId);
+    const user = await db.users.getById(userId);
     if (!user) {
         return res.status(404).json({ error: '用户不存在' });
     }
@@ -76,7 +76,7 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     const updates = {};
     
     if (username && username !== user.username) {
-        const allUsers = db.users.getAll();
+        const allUsers = await db.users.getAll();
         if (allUsers.find(u => u.username === username)) {
             return res.status(400).json({ error: '用户名已存在' });
         }
@@ -95,7 +95,7 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     
     if (email !== undefined) {
         if (email && email !== user.email) {
-            const allUsers = db.users.getAll();
+            const allUsers = await db.users.getAll();
             if (allUsers.find(u => u.email === email && u.id !== userId)) {
                 return res.status(400).json({ error: '该邮箱已被使用' });
             }
@@ -111,7 +111,7 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
         updates.emailVerified = emailVerified;
     }
     
-    db.users.update(userId, updates);
+    await db.users.update(userId, updates);
     
     res.json({ message: '用户更新成功' });
 });

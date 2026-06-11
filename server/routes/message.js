@@ -7,7 +7,7 @@ router.get('/messages', authMiddleware, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const type = req.query.type || 'all';
-        const result = db.messages.getByUser(req.user.id, type, page);
+        const result = await db.messages.getByUser(req.user.id, type, page);
         res.json(result);
     } catch (error) {
         console.error('获取消息列表失败:', error);
@@ -17,7 +17,7 @@ router.get('/messages', authMiddleware, async (req, res) => {
 
 router.get('/messages/unread-count', authMiddleware, async (req, res) => {
     try {
-        const count = db.messages.getUnreadCount(req.user.id);
+        const count = await db.messages.getUnreadCount(req.user.id);
         res.json({ count });
     } catch (error) {
         res.status(500).json({ error: '获取未读数失败' });
@@ -26,7 +26,7 @@ router.get('/messages/unread-count', authMiddleware, async (req, res) => {
 
 router.get('/messages/:id', authMiddleware, async (req, res) => {
     try {
-        const msg = db.messages.getById(parseInt(req.params.id));
+        const msg = await db.messages.getById(parseInt(req.params.id));
         if (!msg) return res.status(404).json({ error: '消息不存在' });
         if (msg.uid !== 0 && msg.uid !== req.user.id) return res.status(403).json({ error: '无权限' });
         db.messages.markRead(msg.id);

@@ -1,19 +1,18 @@
-const mysql = require('sync-mysql');
+const mysql = require('mysql2/promise');
 const crypto = require('crypto');
 const CryptoJS = require('crypto-js');
 
 /**
- * 生成指定长度的随机强密码
+ * 生成指定长度的随机强密码（使用 crypto.randomBytes，兼容 Node.js）
  * @param {number} length - 密码长度，默认 16
  * @returns {string} 随机密码字符串
  */
 function generateRandomPassword(length = 16) {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&*';
-    const array = new Uint8Array(length);
-    crypto.getRandomValues(array);
+    const bytes = crypto.randomBytes(length);
     let result = '';
     for (let i = 0; i < length; i++) {
-        result += chars[array[i] % chars.length];
+        result += chars[bytes[i] % chars.length];
     }
     return result;
 }
@@ -26,39 +25,25 @@ function mysqlToday() {
     return mysqlNow().slice(0, 10);
 }
 
-// 单例连接（Node.js 单线程，单连接足够）
-// 注意：sync-mysql 连接断开后必须先 destroy 旧连接再创建新的，否则 MySQL 连接池会耗尽
-let _connection = null;
+// 连接池单例
+let pool = null;
 
-// 统一的连接配置（所有地方共用，确保 charset 等参数一致）
-function getConnectionConfig() {
-    return {
-        host: process.env.MYSQL_HOST || 'localhost',
-        port: parseInt(process.env.MYSQL_PORT || '3306'),
-        user: process.env.MYSQL_USER || 'root',
-        password: process.env.MYSQL_PASSWORD || '',
-        database: process.env.MYSQL_DATABASE || 'pve_panel',
-        charset: 'utf8mb4',           // 必须设置！否则 4 字节 emoji 会报错
-        connectTimeout: 10000,         // 10 秒连接超时
-    };
-}
-
-function getConnection() {
-    try {
-        // 检查连接是否可用
-        if (_connection && _connection.state && _connection.state !== 'disconnected') {
-            return _connection;
-        }
-    } catch (e) {
-        // 连接状态检查异常，需要重建
+function getPool() {
+    if (!pool) {
+        pool = mysql.createPool({
+            host: process.env.MYSQL_HOST || 'localhost',
+            port: parseInt(process.env.MYSQL_PORT || '3306'),
+            user: process.env.MYSQL_USER || 'root',
+            password: process.env.MYSQL_PASSWORD || '',
+            database: process.env.MYSQL_DATABASE || 'pve_panel',
+            charset: 'utf8mb4',
+            connectionLimit: 10,
+            queueLimit: 0,
+            waitForConnections: true,
+            connectTimeout: 10000,
+        });
     }
-    // 销毁旧连接（防止连接池耗尽导致 ER_CON_COUNT_ERROR）
-    if (_connection) {
-        try { _connection.destroy(); } catch (e) { /* ignore */ }
-        _connection = null;
-    }
-    _connection = new mysql(getConnectionConfig());
-    return _connection;
+    return pool;
 }
 
 // 将 ISO 8601 日期字符串转换为 MySQL DATETIME 格式（调用方可能传入 toISOString() 的值）
@@ -69,70 +54,23 @@ function sanitizeParams(params) {
         ? p.slice(0, 19).replace('T', ' ') : p);
 }
 
-// 辅助函数：执行查询返回单行（带连接错误自动恢复）
-function queryOne(sql, params = []) {
-    try {
-        const rows = getConnection().query(sql, sanitizeParams(params));
-        return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-    } catch (e) {
-        // 连接类错误（断开/超限/超时）：销毁旧连接，重试一次
-        if (isConnectionError(e)) {
-            forceReconnect();
-            const rows = getConnection().query(sql, sanitizeParams(params));
-            return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
-        }
-        throw e;
-    }
+// 核心 async 查询函数
+async function execute(sql, params = []) {
+    return getPool().execute(sql, sanitizeParams(params));
+}
+async function queryOne(sql, params = []) {
+    const [rows] = await getPool().query(sql, sanitizeParams(params));
+    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+}
+async function queryAll(sql, params = []) {
+    const [rows] = await getPool().query(sql, sanitizeParams(params));
+    return Array.isArray(rows) ? rows : [];
 }
 
-// 辅助函数：执行查询返回多行（带连接错误自动恢复）
-function queryAll(sql, params = []) {
-    try {
-        const result = getConnection().query(sql, sanitizeParams(params));
-        return Array.isArray(result) ? result : [];
-    } catch (e) {
-        if (isConnectionError(e)) {
-            forceReconnect();
-            const result = getConnection().query(sql, sanitizeParams(params));
-            return Array.isArray(result) ? result : [];
-        }
-        throw e;
-    }
-}
-
-// 辅助函数：执行写入返回 result（带连接错误自动恢复）
-function execute(sql, params = []) {
-    try {
-        return getConnection().query(sql, sanitizeParams(params));
-    } catch (e) {
-        if (isConnectionError(e)) {
-            forceReconnect();
-            return getConnection().query(sql, sanitizeParams(params));
-        }
-        throw e;
-    }
-}
-
-// 判断是否为连接级错误（需要重建连接）
-function isConnectionError(e) {
-    const code = e.code || '';
-    return ['PROTOCOL_CONNECTION_LOST', 'ER_CON_COUNT_ERROR', 'ECONNRESET',
-            'ETIMEDOUT', 'EPIPE', 'ER_ACCESS_DENIED_ERROR'].includes(code)
-        || (e.message && /lost connection|too many connections|connect timeout/i.test(e.message));
-}
-
-// 强制重建连接
-function forceReconnect() {
-    if (_connection) {
-        try { _connection.destroy(); } catch (e) { /* ignore */ }
-        _connection = null;
-    }
-}
-
-// 数据库初始化函数（同步）
-function initDb() {
-    // 创建用户表
-    execute(`
+// 数据库初始化函数（异步）
+async function initDb() {
+    // 创建用户表（包含 is_active 列 — M-1 修复）
+    await execute(`
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
             username VARCHAR(255) UNIQUE NOT NULL,
@@ -146,12 +84,13 @@ function initDb() {
             totp_enabled INT DEFAULT 0,
             must_change_password INT DEFAULT 0,
             password_salt TEXT,
+            is_active INT DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
 
     // 创建虚拟机表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS vms (
             id INT AUTO_INCREMENT PRIMARY KEY,
             vm_id INT NOT NULL,
@@ -169,7 +108,7 @@ function initDb() {
     `);
 
     // 创建虚拟机提醒记录表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS vm_reminders (
             id INT AUTO_INCREMENT PRIMARY KEY,
             vm_id INT NOT NULL,
@@ -179,7 +118,7 @@ function initDb() {
     `);
 
     // 创建备忘录表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS memos (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -191,7 +130,7 @@ function initDb() {
     `);
 
     // 创建密码重置令牌表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS password_reset_tokens (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -203,7 +142,7 @@ function initDb() {
     `);
 
     // 创建 CDK 兑换码表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS cdk_codes (
             id INT AUTO_INCREMENT PRIMARY KEY,
             code VARCHAR(100) UNIQUE NOT NULL,
@@ -222,7 +161,7 @@ function initDb() {
     `);
 
     // 创建配置表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS config (
             \`key\` VARCHAR(255) PRIMARY KEY,
             value TEXT NOT NULL
@@ -230,7 +169,7 @@ function initDb() {
     `);
 
     // 创建站内消息表（utf8mb4 支持 emoji 等四字节字符）
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS messages (
             id INT AUTO_INCREMENT PRIMARY KEY,
             uid INT NOT NULL,
@@ -250,7 +189,7 @@ function initDb() {
     `);
 
     // 创建刷新令牌表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS refresh_tokens (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -265,7 +204,7 @@ function initDb() {
     `);
 
     // 创建快照操作日志表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS snapshot_logs (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -276,7 +215,7 @@ function initDb() {
     `);
 
     // 创建恢复码表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS recovery_codes (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -286,8 +225,8 @@ function initDb() {
         )
     `);
 
-    // 创建备份表
-    execute(`
+    // 创建备份表（size 为 BIGINT）
+    await execute(`
         CREATE TABLE IF NOT EXISTS backups (
             id INT AUTO_INCREMENT PRIMARY KEY,
             vm_id INT NOT NULL,
@@ -311,7 +250,7 @@ function initDb() {
     `);
 
     // 创建备份操作日志表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS backup_logs (
             id INT AUTO_INCREMENT PRIMARY KEY,
             user_id INT NOT NULL,
@@ -322,7 +261,7 @@ function initDb() {
     `);
 
     // 创建恢复任务表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS restore_tasks (
             id INT AUTO_INCREMENT PRIMARY KEY,
             vm_id INT NOT NULL,
@@ -340,7 +279,7 @@ function initDb() {
     `);
 
     // 创建 LXC 容器表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS lxc_containers (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ct_id INT NOT NULL,
@@ -357,7 +296,7 @@ function initDb() {
     `);
 
     // 创建 LXC 提醒记录表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS lxc_reminders (
             id INT AUTO_INCREMENT PRIMARY KEY,
             ct_id INT NOT NULL,
@@ -367,7 +306,7 @@ function initDb() {
     `);
 
     // 创建端口转发表
-    execute(`
+    await execute(`
         CREATE TABLE IF NOT EXISTS port_forwards (
             id INT AUTO_INCREMENT PRIMARY KEY,
             type VARCHAR(10) NOT NULL,
@@ -389,25 +328,25 @@ function initDb() {
     `);
 
     // 初始化默认配置
-    initDefaultConfig();
+    await initDefaultConfig();
 
     // 检查并创建默认管理员用户
-    createDefaultAdmin();
+    await createDefaultAdmin();
 
     // 数据库迁移：添加新字段（兼容已有数据库）
-    migrateSchema();
+    await migrateSchema();
 
     // SQLite → MySQL 数据迁移（仅在 MySQL 空表且 SQLite 有数据时执行）
-    migrateFromSQLite();
+    await migrateFromSQLite();
 
     console.log('[数据库] MySQL 初始化完成');
 }
 
-// 数据库 schema 迁移
-function migrateSchema() {
-    function safeAlter(table, column, definition) {
+// 数据库 schema 迁移（异步）
+async function migrateSchema() {
+    async function safeAlter(table, column, definition) {
         try {
-            execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+            await execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
         } catch (e) {
             if (!e.message.toLowerCase().includes('duplicate')) {
                 console.error(`迁移 ${table}.${column} 字段失败:`, e.message);
@@ -415,28 +354,28 @@ function migrateSchema() {
         }
     }
 
-    safeAlter('vms', 'renewal_price', "TEXT");
-    safeAlter('cdk_codes', 'target_user_id', 'INT');
-    safeAlter('users', 'totp_secret', "TEXT");
-    safeAlter('users', 'totp_enabled', 'INT DEFAULT 0');
-    safeAlter('vms', 'backup_storage', "TEXT");
-    safeAlter('backups', "type", "VARCHAR(10) DEFAULT 'vm'");
-    safeAlter('backups', 'ct_id', 'INT');
-    safeAlter('cdk_codes', 'used_ct_id', 'INT');
-    safeAlter('backups', 'rootfs_storage', "TEXT");
-    safeAlter('vms', 'dhcp_static_ip', "TEXT");
-    safeAlter('lxc_containers', 'dhcp_static_ip', "TEXT");
+    await safeAlter('vms', 'renewal_price', "TEXT");
+    await safeAlter('cdk_codes', 'target_user_id', 'INT');
+    await safeAlter('users', 'totp_secret', "TEXT");
+    await safeAlter('users', 'totp_enabled', 'INT DEFAULT 0');
+    await safeAlter('vms', 'backup_storage', "TEXT");
+    await safeAlter('backups', "type", "VARCHAR(10) DEFAULT 'vm'");
+    await safeAlter('backups', 'ct_id', 'INT');
+    await safeAlter('cdk_codes', 'used_ct_id', 'INT');
+    await safeAlter('backups', 'rootfs_storage', "TEXT");
+    await safeAlter('vms', 'dhcp_static_ip', "TEXT");
+    await safeAlter('lxc_containers', 'dhcp_static_ip', "TEXT");
 
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {
-        const orphaned = queryAll("SELECT id, pve_upid FROM backups WHERE vm_id = 0 AND ct_id IS NULL AND type = 'vm'");
+        const orphaned = await queryAll("SELECT id, pve_upid FROM backups WHERE vm_id = 0 AND ct_id IS NULL AND type = 'vm'");
         for (const row of orphaned) {
             if (row.pve_upid) {
                 const parts = row.pve_upid.split(':');
                 if (parts.length >= 7 && parts[5] === 'vzdump') {
                     const ctId = parseInt(parts[6]);
                     if (!isNaN(ctId)) {
-                        execute("UPDATE backups SET ct_id = ?, type = 'lxc' WHERE id = ?", [ctId, row.id]);
+                        await execute("UPDATE backups SET ct_id = ?, type = 'lxc' WHERE id = ?", [ctId, row.id]);
                         console.log(`修复备份记录 ID=${row.id}: 设置 ct_id=${ctId}, type='lxc'`);
                     }
                 }
@@ -447,8 +386,8 @@ function migrateSchema() {
     }
 }
 
-// 初始化默认配置
-function initDefaultConfig() {
+// 初始化默认配置（异步）
+async function initDefaultConfig() {
     const defaultConfigs = {
         'smtp:host': '',
         'smtp:port': '587',
@@ -486,24 +425,24 @@ function initDefaultConfig() {
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {
-        execute(
+        await execute(
             'INSERT IGNORE INTO config (`key`, value) VALUES (?, ?)',
             [key, value]
         );
     }
 }
 
-// 创建默认管理员账户
-function createDefaultAdmin() {
-    const adminExists = queryOne('SELECT id FROM users WHERE username = ?', ['admin']);
+// 创建默认管理员账户（异步，含 is_active 迁移）
+async function createDefaultAdmin() {
+    const adminExists = await queryOne('SELECT id FROM users WHERE username = ?', ['admin']);
     if (!adminExists) {
         const defaultAdminPassword = process.env.DEFAULT_ADMIN_PASSWORD || generateRandomPassword(16);
         const adminSalt = crypto.randomBytes(16).toString('hex');
         const hashedPassword = CryptoJS.SHA256(adminSalt + defaultAdminPassword).toString();
 
-        execute(
-            `INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, must_change_password, password_salt, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        await execute(
+            `INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, must_change_password, password_salt, is_active, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
             ['admin', hashedPassword, 'admin', '', '', '', 0, 1, adminSalt, mysqlNow()]
         );
 
@@ -517,22 +456,28 @@ function createDefaultAdmin() {
 
     // 兼容旧数据库：添加 must_change_password 字段（如果不存在）
     try {
-        execute("ALTER TABLE users ADD COLUMN must_change_password INT DEFAULT 0");
+        await execute("ALTER TABLE users ADD COLUMN must_change_password INT DEFAULT 0");
     } catch (e) {
         // 字段已存在，忽略错误
     }
 
     // 兼容旧数据库：添加 password_salt 字段（如果不存在）
     try {
-        execute("ALTER TABLE users ADD COLUMN password_salt TEXT");
+        await execute("ALTER TABLE users ADD COLUMN password_salt TEXT");
+    } catch (e) {
+        // 字段已存在，忽略错误
+    }
+
+    // M-1 修复：添加 is_active 字段（如果不存在）
+    try {
+        await execute("ALTER TABLE users ADD COLUMN is_active INT DEFAULT 1");
     } catch (e) {
         // 字段已存在，忽略错误
     }
 }
 
-// SQLite → MySQL 数据迁移
-// 当首次切换到 MySQL 模式时，自动将 SQLite 数据导入 MySQL
-function migrateFromSQLite() {
+// SQLite → MySQL 数据迁移（异步版本，使用连接池无需手动管理连接）
+async function migrateFromSQLite() {
     const path = require('path');
     const fs = require('fs');
     const sqliteDbFile = path.join(__dirname, '../../data/pve-panel.db');
@@ -543,7 +488,7 @@ function migrateFromSQLite() {
     }
 
     // 2. 检查 MySQL 是否已有数据（users 表超过 1 行说明已迁移过或有独立数据）
-    const userCount = queryOne('SELECT COUNT(*) AS cnt FROM users');
+    const userCount = await queryOne('SELECT COUNT(*) AS cnt FROM users');
     if (userCount && userCount.cnt > 1) {
         return; // MySQL 已有数据，跳过迁移
     }
@@ -551,8 +496,8 @@ function migrateFromSQLite() {
     console.log('[迁移] 检测到 SQLite 数据库，开始迁移到 MySQL...');
 
     // 3. 预处理：修复已创建的表结构问题
-    try { execute('ALTER TABLE messages CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch(e) {}
-    try { execute('ALTER TABLE backups MODIFY COLUMN size BIGINT DEFAULT 0'); } catch(e) {}
+    try { await execute('ALTER TABLE messages CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'); } catch(e) {}
+    try { await execute('ALTER TABLE backups MODIFY COLUMN size BIGINT DEFAULT 0'); } catch(e) {}
 
     let sqliteDb;
     try {
@@ -570,14 +515,6 @@ function migrateFromSQLite() {
         config: { backtickColumns: ['key'] },
         backups: { intToBigInt: ['size'] },
     };
-
-    // ===== 迁移专用裸查询（无重试机制，避免连接雪崩）=====
-    function migrateQuery(sql, params) {
-        // 直接使用当前连接查询，不经过 execute 的重试逻辑
-        // 迁移过程中连接错误直接抛出，由外层 catch 跳过该表
-        return getConnection().query(sql, sanitizeParams(params));
-    }
-    // =====================================================
 
     try {
         const tables = [
@@ -623,7 +560,7 @@ function migrateFromSQLite() {
                     stmt = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders})`;
                 }
 
-                // 批量 INSERT：每批 50 行，减少连接往返次数
+                // 批量 INSERT：每批 50 行
                 const BATCH_SIZE = 50;
                 for (let i = 0; i < rowsToMigrate.length; i += BATCH_SIZE) {
                     const batch = rowsToMigrate.slice(i, i + BATCH_SIZE);
@@ -643,14 +580,13 @@ function migrateFromSQLite() {
                     // 多行 INSERT: VALUES (?),(?),(?)...
                     const batchPlaceholders = batch.map(() => `(${placeholders})`).join(', ');
                     const batchStmt = stmt.replace(`VALUES (${placeholders})`, `VALUES ${batchPlaceholders}`);
-                    migrateQuery(batchStmt, batchValues.flat());
+                    await execute(batchStmt, batchValues.flat());
                 }
 
                 totalMigrated += rowsToMigrate.length;
                 console.log(`[迁移] ${table}: 迁移 ${rowsToMigrate.length} 条数据`);
             } catch (e) {
                 console.warn(`[迁移] 表 ${table} 迁移失败:`, e.message);
-                // 不重试！避免连接雪崩。该表数据可稍后手动补入。
             }
         }
 
@@ -661,32 +597,23 @@ function migrateFromSQLite() {
         }
     } finally {
         sqliteDb.close();
-
-        // 销毁迁移过程中可能变脏的连接，等待 MySQL 服务端回收僵尸连接后重建
-        if (_connection) {
-            try { _connection.destroy(); } catch (e) { /* ignore */ }
-            _connection = null;
-        }
-        // 延迟 2 秒让 MySQL 服务端清理 TIME_WAIT 状态的旧连接
-        const start = Date.now();
-        while (Date.now() - start < 2000) { /* busy wait - Node.js sync context */ }
-        _connection = new mysql(getConnectionConfig());
-        console.log('[迁移] 连接已重建，可正常使用');
+        // 连接池自动管理连接，无需手动 destroy 或延迟重建
+        console.log('[迁移] 连接池自动管理，可正常使用');
     }
 }
 
-// 导出数据库操作函数
+// 导出数据库操作函数（全部 async）
 module.exports = {
     // 数据库连接
-    db: { connection: getConnection },
+    db: { connection: getPool },
 
     // 用户操作
     users: {
         getAll: () => queryAll('SELECT * FROM users'),
         getById: (id) => queryOne('SELECT * FROM users WHERE id = ?', [id]),
         getByUsername: (username) => queryOne('SELECT * FROM users WHERE username = ?', [username]),
-        create: (user) => {
-            const result = execute(
+        create: async (user) => {
+            const [result] = await execute(
                 `INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, created_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
@@ -702,8 +629,9 @@ module.exports = {
             );
             return queryOne('SELECT * FROM users WHERE id = ?', [result.insertId]);
         },
-        update: (id, updates) => {
-            const allowedColumns = ['username', 'email', 'password', 'password_salt', 'avatar', 'role', 'is_active',
+        update: async (id, updates) => {
+            // M-2 修复：白名单包含 bio
+            const allowedColumns = ['username', 'email', 'password', 'password_salt', 'avatar', 'bio', 'role', 'is_active',
                 'must_change_password', 'emailVerified'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
@@ -722,7 +650,7 @@ module.exports = {
             }
             values.push(id);
 
-            execute(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
+            await execute(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, values);
             return queryOne('SELECT * FROM users WHERE id = ?', [id]);
         },
         delete: (id) => execute('DELETE FROM users WHERE id = ?', [id]),
@@ -733,8 +661,8 @@ module.exports = {
         getAll: () => queryAll('SELECT * FROM vms'),
         getByUserId: (userId) => queryAll('SELECT * FROM vms WHERE user_id = ?', [userId]),
         getById: (id) => queryOne('SELECT * FROM vms WHERE id = ?', [id]),
-        create: (vm) => {
-            const result = execute(
+        create: async (vm) => {
+            const [result] = await execute(
                 `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, created_at)
                  VALUES (?, ?, ?, ?, ?, ?)`,
                 [
@@ -748,7 +676,7 @@ module.exports = {
             );
             return queryOne('SELECT * FROM vms WHERE id = ?', [result.insertId]);
         },
-        update: (id, updates) => {
+        update: async (id, updates) => {
             const allowedColumns = ['name', 'vm_id', 'user_id', 'username', 'expiration_date',
                 'renewal_price', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
@@ -768,25 +696,25 @@ module.exports = {
             }
             values.push(id);
 
-            execute(`UPDATE vms SET ${fields.join(', ')} WHERE id = ?`, values);
+            await execute(`UPDATE vms SET ${fields.join(', ')} WHERE id = ?`, values);
             return queryOne('SELECT * FROM vms WHERE id = ?', [id]);
         },
-        delete: (id) => {
-            execute('UPDATE cdk_codes SET used_vm_id = NULL WHERE used_vm_id = ?', [id]);
+        delete: async (id) => {
+            await execute('UPDATE cdk_codes SET used_vm_id = NULL WHERE used_vm_id = ?', [id]);
             return execute('DELETE FROM vms WHERE id = ?', [id]);
         },
         // 虚拟机提醒记录操作
         reminders: {
             getByVmId: (vmId) => queryAll('SELECT * FROM vm_reminders WHERE vm_id = ?', [vmId]),
             add: (vmId, days) => {
-                execute(
+                return execute(
                     'INSERT INTO vm_reminders (vm_id, days, sent_at) VALUES (?, ?, ?)',
                     [vmId, days, mysqlNow()]
                 );
             },
             clear: (vmId) => execute('DELETE FROM vm_reminders WHERE vm_id = ?', [vmId]),
-            countExpiredDays: (vmId) => {
-                const result = queryOne(
+            countExpiredDays: async (vmId) => {
+                const result = await queryOne(
                     `SELECT COUNT(DISTINCT DATE(sent_at)) as count FROM vm_reminders
                      WHERE vm_id = ? AND days = 0`,
                     [vmId]
@@ -834,8 +762,8 @@ module.exports = {
         `, [batchId]),
         getUnused: () => queryAll('SELECT * FROM cdk_codes WHERE is_used = 0'),
         getUsed: () => queryAll('SELECT * FROM cdk_codes WHERE is_used = 1'),
-        create: (cdk) => {
-            const result = execute(
+        create: async (cdk) => {
+            const [result] = await execute(
                 `INSERT INTO cdk_codes (code, duration_days, created_by, target_user_id, created_at, expires_at, batch_id)
                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
@@ -850,15 +778,15 @@ module.exports = {
             );
             return queryOne('SELECT * FROM cdk_codes WHERE id = ?', [result.insertId]);
         },
-        markAsUsed: (id, userId, vmId, ctId) => {
+        markAsUsed: async (id, userId, vmId, ctId) => {
             if (ctId) {
-                execute(
+                await execute(
                     `UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_ct_id = ?, used_at = ?
                      WHERE id = ?`,
                     [userId, vmId, ctId, mysqlNow(), id]
                 );
             } else {
-                execute(
+                await execute(
                     `UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_at = ?
                      WHERE id = ?`,
                     [userId, vmId, mysqlNow(), id]
@@ -870,7 +798,7 @@ module.exports = {
         deleteBatch: (ids) => {
             if (!ids || ids.length === 0) return;
             const placeholders = ids.map(() => '?').join(',');
-            execute(`DELETE FROM cdk_codes WHERE id IN (${placeholders})`, ids);
+            return execute(`DELETE FROM cdk_codes WHERE id IN (${placeholders})`, ids);
         },
         deleteExpired: () => {
             return execute(
@@ -896,8 +824,8 @@ module.exports = {
     memos: {
         getByUserId: (userId) => queryAll('SELECT * FROM memos WHERE user_id = ?', [userId]),
         getById: (id) => queryOne('SELECT * FROM memos WHERE id = ?', [id]),
-        create: (memo) => {
-            const result = execute(
+        create: async (memo) => {
+            const [result] = await execute(
                 `INSERT INTO memos (user_id, title, content, created_at, updated_at)
                  VALUES (?, ?, ?, ?, ?)`,
                 [
@@ -910,7 +838,7 @@ module.exports = {
             );
             return queryOne('SELECT * FROM memos WHERE id = ?', [result.insertId]);
         },
-        update: (id, updates) => {
+        update: async (id, updates) => {
             const allowedColumns = ['title', 'content', 'user_id'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
@@ -926,7 +854,7 @@ module.exports = {
             values.push(mysqlNow());
             values.push(id);
 
-            execute(`UPDATE memos SET ${fields.join(', ')} WHERE id = ?`, values);
+            await execute(`UPDATE memos SET ${fields.join(', ')} WHERE id = ?`, values);
             return queryOne('SELECT * FROM memos WHERE id = ?', [id]);
         },
         delete: (id) => execute('DELETE FROM memos WHERE id = ?', [id])
@@ -936,8 +864,8 @@ module.exports = {
     passwordResetTokens: {
         getAll: () => queryAll('SELECT * FROM password_reset_tokens'),
         getByToken: (token) => queryOne('SELECT * FROM password_reset_tokens WHERE token = ?', [token]),
-        create: (tokenData) => {
-            const result = execute(
+        create: async (tokenData) => {
+            const [result] = await execute(
                 `INSERT INTO password_reset_tokens (user_id, email, token, type, expires_at)
                  VALUES (?, ?, ?, ?, ?)`,
                 [
@@ -960,8 +888,8 @@ module.exports = {
 
     // 站内消息操作
     messages: {
-        create: (data) => {
-            const result = execute(
+        create: async (data) => {
+            const [result] = await execute(
                 `INSERT INTO messages (uid, title, content, type, send_type, link_url, link_text, batch_id, created_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
@@ -978,7 +906,7 @@ module.exports = {
             );
             return queryOne('SELECT * FROM messages WHERE id = ?', [result.insertId]);
         },
-        getByUser: (uid, type, page = 1, pageSize = 20) => {
+        getByUser: async (uid, type, page = 1, pageSize = 20) => {
             const offset = (page - 1) * pageSize;
             let where = '(uid = ? OR uid = 0)';
             const params = [uid];
@@ -986,8 +914,8 @@ module.exports = {
                 where += ' AND type = ?';
                 params.push(parseInt(type));
             }
-            const totalResult = queryOne(`SELECT COUNT(*) as count FROM messages WHERE ${where}`, params);
-            const list = queryAll(
+            const totalResult = await queryOne(`SELECT COUNT(*) as count FROM messages WHERE ${where}`, params);
+            const list = await queryAll(
                 `SELECT * FROM messages WHERE ${where}
                  ORDER BY is_read ASC, created_at DESC LIMIT ? OFFSET ?`,
                 [...params, pageSize, offset]
@@ -995,8 +923,8 @@ module.exports = {
             return { list, total: totalResult.count, page, pageSize };
         },
         getById: (id) => queryOne('SELECT * FROM messages WHERE id = ?', [id]),
-        getUnreadCount: (uid) => {
-            const result = queryOne(
+        getUnreadCount: async (uid) => {
+            const result = await queryOne(
                 `SELECT COUNT(*) as count FROM messages
                  WHERE (uid = ? OR uid = 0) AND is_read = 0`,
                 [uid]
@@ -1016,53 +944,53 @@ module.exports = {
             "DELETE FROM messages WHERE (uid = ? OR uid = 0) AND is_read = 1",
             [uid]
         ),
-        getStats: () => {
-            const total = queryOne('SELECT COUNT(*) as count FROM messages');
-            const unread = queryOne("SELECT COUNT(*) as count FROM messages WHERE is_read = 0");
-            const byType = queryAll('SELECT type, COUNT(*) as count FROM messages GROUP BY type');
+        getStats: async () => {
+            const total = await queryOne('SELECT COUNT(*) as count FROM messages');
+            const unread = await queryOne("SELECT COUNT(*) as count FROM messages WHERE is_read = 0");
+            const byType = await queryAll('SELECT type, COUNT(*) as count FROM messages GROUP BY type');
             return { total: total.count, unread: unread.count, byType };
         }
     },
 
     // 配置操作
     config: {
-        getSmtp: () => ({
-            host: (queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:host']))?.value || '',
-            port: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:port']))?.value || '587'),
-            secure: (queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:secure']))?.value === '1',
-            user: (queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:user']))?.value || '',
-            password: (queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:password']))?.value || '',
-            from: (queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:from']))?.value || '',
-            enabled: (queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:enabled']))?.value === '1'
+        getSmtp: async () => ({
+            host: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:host']))?.value || '',
+            port: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:port']))?.value || '587'),
+            secure: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:secure']))?.value === '1',
+            user: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:user']))?.value || '',
+            password: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:password']))?.value || '',
+            from: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:from']))?.value || '',
+            enabled: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:enabled']))?.value === '1'
         }),
-        setSmtp: (smtpConfig) => {
-            const currentPassword = (queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:password']))?.value || '';
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:host', smtpConfig.host ?? '']);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:port', String(smtpConfig.port ?? 587)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:secure', smtpConfig.secure ? '1' : '0']);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:user', smtpConfig.user ?? '']);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:password', smtpConfig.password !== undefined ? smtpConfig.password : currentPassword]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:from', smtpConfig.from ?? '']);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:enabled', smtpConfig.enabled ? '1' : '0']);
+        setSmtp: async (smtpConfig) => {
+            const currentPassword = (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:password']))?.value || '';
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:host', smtpConfig.host ?? '']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:port', String(smtpConfig.port ?? 587)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:secure', smtpConfig.secure ? '1' : '0']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:user', smtpConfig.user ?? '']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:password', smtpConfig.password !== undefined ? smtpConfig.password : currentPassword]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:from', smtpConfig.from ?? '']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:enabled', smtpConfig.enabled ? '1' : '0']);
         },
-        getReminder: () => ({
-            days1: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['reminder:days1']))?.value) || 7,
-            days2: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['reminder:days2']))?.value) || 3,
-            days3: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['reminder:days3']))?.value) || 1
+        getReminder: async () => ({
+            days1: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['reminder:days1']))?.value) || 7,
+            days2: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['reminder:days2']))?.value) || 3,
+            days3: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['reminder:days3']))?.value) || 1
         }),
-        setReminder: (reminderConfig) => {
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days1', String(reminderConfig.days1 ?? 7)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days2', String(reminderConfig.days2 ?? 3)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days3', String(reminderConfig.days3 ?? 1)]);
+        setReminder: async (reminderConfig) => {
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days1', String(reminderConfig.days1 ?? 7)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days2', String(reminderConfig.days2 ?? 3)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days3', String(reminderConfig.days3 ?? 1)]);
         },
-        get: (key) => (queryOne('SELECT value FROM config WHERE `key` = ?', [key]))?.value,
+        get: async (key) => (await queryOne('SELECT value FROM config WHERE `key` = ?', [key]))?.value,
         set: (key, value) => execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', [key, value])
     },
 
     // 刷新令牌操作
     refreshTokens: {
-        create: (data) => {
-            const result = execute(
+        create: async (data) => {
+            const [result] = await execute(
                 `INSERT INTO refresh_tokens (user_id, token, device_name, ip, user_agent, created_at, expires_at, revoked)
                  VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
                 [
@@ -1086,11 +1014,11 @@ module.exports = {
         ),
         revoke: (id) => execute('UPDATE refresh_tokens SET revoked = 1 WHERE id = ?', [id]),
         deleteByToken: (token) => execute('DELETE FROM refresh_tokens WHERE token = ?', [token]),
-        revokeByUserId: (userId, excludeId) => {
+        revokeByUserId: async (userId, excludeId) => {
             if (excludeId) {
-                execute('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND id != ?', [userId, excludeId]);
+                await execute('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND id != ?', [userId, excludeId]);
             } else {
-                execute('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ?', [userId]);
+                await execute('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ?', [userId]);
             }
         },
         cleanup: () => execute("DELETE FROM refresh_tokens WHERE expires_at <= NOW() OR revoked = 1")
@@ -1098,29 +1026,29 @@ module.exports = {
 
     // 快照配置操作
     snapshotConfig: {
-        get: () => ({
-            max_per_vm: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['snapshot:max_per_vm']))?.value) || 5,
-            daily_create_limit: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['snapshot:daily_create_limit']))?.value) || 20,
-            daily_restore_limit: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['snapshot:daily_restore_limit']))?.value) || 10
+        get: async () => ({
+            max_per_vm: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['snapshot:max_per_vm']))?.value) || 5,
+            daily_create_limit: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['snapshot:daily_create_limit']))?.value) || 20,
+            daily_restore_limit: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['snapshot:daily_restore_limit']))?.value) || 10
         }),
-        set: (cfg) => {
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['snapshot:max_per_vm', String(cfg.max_per_vm ?? 5)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['snapshot:daily_create_limit', String(cfg.daily_create_limit ?? 20)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['snapshot:daily_restore_limit', String(cfg.daily_restore_limit ?? 10)]);
+        set: async (cfg) => {
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['snapshot:max_per_vm', String(cfg.max_per_vm ?? 5)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['snapshot:daily_create_limit', String(cfg.daily_create_limit ?? 20)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['snapshot:daily_restore_limit', String(cfg.daily_restore_limit ?? 10)]);
         }
     },
 
     // 快照日志操作
     snapshotLogs: {
         add: (userId, vmId, action) => {
-            execute(
+            return execute(
                 'INSERT INTO snapshot_logs (user_id, vm_id, action, created_at) VALUES (?, ?, ?, ?)',
                 [userId, vmId, action, mysqlNow()]
             );
         },
-        getDailyCount: (userId, action) => {
+        getDailyCount: async (userId, action) => {
             const today = mysqlToday();
-            const result = queryOne(
+            const result = await queryOne(
                 `SELECT COUNT(*) as count FROM snapshot_logs
                  WHERE user_id = ? AND action = ? AND created_at >= ?`,
                 [userId, action, today]
@@ -1131,10 +1059,10 @@ module.exports = {
 
     // 2FA 操作
     twofa: {
-        getSecret: (userId) => (queryOne('SELECT totp_secret FROM users WHERE id = ?', [userId]))?.totp_secret || '',
+        getSecret: async (userId) => (await queryOne('SELECT totp_secret FROM users WHERE id = ?', [userId]))?.totp_secret || '',
         setSecret: (userId, secret) => execute('UPDATE users SET totp_secret = ? WHERE id = ?', [secret, userId]),
-        isEnabled: (userId) => {
-            const row = queryOne('SELECT totp_enabled FROM users WHERE id = ?', [userId]);
+        isEnabled: async (userId) => {
+            const row = await queryOne('SELECT totp_enabled FROM users WHERE id = ?', [userId]);
             return row ? row.totp_enabled === 1 : false;
         },
         enable: (userId) => execute('UPDATE users SET totp_enabled = 1 WHERE id = ?', [userId]),
@@ -1148,10 +1076,10 @@ module.exports = {
             'SELECT code FROM recovery_codes WHERE user_id = ? AND used = 0',
             [userId]
         ),
-        addRecoveryCodes: function(userId, codes) {
+        addRecoveryCodes: async function(userId, codes) {
             const stmt = 'INSERT INTO recovery_codes (user_id, code) VALUES (?, ?)';
             for (const code of codes) {
-                execute(stmt, [userId, code]);
+                await execute(stmt, [userId, code]);
             }
         },
         markRecoveryCodeUsed: (code) => execute(
@@ -1162,8 +1090,8 @@ module.exports = {
             'DELETE FROM recovery_codes WHERE user_id = ?',
             [userId]
         ),
-        getUnusedRecoveryCodeCount: (userId) => {
-            const result = queryOne(
+        getUnusedRecoveryCodeCount: async (userId) => {
+            const result = await queryOne(
                 'SELECT COUNT(*) as count FROM recovery_codes WHERE user_id = ? AND used = 0',
                 [userId]
             );
@@ -1173,22 +1101,22 @@ module.exports = {
 
     // 备份配置操作
     backupConfig: {
-        get: () => ({
-            default_storage: (queryOne('SELECT value FROM config WHERE `key` = ?', ['backup:default_storage']))?.value || 'local',
-            max_per_vm: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['backup:max_per_vm']))?.value) || 3,
-            daily_limit: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['backup:daily_limit']))?.value) || 3
+        get: async () => ({
+            default_storage: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['backup:default_storage']))?.value || 'local',
+            max_per_vm: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['backup:max_per_vm']))?.value) || 3,
+            daily_limit: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['backup:daily_limit']))?.value) || 3
         }),
-        set: (cfg) => {
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:default_storage', cfg.default_storage ?? 'local']);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:max_per_vm', String(cfg.max_per_vm ?? 3)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:daily_limit', String(cfg.daily_limit ?? 3)]);
+        set: async (cfg) => {
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:default_storage', cfg.default_storage ?? 'local']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:max_per_vm', String(cfg.max_per_vm ?? 3)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:daily_limit', String(cfg.daily_limit ?? 3)]);
         }
     },
 
     // 备份操作
     backups: {
-        create: (data) => {
-            const result = execute(
+        create: async (data) => {
+            const [result] = await execute(
                 `INSERT INTO backups (vm_id, ct_id, user_id, storage, notes, type, rootfs_storage, status)
                  VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
                 [data.vm_id, data.ct_id || null, data.user_id, data.storage, data.notes || '', data.type || 'vm', data.rootfs_storage || '']
@@ -1201,22 +1129,22 @@ module.exports = {
             [vmId]
         ),
         getByStatus: (status) => queryAll('SELECT * FROM backups WHERE status = ?', [status]),
-        getByUserAndDate: (userId, date) => {
-            const result = queryOne(
+        getByUserAndDate: async (userId, date) => {
+            const result = await queryOne(
                 `SELECT COUNT(*) as count FROM backups WHERE user_id = ? AND created_at >= ?`,
                 [userId, date]
             );
             return result?.count || 0;
         },
-        getCountByVmId: (vmId, userId) => {
+        getCountByVmId: async (vmId, userId) => {
             if (userId) {
-                const result = queryOne(
+                const result = await queryOne(
                     `SELECT COUNT(*) as count FROM backups WHERE vm_id = ? AND user_id = ? AND status != 'failed'`,
                     [vmId, userId]
                 );
                 return result?.count || 0;
             }
-            const result = queryOne(
+            const result = await queryOne(
                 `SELECT COUNT(*) as count FROM backups WHERE vm_id = ? AND status != 'failed'`,
                 [vmId]
             );
@@ -1237,7 +1165,7 @@ module.exports = {
         delete: (id) => execute('DELETE FROM backups WHERE id = ?', [id]),
         deleteBatch: (ids) => {
             const placeholders = ids.map(() => '?').join(',');
-            execute(`DELETE FROM backups WHERE id IN (${placeholders})`, ids);
+            return execute(`DELETE FROM backups WHERE id IN (${placeholders})`, ids);
         },
         getRunningBackups: () => queryAll(
             "SELECT * FROM backups WHERE status = 'running' OR status = 'pending'"
@@ -1246,15 +1174,15 @@ module.exports = {
             "SELECT * FROM backups WHERE ct_id = ? AND type = 'lxc' ORDER BY created_at DESC",
             [ctId]
         ),
-        getCountByCtId: (ctId, userId) => {
+        getCountByCtId: async (ctId, userId) => {
             if (userId) {
-                const result = queryOne(
+                const result = await queryOne(
                     `SELECT COUNT(*) as count FROM backups WHERE ct_id = ? AND user_id = ? AND type = 'lxc' AND status != 'failed'`,
                     [ctId, userId]
                 );
                 return result?.count || 0;
             }
-            const result = queryOne(
+            const result = await queryOne(
                 `SELECT COUNT(*) as count FROM backups WHERE ct_id = ? AND type = 'lxc' AND status != 'failed'`,
                 [ctId]
             );
@@ -1268,9 +1196,9 @@ module.exports = {
             'INSERT INTO backup_logs (user_id, vm_id, action) VALUES (?, ?, ?)',
             [userId, vmId, action]
         ),
-        getDailyCount: (userId) => {
+        getDailyCount: async (userId) => {
             const today = mysqlToday();
-            const result = queryOne(
+            const result = await queryOne(
                 `SELECT COUNT(*) as count FROM backup_logs WHERE user_id = ? AND action = 'create' AND created_at >= ?`,
                 [userId, today]
             );
@@ -1280,8 +1208,8 @@ module.exports = {
 
     // 恢复任务操作
     restoreTasks: {
-        create: (data) => {
-            const result = execute(
+        create: async (data) => {
+            const [result] = await execute(
                 `INSERT INTO restore_tasks (vm_id, user_id, backup_id, pve_upid, status)
                  VALUES (?, ?, ?, ?, 'pending')`,
                 [data.vm_id, data.user_id, data.backup_id, data.pve_upid || '']
@@ -1320,21 +1248,21 @@ module.exports = {
 
     // LXC 配置操作
     lxcConfig: {
-        get: () => ({
-            max_per_vm: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:max_per_vm']))?.value) || 3,
-            default_storage: (queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_storage']))?.value || 'local',
-            default_memory: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_memory']))?.value) || 512,
-            default_cores: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_cores']))?.value) || 1,
-            default_disk: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_disk']))?.value) || 8,
-            default_swap: parseInt((queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_swap']))?.value) || 512
+        get: async () => ({
+            max_per_vm: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:max_per_vm']))?.value) || 3,
+            default_storage: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_storage']))?.value || 'local',
+            default_memory: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_memory']))?.value) || 512,
+            default_cores: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_cores']))?.value) || 1,
+            default_disk: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_disk']))?.value) || 8,
+            default_swap: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_swap']))?.value) || 512
         }),
-        set: (cfg) => {
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:max_per_vm', String(cfg.max_per_vm ?? 3)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_storage', cfg.default_storage ?? 'local']);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_memory', String(cfg.default_memory ?? 512)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_cores', String(cfg.default_cores ?? 1)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_disk', String(cfg.default_disk ?? 8)]);
-            execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_swap', String(cfg.default_swap ?? 512)]);
+        set: async (cfg) => {
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:max_per_vm', String(cfg.max_per_vm ?? 3)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_storage', cfg.default_storage ?? 'local']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_memory', String(cfg.default_memory ?? 512)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_cores', String(cfg.default_cores ?? 1)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_disk', String(cfg.default_disk ?? 8)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_swap', String(cfg.default_swap ?? 512)]);
         }
     },
 
@@ -1344,8 +1272,8 @@ module.exports = {
         getByUserId: (userId) => queryAll('SELECT * FROM lxc_containers WHERE user_id = ?', [userId]),
         getById: (id) => queryOne('SELECT * FROM lxc_containers WHERE id = ?', [id]),
         getByCtId: (ctId) => queryAll('SELECT * FROM lxc_containers WHERE ct_id = ?', [ctId]),
-        create: (ct) => {
-            const result = execute(
+        create: async (ct) => {
+            const [result] = await execute(
                 `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, created_at)
                  VALUES (?, ?, ?, ?, ?, ?)`,
                 [
@@ -1359,7 +1287,7 @@ module.exports = {
             );
             return queryOne('SELECT * FROM lxc_containers WHERE id = ?', [result.insertId]);
         },
-        update: (id, updates) => {
+        update: async (id, updates) => {
             const allowedColumns = ['name', 'ct_id', 'user_id', 'username', 'expiration_date',
                 'renewal_price', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
@@ -1379,25 +1307,25 @@ module.exports = {
             }
             values.push(id);
 
-            execute(`UPDATE lxc_containers SET ${fields.join(', ')} WHERE id = ?`, values);
+            await execute(`UPDATE lxc_containers SET ${fields.join(', ')} WHERE id = ?`, values);
             return queryOne('SELECT * FROM lxc_containers WHERE id = ?', [id]);
         },
-        delete: (id) => {
-            execute('UPDATE cdk_codes SET used_ct_id = NULL WHERE used_ct_id = ?', [id]);
+        delete: async (id) => {
+            await execute('UPDATE cdk_codes SET used_ct_id = NULL WHERE used_ct_id = ?', [id]);
             return execute('DELETE FROM lxc_containers WHERE id = ?', [id]);
         },
         // LXC 容器提醒记录操作
         reminders: {
             getByCtId: (ctId) => queryAll('SELECT * FROM lxc_reminders WHERE ct_id = ?', [ctId]),
             add: (ctId, days) => {
-                execute(
+                return execute(
                     'INSERT INTO lxc_reminders (ct_id, days, sent_at) VALUES (?, ?, ?)',
                     [ctId, days, mysqlNow()]
                 );
             },
             clear: (ctId) => execute('DELETE FROM lxc_reminders WHERE ct_id = ?', [ctId]),
-            countExpiredDays: (ctId) => {
-                const result = queryOne(
+            countExpiredDays: async (ctId) => {
+                const result = await queryOne(
                     `SELECT COUNT(DISTINCT DATE(sent_at)) as count FROM lxc_reminders
                      WHERE ct_id = ? AND days = 0`,
                     [ctId]
@@ -1429,22 +1357,22 @@ module.exports = {
             [type]
         ),
         getById: (id) => queryOne('SELECT * FROM port_forwards WHERE id = ?', [id]),
-        getByUserId: (userId) => {
-            const userVms = queryAll('SELECT vm_id FROM vms WHERE user_id = ?', [userId]);
-            const userCts = queryAll('SELECT ct_id FROM lxc_containers WHERE user_id = ?', [userId]);
+        getByUserId: async (userId) => {
+            const userVms = await queryAll('SELECT vm_id FROM vms WHERE user_id = ?', [userId]);
+            const userCts = await queryAll('SELECT ct_id FROM lxc_containers WHERE user_id = ?', [userId]);
             const vmIds = userVms.map(v => v.vm_id);
             const ctIds = userCts.map(c => c.ct_id);
             let rules = [];
             if (vmIds.length > 0) {
                 const placeholders = vmIds.map(() => '?').join(',');
-                rules = rules.concat(queryAll(
+                rules = rules.concat(await queryAll(
                     `SELECT * FROM port_forwards WHERE type = 'vm' AND vm_id IN (${placeholders})`,
                     vmIds
                 ));
             }
             if (ctIds.length > 0) {
                 const placeholders = ctIds.map(() => '?').join(',');
-                rules = rules.concat(queryAll(
+                rules = rules.concat(await queryAll(
                     `SELECT * FROM port_forwards WHERE type = 'lxc' AND ct_id IN (${placeholders})`,
                     ctIds
                 ));
@@ -1469,15 +1397,15 @@ module.exports = {
                 [deviceId]
             );
         },
-        getCountByUserId: (userId) => {
-            const userVms = queryAll('SELECT vm_id FROM vms WHERE user_id = ?', [userId]);
-            const userCts = queryAll('SELECT ct_id FROM lxc_containers WHERE user_id = ?', [userId]);
+        getCountByUserId: async (userId) => {
+            const userVms = await queryAll('SELECT vm_id FROM vms WHERE user_id = ?', [userId]);
+            const userCts = await queryAll('SELECT ct_id FROM lxc_containers WHERE user_id = ?', [userId]);
             const vmIds = userVms.map(v => v.vm_id);
             const ctIds = userCts.map(c => c.ct_id);
             let count = 0;
             if (vmIds.length > 0) {
                 const placeholders = vmIds.map(() => '?').join(',');
-                const r = queryOne(
+                const r = await queryOne(
                     `SELECT COUNT(*) as c FROM port_forwards WHERE type = 'vm' AND vm_id IN (${placeholders})`,
                     vmIds
                 );
@@ -1485,7 +1413,7 @@ module.exports = {
             }
             if (ctIds.length > 0) {
                 const placeholders = ctIds.map(() => '?').join(',');
-                const r = queryOne(
+                const r = await queryOne(
                     `SELECT COUNT(*) as c FROM port_forwards WHERE type = 'lxc' AND ct_id IN (${placeholders})`,
                     ctIds
                 );
@@ -1493,8 +1421,8 @@ module.exports = {
             }
             return count;
         },
-        create: (data) => {
-            const result = execute(
+        create: async (data) => {
+            const [result] = await execute(
                 `INSERT INTO port_forwards (type, vm_id, ct_id, name, ip, mac, internal_port, external_port, protocol, enabled, source, sync_status, ikuai_id, created_at, updated_at)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
@@ -1517,7 +1445,7 @@ module.exports = {
             );
             return queryOne('SELECT * FROM port_forwards WHERE id = ?', [result.insertId]);
         },
-        update: (id, data) => {
+        update: async (id, data) => {
             const allowedColumns = ['name', 'type', 'vm_id', 'ct_id', 'ip', 'mac', 'internal_port', 'external_port', 'protocol', 'enabled', 'source', 'sync_status', 'ikuai_id'];
             for (const key of Object.keys(data)) {
                 if (!allowedColumns.includes(key)) {
@@ -1531,7 +1459,7 @@ module.exports = {
                 values.push(value);
             }
             values.push(mysqlNow(), id);
-            execute(`UPDATE port_forwards SET ${fields.join(', ')}, updated_at = ? WHERE id = ?`, values);
+            await execute(`UPDATE port_forwards SET ${fields.join(', ')}, updated_at = ? WHERE id = ?`, values);
             return queryOne('SELECT * FROM port_forwards WHERE id = ?', [id]);
         },
         delete: (id) => execute('DELETE FROM port_forwards WHERE id = ?', [id]),
@@ -1556,6 +1484,6 @@ module.exports = {
         ),
     },
 
-    // 初始化入口（供外部调用）
+    // 初始化入口（供外部调用，已改为 async）
     initDb,
 };

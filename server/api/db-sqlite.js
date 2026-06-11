@@ -12,7 +12,7 @@ const fs = require('fs');
 function generateRandomPassword(length = 16) {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%&*';
     const array = new Uint8Array(length);
-    crypto.getRandomValues(array);
+    crypto.randomFillSync(array);
     let result = '';
     for (let i = 0; i < length; i++) {
         result += chars[array[i] % chars.length];
@@ -57,6 +57,7 @@ function initDb() {
             totp_enabled INTEGER DEFAULT 0,
             must_change_password INTEGER DEFAULT 0,
             password_salt TEXT DEFAULT '',
+            is_active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
     `);
@@ -521,6 +522,13 @@ function createDefaultAdmin() {
     // 兼容旧数据库：添加 password_salt 字段（如果不存在）
     try {
         db.prepare(`ALTER TABLE users ADD COLUMN password_salt TEXT DEFAULT ''`).run();
+    } catch (e) {
+        // 字段已存在，忽略错误
+    }
+
+    // 兼容旧数据库：添加 is_active 字段（如果不存在）
+    try {
+        db.exec("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1");
     } catch (e) {
         // 字段已存在，忽略错误
     }

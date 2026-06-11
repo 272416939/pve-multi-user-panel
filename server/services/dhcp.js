@@ -4,8 +4,8 @@ const db = require('../api/db');
 async function pickUnusedStaticIp() {
     if (!ikuaiApi.isConfigured()) return '';
     try {
-        const rangeStart = db.config.get('dhcp:ip_range_start') || '10.0.0.110';
-        const rangeEnd = db.config.get('dhcp:ip_range_end') || '10.0.0.199';
+        const rangeStart = await db.config.get('dhcp:ip_range_start') || '10.0.0.110';
+        const rangeEnd = await db.config.get('dhcp:ip_range_end') || '10.0.0.199';
         const startParts = rangeStart.split('.').map(Number);
         const endParts = rangeEnd.split('.').map(Number);
         const startNum = startParts[3] || 110;
@@ -59,10 +59,10 @@ async function createDhcpStaticBinding(type, vmid, mac, preferredIp) {
         if (!ip) return '';
 
         const comment = type === 'vm' ? `VM-${vmid}` : `CT-${vmid}`;
-        const iface = db.config.get('dhcp:interface') || 'lan2';
-        const gateway = db.config.get('dhcp:gateway') || '10.0.0.1';
-        const dns1 = db.config.get('dhcp:dns1') || '119.29.29.29';
-        const dns2 = db.config.get('dhcp:dns2') || '223.5.5.5';
+        const iface = await db.config.get('dhcp:interface') || 'lan2';
+        const gateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
+        const dns1 = await db.config.get('dhcp:dns1') || '119.29.29.29';
+        const dns2 = await db.config.get('dhcp:dns2') || '223.5.5.5';
 
         await ikuaiApi.addDhcpStaticBinding(mac, ip, comment, iface, gateway, dns1, dns2);
         console.log(`[DHCP] 静态绑定创建成功: ${type}/${vmid} ${mac} → ${ip}`);
@@ -109,7 +109,7 @@ async function updateDhcpStaticBindingIp(type, vmid, newIp) {
 }
 
 async function getWanInterface() {
-    const dbIface = db.config.get('forward:wan_interface');
+    const dbIface = await db.config.get('forward:wan_interface');
     if (dbIface) return dbIface;
     if (!ikuaiApi.isConfigured()) return '';
     try {
@@ -117,7 +117,7 @@ async function getWanInterface() {
         const wanIfaces = ifaces.filter(i => i.type === 'wan');
         if (wanIfaces.length > 0) {
             const firstWan = wanIfaces[0].name;
-            db.config.set('forward:wan_interface', firstWan);
+            await db.config.set('forward:wan_interface', firstWan);
             console.log('[端口转发] 自动检测到外网接口:', firstWan);
             return firstWan;
         }

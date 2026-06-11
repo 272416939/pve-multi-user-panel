@@ -126,7 +126,7 @@ function createEmailTemplate(title, content) {
 }
 
 async function sendEmail(to, subject, html) {
-    const config = db.config.getSmtp();
+    const config = await db.config.getSmtp();
     
     if (!config.enabled || !config.host || !config.user || !config.password) {
         throw new Error('SMTP 配置不完整或未启用');

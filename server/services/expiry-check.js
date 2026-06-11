@@ -9,7 +9,7 @@ const reminderSentTracker = new Map();
 async function loadSentRemindersFromDb() {
     try {
         const today = new Date().toISOString().split('T')[0];
-        const todayReminders = db.vms.reminders.getTodayAll();
+        const todayReminders = await db.vms.reminders.getTodayAll();
         let preExpiryCount = 0;
         let expiredCount = 0;
 
@@ -49,11 +49,11 @@ const checkExpiredVms = async () => {
             }
         }
         
-        const reminderConfig = db.config.getReminder();
+        const reminderConfig = await db.config.getReminder();
         const reminderDays = [reminderConfig.days1, reminderConfig.days2, reminderConfig.days3].filter(d => d > 0);
         const oneDayMs = 24 * 60 * 60 * 1000;
-        const allVms = db.vms.getAll();
-        const allUsers = db.users.getAll();
+        const allVms = await db.vms.getAll();
+        const allUsers = await db.users.getAll();
         
         for (const vm of allVms) {
             if (!vm.expiration_date) {
@@ -76,7 +76,7 @@ const checkExpiredVms = async () => {
                     continue;
                 }
                 
-                const existingReminders = db.vms.reminders.getByVmId(vm.id);
+                const existingReminders = await db.vms.reminders.getByVmId(vm.id);
                 if (existingReminders.find(r => r.days === days && r.sent_at?.startsWith(today))) {
                     continue;
                 }
@@ -107,13 +107,13 @@ const checkExpiredVms = async () => {
                     await sendEmail(user.email, '虚拟机到期提醒', createEmailTemplate(`虚拟机将在${days}天后到期`, emailContent));
                     
                     reminderSentTracker.set(memKey, true);
-                    db.vms.reminders.add(vm.id, days);
-                    db.vms.update(vm.id, { lastReminderDate: today });
+                    await db.vms.reminders.add(vm.id, days);
+                    await db.vms.update(vm.id, { lastReminderDate: today });
                     
                     dbg(`已向 ${user.username} 发送虚拟机到期提醒（VM ${vm.vm_id}，${days}天前）`);
                     
                     try {
-                        db.messages.create({
+                        await db.messages.create({
                             uid: user.id,
                             title: `虚拟机即将到期提醒`,
                             content: `您的虚拟机 ${vm.name || 'VM ' + vm.vm_id} 将在 ${days} 天后到期！\n到期时间：${expDate.toLocaleString('zh-CN')}${vm.renewal_price ? '\n续费价格：' + vm.renewal_price : ''}\n请及时续费，以免影响使用。`,
@@ -134,15 +134,15 @@ const checkExpiredVms = async () => {
                         reminderSentTracker.delete(key);
                     }
                 }
-                db.vms.reminders.clear(vm.id);
-                db.vms.update(vm.id, { lastReminderDate: '' });
+                await db.vms.reminders.clear(vm.id);
+                await db.vms.update(vm.id, { lastReminderDate: '' });
             }
             
             if (expDate < now) {
                 const expiredMemKey = `expired-${vm.vm_id}-${today}`;
-                const todayExpiredInDb = db.vms.reminders.getByVmId(vm.id)
+                const todayExpiredInDb = (await db.vms.reminders.getByVmId(vm.id))
                     .filter(r => r.days === 0 && r.sent_at?.startsWith(today));
-                const expiredDaysCount = db.vms.reminders.countExpiredDays(vm.id);
+                const expiredDaysCount = await db.vms.reminders.countExpiredDays(vm.id);
                 const alreadySentToday = reminderSentTracker.has(expiredMemKey) || todayExpiredInDb.length > 0;
                 
                 if (!alreadySentToday && expiredDaysCount < 3) {
@@ -175,12 +175,12 @@ const checkExpiredVms = async () => {
                             `;
                             await sendEmail(user.email, '虚拟机已到期 - 请及时续费', createEmailTemplate('虚拟机已到期', emailContent));
                             reminderSentTracker.set(expiredMemKey, true);
-                            db.vms.reminders.add(vm.id, 0);
+                            await db.vms.reminders.add(vm.id, 0);
                             dbg(`已向 ${user.username} 发送虚拟机到期续费提醒（VM ${vm.vm_id}，第${dayNum}/3天）`);
                             
                             try {
                                 const remainingDays = 3 - expiredDaysCount > 0 ? 3 - expiredDaysCount : 0;
-                                db.messages.create({
+                                await db.messages.create({
                                     uid: user.id,
                                     title: `虚拟机已到期 - 请及时续费`,
                                     content: `您的虚拟机 ${vm.name || 'VM ' + vm.vm_id} 已到期！\n续费提醒（${dayNum}/3）— 数据保留还剩 ${remainingDays} 天，请尽快续费，以免数据丢失！`,
@@ -214,8 +214,8 @@ const checkExpiredVms = async () => {
 
 async function checkExpiredLxc() {
     try {
-        const allCts = db.lxcContainers.getAll();
-        const reminderCfg = db.config.getReminder();
+        const allCts = await db.lxcContainers.getAll();
+        const reminderCfg = await db.config.getReminder();
         const today = new Date();
 
         for (const ct of allCts) {
@@ -228,11 +228,11 @@ async function checkExpiredLxc() {
                 const reminderDays = [reminderCfg.days1, reminderCfg.days2, reminderCfg.days3].filter(d => d > 0);
                 for (const days of reminderDays) {
                     if (diffDays === days) {
-                        const existing = db.lxcContainers.reminders.getTodayAll().filter(r => r.ct_id === ct.id && r.days === days);
+                        const existing = (await db.lxcContainers.reminders.getTodayAll()).filter(r => r.ct_id === ct.id && r.days === days);
                         if (existing.length === 0) {
-                            db.lxcContainers.reminders.add(ct.id, days);
+                            await db.lxcContainers.reminders.add(ct.id, days);
                             try {
-                                const user = db.users.getById(ct.user_id);
+                                const user = await db.users.getById(ct.user_id);
                                 if (user && user.email && user.emailVerified) {
                                     try {
                                         const emailContent = `
@@ -257,7 +257,7 @@ async function checkExpiredLxc() {
                                         console.error('发送 LXC 到期提醒邮件失败:', e.message);
                                     }
                                 }
-                                db.messages.create({
+                                await db.messages.create({
                                     uid: ct.user_id,
                                     title: 'LXC 容器到期提醒',
                                     content: `您的 LXC 容器 ${ct.name || 'CT ' + ct.ct_id} 将在 ${days} 天后到期（${expDate.toLocaleString('zh-CN')}），请及时续费。`,
@@ -269,13 +269,13 @@ async function checkExpiredLxc() {
                     }
                 }
             } else {
-                const expiredDays = db.lxcContainers.reminders.countExpiredDays(ct.id);
+                const expiredDays = await db.lxcContainers.reminders.countExpiredDays(ct.id);
                 if (expiredDays < 3) {
-                    const todaySent = db.lxcContainers.reminders.getTodayExpired().some(r => r.ct_id === ct.id);
+                    const todaySent = (await db.lxcContainers.reminders.getTodayExpired()).some(r => r.ct_id === ct.id);
                     if (!todaySent) {
-                        db.lxcContainers.reminders.add(ct.id, 0);
+                        await db.lxcContainers.reminders.add(ct.id, 0);
                         try {
-                            const user = db.users.getById(ct.user_id);
+                            const user = await db.users.getById(ct.user_id);
                             if (user && user.email && user.emailVerified) {
                                 try {
                                     const dayNum = expiredDays + 1;
@@ -307,7 +307,7 @@ async function checkExpiredLxc() {
                                     console.error('发送 LXC 到期续费邮件失败:', e.message);
                                 }
                             }
-                            db.messages.create({
+                            await db.messages.create({
                                 uid: ct.user_id,
                                 title: 'LXC 容器已到期',
                                 content: `您的 LXC 容器 ${ct.name || 'CT ' + ct.ct_id} 已到期，请尽快续费（${ct.renewal_price ? '续费价格：' + ct.renewal_price : ''}）。数据保留 ${3 - expiredDays - 1} 天。`,

@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../utils/token');
 const db = require('../api/db');
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
         return res.status(401).json({ error: '未授权' });
@@ -13,7 +13,7 @@ const authMiddleware = (req, res, next) => {
             return res.status(401).json({ error: '2FA 验证未完成' });
         }
         if (decoded.deviceId) {
-            const device = db.refreshTokens.getById(decoded.deviceId);
+            const device = await db.refreshTokens.getById(decoded.deviceId);
             if (!device || device.revoked) {
                 return res.status(401).json({ error: '该设备已被强制下线', code: 'TOKEN_EXPIRED' });
             }
