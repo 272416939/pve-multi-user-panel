@@ -723,6 +723,132 @@
         border-radius: 8px; background: transparent; color: var(--text-secondary); font-size: 18px;
         cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; }
     .modal-close:hover { background: rgba(239,68,68,0.15); color: #FCA5A5; border-color: rgba(239,68,68,0.3); }
+
+    /* ========== Light Theme Explicit Overrides for Dashboard ========== */
+    [data-theme="light"] body { color: #1a1a2e; }
+    [data-theme="light"] .header-btn { color: #475569; border-color: rgba(0,0,0,0.1); }
+    [data-theme="light"] .header-btn:hover { color: #1a1a2e; background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.2); }
+    [data-theme="light"] .sidebar-toggle { color: #475569; border-color: rgba(0,0,0,0.1); }
+    [data-theme="light"] .sidebar-toggle:hover { color: #4f46e5; }
+    [data-theme="light"] .user-info-dropdown span { color: #1a1a2e; }
+
+    /* Sidebar */
+    [data-theme="light"] .nav-item { color: #475569; border-color: transparent; }
+    [data-theme="light"] .nav-item.active { color: #4f46e5; background: rgba(79,70,229,0.08) !important; border-color: rgba(79,70,229,0.15) !important; box-shadow: none; }
+    [data-theme="light"] .nav-item:hover:not(.active) { color: #1a1a2e; background: rgba(79,70,229,0.04); }
+    [data-theme="light"] .nav-text { color: inherit; }
+    [data-theme="light"] .nav-icon { filter: none; opacity: 0.7; }
+
+    /* Stats - 最关键！这些数字在截图中几乎看不见 */
+    [data-theme="light"] .stat-label { color: #64748b !important; }
+    [data-theme="light"] .stat-num { color: #1a1a2e !important; }
+    [data-theme="light"] .circle-num { color: #1a1a2e !important; }
+    [data-theme="light"] .circle-name { color: #64748b !important; }
+    [data-theme="light"] .chart-legend { color: #475569 !important; }
+
+    /* Module title */
+    [data-theme="light"] .module-title { color: #1a1a2e !important; }
+
+    /* Table */
+    [data-theme="light"] th { color: #64748b !important; background: rgba(0,0,0,0.02) !important; border-bottom-color: rgba(0,0,0,0.06) !important; }
+    [data-theme="light"] td { color: #334155 !important; border-bottom-color: rgba(0,0,0,0.05) !important; }
+    [data-theme="light"] tr:hover td { background: rgba(79,70,229,0.04) !important; }
+    [data-theme="light"] .table-btn { color: #64748b !important; }
+    [data-theme="light"] .table-btn:hover { color: #1a1a2e !important; background: rgba(79,70,229,0.08) !important; }
+    [data-theme="light"] .tag-run { color: #059669 !important; background: rgba(5,150,105,0.1) !important; }
+    [data-theme="light"] .tag-stop { color: #64748b !important; background: rgba(100,116,139,0.1) !important; }
+
+    /* Card */
+    [data-theme="light"] .vm-card { background: rgba(255,255,255,0.72) !important; border-color: rgba(0,0,0,0.06) !important; }
+    [data-theme="light"] .vm-card:hover { border-color: rgba(79,70,229,0.2) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.08) !important; }
+    [data-theme="light"] .card { background: rgba(255,255,255,0.72) !important; border-color: rgba(0,0,0,0.06) !important; }
+    [data-theme="light"] .card:hover { border-color: rgba(79,70,229,0.2) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.08) !important; }
+    [data-theme="light"] .stat-card { background: rgba(255,255,255,0.72) !important; border-color: rgba(0,0,0,0.06) !important; }
+    [data-theme="light"] .overview-chart-card { background: rgba(255,255,255,0.72) !important; border-color: rgba(0,0,0,0.06) !important; }
+
+    /* Modal */
+    [data-theme="light"] .modal-content { background: rgba(255,255,255,0.94) !important; border-color: rgba(0,0,0,0.08) !important; }
+    [data-theme="light"] .modal-title { color: #1a1a2e !important; }
+    [data-theme="light"] .modal-close { color: #64748b !important; }
+    [data-theme="light"] .modal-header { border-bottom-color: rgba(0,0,0,0.08) !important; }
+    [data-theme="light"] .modal-footer { border-top-color: rgba(0,0,0,0.08) !important; }
+
+    /* Dropdown */
+    [data-theme="light"] .dropdown-menu { background: rgba(255,255,255,0.95) !important; border-color: rgba(0,0,0,0.1) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important; }
+    [data-theme="light"] .dropdown-item { color: #334155 !important; }
+    [data-theme="light"] .dropdown-item:hover { color: #1a1a2e !important; background: rgba(79,70,229,0.06) !important; }
+    [data-theme="light"] .dropdown-menu-table { background: rgba(255,255,255,0.95) !important; border-color: rgba(0,0,0,0.1) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important; }
+    [data-theme="light"] .dropdown-menu-table li a { color: #334155 !important; }
+    [data-theme="light"] .dropdown-menu-table li a:hover { color: #1a1a2e !important; background: rgba(79,70,229,0.06) !important; }
+    [data-theme="light"] .floating-dropdown-menu { background: rgba(255,255,255,0.95) !important; border-color: rgba(0,0,0,0.1) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important; }
+    [data-theme="light"] .floating-dropdown-menu .dropdown-item { color: #334155 !important; }
+    [data-theme="light"] .floating-dropdown-menu .dropdown-item:hover { color: #1a1a2e !important; background: rgba(79,70,229,0.06) !important; }
+    [data-theme="light"] .custom-select-trigger { background: rgba(255,255,255,0.7) !important; border-color: rgba(0,0,0,0.1) !important; color: #334155 !important; }
+    [data-theme="light"] .custom-select-trigger:hover { background: rgba(255,255,255,0.85) !important; }
+    [data-theme="light"] .custom-select-dropdown { background: rgba(255,255,255,0.97) !important; border-color: rgba(0,0,0,0.1) !important; }
+
+    /* Form controls */
+    [data-theme="light"] .form-control, [data-theme="light"] .form-select { background: rgba(255,255,255,0.8) !important; border-color: rgba(0,0,0,0.12) !important; color: #1a1a2e !important; }
+    [data-theme="light"] .form-control::placeholder { color: #94a3b8 !important; }
+    [data-theme="light"] .input-group-text { background: rgba(0,0,0,0.03) !important; border-color: rgba(0,0,0,0.12) !important; color: #475569 !important; }
+
+    /* Status badges */
+    [data-theme="light"] .status-running { color: #059669 !important; text-shadow: none !important; }
+    [data-theme="light"] .status-stopped { color: #dc2626 !important; text-shadow: none !important; }
+
+    /* Alert */
+    [data-theme="light"] .alert-danger { color: #991b1b !important; background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,87,108,0.08)) !important; border-color: rgba(239,68,68,0.2) !important; }
+    [data-theme="light"] .alert-success { color: #065f46 !important; background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(52,211,153,0.08)) !important; border-color: rgba(16,185,129,0.2) !important; }
+
+    /* Buttons */
+    [data-theme="light"] .btn-glass { color: #4f46e5 !important; border-color: rgba(79,70,229,0.3); background: linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06)) !important; }
+    [data-theme="light"] .btn-glass:hover:not(:disabled) { color: #4338ca !important; background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1)) !important; }
+    [data-theme="light"] .btn-glass-success { color: #059669 !important; border-color: rgba(5,150,105,0.35); background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(34,197,94,0.05)) !important; }
+    [data-theme="light"] .btn-glass-warning { color: #d97706 !important; border-color: rgba(217,119,6,0.35); background: linear-gradient(135deg, rgba(251,191,36,0.08), rgba(245,158,11,0.05)) !important; }
+    [data-theme="light"] .btn-glass-danger { color: #dc2626 !important; border-color: rgba(220,38,38,0.35); background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(220,38,38,0.05)) !important; }
+    [data-theme="light"] .btn-glass-info { color: #2563eb !important; border-color: rgba(37,99,235,0.35); background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.05)) !important; }
+
+    /* Card headers */
+    [data-theme="light"] .card-header { background: rgba(79,70,229,0.04) !important; border-bottom-color: rgba(0,0,0,0.06) !important; }
+
+    /* List group */
+    [data-theme="light"] .list-group-item { border-color: rgba(0,0,0,0.06) !important; color: #334155 !important; }
+    [data-theme="light"] .list-group-item:hover { background: rgba(79,70,229,0.04) !important; }
+
+    /* Progress bar */
+    [data-theme="light"] .progress { background: rgba(0,0,0,0.06) !important; }
+
+    /* Badge */
+    [data-theme="light"] .bg-secondary { background: rgba(100,116,139,0.15) !important; color: #475569 !important; }
+    [data-theme="light"] .badge.bg-secondary { color: #475569 !important; background: rgba(100,116,139,0.15) !important; }
+
+    /* Text muted / footer version */
+    [data-theme="light"] .text-muted { color: #64748b !important; }
+    [data-theme="light"] .text-muted.small { opacity: 0.8 !important; }
+    [data-theme="light"] .footer-version { color: #94a3b8 !important; }
+
+    /* Nav pills */
+    [data-theme="light"] .nav-pills { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08); }
+    [data-theme="light"] .nav-pills .nav-link:hover { background: rgba(79,70,229,0.06) !important; }
+
+    /* Table container */
+    [data-theme="light"] .table-container { background: rgba(255,255,255,0.5) !important; border-color: rgba(0,0,0,0.06) !important; }
+
+    /* Confirm overlay text */
+    [data-theme="light"] .confirm-overlay, [data-theme="light"] .destroyed-overlay { background: rgba(255,255,255,0.85) !important; }
+    [data-theme="light"] .custom-alert-msg { color: #1a1a2e !important; }
+
+    /* Close button icon */
+    [data-theme="light"] .btn-close { filter: brightness(0) invert(0); }
+
+    /* VM card specific elements (if used in dashboard) */
+    [data-theme="light"] .vm-card-title { color: #1a1a2e !important; }
+    [data-theme="light"] .vm-card-ip { color: #64748b !important; }
+    [data-theme="light"] .vm-card-status { color: #475569 !important; }
+
+    /* Forward rule elements */
+    [data-theme="light"] .forward-rule-port { color: #1a1a2e !important; }
+    [data-theme="light"] .forward-rule-target { color: #64748b !important; }
     </style>
 </head>
 <body>

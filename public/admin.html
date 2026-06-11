@@ -293,6 +293,99 @@
         .dropdown-menu-table li a { display: block; padding: 6px 14px; font-size: 13px; color: var(--text-primary);
             text-decoration: none; transition: background 0.15s; white-space: nowrap; }
         .dropdown-menu-table li a:hover { background: rgba(99,102,241,0.15); color: #fff; }
+
+    /* ========== Light Theme Explicit Overrides ========== */
+    [data-theme="light"] body { color: #1a1a2e; }
+    [data-theme="light"] .header-btn { color: #475569; border-color: rgba(0,0,0,0.1); }
+    [data-theme="light"] .header-btn:hover { color: #1a1a2e; background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.2); }
+    [data-theme="light"] .header-username { color: #1a1a2e; }
+    [data-theme="light"] .header-user-menu li a { color: #475569; }
+    [data-theme="light"] .header-user-menu li a:hover { color: #1a1a2e; background: rgba(99,102,241,0.06); }
+
+    /* Sidebar */
+    [data-theme="light"] .nav-item { color: #475569; border-color: transparent; }
+    [data-theme="light"] .nav-item.active { color: #4f46e5; background: rgba(79,70,229,0.08) !important; border-color: rgba(79,70,229,0.15) !important; box-shadow: none; }
+    [data-theme="light"] .nav-item:hover:not(.active) { color: #1a1a2e; background: rgba(79,70,229,0.04); }
+    [data-theme="light"] .nav-text { color: inherit; }
+    [data-theme="light"] .nav-icon { filter: none; opacity: 0.7; }
+
+    /* Stats - 最关键！这些数字在截图中几乎看不见 */
+    [data-theme="light"] .stat-label { color: #64748b !important; }
+    [data-theme="light"] .stat-num { color: #1a1a2e !important; }
+    [data-theme="light"] .circle-num { color: #1a1a2e !important; }
+    [data-theme="light"] .circle-name { color: #64748b !important; }
+    [data-theme="light"] .circle-legend { color: #475569 !important; }
+
+    /* Module title */
+    [data-theme="light"] .module-title { color: #1a1a2e !important; }
+
+    /* Nav tabs */
+    [data-theme="light"] .nav-tabs { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08); }
+    [data-theme="light"] .nav-tabs .nav-link { color: #64748b; }
+    [data-theme="light"] .nav-tabs .nav-link:hover { color: #1a1a2e; background: rgba(79,70,229,0.06); }
+    [data-theme="light"] .nav-tabs .nav-link.active { color: #fff; } /* active 保持白色因为有渐变背景 */
+
+    /* Table */
+    [data-theme="light"] .table { color: #334155 !important; }
+    [data-theme="light"] .table th { color: #64748b !important; background: rgba(0,0,0,0.02) !important; border-bottom-color: rgba(0,0,0,0.06) !important; border-right-color: rgba(0,0,0,0.04) !important; }
+    [data-theme="light"] .table td { color: #334155 !important; border-bottom-color: rgba(0,0,0,0.05) !important; }
+    [data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) { background: rgba(0,0,0,0.02) !important; }
+    [data-theme="light"] .table-striped > tbody > tr:nth-of-type(even) { background: transparent !important; }
+    [data-theme="light"] .table tbody tr:hover td { background: rgba(79,70,229,0.04) !important; }
+    [data-theme="light"] .table-btn { color: #64748b !important; }
+    [data-theme="light"] .table-btn:hover { color: #1a1a2e !important; background: rgba(79,70,229,0.08) !important; }
+    [data-theme="light"] .btn-glass-inactive { color: #64748b !important; border-color: rgba(0,0,0,0.1); }
+    [data-theme="light"] .btn-glass-inactive:hover { color: #1a1a2e !important; background: rgba(79,70,229,0.08) !important; }
+
+    /* Card */
+    [data-theme="light"] .card { background: rgba(255,255,255,0.72) !important; border-color: rgba(0,0,0,0.06) !important; }
+    [data-theme="light"] .card:hover { border-color: rgba(79,70,229,0.2) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.08) !important; }
+    [data-theme="light"] .card .vm-label { color: #475569 !important; }
+
+    /* Modal */
+    [data-theme="light"] .modal-content { background: rgba(255,255,255,0.94) !important; border-color: rgba(0,0,0,0.08) !important; }
+    [data-theme="light"] .modal-title { color: #1a1a2e !important; }
+    [data-theme="light"] .modal-close { color: #64748b !important; }
+    [data-theme="light"] .confirm-text { color: #334155 !important; }
+
+    /* Info section */
+    [data-theme="light"] .info-label { color: #64748b !important; }
+    [data-theme="light"] .info-value { color: #1a1a2e !important; }
+
+    /* Chart */
+    [data-theme="light"] .chart-title { color: #64748b !important; }
+
+    /* Dropdown */
+    [data-theme="light"] .dropdown-menu-table { background: rgba(255,255,255,0.95) !important; border-color: rgba(0,0,0,0.1) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.12) !important; }
+    [data-theme="light"] .dropdown-menu-table li a { color: #334155 !important; }
+    [data-theme="light"] .dropdown-menu-table li a:hover { color: #1a1a2e !important; background: rgba(79,70,229,0.06) !important; }
+    [data-theme="light"] .custom-select-trigger { background: rgba(255,255,255,0.7) !important; border-color: rgba(0,0,0,0.1) !important; color: #334155 !important; }
+    [data-theme="light"] .custom-select-trigger:hover { background: rgba(255,255,255,0.85) !important; }
+
+    /* Status badges */
+    [data-theme="light"] .status-running { color: #059669 !important; text-shadow: none !important; }
+    [data-theme="light"] .status-stopped { color: #dc2626 !important; text-shadow: none !important; }
+
+    /* Alert */
+    [data-theme="light"] .alert-danger { color: #991b1b !important; background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,87,108,0.08)) !important; border-color: rgba(239,68,68,0.2) !important; }
+    [data-theme="light"] .alert-success { color: #065f46 !important; background: linear-gradient(135deg, rgba(16,185,129,0.08), rgba(52,211,153,0.08)) !important; border-color: rgba(16,185,129,0.2) !important; }
+
+    /* Footer version */
+    [data-theme="light"] .footer-version { color: #94a3b8 !important; }
+
+    /* Nav pills */
+    [data-theme="light"] .nav-pills { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08); }
+    [data-theme="light"] .nav-pills .nav-link:hover { background: rgba(79,70,229,0.06) !important; }
+
+    /* List group */
+    [data-theme="light"] .list-group-item { border-color: rgba(0,0,0,0.06) !important; }
+    [data-theme="light"] .list-group-item:hover { background: rgba(79,70,229,0.04) !important; }
+
+    /* bg-secondary text */
+    [data-theme="light"] .bg-secondary { color: #64748b !important; }
+
+    /* Close button icon */
+    [data-theme="light"] .btn-close { filter: brightness(0) invert(0); }
     </style>
 </head>
 <body>
