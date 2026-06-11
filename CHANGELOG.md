@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.5-UI-beta21] - 2026-06-11
+
+### Fixed
+- fix(ui): **管理员返回按钮移至侧边栏** — 从 header 右上角移到侧边栏"仪表盘"下方，使用 SVG 左箭头图标 + "管理后台"文字，仅 admin 角色可见，更醒目易操作
+- fix(ui): **全页面 emoji 图标替换为 SVG** — admin.html(12处)、dashboard.html(12处)、user-center.html(11处) 共 35 处 UI emoji 全部替换为 Lucide 风格 SVG 图标（menu/refresh/home/monitor/box/settings/user/logout/bell/file-text/lock 等），统一视觉风格
+- 涉及文件：public/admin.html, public/dashboard.html, public/user-center.html
+
+---
+
 ## [1.7.5-UI-beta20] - 2026-06-11
 
 ### Fixed
