@@ -119,7 +119,8 @@
         }
 
         const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProto}//${location.host}/vnc-proxy?node=${node}&vmid=${vmid}&port=${port}&ticket=${encodeURIComponent(ticket)}&type=${encodeURIComponent(type || 'qemu')}`;
+        const userId = params.get('userId') || '';
+        const wsUrl = `${wsProto}//${location.host}/vnc-proxy?node=${node}&vmid=${vmid}&port=${port}&ticket=${encodeURIComponent(ticket)}&type=${encodeURIComponent(type || 'qemu')}&userId=${encodeURIComponent(userId)}`;
 
         let rfb = null;
         let scaled = true;

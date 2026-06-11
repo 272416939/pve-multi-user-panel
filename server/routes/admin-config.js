@@ -117,7 +117,8 @@ router.put('/admin/reminder', authMiddleware, adminMiddleware, async (req, res) 
     }
 });
 
-router.get('/version', (req, res) => {
+// P2-H1⑥ 修复：版本号接口需认证（防止未登录泄露版本信息）
+router.get('/version', authMiddleware, (req, res) => {
     res.json({ version: pkg.version });
 });
 

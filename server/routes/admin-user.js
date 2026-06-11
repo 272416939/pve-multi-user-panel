@@ -38,19 +38,25 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     const userId = parseInt(req.params.id);
-    
+
     const userVms = db.vms.getByUserId(userId);
     for (const vm of userVms) {
         db.vms.delete(vm.id);
     }
-    
+
+    // M-3 修复：删除用户时同步清理 LXC 容器分配记录
+    const userCts = db.lxcContainers.getByUserId(userId);
+    for (const ct of userCts) {
+        db.lxcContainers.delete(ct.id);
+    }
+
     const userMemos = db.memos.getByUserId(userId);
     for (const memo of userMemos) {
         db.memos.delete(memo.id);
     }
-    
+
     db.passwordResetTokens.deleteByUserId(userId);
-    
+
     db.users.delete(userId);
     res.json({ message: '用户删除成功' });
 });

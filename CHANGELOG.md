@@ -1,5 +1,50 @@
 # Changelog
 
+## [1.7.5-UI-beta31] - 2026-06-12
+
+### Security (Critical/High — 10 漏洞修复)
+- **P0-C1: Terminal WebSocket 无认证 → JWT Ticket 认证** — 任意用户可直接连接 WebSocket 获取 LXC root shell
+  - terminal-proxy.js: 新增 `validateTicket()` 函数，校验 JWT ticket 类型+过期时间+vmid 绑定
+  - lxc.js: `/lxc/:vmid/terminal` 端点生成 5 分钟有效期签名 ticket（含 vmid+userId）
+  - terminal.html: 从 URL 读取 token 并传入 WebSocket 连接
+- **P0-C3: LXC 重置密码命令注入 → vmid 白名单校验** — vmid 未过滤直接拼入 shell 命令
+  - lxc.js: `reset-password` 端点新增 `Number.isInteger(vmid) && vmid >= 100 && vmid <= 999999999` 强校验
+- **P1-C2: 默认管理员硬编码密码 → 首次登录强制改密机制**
+  - db-sqlite.js: users 表新增 `must_change_password` 字段，默认管理员创建时标记为 1；ALTER TABLE 兼容旧库
+  - auth.js: 登录成功后检查该字段，响应中返回 `must_change_password: true` 标记
+- **P1-C5: VNC ticket 跨用户复用 → userId 强校验**
+  - vnc-proxy.js: `validateTicket()` 新增 userId 参数，ticket 与请求用户不匹配则拒绝
+  - vm.js/lxc.js: VNC proxyUrl 新增 `userId` 参数
+  - vnc.html: 前端将 userId 传入 WebSocket URL
+
+### Security (Medium — 4 端点认证补全)
+- **P2-H1: 4 个端点补充权限中间件**
+  - vm.js: `GET /pve/vms` 新增 `adminMiddleware`（泄露全部 VM 分配信息）
+  - lxc.js: `GET /pve/lxc` 新增 `adminMiddleware`（泄露全部容器分配信息）
+  - network.js: `GET /ikuai/interfaces` 新增 `adminMiddleware`（泄露内网拓扑）
+  - admin-config.js: `GET /version` 新增 `authMiddleware`（原完全无认证）
+
+### Security (Improvement — 快照/限速/数据清理)
+- **H-4: LXC/VM 快照操作统一权限模式** — snapshot.js 6 个写端点（创建/回滚/删除 x LXC+VM）从旧版 `if(!admin){check}` 改为统一 `if(resource){owner|admin}else if(!admin){403}` 模式
+- **M-1: 登录速率限制** — auth.js 新增内存限速器，基于 IP+用户名，5 次/分钟，超限返回 429
+- **M-3: 删除用户清理 LXC** — admin-user.js 删除用户时同步清理 `lxcContainers` 表记录（原只清理 VM）
+
+### Modified Files
+- server/websocket/terminal-proxy.js (C-1: +JWT 认证)
+- server/websocket/vnc-proxy.js (C-5: +userId 校验)
+- server/routes/lxc.js (C-1 ticket生成, C-3 vmid白名单, C-5 VNC userId, H-1② adminMiddleware)
+- server/routes/vm.js (C-5 VNC userId, H-1① adminMiddleware)
+- server/routes/auth.js (C-2 must_change_password标记, M-1 登录限速)
+- server/routes/admin-config.js (H-1⑥ authMiddleware)
+- server/routes/admin-user.js (M-3 LXC 清理)
+- server/routes/network.js (H-1⑤ adminMiddleware)
+- server/routes/snapshot.js (H-4: 6端点统一权限模式)
+- server/api/db-sqlite.js (C-2: must_change_password 字段+ALTER TABLE)
+- public/terminal.html (C-1: token 传递)
+- public/vnc.html (C-5: userId 传递)
+
+---
+
 ## [1.7.5-UI-beta30] - 2026-06-11
 
 ### Security

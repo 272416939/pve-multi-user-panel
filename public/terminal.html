@@ -33,9 +33,10 @@
 (function() {
     const params = new URLSearchParams(location.search);
     const vmid = params.get('vmid');
+    const token = params.get('token');
 
-    if (!vmid) {
-        document.getElementById('statusText').textContent = '参数缺失：vmid';
+    if (!vmid || !token) {
+        document.getElementById('statusText').textContent = '参数缺失：vmid 或认证 token';
         document.getElementById('statusText').className = 'error';
         return;
     }
@@ -60,7 +61,7 @@
     window.addEventListener('resize', () => fitAddon.fit());
 
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = wsProto + '//' + location.host + '/term-proxy?vmid=' + encodeURIComponent(vmid);
+    const wsUrl = wsProto + '//' + location.host + '/term-proxy?vmid=' + encodeURIComponent(vmid) + '&token=' + encodeURIComponent(token);
 
     let ws;
     let wsConnected = false;

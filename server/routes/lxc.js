@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const db = require('../api/db-sqlite');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const { JWT_SECRET } = require('../utils/token');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
@@ -10,7 +12,8 @@ const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp } =
 const { execSSH, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
 const dbg = require('../utils/debug');
 const vncProxy = require('../websocket/vnc-proxy');
-router.get('/pve/lxc', authMiddleware, async (req, res) => {
+// P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
+router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const containers = await pveApi.getLxcContainers();
  
@@ -476,7 +479,7 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         // 安全修复：注册 ticket 到校验存储，WebSocket 代理连接时会校验
         vncProxy.registerTicket(result.ticket, vmid, req.user.id);
 
-        const proxyUrl = `/vnc.html?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&type=lxc`;
+        const proxyUrl = `/vnc.html?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&type=lxc&userId=${req.user.id}`;
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC VNC 控制台失败:', error.message);
@@ -510,8 +513,19 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '容器未运行，请先开机' });
         }
 
-        // 不再调用 PVE termproxy API，直接通过 SSH PTY 方式连接
-        const proxyUrl = `/terminal.html?vmid=${vmid}`;
+        // 生成一次性 terminal ticket（5分钟有效期，绑定 vmid + userId）
+        const terminalTicket = jwt.sign(
+            {
+                type: 'terminal',
+                vmid: vmid,
+                userId: req.user.id,
+                username: req.user.username
+            },
+            JWT_SECRET,
+            { expiresIn: '5m' }
+        );
+
+        const proxyUrl = `/terminal.html?vmid=${vmid}&token=${encodeURIComponent(terminalTicket)}`;
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC 终端失败:', error.message);
@@ -613,7 +627,12 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         const { password } = req.body;
- 
+
+        // P0-C3 修复：vmid 白名单校验，防止命令注入
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+            return res.status(400).json({ error: '无效的容器 ID' });
+        }
+
         if (!password || password.length < 8) {
             return res.status(400).json({ error: '密码长度至少 8 位' });
         }

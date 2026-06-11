@@ -8,9 +8,44 @@ const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateA
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 
+// M-1 修复：登录速率限制（内存实现，防止暴力破解）
+const loginAttempts = new Map(); // key: "ip:username" → { count, lastAttempt }
+const LOGIN_RATE_LIMIT = 5;      // 每分钟最大尝试次数
+const LOGIN_WINDOW_MS = 60 * 1000; // 时间窗口（毫秒）
+
+function checkLoginRateLimit(ip, username) {
+    const key = `${ip}:${username}`;
+    const now = Date.now();
+    const record = loginAttempts.get(key);
+
+    if (!record || now - record.lastAttempt > LOGIN_WINDOW_MS) {
+        // 新窗口或已过期，重置计数
+        loginAttempts.set(key, { count: 1, lastAttempt: now });
+        return { allowed: true };
+    }
+
+    if (record.count >= LOGIN_RATE_LIMIT) {
+        const retryAfter = Math.ceil((LOGIN_WINDOW_MS - (now - record.lastAttempt)) / 1000);
+        return { allowed: false, retryAfter };
+    }
+
+    record.count++;
+    record.lastAttempt = now;
+    return { allowed: true };
+}
+
 router.post('/login', async (req, res) => {
     const { username, password, device_name } = req.body;
-    const hashedPassword = CryptoJS.SHA256(password).toString();
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+
+    // M-1 修复：检查登录速率限制
+    const rateLimit = checkLoginRateLimit(ip, username);
+    if (!rateLimit.allowed) {
+        return res.status(429).json({
+            error: '登录尝试过于频繁，请稍后再试',
+            retryAfter: rateLimit.retryAfter
+        });
+    }
     
     const user = db.users.getByUsername(username);
     
@@ -19,7 +54,6 @@ router.post('/login', async (req, res) => {
     }
 
     const refreshToken = generateRefreshToken();
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
     const ua = req.headers['user-agent'] || '';
     
     const record = db.refreshTokens.create({
@@ -44,8 +78,12 @@ router.post('/login', async (req, res) => {
     }
     
     const token = generateAccessToken(user, record.id);
-    
+
     const { password: _, ...safeUser } = user;
+    // P1-C2 修复：如果用户需要强制改密，在响应中标记
+    if (user.must_change_password) {
+        return res.json({ token, refreshToken, user: safeUser, must_change_password: true });
+    }
     res.json({ token, refreshToken, user: safeUser });
 });
 

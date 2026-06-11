@@ -51,7 +51,8 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
     }
 });
 
-router.get('/ikuai/interfaces', authMiddleware, async (req, res) => {
+// P2-H1⑤ 修复：iKuai 接口信息需管理员权限（泄露内网拓扑）
+router.get('/ikuai/interfaces', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const interfaces = await ikuaiApi.getInterfaces();
         const wanIfaces = interfaces.filter(i => i.type === 'wan');

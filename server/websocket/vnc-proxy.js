@@ -30,9 +30,10 @@ function registerTicket(ticket, vmid, userId) {
  * 校验 ticket 是否合法且未过期
  * @param {string} ticket
  * @param {string} vmid - 请求连接的 vmid
+ * @param {string} userId - 请求用户的 ID（P1-C5 修复：防止跨用户复用）
  * @returns {{ valid: boolean, reason?: string }}
  */
-function validateTicket(ticket, vmid) {
+function validateTicket(ticket, vmid, userId) {
     if (!ticket || !vmid) return { valid: false, reason: '缺少参数' };
     const info = ticketRegistry.get(ticket);
     if (!info) return { valid: false, reason: 'ticket不存在或已过期' };
@@ -42,6 +43,10 @@ function validateTicket(ticket, vmid) {
     }
     if (info.vmid !== String(vmid)) {
         return { valid: false, reason: 'ticket与目标VM不匹配' };
+    }
+    // P1-C5 修复：校验 userId，防止用户 A 的 ticket 被用户 B 使用
+    if (userId && info.userId !== String(userId)) {
+        return { valid: false, reason: 'ticket不属于当前用户' };
     }
     return { valid: true };
 }
@@ -54,6 +59,7 @@ vncProxy.on('connection', (clientWs, request) => {
     const vmid = url.searchParams.get('vmid');
     const port = url.searchParams.get('port');
     const ticket = url.searchParams.get('ticket');
+    const userId = url.searchParams.get('userId'); // P1-C5 修复：从 URL 获取用户 ID
     const type = url.searchParams.get('type') || 'qemu';
 
     if (!node || !vmid || !port || !ticket) {
@@ -61,10 +67,10 @@ vncProxy.on('connection', (clientWs, request) => {
         return;
     }
 
-    // 安全修复：校验 ticket 合法性，防止伪造 ticket 连接任意机器
-    const ticketCheck = validateTicket(ticket, vmid);
+    // 安全修复：校验 ticket 合法性 + userId（P1-C5 防跨用户复用）
+    const ticketCheck = validateTicket(ticket, vmid, userId);
     if (!ticketCheck.valid) {
-        console.warn('[VNC Proxy] 拒绝非法连接:', ticketCheck.reason, '| vmid:', vmid);
+        console.warn('[VNC Proxy] 拒绝非法连接:', ticketCheck.reason, '| vmid:', vmid, '| userId:', userId);
         clientWs.close(4001, '无效的VNC票据: ' + ticketCheck.reason);
         return;
     }
