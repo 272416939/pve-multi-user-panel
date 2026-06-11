@@ -609,6 +609,20 @@
     }
     .modal-close:hover { background: rgba(239,68,68,0.15); color: var(--color-danger); border-color: rgba(239,68,68,0.3); }
 
+    /* ========== 详情弹窗样式 ========== */
+    .info-card { background: rgba(99,102,241,0.06); border: 1px solid var(--border-color);
+        border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; }
+    .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .info-item { display: flex; flex-direction: column; gap: 4px; }
+    .info-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+    .info-value { font-size: 15px; font-weight: 600; color: var(--text-primary); word-break: break-all; }
+    .chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+    @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+    .chart-card { background: var(--bg-card); border: 1px solid var(--border-color);
+        border-radius: 12px; padding: 16px; }
+    .chart-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px; }
+    .chart-card canvas { width: 100% !important; height: 220px !important; max-height: 220px; flex-shrink: 0; }
+
     /* Nav pills / tabs */
     .nav-tabs {
         background: var(--bg-hover); border: 1px solid var(--border-color);
@@ -837,6 +851,7 @@
                                     <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                     <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
+                                        <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
                                         <button class="table-btn" @click="openDeviceForward(vm, 'vm')" title="端口转发">网络</button>
                                         <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
                                             <button class="table-btn" @click="openVncConsole(vm.vm_id)" title="VNC控制台">控制台</button>
@@ -899,6 +914,7 @@
                                     <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                     <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
+                                        <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
                                         <button class="table-btn" @click="openDeviceForward(ct, 'lxc')" title="端口转发">网络</button>
                                         <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
                                             <button class="table-btn" @click="openLxcTerminal(ct.ct_id)">终端</button>
@@ -1836,6 +1852,37 @@
     </div>
 </div>
 
+<!-- VM/CT 详情监控弹窗 -->
+<div class="vm-detail-modal" :class="{ show: showVmDetail }" @click.self="closeVmDetail()">
+    <div class="modal-content" style="max-width:720px">
+        <div class="modal-header">
+            <h2 class="modal-title">{{ detailVm._isLxc ? (detailVm.name || ('CT ' + detailVm.vm_id)) : (detailVm.name || ('VM ' + detailVm.vm_id)) }} 详情</h2>
+            <button class="modal-close" @click="closeVmDetail()">✕</button>
+        </div>
+        <div class="modal-body">
+            <!-- 基本信息区域 -->
+            <div class="info-card">
+                <div class="info-grid">
+                    <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '容器ID' : '虚拟机ID' }}</span><span class="info-value">{{ detailVm.vm_id || '-' }}</span></div>
+                    <div class="info-item"><span class="info-label">内网IP</span><span class="info-value">{{ detailVm.ip || '-' }}</span></div>
+                    <div class="info-item"><span class="info-label">硬件配置</span><span class="info-value">{{ detailVmConfigStr }}</span></div>
+                    <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '镜像' : '操作系统' }}</span><span class="info-value">{{ detailVmOsStr }}</span></div>
+                    <div class="info-item"><span class="info-label">运行状态</span><span class="info-value">{{ detailVmStatusStr }}</span></div>
+                    <div class="info-item"><span class="info-label">运行时长</span><span class="info-value">{{ detailVmUptimeStr }}</span></div>
+                </div>
+            </div>
+            <!-- 监控图表区域 -->
+            <h4 style="font-size:16px;color:var(--text-secondary);margin-bottom:16px;">实时性能监控</h4>
+            <div class="chart-grid">
+                <div class="chart-card"><div class="chart-title">CPU 使用率 (%)</div><canvas id="detailCpuChart"></canvas></div>
+                <div class="chart-card"><div class="chart-title">内存使用率 (%)</div><canvas id="detailMemChart"></canvas></div>
+                <div class="chart-card"><div class="chart-title">网络流量 (MB/s)</div><canvas id="detailNetChart"></canvas></div>
+                <div class="chart-card"><div class="chart-title">磁盘IO (MB/s)</div><canvas id="detailDiskChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 浮动下拉菜单（Teleport到body，避免表格overflow裁剪） -->
 <div v-if="openDropdownId !== null" class="floating-dropdown-menu"
      :style="{ top: dropdownPos.top + 'px', left: dropdownPos.left + 'px' }"
@@ -1856,13 +1903,14 @@
 </main><!-- /main-wrap -->
 
 <script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="js/shared.js"></script>
 <script>
     window.__dashboard = {};
 </script>
 <!-- Dashboard 模块 -->
-<script src="js/dashboard/core.js?v=20260611b"></script>
+<script src="js/dashboard/core.js?v=20260611c"></script>
 <script src="js/dashboard/vm.js?v=20260611b"></script>
 <script src="js/dashboard/lxc.js?v=20260611b"></script>
 <script src="js/dashboard/forward.js?v=20260611b"></script>

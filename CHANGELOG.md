@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5-UI-beta26] - 2026-06-11
+
+### Added
+- feat(dashboard): **虚拟机/容器列表新增"详情"按钮** — VM 和 CT 操作列首位置新增蓝色"详情"按钮，点击弹出详情监控弹窗。弹窗包含：基本信息卡片（ID/内网IP/硬件配置/操作系统或镜像/运行状态/运行时长）+ 4 个 Chart.js 实时监控图表（CPU使用率、内存使用率、网络流量上行下行、磁盘IO读取写入），运行中实例每 3 秒自动刷新监控数据
+- 涉及文件：public/dashboard.html（Chart.js依赖、CSS样式、详情按钮HTML、详情弹窗模板）、public/js/dashboard/core.js（状态/computed/openVmDetail/openLxcDetail/closeVmDetail/initDetailCharts）
+
+---
+
 ## [1.7.5-UI-beta25] - 2026-06-11
 
 ### Fixed

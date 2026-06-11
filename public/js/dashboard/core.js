@@ -24,8 +24,52 @@
     $.dropdownItems = ref([]); // 当前下拉菜单的 [{label, action, cls}]
     $.dropdownPos = ref({ top: 0, left: 0 });
 
+    // ===== 详情弹窗状态 =====
+    $.showVmDetail = ref(false);
+    $.detailVm = ref({});
+    $.detailVmCharts = [];
+    $.detailVmTimer = null;
+
     // computed
     $.currentNavId = computed(function() { return $.activeSection.value === 'vm' ? 'vms' : 'lxc'; });
+
+    // ===== 详情弹窗 computed =====
+    $.detailVmConfigStr = computed(function() {
+        var vm = $.detailVm.value;
+        if (!vm || !vm.config) return '-';
+        var str = (vm.config.sockets || 1) + '核' + (vm.config.cores || 1);
+        var diskStr = '';
+        if (vm.status && vm.status.maxdisk) {
+            diskStr = $.formatBytes(vm.status.maxdisk);
+        } else {
+            var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
+            for (var i = 0; i < diskKeys.length; i++) {
+                var dv = vm.config[diskKeys[i]];
+                if (dv) {
+                    var m = dv.match(/size=(\d+[KMGT]?)/i);
+                    if (m) { diskStr = m[1]; break; }
+                    if (vm.status && vm.status.maxdisk) diskStr = $.formatBytes(vm.status.maxdisk);
+                }
+            }
+        }
+        if (diskStr) str += 'G / ' + diskStr;
+        return str;
+    });
+    $.detailVmOsStr = computed(function() {
+        var vm = $.detailVm.value;
+        if (!vm) return '-';
+        return vm.os || (vm.config ? (vm.config.ostype || '-') : '-');
+    });
+    $.detailVmStatusStr = computed(function() {
+        var vm = $.detailVm.value;
+        if (!vm || !vm.status) return '未知';
+        return vm.status.status === 'running' ? '运行中' : '已停止';
+    });
+    $.detailVmUptimeStr = computed(function() {
+        var vm = $.detailVm.value;
+        if (!vm || !vm.status || vm.status.status !== 'running') return '-';
+        return typeof vm.status.uptime !== 'undefined' ? $.formatUptime(vm.status.uptime) : '-';
+    });
 
     // ===== 工具函数注册到 $（从 shared.js 全局函数引用） =====
     $.formatMemory = formatMemory;
@@ -265,6 +309,132 @@
         if (el) {
             var modal = bootstrap.Modal.getInstance(el);
             if (modal) modal.hide();
+        }
+    };
+
+    // ===== 详情弹窗函数 =====
+    $.openVmDetail = function(vm) {
+        var detailVm = Object.assign({}, vm);
+        detailVm.ip = detailVm.ip || detailVm.dhcp_static_ip || '-';
+        $.detailVm.value = detailVm;
+        $.showVmDetail.value = true;
+        document.body.style.overflow = 'hidden';
+        setTimeout(function() {
+            try { $.initDetailCharts(); } catch(e) { console.warn('Chart init error:', e); }
+        }, 200);
+    };
+
+    $.openLxcDetail = function(ct) {
+        $.detailVm.value = {
+            vm_id: ct.ct_id,
+            name: ct.name || ('CT ' + ct.ct_id),
+            ip: ct.ip || ct.dhcp_static_ip || '-',
+            config: ct.config,
+            os: ct.template_name || (ct.config ? ct.config.ostype : '-'),
+            status: ct.status,
+            _isLxc: true
+        };
+        $.showVmDetail.value = true;
+        document.body.style.overflow = 'hidden';
+        setTimeout(function() {
+            try { $.initDetailCharts(); } catch(e) { console.warn('Chart init error:', e); }
+        }, 200);
+    };
+
+    $.closeVmDetail = function() {
+        $.showVmDetail.value = false;
+        document.body.style.overflow = '';
+        if ($.detailVmTimer) clearInterval($.detailVmTimer);
+        $.detailVmTimer = null;
+        $.detailVmCharts.forEach(function(c) { if(c) c.destroy(); });
+        $.detailVmCharts = [];
+    };
+
+    $.initDetailCharts = function() {
+        var vm = $.detailVm.value;
+        if (!vm) return;
+
+        $.detailVmCharts.forEach(function(c) { if(c) c.destroy(); });
+        $.detailVmCharts = [];
+        if ($.detailVmTimer) clearInterval($.detailVmTimer);
+        $.detailVmTimer = null;
+
+        var isRunning = vm.status && vm.status.status === 'running';
+        var isLxc = !!vm._isLxc;
+        var textColor = '#9CA3AF';
+        var gridColor = 'rgba(148,163,184,0.15)';
+        var maxPoints = 15;
+
+        var cpuEl = document.getElementById('detailCpuChart');
+        var memEl = document.getElementById('detailMemChart');
+        var netEl = document.getElementById('detailNetChart');
+        var diskEl = document.getElementById('detailDiskChart');
+        if(!cpuEl || !memEl || !netEl || !diskEl) return;
+
+        var cpuData = [], memData = [], netInData = [], netOutData = [], diskReadData = [], diskWriteData = [];
+        var labels = [];
+        for(var i=0;i<maxPoints;i++){cpuData.push(null);memData.push(null);netInData.push(null);netOutData.push(null);diskReadData.push(null);diskWriteData.push(null);labels.push('');}
+
+        var commonOpts = {
+            responsive:true,maintainAspectRatio:false,
+            animation:{duration:200},
+            scales:{
+                x:{ticks:{color:textColor,font:{size:10},maxTicksLimit:8},grid:{color:gridColor}},
+                y:{beginAtZero:true,max:100,ticks:{color:textColor,font:{size:10}},grid:{color:gridColor}}
+            },
+            plugins:{legend:{display:false}}
+        };
+
+        var dualYOpts = Object.assign({},commonOpts,{
+            scales:Object.assign({},commonOpts.scales,{
+                y:Object.assign({},commonOpts.scales.y,{max:null})
+            }),
+            plugins:{legend:{display:true,labels:{color:textColor,font:{size:10},boxWidth:12}}}
+        });
+
+        $.detailVmCharts.push(new Chart(cpuEl.getContext('2d'),{
+            type:'line',data:{labels:labels,datasets:[{label:'CPU',data:cpuData,borderColor:'#36D399',backgroundColor:'rgba(54,211,153,0.1)',tension:0.4,fill:true,pointRadius:0,borderWidth:2}]},
+            options:commonOpts}));
+        $.detailVmCharts.push(new Chart(memEl.getContext('2d'),{
+            type:'line',data:{labels:labels,datasets:[{label:'MEM',data:memData,borderColor:'#36A2EB',backgroundColor:'rgba(54,162,235,0.1)',tension:0.4,fill:true,pointRadius:0,borderWidth:2}]},
+            options:commonOpts}));
+        $.detailVmCharts.push(new Chart(netEl.getContext('2d'),{
+            type:'line',data:{labels:labels,datasets:[
+                {label:'上行',data:netOutData,borderColor:'#FBBF24',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
+                {label:'下行',data:netInData,borderColor:'#36D399',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
+            ]},options:dualYOpts}));
+        $.detailVmCharts.push(new Chart(diskEl.getContext('2d'),{
+            type:'line',data:{labels:labels,datasets:[
+                {label:'读取',data:diskReadData,borderColor:'#36A2EB',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
+                {label:'写入',data:diskWriteData,borderColor:'#F53F3F',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
+            ]},options:dualYOpts}));
+
+        $.fetchDetailStatus = function() {
+            var endpoint = isLxc ? '/lxc/' + vm.vm_id + '/status' : '/vm/' + vm.vm_id + '/status';
+            api(endpoint).then(function(res) {
+                var s = res.status || {};
+                var cpuVal = typeof s.cpu === 'number' ? Math.round(s.cpu * 100) : 0;
+                var memVal = (s.mem && s.maxmem) ? Math.round(s.mem / s.maxmem * 100) : 0;
+                var netInVal = typeof s.netin === 'number' ? +(s.netin / 1048576).toFixed(2) : 0;
+                var netOutVal = typeof s.netout === 'number' ? +(s.netout / 1048576).toFixed(2) : 0;
+                var diskReadVal = typeof s.diskread === 'number' ? +(s.diskread / 1048576).toFixed(2) : 0;
+                var diskWriteVal = typeof s.diskwrite === 'number' ? +(s.diskwrite / 1048576).toFixed(2) : 0;
+
+                cpuData.push(cpuVal); memData.push(memVal);
+                netInData.push(netInVal); netOutData.push(netOutVal);
+                diskReadData.push(diskReadVal); diskWriteData.push(diskWriteVal);
+
+                if(cpuData.length > maxPoints){cpuData.shift();memData.shift();netInData.shift();netOutData.shift();diskReadData.shift();diskWriteData.shift();}
+                labels.splice(0,labels.length);
+                for(var i=Math.max(0,cpuData.length-maxPoints);i<cpuData.length;i++){labels.push(i*2+'s');}
+
+                $.detailVmCharts.forEach(function(c){if(c)c.update('none');});
+            }).catch(function(err) { console.warn('监控数据获取失败:', err.message || err); });
+        };
+
+        $.fetchDetailStatus();
+        if(isRunning){
+            $.detailVmTimer = setInterval($.fetchDetailStatus, 3000);
         }
     };
 
