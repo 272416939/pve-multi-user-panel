@@ -377,6 +377,10 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+            }
             if (isOwner && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '虚拟机已到期，无法开机' });
             }
@@ -403,6 +407,10 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+            }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
         }
@@ -426,6 +434,10 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+            }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
         }
@@ -448,6 +460,10 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
+            }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });

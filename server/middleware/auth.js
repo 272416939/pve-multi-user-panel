@@ -8,7 +8,7 @@ const authMiddleware = (req, res, next) => {
         return res.status(401).json({ error: '未授权' });
     }
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
         if (decoded.twofa_pending) {
             return res.status(401).json({ error: '2FA 验证未完成' });
         }

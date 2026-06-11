@@ -76,6 +76,14 @@ async function restoreLxcBySSH(vmid, volid, storage) {
         throw new Error('SSH 配置不完整：请设置 PVE_SSH_HOST 和 PVE_SSH_PASSWORD');
     }
 
+    // R3-4 修复：白名单校验防止命令注入
+    if (!/^[a-zA-Z0-9_-]+:backup\/[a-zA-Z0-9_.\-]+$/.test(volid)) {
+        throw new Error('无效的备份路径格式');
+    }
+    if (storage && !/^[a-zA-Z0-9_-]+$/.test(storage)) {
+        throw new Error('无效的存储名称');
+    }
+
     let cmd = `pct restore ${vmid} ${volid} --force 1`;
     if (storage) {
         cmd += ` --storage ${storage}`;
@@ -99,6 +107,12 @@ async function restoreLxcBySSH(vmid, volid, storage) {
  * @returns {object} - { conn, resize, write, close }
  */
 function createTerminalPty(host, username, password, vmid, pty, onData, onError, onClose) {
+    // R3-6 修复：vmid 严格白名单校验，与 lxc-attach 保持一致
+    if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+        onError(new Error('无效的容器 ID'));
+        return { conn: null, resize: () => {}, write: () => {}, close: () => {} };
+    }
+
     const conn = new Client();
     let shellStream = null;
 

@@ -324,10 +324,10 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
                     remote = 'origin';
                 } catch (e2) {
                     const stderr2 = e2.stderr ? e2.stderr.toString().trim() : e2.message;
-                    return res.status(500).json({ error: '更新失败: git fetch 失败（gitee: ' + stderr + ', origin: ' + stderr2 + '）' });
+                    return res.status(500).json({ error: '更新失败: git fetch 失败（gitee 和 origin 均不可达），请检查网络连接或远程仓库配置' });
                 }
             } else {
-                return res.status(500).json({ error: '更新失败: git fetch 失败 - ' + stderr });
+                return res.status(500).json({ error: '更新失败: git fetch 失败，请检查网络连接或远程仓库配置' });
             }
         }
         try {
@@ -340,7 +340,7 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             execSync('npm install --production', { cwd: projectRoot, timeout: 120000, stdio: 'pipe' });
         } catch (error) {
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
-            return res.status(500).json({ error: '更新失败: npm install 失败 - ' + stderr });
+            return res.status(500).json({ error: '更新失败: npm install 失败，请检查网络或依赖配置' });
         }
         res.json({ message: '更新成功，服务正在重启...' });
         console.log('\n[系统更新] 自动更新完成，服务即将重启（此为正常行为，非异常崩溃）\n');

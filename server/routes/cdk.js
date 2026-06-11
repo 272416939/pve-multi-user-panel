@@ -383,7 +383,8 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             db.lxcContainers.reminders.clear(targetId);
  
             // M-5: CDK 已被原子 CAS 标记为已用，此处仅补充关联信息
-            db.cdkCodes.db.prepare(
+            // R3-3 修复：db.cdkCodes → db.db
+            db.db.prepare(
                 'UPDATE cdk_codes SET used_ct_id = ? WHERE id = ?'
             ).run(targetId, cdk.id);
  
@@ -476,7 +477,8 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             db.vms.reminders.clear(vm.id);
  
             // M-5: CDK 已被原子 CAS 标记为已用，此处仅补充关联信息
-            db.cdkCodes.db.prepare(
+            // R3-3 修复：db.cdkCodes → db.db
+            db.db.prepare(
                 'UPDATE cdk_codes SET used_vm_id = ? WHERE id = ?'
             ).run(vm.id, cdk.id);
  

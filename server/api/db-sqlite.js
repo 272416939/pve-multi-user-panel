@@ -710,9 +710,9 @@ module.exports = {
             return db.prepare('SELECT * FROM users WHERE id = ?').get(lastInsertRowid);
         },
         update: (id, updates) => {
-            // M-9: 列名白名单防 SQL 注入
-            const allowedColumns = ['username', 'email', 'password', 'salt', 'avatar', 'role', 'is_active',
-                'must_change_password', '2fa_secret', '2fa_enabled', 'recovery_codes', 'emailVerified'];
+            // M-9 + R3-8 修复：列名白名单防 SQL 注入（列名与实际表结构匹配）
+            const allowedColumns = ['username', 'email', 'password', 'password_salt', 'avatar', 'role', 'is_active',
+                'must_change_password', 'emailVerified'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

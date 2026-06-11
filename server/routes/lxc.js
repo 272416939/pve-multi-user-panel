@@ -369,6 +369,10 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+            }
             if (isOwner && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '容器已到期，无法开机' });
             }
@@ -395,6 +399,10 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+            }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
@@ -418,6 +426,10 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+            }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
@@ -440,6 +452,10 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
+            }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
@@ -507,6 +523,10 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
+            }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
@@ -655,6 +675,10 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+            }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
         }
@@ -717,6 +741,10 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
+            }
+            // R3-10 修复：非管理员用户关机/停止时检查到期时间
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配' });

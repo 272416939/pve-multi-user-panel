@@ -9,6 +9,10 @@ const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateA
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 
+// R3-7 修复：声明限速 Map 变量，避免隐式全局变量
+let _tfaRateLimit = null;
+let _forgotPwdRateLimit = null;
+
 // M-1 修复：登录速率限制（内存实现，防止暴力破解）
 const loginAttempts = new Map(); // key: "ip:username" → { count, lastAttempt }
 const LOGIN_RATE_LIMIT = 5;      // 每分钟最大尝试次数
@@ -37,7 +41,8 @@ function checkLoginRateLimit(ip, username) {
 
 router.post('/login', async (req, res) => {
     const { username, password, device_name } = req.body;
-    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+    // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
+    const ip = req.ip;
 
     // M-1 修复：检查登录速率限制
     const rateLimit = checkLoginRateLimit(ip, username);
@@ -137,7 +142,7 @@ router.post('/login/2fa', async (req, res) => {
 
     let decoded;
     try {
-        decoded = jwt.verify(partial_token, JWT_SECRET);
+        decoded = jwt.verify(partial_token, JWT_SECRET, { algorithms: ['HS256'] });
         if (!decoded.twofa_pending) {
             return res.status(400).json({ error: '无效的令牌' });
         }
@@ -168,7 +173,8 @@ router.post('/login/2fa', async (req, res) => {
             record = db.refreshTokens.getByToken(refreshToken);
         }
         if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
-            const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+            // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
+    const ip = req.ip;
             const ua = req.headers['user-agent'] || '';
             refreshToken = generateRefreshToken();
             record = db.refreshTokens.create({
@@ -197,7 +203,8 @@ router.post('/login/2fa', async (req, res) => {
                 record = db.refreshTokens.getByToken(refreshToken);
             }
             if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
-                const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '';
+                // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
+    const ip = req.ip;
                 const ua = req.headers['user-agent'] || '';
                 refreshToken = generateRefreshToken();
                 record = db.refreshTokens.create({
@@ -224,15 +231,7 @@ router.post('/auth/refresh', async (req, res) => {
         const { refreshToken } = req.body;
         if (!refreshToken) return res.status(400).json({ error: '缺少 refreshToken' });
 
-        // 验证 refresh token
-        let decoded;
-        try {
-            decoded = jwt.verify(refreshToken, JWT_SECRET);
-        } catch (e) {
-            return res.status(401).json({ error: 'refreshToken 无效或已过期' });
-        }
-
-        // H-11 修复：先查后删，防止先删后查导致永远401
+        // R3-1 修复：refreshToken 是纯随机字符串（非 JWT），直接用 DB 查询校验，移除无效的 jwt.verify
         const record = db.refreshTokens.getByToken(refreshToken);
         if (!record || !record.user_id) {
             return res.status(401).json({ error: 'refreshToken 已失效' });
