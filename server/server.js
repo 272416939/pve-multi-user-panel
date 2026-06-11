@@ -27,20 +27,31 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
     origin: function (origin, callback) {
         const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
-        // 自动将 SITE_URL 加入白名单（前缀匹配，兼容带/不带端口）
-        let siteUrlBase = '';
+        // 自动将 SITE_URL 加入白名单（按 hostname 匹配，忽略端口差异）
+        let siteHost = '';
         if (process.env.SITE_URL) {
-            siteUrlBase = process.env.SITE_URL.replace(/\/+$/, '');
-            allowedOrigins.push(siteUrlBase);
+            try {
+                siteHost = new URL(process.env.SITE_URL).hostname;
+                allowedOrigins.push(process.env.SITE_URL.replace(/\/+$/, ''));
+            } catch (_) {}
         }
         allowedOrigins.push('http://localhost:3002');
         allowedOrigins.push('http://127.0.0.1:3002');
 
-        if (!origin || allowedOrigins.some(o => origin === o.trim() || (siteUrlBase && origin.startsWith(siteUrlBase)))) {
-            callback(null, true);
-        } else {
-            callback(new Error('CORS policy: Origin not allowed'));
+        if (!origin) return callback(null, true);
+        // 精确匹配或同 hostname（端口不同也放行）
+        if (allowedOrigins.some(o => o.trim() === origin)) {
+            return callback(null, true);
         }
+        if (siteHost) {
+            try {
+                if (new URL(origin).hostname === siteHost) {
+                    return callback(null, true);
+                }
+            } catch (_) {}
+        }
+        console.warn('[cors] blocked origin:', origin, 'siteHost:', siteHost);
+        callback(new Error('CORS policy: Origin not allowed'));
     },
     credentials: true
 }));
