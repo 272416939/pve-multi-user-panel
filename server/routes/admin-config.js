@@ -191,20 +191,42 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
     try {
         const tag = response.data.tag_name.replace(/^v/, '');
         // 版本号比较：支持 1.7.5 / 1.7.5-beta1 / 1.7.5-UI-beta1 等格式
+        // 完整解析含后缀的版本号（旧逻辑只取 - 前面的主版本，导致 beta4==beta5 无法区分）
         const parseVer = (v) => {
-            // 提取主版本号部分（去掉 -beta/-alpha/-rc 等后缀）
-            const main = v.split(/[-+]/)[0];
-            return main.split('.').map(Number);
+            v = String(v).replace(/^v/, '');
+            const segs = v.split(/[-+]/);
+            const main = (segs[0] || '').split('.').map(n => isNaN(parseInt(n)) ? 0 : parseInt(n));
+            let suffix = null;
+            if (segs.length > 1) {
+                const rest = segs.slice(1).join('-');
+                const m = rest.match(/(beta|alpha|rc|preview)(\d*)/i);
+                if (m) { suffix = { type: m[1].toLowerCase(), num: parseInt(m[2]) || 0 }; }
+            }
+            // 正式版(无后缀) > rc > beta > alpha
+            const typeOrder = { release: 4, rc: 3, preview: 2, beta: 1, alpha: 0 };
+            return { main, suffix: suffix || { type: 'release', num: Infinity } };
         };
+
+        const compareVer = (a, b) => {
+            // 先比较主版本号
+            const maxLen = Math.max(a.main.length, b.main.length);
+            for (let i = 0; i < maxLen; i++) {
+                const av = a.main[i] || 0, bv = b.main[i] || 0;
+                if (av !== bv) return av < bv ? 1 : -1; // 返回 1 表示 b 更新
+            }
+            // 主版本相同时比较后缀类型
+            const typeOrder = { release: 4, rc: 3, preview: 2, beta: 1, alpha: 0 };
+            const at = typeOrder[a.suffix.type] ?? 0;
+            const bt = typeOrder[b.suffix.type] ?? 0;
+            if (at !== bt) return at < bt ? 1 : -1;
+            // 同类型比较数字
+            if (a.suffix.num !== b.suffix.num) return a.suffix.num < b.suffix.num ? 1 : -1;
+            return 0;
+        };
+
         const current = parseVer(pkg.version);
         const latest = parseVer(tag);
-        let hasUpdate = false;
-        for (let i = 0; i < Math.max(current.length, latest.length); i++) {
-            const c = current[i] || 0;
-            const l = latest[i] || 0;
-            if (l > c) { hasUpdate = true; break; }
-            if (l < c) { break; }
-        }
+        const hasUpdate = compareVer(current, latest) === 1;
         res.json({
             current_version: pkg.version,
             latest_version: tag,

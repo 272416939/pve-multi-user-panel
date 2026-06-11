@@ -1,14 +1,20 @@
 # Changelog
 
-## [1.7.5-UI-beta5] - 2026-06-11
+## [1.7.5-UI-beta6] - 2026-06-11
 
 ### Fixed
+- fix(update): **版本比较逻辑严重缺陷** — parseVer 只取主版本号(1.7.5)丢弃后缀(-UI-betaN)，导致 beta4==beta5 无法检测到新版本
+  - 重写 compareVer 完整解析器：先比主版本 → 再比后缀类型(release>rc>beta>alpha) → 最后比后缀数字
 - fix(update): GitHub 检查更新无法检测 prerelease 版本（并行查询 releases+prereleases 取最新）
 - fix(update): Gitee Release API 缺少 published_at/html_url 字段导致解析失败（fallback 兼容）
 - fix(update): API 返回空数据时增加防御，错误信息详细化
 
+---
+
+## [1.7.5-UI-beta5] - 2026-06-11
+
 ### Notes
-- 测试版本：用于验证检查更新功能修复是否生效
+- 测试版本：用于验证检查更新功能（发现版本比较逻辑缺陷）
 
 ---
 
