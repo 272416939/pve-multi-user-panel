@@ -27,17 +27,29 @@ function mysqlToday() {
 }
 
 // 单例连接（Node.js 单线程，单连接足够）
+// 注意：sync-mysql 连接断开后必须先 destroy 旧连接再创建新的，否则 MySQL 连接池会耗尽
 let _connection = null;
 function getConnection() {
-    if (!_connection || !_connection.state || _connection.state === 'disconnected') {
-        _connection = new mysql({
-            host: process.env.MYSQL_HOST || 'localhost',
-            port: parseInt(process.env.MYSQL_PORT || '3306'),
-            user: process.env.MYSQL_USER || 'root',
-            password: process.env.MYSQL_PASSWORD || '',
-            database: process.env.MYSQL_DATABASE || 'pve_panel',
-        });
+    try {
+        // 检查连接是否可用
+        if (_connection && _connection.state && _connection.state !== 'disconnected') {
+            return _connection;
+        }
+    } catch (e) {
+        // 连接状态检查异常，需要重建
     }
+    // 销毁旧连接（防止连接池耗尽导致 ER_CON_COUNT_ERROR）
+    if (_connection) {
+        try { _connection.destroy(); } catch (e) { /* ignore */ }
+        _connection = null;
+    }
+    _connection = new mysql({
+        host: process.env.MYSQL_HOST || 'localhost',
+        port: parseInt(process.env.MYSQL_PORT || '3306'),
+        user: process.env.MYSQL_USER || 'root',
+        password: process.env.MYSQL_PASSWORD || '',
+        database: process.env.MYSQL_DATABASE || 'pve_panel',
+    });
     return _connection;
 }
 
@@ -333,6 +345,10 @@ function initDb() {
 
     // 数据库迁移：添加新字段（兼容已有数据库）
     migrateSchema();
+
+    // SQLite → MySQL 数据迁移（仅在 MySQL 空表且 SQLite 有数据时执行）
+    migrateFromSQLite();
+
     console.log('[数据库] MySQL 初始化完成');
 }
 
@@ -460,6 +476,119 @@ function createDefaultAdmin() {
         execute("ALTER TABLE users ADD COLUMN password_salt TEXT");
     } catch (e) {
         // 字段已存在，忽略错误
+    }
+}
+
+// SQLite → MySQL 数据迁移
+// 当首次切换到 MySQL 模式时，自动将 SQLite 数据导入 MySQL
+function migrateFromSQLite() {
+    const path = require('path');
+    const fs = require('fs');
+    const sqliteDbFile = path.join(__dirname, '../../data/pve-panel.db');
+
+    // 1. 检查 SQLite 文件是否存在
+    if (!fs.existsSync(sqliteDbFile)) {
+        return; // 没有 SQLite 数据库，无需迁移
+    }
+
+    // 2. 检查 MySQL 是否已有数据（users 表超过 1 行说明已迁移过或有独立数据）
+    const userCount = queryOne('SELECT COUNT(*) AS cnt FROM users');
+    if (userCount && userCount.cnt > 1) {
+        return; // MySQL 已有数据，跳过迁移
+    }
+
+    console.log('[迁移] 检测到 SQLite 数据库，开始迁移到 MySQL...');
+
+    let sqliteDb;
+    try {
+        const Database = require('better-sqlite3');
+        sqliteDb = new Database(sqliteDbFile, { readonly: true });
+    } catch (e) {
+        console.warn('[迁移] 无法打开 SQLite 数据库:', e.message);
+        return;
+    }
+
+    let totalMigrated = 0;
+
+    try {
+        // 需要迁移的表列表（按依赖顺序：用户表优先）
+        const tables = [
+            'users',           // 用户表（其他表依赖 user_id）
+            'config',          // 配置表
+            'cdk_codes',       // CDK 兑换码
+            'vms',             // 虚拟机
+            'vm_reminders',    // VM 提醒记录
+            'lxc_containers',  // LXC 容器
+            'lxc_reminders',   // LXC 提醒记录
+            'memos',           // 备忘录
+            'messages',        // 站内消息
+            'password_reset_tokens', // 密码重置令牌
+            'refresh_tokens',  // 刷新令牌
+            'snapshot_logs',   // 快照日志
+            'recovery_codes',  // 恢复码
+            'backups',         // 备份
+            'backup_logs',     // 备份日志
+            'restore_tasks',   // 恢复任务
+            'port_forwards',   // 端口转发
+        ];
+
+        for (const table of tables) {
+            try {
+                // 检查 SQLite 表是否存在
+                const tblInfo = sqliteDb.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table);
+                if (!tblInfo) continue;
+
+                // 从 SQLite 读取所有数据
+                const rows = sqliteDb.prepare(`SELECT * FROM ${table}`).all();
+                if (!rows || rows.length === 0) continue;
+
+                // 获取列名
+                if (rows.length === 0) continue;
+                const columns = Object.keys(rows[0]);
+
+                // 跳过 users 表中的默认管理员（MySQL 已创建）
+                let rowsToMigrate = rows;
+                if (table === 'users') {
+                    rowsToMigrate = rows.filter(r => r.username !== 'admin');
+                }
+
+                if (rowsToMigrate.length === 0) continue;
+
+                // 批量插入 MySQL（逐行，处理日期格式转换）
+                const placeholders = columns.map(() => '?').join(', ');
+                const colNames = columns.join(', ');
+                const stmt = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders})`;
+
+                for (const row of rowsToMigrate) {
+                    const values = columns.map(col => {
+                        let val = row[col];
+                        // 将 SQLite 的 ISO 日期字符串转为 MySQL DATETIME 格式
+                        if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(val)) {
+                            val = val.slice(0, 19).replace('T', ' ');
+                        }
+                        // 处理 Buffer 类型（SQLite BLOB）
+                        if (Buffer.isBuffer(val)) {
+                            val = val.toString('binary');
+                        }
+                        return val;
+                    });
+                    execute(stmt, values);
+                }
+
+                totalMigrated += rowsToMigrate.length;
+                console.log(`[迁移] ${table}: 迁移 ${rowsToMigrate.length} 条数据`);
+            } catch (e) {
+                console.warn(`[迁移] 表 ${table} 迁移失败:`, e.message);
+            }
+        }
+
+        if (totalMigrated > 0) {
+            console.log(`[迁移] 完成！共迁移 ${totalMigrated} 条数据从 SQLite 到 MySQL`);
+        } else {
+            console.log('[迁移] SQLite 数据库为空或无需迁移');
+        }
+    } finally {
+        sqliteDb.close();
     }
 }
 
