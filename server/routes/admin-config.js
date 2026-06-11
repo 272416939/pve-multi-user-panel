@@ -140,6 +140,10 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
             response = await axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=1`, { timeout: 10000 });
             response.data = Array.isArray(response.data) ? response.data[0] : response.data;
         }
+        // 防御：API 返回空数据时提前报错
+        if (!response.data || !response.data.tag_name) {
+            throw new Error(source === 'gitee' ? 'Gitee 未找到任何 Release，请确认仓库已发布' : 'GitHub 未找到任何 Release');
+        }
     } catch (e) {
         // 指定源失败时尝试回退到另一个源
         if (source === 'gitee') {
@@ -195,15 +199,19 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
                 tag_name: response.data.tag_name,
                 name: response.data.name,
                 body: response.data.body,
-                html_url: response.data.html_url,
-                published_at: response.data.published_at
+                // Gitee 不返回 html_url/published_at，用 fallback 兼容
+                html_url: response.data.html_url || (source === 'gitee'
+                    ? `https://gitee.com/${giteeRepo}/releases/tag/${response.data.tag_name}`
+                    : `https://github.com/${githubRepo}/releases/tag/${response.data.tag_name}`),
+                published_at: response.data.published_at || response.data.created_at || new Date().toISOString()
             }
         });
     } catch (error) {
+        console.error('[更新检查] 解析版本信息失败:', error.message);
         res.json({
             current_version: pkg.version,
             has_update: false,
-            error: '解析版本信息失败'
+            error: '解析版本信息失败: ' + error.message
         });
     }
 });
