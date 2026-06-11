@@ -27,6 +27,10 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
     origin: function (origin, callback) {
         const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
+        // 自动将 SITE_URL 加入白名单
+        if (process.env.SITE_URL) {
+            allowedOrigins.push(process.env.SITE_URL.replace(/\/+$/, ''));
+        }
         allowedOrigins.push('http://localhost:3002');
         allowedOrigins.push('http://127.0.0.1:3002');
 
