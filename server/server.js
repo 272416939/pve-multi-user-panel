@@ -123,6 +123,15 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../public', 'index.html'));
 });
 
+// 全局错误处理：确保 API 返回 JSON 而非 HTML
+app.use((err, req, res, next) => {
+    console.error('[error]', err.message || err);
+    if (req.path.startsWith('/api/')) {
+        return res.status(err.status || 500).json({ error: err.message || '服务器内部错误' });
+    }
+    res.status(500).send('服务器内部错误');
+});
+
 httpServer.listen(PORT, async () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);
     console.log(`[system] 当前系统版本：v${pkg.version}`);
