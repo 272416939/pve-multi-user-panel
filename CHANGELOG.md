@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.5-UI-beta15] - 2026-06-11
+
+### Fixed
+- fix(ui): **检查更新当前版本号首次不显示** — 点击"检查更新"后 `#currentVersion` 仍为"加载中..."，需手动刷新才出现。原因：`checkUpdate()` 获取数据后未同步更新 DOM 元素，现已修复
+- fix(ui): **虚拟机/容器关机/停止后状态不自动刷新** — 操作完成后立即调用 `loadData()` 获取状态，但 PVE 尚未完成状态变更（ACPI 关机需要数秒）。现增加延迟轮询机制：关机后 4 秒、停止后 2 秒自动再次刷新列表
+- 涉及文件：admin.html (update.js/vm.js/lxc.js) + dashboard.html (vm.js/lxc.js)
+
+---
+
 ## [1.7.5-UI-beta14] - 2026-06-11
 
 ### Fixed

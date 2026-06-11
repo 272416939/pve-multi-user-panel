@@ -114,8 +114,11 @@
     $.shutdownLxc = async function(ctId) {
         try {
             await api('/lxc/' + ctId + '/shutdown', { method: 'POST' });
+            $.lxcConfirmState.value = { ctId: null, action: null };
             await $.loadLxcContainers();
+            setTimeout(function() { $.loadLxcContainers(); }, 4000);
         } catch (e) {
+            $.lxcConfirmState.value = { ctId: null, action: null };
             alert(e.message);
         }
     };
@@ -123,8 +126,11 @@
     $.stopLxc = async function(ctId) {
         try {
             await api('/lxc/' + ctId + '/stop', { method: 'POST' });
+            $.lxcConfirmState.value = { ctId: null, action: null };
             await $.loadLxcContainers();
+            setTimeout(function() { $.loadLxcContainers(); }, 2000);
         } catch (e) {
+            $.lxcConfirmState.value = { ctId: null, action: null };
             alert(e.message);
         }
     };

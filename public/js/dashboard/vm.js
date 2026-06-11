@@ -83,6 +83,7 @@
             await api('/vm/' + vmid + '/shutdown', { method: 'POST' });
             $.confirmState.value = { vmId: null, action: null };
             await $.loadData();
+            setTimeout(function() { $.loadData(); }, 4000);
         } catch (e) {
             $.confirmState.value = { vmId: null, action: null };
             alert(e.message);
@@ -94,6 +95,7 @@
             await api('/vm/' + vmid + '/stop', { method: 'POST' });
             $.confirmState.value = { vmId: null, action: null };
             await $.loadData();
+            setTimeout(function() { $.loadData(); }, 2000);
         } catch (e) {
             $.confirmState.value = { vmId: null, action: null };
             alert(e.message);

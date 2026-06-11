@@ -15,6 +15,11 @@
         try {
             var data = await api('/admin/system/update/check?source=' + $.updateSource.value);
             $.updateInfo.value = data;
+            // 同步更新当前版本号显示（解决首次点击不显示的问题）
+            if (data && data.current_version) {
+                var verEl = document.getElementById('currentVersion');
+                if (verEl) verEl.textContent = 'v' + data.current_version;
+            }
         } catch (e) {
             console.error('检查更新失败', e);
             $.updateInfo.value = { has_update: false, error: e.message || '检查更新失败' };

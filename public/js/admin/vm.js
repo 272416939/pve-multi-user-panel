@@ -96,6 +96,8 @@
             await api('/vm/' + vmid + '/shutdown', { method: 'POST' });
             $.confirmState.value = { vmId: null, action: null };
             await $.loadData();
+            // 延迟再次刷新，等待 PVE 完成关机状态变更
+            setTimeout(function() { $.loadData(); }, 4000);
         } catch (e) {
             $.confirmState.value = { vmId: null, action: null };
             alert(e.message);
@@ -107,6 +109,8 @@
             await api('/vm/' + vmid + '/stop', { method: 'POST' });
             $.confirmState.value = { vmId: null, action: null };
             await $.loadData();
+            // 延迟再次刷新，确保状态已更新
+            setTimeout(function() { $.loadData(); }, 2000);
         } catch (e) {
             $.confirmState.value = { vmId: null, action: null };
             alert(e.message);

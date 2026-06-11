@@ -212,13 +212,13 @@
     };
 
     $.shutdownLxc = async function(ctid) {
-        try { await api('/lxc/' + ctid + '/shutdown', { method: 'POST' }); await $.loadUserLxcContainers(); }
-        catch (e) { alert(e.message); }
+        try { await api('/lxc/' + ctid + '/shutdown', { method: 'POST' }); $.lxcConfirmState.value = { ctId: null, action: null }; await $.loadUserLxcContainers(); setTimeout(function() { $.loadUserLxcContainers(); }, 4000); }
+        catch (e) { $.lxcConfirmState.value = { ctId: null, action: null }; alert(e.message); }
     };
 
     $.stopLxc = async function(ctid) {
-        try { await api('/lxc/' + ctid + '/stop', { method: 'POST' }); await $.loadUserLxcContainers(); }
-        catch (e) { alert(e.message); }
+        try { await api('/lxc/' + ctid + '/stop', { method: 'POST' }); $.lxcConfirmState.value = { ctId: null, action: null }; await $.loadUserLxcContainers(); setTimeout(function() { $.loadUserLxcContainers(); }, 2000); }
+        catch (e) { $.lxcConfirmState.value = { ctId: null, action: null }; alert(e.message); }
     };
 
     $.rebootLxc = async function(ctid) {
