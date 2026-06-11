@@ -1,6 +1,25 @@
 # Changelog
 
-## [1.7.5-UI-beta12] - 2026-06-11
+## [1.7.5-UI-beta13] - 2026-06-11
+
+### Features
+- feat(ui): **双主题系统全面重构** — 行业标准 CSS 变量 + data-theme 切换方案
+  - 全新 CSS 变量体系：40+ 变量覆盖背景/文字/边框/颜色/阴影/毛玻璃全套
+  - 明亮模式：柔和浅紫渐变 `#f0f4ff→#e6e9ff` + 白色毛玻璃卡片 + #334155 正文色
+  - 暗黑模式：深紫渐变 `#1e1b4b→#0f172a` + 暗色毛玻璃卡片 + #e2e8f0 正文色
+  - SVG 太阳/月亮图标切换按钮（带过渡动画），替代原有文本符号 ☀/☾
+  - 防闪烁：`<head>` 内联脚本在 DOM 渲染前读取 localStorage 或系统偏好
+  - 系统偏好检测：首次访问自动匹配 `prefers-color-scheme`
+  - 全局过渡动画：所有元素 `transition: background/color/border/box-shadow 0.3s ease`
+  - **删除旧方案**：移除全部 ~270 条 `[data-theme="light"] !important` 硬编码覆盖规则
+  - 覆盖页面：admin.html / dashboard.html / user-center.html / login.html（新增支持）
+
+### Fixed
+- fix(ui): 解决明亮模式刺眼问题 — 纯白背景替换为柔和浅紫色调
+- fix(ui): 统一四页面的主题切换体验（之前 login.html 无主题切换功能）
+- fix(ui): 主题状态跨页面同步（localStorage 持久化 + 防闪烁脚本统一初始化）
+
+---
 
 ### Fixed
 - fix(ui): **明亮模式最终修复** — 采用「全局颜色重置 + 特殊元素恢复」策略彻底解决

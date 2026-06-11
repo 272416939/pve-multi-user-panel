@@ -1,6 +1,7 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="dark">
 <head>
+    <script>(function(){try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);else if(window.matchMedia('(prefers-color-scheme:light)').matches)document.documentElement.setAttribute('data-theme','light')}catch(e){}})()</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PVE 多用户控制面板 | 登录</title>
@@ -9,6 +10,32 @@
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
     <style>
         .modal-backdrop{z-index:1050!important}.modal{z-index:1055!important}
+        :root {
+            --login-bg-card: rgba(15, 23, 42, 0.75);
+            --login-bg-input: rgba(255, 255, 255, 0.06);
+            --login-border-input: rgba(255, 255, 255, 0.15);
+            --login-text-input: #e2e8f0;
+            --login-text-label: #94a3b8;
+            --login-color-primary: #667eea;
+            --login-gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --login-color-error: #f87171;
+            --login-color-success: #34d399;
+            --login-text-version: rgba(255, 255, 255, 0.35);
+            --login-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        [data-theme="light"] {
+            --login-bg-card: rgba(255, 255, 255, 0.85);
+            --login-bg-input: rgba(255, 255, 255, 0.9);
+            --login-border-input: rgba(99, 102, 241, 0.2);
+            --login-text-input: #334155;
+            --login-text-label: #64748b;
+            --login-color-primary: #6366f1;
+            --login-gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            --login-color-error: #ef4444;
+            --login-color-success: #10b981;
+            --login-text-version: #94a3b8;
+            --login-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
+        }
         .login-page {
             background-image: url('https://cn-img.owoser.cn/images/2022/11/08/adc63889cad0409392e7e44ac0e48fd8.png') !important;
             background-size: cover !important;
@@ -16,25 +43,29 @@
             background-repeat: no-repeat !important;
             background-attachment: fixed !important;
         }
+        .login-card {
+            position: relative;
+        }
         .login-field-error {
-            color: #ff6b72;
+            color: var(--login-color-error);
             font-size: 0.82rem;
             margin-top: 4px;
             min-height: 20px;
             display: block;
-            text-shadow: 0 0 8px rgba(255, 107, 114, 0.4), 0 0 16px rgba(255, 107, 114, 0.2);
-            transition: opacity 0.2s ease;
+            text-shadow: 0 0 8px var(--login-color-error), 0 0 16px var(--login-color-error);
+            transition: opacity 0.2s ease, color 0.3s ease;
         }
         .login-form-error {
-            color: #ff6b72;
+            color: var(--login-color-error);
             font-size: 0.85rem;
             padding: 10px 14px;
             background: rgba(255, 107, 114, 0.08);
-            border: 1px solid rgba(255, 107, 114, 0.25);
+            border: 1px solid var(--login-color-error);
             border-radius: 10px;
             margin-bottom: 12px;
-            text-shadow: 0 0 8px rgba(255, 107, 114, 0.35), 0 0 16px rgba(255, 107, 114, 0.15);
+            text-shadow: 0 0 8px var(--login-color-error), 0 0 16px var(--login-color-error);
             text-align: center;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
         }
         /* 覆盖 Bootstrap card 样式以适配玻璃态 */
         .login-card .card {
@@ -50,27 +81,28 @@
             padding: 0;
         }
         .login-card .form-control {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: var(--text-primary, #e0e0e0);
+            background: var(--login-bg-input);
+            border: 1px solid var(--login-border-input);
+            color: var(--login-text-input);
             border-radius: 10px;
             padding: 12px 16px;
-            transition: all 0.3s ease;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
         }
         .login-card .form-control:focus {
-            background: rgba(255, 255, 255, 0.1);
-            border-color: var(--color-primary, #667eea);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
-            color: var(--text-primary, #e0e0e0);
+            background: var(--login-bg-input);
+            border-color: var(--login-color-primary);
+            box-shadow: 0 0 0 3px var(--login-color-primary);
+            color: var(--login-text-input);
         }
         .login-card .form-label {
-            color: var(--text-secondary, #a0a0b0);
+            color: var(--login-text-label);
             font-size: 13px;
             margin-bottom: 6px;
             font-weight: 500;
+            transition: color 0.3s ease;
         }
         .login-card .btn-primary {
-            background: var(--primary-gradient, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
+            background: var(--login-gradient-primary);
             border: none;
             border-radius: 10px;
             padding: 12px;
@@ -80,51 +112,56 @@
         }
         .login-card .btn-primary:hover {
             transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 16px var(--login-color-primary);
         }
         .login-card .btn-outline-secondary {
             background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: var(--text-secondary, #a0a0b0);
+            border: 1px solid var(--login-border-input);
+            color: var(--login-text-label);
             border-radius: 10px;
             padding: 12px;
-            transition: all 0.3s ease;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
         }
         .login-card .btn-outline-secondary:hover {
-            border-color: var(--color-primary, #667eea);
-            color: var(--text-primary, #e0e0e0);
+            border-color: var(--login-color-primary);
+            color: var(--login-text-input);
         }
         .login-card .btn-link {
-            color: var(--color-primary, #667eea) !important;
+            color: var(--login-color-primary) !important;
             text-decoration: none;
             font-size: 13px;
-            transition: opacity 0.2s ease;
+            transition: opacity 0.2s ease, color 0.3s ease;
         }
         .login-card .btn-link:hover {
             opacity: 0.8;
         }
         .login-card .alert-success {
-            background: rgba(72, 187, 120, 0.12) !important;
-            border: 1px solid rgba(72, 187, 120, 0.3) !important;
-            color: #48bb78 !important;
+            background: rgba(52, 211, 153, 0.12) !important;
+            border: 1px solid var(--login-color-success) !important;
+            color: var(--login-color-success) !important;
             border-radius: 10px;
             font-size: 13px;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
         }
         .login-card .alert-danger {
-            background: rgba(245, 87, 108, 0.12) !important;
-            border: 1px solid rgba(245, 87, 108, 0.3) !important;
-            color: #f5576c !important;
+            background: rgba(239, 68, 68, 0.12) !important;
+            border: 1px solid var(--login-color-error) !important;
+            color: var(--login-color-error) !important;
             border-radius: 10px;
             font-size: 13px;
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
         }
         .login-card h5, .login-card h6 {
-            color: var(--text-primary, #e0e0e0);
+            color: var(--login-text-input);
+            transition: color 0.3s ease;
         }
         .login-card .text-muted {
-            color: var(--text-secondary, #808090) !important;
+            color: var(--login-text-label) !important;
+            transition: color 0.3s ease;
         }
         .login-card .text-primary {
-            color: var(--color-primary, #667eea) !important;
+            color: var(--login-color-primary) !important;
+            transition: color 0.3s ease;
         }
         /* 底部版本信息样式 */
         .login-version-info {
@@ -133,16 +170,39 @@
             left: 50%;
             transform: translateX(-50%);
             text-align: center;
-            color: rgba(255, 255, 255, 0.35);
+            color: var(--login-text-version);
             font-size: 12px;
             z-index: 1;
+            transition: color 0.3s ease;
         }
+        /* 毛玻璃效果 */
+        [data-theme="light"] .login-card,
+        [data-theme="dark"] .login-card {
+            background: var(--login-bg-card);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 16px;
+            box-shadow: var(--login-shadow);
+        }
+        /* 主题切换按钮图标显示隐藏 */
+        [data-theme="dark"] .theme-icon-sun { display: block; }
+        [data-theme="dark"] .theme-icon-moon { display: none; }
+        [data-theme="light"] .theme-icon-sun { display: none; }
+        [data-theme="light"] .theme-icon-moon { display: block; }
     </style>
 </head>
 <body class="login-page">
 
     <!-- Glassmorphism Login Card -->
     <div class="login-card">
+        <!-- Theme Toggle Button -->
+        <div style="position:absolute;top:12px;right:12px;">
+            <button id="themeToggle" style="background:none;border:1px solid var(--login-border-input);border-radius:8px;width:36px;height:36px;cursor:pointer;color:var(--login-text-label);display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;" title="切换主题" aria-label="切换主题">
+                <svg class="theme-icon theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                <svg class="theme-icon theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+            </button>
+        </div>
+
         <!-- Card Header: Logo / Title -->
         <div class="login-logo">PVE Panel</div>
         <div class="login-subtitle">欢迎回来，请登录您的账户</div>
@@ -568,5 +628,17 @@
         createApp(App).mount('#app');
     </script>
 <script>fetch("/api/version").then(function(r){return r.json()}).then(function(d){var el=document.getElementById("appVersion");if(el)el.textContent="v"+d.version})</script>
+<script>
+(function() {
+    var btn = document.getElementById('themeToggle');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+        var current = document.documentElement.getAttribute('data-theme') || 'dark';
+        var next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+    });
+})();
+</script>
 </body>
 </html>
