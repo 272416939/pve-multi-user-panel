@@ -1,6 +1,6 @@
 {
   "name": "pve-multi-user-panel",
-  "version": "1.7.5-UI-beta64",
+  "version": "1.7.5-UI-beta65",
   "description": "Proxmox Virtual Environment 多用户控制面板",
   "main": "server/server.js",
   "scripts": {

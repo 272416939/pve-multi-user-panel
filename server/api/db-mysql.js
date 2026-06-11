@@ -41,21 +41,29 @@ function getConnection() {
     return _connection;
 }
 
+// 将 ISO 8601 日期字符串转换为 MySQL DATETIME 格式（调用方可能传入 toISOString() 的值）
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
+function sanitizeParams(params) {
+    if (!Array.isArray(params)) return params;
+    return params.map(p => (typeof p === 'string' && ISO_DATE_RE.test(p))
+        ? p.slice(0, 19).replace('T', ' ') : p);
+}
+
 // 辅助函数：执行查询返回单行
 function queryOne(sql, params = []) {
-    const rows = getConnection().query(sql, params);
+    const rows = getConnection().query(sql, sanitizeParams(params));
     return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
 }
 
 // 辅助函数：执行查询返回多行
 function queryAll(sql, params = []) {
-    const result = getConnection().query(sql, params);
+    const result = getConnection().query(sql, sanitizeParams(params));
     return Array.isArray(result) ? result : [];
 }
 
 // 辅助函数：执行写入返回 result
 function execute(sql, params = []) {
-    return getConnection().query(sql, params);
+    return getConnection().query(sql, sanitizeParams(params));
 }
 
 // 数据库初始化函数（同步）
