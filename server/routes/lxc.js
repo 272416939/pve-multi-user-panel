@@ -620,7 +620,7 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
  
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
-        const isAdmin = req.user.role === 'admin');
+        const isAdmin = req.user.role === 'admin';
 
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
@@ -682,7 +682,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         // 权限检查
         const allCts = db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
-        const isAdmin = req.user.role === 'admin');
+        const isAdmin = req.user.role === 'admin';
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {

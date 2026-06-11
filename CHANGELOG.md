@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5-UI-beta28] - 2026-06-11
+
+### Fixed
+- **fix(lxc): 修复 lxc.js 语法错误导致服务崩溃** — beta27 权限修复时，lxc.js 中 reset-password 和 reset-ip 两个端点的 `const isAdmin = req.user.role === 'admin');` 遗留了多余的 `)` 括号，导致 Node.js SyntaxError 无法启动服务器（生产环境 /root/.pm2/logs/pve-owoser-cn-error.log 报错）
+- 涉及文件：server/routes/lxc.js（2处多余括号已移除）
+
+---
+
 ## [1.7.5-UI-beta27] - 2026-06-11
 
 ### Security
