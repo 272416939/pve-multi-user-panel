@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.5-UI-beta36] - 2026-06-12
+
+### Bugfix: Express 5.x → 4.x 降级（启动崩溃修复）
+- **H-14 修正**: express 从 5.2.1 降级至 **4.22.2**
+  - Express 5.x 的 `path-to-regexp` 不再支持 `app.get('*', ...)` 通配符路由语法
+  - 导致 `PathError: Missing parameter name at index 1: *` 启动崩溃
+  - Express 5 破坏性变更过多（body-parser 拆分、router API 变更等），生产环境暂不升级
+  - axios 保持 1.17.0 不变（SSRF CVE 已在 1.7.4+ 修复）
+
+---
+
 ## [1.7.5-UI-beta35] - 2026-06-12
 
 ### Security (Deep Audit Round 2 — 21 漏洞全部修复)
