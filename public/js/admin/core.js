@@ -374,7 +374,6 @@ watch($.user, function(u) {
 
     // 打开 LXC 容器详情弹窗
     $.openLxcDetail = function(ct) {
-        console.log('openLxcDetail called', ct);
         $.detailVm.value = {
             vm_id: ct.ct_id,
             name: ct.name || ('CT ' + ct.ct_id),
