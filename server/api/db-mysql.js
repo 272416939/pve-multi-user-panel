@@ -29,6 +29,20 @@ function mysqlToday() {
 // 单例连接（Node.js 单线程，单连接足够）
 // 注意：sync-mysql 连接断开后必须先 destroy 旧连接再创建新的，否则 MySQL 连接池会耗尽
 let _connection = null;
+
+// 统一的连接配置（所有地方共用，确保 charset 等参数一致）
+function getConnectionConfig() {
+    return {
+        host: process.env.MYSQL_HOST || 'localhost',
+        port: parseInt(process.env.MYSQL_PORT || '3306'),
+        user: process.env.MYSQL_USER || 'root',
+        password: process.env.MYSQL_PASSWORD || '',
+        database: process.env.MYSQL_DATABASE || 'pve_panel',
+        charset: 'utf8mb4',           // 必须设置！否则 4 字节 emoji 会报错
+        connectTimeout: 10000,         // 10 秒连接超时
+    };
+}
+
 function getConnection() {
     try {
         // 检查连接是否可用
@@ -43,13 +57,7 @@ function getConnection() {
         try { _connection.destroy(); } catch (e) { /* ignore */ }
         _connection = null;
     }
-    _connection = new mysql({
-        host: process.env.MYSQL_HOST || 'localhost',
-        port: parseInt(process.env.MYSQL_PORT || '3306'),
-        user: process.env.MYSQL_USER || 'root',
-        password: process.env.MYSQL_PASSWORD || '',
-        database: process.env.MYSQL_DATABASE || 'pve_panel',
-    });
+    _connection = new mysql(getConnectionConfig());
     return _connection;
 }
 
@@ -61,21 +69,64 @@ function sanitizeParams(params) {
         ? p.slice(0, 19).replace('T', ' ') : p);
 }
 
-// 辅助函数：执行查询返回单行
+// 辅助函数：执行查询返回单行（带连接错误自动恢复）
 function queryOne(sql, params = []) {
-    const rows = getConnection().query(sql, sanitizeParams(params));
-    return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    try {
+        const rows = getConnection().query(sql, sanitizeParams(params));
+        return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    } catch (e) {
+        // 连接类错误（断开/超限/超时）：销毁旧连接，重试一次
+        if (isConnectionError(e)) {
+            forceReconnect();
+            const rows = getConnection().query(sql, sanitizeParams(params));
+            return Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+        }
+        throw e;
+    }
 }
 
-// 辅助函数：执行查询返回多行
+// 辅助函数：执行查询返回多行（带连接错误自动恢复）
 function queryAll(sql, params = []) {
-    const result = getConnection().query(sql, sanitizeParams(params));
-    return Array.isArray(result) ? result : [];
+    try {
+        const result = getConnection().query(sql, sanitizeParams(params));
+        return Array.isArray(result) ? result : [];
+    } catch (e) {
+        if (isConnectionError(e)) {
+            forceReconnect();
+            const result = getConnection().query(sql, sanitizeParams(params));
+            return Array.isArray(result) ? result : [];
+        }
+        throw e;
+    }
 }
 
-// 辅助函数：执行写入返回 result
+// 辅助函数：执行写入返回 result（带连接错误自动恢复）
 function execute(sql, params = []) {
-    return getConnection().query(sql, sanitizeParams(params));
+    try {
+        return getConnection().query(sql, sanitizeParams(params));
+    } catch (e) {
+        if (isConnectionError(e)) {
+            forceReconnect();
+            return getConnection().query(sql, sanitizeParams(params));
+        }
+        throw e;
+    }
+}
+
+// 判断是否为连接级错误（需要重建连接）
+function isConnectionError(e) {
+    const code = e.code || '';
+    return ['PROTOCOL_CONNECTION_LOST', 'ER_CON_COUNT_ERROR', 'ECONNRESET',
+            'ETIMEDOUT', 'EPIPE', 'ER_ACCESS_DENIED_ERROR'].includes(code)
+        || (e.message && /lost connection|too many connections|connect timeout/i.test(e.message));
+}
+
+// 强制重建连接
+function forceReconnect() {
+    if (_connection) {
+        try { _connection.destroy(); } catch (e) { /* ignore */ }
+        _connection = null;
+    }
 }
 
 // 数据库初始化函数（同步）
@@ -568,7 +619,18 @@ function migrateFromSQLite() {
                 }).join(', ');
 
                 const placeholders = columns.map(() => '?').join(', ');
-                const stmt = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders})`;
+                // 有唯一键/主键的表用 ON DUPLICATE KEY UPDATE 避免重复插入错误
+                const hasUniqueKey = ['config', 'users', 'cdk_codes', 'port_forwards', 'refresh_tokens', 'password_reset_tokens', 'recovery_codes'].includes(table);
+                let stmt;
+                if (hasUniqueKey) {
+                    const updatePart = columns.map(col => {
+                        const quoted = (cfg.backtickColumns && cfg.backtickColumns.includes(col)) ? `\`${col}\`` : col;
+                        return `${quoted}=VALUES(${quoted})`;
+                    }).join(', ');
+                    stmt = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders}) ON DUPLICATE KEY UPDATE ${updatePart}`;
+                } else {
+                    stmt = `INSERT INTO ${table} (${colNames}) VALUES (${placeholders})`;
+                }
 
                 for (const row of rowsToMigrate) {
                     const values = columns.map(col => {
@@ -610,13 +672,7 @@ function migrateFromSQLite() {
             try { _connection.destroy(); } catch (e) { /* ignore */ }
             _connection = null;
         }
-        _connection = new mysql({
-            host: process.env.MYSQL_HOST || 'localhost',
-            port: parseInt(process.env.MYSQL_PORT || '3306'),
-            user: process.env.MYSQL_USER || 'root',
-            password: process.env.MYSQL_PASSWORD || '',
-            database: process.env.MYSQL_DATABASE || 'pve_panel',
-        });
+        _connection = new mysql(getConnectionConfig());
         console.log('[迁移] 连接已重建，可正常使用');
     }
 }
