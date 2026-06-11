@@ -15,6 +15,7 @@ let dbInstance;
 if (dbType === 'mysql') {
     console.log('[数据库] 当前使用: mysql');
     dbInstance = require('./db-mysql');
+    dbInstance.initDb(); // 同步调用
 } else {
     console.log('[数据库] 当前使用: sqlite');
     dbInstance = require('./db-sqlite');
