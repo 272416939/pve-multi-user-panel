@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.5-UI-beta14] - 2026-06-11
+
+### Fixed
+- fix(ui): **主题切换按钮不可见** — moon SVG 内联 `style="display:none"` 覆盖 CSS 优先级，导致明亮模式下太阳/月亮图标同时隐藏。移除内联 style，完全由 CSS 类控制显示/隐藏（admin.html / dashboard.html / login.html）
+
+---
+
 ## [1.7.5-UI-beta13] - 2026-06-11
 
 ### Features
