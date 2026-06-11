@@ -334,7 +334,7 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             execSync(`git reset --hard ${remote}/main`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
         } catch (error) {
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
-            return res.status(500).json({ error: '更新失败: git reset 失败 - ' + stderr });
+            return res.status(500).json({ error: '更新失败: git reset 失败，请检查仓库状态' });
         }
         try {
             execSync('npm install --production', { cwd: projectRoot, timeout: 120000, stdio: 'pipe' });

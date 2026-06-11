@@ -336,8 +336,9 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
         }
 
         // M-5 修复：原子 CAS 操作防并发重复兑换
+        // R3-3 修复：db.cdkCodes 不存在，改用 db.db（底层 better-sqlite3 连接）
         // 先用 UPDATE ... WHERE id=? AND is_used=0 原子锁定 CDK，避免 TOCTOU 竞态
-        const affected = db.cdkCodes.db.prepare(
+        const affected = db.db.prepare(
             'UPDATE cdk_codes SET is_used=1, used_by=?, used_at=? WHERE id=? AND is_used=0'
         ).run(req.user.id, new Date().toISOString(), cdk.id);
 
