@@ -1078,3 +1078,8 @@ body[data-theme="light"] .user-checkbox-item:hover {
   height: 16px;
   cursor: pointer;
 }
+
+/* Forward table in light mode */
+body[data-theme="light"] .forward-table th {
+  background: rgba(0, 0, 0, 0.03) !important;
+}

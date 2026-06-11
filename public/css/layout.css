@@ -623,3 +623,82 @@ body[data-theme="light"] .modal-content {
   border: 1px solid rgba(54, 211, 153, 0.3);
   color: #a7f3d0;
 }
+
+/* ========== Light Theme Comprehensive Fixes ========== */
+
+/* Card VM label — dark mode uses #cbd5e1, light mode needs darker */
+body[data-theme="light"] .card .vm-label {
+  color: var(--text-secondary) !important;
+}
+
+/* Table striped rows — dark mode rgba(255,255,255,0.02) invisible in light */
+body[data-theme="light"] .table-striped > tbody > tr:nth-of-type(odd) {
+  background: rgba(0, 0, 0, 0.03) !important;
+}
+body[data-theme="light"] .table-striped > tbody > tr:nth-of-type(even) {
+  background: transparent !important;
+}
+
+/* Alert colors — dark mode bright colors lack contrast in light */
+body[data-theme="light"] .alert-danger {
+  color: #991b1b !important;
+  background: linear-gradient(135deg, rgba(245, 87, 108, 0.12) 0%, rgba(240, 147, 251, 0.12) 100%) !important;
+  border-color: rgba(245, 87, 108, 0.3) !important;
+}
+body[data-theme="light"] .alert-success {
+  color: #065f46 !important;
+  background: linear-gradient(135deg, rgba(54, 211, 153, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%) !important;
+  border-color: rgba(54, 211, 153, 0.3) !important;
+}
+
+/* Status text — remove neon glow, use solid colors */
+body[data-theme="light"] .status-running {
+  color: #059669 !important;
+  text-shadow: none !important;
+}
+body[data-theme="light"] .status-stopped {
+  color: #dc2626 !important;
+  text-shadow: none !important;
+}
+
+/* Sidebar nav active — stronger background */
+body[data-theme="light"] .nav-item.active,
+body[data-theme="light"] .menu-item.active {
+  background: rgba(102, 126, 234, 0.12) !important;
+}
+
+/* Nav pills hover */
+body[data-theme="light"] .nav-pills .nav-link:hover {
+  background: rgba(102, 126, 234, 0.05) !important;
+}
+
+/* Nav item hover */
+body[data-theme="light"] .nav-item:hover:not(.active),
+body[data-theme="light"] .menu-item:hover:not(.active) {
+  background: rgba(102, 126, 234, 0.04) !important;
+}
+
+/* List group hover */
+body[data-theme="light"] .list-group-item:hover {
+  background: rgba(102, 126, 234, 0.04) !important;
+}
+
+/* Table header border */
+body[data-theme="light"] .table thead th {
+  border-right-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Table cell border */
+body[data-theme="light"] .table tbody td {
+  border-bottom-color: var(--border-color) !important;
+}
+
+/* Custom select trigger hover in light mode */
+body[data-theme="light"] .custom-select-trigger:hover {
+  background: rgba(102, 126, 234, 0.05) !important;
+}
+
+/* Modal close button filter invert for light mode */
+body[data-theme="light"] .btn-close {
+  filter: brightness(0) invert(0);
+}

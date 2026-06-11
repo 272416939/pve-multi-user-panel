@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.5-UI-beta10] - 2026-06-11
+
+### Fixed
+- fix(ui): **明亮模式全面重构** — 修复所有页面在 light theme 下文字不可读的问题
+  - **根因**：admin.html / dashboard.html 内联样式中大量使用浅色 fallback 值（`#E5E7EB`/`#9CA3AF`/`#e0e0e0`），light 模式下 CSS 变量未生效时直接显示浅色文字
+  - **修复**：30 处硬编码浅色值统一替换为 `var(--text-primary)` / `var(--text-secondary)`，由 CSS 变量自动适配主题
+  - **新增 light mode 覆盖规则**：table striped 行背景、alert 颜色对比度、status 文字移除 neon glow、sidebar/nav hover 背景、card vm-label 颜色等 16+ 条专用规则
+- fix(ui): 更新日志容器缺少 `markdown-body` 类（beta9 继承）
+
+---
+
 ## [1.7.5-UI-beta9] - 2026-06-11
 
 ### Fixed

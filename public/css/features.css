@@ -441,8 +441,14 @@
 }
 
 body[data-theme="light"] .forward-modal .modal-content {
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Device forward modal (dashboard.html) — override inline dark style */
+body[data-theme="light"] #deviceForwardModal .modal-content {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: var(--text-primary) !important;
 }
 
 .forward-modal .modal-header {
@@ -481,4 +487,9 @@ body[data-theme="light"] .forward-modal .modal-footer {
 .badge.bg-secondary {
   background: linear-gradient(135deg, #64748b 0%, #475569 100%) !important;
   color: white !important;
+}
+
+/* VM label in light mode — dark mode uses #cbd5e1, needs darker for light */
+body[data-theme="light"] .card .vm-label {
+  color: var(--text-secondary) !important;
 }
