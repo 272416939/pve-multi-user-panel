@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.7.5-UI-beta12] - 2026-06-11
+
+### Fixed
+- fix(ui): **明亮模式最终修复** — 采用「全局颜色重置 + 特殊元素恢复」策略彻底解决
+  - 根因：原始暗色样式使用 `!important` 但无 `[data-theme="dark"]` 条件，在 light mode 下仍强制生效
+  - 方案：每个页面 inline style 末尾添加 `[data-theme="light"] .main-wrap { color: #1a1a2e !important; }` 全局重置
+    + 对 td/th/span/div/p/li/label/small/form-control 等所有文本元素 `color: inherit`
+    + 用 `:not()` 排除按钮/badge/modal/card 等组件后逐一恢复正确颜色
+  - admin.html：~100 条覆盖规则（全局重置 + 按钮恢复 + badge恢复 + 弱化/强调文字分层）
+  - dashboard.html：~130 条覆盖规则（含 vm-card/floating-dropdown/custom-select 特有元素）
+  - user-center.html：~40 条覆盖规则（含 sidebar/page-header 背景覆盖、sub-nav-item/form-control）
+  - Playwright 自动化截图验证全部三页面明亮模式效果通过
+
+---
+
 ## [1.7.5-UI-beta11] - 2026-06-11
 
 ### Fixed
