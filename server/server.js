@@ -24,6 +24,9 @@ if (!fs.existsSync(envPath)) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// R3-2 补充: 反向代理环境下 req.ip 需要信任代理头才能获取真实客户端IP
+app.set('trust proxy', true);
+
 app.use(cors({
     origin: function (origin, callback) {
         const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
