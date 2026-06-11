@@ -27,14 +27,16 @@ const PORT = process.env.PORT || 3000;
 app.use(cors({
     origin: function (origin, callback) {
         const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
-        // 自动将 SITE_URL 加入白名单
+        // 自动将 SITE_URL 加入白名单（前缀匹配，兼容带/不带端口）
+        let siteUrlBase = '';
         if (process.env.SITE_URL) {
-            allowedOrigins.push(process.env.SITE_URL.replace(/\/+$/, ''));
+            siteUrlBase = process.env.SITE_URL.replace(/\/+$/, '');
+            allowedOrigins.push(siteUrlBase);
         }
         allowedOrigins.push('http://localhost:3002');
         allowedOrigins.push('http://127.0.0.1:3002');
 
-        if (!origin || allowedOrigins.some(o => origin === o.trim())) {
+        if (!origin || allowedOrigins.some(o => origin === o.trim() || (siteUrlBase && origin.startsWith(siteUrlBase)))) {
             callback(null, true);
         } else {
             callback(new Error('CORS policy: Origin not allowed'));
