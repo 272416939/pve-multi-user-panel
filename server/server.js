@@ -49,13 +49,14 @@ app.use((req, res, next) => {
     };
     res.removeHeader('X-Frame-Options');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    // L-4 修复：强化 CSP 策略
+    // L-4 修复：CSP 策略（允许项目依赖的 CDN 资源）
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: https:",
-        "connect-src 'self' ws: wss:",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https:",
+        "connect-src 'self' ws: wss: https:",
         "frame-ancestors 'self'",
         "object-src 'none'",
         "base-uri 'self'",
