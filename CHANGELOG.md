@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.5-UI-beta22] - 2026-06-11
+
+### Fixed
+- fix(ui): **dashboard 侧边栏增加"管理后台"入口** — 容器导航项下方新增管理员返回链接（SVG 左箭头 + "管理后台"文字），仅 `role === 'admin'` 时显示，普通用户不可见。与 user-center 保持一致的交互体验
+- 涉及文件：public/dashboard.html, public/js/dashboard/core.js
+
+---
+
 ## [1.7.5-UI-beta21] - 2026-06-11
 
 ### Fixed

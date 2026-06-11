@@ -36,11 +36,12 @@
     $.getGeekAvatar = getGeekAvatar;
     $.formatDateTimeLocal = formatDateTimeLocal;
 
-    // ===== 用户数据变化时同步 Header 头像/用户名 =====
+    // ===== 用户数据变化时同步 Header 头像/用户名 + 管理员链接 =====
     watch($.user, function(u) {
         if (!u) return;
         var avatarEl = document.getElementById('headerAvatar');
         var nameEl = document.getElementById('headerUsername');
+        var adminLink = document.getElementById('dashboardAdminLink');
         if (avatarEl) {
             if (u.avatar) {
                 avatarEl.src = u.avatar;
@@ -49,6 +50,10 @@
             }
         }
         if (nameEl) nameEl.textContent = u.username || '用户';
+        // 管理员显示侧边栏"管理后台"链接
+        if (adminLink) {
+            adminLink.style.display = u.role === 'admin' ? '' : 'none';
+        }
     }, { immediate: true });
 
     // 环形图偏移计算（周长 377 = 2 * PI * 60）
