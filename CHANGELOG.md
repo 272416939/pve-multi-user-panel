@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.7.5-UI-beta5] - 2026-06-11
+
+### Fixed
+- fix(update): GitHub 检查更新无法检测 prerelease 版本（并行查询 releases+prereleases 取最新）
+- fix(update): Gitee Release API 缺少 published_at/html_url 字段导致解析失败（fallback 兼容）
+- fix(update): API 返回空数据时增加防御，错误信息详细化
+
+### Notes
+- 测试版本：用于验证检查更新功能修复是否生效
+
+---
+
 ## [1.7.5-UI-beta4] - 2026-06-11
 
 ### Fixed
