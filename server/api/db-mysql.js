@@ -22,13 +22,12 @@ function generateRandomPassword(length = 16) {
 let _connection = null;
 function getConnection() {
     if (!_connection || !_connection.state || _connection.state === 'disconnected') {
-        _connection = new mysql.Connection({
+        _connection = new mysql({
             host: process.env.MYSQL_HOST || 'localhost',
             port: parseInt(process.env.MYSQL_PORT || '3306'),
             user: process.env.MYSQL_USER || 'root',
             password: process.env.MYSQL_PASSWORD || '',
             database: process.env.MYSQL_DATABASE || 'pve_panel',
-            multipleStatements: false,
         });
     }
     return _connection;
@@ -922,17 +921,9 @@ module.exports = {
             [userId]
         ),
         addRecoveryCodes: function(userId, codes) {
-            const conn = getConnection();
-            conn.beginTransaction();
-            try {
-                const stmt = 'INSERT INTO recovery_codes (user_id, code) VALUES (?, ?)';
-                for (const code of codes) {
-                    conn.query(stmt, [userId, code]);
-                }
-                conn.commit();
-            } catch (e) {
-                conn.rollback();
-                throw e;
+            const stmt = 'INSERT INTO recovery_codes (user_id, code) VALUES (?, ?)';
+            for (const code of codes) {
+                execute(stmt, [userId, code]);
             }
         },
         markRecoveryCodeUsed: (code) => execute(
