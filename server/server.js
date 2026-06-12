@@ -90,6 +90,8 @@ app.use(express.static(path.join(__dirname, '../public'), {
         res.removeHeader('Expires');
         if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        } else if (filePath.endsWith('.js')) {
+            res.setHeader('Cache-Control', 'no-cache');
         } else {
             res.setHeader('Cache-Control', 'public, max-age=3600');
         }
