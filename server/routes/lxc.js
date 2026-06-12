@@ -504,7 +504,7 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         const result = await pveApi.getLxcVncConsole(vmid);
 
         // 安全修复：注册 ticket 到校验存储，WebSocket 代理连接时会校验
-        vncProxy.registerTicket(result.ticket, vmid, req.user.id);
+        await vncProxy.registerTicket(result.ticket, vmid, req.user.id);
 
         const proxyUrl = `/vnc.html?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&type=lxc&userId=${req.user.id}`;
         res.json({ proxyUrl });

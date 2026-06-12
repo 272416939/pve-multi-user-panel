@@ -514,7 +514,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         const result = await pveApi.getVncConsole(vmid);
 
         // 安全修复：注册 ticket 到校验存储，WebSocket 代理连接时会校验
-        vncProxy.registerTicket(result.ticket, vmid, req.user.id);
+        await vncProxy.registerTicket(result.ticket, vmid, req.user.id);
 
         // 返回代理页面，通过我们的服务器转发 VNC 流量
         const proxyUrl = `/vnc.html?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&userId=${req.user.id}`;

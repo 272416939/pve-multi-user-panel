@@ -2,9 +2,38 @@ const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const dbg = require('../utils/debug');
+const { getRedisClient } = require('../api/redis');
 
 let isCheckingExpired = false;
 const reminderSentTracker = new Map();
+
+async function markReminderSent(vmId, days, date) {
+    const key = days === 0 ? `reminder:expired:${vmId}:${date}` : `reminder:${vmId}:${days}:${date}`;
+    const redis = getRedisClient();
+    if (redis) {
+        try {
+            await redis.setex(key, 86400, '1');
+            return;
+        } catch (e) {
+            console.warn('[reminder] Redis 不可用，使用内存回退:', e.message);
+        }
+    }
+    reminderSentTracker.set(key, true);
+}
+
+async function isReminderSent(vmId, days, date) {
+    const key = days === 0 ? `reminder:expired:${vmId}:${date}` : `reminder:${vmId}:${days}:${date}`;
+    const redis = getRedisClient();
+    if (redis) {
+        try {
+            const val = await redis.get(key);
+            return val === '1';
+        } catch (e) {
+            console.warn('[reminder] Redis 不可用，使用内存回退:', e.message);
+        }
+    }
+    return reminderSentTracker.has(key);
+}
 
 async function loadSentRemindersFromDb() {
     try {
@@ -15,12 +44,10 @@ async function loadSentRemindersFromDb() {
 
         for (const record of todayReminders) {
             if (record.days === 0) {
-                const memKey = `expired-${record.vm_id}-${today}`;
-                reminderSentTracker.set(memKey, true);
+                await markReminderSent(record.vm_id, 0, today);
                 expiredCount++;
             } else {
-                const memKey = `${record.vm_id}-${record.days}-${today}`;
-                reminderSentTracker.set(memKey, true);
+                await markReminderSent(record.vm_id, record.days, today);
                 preExpiryCount++;
             }
         }
@@ -71,8 +98,7 @@ const checkExpiredVms = async () => {
                     continue;
                 }
                 
-                const memKey = `${vm.vm_id}-${days}-${today}`;
-                if (reminderSentTracker.has(memKey)) {
+                if (await isReminderSent(vm.vm_id, days, today)) {
                     continue;
                 }
                 
@@ -105,8 +131,8 @@ const checkExpiredVms = async () => {
                         <p>请及时续费或联系管理员，以免影响您的使用！</p>
                     `;
                     await sendEmail(user.email, '虚拟机到期提醒', createEmailTemplate(`虚拟机将在${days}天后到期`, emailContent));
-                    
-                    reminderSentTracker.set(memKey, true);
+
+                    await markReminderSent(vm.vm_id, days, today);
                     await db.vms.reminders.add(vm.id, days);
                     await db.vms.update(vm.id, { lastReminderDate: today });
                     
@@ -139,11 +165,10 @@ const checkExpiredVms = async () => {
             }
             
             if (expDate < now) {
-                const expiredMemKey = `expired-${vm.vm_id}-${today}`;
                 const todayExpiredInDb = (await db.vms.reminders.getByVmId(vm.id))
                     .filter(r => r.days === 0 && r.sent_at?.startsWith(today));
                 const expiredDaysCount = await db.vms.reminders.countExpiredDays(vm.id);
-                const alreadySentToday = reminderSentTracker.has(expiredMemKey) || todayExpiredInDb.length > 0;
+                const alreadySentToday = await isReminderSent(vm.vm_id, 0, today) || todayExpiredInDb.length > 0;
                 
                 if (!alreadySentToday && expiredDaysCount < 3) {
                     const user = allUsers.find(u => u.id === vm.user_id);
@@ -174,7 +199,7 @@ const checkExpiredVms = async () => {
                                 <p style="margin-top: 16px;">如有问题，请联系管理员。</p>
                             `;
                             await sendEmail(user.email, '虚拟机已到期 - 请及时续费', createEmailTemplate('虚拟机已到期', emailContent));
-                            reminderSentTracker.set(expiredMemKey, true);
+                            await markReminderSent(vm.vm_id, 0, today);
                             await db.vms.reminders.add(vm.id, 0);
                             dbg(`已向 ${user.username} 发送虚拟机到期续费提醒（VM ${vm.vm_id}，第${dayNum}/3天）`);
                             

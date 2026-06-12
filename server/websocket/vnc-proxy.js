@@ -5,11 +5,13 @@ const tls = require('tls');
 const crypto = require('crypto');
 const pveApi = require('../api/pve-api');
 const dbg = require('../utils/debug');
+const { getRedisClient } = require('../api/redis');
 
 // VNC Ticket 安全校验：防止任意用户通过伪造ticket连接他人机器的控制台
 // ticket → { vmid, userId, createdAt }
 const TICKET_TTL_MS = 5 * 60 * 1000; // 5分钟有效期（PVE自身ticket也是短期的）
-const ticketRegistry = new Map();
+const TICKET_TTL_SEC = 300;
+const ticketRegistry = new Map(); // 仅 Redis 不可用时回退使用
 
 /**
  * 注册一个 VNC ticket（由 API 路程在获取 PVE ticket 后调用）
@@ -17,8 +19,19 @@ const ticketRegistry = new Map();
  * @param {string|number} vmid - 虚拟机/容器 ID
  * @param {string|number} userId - 请求用户的 ID
  */
-function registerTicket(ticket, vmid, userId) {
-    // 清理过期 ticket（懒清理，每次注册时执行）
+async function registerTicket(ticket, vmid, userId) {
+    const redis = getRedisClient();
+    const data = JSON.stringify({ vmid: String(vmid), userId: String(userId) });
+
+    if (redis) {
+        try {
+            await redis.setex(`vncticket:${ticket}`, 300, data);
+            return;
+        } catch (e) {
+            console.warn('[vnc-ticket] Redis 不可用，使用内存回退:', e.message);
+        }
+    }
+
     const now = Date.now();
     for (const [t, info] of ticketRegistry) {
         if (now - info.createdAt > TICKET_TTL_MS) ticketRegistry.delete(t);
@@ -33,8 +46,23 @@ function registerTicket(ticket, vmid, userId) {
  * @param {string} userId - 请求用户的 ID（P1-C5 修复：防止跨用户复用）
  * @returns {{ valid: boolean, reason?: string }}
  */
-function validateTicket(ticket, vmid, userId) {
+async function validateTicket(ticket, vmid, userId) {
     if (!ticket || !vmid) return { valid: false, reason: '缺少参数' };
+
+    const redis = getRedisClient();
+    if (redis) {
+        try {
+            const data = await redis.get(`vncticket:${ticket}`);
+            if (!data) return { valid: false, reason: 'ticket不存在或已过期' };
+            const info = JSON.parse(data);
+            if (info.vmid !== String(vmid)) return { valid: false, reason: 'ticket与目标VM不匹配' };
+            if (userId && info.userId !== String(userId)) return { valid: false, reason: 'ticket不属于当前用户' };
+            return { valid: true };
+        } catch (e) {
+            console.warn('[vnc-ticket] Redis 不可用，使用内存回退:', e.message);
+        }
+    }
+
     const info = ticketRegistry.get(ticket);
     if (!info) return { valid: false, reason: 'ticket不存在或已过期' };
     if (Date.now() - info.createdAt > TICKET_TTL_MS) {
@@ -44,7 +72,6 @@ function validateTicket(ticket, vmid, userId) {
     if (info.vmid !== String(vmid)) {
         return { valid: false, reason: 'ticket与目标VM不匹配' };
     }
-    // P1-C5 修复：校验 userId，防止用户 A 的 ticket 被用户 B 使用
     if (userId && info.userId !== String(userId)) {
         return { valid: false, reason: 'ticket不属于当前用户' };
     }
@@ -53,7 +80,7 @@ function validateTicket(ticket, vmid, userId) {
 
 const vncProxy = new WebSocketServer({ noServer: true });
 
-vncProxy.on('connection', (clientWs, request) => {
+vncProxy.on('connection', async (clientWs, request) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
     const node = url.searchParams.get('node');
     const vmid = url.searchParams.get('vmid');
@@ -68,7 +95,7 @@ vncProxy.on('connection', (clientWs, request) => {
     }
 
     // 安全修复：校验 ticket 合法性 + userId（P1-C5 防跨用户复用）
-    const ticketCheck = validateTicket(ticket, vmid, userId);
+    const ticketCheck = await validateTicket(ticket, vmid, userId);
     if (!ticketCheck.valid) {
         console.warn('[VNC Proxy] 拒绝非法连接:', ticketCheck.reason, '| vmid:', vmid, '| userId:', userId);
         clientWs.close(4001, '无效的VNC票据: ' + ticketCheck.reason);

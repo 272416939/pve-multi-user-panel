@@ -166,6 +166,19 @@ app.use((err, req, res, next) => {
 
 httpServer.listen(PORT, async () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);
+
+    try {
+        const { getRedisClient } = require('./api/redis');
+        const redis = getRedisClient();
+        app.locals.redis = redis;
+        if (!redis) {
+            console.log('[redis] 未配置 REDIS_HOST，使用进程内存模式');
+        }
+    } catch (e) {
+        console.warn('[redis] 初始化异常:', e.message);
+        app.locals.redis = null;
+    }
+
     console.log(`[system] 当前系统版本：v${pkg.version}`);
 
     // MySQL 模式下异步初始化数据库（建表+迁移）

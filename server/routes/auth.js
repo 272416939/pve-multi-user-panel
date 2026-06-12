@@ -9,34 +9,12 @@ const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateA
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 
-// R3-7 修复：声明限速 Map 变量，避免隐式全局变量
-let _tfaRateLimit = null;
-let _forgotPwdRateLimit = null;
+const { checkRateLimit } = require('../middleware/rate-limiter');
+const RATELIMIT_PREFIX = 'ratelimit:login:';
 
-// M-1 修复：登录速率限制（内存实现，防止暴力破解）
-const loginAttempts = new Map(); // key: "ip:username" → { count, lastAttempt }
-const LOGIN_RATE_LIMIT = 5;      // 每分钟最大尝试次数
-const LOGIN_WINDOW_MS = 60 * 1000; // 时间窗口（毫秒）
-
-function checkLoginRateLimit(ip, username) {
-    const key = `${ip}:${username}`;
-    const now = Date.now();
-    const record = loginAttempts.get(key);
-
-    if (!record || now - record.lastAttempt > LOGIN_WINDOW_MS) {
-        // 新窗口或已过期，重置计数
-        loginAttempts.set(key, { count: 1, lastAttempt: now });
-        return { allowed: true };
-    }
-
-    if (record.count >= LOGIN_RATE_LIMIT) {
-        const retryAfter = Math.ceil((LOGIN_WINDOW_MS - (now - record.lastAttempt)) / 1000);
-        return { allowed: false, retryAfter };
-    }
-
-    record.count++;
-    record.lastAttempt = now;
-    return { allowed: true };
+async function checkLoginRateLimit(ip, username) {
+    const key = `${RATELIMIT_PREFIX}${ip}:${username}`;
+    return checkRateLimit(key, 5, 60000);
 }
 
 router.post('/login', async (req, res) => {
@@ -45,7 +23,7 @@ router.post('/login', async (req, res) => {
     const ip = req.ip;
 
     // M-1 修复：检查登录速率限制
-    const rateLimit = checkLoginRateLimit(ip, username);
+    const rateLimit = await checkLoginRateLimit(ip, username);
     if (!rateLimit.allowed) {
         return res.status(429).json({
             error: '登录尝试过于频繁，请稍后再试',
@@ -120,19 +98,9 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/login/2fa', async (req, res) => {
-    // H-15 修复：2FA 验证速率限制（每用户每分钟 3 次）
-    if (!_tfaRateLimit) _tfaRateLimit = new Map();
-    const tfaKey = `${req.ip}:${req.body?.userId || req.body?.username}`;
-    const now = Date.now();
-    const tfaRecord = _tfaRateLimit.get(tfaKey);
-    if (tfaRecord && now - tfaRecord.lastAttempt < 60000) {
-        if (tfaRecord.count >= 3) {
-            return res.status(429).json({ error: '2FA 验证过于频繁，请 60 秒后重试' });
-        }
-        tfaRecord.count++;
-        tfaRecord.lastAttempt = now;
-    } else {
-        _tfaRateLimit.set(tfaKey, { count: 1, lastAttempt: now });
+    const tfaLimit = await checkRateLimit(`ratelimit:2fa:${req.ip}:${req.body?.userId || req.body?.username}`, 3, 60000);
+    if (!tfaLimit.allowed) {
+        return res.status(429).json({ error: '2FA 验证过于频繁，请 60 秒后重试' });
     }
 
     const { partial_token, code, refresh_token: reqRefreshToken } = req.body;
@@ -280,15 +248,10 @@ router.post('/logout', async (req, res) => {
 });
 
 router.post('/auth/forgot-password', async (req, res) => {
-    // H-16 修复：密码重置邮件速率限制（每 IP 每 10 分钟 1 次）
-    if (!_forgotPwdRateLimit) _forgotPwdRateLimit = new Map();
-    const forgotKey = `forgot:${req.ip}`;
-    const now = Date.now();
-    const forgotRecord = _forgotPwdRateLimit.get(forgotKey);
-    if (forgotRecord && now - forgotRecord.lastAttempt < 600000) {
+    const forgotLimit = await checkRateLimit(`ratelimit:forgot:${req.ip}`, 1, 600000);
+    if (!forgotLimit.allowed) {
         return res.status(429).json({ error: '密码重置邮件发送过于频繁，请 10 分钟后重试' });
     }
-    _forgotPwdRateLimit.set(forgotKey, { count: 1, lastAttempt: now });
 
     try {
         const { email } = req.body;
