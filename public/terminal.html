@@ -8,13 +8,17 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; overflow: hidden; height: 100vh; }
-        #terminal-container { height: 100vh; padding: 4px; padding-top: 28px; }
+        #terminal-container {
+            position: fixed; top: 28px; bottom: 0; left: 0; right: 0;
+            padding: 4px;
+        }
         .status-bar {
             position: fixed; top: 0; left: 0; right: 0;
             background: #1a1a2e; color: #888; font-size: 12px;
             padding: 4px 12px; font-family: monospace;
             display: flex; justify-content: space-between;
             z-index: 10;
+            height: 28px;
         }
         .status-bar .error { color: #ff4444; }
         .status-bar .connected { color: #44ff44; }
