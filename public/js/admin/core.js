@@ -27,6 +27,7 @@ $.showVmDetail = ref(false);
 $.detailVm = ref({});
 $.detailVmCharts = [];
 $.detailVmTimer = null;
+$.detailVmChartData = null;
 
     // ==================== 工具函数注册到$ ====================
     $.formatMemory = formatMemory;
@@ -415,10 +416,15 @@ watch($.user, function(u) {
     };
 
 $.closeVmDetail = function() {
+    var vm = $.detailVm.value;
+    if (vm && vm.vm_id) {
+        sendPush({ type: 'unsubscribe-detail', vmid: vm.vm_id });
+    }
     $.showVmDetail.value = false;
     document.body.style.overflow = '';
     if ($.detailVmTimer) clearInterval($.detailVmTimer);
     $.detailVmTimer = null;
+    $.detailVmChartData = null;
     $.detailVmCharts.forEach(function(c) { if(c) c.destroy(); });
     $.detailVmCharts = [];
 };
@@ -448,6 +454,8 @@ $.initDetailCharts = function() {
     var cpuData = [], memData = [], netInData = [], netOutData = [], diskReadData = [], diskWriteData = [];
     var labels = [];
     for(var i=0;i<maxPoints;i++){cpuData.push(null);memData.push(null);netInData.push(null);netOutData.push(null);diskReadData.push(null);diskWriteData.push(null);labels.push('');}
+
+    $.detailVmChartData = { cpuData: cpuData, memData: memData, netInData: netInData, netOutData: netOutData, diskReadData: diskReadData, diskWriteData: diskWriteData, labels: labels, maxPoints: maxPoints };
 
     var commonOpts = {
         responsive:true,maintainAspectRatio:false,
@@ -484,41 +492,41 @@ $.initDetailCharts = function() {
             {label:'写入',data:diskWriteData,borderColor:'#F53F3F',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
         ]},options:dualYOpts}));
 
-    // 真实数据拉取函数
     $.fetchDetailStatus = function() {
+        var vm = $.detailVm.value;
+        if (!vm || !vm.vm_id) return;
         var endpoint = isLxc ? '/lxc/' + vm.vm_id + '/status' : '/vm/' + vm.vm_id + '/status';
         api(endpoint).then(function(res) {
-            var s = res.status || {};
-            // CPU: PVE返回0~1的小数，转百分比
-            var cpuVal = typeof s.cpu === 'number' ? Math.round(s.cpu * 100) : 0;
-            // 内存: mem/maxmem 转百分比
-            var memVal = (s.mem && s.maxmem) ? Math.round(s.mem / s.maxmem * 100) : 0;
-            // 网络: bytes -> MB/s（近似值，除以采样间隔）
-            var netInVal = typeof s.netin === 'number' ? +(s.netin / 1048576).toFixed(2) : 0;
-            var netOutVal = typeof s.netout === 'number' ? +(s.netout / 1048576).toFixed(2) : 0;
-            // 磁盘: bytes -> MB/s
-            var diskReadVal = typeof s.diskread === 'number' ? +(s.diskread / 1048576).toFixed(2) : 0;
-            var diskWriteVal = typeof s.diskwrite === 'number' ? +(s.diskwrite / 1048576).toFixed(2) : 0;
-
-            // 推入数据
-            cpuData.push(cpuVal); memData.push(memVal);
-            netInData.push(netInVal); netOutData.push(netOutVal);
-            diskReadData.push(diskReadVal); diskWriteData.push(diskWriteVal);
-
-            // 保持最大点数
-            if(cpuData.length > maxPoints){cpuData.shift();memData.shift();netInData.shift();netOutData.shift();diskReadData.shift();diskWriteData.shift();}
-            labels.splice(0,labels.length);
-            for(var i=Math.max(0,cpuData.length-maxPoints);i<cpuData.length;i++){labels.push(i*2+'s');}
-
-            // 更新所有图表
-            $.detailVmCharts.forEach(function(c){if(c)c.update('none');});
+            $.feedDetailCharts(res.status || {});
         }).catch(function(err) { console.warn('监控数据获取失败:', err.message || err); });
     };
 
-    // 立即拉取一次
+    $.feedDetailCharts = function(s) {
+        if (!$.detailVmChartData) return;
+        var d = $.detailVmChartData;
+        var vm = $.detailVm.value;
+        if (!vm || !s) return;
+        var cpuVal = typeof s.cpu === 'number' ? Math.round(s.cpu * 100) : 0;
+        var memVal = (s.mem && s.maxmem) ? Math.round(s.mem / s.maxmem * 100) : 0;
+        var netInVal = typeof s.netin === 'number' ? +(s.netin / 1048576).toFixed(2) : 0;
+        var netOutVal = typeof s.netout === 'number' ? +(s.netout / 1048576).toFixed(2) : 0;
+        var diskReadVal = typeof s.diskread === 'number' ? +(s.diskread / 1048576).toFixed(2) : 0;
+        var diskWriteVal = typeof s.diskwrite === 'number' ? +(s.diskwrite / 1048576).toFixed(2) : 0;
+
+        d.cpuData.push(cpuVal); d.memData.push(memVal);
+        d.netInData.push(netInVal); d.netOutData.push(netOutVal);
+        d.diskReadData.push(diskReadVal); d.diskWriteData.push(diskWriteVal);
+
+        if(d.cpuData.length > d.maxPoints){d.cpuData.shift();d.memData.shift();d.netInData.shift();d.netOutData.shift();d.diskReadData.shift();d.diskWriteData.shift();}
+        d.labels.splice(0,d.labels.length);
+        for(var i=Math.max(0,d.cpuData.length-d.maxPoints);i<d.cpuData.length;i++){d.labels.push(i*2+'s');}
+
+        $.detailVmCharts.forEach(function(c){if(c)c.update('none');});
+    };
+
     $.fetchDetailStatus();
     if(isRunning){
-        $.detailVmTimer = setInterval($.fetchDetailStatus, 3000);
+        sendPush({ type: 'subscribe-detail', vmid: vm.vm_id, isLxc: isLxc });
     }
 };
 
@@ -552,6 +560,20 @@ $.initDetailCharts = function() {
                                     break;
                                 }
                             }
+                            if (u.isDetail && $.showVmDetail.value && $.detailVm.value) {
+                                var dv = $.detailVm.value;
+                                var dvIdField = dv._isLxc ? 'ct_id' : 'vm_id';
+                                if (u.vmid === dv[dvIdField]) {
+                                    $.feedDetailCharts(u.status);
+                                }
+                            }
+                        }
+                    }
+                    if (msg.type === 'backup-done' || msg.type === 'restore-done') {
+                        if ($.activeSection.value === 'vms') {
+                            $.refreshVms();
+                        } else if ($.activeSection.value === 'lxc') {
+                            $.loadUserLxcContainers();
                         }
                     }
                     if (msg.type === 'tick') {

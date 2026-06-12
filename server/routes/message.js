@@ -4,6 +4,8 @@ const db = require('../api/db');
 const { pushUnreadCount } = require('../websocket/push-proxy');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { ttl: cache } = require('../utils/cache');
+const unreadCache = cache('unread', 10000);
 router.get('/messages', authMiddleware, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
@@ -18,7 +20,10 @@ router.get('/messages', authMiddleware, async (req, res) => {
 
 router.get('/messages/unread-count', authMiddleware, async (req, res) => {
     try {
+        const cached = unreadCache.get(req.user.id);
+        if (cached !== undefined) return res.json({ count: cached });
         const count = await db.messages.getUnreadCount(req.user.id);
+        unreadCache.set(req.user.id, count);
         res.json({ count });
     } catch (error) {
         res.status(500).json({ error: '获取未读数失败' });
@@ -32,6 +37,7 @@ router.get('/messages/:id', authMiddleware, async (req, res) => {
         if (msg.uid !== 0 && msg.uid !== req.user.id) return res.status(403).json({ error: '无权限' });
         await db.messages.markRead(msg.id);
         res.json(msg);
+        unreadCache.del(req.user.id);
         pushUnreadCount();
     } catch (error) {
         res.status(500).json({ error: '获取消息失败' });
@@ -48,6 +54,7 @@ router.put('/messages/:id/read', authMiddleware, async (req, res) => {
         }
         await db.messages.markRead(msgId);
         res.json({ message: '已标记已读' });
+        unreadCache.del(req.user.id);
         pushUnreadCount();
     } catch (error) {
         res.status(500).json({ error: '标记已读失败' });
@@ -58,6 +65,7 @@ router.put('/messages/read-all', authMiddleware, async (req, res) => {
     try {
         await db.messages.markAllRead(req.user.id);
         res.json({ message: '全部标记已读' });
+        unreadCache.del(req.user.id);
         pushUnreadCount();
     } catch (error) {
         res.status(500).json({ error: '标记已读失败' });
@@ -68,6 +76,7 @@ router.delete('/messages/:id', authMiddleware, async (req, res) => {
     try {
         await db.messages.delete(parseInt(req.params.id), req.user.id);
         res.json({ message: '消息已删除' });
+        unreadCache.del(req.user.id);
         pushUnreadCount();
     } catch (error) {
         res.status(500).json({ error: '删除消息失败' });
@@ -103,6 +112,7 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
                 });
             }
             res.json({ message: `已向 ${users.length} 个用户发送消息` });
+            unreadCache.clear();
             pushUnreadCount();
         } else {
             // 多选用户发送
@@ -126,6 +136,7 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
                 sentCount++;
             }
             res.json({ message: `消息已发送给 ${sentCount} 个用户` });
+            for (const uid of uidArr) { unreadCache.del(parseInt(uid)); }
             pushUnreadCount();
         }
     } catch (error) {

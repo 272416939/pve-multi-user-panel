@@ -5,6 +5,7 @@ const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
+const { getStatusCache } = require('../websocket/push-proxy');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
@@ -79,20 +80,24 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
         // 再尝试获取 PVE 状态，每个 VM 独立处理
         for (const vmData of vmsWithDetails) {
             try {
-                const [status, config] = await Promise.all([
-                    pveApi.getVmStatus(vmData.vm_id),
-                    pveApi.getVmConfig(vmData.vm_id)
-                ]);
-                vmData.status = _applyRate('vm:' + vmData.vm_id, status);
+                var cachedStatus = getStatusCache('vm:' + vmData.vm_id);
+                var rawStatus = cachedStatus || await pveApi.getVmStatus(vmData.vm_id);
+                var config = await pveApi.getVmConfig(vmData.vm_id);
+                vmData.status = cachedStatus || _applyRate('vm:' + vmData.vm_id, rawStatus);
                 vmData.config = config;
                 vmData.error = null;
             } catch (innerError) {
-                // 检查是否为 VM 已销毁（404 或配置文件不存在）
-                const errMsg = innerError?.response?.data?.message || innerError?.message || '';
-                if (innerError.response?.status === 404 || errMsg.includes('does not exist')) {
-                    vmData.destroyed = true;
+                var cachedFallback = getStatusCache('vm:' + vmData.vm_id);
+                if (cachedFallback) {
+                    vmData.status = cachedFallback;
+                    vmData.error = null;
                 } else {
-                    vmData.error = '获取虚拟机信息失败';
+                    const errMsg = innerError?.response?.data?.message || innerError?.message || '';
+                    if (innerError.response?.status === 404 || errMsg.includes('does not exist')) {
+                        vmData.destroyed = true;
+                    } else {
+                        vmData.error = '获取虚拟机信息失败';
+                    }
                 }
             }
         }

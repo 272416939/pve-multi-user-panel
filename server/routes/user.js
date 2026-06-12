@@ -15,6 +15,8 @@ const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 
 const generateToken = require('../utils/token');
+const { ttl: cache } = require('../utils/cache');
+const profileCache = cache('profile', 60000);
 
 router.post('/user/2fa/setup', authMiddleware, async (req, res) => {
     try {
@@ -164,11 +166,15 @@ router.delete('/user/devices', authMiddleware, async (req, res) => {
 
 router.get('/user/profile', authMiddleware, async (req, res) => {
     try {
+        const cached = profileCache.get(req.user.id);
+        if (cached) return res.json(cached);
+
         const user = await db.users.getById(req.user.id);
         if (!user) {
             return res.status(404).json({ error: '用户不存在' });
         }
         const { password, ...safeUser } = user;
+        profileCache.set(req.user.id, safeUser);
         res.json(safeUser);
     } catch (error) {
         res.status(500).json({ error: '获取用户信息失败' });
@@ -229,6 +235,7 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         
         const updatedUser = await db.users.getById(req.user.id);
         const { password: _, ...safeUser } = updatedUser;
+        profileCache.del(req.user.id);
         res.json({ message: '资料更新成功', user: safeUser });
     } catch (error) {
         res.status(500).json({ error: '更新资料失败' });

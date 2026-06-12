@@ -46,8 +46,17 @@ function send(ws, data) {
     }
 }
 
+function pushToUser(userId, data) {
+    for (const [ws, info] of SUBSCRIPTIONS) {
+        if (info.userId === userId) {
+            send(ws, data);
+        }
+    }
+}
+
 let pveApiCache = null;
 let dbCache = null;
+let statusCacheGlobal = new Map();
 
 function getPveApi() {
     if (!pveApiCache) pveApiCache = require('../api/pve-api');
@@ -84,13 +93,17 @@ async function pushStatus() {
     for (const vmid of vms) {
         try {
             const raw = await pveApi.getVmStatus(vmid);
-            statusCache.set('vm:' + vmid, _applyRate('vm:' + vmid, raw));
+            const s = _applyRate('vm:' + vmid, raw);
+            statusCache.set('vm:' + vmid, s);
+            statusCacheGlobal.set('vm:' + vmid, { s, ts: Date.now() });
         } catch (e) {}
     }
     for (const vmid of lxcs) {
         try {
             const raw = await pveApi.getLxcStatus(vmid);
-            statusCache.set('lxc:' + vmid, _applyRate('lxc:' + vmid, raw));
+            const s = _applyRate('lxc:' + vmid, raw);
+            statusCache.set('lxc:' + vmid, s);
+            statusCacheGlobal.set('lxc:' + vmid, { s, ts: Date.now() });
         } catch (e) {}
     }
 
@@ -100,11 +113,11 @@ async function pushStatus() {
         const updates = [];
         for (const v of info.vms) {
             const s = statusCache.get('vm:' + v);
-            if (s) updates.push({ vmid: v, type: 'vm', status: s });
+            if (s) updates.push({ vmid: v, type: 'vm', status: s, isDetail: info.detailVms.has(v) });
         }
         for (const l of info.lxcs) {
             const s = statusCache.get('lxc:' + l);
-            if (s) updates.push({ vmid: l, type: 'lxc', status: s });
+            if (s) updates.push({ vmid: l, type: 'lxc', status: s, isDetail: info.detailLxcs.has(l) });
         }
         if (updates.length > 0) {
             send(ws, { type: 'status', updates });
@@ -133,6 +146,8 @@ pushProxy.on('connection', async (clientWs, request) => {
         username: decoded.username,
         vms: new Set(),
         lxcs: new Set(),
+        detailVms: new Set(),
+        detailLxcs: new Set(),
         lastPong: Date.now()
     };
 
@@ -168,10 +183,27 @@ pushProxy.on('connection', async (clientWs, request) => {
                         }
                     }
                     break;
+                case 'subscribe-detail':
+                    if (msg.vmid && Number.isInteger(msg.vmid)) {
+                        if (msg.isLxc) {
+                            info.detailLxcs.add(msg.vmid);
+                            info.lxcs.add(msg.vmid);
+                        } else {
+                            info.detailVms.add(msg.vmid);
+                            info.vms.add(msg.vmid);
+                        }
+                    }
+                    break;
                 case 'unsubscribe':
                     if (msg.vmid) {
                         info.vms.delete(msg.vmid);
                         info.lxcs.delete(msg.vmid);
+                    }
+                    break;
+                case 'unsubscribe-detail':
+                    if (msg.vmid) {
+                        info.detailVms.delete(msg.vmid);
+                        info.detailLxcs.delete(msg.vmid);
                     }
                     break;
                 case 'ping':
@@ -213,3 +245,10 @@ pushProxy.on('connection', () => { ensureTimers(); });
 
 module.exports = pushProxy;
 module.exports.pushUnreadCount = pushUnreadCount;
+module.exports.pushToUser = pushToUser;
+module.exports.getStatusCache = function(key) {
+    var e = statusCacheGlobal.get(key);
+    if (e && Date.now() - e.ts < 5000) return e.s;
+    statusCacheGlobal.delete(key);
+    return null;
+};

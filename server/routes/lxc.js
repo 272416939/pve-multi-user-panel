@@ -7,6 +7,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { JWT_SECRET } = require('../utils/token');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
+const { getStatusCache } = require('../websocket/push-proxy');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp } = require('../services/dhcp');
 const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
@@ -76,19 +77,24 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
  
         for (const ctData of ctsWithDetails) {
             try {
-                const [status, config] = await Promise.all([
-                    pveApi.getLxcStatus(ctData.ct_id),
-                    pveApi.getLxcConfig(ctData.ct_id)
-                ]);
-                ctData.status = _applyRate('lxc:' + ctData.ct_id, status);
+                var cachedStatus = getStatusCache('lxc:' + ctData.ct_id);
+                var rawStatus = cachedStatus || await pveApi.getLxcStatus(ctData.ct_id);
+                var config = await pveApi.getLxcConfig(ctData.ct_id);
+                ctData.status = cachedStatus || _applyRate('lxc:' + ctData.ct_id, rawStatus);
                 ctData.config = config;
                 ctData.error = null;
             } catch (innerError) {
-                const errMsg = innerError?.response?.data?.message || innerError?.message || '';
-                if (innerError.response?.status === 404 || errMsg.includes('does not exist')) {
-                    ctData.destroyed = true;
+                var cachedFallback = getStatusCache('lxc:' + ctData.ct_id);
+                if (cachedFallback) {
+                    ctData.status = cachedFallback;
+                    ctData.error = null;
                 } else {
-                    ctData.error = '获取容器信息失败';
+                    const errMsg = innerError?.response?.data?.message || innerError?.message || '';
+                    if (innerError.response?.status === 404 || errMsg.includes('does not exist')) {
+                        ctData.destroyed = true;
+                    } else {
+                        ctData.error = '获取容器信息失败';
+                    }
                 }
             }
         }

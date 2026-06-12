@@ -1,6 +1,7 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { pushToUser } = require('../websocket/push-proxy');
 
 const lxcBackupPollingMap = new Map();
 
@@ -64,6 +65,8 @@ async function sendLxcBackupNotification(vmid, backupId, status) {
         if (!backup) return;
         const user = await db.users.getById(backup.user_id);
         if (!user) return;
+
+        pushToUser(backup.user_id, { type: 'backup-done', backupId: backupId, ct_id: vmid, status: status });
 
         const title = status === 'completed' ? 'LXC 容器备份完成' : 'LXC 容器备份失败';
         const content = status === 'completed'
@@ -133,6 +136,8 @@ async function sendLxcRestoreNotification(vmid, taskId, status) {
         const user = await db.users.getById(task.user_id);
         if (!user) return;
 
+        pushToUser(task.user_id, { type: 'restore-done', taskId: taskId, ct_id: vmid, status: status });
+
         const title = status === 'completed' ? 'LXC 容器恢复完成' : 'LXC 容器恢复失败';
         const content = status === 'completed'
             ? `您的 LXC 容器 (CT ${vmid}) 已恢复完成。`
@@ -188,6 +193,9 @@ const backupPollIntervals = new Map();
 async function sendBackupNotification(userId, vmId, status, filename) {
     const user = await db.users.getById(userId);
     if (!user) return;
+
+    pushToUser(userId, { type: 'backup-done', vm_id: vmId, status: status });
+
     const vm = (await db.vms.getByUserId(userId)).find(v => v.vm_id == vmId);
     const vmName = vm?.name || 'VM ' + vmId;
     let title, content;
@@ -291,6 +299,9 @@ async function resumeRunningBackups() {
 async function sendRestoreNotification(userId, vmId, statusMsg) {
     const user = await db.users.getById(userId);
     if (!user) return;
+
+    pushToUser(userId, { type: 'restore-done', vm_id: vmId, status: statusMsg === 'completed' ? 'completed' : 'failed' });
+
     const vm = (await db.vms.getByUserId(userId)).find(v => v.vm_id == vmId);
     const vmName = vm?.name || 'VM ' + vmId;
     const isSuccess = statusMsg === 'completed';
