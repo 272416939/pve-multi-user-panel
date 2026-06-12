@@ -111,7 +111,7 @@ async function pushStatus() {
     }
 }
 
-pushProxy.on('connection', (clientWs, request) => {
+pushProxy.on('connection', async (clientWs, request) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
     const ticket = url.searchParams.get('ticket');
 
@@ -139,9 +139,10 @@ pushProxy.on('connection', (clientWs, request) => {
     dbg(`[Push] 已连接: ${decoded.username}(${decoded.userId})`);
 
     const db = getDb();
-    db.messages.getUnreadCount ? db.messages.getUnreadCount(decoded.userId)
-        .then(c => send(clientWs, { type: 'unread', count: c || 0 }))
-        .catch(() => {}) : null;
+    try {
+        const c = await db.messages.getUnreadCount(decoded.userId);
+        send(clientWs, { type: 'unread', count: typeof c === 'number' ? c : 0 });
+    } catch (e) {}
 
     const pingInterval = setInterval(() => {
         if (info.lastPong && Date.now() - info.lastPong > HEARTBEAT_INTERVAL * 2) {

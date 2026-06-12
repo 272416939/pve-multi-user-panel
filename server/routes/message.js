@@ -32,6 +32,7 @@ router.get('/messages/:id', authMiddleware, async (req, res) => {
         if (msg.uid !== 0 && msg.uid !== req.user.id) return res.status(403).json({ error: '无权限' });
         await db.messages.markRead(msg.id);
         res.json(msg);
+        pushUnreadCount();
     } catch (error) {
         res.status(500).json({ error: '获取消息失败' });
     }
@@ -45,8 +46,9 @@ router.put('/messages/:id/read', authMiddleware, async (req, res) => {
         if (msg.uid !== 0 && msg.uid !== req.user.id) {
             return res.status(403).json({ error: '无权限' });
         }
-        db.messages.markRead(msgId);
+        await db.messages.markRead(msgId);
         res.json({ message: '已标记已读' });
+        pushUnreadCount();
     } catch (error) {
         res.status(500).json({ error: '标记已读失败' });
     }
@@ -54,8 +56,9 @@ router.put('/messages/:id/read', authMiddleware, async (req, res) => {
 
 router.put('/messages/read-all', authMiddleware, async (req, res) => {
     try {
-        db.messages.markAllRead(req.user.id);
+        await db.messages.markAllRead(req.user.id);
         res.json({ message: '全部标记已读' });
+        pushUnreadCount();
     } catch (error) {
         res.status(500).json({ error: '标记已读失败' });
     }
@@ -65,6 +68,7 @@ router.delete('/messages/:id', authMiddleware, async (req, res) => {
     try {
         await db.messages.delete(parseInt(req.params.id), req.user.id);
         res.json({ message: '消息已删除' });
+        pushUnreadCount();
     } catch (error) {
         res.status(500).json({ error: '删除消息失败' });
     }
