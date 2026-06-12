@@ -60,22 +60,11 @@ function getDb() {
 
 async function pushUnreadCount() {
     const db = getDb();
-    let counts;
-    try {
-        const allMessages = await db.messages.getAll();
-        const grouped = {};
-        for (const m of allMessages) {
-            if (m.is_read) continue;
-            if (!grouped[m.user_id]) grouped[m.user_id] = 0;
-            grouped[m.user_id]++;
-        }
-        counts = grouped;
-    } catch (e) {
-        return;
-    }
-
     for (const [ws, info] of SUBSCRIPTIONS) {
-        send(ws, { type: 'unread', count: counts[info.userId] || 0 });
+        try {
+            const c = await db.messages.getUnreadCount(info.userId);
+            send(ws, { type: 'unread', count: typeof c === 'number' ? c : 0 });
+        } catch (e) {}
     }
 }
 
