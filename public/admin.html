@@ -842,7 +842,10 @@
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label">IPv4（留空=DHCP）</label>
-                                            <input type="text" class="form-control" v-model="lxcForm.net0Ip" placeholder="如: 192.168.1.100/24">
+                                            <div class="input-group">
+                                                <input type="text" class="form-control" v-model="lxcForm.net0Ip" placeholder="如: 192.168.1.100/24">
+                                                <button type="button" class="btn btn-outline-info" @click="randomLxcCreateIp" title="随机生成 DHCP 范围内未绑定的 IP">🎲</button>
+                                            </div>
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label">MAC（留空=自动）</label>

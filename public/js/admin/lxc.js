@@ -283,6 +283,16 @@
         }
     };
 
+    // 新建 LXC 容器时随机生成 IP
+    $.randomLxcCreateIp = async function() {
+        try {
+            var data = await api('/lxc/random-ip');
+            $.lxcForm.value.net0Ip = data.ip + '/24';
+        } catch (e) {
+            alert('获取随机 IP 失败：' + e.message);
+        }
+    };
+
     $.confirmResetLxcIp = async function() {
         var f = $.lxcIpForm.value;
         if (f.ip_mode === 'static' && !f.ip) {
