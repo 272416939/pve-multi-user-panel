@@ -442,7 +442,10 @@
             transition: color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease; }
 
         /* Markdown body container */
-        .markdown-body { color: var(--text-primary); transition: color 0.3s ease; }
+        .markdown-body { color: var(--text-primary); transition: color 0.3s ease, background 0.3s ease; }
+        .markdown-body code { background: rgba(99,102,241,0.12); color: #a5b4fc; padding: 2px 6px; border-radius: 4px; font-size: 0.88em; }
+        .markdown-body pre { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; overflow-x: auto; }
+        .markdown-body pre code { background: transparent; padding: 0; color: var(--text-primary); font-size: 0.9em; }
 
         /* Minimal necessary overrides for btn-close filter in light mode */
         [data-theme="light"] .btn-close { filter: brightness(0) invert(0.4); opacity: 0.8; }
@@ -504,6 +507,10 @@
         [data-theme="light"] .type-badge-ct {
             background: rgba(16,185,129,0.12); color: #059669; border-color: rgba(16,185,129,0.25);
         }
+        /* Light mode: markdown body */
+        [data-theme="light"] .markdown-body code { background: rgba(99,102,241,0.10); color: #4338ca; }
+        [data-theme="light"] .markdown-body pre { background: rgba(241,245,249,0.8); border-color: rgba(99,102,241,0.12); }
+        [data-theme="light"] .markdown-body pre code { color: #334155; }
     </style>
 </head>
 <body>
