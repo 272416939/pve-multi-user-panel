@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0-beta26] - 2026-06-13
+
+### Fixed
+- fix(ui): 弹窗统计卡片字体颜色过暗，深色背景下 text-muted 改为 text-light opacity-75（dashboard.html + admin.html 共 16 处）
+
+---
+
 ## [1.7.5-UI-beta36] - 2026-06-12
 
 ### Bugfix: Express 5.x → 4.x 降级（启动崩溃修复）
