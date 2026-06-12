@@ -1927,6 +1927,8 @@
             if (!$.lxcIpForm) $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
             if (!$.confirmState) $.confirmState = Vue.ref({ vmId: null, action: null });
             if (!$.lxcConfirmState) $.lxcConfirmState = Vue.ref({ ctId: null, action: null });
+            if (!$.userVms) $.userVms = Vue.ref([]);
+            if (!$.userLxcContainers) $.userLxcContainers = Vue.ref([]);
             $.initCore();
             $.initVm();
             $.initLxc();

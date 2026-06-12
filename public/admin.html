@@ -2996,6 +2996,9 @@
                 if (!$.lxcConfirmState) $.lxcConfirmState = Vue.ref({ ctId: null, action: null });
                 if (!$.snapshotForm) $.snapshotForm = Vue.ref({ name: '', description: '' });
                 if (!$.lxcSnapshotForm) $.lxcSnapshotForm = Vue.ref({ name: '', description: '' });
+                if (!$.userVms) $.userVms = Vue.ref([]);
+                if (!$.userLxcContainers) $.userLxcContainers = Vue.ref([]);
+                if (!$.lxcContainers) $.lxcContainers = Vue.ref([]);
                 $.initCore();
                 $.initVm();
                 $.initLxc();

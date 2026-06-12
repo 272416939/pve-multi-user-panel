@@ -539,6 +539,7 @@ $.initDetailCharts = function() {
                 await $.loadNavItems();
                 await $.loadAssignData();
                 await $.loadData();
+                await $.loadUserLxcContainers();
                 $.loadUnreadCount();
                 initPushClient(function(msg) {
                     if (msg.type === 'unread') {
