@@ -108,6 +108,7 @@ async function restoreLxcBySSH(vmid, volid, storage) {
  */
 function createTerminalPty(host, username, password, vmid, pty, onData, onError, onClose) {
     // R3-6 修复：vmid 严格白名单校验，与 lxc-attach 保持一致
+    vmid = parseInt(vmid);
     if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
         onError(new Error('无效的容器 ID'));
         return { conn: null, resize: () => {}, write: () => {}, close: () => {} };

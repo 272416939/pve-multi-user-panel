@@ -59,7 +59,7 @@ terminalProxy.on('connection', (clientWs, request) => {
     let pendingResize = { rows: 24, cols: 80 };
 
     const session = createTerminalPty(
-        sshHost, 'root', sshPassword, vmid,
+        sshHost, 'root', sshPassword, parseInt(vmid),
         pendingResize,
         (data) => {
             if (clientWs.readyState === WebSocket.OPEN) {
