@@ -510,6 +510,19 @@
         border-color: var(--color-primary) !important;
         box-shadow: 0 0 0 3px rgba(99, 126, 234, 0.2) !important;
     }
+    .form-select option { background: var(--bg-input); color: var(--text-primary); }
+    .form-control.bg-dark, .form-select.bg-dark { background: var(--bg-input) !important; color: var(--text-primary) !important; }
+
+    /* btn-close 主题适配 */
+    [data-theme="light"] .btn-close { filter: brightness(0) invert(0.4); opacity: 0.8; }
+    [data-theme="dark"] .btn-close { filter: brightness(0) invert(1); opacity: 0.6; }
+    .btn-close:hover { opacity: 1 !important; }
+
+    /* bg-warning text-dark 徽章主题适配 */
+    .bg-warning.text-dark { color: var(--text-primary) !important; }
+
+    /* 硬编码颜色修复 */
+    .text-danger-custom { color: #ff4444 !important; }
 
     /* Table styling */
     .table-dark { background: var(--bg-hover) !important; border-color: var(--border-color) !important; }
@@ -957,7 +970,7 @@
         <div class="modal-content" style="background:#1a1a2e;color:#e0e0e0;">
             <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
                 <h5 class="modal-title">{{ currentDevice.name || (currentDevice.type === 'vm' ? 'VM ' + currentDevice.deviceId : 'CT ' + currentDevice.deviceId) }} - 端口转发管理</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" style="min-height:150px;">
 
@@ -999,15 +1012,15 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">规则名称</label>
-                        <input type="text" class="form-control bg-dark text-light border-secondary" v-model="deviceForm.name" placeholder="如 SSH 转发">
+                        <input type="text" class="form-control" v-model="deviceForm.name" placeholder="如 SSH 转发">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">目标 IP</label>
-                        <input type="text" class="form-control bg-dark text-light border-secondary" :value="availableIps[0]?.ip || ''" readonly>
+                        <input type="text" class="form-control" :value="availableIps[0]?.ip || ''" readonly>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">协议</label>
-                        <select class="form-select bg-dark text-light border-secondary" v-model="deviceForm.protocol">
+                        <select class="form-select" v-model="deviceForm.protocol">
                             <option value="tcp">TCP</option>
                             <option value="udp">UDP</option>
                             <option value="tcp+udp">TCP+UDP</option>
@@ -1021,7 +1034,7 @@
                         <div class="col-md-6">
                             <label class="form-label">外网端口</label>
                             <div class="input-group">
-                                <input type="number" class="form-control bg-dark text-light border-secondary" :class="{ 'is-invalid': deviceCheckResult === false }" v-model.number="deviceForm.external_port" min="1" max="65535">
+                                <input type="number" class="form-control" :class="{ 'is-invalid': deviceCheckResult === false }" v-model.number="deviceForm.external_port" min="1" max="65535">
                                 <button class="btn btn-outline-secondary" type="button" @click="randomDevicePort" title="随机端口">🎲</button>
                             </div>
                             <small class="text-muted">可用范围: {{ forwardConfig.port_range_start }}-{{ forwardConfig.port_range_end }}</small>

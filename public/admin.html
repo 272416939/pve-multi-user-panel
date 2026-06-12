@@ -393,6 +393,9 @@
             color: var(--text-primary);
             transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease; }
         .form-control:focus, .form-select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 0.2rem rgba(99,102,241,0.15); }
+        .form-select option { background: var(--bg-input); color: var(--text-primary); }
+        .form-control.bg-dark, .form-select.bg-dark { background: var(--bg-input) !important; color: var(--text-primary) !important; }
+        .form-control.text-light, .form-select.text-light { color: var(--text-primary) !important; }
 
         /* Alerts */
         .alert-danger { color: var(--color-danger); background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,87,108,0.08));
@@ -406,7 +409,9 @@
         .markdown-body { color: var(--text-primary); transition: color 0.3s ease; }
 
         /* Minimal necessary overrides for btn-close filter in light mode */
-        [data-theme="light"] .btn-close { filter: brightness(0) invert(0); }
+        [data-theme="light"] .btn-close { filter: brightness(0) invert(0.4); opacity: 0.8; }
+        [data-theme="dark"] .btn-close { filter: brightness(0) invert(1); opacity: 0.6; }
+        .btn-close:hover { opacity: 1 !important; }
     </style>
 </head>
 <body>
