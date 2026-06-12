@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v1.8.0_beta15-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v1.8.0_beta23-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -37,7 +37,7 @@
 | 1 | **多租户系统** | 支持管理员和普通用户角色 |
 | 2 | **接入已有虚拟机** | 将 PVE 上现有的虚拟机分配给用户 |
 | 3 | **虚拟机到期管理** | 设置到期时间，到期自动关机并发送提醒 |
-| 4 | **虚拟机监控** | CPU、内存、网络流量、磁盘 IO 实时监控 |
+| 4 | **实时状态监控** | CPU、内存、网络流量、磁盘 IO 3秒 WebSocket 推送（零 HTTP 轮询） |
 | 5 | **LXC 容器管理** | 模板创建、分配换绑、重置密码、销毁 |
 | 6 | **LXC XtermJS 终端** | SSH + PTY 直连，无需 PVE termproxy 代理 |
 | 7 | **LXC 重置 IP** | 手动输入/DHCP/随机三种模式，自动同步绑定 |
@@ -63,7 +63,7 @@
 ### 📬 消息 & 通知
 | # | 功能 | 说明 |
 |---|------|------|
-| 18 | **站内消息系统** | 系统公告、续费提醒、客服私聊，未读角标 |
+| 18 | **站内消息系统** | 系统公告、续费提醒、客服私聊，未读角标 WS 实时推送 |
 | 19 | **SMTP 邮件** | 到期提醒、续费通知、CDK 兑换成功邮件 |
 | 20 | **到期提醒** | 自定义多个提醒时间点，持久化不重复发送 |
 
@@ -75,13 +75,22 @@
 | 23 | **极客头像** | 基于用户名自动生成唯一的 SVG 电路板渐变头像 |
 | 24 | **导航动态化** | 三页面导航统一通过 API 渲染，角色感知 |
 
+### ⚡ 性能优化（v1.8.0-beta21~23）
+| # | 功能 | 说明 |
+|---|------|------|
+| 25 | **WS 状态推送** | VM/LXC CPU/内存/网络 3s 实时推送，替代 HTTP 整表轮询 |
+| 26 | **WS 监控图表** | 详情弹窗 4 组 Chart.js 图表通过 subscribe-detail 推送，消灭 3s HTTP 请求 |
+| 27 | **进程内 TTL 缓存** | profile(60s) + unread-count(10s) + PVE 状态(5s) 缓存，减少 DB/PVE 调用 |
+| 28 | **备份进度 WS 推送** | 备份/恢复完成后 pushToUser 实时通知，消灭 10s 前端轮询 |
+| 29 | **PVE 状态复用** | GET /user/vms 和 /user/lxc 优先命中 pushStatus 缓存，PVE API 调用减半 |
+
 ### 🗄️ 基础设施（v1.8.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 25 | **MySQL 支持** | 可选远程 MySQL 5.7+，自动迁移 SQLite 数据 |
-| 26 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
-| 27 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
-| 28 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
+| 30 | **MySQL 支持** | 可选远程 MySQL 5.7+，自动迁移 SQLite 数据 |
+| 31 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
+| 32 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
+| 33 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
 
 ---
 
@@ -210,6 +219,7 @@ npm run dev
 │   ├── utils/                 # 工具模块
 │   │   ├── debug.js
 │   │   ├── pve-rate.js
+│   │   ├── cache.js            # TTL Map 进程内缓存
 │   │   ├── email.js
 │   │   ├── token.js
 │   │   ├── site-url.js
@@ -301,14 +311,20 @@ npm run dev
 ```
 用户浏览器 ──→ 面板服务器 (443) ──→ PVE / 数据库
                     │
-            ┌───────┴───────┐
-            │  统一推送通道   │ wss://host/ws/push
-            │  JWT ticket    │ 未读角标自动刷新
-            │  心跳 ping/pong│ 消息到达即时显示
-            └───────────────┘
+            ┌───────┴──────────────┐
+            │  统一推送通道          │ wss://host/ws/push
+            │  JWT ticket (5min)    │
+            │  ping/pong 心跳(30s)  │
+            ├───────────────────────┤
+            │  status(3s)           │ CPU/内存/网络/磁盘实时推送
+            │  subscribe-detail     │ 详情弹窗 4 组图表 WS 渲染
+            │  unread(30s)          │ 未读消息角标主动推送
+            │  tick(60s)            │ 列表兜底刷新（名称/IP 变更）
+            │  backup-done/restore  │ 备份/恢复完成即时通知
+            └───────────────────────┘
 ```
 
-通过单一 WebSocket 连接替代多路 HTTP 轮询。前端断线自动重连，30 秒 ping/pong 心跳检测假死连接。JWT ticket 5 分钟有效，防止跨站 WebSocket 劫持。
+六合一 WebSocket 通道替代 5 路 HTTP 轮询。前端 [shared.js](file:///e:/code/pve管理面板/public/js/shared.js) `initPushClient(onMessage, onOpen)` 自动断线重连，`subscribe` 队列确保重连后重新订阅。服务端 [push-proxy.js](file:///e:/code/pve管理面板/server/websocket/push-proxy.js) 通过 `pushToUser` 支持定向推送。
 
 ---
 
@@ -382,6 +398,7 @@ REDIS_PREFIX=pve:
 - **速率限制**: 登录/2FA/忘记密码/CDK 限制计数器持久化，重启不丢失
 - **VNC Ticket**: 5 分钟 TTL 自动过期
 - **到期提醒**: 24 小时去重，防止重复邮件
+- **推送 WebSocket**: `pushToUser()` 定向推送到在线用户（进程内直通，Redis 无需额外配置）
 
 ---
 
@@ -417,6 +434,115 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v1.8.0-beta23</b> (2026-06-12) — 四项性能优化</summary>
+
+**① 详情监控 WS 推送：**
+- ✅ 详情弹窗 3s HTTP 轮询 → subscribe-detail WS 推送，feedDetailCharts 原地更新 4 组图表
+- ✅ 消灭 GET /vm/:vmid/status + GET /lxc/:vmid/status 两个高频端点
+
+**② 进程内 TTL 缓存：**
+- ✅ 新增 server/utils/cache.js TTL Map 缓存工具（60s 自动清理过期条目）
+- ✅ GET /user/profile 缓存 60s（修改资料时主动失效）
+- ✅ GET /messages/unread-count 缓存 10s（已读/删除/发消息时主动失效）
+
+**③ 备份进度 WS 推送：**
+- ✅ backup-polling.js 完成/失败时 pushToUser 推 backup-done / restore-done
+- ✅ 消灭前端 10s backup/lxcBackup 弹窗轮询
+
+**④ PVE 状态缓存复用：**
+- ✅ pushStatus 结果存入 statusCacheGlobal (5s TTL)
+- ✅ GET /user/vms + /user/lxc 优先命中缓存，PVE API 调用减半
+
+**涉及文件：** `server/utils/cache.js`（新增）· `push-proxy.js` · `backup-polling.js` · `message.js` · `user.js` · `vm.js` · `lxc.js` · `shared.js` · `dashboard/core.js` · `admin/core.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta22</b> (2026-06-12) — LXC 误操作严重 Bug 修复</summary>
+
+**修复：**
+- ✅ 确认弹窗 `c.id === lxcConfirmState.ctId` → `c.ct_id === lxcConfirmState.ctId`
+- ✅ DB 自增 ID 与 PVE 真实 ID 永远不匹配 → find() 返回 undefined → 回退 [0]，导致误操作错误容器
+- ✅ admin.html + dashboard.html 两处同步修复
+
+**涉及文件：** `public/admin.html` · `public/dashboard.html` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta21</b> (2026-06-12) — WS status 推送替代 HTTP 轮询</summary>
+
+**架构变革：**
+- ✅ tick(10s) + HTTP GET /user/vms → subscribe + status(3s) + 原地更新卡片
+- ✅ push-proxy 对接 _applyRate 速率转换
+- ✅ tick 降频 10s→60s（仅兜底刷新）
+- ✅ shared.js initPushClient onOpen 回调 + subscribe 队列
+
+**涉及文件：** `push-proxy.js` · `shared.js` · `dashboard/core.js` · `admin/core.js` · `pve-rate.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta20</b> (2026-06-12) — pushStatus 并行查询 + emit 分组</summary>
+
+**优化：**
+- ✅ pushStatus 从串行 for-of → 并行 Promise.all（N 个 VM/LXC 同时查 PVE）
+- ✅ 检查后端 WS 是否活跃再发送（避免无客户端时空推）
+- ✅ 心跳 ping/pong 修复 → 改用 ws.on('pong') 监听
+
+**涉及文件：** `push-proxy.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta19</b> (2026-06-12) — VM 列表字段补全 + 图标对齐</summary>
+
+**修复：**
+- ✅ admin lxcList 补全 `os` 字段映射（template_name 回退 config.ostype）
+- ✅ 管理员 VM 列表补全 `username` 字段
+- ✅ dashboard 内部转发按钮图标对齐修复
+
+**涉及文件：** `server/routes/vm.js` · `server/routes/lxc.js` · `public/dashboard.html` · `public/admin.html` · `public/js/admin/vm.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta18</b> (2026-06-12) — CDK 优化 + CORS 修复</summary>
+
+**修复：**
+- ✅ CORS 白名单支持带端口域名（`https://domain.com:443`）
+- ✅ CDK 兑换优化：兑换后自动拉取最新 VM 列表
+- ✅ CDK 配额检查：后台创建时校验未使用 CDK + 已分配 VM 总数
+
+**涉及文件：** `server/server.js` · `server/routes/cdk.js` · `public/js/dashboard/cdk.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta17</b> (2026-06-12) — VM 详情监控 + LXC 列表修复</summary>
+
+**新特性 & 修复：**
+- ✅ VM/LXC 详情弹窗：4 组 Chart.js 实时监控图表（CPU/内存/网络/磁盘）
+- ✅ 管理员 LXC 列表补全用户名字段（username）
+- ✅ push-proxy 修复：emit 时检查 ws.readyState 防止 crash
+
+**涉及文件：** `push-proxy.js` · `dashboard/core.js` · `admin/core.js` · `dashboard.html` · `admin.html` · `lxc.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta16</b> (2026-06-12) — WebSocket 在线订阅</summary>
+
+**新特性：**
+- ✅ push-proxy subscribe/unsubscribe 在线订阅机制
+- ✅ 用户 VM/LXC 变更后无需刷新页面，WS 自动更新
+- ✅ 连接时自动推送当前未读数
+
+**涉及文件：** `push-proxy.js` · `shared.js` · `dashboard/core.js` · `admin/core.js` · `package.json`
+
+</details>
 
 <details>
 <summary><b>v1.8.0-beta15</b> (2026-06-12) — WebSocket 统一推送</summary>
