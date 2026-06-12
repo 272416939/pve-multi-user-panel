@@ -141,20 +141,18 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
     let fallbackNote = '';
 
     try {
-        // 使用 per_page=1 获取最新 release
-        // 注意：GitHub /releases 默认不返回 prerelease，需额外查询后合并取最新
+        // per_page=20 确保拉取足够多 Release 后按 published_at 降序取最新
+        // GitHub API 默认按标签时间戳排序（不可靠），需拉取多条后手动按 published_at 排序
         if (source === 'gitee') {
-            response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=1&sort=created&direction=desc`, { timeout: 10000 });
+            response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=20&sort=created&direction=desc`, { timeout: 10000 });
             response.data = Array.isArray(response.data) ? response.data[0] : response.data;
         } else {
-            // GitHub 需要同时查询 releases 和 prereleases，取按时间最新的
             const [releasesRes, preReleasesRes] = await Promise.allSettled([
-                axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=1`, { timeout: 10000 }),
-                axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=1&prerelease=true`, { timeout: 10000 })
+                axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=20`, { timeout: 10000 }),
+                axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=20&prerelease=true`, { timeout: 10000 })
             ]);
             const releases = releasesRes.status === 'fulfilled' && Array.isArray(releasesRes.value.data) ? releasesRes.value.data : [];
             const preReleases = preReleasesRes.status === 'fulfilled' && Array.isArray(preReleasesRes.value.data) ? preReleasesRes.value.data : [];
-            // 合并后按 published_at 降序取第一条
             const all = [...releases, ...preReleases].sort((a, b) => new Date(b.published_at || b.created_at) - new Date(a.published_at || a.created_at));
             response = { data: all[0] || null };
         }
@@ -168,8 +166,8 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
             fallbackNote = '（Gitee 不可达，已回退到 GitHub）';
             try {
                 const [rr, prr] = await Promise.allSettled([
-                    axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=1`, { timeout: 10000 }),
-                    axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=1&prerelease=true`, { timeout: 10000 })
+                    axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=20`, { timeout: 10000 }),
+                    axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=20&prerelease=true`, { timeout: 10000 })
                 ]);
                 const rels = rr.status === 'fulfilled' && Array.isArray(rr.value.data) ? rr.value.data : [];
                 const prels = prr.status === 'fulfilled' && Array.isArray(prr.value.data) ? prr.value.data : [];
@@ -185,7 +183,7 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
         } else {
             fallbackNote = '（GitHub 不可达，已回退到 Gitee）';
             try {
-                response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=1&sort=created&direction=desc`, { timeout: 10000 });
+                response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=20&sort=created&direction=desc`, { timeout: 10000 });
                 response.data = Array.isArray(response.data) ? response.data[0] : response.data;
             } catch (e2) {
                 return res.json({
