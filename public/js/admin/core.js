@@ -142,6 +142,10 @@ watch($.user, function(u) {
             if (sb) sb.classList.remove('open');
             if (ol) ol.style.display = 'none';
         }
+        // Clear submenu active states
+        document.querySelectorAll('.nav-submenu .nav-item').forEach(function(item) {
+            item.classList.remove('active');
+        });
     };
 
     $.loadUserData = async function() {
@@ -378,6 +382,52 @@ watch($.user, function(u) {
         });
     };
 
+    // ===== 二级菜单 =====
+    $.expandedSections = ref({});
+
+    $.toggleSubmenu = function(section) {
+        $.expandedSections.value[section] = !$.expandedSections.value[section];
+        var el = document.getElementById('submenu-' + section);
+        if (el) el.classList.toggle('open', $.expandedSections.value[section]);
+        var parent = el ? el.previousElementSibling : null;
+        if (parent) parent.classList.toggle('expanded', $.expandedSections.value[section]);
+        $.switchSection(section);
+    };
+
+    $.switchSubsection = function(section, tab) {
+        $.switchSection(section);
+        if (section === 'vms') {
+            $.activeTabVm.value = tab;
+        } else if (section === 'lxc') {
+            $.activeTabLxc.value = tab;
+        }
+        $.expandedSections.value[section] = true;
+        var el = document.getElementById('submenu-' + section);
+        if (el) el.classList.add('open');
+        var parent = el ? el.previousElementSibling : null;
+        if (parent) parent.classList.add('expanded');
+        document.querySelectorAll('.nav-submenu .nav-item').forEach(function(item) {
+            item.classList.remove('active');
+        });
+        var target = document.querySelector('[data-subsection="' + section + '-' + tab + '"]');
+        if (target) target.classList.add('active');
+    };
+
+    $.switchAdminTab = function(tab) {
+        $.switchSection('admin');
+        $.activeTab.value = tab;
+        $.expandedSections.value['admin'] = true;
+        var el = document.getElementById('submenu-admin');
+        if (el) el.classList.add('open');
+        var parent = el ? el.previousElementSibling : null;
+        if (parent) parent.classList.add('expanded');
+        document.querySelectorAll('#submenu-admin .nav-item').forEach(function(item) {
+            item.classList.remove('active');
+        });
+        var target = document.querySelector('[data-subsection="admin-' + tab + '"]');
+        if (target) target.classList.add('active');
+    };
+
     // ==================== 详情弹窗函数 ====================
     $.openVmDetail = function(vm) {
         console.log('openVmDetail called', vm);
@@ -539,6 +589,16 @@ $.initDetailCharts = function() {
                 await $.loadNavItems();
                 await $.loadAssignData();
                 await $.loadData();
+                // Auto-expand submenu based on current section
+                if ($.activeSection.value === 'vms' || $.activeSection.value === 'lxc') {
+                    setTimeout(function() {
+                        $.toggleSubmenu($.activeSection.value);
+                    }, 100);
+                } else if ($.activeSection.value === 'admin') {
+                    setTimeout(function() {
+                        $.toggleSubmenu('admin');
+                    }, 100);
+                }
                 await $.loadUserLxcContainers();
                 $.loadUnreadCount();
                 initPushClient(function(msg) {
