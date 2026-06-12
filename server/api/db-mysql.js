@@ -779,20 +779,21 @@ module.exports = {
             return queryOne('SELECT * FROM cdk_codes WHERE id = ?', [result.insertId]);
         },
         markAsUsed: async (id, userId, vmId, ctId) => {
+            let result;
             if (ctId) {
-                await execute(
+                [result] = await execute(
                     `UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_ct_id = ?, used_at = ?
-                     WHERE id = ?`,
+                     WHERE id = ? AND is_used = 0`,
                     [userId, vmId, ctId, mysqlNow(), id]
                 );
             } else {
-                await execute(
+                [result] = await execute(
                     `UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_at = ?
-                     WHERE id = ?`,
+                     WHERE id = ? AND is_used = 0`,
                     [userId, vmId, mysqlNow(), id]
                 );
             }
-            return queryOne('SELECT * FROM cdk_codes WHERE id = ?', [id]);
+            return { affected: result.affectedRows, cdk: await queryOne('SELECT * FROM cdk_codes WHERE id = ?', [id]) };
         },
         delete: (id) => execute('DELETE FROM cdk_codes WHERE id = ?', [id]),
         deleteBatch: (ids) => {

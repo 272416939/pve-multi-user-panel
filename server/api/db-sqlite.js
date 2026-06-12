@@ -867,18 +867,19 @@ module.exports = {
             return db.prepare('SELECT * FROM cdk_codes WHERE id = ?').get(lastInsertRowid);
         },
         markAsUsed: (id, userId, vmId, ctId) => {
+            let info;
             if (ctId) {
-                db.prepare(`
+                info = db.prepare(`
                     UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_ct_id = ?, used_at = ?
-                    WHERE id = ?
+                    WHERE id = ? AND is_used = 0
                 `).run(userId, vmId, ctId, new Date().toISOString(), id);
             } else {
-                db.prepare(`
+                info = db.prepare(`
                     UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_at = ?
-                    WHERE id = ?
+                    WHERE id = ? AND is_used = 0
                 `).run(userId, vmId, new Date().toISOString(), id);
             }
-            return db.prepare('SELECT * FROM cdk_codes WHERE id = ?').get(id);
+            return { affected: info.changes, cdk: db.prepare('SELECT * FROM cdk_codes WHERE id = ?').get(id) };
         },
         delete: (id) => db.prepare('DELETE FROM cdk_codes WHERE id = ?').run(id),
         deleteBatch: (ids) => {
