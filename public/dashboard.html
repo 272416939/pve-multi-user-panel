@@ -1319,24 +1319,24 @@
                             <div class="row text-center g-2">
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-light opacity-75">当前快照数</div>
-                                        <div class="fw-bold text-light" :class="snapshotLimits.current >= snapshotLimits.max ? 'text-danger' : ''">
+                                        <div class="small" style="color: var(--text-secondary); opacity: 0.75;">当前快照数</div>
+                                        <div class="fw-bold" :class="snapshotLimits.current >= snapshotLimits.max ? 'text-danger' : ''" style="color: var(--text-primary);">
                                             {{ snapshotLimits.current }} / {{ snapshotLimits.max }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-light opacity-75">今日创建</div>
-                                        <div class="fw-bold text-light" :class="snapshotLimits.today_creates >= snapshotLimits.max_creates ? 'text-danger' : ''">
+                                        <div class="small" style="color: var(--text-secondary); opacity: 0.75;">今日创建</div>
+                                        <div class="fw-bold" :class="snapshotLimits.today_creates >= snapshotLimits.max_creates ? 'text-danger' : ''" style="color: var(--text-primary);">
                                             {{ snapshotLimits.today_creates }} / {{ snapshotLimits.max_creates }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-light opacity-75">今日恢复</div>
-                                        <div class="fw-bold text-light" :class="snapshotLimits.today_rollbacks >= snapshotLimits.max_rollbacks ? 'text-danger' : ''">
+                                        <div class="small" style="color: var(--text-secondary); opacity: 0.75;">今日恢复</div>
+                                        <div class="fw-bold" :class="snapshotLimits.today_rollbacks >= snapshotLimits.max_rollbacks ? 'text-danger' : ''" style="color: var(--text-primary);">
                                             {{ snapshotLimits.today_rollbacks }} / {{ snapshotLimits.max_rollbacks }}
                                         </div>
                                     </div>
@@ -1453,16 +1453,16 @@
                         <div class="row text-center g-2">
                             <div class="col-6">
                                 <div class="border rounded p-2">
-                                    <div class="small text-light opacity-75">当前备份数</div>
-                                    <div class="fw-bold text-light" :class="backupLimits.current >= backupLimits.max_per_vm ? 'text-danger' : ''">
+                                    <div class="small" style="color: var(--text-secondary); opacity: 0.75;">当前备份数</div>
+                                    <div class="fw-bold" :class="backupLimits.current >= backupLimits.max_per_vm ? 'text-danger' : ''" style="color: var(--text-primary);">
                                         {{ backupLimits.current }} / {{ backupLimits.max_per_vm }}
                                     </div>
                                 </div>
                             </div>
                             <div class="col-6">
                                 <div class="border rounded p-2">
-                                    <div class="small text-light opacity-75">今日创建</div>
-                                    <div class="fw-bold text-light" :class="backupLimits.today_creates >= backupLimits.daily_limit ? 'text-danger' : ''">
+                                    <div class="small" style="color: var(--text-secondary); opacity: 0.75;">今日创建</div>
+                                    <div class="fw-bold" :class="backupLimits.today_creates >= backupLimits.daily_limit ? 'text-danger' : ''" style="color: var(--text-primary);">
                                         {{ backupLimits.today_creates }} / {{ backupLimits.daily_limit }}
                                     </div>
                                 </div>
@@ -1683,24 +1683,24 @@
                             <div class="row text-center g-2">
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-light opacity-75">当前快照数</div>
-                                        <div class="fw-bold text-light" :class="lxcSnapshotLimits.current >= lxcSnapshotLimits.max ? 'text-danger' : ''">
+                                        <div class="small" style="color: var(--text-secondary); opacity: 0.75;">当前快照数</div>
+                                        <div class="fw-bold" :class="lxcSnapshotLimits.current >= lxcSnapshotLimits.max ? 'text-danger' : ''" style="color: var(--text-primary);">
                                             {{ lxcSnapshotLimits.current }} / {{ lxcSnapshotLimits.max }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-light opacity-75">今日创建</div>
-                                        <div class="fw-bold text-light" :class="lxcSnapshotLimits.today_creates >= lxcSnapshotLimits.max_creates ? 'text-danger' : ''">
+                                        <div class="small" style="color: var(--text-secondary); opacity: 0.75;">今日创建</div>
+                                        <div class="fw-bold" :class="lxcSnapshotLimits.today_creates >= lxcSnapshotLimits.max_creates ? 'text-danger' : ''" style="color: var(--text-primary);">
                                             {{ lxcSnapshotLimits.today_creates }} / {{ lxcSnapshotLimits.max_creates }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-light opacity-75">今日恢复</div>
-                                        <div class="fw-bold text-light" :class="lxcSnapshotLimits.today_rollbacks >= lxcSnapshotLimits.max_rollbacks ? 'text-danger' : ''">
+                                        <div class="small" style="color: var(--text-secondary); opacity: 0.75;">今日恢复</div>
+                                        <div class="fw-bold" :class="lxcSnapshotLimits.today_rollbacks >= lxcSnapshotLimits.max_rollbacks ? 'text-danger' : ''" style="color: var(--text-primary);">
                                             {{ lxcSnapshotLimits.today_rollbacks }} / {{ lxcSnapshotLimits.max_rollbacks }}
                                         </div>
                                     </div>
@@ -1816,16 +1816,16 @@
                         <div class="row text-center g-2">
                             <div class="col-6">
                                 <div class="border rounded p-2">
-                                    <div class="small text-light opacity-75">当前备份数</div>
-                                    <div class="fw-bold text-light" :class="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm ? 'text-danger' : ''">
+                                    <div class="small" style="color: var(--text-secondary); opacity: 0.75;">当前备份数</div>
+                                    <div class="fw-bold" :class="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm ? 'text-danger' : ''" style="color: var(--text-primary);">
                                         {{ lxcBackupLimits.current }} / {{ lxcBackupLimits.max_per_vm }}
                                     </div>
                                 </div>
                             </div>
                             <div class="col-6">
                                 <div class="border rounded p-2">
-                                    <div class="small text-light opacity-75">今日创建</div>
-                                    <div class="fw-bold text-light" :class="lxcBackupLimits.today_creates >= lxcBackupLimits.daily_limit ? 'text-danger' : ''">
+                                    <div class="small" style="color: var(--text-secondary); opacity: 0.75;">今日创建</div>
+                                    <div class="fw-bold" :class="lxcBackupLimits.today_creates >= lxcBackupLimits.daily_limit ? 'text-danger' : ''" style="color: var(--text-primary);">
                                         {{ lxcBackupLimits.today_creates }} / {{ lxcBackupLimits.daily_limit }}
                                     </div>
                                 </div>
