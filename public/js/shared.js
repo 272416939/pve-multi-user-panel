@@ -26,6 +26,7 @@ const api = (endpoint, options = {}) => {
                     if (refreshRes.ok) {
                         const refreshData = await refreshRes.json();
                         localStorage.setItem('token', refreshData.token);
+                        localStorage.setItem('refreshToken', refreshData.refreshToken);
                         const retryOptions = {
                             ...options,
                             headers: {
@@ -89,6 +90,7 @@ function ensureValidToken() {
     }).then(data => {
         if (data.token) {
             localStorage.setItem('token', data.token);
+            if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
             return data.token;
         }
         return null;

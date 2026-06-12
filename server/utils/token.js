@@ -38,7 +38,7 @@ if (DANGEROUS_SECRETS.includes(JWT_SECRET)) {
     console.error('╚════════════════════════════════════════╝');
     console.error('');
 }
-const JWT_EXPIRES_IN = '15m';
+const JWT_EXPIRES_IN = '60m';
 const REFRESH_TOKEN_DAYS = 7;
 
 function generateToken() {
