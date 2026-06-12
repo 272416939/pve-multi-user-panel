@@ -163,7 +163,10 @@
         });
 
         document.getElementById('ctrlAltDelBtn').addEventListener('click', () => {
-            if (rfb) rfb.sendCtrlAltDel();
+            if (!rfb) return;
+            if (confirm('确定要发送 Ctrl+Alt+Del 吗？\n\nLinux 系统可能会触发重启操作。')) {
+                rfb.sendCtrlAltDel();
+            }
         });
 
         document.getElementById('altTabBtn').addEventListener('click', () => {
