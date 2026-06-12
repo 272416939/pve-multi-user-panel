@@ -1098,6 +1098,10 @@ module.exports = {
                 db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ?').run(userId);
             }
         },
+        revokeByUserAndDevice: (userId, deviceName) => {
+            db.prepare('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND device_name = ? AND revoked = 0')
+              .run(userId, deviceName);
+        },
         cleanup: () => db.prepare('DELETE FROM refresh_tokens WHERE expires_at <= datetime("now") OR revoked = 1').run()
     },
 

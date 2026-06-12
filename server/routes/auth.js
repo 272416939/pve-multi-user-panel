@@ -65,11 +65,13 @@ router.post('/login', async (req, res) => {
 
     const refreshToken = generateRefreshToken();
     const ua = req.headers['user-agent'] || '';
+    const deviceName = (device_name || ua.substring(0, 100));
+    await db.refreshTokens.revokeByUserAndDevice(user.id, deviceName);
     
     const record = await db.refreshTokens.create({
         user_id: user.id,
         token: refreshToken,
-        device_name: device_name || ua.substring(0, 100),
+        device_name: deviceName,
         ip,
         user_agent: ua,
         created_at: new Date().toISOString(),
@@ -141,14 +143,15 @@ router.post('/login/2fa', async (req, res) => {
             record = await db.refreshTokens.getByToken(refreshToken);
         }
         if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
-            // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
-    const ip = req.ip;
+            const ip = req.ip;
             const ua = req.headers['user-agent'] || '';
+            const deviceName = ua.substring(0, 100);
+            await db.refreshTokens.revokeByUserAndDevice(user.id, deviceName);
             refreshToken = generateRefreshToken();
             record = await db.refreshTokens.create({
                 user_id: user.id,
                 token: refreshToken,
-                device_name: ua.substring(0, 100),
+                device_name: deviceName,
                 ip,
                 user_agent: ua,
                 created_at: new Date().toISOString(),
@@ -171,14 +174,15 @@ router.post('/login/2fa', async (req, res) => {
                 record = await db.refreshTokens.getByToken(refreshToken);
             }
             if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
-                // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
-    const ip = req.ip;
+                const ip = req.ip;
                 const ua = req.headers['user-agent'] || '';
+                const deviceName = ua.substring(0, 100);
+                await db.refreshTokens.revokeByUserAndDevice(user.id, deviceName);
                 refreshToken = generateRefreshToken();
                 record = await db.refreshTokens.create({
                     user_id: user.id,
                     token: refreshToken,
-                    device_name: ua.substring(0, 100),
+                    device_name: deviceName,
                     ip,
                     user_agent: ua,
                     created_at: new Date().toISOString(),

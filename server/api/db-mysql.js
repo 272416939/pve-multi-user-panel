@@ -1022,6 +1022,10 @@ module.exports = {
                 await execute('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ?', [userId]);
             }
         },
+        revokeByUserAndDevice: async (userId, deviceName) => {
+            await execute('UPDATE refresh_tokens SET revoked = 1 WHERE user_id = ? AND device_name = ? AND revoked = 0',
+              [userId, deviceName]);
+        },
         cleanup: () => execute("DELETE FROM refresh_tokens WHERE expires_at <= NOW() OR revoked = 1")
     },
 
