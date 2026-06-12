@@ -848,6 +848,7 @@
                                     <td>{{ vm.vm_id }}</td>
                                     <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
+                                    <td><span v-if="cnameDomain" class="text-primary">{{ vm.vm_id }}.{{ cnameDomain }}</span><span v-else class="text-muted">-</span></td>
                                     <td>{{ (vm.config ? (vm.config.sockets||1) + '核' + (vm.config.cores||1) + 'G' : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
                                     <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                     <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
