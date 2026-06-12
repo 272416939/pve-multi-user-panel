@@ -89,11 +89,10 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
         if (!title || !content) return res.status(400).json({ error: '标题和内容不能为空' });
         
         if (!uids || uids.length === 0) {
-            // 全员发送 - 为每个用户创建一条消息
-            const users = db.users.getAll();
+            const users = await db.users.getAll();
             const batchId = Date.now().toString();
             for (const user of users) {
-                db.messages.create({
+                await db.messages.create({
                     uid: user.id,
                     title, content,
                     type: type || 1,
