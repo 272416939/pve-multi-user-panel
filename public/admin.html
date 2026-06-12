@@ -275,13 +275,13 @@
             width: 3px; height: 20px; border-radius: 2px; background: linear-gradient(180deg, #6366F1, #8B5CF6); }
 
         table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
-        thead th, .table thead th, .table-striped thead th { padding: 12px 16px !important; text-align: left; font-weight: 600 !important; color: var(--text-secondary) !important; font-size: 12px !important;
-            text-transform: uppercase; letter-spacing: 0.5px;
-            background: linear-gradient(180deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%) !important;
-            border-bottom: 1px solid rgba(99,102,241,0.15) !important;
+        thead th, .table thead th, .table-striped thead th { padding: 14px 18px !important; text-align: left; font-weight: 600 !important; color: var(--text-secondary) !important; font-size: 12px !important;
+            text-transform: uppercase; letter-spacing: 0.6px;
+            background: linear-gradient(180deg, rgba(99,102,241,0.10) 0%, rgba(139,92,246,0.05) 100%) !important;
+            border-bottom: 2px solid rgba(99,102,241,0.18) !important;
             white-space: nowrap; transition: all 0.3s ease; }
-        thead th:first-child, .table thead th:first-child, .table-striped thead th:first-child { border-radius: 10px 0 0 0 !important; }
-        thead th:last-child, .table thead th:last-child, .table-striped thead th:last-child { border-radius: 0 10px 0 0 !important; }
+        thead tr:first-child th:first-child, .table thead tr:first-child th:first-child, .table-striped thead tr:first-child th:first-child { border-radius: 12px 0 0 0 !important; }
+        thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .table-striped thead tr:last-child th:last-child { border-radius: 0 12px 0 0 !important; }
         /* Reset Bootstrap table background variables and thead bg */
         .table, .table-striped, .table-sm, .table-hover, .table-dark {
             --bs-table-bg: transparent;
@@ -303,6 +303,11 @@
         .update-source-badge { display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
             background: rgba(99,102,241,0.18); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.25);
             transition: all 0.3s ease; }
+        /* VM/CT type badge - theme adaptive */
+        .type-badge { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
+            letter-spacing: 0.5px; transition: all 0.3s ease; }
+        .type-badge-vm { background: rgba(99,102,241,0.2); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.3); }
+        .type-badge-ct { background: rgba(52,211,153,0.15); color: #34d399; border: 1px solid rgba(52,211,153,0.25); }
         td { padding: 11px 16px; border-bottom: 1px solid var(--border-light); vertical-align: middle; color: var(--text-primary); font-size: 13px;
             transition: color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease; }
         tr:hover td { background: var(--bg-hover); }
@@ -481,8 +486,8 @@
         }
         /* Light mode: table header */
         [data-theme="light"] thead th, [data-theme="light"] .table thead th, [data-theme="light"] .table-striped thead th {
-            background: linear-gradient(180deg, rgba(99,102,241,0.06) 0%, rgba(139,92,246,0.03) 100%) !important;
-            border-bottom: 1px solid rgba(99,102,241,0.12) !important;
+            background: linear-gradient(180deg, rgba(99,102,241,0.07) 0%, rgba(139,92,246,0.035) 100%) !important;
+            border-bottom: 2px solid rgba(99,102,241,0.14) !important;
             color: #6b7280 !important;
         }
         /* Light mode: update banner */
@@ -492,6 +497,12 @@
         }
         [data-theme="light"] .update-source-badge {
             background: rgba(99,102,241,0.1); color: #4f46e5; border-color: rgba(99,102,241,0.2);
+        }
+        [data-theme="light"] .type-badge-vm {
+            background: rgba(99,102,241,0.12); color: #4338ca; border-color: rgba(99,102,241,0.25);
+        }
+        [data-theme="light"] .type-badge-ct {
+            background: rgba(16,185,129,0.12); color: #059669; border-color: rgba(16,185,129,0.25);
         }
     </style>
 </head>
@@ -1720,7 +1731,7 @@
                                             <tr v-for="(rule, idx) in paginatedForwardRules" :key="rule.id" :class="{ 'text-muted': rule.sync_status === 'orphan' }">
                                                 <td>{{ (forwardPage - 1) * forwardPageSize + idx + 1 }}</td>
                                                 <td>{{ rule.name || '-' }}</td>
-                                                <td><span class="badge" :class="rule.type === 'vm' ? 'bg-info' : 'bg-success'">{{ rule.type === 'vm' ? 'VM' : 'CT' }}</span></td>
+                                                <td><span class="type-badge" :class="rule.type === 'vm' ? 'type-badge-vm' : 'type-badge-ct'">{{ rule.type === 'vm' ? 'VM' : 'CT' }}</span></td>
                                                 <td>{{ rule.vm_id || rule.ct_id }}</td>
                                                 <td>{{ rule.ip }}</td>
                                                 <td>{{ rule.internal_port }}</td>
