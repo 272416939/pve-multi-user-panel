@@ -1682,24 +1682,24 @@
                             <div class="row text-center g-2">
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-muted">当前快照数</div>
-                                        <div class="fw-bold" :class="lxcSnapshotLimits.current >= lxcSnapshotLimits.max ? 'text-danger' : ''">
+                                        <div class="small text-light opacity-75">当前快照数</div>
+                                        <div class="fw-bold text-light" :class="lxcSnapshotLimits.current >= lxcSnapshotLimits.max ? 'text-danger' : ''">
                                             {{ lxcSnapshotLimits.current }} / {{ lxcSnapshotLimits.max }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-muted">今日创建</div>
-                                        <div class="fw-bold" :class="lxcSnapshotLimits.today_creates >= lxcSnapshotLimits.max_creates ? 'text-danger' : ''">
+                                        <div class="small text-light opacity-75">今日创建</div>
+                                        <div class="fw-bold text-light" :class="lxcSnapshotLimits.today_creates >= lxcSnapshotLimits.max_creates ? 'text-danger' : ''">
                                             {{ lxcSnapshotLimits.today_creates }} / {{ lxcSnapshotLimits.max_creates }}
                                         </div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-muted">今日恢复</div>
-                                        <div class="fw-bold" :class="lxcSnapshotLimits.today_rollbacks >= lxcSnapshotLimits.max_rollbacks ? 'text-danger' : ''">
+                                        <div class="small text-light opacity-75">今日恢复</div>
+                                        <div class="fw-bold text-light" :class="lxcSnapshotLimits.today_rollbacks >= lxcSnapshotLimits.max_rollbacks ? 'text-danger' : ''">
                                             {{ lxcSnapshotLimits.today_rollbacks }} / {{ lxcSnapshotLimits.max_rollbacks }}
                                         </div>
                                     </div>
