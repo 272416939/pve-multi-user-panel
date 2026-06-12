@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
+const { pushUnreadCount } = require('../websocket/push-proxy');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 router.get('/messages', authMiddleware, async (req, res) => {
@@ -99,6 +100,7 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
                 });
             }
             res.json({ message: `已向 ${users.length} 个用户发送消息` });
+            pushUnreadCount();
         } else {
             // 多选用户发送
             const uidArr = Array.isArray(uids) ? uids : [uids];
@@ -121,6 +123,7 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
                 sentCount++;
             }
             res.json({ message: `消息已发送给 ${sentCount} 个用户` });
+            pushUnreadCount();
         }
     } catch (error) {
         console.error('发送消息失败:', error);

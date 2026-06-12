@@ -500,7 +500,6 @@ $.initDetailCharts = function() {
 
 // ==================== initCore ====================
     $.initCore = function() {
-        var refreshInterval = null;
 
         onMounted(async function() {
             var hasAccess = await $.loadUserData();
@@ -511,21 +510,24 @@ $.initDetailCharts = function() {
                 initPushClient(function(msg) {
                     if (msg.type === 'unread') {
                         $.unreadCount.value = msg.count;
+                        var el = document.getElementById('adminMsgCount');
+                        if (el) {
+                            el.textContent = msg.count;
+                            el.style.display = msg.count > 0 ? '' : 'none';
+                        }
+                    }
+                    if (msg.type === 'tick') {
+                        if ($.user.value && $.activeSection.value === 'vms') {
+                            $.refreshVms();
+                        } else if ($.user.value && $.activeSection.value === 'lxc') {
+                            $.loadUserLxcContainers();
+                        }
                     }
                 });
                 $.loadNetworkConfig();
-                // 若刷新后 activeTab 为 network，主动加载转发规则
                 if ($.activeTab.value === 'network') {
                     $.loadForwardRules('all');
                 }
-
-                refreshInterval = setInterval(function() {
-                    if ($.user.value && $.activeSection.value === 'vms') {
-                        $.refreshVms();
-                    } else if ($.user.value && $.activeSection.value === 'lxc') {
-                        $.loadUserLxcContainers();
-                    }
-                }, 10000);
             }
         });
 

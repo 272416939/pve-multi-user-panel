@@ -205,13 +205,20 @@ pushProxy.on('connection', (clientWs, request) => {
 let hbTimer = null;
 let statusTimer = null;
 let unreadTimer = null;
+let tickTimer = null;
 
 function ensureTimers() {
     if (!hbTimer) hbTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL);
     if (!statusTimer) statusTimer = setInterval(pushStatus, STATUS_INTERVAL);
     if (!unreadTimer) unreadTimer = setInterval(pushUnreadCount, UNREAD_INTERVAL);
+    if (!tickTimer) tickTimer = setInterval(() => {
+        for (const [ws] of SUBSCRIPTIONS) {
+            send(ws, { type: 'tick' });
+        }
+    }, 10000);
 }
 
 pushProxy.on('connection', () => { ensureTimers(); });
 
 module.exports = pushProxy;
+module.exports.pushUnreadCount = pushUnreadCount;

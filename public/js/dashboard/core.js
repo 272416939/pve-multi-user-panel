@@ -464,16 +464,24 @@
                 initPushClient(function(msg) {
                     if (msg.type === 'unread') {
                         $.unreadCount.value = msg.count;
+                        var el = document.getElementById('msgCount');
+                        if (el) {
+                            el.textContent = msg.count;
+                            el.style.display = msg.count > 0 ? '' : 'none';
+                        }
+                    }
+                    if (msg.type === 'tick') {
+                        if ($.user.value && $.activeSection.value === 'vm') {
+                            $.loadData();
+                        }
+                        if ($.user.value && $.activeSection.value === 'lxc') {
+                            $.loadLxcContainers();
+                        }
                     }
                 });
 
+                // backup/lxcBackup modals polling
                 $.refreshInterval = setInterval(function() {
-                    if ($.user.value && $.activeSection.value === 'vm') {
-                        $.loadData();
-                    }
-                    if ($.user.value && $.activeSection.value === 'lxc') {
-                        $.loadLxcContainers();
-                    }
                     var backupEl = document.getElementById('backupModal');
                     if (backupEl && backupEl.classList.contains('show') && $.backups.value.some(function(b) { return b.status === 'running' || b.status === 'pending'; })) {
                         $.loadBackups($.backupVmId.value);
