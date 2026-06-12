@@ -4,10 +4,12 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v1.7.4-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v1.8.0_beta9-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-可选-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Redis](https://img.shields.io/badge/Redis-可选-dc382d?style=flat-square&labelColor=1a1740&logo=redis&logoColor=white)](https://redis.io/)
 [![License](https://img.shields.io/badge/license-MIT-f59e0b?style=flat-square&labelColor=1a1740)](LICENSE)
 
 </div>
@@ -47,7 +49,7 @@
 | 9 | **二次验证 (2FA)** | TOTP 双因素认证，支持 Google Authenticator |
 | 10 | **权限控制** | 用户仅可见操作已分配的虚拟机/容器 |
 | 11 | **全站统一弹窗** | 自定义深色科技风格 Modal 替代原生 alert/confirm |
-| 12 | **内嵌操作确认** | 关机/重启/停止卡片内遮罩确认，防误操作 |
+| 12 | **速率限制** | 登录/2FA/忘记密码/CDK 兑换自动限速，支持 Redis |
 
 ### 🛠️ 管理功能
 | # | 功能 | 说明 |
@@ -56,7 +58,7 @@
 | 14 | **虚拟机备份恢复** | PVE 停止模式 + zstd 压缩，异步轮询进度 |
 | 15 | **CDK 兑换码系统** | 批量生成、CSV 导出、指定用户分配、自动通知 |
 | 16 | **DHCP 静态绑定** | VM/LXC 分配时自动创建，解绑销毁自动删除 |
-| 17 | **端口转发管理** | ikaui 自动同步，随机端口、冲突检查 |
+| 17 | **端口转发管理** | ikuai 自动同步，随机端口、冲突检查 |
 
 ### 📬 消息 & 通知
 | # | 功能 | 说明 |
@@ -73,6 +75,14 @@
 | 23 | **极客头像** | 基于用户名自动生成唯一的 SVG 电路板渐变头像 |
 | 24 | **导航动态化** | 三页面导航统一通过 API 渲染，角色感知 |
 
+### 🗄️ 基础设施（v1.8.0 新增）
+| # | 功能 | 说明 |
+|---|------|------|
+| 25 | **MySQL 支持** | 可选远程 MySQL 5.7+，自动迁移 SQLite 数据 |
+| 26 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
+| 27 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
+| 28 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
+
 ---
 
 ## 🚀 快速开始
@@ -81,7 +91,9 @@
 
 - Node.js 18+
 - Proxmox VE 服务器（需配置 API Token）
-- （可选）ikuai 软路由 v3.7.21+（用于 DHCP 绑定 + 端口转发同步；4.0 版本暂未测试，不确定是否支持）
+- （可选）MySQL 5.7+ 远程数据库
+- （可选）Redis 缓存服务
+- （可选）ikuai 软路由 v3.7.21+（用于 DHCP 绑定 + 端口转发同步；4.0 版本暂未测试）
 
 ### 安装
 
@@ -114,7 +126,7 @@ npm run dev
 ### 默认账号
 
 > **用户名:** `admin`  
-> **密码:** `admin123`  
+> **密码:** 首次启动时随机生成，控制台输出 ⚠️  
 > ⚠️ **首次登录后请立即修改密码！**
 
 ---
@@ -130,12 +142,43 @@ npm run dev
 | `PORT` | 面板服务端口 | `3002` |
 | `SITE_URL` | 外部访问域名（反向代理必填） | `https://your-domain.com` |
 | `JWT_SECRET` | JWT 签名密钥（生产环境请修改） | — |
+| `DEBUG` | 调试日志开关 | `false` |
 | `PVE_SSH_HOST` | PVE 宿主机 SSH 地址 | `10.0.0.2` |
 | `PVE_SSH_PASSWORD` | PVE root 密码 | — |
+
+### 数据库配置（可选）
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `DB_TYPE` | 数据库类型：`sqlite` / `mysql` | `sqlite` |
+| `MYSQL_HOST` | MySQL 服务器地址 | — |
+| `MYSQL_PORT` | MySQL 端口 | `3306` |
+| `MYSQL_USER` | MySQL 用户名 | — |
+| `MYSQL_PASSWORD` | MySQL 密码 | — |
+| `MYSQL_DATABASE` | MySQL 数据库名 | — |
+| `MYSQL_CONNECTION_LIMIT` | 连接池最大连接数 | `10` |
+
+> **注意:** 切换 `DB_TYPE=mysql` 后，系统会自动将 SQLite 数据迁移到 MySQL。已迁移的数据不会重复导入。
+
+### Redis 缓存配置（可选）
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `REDIS_HOST` | Redis 服务器地址（留空=禁用） | — |
+| `REDIS_PORT` | Redis 端口 | `6379` |
+| `REDIS_PASSWORD` | Redis 密码（无密码留空） | — |
+| `REDIS_DB` | Redis 数据库编号 | `0` |
+| `REDIS_PREFIX` | key 前缀（防与其他应用冲突） | `pve:` |
+
+> **注意:** 不配置 `REDIS_HOST` 时，所有缓存回退到进程内存方案，行为不变。配置后速率限制、VNC ticket、到期提醒追踪将持久化到 Redis。
+
+### ikuai 软路由配置
+
+| 变量 | 说明 | 示例 |
+|------|------|------|
 | `IKUAI_HOST` | ikuai 软路由地址 | `http://10.10.10.1` |
 | `IKUAI_USER` | ikuai 用户名 | — |
 | `IKUAI_PASSWORD` | ikuai 密码 | — |
-| `DEBUG` | 调试日志开关 | `false` |
 
 > **注意:** `SITE_URL` 部署在反向代理环境中必填，否则邮件链接会使用内网 IP。ikuai 配置仅后端使用，不会在前端展示。
 
@@ -162,7 +205,8 @@ npm run dev
 │   ├── config/
 │   │   └── multer.js          # 文件上传配置
 │   ├── middleware/
-│   │   └── auth.js            # JWT 认证 + 权限中间件
+│   │   ├── auth.js            # JWT 认证 + 权限中间件
+│   │   └── rate-limiter.js    # 统一速率限制（Redis/内存双模式）
 │   ├── utils/                 # 工具模块
 │   │   ├── debug.js
 │   │   ├── pve-rate.js
@@ -193,10 +237,13 @@ npm run dev
 │   ├── schedule/
 │   │   └── tasks.js           # 定时任务
 │   └── api/
+│       ├── db.js              # 数据库工厂（SQLite/MySQL 自动选择）
+│       ├── db-sqlite.js       # SQLite 驱��
+│       ├── db-mysql.js        # MySQL 驱动（mysql2/promise 连接池）
+│       ├── redis.js           # Redis 缓存客户端（可选）
 │       ├── pve-api.js         # PVE REST API 封装
 │       ├── ikuai-api.js       # ikuai API 封装
-│       ├── ssh-exec.js        # SSH 执行工具
-│       └── db-sqlite.js       # SQLite 数据库
+│       └── ssh-exec.js        # SSH 执行工具
 ├── data/
 │   └── pve-panel.db           # SQLite 数据库（自动生成）
 ├── images/                    # 头像存储（自动创建）
@@ -232,7 +279,7 @@ npm run dev
             └───────────────┘
 ```
 
-所有 VNC 流量经由面板服务器中转，PVE 内网地址不暴露到公网。
+所有 VNC 流量经由面板服务器中转，PVE 内网地址不暴露到公网。VNC ticket 校验支持 Redis 持久化（配置后 5 分钟 TTL），解决进程重启后 ticket 失效问题。
 
 ### LXC XtermJS 终端架构
 
@@ -289,7 +336,37 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 - 系统每 5 分钟检查到期 VM/LXC
 - 到期前按配置天数发送提醒邮件（默认 7/3/1 天前）
 - 到期后自动关机，续费提醒每日 1 次，最多 3 天
-- 提醒持久化到数据库，重启不重复发送
+- 提醒持久化到数据库/Redis，重启不重复发送
+
+### MySQL 模式
+
+```bash
+# .env 中设置
+DB_TYPE=mysql
+MYSQL_HOST=10.0.0.16
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=your-password
+MYSQL_DATABASE=pve_panel
+```
+
+首次启动时自动从 SQLite 迁移所有数据到 MySQL（使用 ON DUPLICATE KEY UPDATE 安全插入）。字符集统一为 utf8mb4，完美支持 emoji。
+
+### Redis 缓存
+
+```bash
+# .env 中设置
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+# REDIS_PASSWORD=  # 无密码则留空
+REDIS_DB=0
+REDIS_PREFIX=pve:
+```
+
+配置后生效的数据类别：
+- **速率限制**: 登录/2FA/忘记密码/CDK 限制计数器持久化，重启不丢失
+- **VNC Ticket**: 5 分钟 TTL 自动过期
+- **到期提醒**: 24 小时去重，防止重复邮件
 
 ---
 
@@ -306,6 +383,7 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 - 不要删除或覆盖 `.env` 文件
 - 不要删除 `data/` 目录和数据库文件
 - 更新前端 JS 模块后需清除 Nginx 反向代理缓存
+- 切换 MySQL 模式前建议备份 `data/pve-panel.db`
 
 ---
 
@@ -326,13 +404,86 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ## 🔄 更新日志
 
 <details>
+<summary><b>v1.8.0-beta9</b> (2026-06-12) — Redis 缓存层</summary>
+
+**新特性：**
+- ✅ 可选 Redis 缓存：5 个独立环境变量配置（HOST/PORT/PASSWORD/DB/PREFIX）
+- ✅ 未配置时自动回退进程内存，零破坏性兼容
+- ✅ 速率限制/VNC ticket/到期提醒追踪迁移到 Redis
+- ✅ 新增 `server/api/redis.js` + `server/middleware/rate-limiter.js`
+- ✅ ioredis 连接池，失败自动降级到内存模式
+
+**涉及文件：**
+`package.json` · `server/api/redis.js`（新增）· `server/middleware/rate-limiter.js`（新增）· `.env.example` · `server/server.js` · `server/routes/auth.js` · `server/routes/cdk.js` · `server/routes/vm.js` · `server/routes/lxc.js` · `server/websocket/vnc-proxy.js` · `server/services/expiry-check.js`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta8</b> (2026-06-12) — SQLite bio 白名单修复</summary>
+
+**修复：**
+- ✅ db-sqlite.js `users.update` 白名单补入 `bio` 列，与 MySQL 版本对齐
+
+**涉及文件：**
+`package.json` · `server/api/db-sqlite.js`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta7</b> (2026-06-12) — await 补全修复</summary>
+
+**修复：**
+- ✅ 7 个路由/服务文件 57 处 db 调用补全 await（修复 `forwardRules.slice` 报错）
+
+**涉及文件：**
+`server/routes/network.js` · `server/routes/message.js` · `server/routes/backup.js` · `server/routes/admin-config.js` · `server/routes/snapshot.js` · `server/api/ikuai-api.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta6</b> (2026-06-12) — MySQL 异步连接池 + 审计修复</summary>
+
+**核心变更：**
+- ✅ sync-mysql 单连接 → mysql2/promise 异步连接池（10 连接，utf8mb4）
+- ✅ 23 个路由/中间件/服务文件同步改 async/await
+- ✅ 修复 7 个安全审计漏洞：is_active 列缺失、白名单错误、crypto 兼容性等
+
+**涉及文件：**
+`package.json` · `server/api/db-mysql.js` · `server/api/db-sqlite.js` · `server/api/db.js` · `server/routes/*` · `server/middleware/auth.js` · `server/services/*` · `server/utils/*`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta5</b> (2026-06-12) — 迁移性能优化</summary>
+
+**优化：**
+- ✅ 迁移专用裸查询（无重试避免雪崩）+ 批量多行 INSERT（每批 50 行）
+- ✅ 迁移后延迟 2 秒重建连接，连接数降低 95%+
+
+**涉及文件：**
+`package.json` · `server/api/db-mysql.js`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta1~4</b> (2026-06-11) — MySQL 数据库支持</summary>
+
+**新特性：**
+- ✅ 新增 `DB_TYPE=mysql` 支持，SQLite 自动迁移
+- ✅ 数据库工厂层 `db.js`，路由透明切换
+- ✅ 修复 charset/连接恢复/重复键冲突等迁移问题
+
+**涉及文件：**
+`server/api/db.js`（新增）· `server/api/db-mysql.js`（新增，1561 行）· `server/schedule/tasks.js`（新增）· 18 个路由/服务文件统一 `require('../api/db')`
+
+</details>
+
+<details>
 <summary><b>v1.7.4</b> (2026-06-09) — CDK 表单输入框高度统一</summary>
 
 **优化：**
 - ✅ 所有输入框统一使用 form-control-sm，高度一致（31px）
 - ✅ 标签输入框新增 sm 紧凑变体，与其他输入框对齐
-- ✅ 第一行使用 align-items-end 底部对齐，标签间距统一 mb-1
-- ✅ 提示文字统一 d-block mt-1，垂直间距规整
 
 **涉及文件：**
 `package.json` · `public/admin.html` · `public/css/components.css`
@@ -340,209 +491,19 @@ git fetch origin && git reset --hard origin/main && npm install --production
 </details>
 
 <details>
-<summary><b>v1.7.3</b> (2026-06-09) — CDK 生成表单布局优化</summary>
+<summary><b>v1.7.0 ~ v1.7.3</b> (2026-06-09) — 系统更新优化</summary>
 
-**优化：**
-- ✅ CDK 生成表单重新设计布局：续费时长按钮组改为 btn-group 横向紧凑排列
-- ✅ 自定义天数输入框与按钮组同行对齐，不再换行堆叠
-- ✅ 列宽比例调整：续费时长 7:5、有效期 5:7，更符合内容量
-- ✅ 标签统一为 small text-muted 风格，视觉更清爽
-- ✅ 提示文字精简，减少冗余
-
-**涉及文件：**
-`package.json` · `public/admin.html`
+- ✅ CDK 表单布局优化、更新源选择器、版本号显示修复
 
 </details>
 
 <details>
-<summary><b>v1.7.2</b> (2026-06-09) — 系统更新源选择功能</summary>
+<summary><b>v1.6.0 ~ v1.6.9</b> (2026-06-07~09) — 自动更新 + 模块化重构</summary>
 
-**新功能：**
-- ✅ 系统更新页面新增更新源下拉选择器（Gitee / GitHub）
-- ✅ 每个选项带说明文字：适用场景、访问速度、推荐程度
-- ✅ 选择后检查更新和执行更新均使用指定源
-- ✅ 指定源不可达时自动回退到另一源
-
-**涉及文件：**
-`package.json` · `public/js/admin/update.js` · `public/admin.html` · `server/routes/admin-config.js`
-
-</details>
-
-<details>
-<summary><b>v1.7.1</b> (2026-06-09) — 版本号显示最终修复</summary>
-
-**修复：**
-- ✅ 系统更新页面"当前版本"改为 HTML 模板硬编码，不再依赖 JS 动态获取，确保 100% 可靠显示
-- ✅ 移除 `currentVersion` ref 和 fetch API 调用
-
-**涉及文件：**
-`package.json` · `public/js/admin/update.js` · `public/admin.html`
-
-</details>
-
-<details>
-<summary><b>v1.7.0</b> (2026-06-09) — 版本号获取方式优化</summary>
-
-**优化：**
-- ✅ 系统更新页面版本号改为从 `/api/version` 接口获取，与页脚方式一致，确保始终正确显示
-
-**涉及文件：**
-`package.json` · `public/js/admin/update.js`
-
-</details>
-
-<details>
-<summary><b>v1.6.9</b> (2026-06-09) — 版本号显示优化</summary>
-
-**优化：**
-- ✅ 版本号改为 JS 直接硬编码，不再依赖 meta 标签或 API，页面加载即可正确显示
-- ✅ 移除不再需要的 `<meta name="app-version">` 标签
-
-**涉及文件：**
-`package.json` · `public/js/admin/update.js` · `public/admin.html`
-
-</details>
-
-<details>
-<summary><b>v1.6.8</b> (2026-06-09) — 版本显示修复</summary>
-
-**Bug 修复：**
-- ✅ 修复系统更新页面版本号显示为空的问题：内嵌默认版本号，API 获取后覆盖
-
-**涉及文件：**
-`package.json` · `public/js/admin/update.js` · `public/admin.html`
-
-</details>
-
-<details>
-<summary><b>v1.6.7</b> (2026-06-09) — 自动更新权限修复</summary>
-
-**Bug 修复：**
-- ✅ 修复服务器部署时 git 权限检测报错：执行更新前自动添加 `safe.directory` 配置
-
-**涉及文件：**
-`package.json` · `server/routes/admin-config.js`
-
-</details>
-
-<details>
-<summary><b>v1.6.6</b> (2026-06-09) — 系统更新体验优化</summary>
-
-**Bug 修复：**
-- ✅ 修复更新日志背景白色与深色主题不协调：改为半透明背景
-- ✅ 修复进入系统更新 Tab 需点击检查更新才显示当前版本：进入时自动加载
-
-**涉及文件：**
-`package.json` · `public/js/admin/update.js` · `public/admin.html` · `server/server.js`
-
-</details>
-
-<details>
-<summary><b>v1.6.5</b> (2026-06-09) — Gitee 国内源支持</summary>
-
-**Gitee 国内源支持：**
-- ✅ 自动更新检查优先从 Gitee 获取（国内快），失败自动回退 GitHub
-- ✅ 执行更新优先从 Gitee 远程源拉取代码，失败回退 origin
-- ✅ 前端显示更新来源标签（Gitee / GitHub）
-- ✅ 新增 `GITEE_REPO` 环境变量配置（默认 `Allen0528/pve-multi-user-panel`）
-
-**涉及文件：**
-`package.json` · `server/routes/admin-config.js` · `public/admin.html` · `.env.example`
-
-</details>
-
-<details>
-<summary><b>v1.6.4</b> (2026-06-09) — 自动更新修复</summary>
-
-**Bug 修复：**
-- ✅ 修复非 git 仓库部署时更新报错：增加 `.git` 目录检测，非 git 仓库返回友好提示
-- ✅ 优化错误信息：使用 `stdio: 'pipe'` 捕获 stderr，返回具体错误而非 Node.js 内部报错
-
-**涉及文件：**
-`package.json` · `server/routes/admin-config.js`
-
-</details>
-
-<details>
-<summary><b>v1.6.3</b> (2026-06-09) — 自动更新系统</summary>
-
-**系统更新功能：**
-- ✅ 管理后台新增「系统更新」标签页
-- ✅ 检查更新：查询 GitHub Releases API，semver 版本比较
-- ✅ 更新日志：Markdown 渲染展示
-- ✅ 一键更新：`git pull` + `npm install` + 自动重启（依赖 PM2/systemd）
-- ✅ 更新前二次确认弹窗，更新中状态提示
-- ✅ 支持 `.env` 配置 `GITHUB_REPO`（默认 `272416939/pve-multi-user-panel`）
-
-**安全设计：**
-- ✅ 仅 admin 权限可访问更新 API
-- ✅ GitHub 不可达时返回友好提示而非 500 错误
-- ✅ 更新失败时不退出进程，返回具体错误信息
-
-**涉及文件：**
-`package.json` · `server/routes/admin-config.js` · `public/js/admin/update.js`（新增） · `public/admin.html` · `.env.example`
-
-</details>
-
-<details>
-<summary><b>v1.6.2</b> (2026-06-09) — LXC 重置 IP + 危险操作警告</summary>
-
-**LXC 容器重置 IP 功能：**
-- ✅ 新增重置 IP 按钮（位于重置密码按钮旁），支持手动输入/DHCP/随机三种模式
-- ✅ 随机按钮：系统自动生成未被绑定的空闲 IP
-- ✅ 后端 API：`GET /api/lxc/random-ip`、`POST /api/lxc/:vmid/reset-ip`
-- ✅ 重置流程：解析 net0 → 运行中自动关机 → 修改 PVE 配置 → 自动开机 → 同步 DHCP/端口转发
-
-**危险操作警告与二次确认：**
-- ✅ 重置 IP 弹窗顶部红色透明毛玻璃警告（`backdrop-filter:blur(12px)`）
-- ✅ 保存按钮红色（`btn-danger`），弹出二次确认弹窗
-
-**Bug 修复：**
-- ✅ PVE 修改 LXC 配置 API：`POST` → `PUT`
-- ✅ DHCP 静态绑定 `preferredIp` 参数
-- ✅ dashboard `confirmResetLxcIp` 使用不存在的 `$.selectedLxc`
-
-**涉及文件：**
-`package.json` · `server/api/pve-api.js` · `server/api/ikuai-api.js` · `server/services/dhcp.js` · `server/routes/lxc.js` · `server/routes/vm.js` · `public/admin.html` · `public/dashboard.html` · `public/js/admin/lxc.js` · `public/js/dashboard/lxc.js`
-
-</details>
-
-<details>
-<summary><b>v1.6.1</b> (2026-06-07) — 后端架构重构 + 前端模块化拆分</summary>
-
-**后端架构重构：**
-- ✅ `server.js` 从 5766 行精简到 64 行：模块化拆分
-- ✅ 拆分 `utils/`(6)、`middleware/`(1)、`config/`(1)、`routes/`(11)、`websocket/`(2)、`services/`(4)、`schedule/`(1)
-- ✅ 100% 功能不变
-
-**前端 CSS 模块化：**
-- ✅ `styles.css` 从 1188 行 → 5 行 `@import` 聚合
-- ✅ 拆分 4 个独立文件：`base.css` / `layout.css` / `components.css` / `features.css`
-- ✅ 修复 Safari `backdrop-filter`、`user-select` 兼容性
-
-**前端 JS 模块化：**
-- ✅ `admin.html` 5056 行 → ~2570 行，内联 JS 拆 5 个模块
-- ✅ `dashboard.html` 2751 行 → ~1190 行，内联 JS 拆 5 个模块
-- ✅ `window.__namespace` + IIFE + `initXxx()` 模式
-
-**Bug 修复：**
-- ✅ `index.html` 已登录角色跳转（admin→admin.html, user→dashboard.html）
-- ✅ HTML 文件 `Cache-Control: no-store`
-- ✅ 安全响应头统一管理
-
-</details>
-
-<details>
-<summary><b>v1.6.0</b> (2026-06-07) — 端口转发 + DHCP 静态绑定</summary>
-
-- ✅ 网络管理标签页：端口转发范围/每用户上限/默认外网接口
-- ✅ VM/LXC 端口转发：CRUD + ikuai 自动同步
-- ✅ 随机端口 + 冲突检查
-- ✅ DHCP 静态绑定：自动创建/删除，随机空闲 IP
-- ✅ DHCP 全量同步：从爱快拉取按备注匹配
-- ✅ 端口转发级联清理（解绑/销毁时）
-- ✅ ikuai-api.js 独立模块
-- ✅ 数据库迁移：port_forwards、dhcp_static_ip 字段
+- ✅ 后端架构重构：5766 行 → 11 个模块
+- ✅ 前端 CSS/JS 模块化拆分
+- ✅ 自动更新系统：检查/日志/一键更新
+- ✅ Gitee 国内源支持
 
 </details>
 
@@ -551,79 +512,17 @@ git fetch origin && git reset --hard origin/main && npm install --production
 
 - ✅ LXC 完整 CRUD：创建/分配/操作/销毁
 - ✅ LXC XtermJS 终端：SSH + PTY 直连 `lxc-console`
-- ✅ LXC 快照/备份/CDK 续费
-- ✅ 终端安全加固：`conn.exec()` 消除 bash 中间层
-- ✅ LXC 到期检查 + 自动关机
-- ✅ 创建 LXC 弹窗：模板选择 + 网络配置 + 资源配置
-- ✅ 导航动态化 API：三页面统一渲染
+- ✅ LXC 快照/备份/CDK 续费 + 到期检查
 
 </details>
 
 <details>
-<summary><b>v1.4.1</b> (2026-06-05) — 备份恢复</summary>
+<summary><b>v1.0.0 ~ v1.4.1</b> (2026-05~06) — 核心功能</summary>
 
-- ✅ PVE 备份 API：创建/查询/删除
-- ✅ 备份恢复：含关机校验、并发保护、轮询进度
-- ✅ 存储位置选择：全局默认 + 单 VM 指定
-- ✅ 恢复完成/失败自动通知
-- ✅ 管理员清理接口
-
-</details>
-
-<details>
-<summary><b>v1.4.0</b> (2026-06-05) — API Token + 快照 + 2FA</summary>
-
-- ✅ PVE 认证：账号密码 → API Token
-- ✅ VNC 适配 API Token 认证
-- ✅ 快照 CRUD + 运行中创建 + 批量删除
-- ✅ 2FA TOTP 双因素认证 + 恢复码
-- ✅ `.env` 配置变更
-
-</details>
-
-<details>
-<summary><b>v1.3.0</b> (2026-06-05) — JWT + 设备管理</summary>
-
-- ✅ JWT 无状态认证 + Refresh Token
-- ✅ 登录设备管理：上下线、当前设备标记
-- ✅ 2FA 预留页面
-- ✅ 可访问性优化（标签、aria、语义化）
-- ✅ CDK 兑换体验优化
-
-</details>
-
-<details>
-<summary><b>v1.2.0 ~ v1.2.2</b> (2026-05) — 消息系统 + 功能完善</summary>
-
-- ✅ 站内消息系统（分类、角标、详情、推送）
-- ✅ 全站统一自定义弹窗（alert/confirm）
-- ✅ 导航优化：角色自动跳转、全局导航栏统一
-- ✅ 权限加固：admin 页面拦截
-- ✅ 标签页状态持久化
-- ✅ CDK 分配用户 + 批量删除
-- ✅ 表格深色主题适配
-- ✅ 登录页面优化（前端校验、后端统一错误文案）
-
-</details>
-
-<details>
-<summary><b>v1.1.0</b> (2026-05-20) — CDK + 续费</summary>
-
-- ✅ CDK 兑换码系统：生成/批量/CSV/清理
-- ✅ CDK 续费到期 + 邮件通知
-- ✅ 极客头像（SVG 电路板）
-- ✅ 虚拟机卡片等高、VM 销毁检测
-- ✅ 运行时长显示、内嵌操作确认
-
-</details>
-
-<details>
-<summary><b>v1.0.0</b> (2026-05-20) — 初始版本</summary>
-
-- ✅ 多租户系统、虚拟机接入/到期/监控
-- ✅ VNC 控制台、SMTP 邮件
-- ✅ SQLite 数据库迁移
-- ✅ 现代化 UI 设计
+- ✅ 多租户系统、虚拟机管理、VNC 控制台
+- ✅ JWT 认证 + Refresh Token + 2FA
+- ✅ CDK 兑换码、站内消息、SMTP 邮件
+- ✅ 快照管理、备份恢复、DHCP 静态绑定、端口转发
 
 </details>
 
