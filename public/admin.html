@@ -303,15 +303,19 @@
         .btn-glass { padding: 7px 20px; font-size: 13px; font-weight: 600; border-radius: 8px;
             border: 1px solid rgba(99,102,241,0.3); cursor: pointer; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
             background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15));
-            color: #C7D2FE; box-shadow: 0 2px 10px rgba(99,102,241,0.15); }
+            color: var(--text-primary); box-shadow: 0 2px 10px rgba(99,102,241,0.15); }
         .btn-glass:hover { background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.22));
-            color: #E0E7FF; box-shadow: 0 4px 16px rgba(99,102,241,0.25); transform: translateY(-1px); }
+            color: var(--text-primary); box-shadow: 0 4px 16px rgba(99,102,241,0.25); transform: translateY(-1px); }
+        /* 明亮模式下按钮背景加深，确保可见性 */
+        [data-theme="light"] .btn-glass { background: linear-gradient(135deg, rgba(99,102,241,0.75), rgba(139,92,246,0.65)); border-color: rgba(99,102,241,0.6); color: #fff; }
+        [data-theme="light"] .btn-glass:hover { background: linear-gradient(135deg, rgba(99,102,241,0.85), rgba(139,92,246,0.75)); }
 
         /* CDK时长选择按钮组（玻璃态） */
         .btn-glass-active { padding: 4px 14px; font-size: 12px; font-weight: 600; border-radius: 6px;
             border: 1px solid rgba(99,102,241,0.4); cursor: pointer; transition: all 0.2s ease;
             background: linear-gradient(135deg, rgba(99,102,241,0.28), rgba(139,92,246,0.18));
-            color: #C7D2FE; box-shadow: 0 2px 8px rgba(99,102,241,0.2); }
+            color: var(--text-primary); box-shadow: 0 2px 8px rgba(99,102,241,0.2); }
+        [data-theme="light"] .btn-glass-active { background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.12)); border-color: rgba(99,102,241,0.5); }
         .btn-glass-inactive { padding: 4px 14px; font-size: 12px; font-weight: 500; border-radius: 6px;
             border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
             background: var(--bg-input); color: var(--text-secondary); }
@@ -396,6 +400,9 @@
         .form-select option { background: var(--bg-input); color: var(--text-primary); }
         .form-control.bg-dark, .form-select.bg-dark { background: var(--bg-input) !important; color: var(--text-primary) !important; }
         .form-control.text-light, .form-select.text-light { color: var(--text-primary) !important; }
+        /* 下拉框禁用选项主题适配 */
+        .form-select option:disabled { color: var(--text-secondary); background: var(--bg-input); }
+        .form-control::placeholder { color: var(--text-secondary) !important; opacity: 0.7; }
 
         /* Alerts */
         .alert-danger { color: var(--color-danger); background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(245,87,108,0.08));
@@ -1179,7 +1186,7 @@
                                     </div>
                                     <div class="d-flex gap-2">
                                         <button type="submit" class="btn-glass">保存配置</button>
-                                        <button type="button" class="btn-glass" style="border-color:rgba(99,102,241,0.25);background:rgba(99,102,241,0.08);color:#A5B4FC;" @click="testSmtpConfig">发送测试邮件</button>
+                                        <button type="button" class="btn-glass" style="border-color:rgba(99,102,241,0.25);background:rgba(99,102,241,0.08);" @click="testSmtpConfig">发送测试邮件</button>
                                     </div>
                                 </form>
                             </div>
