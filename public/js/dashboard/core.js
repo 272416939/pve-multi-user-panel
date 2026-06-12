@@ -281,6 +281,25 @@
         } catch (e) {}
     };
 
+    $.resubAll = function() {
+        if (window._pushClient && window._pushClient.readyState === WebSocket.OPEN) {
+            for (var i = 0; i < $.userVms.value.length; i++) {
+                sendPush({ type: 'subscribe', vmid: $.userVms.value[i].vm_id, isLxc: false });
+            }
+            for (var i = 0; i < $.userLxcContainers.value.length; i++) {
+                sendPush({ type: 'subscribe', vmid: $.userLxcContainers.value[i].ct_id, isLxc: true });
+            }
+        } else {
+            var q = window._pushSubscribeQueue || [];
+            for (var i = 0; i < $.userVms.value.length; i++) {
+                q.push({ type: 'subscribe', vmid: $.userVms.value[i].vm_id, isLxc: false });
+            }
+            for (var i = 0; i < $.userLxcContainers.value.length; i++) {
+                q.push({ type: 'subscribe', vmid: $.userLxcContainers.value[i].ct_id, isLxc: true });
+            }
+        }
+    };
+
     $.loadCnameDomain = async function() {
         try {
             var data = await api('/api/cname');
@@ -476,14 +495,29 @@
                             el.style.display = msg.count > 0 ? '' : 'none';
                         }
                     }
-                    if (msg.type === 'tick') {
-                        if ($.user.value && $.activeSection.value === 'vm') {
-                            $.loadData();
-                        }
-                        if ($.user.value && $.activeSection.value === 'lxc') {
-                            $.loadLxcContainers();
+                    if (msg.type === 'status' && msg.updates) {
+                        for (var i = 0; i < msg.updates.length; i++) {
+                            var u = msg.updates[i];
+                            var list = u.type === 'lxc' ? $.userLxcContainers.value : $.userVms.value;
+                            var idField = u.type === 'lxc' ? 'ct_id' : 'vm_id';
+                            for (var j = 0; j < list.length; j++) {
+                                if (list[j][idField] === u.vmid) {
+                                    list[j].status = u.status;
+                                    break;
+                                }
+                            }
                         }
                     }
+                    if (msg.type === 'tick') {
+                        if ($.user.value && $.activeSection.value === 'vm') {
+                            $.loadData().then(function() { $.resubAll(); });
+                        }
+                        if ($.user.value && $.activeSection.value === 'lxc') {
+                            $.loadLxcContainers().then(function() { $.resubAll(); });
+                        }
+                    }
+                }, function() {
+                    $.resubAll();
                 });
 
                 // backup/lxcBackup modals polling

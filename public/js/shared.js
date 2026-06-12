@@ -101,7 +101,8 @@ function ensureValidToken() {
 
 // ===== PushClient: 统一WebSocket推送通道 =====
 window._pushClient = null;
-window.initPushClient = function(onMessage) {
+window._pushSubscribeQueue = [];
+window.initPushClient = function(onMessage, onOpen) {
     if (window._pushClient && window._pushClient.readyState === WebSocket.OPEN) return;
     window._pushClient = null;
     api('/user/push-ticket').then(function(r) {
@@ -110,7 +111,9 @@ window.initPushClient = function(onMessage) {
         var ws = new WebSocket(protocol + '//' + location.host + '/ws/push?ticket=' + r.ticket);
         window._pushClient = ws;
         ws.addEventListener('open', function() {
-            if (onMessage && onMessage.onOpen) onMessage.onOpen();
+            if (onOpen) onOpen();
+            var q = window._pushSubscribeQueue;
+            while (q.length) { sendPush(q.shift()); }
         });
         ws.addEventListener('message', function(e) {
             try {
@@ -120,7 +123,7 @@ window.initPushClient = function(onMessage) {
         });
         ws.addEventListener('close', function() {
             window._pushClient = null;
-            setTimeout(function() { window.initPushClient(onMessage); }, 5000);
+            setTimeout(function() { window.initPushClient(onMessage, onOpen); }, 5000);
         });
         ws.addEventListener('error', function() {
             window._pushClient = null;

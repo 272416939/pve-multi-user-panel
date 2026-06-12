@@ -1,6 +1,7 @@
 const { WebSocketServer, WebSocket } = require('ws');
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../utils/token');
+const { _applyRate } = require('../utils/pve-rate');
 const dbg = require('../utils/debug');
 
 const pushProxy = new WebSocketServer({ noServer: true });
@@ -83,13 +84,13 @@ async function pushStatus() {
     for (const vmid of vms) {
         try {
             const raw = await pveApi.getVmStatus(vmid);
-            statusCache.set('vm:' + vmid, raw);
+            statusCache.set('vm:' + vmid, _applyRate('vm:' + vmid, raw));
         } catch (e) {}
     }
     for (const vmid of lxcs) {
         try {
             const raw = await pveApi.getLxcStatus(vmid);
-            statusCache.set('lxc:' + vmid, raw);
+            statusCache.set('lxc:' + vmid, _applyRate('lxc:' + vmid, raw));
         } catch (e) {}
     }
 
@@ -205,7 +206,7 @@ function ensureTimers() {
         for (const [ws] of SUBSCRIPTIONS) {
             send(ws, { type: 'tick' });
         }
-    }, 10000);
+    }, 60000);
 }
 
 pushProxy.on('connection', () => { ensureTimers(); });

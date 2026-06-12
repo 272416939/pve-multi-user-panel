@@ -234,6 +234,25 @@ watch($.user, function(u) {
         } catch (e) {}
     };
 
+    $.resubAll = function() {
+        if (window._pushClient && window._pushClient.readyState === WebSocket.OPEN) {
+            for (var i = 0; i < $.userVms.value.length; i++) {
+                sendPush({ type: 'subscribe', vmid: $.userVms.value[i].vm_id, isLxc: false });
+            }
+            for (var i = 0; i < $.userLxcContainers.value.length; i++) {
+                sendPush({ type: 'subscribe', vmid: $.userLxcContainers.value[i].ct_id, isLxc: true });
+            }
+        } else {
+            var q = window._pushSubscribeQueue || [];
+            for (var i = 0; i < $.userVms.value.length; i++) {
+                q.push({ type: 'subscribe', vmid: $.userVms.value[i].vm_id, isLxc: false });
+            }
+            for (var i = 0; i < $.userLxcContainers.value.length; i++) {
+                q.push({ type: 'subscribe', vmid: $.userLxcContainers.value[i].ct_id, isLxc: true });
+            }
+        }
+    };
+
     $.logout = function() {
         var refreshToken = localStorage.getItem('refreshToken');
         if (refreshToken) {
@@ -522,13 +541,28 @@ $.initDetailCharts = function() {
                             el.style.display = msg.count > 0 ? '' : 'none';
                         }
                     }
-                    if (msg.type === 'tick') {
-                        if ($.user.value && $.activeSection.value === 'vms') {
-                            $.refreshVms();
-                        } else if ($.user.value && $.activeSection.value === 'lxc') {
-                            $.loadUserLxcContainers();
+                    if (msg.type === 'status' && msg.updates) {
+                        for (var i = 0; i < msg.updates.length; i++) {
+                            var u = msg.updates[i];
+                            var list = u.type === 'lxc' ? $.userLxcContainers.value : $.userVms.value;
+                            var idField = u.type === 'lxc' ? 'ct_id' : 'vm_id';
+                            for (var j = 0; j < list.length; j++) {
+                                if (list[j][idField] === u.vmid) {
+                                    list[j].status = u.status;
+                                    break;
+                                }
+                            }
                         }
                     }
+                    if (msg.type === 'tick') {
+                        if ($.user.value && $.activeSection.value === 'vms') {
+                            $.refreshVms().then(function() { $.resubAll(); });
+                        } else if ($.user.value && $.activeSection.value === 'lxc') {
+                            $.loadUserLxcContainers().then(function() { $.resubAll(); });
+                        }
+                    }
+                }, function() {
+                    $.resubAll();
                 });
                 $.loadNetworkConfig();
                 if ($.activeTab.value === 'network') {
@@ -537,9 +571,6 @@ $.initDetailCharts = function() {
             }
         });
 
-        onUnmounted(function() {
-            if (refreshInterval) clearInterval(refreshInterval);
-        });
 
         watch($.activeTab, function(newTab) {
             localStorage.setItem('admin_activeTab', newTab);
