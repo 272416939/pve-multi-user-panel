@@ -61,42 +61,49 @@ const api = (endpoint, options = {}) => {
 };
 
 // 本地检查 JWT 是否过期，过期则提前刷新
+var _refreshPromise = null;
+
 function ensureValidToken() {
     const token = localStorage.getItem('token');
     if (!token) return Promise.resolve(null);
     try {
         const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.exp * 1000 > Date.now() + 60000) {
+        if (payload.exp * 1000 > Date.now() + 300000) {
             return Promise.resolve(token);
         }
     } catch {
         return Promise.resolve(token);
     }
-    // token 即将过期或已过期，提前刷新
+    // token 将在5分钟内过期或已过期，需要刷新
+    // 防止并发刷新：如果已有刷新进行中，等待同一个 Promise
+    if (_refreshPromise) return _refreshPromise;
     const refreshToken = localStorage.getItem('refreshToken');
     if (!refreshToken) {
         localStorage.removeItem('token');
         return Promise.resolve(null);
     }
-    return fetch('/api/auth/refresh', {
+    _refreshPromise = fetch('/api/auth/refresh', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken })
-    }).then(res => {
+        body: JSON.stringify({ refreshToken: refreshToken })
+    }).then(function(res) {
         if (res.ok) return res.json();
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        return { token: null };
-    }).then(data => {
+        return res.json().then(function(d) { throw new Error(d.error || '刷新失败'); });
+    }).then(function(data) {
         if (data.token) {
             localStorage.setItem('token', data.token);
             if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+            _refreshPromise = null;
             return data.token;
         }
-        return null;
-    }).catch(() => {
+        throw new Error('无token');
+    }).catch(function() {
+        _refreshPromise = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
         return null;
     });
+    return _refreshPromise;
 }
 
 // ===== PushClient: 统一WebSocket推送通道 =====

@@ -553,6 +553,18 @@
 
                 // ===== 备份/恢复 WS 实时推送 =====
                 // backup-done / restore-done 消息已在上方 WS handler 中处理
+
+                // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
+                setInterval(function() {
+                    var token = localStorage.getItem('token');
+                    if (!token) return;
+                    try {
+                        var payload = JSON.parse(atob(token.split('.')[1]));
+                        if (payload.exp * 1000 < Date.now() + 900000) {
+                            ensureValidToken();
+                        }
+                    } catch(e) {}
+                }, 600000);
             }
         });
 
