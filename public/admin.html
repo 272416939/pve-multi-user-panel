@@ -419,6 +419,22 @@
         [data-theme="light"] .btn-close { filter: brightness(0) invert(0.4); opacity: 0.8; }
         [data-theme="dark"] .btn-close { filter: brightness(0) invert(1); opacity: 0.6; }
         .btn-close:hover { opacity: 1 !important; }
+
+        /* Sidebar submenu */
+        .nav-submenu { display: none; flex-direction: column; }
+        .nav-submenu.open { display: flex; }
+        .nav-submenu .nav-item {
+            padding-left: 44px !important;
+            font-size: 13px;
+            min-height: 36px;
+        }
+        .nav-item.has-children .nav-arrow {
+            transition: transform 0.2s ease;
+            margin-left: auto;
+        }
+        .nav-item.has-children.expanded .nav-arrow {
+            transform: rotate(90deg);
+        }
     </style>
 </head>
 <body>
@@ -458,9 +474,42 @@
         <aside class="sidebar" id="sidebar">
             <nav class="sidebar-nav">
                 <a class="nav-item" :class="{ active: activeSection === 'overview' }" href="#" @click.prevent="switchSection('overview')"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><span class="nav-text">总览</span></a>
-                <a class="nav-item" :class="{ active: activeSection === 'vms' }" href="#" @click.prevent="switchSection('vms')"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span><span class="nav-text">虚拟机管理</span></a>
-                <a class="nav-item" :class="{ active: activeSection === 'lxc' }" href="#" @click.prevent="switchSection('lxc')"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span><span class="nav-text">LXC 容器管理</span></a>
-                <a class="nav-item" :class="{ active: activeSection === 'admin' }" href="#" @click.prevent="switchSection('admin')"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="nav-text">管理后台</span></a>
+                <a class="nav-item has-children" :class="{ active: activeSection === 'vms' }" href="#" onclick="window.__admin.toggleSubmenu('vms');return false;">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+                    <span class="nav-text">虚拟机管理</span>
+                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+                </a>
+                <div class="nav-submenu" id="submenu-vms">
+                    <a class="nav-item" data-subsection="vms-manage" onclick="window.__admin.switchSubsection('vms','manage');return false;"><span class="nav-text">虚拟机列表</span></a>
+                    <a class="nav-item" data-subsection="vms-assign" onclick="window.__admin.switchSubsection('vms','assign');return false;"><span class="nav-text">分配虚拟机</span></a>
+                    <a class="nav-item" data-subsection="vms-network" onclick="window.__admin.switchSubsection('vms','network');return false;"><span class="nav-text">端口转发</span></a>
+                </div>
+                <a class="nav-item has-children" :class="{ active: activeSection === 'lxc' }" href="#" onclick="window.__admin.toggleSubmenu('lxc');return false;">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
+                    <span class="nav-text">LXC 容器管理</span>
+                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+                </a>
+                <div class="nav-submenu" id="submenu-lxc">
+                    <a class="nav-item" data-subsection="lxc-create" onclick="window.__admin.switchSubsection('lxc','create');return false;"><span class="nav-text">新建 LXC 容器</span></a>
+                    <a class="nav-item" data-subsection="lxc-assign" onclick="window.__admin.switchSubsection('lxc','assign');return false;"><span class="nav-text">分配 LXC 容器</span></a>
+                    <a class="nav-item" data-subsection="lxc-manage" onclick="window.__admin.switchSubsection('lxc','manage');return false;"><span class="nav-text">容器管理</span></a>
+                    <a class="nav-item" data-subsection="lxc-network" onclick="window.__admin.switchSubsection('lxc','network');return false;"><span class="nav-text">网络</span></a>
+                </div>
+                <a class="nav-item has-children" :class="{ active: activeSection === 'admin' }" href="#" onclick="window.__admin.toggleSubmenu('admin');return false;">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+                    <span class="nav-text">管理后台</span>
+                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+                </a>
+                <div class="nav-submenu" id="submenu-admin">
+                    <a class="nav-item" data-subsection="admin-users" onclick="window.__admin.switchAdminTab('users');return false;"><span class="nav-text">用户管理</span></a>
+                    <a class="nav-item" data-subsection="admin-smtp" onclick="window.__admin.switchAdminTab('smtp');return false;"><span class="nav-text">SMTP 配置</span></a>
+                    <a class="nav-item" data-subsection="admin-cdk" onclick="window.__admin.switchAdminTab('cdk');return false;"><span class="nav-text">CDK 管理</span></a>
+                    <a class="nav-item" data-subsection="admin-messages" onclick="window.__admin.switchAdminTab('admin-messages');return false;"><span class="nav-text">消息管理</span></a>
+                    <a class="nav-item" data-subsection="admin-snapshot-config" onclick="window.__admin.switchAdminTab('snapshot-config');return false;"><span class="nav-text">快照配置</span></a>
+                    <a class="nav-item" data-subsection="admin-backup" onclick="window.__admin.switchAdminTab('backup');return false;"><span class="nav-text">备份配置</span></a>
+                    <a class="nav-item" data-subsection="admin-network" onclick="window.__admin.switchAdminTab('network');return false;"><span class="nav-text">网络管理</span></a>
+                    <a class="nav-item" data-subsection="admin-system-update" onclick="window.__admin.switchAdminTab('system-update');return false;"><span class="nav-text">系统更新</span></a>
+                </div>
             </nav>
         </aside>
 
@@ -558,17 +607,6 @@
 
                 <!-- 虚拟机管理区域 -->
                 <div v-if="activeSection === 'vms'">
-                    <ul class="nav nav-tabs mb-3">
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTabVm === 'manage' }" @click="activeTabVm = 'manage'">虚拟机管理</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTabVm === 'assign' }" @click="activeTabVm = 'assign'">分配虚拟机</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTabVm === 'network' }" @click="activeTabVm = 'network'">网络</button>
-                        </li>
-                    </ul>
                     <div v-if="activeTabVm === 'manage'">
                         <div class="module-header">
                             <h4 class="module-title">虚拟机管理</h4>
@@ -759,22 +797,6 @@
 
                 <!-- LXC 容器管理区域 -->
                 <div v-if="activeSection === 'lxc'" class="lxc-section">
-                    <div class="mb-3">
-                        <ul class="nav nav-tabs">
-                            <li class="nav-item">
-                                <button class="nav-link" :class="{ active: activeTabLxc === 'create' }" @click="activeTabLxc = 'create'">新建 LXC 容器</button>
-                            </li>
-                            <li class="nav-item">
-                                <button class="nav-link" :class="{ active: activeTabLxc === 'assign' }" @click="activeTabLxc = 'assign'">分配 LXC 容器</button>
-                            </li>
-                            <li class="nav-item">
-                                <button class="nav-link" :class="{ active: activeTabLxc === 'manage' }" @click="activeTabLxc = 'manage'">容器管理</button>
-                            </li>
-                            <li class="nav-item">
-                                <button class="nav-link" :class="{ active: activeTabLxc === 'network' }" @click="activeTabLxc = 'network'">网络</button>
-                            </li>
-                        </ul>
-                    </div>
 
                     <!-- Tab 1: 新建 LXC 容器 -->
                     <div v-if="activeTabLxc === 'create'">
@@ -1067,33 +1089,6 @@
 
                 <!-- 管理后台区域 -->
                 <div v-if="activeSection === 'admin'">
-                    <ul class="nav nav-tabs mb-4">
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTab === 'users' }" @click="activeTab = 'users'">用户管理</button>
-                        </li>
-
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTab === 'smtp' }" @click="activeTab = 'smtp'">SMTP 配置</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTab === 'cdk' }" @click="activeTab = 'cdk'">CDK 管理</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTab === 'admin-messages' }" @click="activeTab = 'admin-messages'">消息管理</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTab === 'snapshot-config' }" @click="activeTab = 'snapshot-config'">快照配置</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTab === 'backup' }" @click="activeTab = 'backup'">备份配置</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTab === 'network' }" @click="activeTab = 'network'">网络管理</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" :class="{ active: activeTab === 'system-update' }" @click="activeTab = 'system-update'">系统更新</button>
-                        </li>
-                    </ul>
 
                     <!-- 用户管理 -->
                     <div v-if="activeTab === 'users'">

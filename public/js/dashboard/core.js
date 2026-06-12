@@ -194,12 +194,50 @@
         document.querySelectorAll('.nav-item').forEach(function(el) {
             el.classList.toggle('active', el.getAttribute('data-section') === section);
         });
+        // Clear submenu active states
+        document.querySelectorAll('.nav-submenu .nav-item').forEach(function(item) {
+            item.classList.remove('active');
+        });
         // Close sidebar on mobile
         if (window.innerWidth <= 768) {
             document.getElementById('sidebar')?.classList.remove('open');
             var overlay = document.getElementById('sidebarOverlay');
             if (overlay) { overlay.style.display = 'none'; }
         }
+    };
+
+    // ===== 二级菜单 =====
+    $.expandedSections = ref({});
+
+    $.toggleSubmenu = function(section) {
+        $.expandedSections.value[section] = !$.expandedSections.value[section];
+        var el = document.getElementById('submenu-' + section);
+        if (el) el.classList.toggle('open', $.expandedSections.value[section]);
+        var parent = el ? el.previousElementSibling : null;
+        if (parent) parent.classList.toggle('expanded', $.expandedSections.value[section]);
+        // Also switch to that section
+        $.switchSection(section);
+    };
+
+    $.switchSubsection = function(section, tab) {
+        $.switchSection(section);
+        if (section === 'vm') {
+            $.activeTabVm.value = tab;
+        } else if (section === 'lxc') {
+            $.activeTabLxc.value = tab;
+        }
+        // Expand the submenu
+        $.expandedSections.value[section] = true;
+        var el = document.getElementById('submenu-' + section);
+        if (el) el.classList.add('open');
+        var parent = el ? el.previousElementSibling : null;
+        if (parent) parent.classList.add('expanded');
+        // Update submenu active state
+        document.querySelectorAll('.nav-submenu .nav-item').forEach(function(item) {
+            item.classList.remove('active');
+        });
+        var target = document.querySelector('[data-subsection="' + section + '-' + tab + '"]');
+        if (target) target.classList.add('active');
     };
 
     // ===== 下拉菜单（Teleport到body，避免表格overflow裁剪） =====
@@ -502,6 +540,12 @@
                 await $.loadData();
                 await $.loadLxcContainers();
                 await $.loadCnameDomain();
+                // Auto-expand submenu based on current section
+                if ($.activeSection.value === 'vm' || $.activeSection.value === 'lxc') {
+                    setTimeout(function() {
+                        $.toggleSubmenu($.activeSection.value);
+                    }, 100);
+                }
                 $.loadUnreadCount();
                 initPushClient(function(msg) {
                     if (msg.type === 'unread') {
