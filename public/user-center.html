@@ -215,15 +215,15 @@
 
         /* ===== 表格玻璃态 ===== */
         .table { color: var(--text-primary) !important; border-collapse: separate; border-spacing: 0; transition: color 0.3s ease; }
-        .table thead th {
+        thead th, .table thead th, .table-striped thead th {
             background: linear-gradient(180deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%) !important; color: var(--text-secondary) !important;
             font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
             border-bottom: 1px solid rgba(99,102,241,0.15) !important;
             padding: 12px 16px; white-space: nowrap;
             transition: all 0.3s ease;
         }
-        .table thead th:first-child { border-radius: 10px 0 0 0 !important; }
-        .table thead th:last-child { border-radius: 0 10px 0 0 !important; }
+        thead th:first-child, .table thead th:first-child, .table-striped thead th:first-child { border-radius: 10px 0 0 0 !important; }
+        thead th:last-child, .table thead th:last-child, .table-striped thead th:last-child { border-radius: 0 10px 0 0 !important; }
         .table td {
             border-bottom: 1px solid var(--border-light) !important; color: var(--text-primary) !important;
             transition: border-color 0.3s ease, color 0.3s ease, background-color 0.3s ease;
@@ -377,7 +377,7 @@
             h4 { font-size: 16px !important; }
         }
     </style>
-    <style>[data-theme="light"] .table thead th {
+    <style>[data-theme="light"] thead th, [data-theme="light"] .table thead th, [data-theme="light"] .table-striped thead th {
         background: linear-gradient(180deg, rgba(99,102,241,0.06) 0%, rgba(139,92,246,0.03) 100%) !important;
         border-bottom: 1px solid rgba(99,102,241,0.12) !important;
         color: #6b7280 !important;
