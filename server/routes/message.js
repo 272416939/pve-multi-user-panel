@@ -29,7 +29,7 @@ router.get('/messages/:id', authMiddleware, async (req, res) => {
         const msg = await db.messages.getById(parseInt(req.params.id));
         if (!msg) return res.status(404).json({ error: '消息不存在' });
         if (msg.uid !== 0 && msg.uid !== req.user.id) return res.status(403).json({ error: '无权限' });
-        db.messages.markRead(msg.id);
+        await db.messages.markRead(msg.id);
         res.json(msg);
     } catch (error) {
         res.status(500).json({ error: '获取消息失败' });
@@ -39,7 +39,7 @@ router.get('/messages/:id', authMiddleware, async (req, res) => {
 router.put('/messages/:id/read', authMiddleware, async (req, res) => {
     try {
         const msgId = parseInt(req.params.id);
-        const msg = db.messages.getById(msgId);
+        const msg = await db.messages.getById(msgId);
         if (!msg) return res.status(404).json({ error: '消息不存在' });
         if (msg.uid !== 0 && msg.uid !== req.user.id) {
             return res.status(403).json({ error: '无权限' });
@@ -62,7 +62,7 @@ router.put('/messages/read-all', authMiddleware, async (req, res) => {
 
 router.delete('/messages/:id', authMiddleware, async (req, res) => {
     try {
-        db.messages.delete(parseInt(req.params.id), req.user.id);
+        await db.messages.delete(parseInt(req.params.id), req.user.id);
         res.json({ message: '消息已删除' });
     } catch (error) {
         res.status(500).json({ error: '删除消息失败' });
@@ -107,9 +107,9 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
             for (const uid of uidArr) {
                 const parsedUid = parseInt(uid);
                 if (isNaN(parsedUid)) continue;
-                const targetUser = db.users.getById(parsedUid);
+                const targetUser = await db.users.getById(parsedUid);
                 if (!targetUser) continue;
-                db.messages.create({
+                await db.messages.create({
                     uid: parsedUid,
                     title, content,
                     type: type || 5,
@@ -130,7 +130,7 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
 
 router.get('/admin/messages/stats', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const stats = db.messages.getStats();
+        const stats = await db.messages.getStats();
         res.json(stats);
     } catch (error) {
         res.status(500).json({ error: '获取统计失败' });

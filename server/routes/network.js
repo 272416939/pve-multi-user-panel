@@ -19,17 +19,17 @@ router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         res.json({
             port_range_start: parseInt(await db.config.get('forward:port_range_start')) || 50000,
             port_range_end: parseInt(await db.config.get('forward:port_range_end')) || 60000,
-            default_protocol: db.config.get('forward:default_protocol') || 'tcp',
-            wan_interface: db.config.get('forward:wan_interface') || '',
-            max_per_user: parseInt(db.config.get('forward:max_per_user')) || 10,
+            default_protocol: await db.config.get('forward:default_protocol') || 'tcp',
+            wan_interface: await db.config.get('forward:wan_interface') || '',
+            max_per_user: parseInt(await db.config.get('forward:max_per_user')) || 10,
             iface_list: ifaceList,
-            dhcp_ip_range_start: db.config.get('dhcp:ip_range_start') || '10.0.0.110',
-            dhcp_ip_range_end: db.config.get('dhcp:ip_range_end') || '10.0.0.199',
-            dhcp_interface: db.config.get('dhcp:interface') || 'lan2',
-            dhcp_gateway: db.config.get('dhcp:gateway') || '10.0.0.1',
-            dhcp_dns1: db.config.get('dhcp:dns1') || '119.29.29.29',
-            dhcp_dns2: db.config.get('dhcp:dns2') || '223.5.5.5',
-            cname_domain: db.config.get('cname:domain') || ''
+            dhcp_ip_range_start: await db.config.get('dhcp:ip_range_start') || '10.0.0.110',
+            dhcp_ip_range_end: await db.config.get('dhcp:ip_range_end') || '10.0.0.199',
+            dhcp_interface: await db.config.get('dhcp:interface') || 'lan2',
+            dhcp_gateway: await db.config.get('dhcp:gateway') || '10.0.0.1',
+            dhcp_dns1: await db.config.get('dhcp:dns1') || '119.29.29.29',
+            dhcp_dns2: await db.config.get('dhcp:dns2') || '223.5.5.5',
+            cname_domain: await db.config.get('cname:domain') || ''
         });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -42,18 +42,18 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
                 dhcp_ip_range_start, dhcp_ip_range_end, dhcp_interface, dhcp_gateway, dhcp_dns1, dhcp_dns2,
                 cname_domain } = req.body;
         const setConfig = db.config.set;
-        setConfig('forward:port_range_start', String(port_range_start ?? 50000));
-        setConfig('forward:port_range_end', String(port_range_end ?? 60000));
-        setConfig('forward:default_protocol', default_protocol || 'tcp');
-        setConfig('forward:wan_interface', wan_interface || '');
-        setConfig('forward:max_per_user', String(max_per_user ?? 10));
-        setConfig('dhcp:ip_range_start', dhcp_ip_range_start || '10.0.0.110');
-        setConfig('dhcp:ip_range_end', dhcp_ip_range_end || '10.0.0.199');
-        setConfig('dhcp:interface', dhcp_interface || 'lan2');
-        setConfig('dhcp:gateway', dhcp_gateway || '10.0.0.1');
-        setConfig('dhcp:dns1', dhcp_dns1 || '119.29.29.29');
-        setConfig('dhcp:dns2', dhcp_dns2 || '223.5.5.5');
-        setConfig('cname:domain', (cname_domain || '').trim());
+        await setConfig('forward:port_range_start', String(port_range_start ?? 50000));
+        await setConfig('forward:port_range_end', String(port_range_end ?? 60000));
+        await setConfig('forward:default_protocol', default_protocol || 'tcp');
+        await setConfig('forward:wan_interface', wan_interface || '');
+        await setConfig('forward:max_per_user', String(max_per_user ?? 10));
+        await setConfig('dhcp:ip_range_start', dhcp_ip_range_start || '10.0.0.110');
+        await setConfig('dhcp:ip_range_end', dhcp_ip_range_end || '10.0.0.199');
+        await setConfig('dhcp:interface', dhcp_interface || 'lan2');
+        await setConfig('dhcp:gateway', dhcp_gateway || '10.0.0.1');
+        await setConfig('dhcp:dns1', dhcp_dns1 || '119.29.29.29');
+        await setConfig('dhcp:dns2', dhcp_dns2 || '223.5.5.5');
+        await setConfig('cname:domain', (cname_domain || '').trim());
         res.json({ message: '网络配置已更新' });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -63,7 +63,7 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
 // CNAME 域名配置：所有已登录用户可读取，仅管理员可写入
 router.get('/api/cname', authMiddleware, async (req, res) => {
     try {
-        const domain = db.config.get('cname:domain') || '';
+        const domain = await db.config.get('cname:domain') || '';
         res.json({ cname_domain: domain });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -77,18 +77,18 @@ router.get('/ikuai/interfaces', authMiddleware, adminMiddleware, async (req, res
         const wanIfaces = interfaces.filter(i => i.type === 'wan');
         
         // 自动对比：若已存储的 WAN 接口在 ikuai 上已不存在，自动替换为第一个可用 WAN 接口
-        const storedIface = db.config.get('forward:wan_interface');
+        const storedIface = await db.config.get('forward:wan_interface');
         if (storedIface && wanIfaces.length > 0) {
             const exists = wanIfaces.some(i => i.name === storedIface);
             if (!exists) {
                 const newIface = wanIfaces[0].name;
-                db.config.set('forward:wan_interface', newIface);
+                await db.config.set('forward:wan_interface', newIface);
                 console.log(`[端口转发] 接口 ${storedIface} 已不存在，自动切换为 ${newIface}`);
             }
         }
         
         // 缓存完整接口列表到数据库（含 WAN + LAN），前端加载后直接使用
-        db.config.set('forward:iface_list', JSON.stringify(interfaces));
+        await db.config.set('forward:iface_list', JSON.stringify(interfaces));
         
         res.json(interfaces);
     } catch (e) {
@@ -114,18 +114,18 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
             try {
                 if (vmMatch) {
                     const vmId = parseInt(vmMatch[1]);
-                    const vm = db.vms.getAll().find(v => v.vm_id === vmId);
+                    const vm = (await db.vms.getAll()).find(v => v.vm_id === vmId);
                     if (vm && vm.dhcp_static_ip !== b.ip) {
-                        db.vms.update(vm.id, { dhcp_static_ip: b.ip });
+                        await db.vms.update(vm.id, { dhcp_static_ip: b.ip });
                         updated++;
                     } else {
                         skipped++;
                     }
                 } else if (ctMatch) {
                     const ctId = parseInt(ctMatch[1]);
-                    const ct = db.lxcContainers.getByCtId(ctId);
+                    const ct = await db.lxcContainers.getByCtId(ctId);
                     if (ct && ct.length > 0 && ct[0].dhcp_static_ip !== b.ip) {
-                        db.lxcContainers.update(ct[0].id, { dhcp_static_ip: b.ip });
+                        await db.lxcContainers.update(ct[0].id, { dhcp_static_ip: b.ip });
                         updated++;
                     } else {
                         skipped++;
@@ -149,10 +149,10 @@ router.get('/port-forwards', authMiddleware, async (req, res) => {
         const { type, vm_id, ct_id } = req.query;
         let rules;
         if (req.user.role === 'admin') {
-            if (type) rules = db.portForwards.getByType(type);
-            else rules = db.portForwards.getAll();
+            if (type) rules = await db.portForwards.getByType(type);
+            else rules = await db.portForwards.getAll();
         } else {
-            rules = db.portForwards.getByUserId(req.user.id);
+            rules = await db.portForwards.getByUserId(req.user.id);
             if (type) rules = rules.filter(r => r.type === type);
         }
         res.json(rules);
@@ -178,37 +178,36 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         }
 
         const config = {
-            port_range_start: parseInt(db.config.get('forward:port_range_start')) || 50000,
-            port_range_end: parseInt(db.config.get('forward:port_range_end')) || 60000,
-            max_per_user: parseInt(db.config.get('forward:max_per_user')) || 10,
+            port_range_start: parseInt(await db.config.get('forward:port_range_start')) || 50000,
+            port_range_end: parseInt(await db.config.get('forward:port_range_end')) || 60000,
+            max_per_user: parseInt(await db.config.get('forward:max_per_user')) || 10,
         };
         if (external_port < config.port_range_start || external_port > config.port_range_end) {
             return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内` });
         }
         // 普通用户检查数量限制
         if (req.user.role !== 'admin') {
-            const count = db.portForwards.getCountByUserId(req.user.id);
+            const count = await db.portForwards.getCountByUserId(req.user.id);
             if (count >= config.max_per_user) {
                 return res.status(400).json({ error: `转发规则数量已达上限（${config.max_per_user} 条），如需新增请联系管理员` });
             }
         }
         // 新增：校验目标资源归属
         if (vm_id && !isAdmin) {
-            const userVms = db.vms.getByUserId(req.user.id);
+            const userVms = await db.vms.getByUserId(req.user.id);
             const ownedVm = userVms.some(v => v.vm_id == vm_id);
             if (!ownedVm) {
                 return res.status(403).json({ error: '无权为此虚拟机创建转发规则' });
             }
         }
         if (ct_id && !isAdmin) {
-            const userCts = db.lxcContainers.getByUserId(req.user.id);
+            const userCts = await db.lxcContainers.getByUserId(req.user.id);
             const ownedCt = userCts.some(c => c.ct_id == ct_id);
             if (!ownedCt) {
                 return res.status(403).json({ error: '无权为此容器创建转发规则' });
             }
         }
-        // 校验端口冲突（本地 + ikuai）
-        const existing = db.portForwards.getByExternalPort(external_port);
+        const existing = await db.portForwards.getByExternalPort(external_port);
         if (existing.length > 0) {
             return res.status(400).json({ error: '外网端口已被占用，请更换' });
         }
@@ -224,7 +223,7 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             }
         }
         // 先写入本地
-        const rule = db.portForwards.create({
+        const rule = await db.portForwards.create({
             type, vm_id: vm_id || null, ct_id: ct_id || null,
             name: name || '', ip, internal_port, external_port,
             protocol: protocol || 'tcp', sync_status: 'pending'
@@ -245,10 +244,10 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
                 );
                 if (match) ikuaiId = String(match.id);
             } catch (_) {}
-            db.portForwards.update(rule.id, { sync_status: 'synced', ikuai_id: ikuaiId });
+            await db.portForwards.update(rule.id, { sync_status: 'synced', ikuai_id: ikuaiId });
             rule.sync_status = 'synced';
         } catch (e) {
-            db.portForwards.update(rule.id, { sync_status: 'failed' });
+            await db.portForwards.update(rule.id, { sync_status: 'failed' });
             rule.sync_status = 'failed';
             console.error('[端口转发] 同步到 ikuai 失败:', e.message);
         }
@@ -261,10 +260,10 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
 router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        const existing = db.portForwards.getById(id);
+        const existing = await db.portForwards.getById(id);
         if (!existing) return res.status(404).json({ error: '规则不存在' });
         if (req.user.role !== 'admin') {
-            const userRules = db.portForwards.getByUserId(req.user.id);
+            const userRules = await db.portForwards.getByUserId(req.user.id);
             if (!userRules.find(r => r.id === id)) return res.status(403).json({ error: '无权限' });
         }
         const { name, ip, internal_port, external_port, protocol } = req.body;
@@ -278,13 +277,13 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
 
         if (external_port) {
             const config = {
-                port_range_start: parseInt(db.config.get('forward:port_range_start')) || 50000,
-                port_range_end: parseInt(db.config.get('forward:port_range_end')) || 60000,
+                port_range_start: parseInt(await db.config.get('forward:port_range_start')) || 50000,
+                port_range_end: parseInt(await db.config.get('forward:port_range_end')) || 60000,
             };
             if (external_port < config.port_range_start || external_port > config.port_range_end) {
                 return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内` });
             }
-            const conflict = db.portForwards.getByExternalPort(external_port).filter(r => r.id !== id);
+            const conflict = (await db.portForwards.getByExternalPort(external_port)).filter(r => r.id !== id);
             if (conflict.length > 0) return res.status(400).json({ error: '外网端口已被占用，请更换' });
         }
         // 检测端口或 IP 变更，需要同步爱快
@@ -294,7 +293,7 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         const needIkuaiSync = ipChanged || portChanged || internalChanged;
         let newIkuaiId = existing.ikuai_id || '';
         if (needIkuaiSync) {
-            db.portForwards.update(id, { sync_status: 'pending' });
+            await db.portForwards.update(id, { sync_status: 'pending' });
             try {
                 if (existing.ikuai_id) {
                     await ikuaiApi.deletePortForward(existing.ikuai_id);
@@ -321,7 +320,7 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                     if (match) newIkuaiId = String(match.id);
                 } catch (_) {}
             } catch (e) {
-                db.portForwards.update(id, { sync_status: 'failed' });
+                await db.portForwards.update(id, { sync_status: 'failed' });
                 return res.status(500).json({ error: safeError(e) });
             }
         }
@@ -336,7 +335,7 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             updates.sync_status = 'synced';
             if (newIkuaiId) updates.ikuai_id = newIkuaiId;
         }
-        const updated = db.portForwards.update(id, updates);
+        const updated = await db.portForwards.update(id, updates);
         res.json(updated);
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -346,15 +345,14 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
 router.delete('/port-forwards/:id', authMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        const rule = db.portForwards.getById(id);
+        const rule = await db.portForwards.getById(id);
         if (!rule) return res.status(404).json({ error: '规则不存在' });
         if (req.user.role !== 'admin') {
-            const userRules = db.portForwards.getByUserId(req.user.id);
+            const userRules = await db.portForwards.getByUserId(req.user.id);
             if (!userRules.find(r => r.id === id)) return res.status(403).json({ error: '无权限' });
         }
-        // 孤儿规则直接删本地
         if (rule.sync_status === 'orphan') {
-            db.portForwards.delete(id);
+            await db.portForwards.delete(id);
             return res.json({ message: '规则已删除' });
         }
         // 正常规则同步删除
@@ -376,7 +374,7 @@ router.delete('/port-forwards/:id', authMiddleware, async (req, res) => {
         } catch (e) {
             console.error('[端口转发] ikuai 删除失败:', e.message);
         }
-        db.portForwards.delete(id);
+        await db.portForwards.delete(id);
         res.json({ message: '规则已删除' });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -392,7 +390,7 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
         const results = { success: 0, failed: 0 };
         for (const id of ids) {
             try {
-                const rule = db.portForwards.getById(id);
+                const rule = await db.portForwards.getById(id);
                 if (!rule) continue;
                 if (rule.sync_status !== 'orphan' && rule.ikuai_id) {
                     try {
@@ -401,7 +399,7 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
                         console.error(`[批量删除] ikuai 删除 ID=${id} 失败:`, e.message);
                     }
                 }
-                db.portForwards.delete(id);
+                await db.portForwards.delete(id);
                 results.success++;
             } catch (e) {
                 results.failed++;
@@ -415,9 +413,9 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
 
 router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
     try {
-        const portRangeStart = parseInt(db.config.get('forward:port_range_start')) || 50000;
-        const portRangeEnd = parseInt(db.config.get('forward:port_range_end')) || 60000;
-        const usedPorts = new Set(db.portForwards.getUsedPorts().map(r => r.external_port));
+        const portRangeStart = parseInt(await db.config.get('forward:port_range_start')) || 50000;
+        const portRangeEnd = parseInt(await db.config.get('forward:port_range_end')) || 60000;
+        const usedPorts = new Set((await db.portForwards.getUsedPorts()).map(r => r.external_port));
         // 也从 ikuai 获取已用端口
         if (ikuaiApi.isConfigured()) {
             try {
@@ -447,7 +445,7 @@ router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
         if (!port || port < 1 || port > 65535) {
             return res.status(400).json({ error: '无效端口' });
         }
-        const existing = db.portForwards.getByExternalPort(port);
+        const existing = await db.portForwards.getByExternalPort(port);
         if (existing.length > 0) {
             return res.json({ available: false });
         }
@@ -467,12 +465,12 @@ router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
 
 router.get('/port-forwards/config', authMiddleware, async (req, res) => {
     try {
-        const maxPerUser = parseInt(db.config.get('forward:max_per_user')) || 10;
-        const totalCount = db.portForwards.getCountByUserId(req.user.id);
+        const maxPerUser = parseInt(await db.config.get('forward:max_per_user')) || 10;
+        const totalCount = await db.portForwards.getCountByUserId(req.user.id);
         res.json({
             max_per_user: maxPerUser,
-            port_range_start: parseInt(db.config.get('forward:port_range_start')) || 50000,
-            port_range_end: parseInt(db.config.get('forward:port_range_end')) || 60000,
+            port_range_start: parseInt(await db.config.get('forward:port_range_start')) || 50000,
+            port_range_end: parseInt(await db.config.get('forward:port_range_end')) || 60000,
             used: totalCount,
             remaining: Math.max(0, maxPerUser - totalCount)
         });
@@ -484,8 +482,8 @@ router.get('/port-forwards/config', authMiddleware, async (req, res) => {
 router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
     try {
         const devices = [];
-        const myVms = db.vms.getByUserId(req.user.id);
-        const myCts = db.lxcContainers.getByUserId(req.user.id);
+        const myVms = await db.vms.getByUserId(req.user.id);
+        const myCts = await db.lxcContainers.getByUserId(req.user.id);
         let dhcpLeases = [];
         let lanIps = [];
         if (ikuaiApi.isConfigured()) {
@@ -505,7 +503,7 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
             return '';
         }
         for (const vm of myVms) {
-            const user = db.users.getById(vm.user_id);
+            const user = await db.users.getById(vm.user_id);
             let ip = '';
             // 优先使用数据库存储的 DHCP 静态绑定 IP
             if (vm.dhcp_static_ip) {
@@ -529,7 +527,7 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
             });
         }
         for (const ct of myCts) {
-            const user = db.users.getById(ct.user_id);
+            const user = await db.users.getById(ct.user_id);
             let ip = '';
             // 优先使用数据库存储的 DHCP 静态绑定 IP
             if (ct.dhcp_static_ip) {

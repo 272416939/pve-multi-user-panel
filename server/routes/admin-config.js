@@ -99,7 +99,7 @@ router.post('/admin/smtp/test', authMiddleware, adminMiddleware, async (req, res
 
 router.get('/admin/reminder', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const config = db.config.getReminder();
+        const config = await db.config.getReminder();
         res.json(config);
     } catch (error) {
         console.error('获取提醒配置失败:', error);

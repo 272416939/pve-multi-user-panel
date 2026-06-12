@@ -332,7 +332,7 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
 
 router.delete('/backups/:id', authMiddleware, async (req, res) => {
     try {
-        const backup = db.backups.getById(req.params.id);
+        const backup = await db.backups.getById(req.params.id);
         if (!backup) return res.status(404).json({ error: '备份不存在' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
@@ -346,8 +346,8 @@ router.delete('/backups/:id', authMiddleware, async (req, res) => {
             const volid = backup.type === 'lxc' ? `${backup.storage}:backup/${backup.filename}` : backup.filename;
             try { await pveApi.deleteBackupFile(volid); } catch (e) { console.error('删除备份文件失败:', e.message); }
         }
-        db.restoreTasks.deleteByBackupId(parseInt(req.params.id));
-        db.backups.delete(req.params.id);
+        await db.restoreTasks.deleteByBackupId(parseInt(req.params.id));
+        await db.backups.delete(req.params.id);
         res.json({ message: '备份已删除' });
     } catch (error) {
         res.status(500).json({ error: '删除备份失败' });
@@ -361,12 +361,12 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
         // B-2 修复：收集有权限删除的 ID，而非使用原始 ids
         const deletableIds = [];
         for (const id of ids) {
-            const backup = db.backups.getById(id);
+            const backup = await db.backups.getById(id);
             if (!backup) continue;
             if (req.user.role !== 'admin') {
                 if (backup.type === 'lxc') {
                     // LXC 备份：检查用户是否是该容器的拥有者
-                    const userCts = db.lxcContainers.getByUserId(req.user.id);
+                    const userCts = await db.lxcContainers.getByUserId(req.user.id);
                     const owned = userCts.some(c => c.ct_id == backup.ct_id);
                     if (!owned) continue;
                 } else {
@@ -386,9 +386,9 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
         }
         if (deletableIds.length > 0) {
             for (const id of deletableIds) {
-                db.restoreTasks.deleteByBackupId(id);
+                await db.restoreTasks.deleteByBackupId(id);
             }
-            db.backups.deleteBatch(deletableIds);
+            await db.backups.deleteBatch(deletableIds);
         }
         res.json({ message: `已删除 ${deletableIds.length} 个备份` });
     } catch (error) {
@@ -401,12 +401,12 @@ router.get('/admin/backups', authMiddleware, adminMiddleware, async (req, res) =
         const vmid = req.query.vm_id;
         let backups;
         if (vmid) {
-            backups = db.backups.getByVmId(vmid);
+            backups = await db.backups.getByVmId(vmid);
         } else {
-            backups = db.backups.getByStatus('completed').concat(
-                db.backups.getByStatus('running'),
-                db.backups.getByStatus('pending'),
-                db.backups.getByStatus('failed')
+            backups = (await db.backups.getByStatus('completed')).concat(
+                await db.backups.getByStatus('running'),
+                await db.backups.getByStatus('pending'),
+                await db.backups.getByStatus('failed')
             );
         }
         res.json(backups);
@@ -417,14 +417,14 @@ router.get('/admin/backups', authMiddleware, adminMiddleware, async (req, res) =
 
 router.delete('/admin/backups/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const backup = db.backups.getById(req.params.id);
+        const backup = await db.backups.getById(req.params.id);
         if (!backup) return res.status(404).json({ error: '备份不存在' });
         if (backup.filename && backup.status === 'completed') {
             const volid = backup.type === 'lxc' ? `${backup.storage}:backup/${backup.filename}` : backup.filename;
             try { await pveApi.deleteBackupFile(volid); } catch (e) { console.error('删除备份文件失败:', e.message); }
         }
-        db.restoreTasks.deleteByBackupId(parseInt(req.params.id));
-        db.backups.delete(req.params.id);
+        await db.restoreTasks.deleteByBackupId(parseInt(req.params.id));
+        await db.backups.delete(req.params.id);
         res.json({ message: '备份已删除' });
     } catch (error) {
         res.status(500).json({ error: '删除备份失败' });
@@ -453,19 +453,19 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
         if (status.status !== 'stopped') {
             return res.status(400).json({ error: '请先关闭虚拟机后再进行恢复' });
         }
-        const runningBackups = db.backups.getByVmId(vmid).filter(b => b.status === 'running' || b.status === 'pending');
-        const runningRestores = db.restoreTasks.getRunningByVmId(vmid);
+        const runningBackups = (await db.backups.getByVmId(vmid)).filter(b => b.status === 'running' || b.status === 'pending');
+        const runningRestores = await db.restoreTasks.getRunningByVmId(vmid);
         if (runningBackups.length > 0 || runningRestores.length > 0) {
             return res.status(409).json({ error: '该虚拟机有正在进行的备份或恢复任务，请等待完成后再试' });
         }
-        const restore = db.restoreTasks.create({ vm_id: vmid, user_id: req.user.id, backup_id: backupId });
+        const restore = await db.restoreTasks.create({ vm_id: vmid, user_id: req.user.id, backup_id: backupId });
         try {
             const result = await pveApi.restoreBackup(vmid, backup.filename);
             const upid = result.data || result;
-            db.restoreTasks.updateProgress(restore.id, 0, upid);
+            await db.restoreTasks.updateProgress(restore.id, 0, upid);
             startRestorePolling(restore.id, upid);
         } catch (e) {
-            db.restoreTasks.fail(restore.id, e.response?.data?.message || e.message);
+            await db.restoreTasks.fail(restore.id, e.response?.data?.message || e.message);
             return res.status(500).json({ error: safeError(e) });
         }
         res.json({ message: '恢复任务已创建，完成后将通过站内信和邮件通知您' });
@@ -481,7 +481,7 @@ router.get('/vm/:vmid/restore-status', authMiddleware, async (req, res) => {
             const owned = userVms.some(v => v.vm_id == req.params.vmid);
             if (!owned) return res.status(403).json({ error: '无权操作此虚拟机' });
         }
-        const tasks = db.restoreTasks.getByVmId(req.params.vmid).filter(t => t.status === 'running' || t.status === 'pending');
+        const tasks = (await db.restoreTasks.getByVmId(req.params.vmid)).filter(t => t.status === 'running' || t.status === 'pending');
         res.json(tasks.length > 0 ? tasks[0] : null);
     } catch (error) {
         res.status(500).json({ error: '获取恢复任务状态失败' });
@@ -495,12 +495,11 @@ router.post('/admin/backups/cleanup', authMiddleware, adminMiddleware, async (re
             return res.status(400).json({ error: '请指定要清理的备份 ID' });
         }
         let deleted = 0;
-        const delRestore = db.db.prepare('DELETE FROM restore_tasks WHERE backup_id = ?');
         for (const id of ids) {
-            const backup = db.db.prepare('SELECT * FROM backups WHERE id = ?').get(id);
+            const backup = await db.backups.getById(id);
             if (backup) {
-                delRestore.run(id);
-                db.backups.delete(id);
+                await db.restoreTasks.deleteByBackupId(id);
+                await db.backups.delete(id);
                 deleted++;
             }
         }

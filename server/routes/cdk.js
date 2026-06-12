@@ -126,7 +126,7 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
  
                 // 发送站内消息
                 try {
-                    db.messages.create({
+                    await db.messages.create({
                         uid: parsedUid,
                         title: '您收到 CDK 兑换码',
                         content: `${userCount > 1 ? `为您生成了 ${userCount} 张 CDK 兑换码` : '为您生成了一张 CDK 兑换码'}${codeListStr}\n续费时长：${durationStr}\n有效期至：${expiryStr}\n\n请前往「我的虚拟机」页面点击「CDK 兑换」输入此码进行续费。`,
@@ -182,7 +182,7 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
 
 router.get('/admin/cdk/list', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const cdkList = db.cdk.getAll();
+        const cdkList = await db.cdk.getAll();
         res.json(cdkList);
     } catch (error) {
         console.error('获取 CDK 列表失败:', error);
@@ -196,9 +196,9 @@ router.get('/admin/cdk/export', authMiddleware, adminMiddleware, async (req, res
         let cdkList;
         
         if (batch_id) {
-            cdkList = db.cdk.getByBatchId(batch_id);
+            cdkList = await db.cdk.getByBatchId(batch_id);
         } else {
-            cdkList = db.cdk.getAll();
+            cdkList = await db.cdk.getAll();
         }
  
         // 构建 CSV
@@ -235,13 +235,13 @@ router.get('/admin/cdk/export', authMiddleware, adminMiddleware, async (req, res
 router.delete('/admin/cdk/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        const cdk = db.cdk.getById(id);
+        const cdk = await db.cdk.getById(id);
         
         if (!cdk) {
             return res.status(404).json({ error: 'CDK 不存在' });
         }
  
-        db.cdk.delete(id);
+        await db.cdk.delete(id);
         res.json({ message: 'CDK 删除成功' });
     } catch (error) {
         console.error('删除 CDK 失败:', error);
@@ -251,7 +251,7 @@ router.delete('/admin/cdk/:id', authMiddleware, adminMiddleware, async (req, res
 
 router.post('/admin/cdk/cleanup', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const result = db.cdk.deleteExpiredOrUsed();
+        const result = await db.cdk.deleteExpiredOrUsed();
         res.json({ message: '清理完成', deleted: result.changes });
     } catch (error) {
         console.error('清理 CDK 失败:', error);
@@ -265,7 +265,7 @@ router.post('/admin/cdk/batch-delete', authMiddleware, adminMiddleware, async (r
         if (!Array.isArray(ids) || ids.length === 0) {
             return res.status(400).json({ error: '请提供要删除的 CDK ID 列表' });
         }
-        db.cdk.deleteBatch(ids.map(id => parseInt(id)));
+        await db.cdk.deleteBatch(ids.map(id => parseInt(id)));
         res.json({ message: `成功删除 ${ids.length} 个 CDK` });
     } catch (error) {
         console.error('批量删除 CDK 失败:', error);
@@ -276,7 +276,7 @@ router.post('/admin/cdk/batch-delete', authMiddleware, adminMiddleware, async (r
 router.get('/user/cdk/redeemable-vms', authMiddleware, async (req, res) => {
     try {
         let userVms;
-        userVms = db.vms.getByUserId(req.user.id);
+        userVms = await db.vms.getByUserId(req.user.id);
         
         const vmsWithDetails = [];
         for (const vm of userVms) {
@@ -320,7 +320,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
         }
  
         // 查找 CDK
-        const cdk = db.cdk.getByCode(code.trim().toUpperCase());
+        const cdk = await db.cdk.getByCode(code.trim().toUpperCase());
         if (!cdk) {
             return res.status(400).json({ error: 'CDK 码不存在' });
         }
@@ -338,7 +338,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
         // M-5 修复：原子 CAS 操作防并发重复兑换
         // R3-3 修复：db.cdkCodes 不存在，改用 db.db（底层 better-sqlite3 连接）
         // 先用 UPDATE ... WHERE id=? AND is_used=0 原子锁定 CDK，避免 TOCTOU 竞态
-        const affected = db.db.prepare(
+        const affected = await db.db.prepare(
             'UPDATE cdk_codes SET is_used=1, used_by=?, used_at=? WHERE id=? AND is_used=0'
         ).run(req.user.id, new Date().toISOString(), cdk.id);
 
@@ -350,7 +350,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
  
         if (container_id) {
             // ===== LXC 容器续费 =====
-            const ct = db.lxcContainers.getById(parseInt(container_id));
+            const ct = await db.lxcContainers.getById(parseInt(container_id));
             if (!ct) {
                 return res.status(404).json({ error: 'LXC 容器不存在' });
             }
@@ -376,16 +376,16 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             }
  
             // 更新容器到期时间
-            db.lxcContainers.update(targetId, {
+            await db.lxcContainers.update(targetId, {
                 expiration_date: newExpirationDate.toISOString(),
                 reminderSent: false,
                 lastReminderDate: ''
             });
-            db.lxcContainers.reminders.clear(targetId);
+            await db.lxcContainers.reminders.clear(targetId);
  
             // M-5: CDK 已被原子 CAS 标记为已用，此处仅补充关联信息
             // R3-3 修复：db.cdkCodes → db.db
-            db.db.prepare(
+            await db.db.prepare(
                 'UPDATE cdk_codes SET used_ct_id = ? WHERE id = ?'
             ).run(targetId, cdk.id);
  
@@ -401,7 +401,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             }
  
             // 发送通知
-            const redeemer = db.users.getById(req.user.id);
+            const redeemer = await db.users.getById(req.user.id);
             if (redeemer && redeemer.email && redeemer.emailVerified) {
                 try {
                     const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
@@ -429,7 +429,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
  
             try {
                 const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
-                db.messages.create({
+                await db.messages.create({
                     uid: redeemer.id,
                     title: 'CDK 续费成功',
                     content: `您的 LXC 容器 ${targetName} 已成功续费 ${durationStr}！\n新到期时间：${newExpirationDate.toLocaleString('zh-CN')}`,
@@ -444,7 +444,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             });
         } else {
             // ===== 虚拟机续费 =====
-            const vm = db.vms.getById(parseInt(vm_id));
+            const vm = await db.vms.getById(parseInt(vm_id));
             if (!vm) {
                 return res.status(404).json({ error: '虚拟机不存在' });
             }
@@ -470,21 +470,21 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             }
  
             // 更新虚拟机到期时间
-            db.vms.update(vm.id, {
+            await db.vms.update(vm.id, {
                 expiration_date: newExpirationDate.toISOString(),
                 reminderSent: false,
                 lastReminderDate: ''
             });
-            db.vms.reminders.clear(vm.id);
+            await db.vms.reminders.clear(vm.id);
  
             // M-5: CDK 已被原子 CAS 标记为已用，此处仅补充关联信息
             // R3-3 修复：db.cdkCodes → db.db
-            db.db.prepare(
+            await db.db.prepare(
                 'UPDATE cdk_codes SET used_vm_id = ? WHERE id = ?'
             ).run(vm.id, cdk.id);
  
             // 发送续费成功邮件和站内信
-            const redeemer = db.users.getById(req.user.id);
+            const redeemer = await db.users.getById(req.user.id);
             if (redeemer && redeemer.email && redeemer.emailVerified) {
                 try {
                     const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
@@ -517,7 +517,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
  
             try {
                 const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
-                db.messages.create({
+                await db.messages.create({
                     uid: redeemer.id,
                     title: 'CDK 续费成功',
                     content: `您的虚拟机 ${targetName} 已成功续费 ${durationStr}！\n新到期时间：${newExpirationDate.toLocaleString('zh-CN')}`,
