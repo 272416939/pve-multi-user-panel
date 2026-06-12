@@ -109,6 +109,7 @@ body[data-theme="light"] .page-header {
   color: var(--text-primary);
   font-size: 16px;
   cursor: pointer;
+  position: relative;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
