@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v1.8.0_beta9-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v1.8.0_beta15-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -214,9 +214,9 @@ npm run dev
 │   │   ├── token.js
 │   │   ├── site-url.js
 │   │   └── cdk-generator.js
-│   ├── routes/                # 路由模块（11 个）
+│   ├── routes/                # 路由模块（12 个）
 │   │   ├── auth.js
-│   │   ├── user.js
+│   │   ├── user.js             # 用户中心 + 2FA + 设备管理 + Push ticket
 │   │   ├── admin-user.js
 │   │   ├── vm.js
 │   │   ├── lxc.js
@@ -228,7 +228,8 @@ npm run dev
 │   │   └── network.js
 │   ├── websocket/
 │   │   ├── vnc-proxy.js       # VNC WebSocket 代理
-│   │   └── terminal-proxy.js  # xterm.js SSH PTY 代理
+│   │   ├── terminal-proxy.js  # xterm.js SSH PTY 代理
+│   │   └── push-proxy.js      # 统一状态推送（未读角标/实时监控）
 │   ├── services/
 │   │   ├── expiry-check.js
 │   │   ├── backup-polling.js
@@ -256,7 +257,7 @@ npm run dev
 │   ├── terminal.html          # xterm.js 终端
 │   ├── css/                   # 样式文件（5 个）
 │   ├── js/
-│   │   ├── shared.js          # 公共函数
+│   │   ├── shared.js          # 公共函数 + PushClient WebSocket
 │   │   ├── admin/             # 5 个管理后台模块
 │   │   └── dashboard/         # 5 个用户面板模块
 │   └── novnc/                 # noVNC 库
@@ -294,6 +295,20 @@ npm run dev
 ```
 
 完全绕过 PVE termproxy 代理层，SSH `conn.exec()` 直接启动 `lxc-console`，宿主机提示符对用户不可见。
+
+### WebSocket 推送架构
+
+```
+用户浏览器 ──→ 面板服务器 (443) ──→ PVE / 数据库
+                    │
+            ┌───────┴───────┐
+            │  统一推送通道   │ wss://host/ws/push
+            │  JWT ticket    │ 未读角标自动刷新
+            │  心跳 ping/pong│ 消息到达即时显示
+            └───────────────┘
+```
+
+通过单一 WebSocket 连接替代多路 HTTP 轮询。前端断线自动重连，30 秒 ping/pong 心跳检测假死连接。JWT ticket 5 分钟有效，防止跨站 WebSocket 劫持。
 
 ---
 
@@ -402,6 +417,87 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v1.8.0-beta15</b> (2026-06-12) — WebSocket 统一推送</summary>
+
+**新特性：**
+- ✅ 统一 WebSocket 推送通道 `/ws/push`，JWT ticket 认证
+- ✅ 未读消息角标由 30s HTTP 轮询 → 服务端主动推送
+- ✅ 30s ping/pong 心跳检测假死连接，自动清理
+- ✅ 前端 `PushClient` 断线 5 秒自动重连
+
+**安全设计：**
+- ✅ CSWSH 防护：WebSocket 连接用 JWT ticket（type='push', 5min 过期, HS256）
+- ✅ 心跳防假死：60 秒无 pong 即 terminate
+- ✅ 断开自动清理 `SUBSCRIPTIONS` Map
+
+**涉及文件：**
+`server/websocket/push-proxy.js`（新增）· `server/routes/user.js` · `server/server.js` · `public/js/shared.js` · `public/js/dashboard/core.js` · `public/js/admin/core.js` · `public/user-center.html` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta14</b> (2026-06-12) — 设备列表去重</summary>
+
+**修复：**
+- ✅ 同设备多次登录，设备管理页不再出现重复记录
+- ✅ 新增 `revokeByUserAndDevice` 双驱方法，登录前自动撤销同设备旧 token
+
+**涉及文件：**
+`server/routes/auth.js` · `server/api/db-sqlite.js` · `server/api/db-mysql.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta13</b> (2026-06-12) — 登录状态持久化修复</summary>
+
+**修复：**
+- ✅ shared.js 刷新 token 后正确保存新 refreshToken（2 处遗漏）
+- ✅ 根除「几分钟自动退出登录」问题：二次刷新不再用已撤销的旧 token
+- ✅ JWT 过期时间从 15 分钟延长至 60 分钟
+
+**涉及文件：**
+`public/js/shared.js` · `server/utils/token.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta12</b> (2026-06-12) — CDK 跨驱动崩溃修复</summary>
+
+**修复：**
+- ✅ CDK CAS `db.db.prepare()` 在 MySQL 下崩溃 → 改为 `db.cdk.markAsUsed` 统一调用
+- ✅ SQLite + MySQL `markAsUsed` 双双添加 `AND is_used=0` CAS 保护
+- ✅ 全局 `db.db.` 调用清零（3 处 → 0）
+
+**涉及文件：**
+`server/routes/cdk.js` · `server/api/db-sqlite.js` · `server/api/db-mysql.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta11</b> (2026-06-12) — 自动更新排序修复</summary>
+
+**修复：**
+- ✅ auto-update `per_page=1` → `per_page=20`（Gitee + GitHub 共 4 处）
+- ✅ GitHub API 按标签时间戳排序不可靠，改为拉取 20 条后按 `published_at` 降序取最新
+
+**涉及文件：**
+`server/routes/admin-config.js` · `package.json`
+
+</details>
+
+<details>
+<summary><b>v1.8.0-beta10</b> (2026-06-12) — Terminal vmid 修复</summary>
+
+**修复：**
+- ✅ `url.searchParams.get('vmid')` 返回字符串，`Number.isInteger` 拒绝校验
+- ✅ `parseInt` 双防护（调用端 + 函数内部）
+
+**涉及文件：**
+`server/websocket/terminal-proxy.js` · `package.json`
+
+</details>
 
 <details>
 <summary><b>v1.8.0-beta9</b> (2026-06-12) — Redis 缓存层</summary>
