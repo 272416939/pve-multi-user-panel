@@ -448,14 +448,12 @@
 
     // ===== 生命周期 =====
     $.refreshInterval = null;
-    $.msgPolling = null;
 
     $.initCore = function() {
         onMounted(async function() {
             var userData = await authGuard();
             if (userData) {
                 $.user.value = userData;
-                // 立即同步管理员入口显示（不依赖 watch 时序）
                 var adminLink = document.getElementById('dashboardAdminLink');
                 if (adminLink) adminLink.style.display = userData.role === 'admin' ? '' : 'none';
                 console.log('[dashboard] 用户角色:', userData.role, '管理员链接显示:', adminLink ? adminLink.style.display : '未找到元素');
@@ -463,9 +461,11 @@
                 await $.loadData();
                 await $.loadLxcContainers();
                 await $.loadCnameDomain();
-                await $.loadUnreadCount();
-                if ($.msgPolling) clearInterval($.msgPolling);
-                $.msgPolling = setInterval($.loadUnreadCount, 30000);
+                initPushClient(function(msg) {
+                    if (msg.type === 'unread') {
+                        $.unreadCount.value = msg.count;
+                    }
+                });
 
                 $.refreshInterval = setInterval(function() {
                     if ($.user.value && $.activeSection.value === 'vm') {
@@ -488,7 +488,6 @@
 
         onUnmounted(function() {
             if ($.refreshInterval) clearInterval($.refreshInterval);
-            if ($.msgPolling) clearInterval($.msgPolling);
         });
 
         watch($.activeTab, function(newTab) {

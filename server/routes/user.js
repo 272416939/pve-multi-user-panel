@@ -3,10 +3,12 @@ const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const CryptoJS = require('crypto-js');
 const QRCode = require('qrcode');
 const otplib = require('otplib');
 const db = require('../api/db');
+const { JWT_SECRET } = require('../utils/token');
 const upload = require('../config/multer');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const getSiteUrl = require('../utils/site-url');
@@ -449,6 +451,20 @@ router.get('/user/verify-email/:token', async (req, res) => {
     } catch (error) {
         console.error('验证邮箱失败', error);
         res.status(500).json({ error: '验证失败' });
+    }
+});
+
+// WebSocket push ticket
+router.get('/user/push-ticket', authMiddleware, async (req, res) => {
+    try {
+        const ticket = jwt.sign(
+            { type: 'push', userId: req.user.id, username: req.user.username, role: req.user.role },
+            JWT_SECRET,
+            { expiresIn: '5m', algorithm: 'HS256' }
+        );
+        res.json({ ticket });
+    } catch (error) {
+        res.status(500).json({ error: '生成ticket失败' });
     }
 });
 

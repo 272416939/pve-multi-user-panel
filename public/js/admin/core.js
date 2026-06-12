@@ -403,7 +403,6 @@ $.initDetailCharts = function() {
     var vm = $.detailVm.value;
     if (!vm) return;
 
-    // 销毁旧图表和定时器
     $.detailVmCharts.forEach(function(c) { if(c) c.destroy(); });
     $.detailVmCharts = [];
     if ($.detailVmTimer) clearInterval($.detailVmTimer);
@@ -494,7 +493,6 @@ $.initDetailCharts = function() {
 
     // 立即拉取一次
     $.fetchDetailStatus();
-    // 每3秒刷新一次
     if(isRunning){
         $.detailVmTimer = setInterval($.fetchDetailStatus, 3000);
     }
@@ -503,7 +501,6 @@ $.initDetailCharts = function() {
 // ==================== initCore ====================
     $.initCore = function() {
         var refreshInterval = null;
-        var msgPolling = null;
 
         onMounted(async function() {
             var hasAccess = await $.loadUserData();
@@ -511,14 +508,16 @@ $.initDetailCharts = function() {
                 await $.loadNavItems();
                 await $.loadAssignData();
                 await $.loadData();
-                await $.loadUnreadCount();
+                initPushClient(function(msg) {
+                    if (msg.type === 'unread') {
+                        $.unreadCount.value = msg.count;
+                    }
+                });
                 $.loadNetworkConfig();
                 // 若刷新后 activeTab 为 network，主动加载转发规则
                 if ($.activeTab.value === 'network') {
                     $.loadForwardRules('all');
                 }
-                if (msgPolling) clearInterval(msgPolling);
-                msgPolling = setInterval($.loadUnreadCount, 30000);
 
                 refreshInterval = setInterval(function() {
                     if ($.user.value && $.activeSection.value === 'vms') {
@@ -532,7 +531,6 @@ $.initDetailCharts = function() {
 
         onUnmounted(function() {
             if (refreshInterval) clearInterval(refreshInterval);
-            if (msgPolling) clearInterval(msgPolling);
         });
 
         watch($.activeTab, function(newTab) {

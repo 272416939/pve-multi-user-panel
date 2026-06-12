@@ -991,8 +991,6 @@
                         if (modal) modal.hide();
                     }
                 };
-                let msgPolling = null;
-
                 // 统一子Tab切换方法（侧边栏导航调用）
                 const switchSubTab = async (tab) => {
                     activeSubTab.value = tab;
@@ -1508,13 +1506,15 @@
                             await loadMemos();
                         }
                         await loadUnreadCount();
-                        if (msgPolling) clearInterval(msgPolling);
-                        msgPolling = setInterval(loadUnreadCount, 30000);
+                        initPushClient(function(msg) {
+                            if (msg.type === 'unread') {
+                                unreadCount.value = msg.count;
+                            }
+                        });
                     }
                 });
 
                 onUnmounted(() => {
-                    if (msgPolling) clearInterval(msgPolling);
                 });
 
                 watch(activeSubTab, (val) => {

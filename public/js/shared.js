@@ -99,6 +99,41 @@ function ensureValidToken() {
     });
 }
 
+// ===== PushClient: 统一WebSocket推送通道 =====
+window._pushClient = null;
+window.initPushClient = function(onMessage) {
+    if (window._pushClient && window._pushClient.readyState === WebSocket.OPEN) return;
+    window._pushClient = null;
+    api('/user/push-ticket').then(function(r) {
+        if (!r.ticket) return;
+        var protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        var ws = new WebSocket(protocol + '//' + location.host + '/ws/push?ticket=' + r.ticket);
+        window._pushClient = ws;
+        ws.addEventListener('open', function() {
+            if (onMessage && onMessage.onOpen) onMessage.onOpen();
+        });
+        ws.addEventListener('message', function(e) {
+            try {
+                var msg = JSON.parse(e.data);
+                if (onMessage) onMessage(msg);
+            } catch (_) {}
+        });
+        ws.addEventListener('close', function() {
+            window._pushClient = null;
+            setTimeout(function() { window.initPushClient(onMessage); }, 5000);
+        });
+        ws.addEventListener('error', function() {
+            window._pushClient = null;
+        });
+    }).catch(function() {});
+};
+
+window.sendPush = function(msg) {
+    if (window._pushClient && window._pushClient.readyState === WebSocket.OPEN) {
+        window._pushClient.send(JSON.stringify(msg));
+    }
+};
+
 const getGeekAvatar = (username) => {
     const name = username || '?';
     let hash = 0;

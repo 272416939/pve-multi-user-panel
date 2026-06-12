@@ -133,6 +133,7 @@ app.use('/api', require('./routes/network'));
 
 const vncProxy = require('./websocket/vnc-proxy');
 const terminalProxy = require('./websocket/terminal-proxy');
+const pushProxy = require('./websocket/push-proxy');
 
 const httpServer = http.createServer(app);
 
@@ -145,6 +146,10 @@ httpServer.on('upgrade', (request, socket, head) => {
     } else if (url.pathname === '/term-proxy') {
         terminalProxy.handleUpgrade(request, socket, head, (ws) => {
             terminalProxy.emit('connection', ws, request);
+        });
+    } else if (url.pathname === '/ws/push') {
+        pushProxy.handleUpgrade(request, socket, head, (ws) => {
+            pushProxy.emit('connection', ws, request);
         });
     } else {
         socket.destroy();
