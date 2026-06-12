@@ -293,6 +293,16 @@
         .table > thead, .table-striped > thead, .table-sm > thead, .table-hover > thead, .table-dark > thead {
             background: transparent !important;
         }
+        /* Update banner - theme adaptive */
+        .update-banner { border: 1px solid rgba(99,102,241,0.25) !important; border-radius: 12px;
+            background: var(--bg-card); transition: all 0.3s ease; }
+        .update-banner-header { padding: 14px 20px; font-weight: 700; font-size: 15px;
+            color: #fff; border-radius: 11px 11px 0 0;
+            background: linear-gradient(135deg, rgba(99,102,241,0.7), rgba(139,92,246,0.55));
+            backdrop-filter: blur(8px); transition: all 0.3s ease; }
+        .update-source-badge { display: inline-block; padding: 2px 10px; border-radius: 6px; font-size: 11px; font-weight: 600;
+            background: rgba(99,102,241,0.18); color: #a5b4fc; border: 1px solid rgba(99,102,241,0.25);
+            transition: all 0.3s ease; }
         td { padding: 11px 16px; border-bottom: 1px solid var(--border-light); vertical-align: middle; color: var(--text-primary); font-size: 13px;
             transition: color 0.3s ease, border-color 0.3s ease, background-color 0.3s ease; }
         tr:hover td { background: var(--bg-hover); }
@@ -474,6 +484,14 @@
             background: linear-gradient(180deg, rgba(99,102,241,0.06) 0%, rgba(139,92,246,0.03) 100%) !important;
             border-bottom: 1px solid rgba(99,102,241,0.12) !important;
             color: #6b7280 !important;
+        }
+        /* Light mode: update banner */
+        [data-theme="light"] .update-banner-header {
+            background: linear-gradient(135deg, rgba(99,102,241,0.55), rgba(139,92,246,0.4));
+            color: #fff;
+        }
+        [data-theme="light"] .update-source-badge {
+            background: rgba(99,102,241,0.1); color: #4f46e5; border-color: rgba(99,102,241,0.2);
         }
     </style>
 </head>
@@ -1788,14 +1806,14 @@
                         </div>
 
                         <!-- 最新版本信息 -->
-                        <div v-if="updateInfo && updateInfo.has_update" class="card mb-3 border-success">
-                            <div class="card-header bg-success text-white">
+                        <div v-if="updateInfo && updateInfo.has_update" class="card mb-3 update-banner">
+                            <div class="card-header update-banner-header">
                                 <h5 class="mb-0">发现新版本 v{{ updateInfo.latest_version }}</h5>
                             </div>
                             <div class="card-body">
                                 <p class="text-muted mb-2">
                                     发布时间：{{ formatDate(updateInfo.release.published_at) }}
-                                    <span class="badge bg-info ms-1">{{ updateInfo.source === 'gitee' ? 'Gitee' : 'GitHub' }}</span>
+                                    <span class="update-source-badge ms-1">{{ updateInfo.source === 'gitee' ? 'Gitee' : 'GitHub' }}</span>
                                     <a :href="updateInfo.release.html_url" target="_blank" class="ms-2">查看 Release</a>
                                 </p>
 
