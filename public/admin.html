@@ -233,7 +233,7 @@
             background: var(--bg-card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
             border: 1px solid var(--border-color);
             transition: background-color 0.3s ease, border-color 0.3s ease; }
-        .circle-wrap { position: relative; display: inline-block; margin-bottom: 16px; }
+        .circle-wrap { position: relative; display: inline-block; margin-bottom: 16px; overflow: visible; }
         .circle-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
         .circle-num { font-size: 32px; font-weight: 700; line-height: 1; color: var(--text-primary); transition: color 0.3s ease; }
         .circle-name { font-size: 13px; margin-top: 4px; color: var(--text-secondary); transition: color 0.3s ease; }
@@ -277,8 +277,8 @@
         table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
         thead th { padding: 12px 16px; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 12px;
             text-transform: uppercase; letter-spacing: 0.5px;
-            background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.08));
-            border-bottom: 1px solid var(--border-color);
+            background: linear-gradient(180deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%);
+            border-bottom: 1px solid rgba(99,102,241,0.15);
             white-space: nowrap; transition: all 0.3s ease; }
         thead th:first-child { border-radius: 10px 0 0 0; }
         thead th:last-child { border-radius: 0 10px 0 0; }
@@ -374,7 +374,7 @@
         .chart-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
         @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
         .chart-card { background: var(--bg-card); border: 1px solid var(--border-color);
-            border-radius: 12px; padding: 16px; min-height: 260px; max-height: 300px; overflow: hidden;
+            border-radius: 12px; padding: 16px; min-height: 260px; max-height: 300px;
             display: flex; flex-direction: column;
             transition: background-color 0.3s ease, border-color 0.3s ease; }
         .chart-title { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 12px;
@@ -457,6 +457,12 @@
             background: rgba(56, 189, 248, 0.1) !important;
             border-color: rgba(56, 189, 248, 0.35) !important;
             color: #0284c7 !important;
+        }
+        /* Light mode: table header */
+        [data-theme="light"] thead th {
+            background: linear-gradient(180deg, rgba(99,102,241,0.06) 0%, rgba(139,92,246,0.03) 100%) !important;
+            border-bottom: 1px solid rgba(99,102,241,0.12) !important;
+            color: #6b7280 !important;
         }
     </style>
 </head>
@@ -606,7 +612,7 @@
                         <div class="col-md-6">
                             <div class="overview-chart-card">
                                 <div class="circle-wrap">
-                                    <svg width="160" height="160" viewBox="0 0 130 130">
+                                    <svg width="160" height="160" viewBox="-7 -7 144 144">
                                         <circle class="circle-bg" cx="65" cy="65" r="60"></circle>
                                         <circle class="circle-progress" :style="{ strokeDashoffset: circleVmOffset }" cx="65" cy="65" r="60"></circle>
                                     </svg>
@@ -624,7 +630,7 @@
                         <div class="col-md-6">
                             <div class="overview-chart-card">
                                 <div class="circle-wrap">
-                                    <svg width="160" height="160" viewBox="0 0 130 130">
+                                    <svg width="160" height="160" viewBox="-7 -7 144 144">
                                         <circle class="circle-bg" cx="65" cy="65" r="60"></circle>
                                         <circle class="circle-progress" :style="{ strokeDashoffset: circleCtOffset, stroke: userLxcContainers.length > 0 ? '#36D399' : '#6B7280' }" cx="65" cy="65" r="60"></circle>
                                     </svg>
