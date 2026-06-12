@@ -273,6 +273,11 @@
         try {
             var data = await api('/messages/unread-count');
             $.unreadCount.value = data.count;
+            var el = document.getElementById('msgCount');
+            if (el) {
+                el.textContent = data.count;
+                el.style.display = data.count > 0 ? '' : 'none';
+            }
         } catch (e) {}
     };
 
@@ -461,6 +466,7 @@
                 await $.loadData();
                 await $.loadLxcContainers();
                 await $.loadCnameDomain();
+                $.loadUnreadCount();
                 initPushClient(function(msg) {
                     if (msg.type === 'unread') {
                         $.unreadCount.value = msg.count;

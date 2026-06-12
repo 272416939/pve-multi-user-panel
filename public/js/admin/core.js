@@ -226,6 +226,11 @@ watch($.user, function(u) {
         try {
             var data = await api('/messages/unread-count');
             $.unreadCount.value = data.count;
+            var el = document.getElementById('adminMsgCount');
+            if (el) {
+                el.textContent = data.count;
+                el.style.display = data.count > 0 ? '' : 'none';
+            }
         } catch (e) {}
     };
 
@@ -507,6 +512,7 @@ $.initDetailCharts = function() {
                 await $.loadNavItems();
                 await $.loadAssignData();
                 await $.loadData();
+                $.loadUnreadCount();
                 initPushClient(function(msg) {
                     if (msg.type === 'unread') {
                         $.unreadCount.value = msg.count;
