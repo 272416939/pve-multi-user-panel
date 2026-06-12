@@ -391,7 +391,6 @@ watch($.user, function(u) {
         if (el) el.classList.toggle('open', $.expandedSections.value[section]);
         var parent = el ? el.previousElementSibling : null;
         if (parent) parent.classList.toggle('expanded', $.expandedSections.value[section]);
-        $.switchSection(section);
     };
 
     $.switchSubsection = function(section, tab) {
@@ -414,17 +413,44 @@ watch($.user, function(u) {
     };
 
     $.switchAdminTab = function(tab) {
-        $.switchSection('admin');
+        // Determine which group this tab belongs to
+        var manageTabs = ['users', 'cdk', 'messages'];
+        var settingsTabs = ['smtp', 'snapshot-backup', 'network'];
+        var section;
+        var submenuId;
+
+        if (manageTabs.indexOf(tab) !== -1) {
+            section = 'manage';
+            submenuId = 'submenu-manage';
+        } else if (settingsTabs.indexOf(tab) !== -1) {
+            section = 'settings';
+            submenuId = 'submenu-settings';
+        } else {
+            section = 'admin'; // fallback
+            submenuId = 'submenu-admin';
+        }
+
+        $.switchSection(section);
         $.activeTab.value = tab;
-        $.expandedSections.value['admin'] = true;
-        var el = document.getElementById('submenu-admin');
+        $.expandedSections.value[section] = true;
+        var el = document.getElementById(submenuId);
         if (el) el.classList.add('open');
         var parent = el ? el.previousElementSibling : null;
         if (parent) parent.classList.add('expanded');
-        document.querySelectorAll('#submenu-admin .nav-item').forEach(function(item) {
+        // Clear active state in this submenu, then highlight target
+        document.querySelectorAll('#' + submenuId + ' .nav-item').forEach(function(item) {
             item.classList.remove('active');
         });
-        var target = document.querySelector('[data-subsection="admin-' + tab + '"]');
+        // Map tab to data-subsection attribute
+        var subMap = {
+            'users': 'manage-users',
+            'cdk': 'manage-cdk',
+            'messages': 'manage-messages',
+            'smtp': 'settings-smtp',
+            'snapshot-backup': 'settings-snapshot-backup',
+            'network': 'settings-network'
+        };
+        var target = document.querySelector('[data-subsection="' + (subMap[tab] || 'admin-' + tab) + '"]');
         if (target) target.classList.add('active');
     };
 
@@ -594,9 +620,9 @@ $.initDetailCharts = function() {
                     setTimeout(function() {
                         $.toggleSubmenu($.activeSection.value);
                     }, 100);
-                } else if ($.activeSection.value === 'admin') {
+                } else if ($.activeSection.value === 'manage' || $.activeSection.value === 'settings') {
                     setTimeout(function() {
-                        $.toggleSubmenu('admin');
+                        $.toggleSubmenu($.activeSection.value);
                     }, 100);
                 }
                 await $.loadUserLxcContainers();
