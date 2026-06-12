@@ -528,8 +528,14 @@
     .text-danger-custom { color: #ff4444 !important; }
 
     /* Table styling */
+    .table, .table-striped, .table-sm, .table-hover, .table-dark {
+        --bs-table-bg: transparent; --bs-table-accent-bg: transparent;
+        --bs-table-hover-bg: rgba(99,102,241,0.04); --bs-table-active-bg: rgba(99,102,241,0.06);
+    }
     .table-dark { background: var(--bg-hover) !important; border-color: var(--border-color) !important; }
-    .table > thead { background: transparent !important; }
+    .table > thead, .table-striped > thead, .table-sm > thead, .table-hover > thead, .table-dark > thead {
+        background: transparent !important;
+    }
     .table-dark thead th, .table-striped thead th {
         background: linear-gradient(180deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%) !important;
         color: var(--text-secondary) !important;

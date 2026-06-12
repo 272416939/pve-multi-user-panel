@@ -214,7 +214,9 @@
         h5.card-title { color: var(--text-primary) !important; transition: color 0.3s ease; }
 
         /* ===== 表格玻璃态 ===== */
-        .table { color: var(--text-primary) !important; border-collapse: separate; border-spacing: 0; transition: color 0.3s ease; }
+        .table { color: var(--text-primary) !important; border-collapse: separate; border-spacing: 0; transition: color 0.3s ease;
+            --bs-table-bg: transparent; --bs-table-accent-bg: transparent;
+            --bs-table-hover-bg: rgba(99,102,241,0.04); --bs-table-active-bg: rgba(99,102,241,0.06); }
         thead th, .table thead th, .table-striped thead th {
             background: linear-gradient(180deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%) !important; color: var(--text-secondary) !important;
             font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
@@ -224,6 +226,7 @@
         }
         thead th:first-child, .table thead th:first-child, .table-striped thead th:first-child { border-radius: 10px 0 0 0 !important; }
         thead th:last-child, .table thead th:last-child, .table-striped thead th:last-child { border-radius: 0 10px 0 0 !important; }
+        .table > thead, .table-striped > thead, .table-sm > thead { background: transparent !important; }
         .table td {
             border-bottom: 1px solid var(--border-light) !important; color: var(--text-primary) !important;
             transition: border-color 0.3s ease, color 0.3s ease, background-color 0.3s ease;
