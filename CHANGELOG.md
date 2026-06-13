@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.1.13] - 2026-06-14
+
+### Fixed
+- fix(date): 修复编辑 VM/LXC 到期时间每次保存偏移数小时的时区 Bug
+  - 根因：MySQL DATETIME 无时区 + `formatDateTimeLocal` 误将 UTC 值解析为本地时间
+  - 每次编辑保存产生 8 小时时区漂移（UTC+8），3 次保存后日期回退 1 天
+  - `wallet.js` 余额续费日期格式修复：完整 ISO 替代 `.slice(0,19).replace('T',' ')`
+  - `formatDateTimeLocal` / `formatDate`：空格分隔无时区日期自动追加 `Z` 按 UTC 解析
+
+---
+
 ## [2.1.12] - 2026-06-14
 
 ### Fixed
