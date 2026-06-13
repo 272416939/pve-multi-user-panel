@@ -162,7 +162,7 @@
         try {
             var expDate = null;
             if (f.expiration_date) {
-                expDate = new Date(f.expiration_date).toISOString();
+                expDate = new Date(f.expiration_date + 'Z').toISOString();
             }
             await api('/user/lxc/' + f.id, {
                 method: 'PUT',

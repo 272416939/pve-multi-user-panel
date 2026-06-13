@@ -215,11 +215,7 @@ const formatBytes = (bytes) => {
 
 const formatDate = (date) => {
     if (!date) return '-';
-    var d = typeof date === 'string' ? date : date;
-    if (!/[Zz]|[+-]\d{2}:\d{2}$/.test(d) && !d.includes('T')) {
-        d = d + 'Z';
-    }
-    return new Date(d).toLocaleString('zh-CN');
+    return new Date(date).toLocaleString('zh-CN');
 };
 
 const formatUptime = (seconds) => {
@@ -244,11 +240,11 @@ const formatDateTimeLocal = (dateStr) => {
     }
     const date = new Date(safe);
     if (isNaN(date.getTime())) return '';
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(date.getUTCDate()).padStart(2, '0');
+    const hours = String(date.getUTCHours()).padStart(2, '0');
+    const minutes = String(date.getUTCMinutes()).padStart(2, '0');
     return `${year}-${month}-${day}T${hours}:${minutes}`;
 };
 

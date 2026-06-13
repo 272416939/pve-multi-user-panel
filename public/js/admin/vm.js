@@ -203,7 +203,7 @@
         try {
             var expDate = null;
             if ($.assignForm.value.expiration_date) {
-                expDate = new Date($.assignForm.value.expiration_date).toISOString();
+                expDate = new Date($.assignForm.value.expiration_date + 'Z').toISOString();
             }
             await api('/user/vms', {
                 method: 'POST',

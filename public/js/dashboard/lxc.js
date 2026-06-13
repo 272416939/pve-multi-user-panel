@@ -184,7 +184,7 @@
         try {
             var expDate = null;
             if ($.editLxcForm.value.expiration_date) {
-                expDate = new Date($.editLxcForm.value.expiration_date).toISOString();
+                expDate = new Date($.editLxcForm.value.expiration_date + 'Z').toISOString();
             }
             await api('/user/lxc/' + $.editLxcForm.value.id, {
                 method: 'PUT',
