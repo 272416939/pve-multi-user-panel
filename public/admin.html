@@ -70,7 +70,7 @@
             --color-warning: #f59e0b;
             --color-info: #3b82f6;
             --shadow-sm: 0 2px 8px rgba(99, 102, 241, 0.05);
-            --shadow-md: 0 4px 20px rgba(99, 102, 241, 0.05);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
             --shadow-lg: 0 8px 32px rgba(99, 102, 241, 0.08);
             --glass-bg: rgba(255, 255, 255, 0.9);
             --glass-border: rgba(99, 102, 241, 0.1);
@@ -767,7 +767,7 @@
                                                     <button class="table-btn btn-danger" @click="removeVmById(vm.id)">删除</button>
                                                 </div>
                                                 <div class="dropdown-table">
-                                                    <button class="table-btn dropdown-toggle" @click.stop="$event.currentTarget.parentElement.classList.toggle('open')">更多</button>
+                                                    <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                     <ul class="dropdown-menu-table">
                                                         <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
                                                         <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
@@ -1182,7 +1182,7 @@
                                                         <button class="table-btn btn-danger" @click="removeLcxById(ct.id)">删除</button>
                                                     </div>
                                                     <div class="dropdown-table">
-                                                        <button class="table-btn dropdown-toggle" @click.stop="$event.currentTarget.parentElement.classList.toggle('open')">更多</button>
+                                                        <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                         <ul class="dropdown-menu-table">
                                                             <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
                                                             <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
@@ -3338,6 +3338,16 @@
                 $.initAdmin();
                 $.initNetwork();
                 $.initUpdate();
+                $.toggleAdminDropdown = function(target) {
+                    var dd = target.parentElement;
+                    var isOpen = dd.classList.contains('open');
+                    document.querySelectorAll('.dropdown-table.open').forEach(function(el) {
+                        el.classList.remove('open');
+                    });
+                    if (!isOpen) {
+                        dd.classList.add('open');
+                    }
+                };
                 return $;
             }
         };
