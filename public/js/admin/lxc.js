@@ -143,7 +143,7 @@
         try {
             var expDate = null;
             if ($.lxcAssignForm.value.expiration_date) {
-                expDate = new Date($.lxcAssignForm.value.expiration_date).toISOString();
+                expDate = new Date($.lxcAssignForm.value.expiration_date + 'Z').toISOString();
             }
             await api('/user/lxc', {
                 method: 'POST',
