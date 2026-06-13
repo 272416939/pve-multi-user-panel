@@ -3623,6 +3623,15 @@
                     }
                 });
             }
+
+            document.addEventListener('click', function(e) {
+                var allOpen = document.querySelectorAll('.dropdown-table.open');
+                allOpen.forEach(function(dd) {
+                    if (!dd.contains(e.target)) {
+                        dd.classList.remove('open');
+                    }
+                });
+            });
         });
     </script>
 </body>
