@@ -24,6 +24,13 @@ function mysqlNow() {
 function mysqlToday() {
     return mysqlNow().slice(0, 10);
 }
+function toMysqlDatetime(val) {
+    if (!val) return null;
+    if (typeof val === 'string') {
+        return val.replace('T', ' ').replace('Z', '').slice(0, 19);
+    }
+    return mysqlNow();
+}
 
 // 连接池单例
 let pool = null;
@@ -771,8 +778,8 @@ module.exports = {
                     cdk.duration_days,
                     cdk.created_by,
                     cdk.target_user_id || null,
-                    cdk.created_at || mysqlNow(),
-                    cdk.expires_at || null,
+                    toMysqlDatetime(cdk.created_at) || mysqlNow(),
+                    toMysqlDatetime(cdk.expires_at),
                     cdk.batch_id || null
                 ]
             );
