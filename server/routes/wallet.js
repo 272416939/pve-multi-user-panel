@@ -11,6 +11,33 @@ function safeError(e) {
     return '操作失败，请稍后重试';
 }
 
+async function queryApiTradeNo(outTradeNo) {
+    try {
+        var pid = await db.config.get('pay:pid');
+        var md5Key = await db.config.get('pay:md5_key');
+        var v2PrivateKey = await db.config.get('pay:v2_private_key');
+        var v2PublicKey = await db.config.get('pay:v2_public_key');
+        var baseUrl = await db.config.get('pay:base_url') || 'https://pay.microgg.cn/';
+        var v2Enabled = (await db.config.get('pay:v2_enabled') || '0') === '1';
+        if (!pid) return null;
+
+        var payClient = createPayClient({ pid: pid, key: md5Key, baseUrl: baseUrl, privateKey: v2PrivateKey, publicKey: v2PublicKey });
+        var queryRes;
+        if (v2Enabled && v2PrivateKey && v2PublicKey) {
+            queryRes = await payClient.queryOrder({ out_trade_no: outTradeNo });
+        } else {
+            queryRes = await payClient.queryOrder({ out_trade_no: outTradeNo });
+        }
+        if (queryRes && queryRes.code === 0 && queryRes.api_trade_no) {
+            dbg('[钱包] 查询到接口订单号:', queryRes.api_trade_no);
+            return queryRes.api_trade_no;
+        }
+    } catch (e) {
+        console.error('[钱包] 查询api_trade_no失败:', e.message);
+    }
+    return null;
+}
+
 function format2(num) {
     var n = parseFloat(num);
     if (isNaN(n)) return '0.00';
@@ -179,7 +206,7 @@ router.post('/wallet/notify', async (req, res) => {
         var balanceAfter = balanceBefore + amount;
         
         var tradeNo = params.trade_no || null;
-        var apiTradeNo = params.transaction_id || null;
+        var apiTradeNo = await queryApiTradeNo(params.out_trade_no);
 
         await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
 
@@ -272,7 +299,7 @@ router.get('/wallet/return', async (req, res) => {
         var balanceAfter = balanceBefore + amount;
 
         var tradeNo = params.trade_no || null;
-        var apiTradeNo = params.transaction_id || null;
+        var apiTradeNo = await queryApiTradeNo(params.out_trade_no);
 
         await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
 
