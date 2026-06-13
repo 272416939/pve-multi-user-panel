@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.1.16] - 2026-06-14
+
+### Fixed
+- fix(db): MySQL 连接池添加 `dateStrings: true` 根除时区漂移
+  - 根因：mysql2 默认将 DATETIME → JS Date 对象 → JSON 序列化产生不可控时区偏移
+  - 影响范围：expiration_date / created_at / expires_at / pay_time 等全部日期字段
+  - VM 编辑、LXC 编辑、CDK 有效期、交易记录、expiry-check 全部受影响
+  - `dateStrings: true` 使返回原始字符串，配合前端 `getUTC*` + 保存 `+'Z'` 三点闭合
+
+---
+
 ## [2.1.15] - 2026-06-14
 
 ### Fixed
