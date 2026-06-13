@@ -18,6 +18,11 @@ function md5Sign(params, key) {
 }
 
 function rsaSign(data, privateKey) {
+  if (typeof privateKey === 'string' && privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+    privateKey = privateKey
+      .replace('-----BEGIN RSA PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----')
+      .replace('-----END RSA PRIVATE KEY-----', '-----END PRIVATE KEY-----');
+  }
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(data);
   return sign.sign(privateKey, 'base64');
