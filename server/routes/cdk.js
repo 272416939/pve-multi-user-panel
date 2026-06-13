@@ -75,7 +75,6 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
                 duration_days: parseInt(duration_days),
                 created_by: req.user.id,
                 target_user_id: assignedUserId,
-                created_at: new Date().toISOString(),
                 expires_at: expires_at || null,
                 batch_id: batchId
             });
