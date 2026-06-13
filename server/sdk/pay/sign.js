@@ -9,7 +9,7 @@ function buildSignStr(params) {
     filtered[key] = val;
   }
   const sortedKeys = Object.keys(filtered).sort((a, b) => a.localeCompare(b));
-  return sortedKeys.map(key => `${key}=${filtered[key]}`).join('&');
+  return sortedKeys.map(key => key + '=' + filtered[key]).join('&');
 }
 
 function md5Sign(params, key) {
@@ -17,52 +17,58 @@ function md5Sign(params, key) {
   return crypto.createHash('md5').update(signStr + key).digest('hex');
 }
 
-function encodeDerLength(len) {
-  if (len < 128) return Buffer.from([len]);
-  var temp = Buffer.alloc(4);
-  temp.writeUInt32BE(len, 0);
-  var i = 0;
-  while (i < 4 && temp[i] === 0) i++;
-  var bytes = 4 - i;
-  return Buffer.concat([Buffer.from([0x80 | bytes]), temp.slice(i)]);
+function toBase64Url(buf) {
+  return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-function convertPkcs1ToPkcs8(pem) {
-  var body = pem.replace(/-----[A-Z ]+-----/g, '').replace(/[\r\n\s]/g, '');
-  var pkcs1Der = Buffer.from(body, 'base64');
+function parsePkcs1Der(der) {
+  var pos = 0;
 
-  var rsaOid = Buffer.from('2a864886f70d010101', 'hex');
-  var rsaOidBlock = Buffer.concat([
-    Buffer.from('06', 'hex'), Buffer.from([rsaOid.length]), rsaOid,
-    Buffer.from('0500', 'hex')
-  ]);
-  var algId = Buffer.concat([Buffer.from('30', 'hex'), Buffer.from([rsaOidBlock.length]), rsaOidBlock]);
+  function readLength() {
+    var b = der[pos++];
+    if ((b & 0x80) === 0) return b;
+    var numBytes = b & 0x7f;
+    var len = 0;
+    while (numBytes-- > 0) len = (len << 8) | der[pos++];
+    return len;
+  }
 
-  var octetContent = Buffer.concat([
-    Buffer.from('04', 'hex'),
-    encodeDerLength(pkcs1Der.length),
-    pkcs1Der
-  ]);
-  var inner = Buffer.concat([
-    Buffer.from('020100', 'hex'),
-    algId,
-    octetContent
-  ]);
+  var tag = der[pos++];
+  if (tag !== 0x30) throw new Error('Expected SEQUENCE (0x30), got ' + tag.toString(16));
+  var seqLen = readLength();
+  var end = pos + seqLen;
 
-  var seqHdr = Buffer.concat([Buffer.from('30', 'hex'), encodeDerLength(inner.length)]);
-  var pkcs8Der = Buffer.concat([seqHdr, inner]);
+  var ints = [];
+  while (pos < end) {
+    tag = der[pos++];
+    if (tag !== 0x02) throw new Error('Expected INTEGER (0x02), got ' + tag.toString(16));
+    var intLen = readLength();
+    if (intLen > 0 && der[pos] === 0) { pos++; intLen--; }
+    ints.push(der.slice(pos, pos + intLen));
+    pos += intLen;
+  }
 
-  return '-----BEGIN PRIVATE KEY-----\n' +
-    pkcs8Der.toString('base64').match(/.{1,64}/g).join('\n') +
-    '\n-----END PRIVATE KEY-----';
+  return {
+    n: toBase64Url(ints[1]),
+    e: toBase64Url(ints[2]),
+    d: toBase64Url(ints[3]),
+    p: toBase64Url(ints[4]),
+    q: toBase64Url(ints[5]),
+    dp: toBase64Url(ints[6]),
+    dq: toBase64Url(ints[7]),
+    qi: toBase64Url(ints[8])
+  };
 }
 
 function rsaSign(data, privateKey) {
-  if (typeof privateKey === 'string' && privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
-    privateKey = convertPkcs1ToPkcs8(privateKey);
-  }
   var keyObj;
-  if (typeof privateKey === 'string') {
+  if (typeof privateKey === 'string' && privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+    var body = privateKey.replace(/-----[A-Z ]+-----/g, '').replace(/[\r\n\s]/g, '');
+    var der = Buffer.from(body, 'base64');
+    var jwk = parsePkcs1Der(der);
+    jwk.kty = jwk.n ? 'RSA' : 'EC';
+    keyObj = crypto.createPrivateKey({ key: jwk, format: 'jwk' });
+  } else if (typeof privateKey === 'string') {
     keyObj = crypto.createPrivateKey({ key: privateKey, format: 'pem', type: 'pkcs8' });
   } else {
     keyObj = privateKey;
