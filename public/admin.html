@@ -164,6 +164,10 @@
         .nav-item.active { background: rgba(99, 102, 241, 0.18); color: var(--color-primary); border-color: rgba(99, 102, 241, 0.3);
             font-weight: 600; box-shadow: inset 0 0 20px rgba(99, 102, 241, 0.08); }
         .nav-item.active::before { transform: scaleY(1); }
+        /* 父级菜单不显示 active 高亮，仅保留展开箭头旋转 */
+        .nav-item.has-children.active { background: transparent; color: var(--glass-text-muted); border-color: transparent;
+            font-weight: 500; box-shadow: none; }
+        .nav-item.has-children.active::before { transform: scaleY(0); }
         .nav-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
         .nav-text { white-space: nowrap; }
         .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
@@ -557,7 +561,7 @@
         <aside class="sidebar" id="sidebar">
             <nav class="sidebar-nav">
                 <a class="nav-item" :class="{ active: activeSection === 'overview' }" href="#" @click.prevent="switchSection('overview')"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><span class="nav-text">总览</span></a>
-                <a class="nav-item has-children" :class="{ active: activeSection === 'vms' }" href="#" onclick="window.__admin.toggleSubmenu('vms');return false;">
+                <a class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('vms');return false;">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
                     <span class="nav-text">虚拟机管理</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
@@ -567,7 +571,7 @@
                     <a class="nav-item" data-subsection="vms-assign" onclick="window.__admin.switchSubsection('vms','assign');return false;"><span class="nav-text">分配虚拟机</span></a>
                     <a class="nav-item" data-subsection="vms-network" onclick="window.__admin.switchSubsection('vms','network');return false;"><span class="nav-text">VM 端口转发管理</span></a>
                 </div>
-                <a class="nav-item has-children" :class="{ active: activeSection === 'lxc' }" href="#" onclick="window.__admin.toggleSubmenu('lxc');return false;">
+                <a class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('lxc');return false;">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
                     <span class="nav-text">LXC 容器管理</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
@@ -579,7 +583,7 @@
                     <a class="nav-item" data-subsection="lxc-network" onclick="window.__admin.switchSubsection('lxc','network');return false;"><span class="nav-text">CT 端口转发管理</span></a>
                 </div>
                 <!-- 后台管理 -->
-                <a class="nav-item has-children" :class="{ active: activeSection === 'manage' }" href="#" onclick="window.__admin.toggleSubmenu('manage');return false;">
+                <a class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('manage');return false;">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
                     <span class="nav-text">后台管理</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
@@ -590,8 +594,18 @@
                     <a class="nav-item" data-subsection="manage-messages" onclick="window.__admin.switchAdminTab('messages');return false;"><span class="nav-text">消息管理</span></a>
                 </div>
 
+                <!-- 财务管理（父菜单，仅admin） -->
+                <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('finance');return false;">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg></span>
+                    <span class="nav-text">财务管理</span>
+                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+                </a>
+                <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-finance">
+                    <a class="nav-item" data-subsection="finance-transactions" onclick="window.__admin.switchSection('finance');window.__admin.activeTab.value='transactions';return false;"><span class="nav-text">交易流水</span></a>
+                </div>
+
                 <!-- 系统设置 -->
-                <a class="nav-item has-children" :class="{ active: activeSection === 'settings' }" href="#" onclick="window.__admin.toggleSubmenu('settings');return false;">
+                <a class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('settings');return false;">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg></span>
                     <span class="nav-text">系统设置</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
@@ -601,16 +615,6 @@
                     <a class="nav-item" data-subsection="settings-snapshot-backup" onclick="window.__admin.switchAdminTab('snapshot-backup');return false;"><span class="nav-text">快照&备份配置</span></a>
                     <a class="nav-item" data-subsection="settings-network" onclick="window.__admin.switchAdminTab('network');return false;"><span class="nav-text">网络管理</span></a>
                     <a class="nav-item" data-subsection="settings-pay" onclick="window.__admin.switchAdminTab('pay');return false;"><span class="nav-text">支付配置</span></a>
-                </div>
-
-                <!-- 财务管理（父菜单，仅admin） -->
-                <a v-if="user && user.role === 'admin'" class="nav-item has-children" :class="{ active: activeSection === 'finance' }" href="#" onclick="window.__admin.toggleSubmenu('finance');return false;">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg></span>
-                    <span class="nav-text">财务管理</span>
-                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
-                </a>
-                <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-finance">
-                    <a class="nav-item" data-subsection="finance-transactions" onclick="window.__admin.switchSection('finance');window.__admin.activeTab.value='transactions';return false;"><span class="nav-text">交易流水</span></a>
                 </div>
 
                 <!-- 系统更新（独立一级菜单） -->

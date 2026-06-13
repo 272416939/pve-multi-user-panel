@@ -142,8 +142,8 @@ watch($.user, function(u) {
             if (sb) sb.classList.remove('open');
             if (ol) ol.style.display = 'none';
         }
-        // Clear submenu active states
-        document.querySelectorAll('.nav-submenu .nav-item').forEach(function(item) {
+        // Clear all active states including parent menus
+        document.querySelectorAll('.sidebar-nav .nav-item').forEach(function(item) {
             item.classList.remove('active');
         });
     };
