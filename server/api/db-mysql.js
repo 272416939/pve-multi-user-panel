@@ -40,6 +40,7 @@ function getPool() {
             queueLimit: 0,
             waitForConnections: true,
             connectTimeout: 10000,
+            dateStrings: true,
         });
     }
     return pool;
