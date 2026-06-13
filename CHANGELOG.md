@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.17] - 2026-06-14
+
+### Fixed
+- fix(cdk): CDK 有效期 datetime-local 保存时加 `+'Z'` 统一 UTC 时区，与 VM/LXC 一致
+- fix(wallet): 站内信 `send_type: 'auto'` → `1` 修复 MySQL 严格模式 `Incorrect integer value` 报错
+- fix(lxc): PUT 解构补全 `renewal_period` 字段，修复 `ReferenceError`
+
+---
+
 ## [2.1.16] - 2026-06-14
 
 ### Fixed
