@@ -80,14 +80,14 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
         // 再尝试获取 PVE 状态，每个 VM 独立处理
         for (const vmData of vmsWithDetails) {
             try {
-                var cachedStatus = getStatusCache('vm:' + vmData.vm_id);
+                var cachedStatus = getStatusCache('vm:' + vmData.vm_id, req.user.id);
                 var rawStatus = cachedStatus || await pveApi.getVmStatus(vmData.vm_id);
                 var config = await pveApi.getVmConfig(vmData.vm_id);
                 vmData.status = cachedStatus || _applyRate('vm:' + vmData.vm_id, rawStatus);
                 vmData.config = config;
                 vmData.error = null;
             } catch (innerError) {
-                var cachedFallback = getStatusCache('vm:' + vmData.vm_id);
+                var cachedFallback = getStatusCache('vm:' + vmData.vm_id, req.user.id);
                 if (cachedFallback) {
                     vmData.status = cachedFallback;
                     vmData.error = null;

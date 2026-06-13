@@ -77,14 +77,14 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
  
         for (const ctData of ctsWithDetails) {
             try {
-                var cachedStatus = getStatusCache('lxc:' + ctData.ct_id);
+                var cachedStatus = getStatusCache('lxc:' + ctData.ct_id, req.user.id);
                 var rawStatus = cachedStatus || await pveApi.getLxcStatus(ctData.ct_id);
                 var config = await pveApi.getLxcConfig(ctData.ct_id);
                 ctData.status = cachedStatus || _applyRate('lxc:' + ctData.ct_id, rawStatus);
                 ctData.config = config;
                 ctData.error = null;
             } catch (innerError) {
-                var cachedFallback = getStatusCache('lxc:' + ctData.ct_id);
+                var cachedFallback = getStatusCache('lxc:' + ctData.ct_id, req.user.id);
                 if (cachedFallback) {
                     ctData.status = cachedFallback;
                     ctData.error = null;

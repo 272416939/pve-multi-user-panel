@@ -125,6 +125,21 @@ async function pushStatus() {
     }
 }
 
+async function checkResourceOwnership(userId, vmid, isLxc) {
+    try {
+        const db = getDb();
+        if (isLxc) {
+            const rows = await db.lxcContainers.getByCtId(vmid);
+            return rows && rows.some(r => r.user_id === userId);
+        } else {
+            const vms = await db.vms.getByUserId(userId);
+            return vms && vms.some(v => v.vm_id === vmid);
+        }
+    } catch (e) {
+        return false;
+    }
+}
+
 pushProxy.on('connection', async (clientWs, request) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
     const ticket = url.searchParams.get('ticket');
@@ -160,6 +175,9 @@ pushProxy.on('connection', async (clientWs, request) => {
         send(clientWs, { type: 'unread', count: typeof c === 'number' ? c : 0 });
     } catch (e) {}
 
+    const areTimersStarted = !!hbTimer;
+    if (!areTimersStarted) ensureTimers();
+
     const pingInterval = setInterval(() => {
         if (info.lastPong && Date.now() - info.lastPong > HEARTBEAT_INTERVAL * 2) {
             clientWs.terminate();
@@ -170,12 +188,15 @@ pushProxy.on('connection', async (clientWs, request) => {
         info.lastPong = Date.now();
     });
 
-    clientWs.on('message', (data) => {
+    clientWs.on('message', async (data) => {
         try {
             const msg = JSON.parse(data.toString());
             switch (msg.type) {
                 case 'subscribe':
                     if (msg.vmid && Number.isInteger(msg.vmid)) {
+                        if (!(await checkResourceOwnership(decoded.userId, msg.vmid, msg.isLxc))) {
+                            break;
+                        }
                         if (msg.isLxc) {
                             info.lxcs.add(msg.vmid);
                         } else {
@@ -185,6 +206,9 @@ pushProxy.on('connection', async (clientWs, request) => {
                     break;
                 case 'subscribe-detail':
                     if (msg.vmid && Number.isInteger(msg.vmid)) {
+                        if (!(await checkResourceOwnership(decoded.userId, msg.vmid, msg.isLxc))) {
+                            break;
+                        }
                         if (msg.isLxc) {
                             info.detailLxcs.add(msg.vmid);
                             info.lxcs.add(msg.vmid);
@@ -241,14 +265,13 @@ function ensureTimers() {
     }, 60000);
 }
 
-pushProxy.on('connection', () => { ensureTimers(); });
-
 module.exports = pushProxy;
 module.exports.pushUnreadCount = pushUnreadCount;
 module.exports.pushToUser = pushToUser;
-module.exports.getStatusCache = function(key) {
-    var e = statusCacheGlobal.get(key);
+module.exports.getStatusCache = function(key, userId) {
+    var cacheKey = userId ? userId + ':' + key : key;
+    var e = statusCacheGlobal.get(cacheKey);
     if (e && Date.now() - e.ts < 5000) return e.s;
-    statusCacheGlobal.delete(key);
+    statusCacheGlobal.delete(cacheKey);
     return null;
 };
