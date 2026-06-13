@@ -167,7 +167,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
         try {
-            const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
+            const expiryStr = expiration_date ? new Date(expiration_date + 'Z').toLocaleString('zh-CN') : '永久有效';
             const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
             const emailContent = `
                 <p>您好 <strong>${assignedUser.username}</strong>，</p>
@@ -276,7 +276,7 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
                 await db.messages.create({
                     uid: newUserId,
                     title: 'LXC 容器已转移',
-                    content: `LXC 容器 ${ct.name || 'CT ' + ct.ct_id} 已被管理员转移给您。${expiration_date ? '\n到期时间：' + new Date(expiration_date).toLocaleString('zh-CN') : ''}`,
+                    content: `LXC 容器 ${ct.name || 'CT ' + ct.ct_id} 已被管理员转移给您。${expiration_date ? '\n到期时间：' + new Date(expiration_date + 'Z').toLocaleString('zh-CN') : ''}`,
                     type: 2,
                     send_type: 1
                 });

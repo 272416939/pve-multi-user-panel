@@ -271,7 +271,7 @@
         try {
             var expires = null;
             if ($.cdkForm.value.expires_at) {
-                expires = new Date($.cdkForm.value.expires_at + 'Z').toISOString();
+                expires = new Date($.cdkForm.value.expires_at).toISOString();
             }
             var result = await api('/admin/cdk/batch-generate', {
                 method: 'POST',

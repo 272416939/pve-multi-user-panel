@@ -1947,7 +1947,7 @@
                             </thead>
                             <tbody>
                                 <tr v-for="tx in transactionList" :key="tx.id">
-                                    <td>{{ tx.pay_time }}</td>
+                                    <td>{{ formatDate(tx.pay_time) }}</td>
                                     <td>{{ tx.username }}</td>
                                     <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method }}</td>
                                     <td><code style="font-size:11px;">{{ tx.order_no }}</code></td>

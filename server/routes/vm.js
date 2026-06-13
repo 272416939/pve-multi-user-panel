@@ -187,7 +187,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
         try {
-            const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
+            const expiryStr = expiration_date ? new Date(expiration_date + 'Z').toLocaleString('zh-CN') : '永久有效';
             const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
             const emailContent = `
                 <p>您好 <strong>${assignedUser.username}</strong>，</p>
@@ -281,7 +281,7 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     // 管理员延长到期时间后，如果虚拟机之前因到期停机，尝试自动开机
     if (isAdmin && expiration_date !== undefined) {
         try {
-            const newExp = new Date(expiration_date);
+            const newExp = new Date(expiration_date + 'Z');
             if (newExp > new Date()) {
                 const currentStatus = await pveApi.getVmStatus(vm.vm_id);
                 if (currentStatus && currentStatus.status === 'stopped') {

@@ -781,7 +781,7 @@
                         <thead><tr><th>支付时间</th><th>支付方式</th><th>商户订单号</th><th>支付流水号</th><th>类型</th><th>金额</th></tr></thead>
                         <tbody>
                             <tr v-for="tx in txList" :key="tx.id">
-                                <td>{{ tx.pay_time }}</td>
+                                <td>{{ formatDate(tx.pay_time) }}</td>
                                 <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method }}</td>
                                 <td><code style="font-size:11px;">{{ tx.order_no }}</code> <button class="btn btn-sm btn-link p-0 ms-1" @click="copyOrderNo(tx.order_no)" title="复制">📋</button></td>
                                 <td><code style="font-size:11px;">{{ tx.trade_no || '-' }}</code></td>
