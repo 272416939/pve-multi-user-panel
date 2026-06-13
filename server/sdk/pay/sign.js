@@ -60,13 +60,21 @@ function parsePkcs1Der(der) {
   };
 }
 
+function fixKey(key) {
+  if (typeof key !== 'string') return key;
+  if (key.includes('\\n')) key = key.replace(/\\n/g, '\n');
+  if (!key.endsWith('\n')) key += '\n';
+  return key;
+}
+
 function rsaSign(data, privateKey) {
+  privateKey = fixKey(privateKey);
   var keyObj;
   if (typeof privateKey === 'string' && privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
     var body = privateKey.replace(/-----[A-Z ]+-----/g, '').replace(/[\r\n\s]/g, '');
     var der = Buffer.from(body, 'base64');
     var jwk = parsePkcs1Der(der);
-    jwk.kty = jwk.n ? 'RSA' : 'EC';
+    jwk.kty = 'RSA';
     keyObj = crypto.createPrivateKey({ key: jwk, format: 'jwk' });
   } else if (typeof privateKey === 'string') {
     keyObj = crypto.createPrivateKey({ key: privateKey, format: 'pem', type: 'pkcs8' });
@@ -79,6 +87,7 @@ function rsaSign(data, privateKey) {
 }
 
 function rsaVerify(data, signature, publicKey) {
+  publicKey = fixKey(publicKey);
   const verify = crypto.createVerify('RSA-SHA256');
   verify.update(data);
   return verify.verify(publicKey, signature, 'base64');
