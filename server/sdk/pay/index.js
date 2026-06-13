@@ -3,7 +3,7 @@ const axios = require('axios');
 const qs = require('querystring');
 const { md5Sign, buildSignStr } = require('./sign');
 const { PayClientV2 } = require('./v2');
-const { SUBMIT_URL, MAPI_URL, API_URL, DEFAULT_BASE_URL, PAY_TYPES, DEVICE_TYPES, ALIPAY, WXPAY, QQPAY, BANK, JDPAY, PAYPAL, DOUYINPAY, PC, MOBILE, QQ, WECHAT, DOUYIN, JUMP, TRADE_SUCCESS } = require('./constants');
+const { SUBMIT_URL, MAPI_URL, API_URL, V2_SUBMIT_URL, V2_QUERY_URL, V2_REFUND_URL, V2_MERCHANT_URL, DEFAULT_BASE_URL, PAY_TYPES, DEVICE_TYPES, ALIPAY, WXPAY, QQPAY, BANK, JDPAY, PAYPAL, DOUYINPAY, PC, MOBILE, QQ, WECHAT, DOUYIN, JUMP, TRADE_SUCCESS, SIGN_TYPE_MD5, SIGN_TYPE_RSA } = require('./constants');
 
 function generateOrderId(prefix) {
     var ts = Date.now().toString(36);
@@ -12,7 +12,7 @@ function generateOrderId(prefix) {
 }
 
 function createPayClient(config) {
-    if ((config.privateKey || config.publicKey) && config.useV2 === true) {
+    if (config.privateKey || config.publicKey) {
         return new PayClientV2(config);
     }
     return new PayClientV1(config);
@@ -127,5 +127,7 @@ module.exports = {
     WECHAT,
     DOUYIN,
     JUMP,
-    TRADE_SUCCESS
+    TRADE_SUCCESS,
+    SIGN_TYPE_MD5,
+    SIGN_TYPE_RSA
 };

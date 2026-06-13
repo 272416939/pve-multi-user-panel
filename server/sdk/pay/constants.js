@@ -37,7 +37,15 @@ const SUBMIT_URL = '/submit.php';
 const MAPI_URL = '/mapi.php';
 const API_URL = '/api.php';
 
+const V2_SUBMIT_URL = '/api/pay/submit';
+const V2_QUERY_URL = '/api/pay/query';
+const V2_REFUND_URL = '/api/pay/refund';
+const V2_MERCHANT_URL = '/api/merchant/info';
+
 const TRADE_SUCCESS = 'TRADE_SUCCESS';
+
+const SIGN_TYPE_MD5 = 'MD5';
+const SIGN_TYPE_RSA = 'RSA';
 
 const DEFAULT_BASE_URL = 'https://pay.microgg.cn';
 
@@ -60,6 +68,12 @@ module.exports = {
   SUBMIT_URL,
   MAPI_URL,
   API_URL,
+  V2_SUBMIT_URL,
+  V2_QUERY_URL,
+  V2_REFUND_URL,
+  V2_MERCHANT_URL,
   TRADE_SUCCESS,
+  SIGN_TYPE_MD5,
+  SIGN_TYPE_RSA,
   DEFAULT_BASE_URL
 };
