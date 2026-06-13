@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.11] - 2026-06-14
+
+### Fixed
+- fix(wallet): 支付回调读取 `transaction_id` 替代不存在的 `api_trade_no`
+  - 支付网关回调实际返回的流水号字段为 `transaction_id`
+  - 移除错误的内存 Map 暂存方案
+  - admin CSV 导出同步适配
+
+---
+
 ## [2.1.10] - 2026-06-14
 
 ### Fixed
