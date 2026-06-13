@@ -727,6 +727,7 @@
                                             <th>内网IP</th>
                                             <th>CNAME域名</th>
                                             <th>配置</th>
+                                            <th>续费价格</th>
                                             <th>系统</th>
                                             <th>状态</th>
                                             <th>操作</th>
@@ -739,7 +740,8 @@
                                             <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
                                             <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                             <td><span v-if="networkConfig.cname_domain" class="text-primary">{{ vm.vm_id }}.{{ networkConfig.cname_domain }}</span><span v-else class="text-muted">-</span></td>
-                                            <td>{{ (vm.config ? (vm.config.sockets||1) + '核' + (vm.config.cores||1) + 'G' : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
+                                            <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
+                                            <td>{{ vm.renewal_price || '-' }}</td>
                                             <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                             <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                             <td>
@@ -1126,6 +1128,7 @@
                                                 <th>内网IP</th>
                                                 <th>CNAME域名</th>
                                                 <th>配置</th>
+                                                <th>续费价格</th>
                                                 <th>镜像</th>
                                                 <th>状态</th>
                                                 <th>操作</th>
@@ -1139,6 +1142,7 @@
                                                 <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
                                                 <td><span v-if="networkConfig.cname_domain" class="text-primary">{{ ct.ct_id }}.{{ networkConfig.cname_domain }}</span><span v-else class="text-muted">-</span></td>
                                                 <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.status && ct.status.maxdisk ? '/ ' + Math.round(ct.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
+                                                <td>{{ ct.renewal_price || '-' }}</td>
                                                 <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                                 <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                                 <td>
@@ -3085,6 +3089,7 @@
                         <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '容器ID' : '虚拟机ID' }}</span><span class="info-value">{{ detailVm.vm_id || '-' }}</span></div>
                         <div class="info-item"><span class="info-label">内网IP</span><span class="info-value">{{ detailVm.ip || '-' }}</span></div>
                         <div class="info-item"><span class="info-label">硬件配置</span><span class="info-value">{{ detailVmConfigStr }}</span></div>
+                        <div class="info-item"><span class="info-label">续费价格</span><span class="info-value">{{ detailVm.renewal_price || '-' }}</span></div>
                         <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '镜像' : '操作系统' }}</span><span class="info-value">{{ detailVmOsStr }}</span></div>
                         <div class="info-item"><span class="info-label">运行状态</span><span class="info-value">{{ detailVmStatusStr }}</span></div>
                         <div class="info-item"><span class="info-label">运行时长</span><span class="info-value">{{ detailVmUptimeStr }}</span></div>

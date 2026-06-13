@@ -39,7 +39,7 @@
     $.detailVmConfigStr = computed(function() {
         var vm = $.detailVm.value;
         if (!vm || !vm.config) return '-';
-        var str = (vm.config.sockets || 1) + '核' + (vm.config.cores || 1);
+        var str = (vm.config.sockets || 1) + '*' + (vm.config.cores || 1) + '核 ' + formatMemory(vm.config.memory);
         var diskStr = '';
         if (vm.status && vm.status.maxdisk) {
             diskStr = $.formatBytes(vm.status.maxdisk);
@@ -54,7 +54,7 @@
                 }
             }
         }
-        if (diskStr) str += 'G / ' + diskStr;
+        if (diskStr) str += ' / ' + diskStr;
         return str;
     });
     $.detailVmOsStr = computed(function() {
@@ -365,6 +365,7 @@
             config: ct.config,
             os: ct.template_name || (ct.config ? ct.config.ostype : '-'),
             status: ct.status,
+            renewal_price: ct.renewal_price || '',
             _isLxc: true
         };
         $.showVmDetail.value = true;

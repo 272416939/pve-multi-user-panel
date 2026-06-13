@@ -47,7 +47,7 @@ $.detailVmChartData = null;
 $.detailVmConfigStr = computed(function() {
     var vm = $.detailVm.value;
     if (!vm || !vm.config) return '-';
-    var str = (vm.config.sockets || 1) + '核' + (vm.config.cores || 1);
+    var str = (vm.config.sockets || 1) + '*' + (vm.config.cores || 1) + '核 ' + formatMemory(vm.config.memory);
     // 磁盘容量：优先取status.maxdisk，其次从config磁盘字段提取size
     var diskStr = '';
     if (vm.status && vm.status.maxdisk) {
@@ -63,7 +63,7 @@ $.detailVmConfigStr = computed(function() {
             }
         }
     }
-    if (diskStr) str += 'G / ' + diskStr;
+    if (diskStr) str += ' / ' + diskStr;
     return str;
 });
 $.detailVmOsStr = computed(function() {
@@ -476,14 +476,15 @@ watch($.user, function(u) {
     // 打开 LXC 容器详情弹窗
     $.openLxcDetail = function(ct) {
         $.detailVm.value = {
-            vm_id: ct.ct_id,
-            name: ct.name || ('CT ' + ct.ct_id),
-            ip: ct.ip || ct.dhcp_static_ip || '-',
-            config: ct.config,
-            os: ct.template_name || (ct.config ? ct.config.ostype : '-'),
-            status: ct.status,
-            _isLxc: true
-        };
+        vm_id: ct.ct_id,
+        name: ct.name || ('CT ' + ct.ct_id),
+        ip: ct.ip || ct.dhcp_static_ip || '-',
+        config: ct.config,
+        os: ct.template_name || (ct.config ? ct.config.ostype : '-'),
+        status: ct.status,
+        renewal_price: ct.renewal_price || '',
+        _isLxc: true
+    };
         $.showVmDetail.value = true;
         document.body.style.overflow = 'hidden';
         setTimeout(function() {
