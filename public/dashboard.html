@@ -890,9 +890,7 @@
                                     <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
                                         <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
-                                        <button class="table-btn" @click="openDeviceForward(vm, 'vm')" title="端口转发">网络</button>
                                         <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
-                                            <button class="table-btn" @click="openVncConsole(vm.vm_id)" title="VNC控制台">控制台</button>
                                             <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
                                             <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
                                             <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
@@ -904,6 +902,9 @@
                                             <button class="table-btn dropdown-toggle" @click.stop="toggleDropdown('vm-'+vm.id, $event.currentTarget, [
                                                 {label:'快照', action:function(){ openSnapshotPanel(vm) }},
                                                 {label:'备份', action:function(){ openBackupPanel(vm) }},
+                                                {label:'网络', action:function(){ openDeviceForward(vm, 'vm') }},
+                                                {label:'控制台', action:function(){ openVncConsole(vm.vm_id) }},
+                                                {label:'续费', action:function(){ renewResource = vm; renewShow = true; }},
                                                 {label:'编辑', action:function(){ editVm(vm) }}
                                             ])">更多</button>
                                         </div>
@@ -957,9 +958,7 @@
                                     <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
                                         <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
-                                        <button class="table-btn" @click="openDeviceForward(ct, 'lxc')" title="端口转发">网络</button>
                                         <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
-                                            <button class="table-btn" @click="openLxcTerminal(ct.ct_id)">终端</button>
                                             <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
                                             <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
                                             <button class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
@@ -971,6 +970,9 @@
                                             <button class="table-btn dropdown-toggle" @click.stop="toggleDropdown('lxc-'+ct.id, $event.currentTarget, [
                                                 {label:'快照', action:function(){ openLxcSnapshotPanel(ct) }},
                                                 {label:'备份', action:function(){ openLxcBackupPanel(ct) }},
+                                                {label:'网络', action:function(){ openDeviceForward(ct, 'lxc') }},
+                                                {label:'终端', action:function(){ openLxcTerminal(ct.ct_id) }},
+                                                {label:'续费', action:function(){ renewResource = ct; renewShow = true; }},
                                                 {label:'编辑', action:function(){ editLxc(ct) }},
                                                 {label:'重置密码', action:function(){ openLxcPasswordReset(ct) }, cls:'text-warning'}
                                             ])">更多</button>
@@ -1951,6 +1953,7 @@
             <div class="modal-body">
                 <p v-if="renewResource">续费资源：{{ renewResource.name || '资源' }}</p>
                 <p v-if="renewResource">续费价格：¥{{ renewResource.renewal_price || '0' }} / {{ renewResource.renewal_period === 'year' ? '年' : '月' }}</p>
+                <p v-if="renewResource && renewResource.expire_time">到期时间：{{ renewResource.expire_time }} <span v-if="renewResource.expire_time" class="text-warning small">({{ daysUntilExpire(renewResource.expire_time) }})</span></p>
                 <div class="mb-3"><label class="form-label">续费数量({{ renewResource && renewResource.renewal_period === 'year' ? '年' : '月' }})</label>
                     <input type="number" class="form-control" v-model.number="renewQuantity" min="1" style="max-width:120px;"></div>
                 <p v-if="renewResource">应付金额：¥{{ (parseFloat(renewResource.renewal_price||0) * renewQuantity).toFixed(2) }}</p>
@@ -2013,6 +2016,14 @@
             $.initLxc();
             $.initForward();
             $.initMessage();
+            $.daysUntilExpire = function(expireTime) {
+                if (!expireTime) return '';
+                var diff = new Date(expireTime) - new Date();
+                var days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                if (days <= 0) return '(已到期)';
+                if (days <= 7) return '(剩余' + days + '天)';
+                return '';
+            };
             return $;
         }
     };

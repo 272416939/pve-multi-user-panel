@@ -178,6 +178,8 @@ router.post('/wallet/notify', async (req, res) => {
         var balanceBefore = parseFloat(user.balance || '0');
         var balanceAfter = balanceBefore + amount;
         
+        var tradeNo = params.trade_no || params.api_trade_no || null;
+        
         await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
         
         await db.transactionRecords.create({
@@ -188,8 +190,31 @@ router.post('/wallet/notify', async (req, res) => {
             trade_type: 'recharge',
             amount: amount.toFixed(2),
             balance_before: balanceBefore.toFixed(2),
-            balance_after: balanceAfter.toFixed(2)
+            balance_after: balanceAfter.toFixed(2),
+            trade_no: tradeNo
         });
+        
+        try {
+            await db.messages.create({
+                uid: userId,
+                title: '充值到账通知',
+                content: '您已成功充值 ¥' + amount.toFixed(2) + '，当前余额 ¥' + balanceAfter.toFixed(2) + '。订单号：' + params.out_trade_no,
+                type: 1,
+                send_type: 'auto'
+            });
+        } catch (e) {
+            console.error('[钱包] 站内信发送失败:', e.message);
+        }
+
+        try {
+            if (user.email && user.email_verified && user.email.includes('@')) {
+                const emailUtil = require('../utils/email');
+                await emailUtil.send(user.email, '充值到账通知 - PVE管理面板',
+                    '您已成功充值 ¥' + amount.toFixed(2) + '\n当前余额 ¥' + balanceAfter.toFixed(2) + '\n订单号：' + params.out_trade_no + '\n时间：' + new Date().toLocaleString('zh-CN'));
+            }
+        } catch (e) {
+            console.error('[钱包] 邮件发送失败:', e.message);
+        }
         
         res.send('success');
     } catch (e) {
@@ -244,6 +269,8 @@ router.get('/wallet/return', async (req, res) => {
         var balanceBefore = parseFloat(user.balance || '0');
         var balanceAfter = balanceBefore + amount;
 
+        var tradeNo = params.trade_no || params.api_trade_no || null;
+
         await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
 
         await db.transactionRecords.create({
@@ -254,8 +281,31 @@ router.get('/wallet/return', async (req, res) => {
             trade_type: 'recharge',
             amount: amount.toFixed(2),
             balance_before: balanceBefore.toFixed(2),
-            balance_after: balanceAfter.toFixed(2)
+            balance_after: balanceAfter.toFixed(2),
+            trade_no: tradeNo
         });
+
+        try {
+            await db.messages.create({
+                uid: userId,
+                title: '充值到账通知',
+                content: '您已成功充值 ¥' + amount.toFixed(2) + '，当前余额 ¥' + balanceAfter.toFixed(2) + '。订单号：' + params.out_trade_no,
+                type: 1,
+                send_type: 'auto'
+            });
+        } catch (e) {
+            console.error('[钱包] 站内信发送失败:', e.message);
+        }
+
+        try {
+            if (user.email && user.email_verified && user.email.includes('@')) {
+                const emailUtil = require('../utils/email');
+                await emailUtil.send(user.email, '充值到账通知 - PVE管理面板',
+                    '您已成功充值 ¥' + amount.toFixed(2) + '\n当前余额 ¥' + balanceAfter.toFixed(2) + '\n订单号：' + params.out_trade_no + '\n时间：' + new Date().toLocaleString('zh-CN'));
+            }
+        } catch (e) {
+            console.error('[钱包] 邮件发送失败:', e.message);
+        }
 
         dbg('[钱包] 同步回调入账成功:', params.out_trade_no, amount.toFixed(2));
 
@@ -373,7 +423,7 @@ router.get('/wallet/transactions', authMiddleware, async (req, res) => {
         var list = await db.transactionRecords.getByUserId(req.user.id, params);
         var total = await db.transactionRecords.countAll(Object.assign({}, params, { user_id: req.user.id }));
         
-        list = list.map(function(r) { return { id: r.id, order_no: r.order_no, pay_time: r.pay_time, pay_method: r.pay_method, trade_type: r.trade_type, amount: parseFloat(r.amount).toFixed(2), period: r.period, period_count: r.period_count, resource_type: r.resource_type, created_at: r.created_at }; });
+        list = list.map(function(r) { return { id: r.id, order_no: r.order_no, pay_time: r.pay_time, pay_method: r.pay_method, trade_type: r.trade_type, amount: parseFloat(r.amount).toFixed(2), period: r.period, period_count: r.period_count, resource_type: r.resource_type, trade_no: r.trade_no || null, created_at: r.created_at }; });
         
         res.json({ data: list, total: total, page: page, limit: limit });
     } catch (e) {

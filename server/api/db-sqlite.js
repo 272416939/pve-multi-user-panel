@@ -336,6 +336,7 @@ function initDb() {
             balance_after TEXT DEFAULT '0.00',
             resource_type TEXT DEFAULT NULL,
             resource_id INTEGER DEFAULT NULL,
+            trade_no TEXT DEFAULT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
@@ -468,6 +469,15 @@ function migrateSchema() {
     } catch (e) {
         if (!e.message.includes('duplicate column name')) {
             console.error('迁移 lxc_containers.dhcp_static_ip 字段失败:', e.message);
+        }
+    }
+
+    // 迁移 transaction_records 表 trade_no 字段
+    try {
+        db.exec(`ALTER TABLE transaction_records ADD COLUMN trade_no TEXT DEFAULT NULL`);
+    } catch (e) {
+        if (!e.message.includes('duplicate column name')) {
+            console.error('迁移 transaction_records.trade_no 字段失败:', e.message);
         }
     }
 }
@@ -1488,14 +1498,15 @@ module.exports = {
     transactionRecords: {
         create: (record) => {
             const { lastInsertRowid } = db.prepare(`
-                INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `).run(
                 record.user_id, record.order_no, record.pay_time || null, record.pay_method || '',
                 record.trade_type || 'recharge', record.amount || '0.00',
                 record.period || null, record.period_count || null,
                 record.balance_before || '0.00', record.balance_after || '0.00',
                 record.resource_type || null, record.resource_id || null,
+                record.trade_no || null,
                 new Date().toISOString()
             );
             return db.prepare('SELECT * FROM transaction_records WHERE id = ?').get(lastInsertRowid);

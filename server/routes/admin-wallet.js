@@ -41,6 +41,7 @@ router.get('/admin/transactions', authMiddleware, adminMiddleware, async (req, r
                 user_id: r.user_id,
                 username: userMap[r.user_id] || '-',
                 order_no: r.order_no,
+                trade_no: r.trade_no || null,
                 pay_time: r.pay_time,
                 pay_method: r.pay_method,
                 trade_type: r.trade_type,
@@ -84,13 +85,14 @@ router.get('/admin/transactions/export', authMiddleware, adminMiddleware, async 
         for (var u of users) { userMap[u.id] = u.username; }
 
         // 构建CSV
-        var rows = [['支付时间', '用户名', '支付方式', '商户订单号', '交易类型', '交易金额', '操作前余额', '操作后余额'].join(',')];
+        var rows = [['支付时间', '用户名', '支付方式', '商户订单号', '接口订单号', '交易类型', '交易金额', '操作前余额', '操作后余额'].join(',')];
         for (var r of list) {
             rows.push([
                 r.pay_time || '',
                 '"' + (userMap[r.user_id] || '-') + '"',
                 r.pay_method === 'alipay' ? '支付宝' : r.pay_method === 'wxpay' ? '微信支付' : r.pay_method,
                 r.order_no,
+                r.trade_no || '',
                 r.trade_type === 'recharge' ? '余额充值' : '服务器续费',
                 parseFloat(r.amount).toFixed(2),
                 parseFloat(r.balance_before).toFixed(2),
