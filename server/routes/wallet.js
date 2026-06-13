@@ -214,7 +214,7 @@ router.get('/wallet/return', async (req, res) => {
         if (params.sign_type === 'RSA' && v2PublicKey) {
             var { rsaVerify, buildSignStr } = require('../sdk/pay/sign');
             var signStr = buildSignStr(params);
-            valid = rsaVerify(signStr, decodeURIComponent(params.sign), v2PublicKey);
+            valid = rsaVerify(signStr, params.sign, v2PublicKey);
         } else if (md5Key) {
             var { md5Sign } = require('../sdk/pay/sign');
             var expected = md5Sign(params, md5Key);

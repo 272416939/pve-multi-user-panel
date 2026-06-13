@@ -17,24 +17,25 @@ function md5Sign(params, key) {
   return crypto.createHash('md5').update(signStr + key).digest('hex');
 }
 
-function wrapPem(key) {
+function wrapPem(key, type) {
+  type = type || 'PRIVATE';
   if (typeof key !== 'string') return key;
   if (key.includes('-----BEGIN')) return key;
   var clean = key.replace(/[\r\n\s]/g, '');
   if (!/^[A-Za-z0-9+/=]+$/.test(clean)) return key;
   var lines = clean.match(/.{1,64}/g).join('\n');
-  return '-----BEGIN PRIVATE KEY-----\n' + lines + '\n-----END PRIVATE KEY-----\n';
+  return '-----BEGIN ' + type + ' KEY-----\n' + lines + '\n-----END ' + type + ' KEY-----\n';
 }
 
 function rsaSign(data, privateKey) {
-  privateKey = wrapPem(privateKey);
+  privateKey = wrapPem(privateKey, 'PRIVATE');
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(data);
   return sign.sign(privateKey, 'base64');
 }
 
 function rsaVerify(data, signature, publicKey) {
-  publicKey = wrapPem(publicKey);
+  publicKey = wrapPem(publicKey, 'PUBLIC');
   const verify = crypto.createVerify('RSA-SHA256');
   verify.update(data);
   return verify.verify(publicKey, signature, 'base64');
