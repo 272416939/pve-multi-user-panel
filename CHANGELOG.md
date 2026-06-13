@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.1.19] - 2026-06-14
+
+### Fixed
+- fix(date): datetime-local 选择器显示本地时间 + pay_time 格式化显示
+  - `formatDateTimeLocal`：`getUTC*` → `get*` 显示本地时间，用户按本地时区输入
+  - 7 处保存：移除 `+'Z'`，`new Date(val).toISOString()` 自动本地→UTC
+  - admin/user-center：`pay_time` 加 `formatDate()` 格式化显示
+  - vm/lxc 分配通知：前端不再传 Z，后端补加 Z 确保站内消息/邮件时间正确
+
+---
+
 ## [2.1.18] - 2026-06-14
 
 ### Fixed
