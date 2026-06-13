@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.15] - 2026-06-14
+
+### Fixed
+- fix(date): 修复 admin updateVm 和 lxcAssignVm 遗漏的 `+ 'Z'` 时区标记
+  - v2.1.14 修复了 6 处中的 4 处，遗漏了 admin VM 编辑和 LXC 分配两个路径
+  - 现全部 6 处 `new Date(val + 'Z').toISOString()` 统一
+
+---
+
 ## [2.1.14] - 2026-06-14
 
 ### Fixed
