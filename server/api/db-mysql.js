@@ -41,6 +41,7 @@ function getPool() {
             waitForConnections: true,
             connectTimeout: 10000,
         });
+        console.log('[db-mysql] pool created, type:', typeof pool, 'has execute:', typeof pool.execute, 'has query:', typeof pool.query);
     }
     return pool;
 }
@@ -55,11 +56,14 @@ function sanitizeParams(params) {
 
 // 核心 async 查询函数
 async function execute(sql, params = []) {
-    if (typeof sql !== 'string') {
-        console.error(`[db-mysql] execute() 收到非字符串 SQL, type=${typeof sql}, value=`, sql);
+    const sqlType = typeof sql;
+    if (sqlType !== 'string') {
+        console.error(`[db-mysql] execute() SQL type=${sqlType}, typeof value=`, sql ? (typeof sql.then === 'function' ? 'THENABLE' : typeof sql) : 'falsy');
         sql = String(sql || '');
     }
-    return getPool().execute(sql, sanitizeParams(params));
+    const p = getPool();
+    console.log('[db-mysql:execute] pool type:', typeof p, 'pool.execute type:', typeof p.execute);
+    return p.execute(sql, sanitizeParams(params));
 }
 async function queryOne(sql, params = []) {
     const [rows] = await getPool().query(sql, sanitizeParams(params));
@@ -768,7 +772,7 @@ module.exports = {
         create: async (cdk) => {
             const created = cdk.created_at ? String(cdk.created_at).replace('T', ' ').replace('Z', '').slice(0, 19) : mysqlNow();
             const expires = cdk.expires_at ? String(cdk.expires_at).replace('T', ' ').replace('Z', '').slice(0, 19) : null;
-            const [result] = await execute(
+            const [result] = await getPool().query(
                 `INSERT INTO cdk_codes (code, duration_days, created_by, target_user_id, created_at, expires_at, batch_id)
                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
