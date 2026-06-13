@@ -601,7 +601,7 @@
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-finance">
-                    <a class="nav-item" data-subsection="finance-transactions" onclick="window.__admin.switchSection('finance');window.__admin.activeTab.value='transactions';return false;"><span class="nav-text">交易流水</span></a>
+                    <a class="nav-item" data-subsection="finance-transactions" onclick="window.__admin.switchSection('finance',{highlight:'finance-transactions'});window.__admin.activeTab.value='transactions';return false;"><span class="nav-text">交易流水</span></a>
                 </div>
 
                 <!-- 系统设置 -->
@@ -1940,6 +1940,7 @@
                                     <th>用户名</th>
                                     <th>支付方式</th>
                                     <th>商户订单号</th>
+                                    <th>支付流水号</th>
                                     <th>交易类型</th>
                                     <th>交易金额</th>
                                 </tr>
@@ -1950,11 +1951,12 @@
                                     <td>{{ tx.username }}</td>
                                     <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method }}</td>
                                     <td><code style="font-size:11px;">{{ tx.order_no }}</code></td>
+                                    <td><code style="font-size:11px;">{{ tx.trade_no || '-' }}</code></td>
                                     <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : 'badge bg-info'">{{ tx.trade_type === 'recharge' ? '余额充值' : '服务器续费' }}</span></td>
                                     <td>¥{{ tx.amount }}</td>
                                 </tr>
                                 <tr v-if="!transactionList || transactionList.length === 0">
-                                    <td colspan="6" class="text-center text-muted py-4">暂无交易记录</td>
+                                    <td colspan="7" class="text-center text-muted py-4">暂无交易记录</td>
                                 </tr>
                             </tbody>
                         </table>

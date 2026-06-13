@@ -129,12 +129,12 @@ watch($.user, function(u) {
     });
 
     // ==================== 函数 ====================
-    $.switchSection = function(id) {
+    $.switchSection = function(id, options) {
         if (id === 'user-center') {
             window.location.href = 'user-center.html';
-        } else {
-            $.activeSection.value = id;
+            return;
         }
+        $.activeSection.value = id;
         // Close sidebar on mobile after navigation
         if (window.innerWidth <= 768) {
             var sb = document.getElementById('sidebar');
@@ -146,6 +146,11 @@ watch($.user, function(u) {
         document.querySelectorAll('.sidebar-nav .nav-item').forEach(function(item) {
             item.classList.remove('active');
         });
+        // If a target submenu item is specified, highlight it
+        if (options && options.highlight) {
+            var target = document.querySelector('[data-subsection="' + options.highlight + '"]');
+            if (target) target.classList.add('active');
+        }
     };
 
     $.loadUserData = async function() {
@@ -448,7 +453,8 @@ watch($.user, function(u) {
             'messages': 'manage-messages',
             'smtp': 'settings-smtp',
             'snapshot-backup': 'settings-snapshot-backup',
-            'network': 'settings-network'
+            'network': 'settings-network',
+            'pay': 'settings-pay'
         };
         var target = document.querySelector('[data-subsection="' + (subMap[tab] || 'admin-' + tab) + '"]');
         if (target) target.classList.add('active');

@@ -41,7 +41,7 @@ router.get('/admin/transactions', authMiddleware, adminMiddleware, async (req, r
                 user_id: r.user_id,
                 username: userMap[r.user_id] || '-',
                 order_no: r.order_no,
-                trade_no: r.trade_no || null,
+                trade_no: r.api_trade_no || r.trade_no || null,
                 pay_time: r.pay_time,
                 pay_method: r.pay_method,
                 trade_type: r.trade_type,

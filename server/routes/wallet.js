@@ -426,7 +426,7 @@ router.get('/wallet/transactions', authMiddleware, async (req, res) => {
         var list = await db.transactionRecords.getByUserId(req.user.id, params);
         var total = await db.transactionRecords.countAll(Object.assign({}, params, { user_id: req.user.id }));
         
-        list = list.map(function(r) { return { id: r.id, order_no: r.order_no, pay_time: r.pay_time, pay_method: r.pay_method, trade_type: r.trade_type, amount: parseFloat(r.amount).toFixed(2), period: r.period, period_count: r.period_count, resource_type: r.resource_type, trade_no: r.trade_no || null, created_at: r.created_at }; });
+        list = list.map(function(r) { return { id: r.id, order_no: r.order_no, pay_time: r.pay_time, pay_method: r.pay_method, trade_type: r.trade_type, amount: parseFloat(r.amount).toFixed(2), period: r.period, period_count: r.period_count, resource_type: r.resource_type, trade_no: r.api_trade_no || r.trade_no || null, created_at: r.created_at }; });
         
         res.json({ data: list, total: total, page: page, limit: limit });
     } catch (e) {
