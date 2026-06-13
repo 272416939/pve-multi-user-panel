@@ -88,6 +88,8 @@ async function initDb() {
         )
     `);
 
+    try { await execute("ALTER TABLE users ADD COLUMN balance DECIMAL(10,2) DEFAULT 0.00"); } catch (_) {}
+
     // 创建虚拟机表
     await execute(`
         CREATE TABLE IF NOT EXISTS vms (
@@ -327,6 +329,28 @@ async function initDb() {
             ikuai_id VARCHAR(100) DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    // 创建交易记录表
+    await execute(`
+        CREATE TABLE IF NOT EXISTS transaction_records (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            order_no VARCHAR(200) NOT NULL UNIQUE,
+            pay_time DATETIME,
+            pay_method VARCHAR(50) DEFAULT '',
+            trade_type VARCHAR(50) NOT NULL DEFAULT 'recharge',
+            amount DECIMAL(10,2) DEFAULT 0.00,
+            period VARCHAR(20) DEFAULT NULL,
+            period_count INT DEFAULT NULL,
+            balance_before DECIMAL(10,2) DEFAULT 0.00,
+            balance_after DECIMAL(10,2) DEFAULT 0.00,
+            resource_type VARCHAR(10) DEFAULT NULL,
+            resource_id INT DEFAULT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_tr_user_id (user_id),
+            INDEX idx_tr_order_no (order_no)
         )
     `);
 
@@ -642,7 +666,7 @@ module.exports = {
         update: async (id, updates) => {
             // M-2 修复：白名单包含 bio
             const allowedColumns = ['username', 'email', 'password', 'password_salt', 'avatar', 'bio', 'role', 'is_active',
-                'must_change_password', 'emailVerified'];
+                'must_change_password', 'emailVerified', 'balance'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1504,4 +1528,55 @@ module.exports = {
 
     // 初始化入口（供外部调用，已改为 async）
     initDb,
+
+    // 交易记录操作
+    transactionRecords: {
+        create: async (record) => {
+            const [result] = await execute(
+                `INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    record.user_id, record.order_no, record.pay_time || null, record.pay_method || '',
+                    record.trade_type || 'recharge', record.amount || '0.00',
+                    record.period || null, record.period_count || null,
+                    record.balance_before || '0.00', record.balance_after || '0.00',
+                    record.resource_type || null, record.resource_id || null,
+                    mysqlNow()
+                ]
+            );
+            return queryOne('SELECT * FROM transaction_records WHERE id = ?', [result.insertId]);
+        },
+        getAll: async (params) => {
+            var sql = 'SELECT * FROM transaction_records WHERE 1=1';
+            var args = [];
+            if (params.user_id) { sql += ' AND user_id = ?'; args.push(params.user_id); }
+            if (params.trade_type) { sql += ' AND trade_type = ?'; args.push(params.trade_type); }
+            if (params.pay_method) { sql += ' AND pay_method = ?'; args.push(params.pay_method); }
+            if (params.order_no) { sql += ' AND order_no = ?'; args.push(params.order_no); }
+            if (params.start_time) { sql += ' AND pay_time >= ?'; args.push(params.start_time); }
+            if (params.end_time) { sql += ' AND pay_time <= ?'; args.push(params.end_time); }
+            sql += ' ORDER BY created_at DESC';
+            if (params.limit) { sql += ' LIMIT ?'; args.push(params.limit); }
+            if (params.offset) { sql += ' OFFSET ?'; args.push(params.offset); }
+            return queryAll(sql, args);
+        },
+        countAll: async (params) => {
+            var sql = 'SELECT COUNT(*) as total FROM transaction_records WHERE 1=1';
+            var args = [];
+            if (params.user_id) { sql += ' AND user_id = ?'; args.push(params.user_id); }
+            if (params.trade_type) { sql += ' AND trade_type = ?'; args.push(params.trade_type); }
+            if (params.pay_method) { sql += ' AND pay_method = ?'; args.push(params.pay_method); }
+            if (params.order_no) { sql += ' AND order_no = ?'; args.push(params.order_no); }
+            if (params.start_time) { sql += ' AND pay_time >= ?'; args.push(params.start_time); }
+            if (params.end_time) { sql += ' AND pay_time <= ?'; args.push(params.end_time); }
+            const row = await queryOne(sql, args);
+            return row?.total || 0;
+        },
+        getByUserId: (userId, params) => {
+            return module.exports.transactionRecords.getAll(Object.assign({}, params, { user_id: userId }));
+        },
+        getByOrderNo: (orderNo) => {
+            return queryOne('SELECT * FROM transaction_records WHERE order_no = ?', [orderNo]);
+        }
+    },
 };

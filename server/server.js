@@ -132,6 +132,8 @@ app.use('/api', require('./routes/cdk'));
 app.use('/api', require('./routes/message'));
 app.use('/api', require('./routes/admin-config'));
 app.use('/api', require('./routes/network'));
+app.use('/api', require('./routes/wallet'));
+app.use('/api', require('./routes/admin-wallet'));
 
 const vncProxy = require('./websocket/vnc-proxy');
 const terminalProxy = require('./websocket/terminal-proxy');

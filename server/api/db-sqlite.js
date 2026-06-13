@@ -62,6 +62,8 @@ function initDb() {
         )
     `);
 
+    try { db.exec("ALTER TABLE users ADD COLUMN balance TEXT DEFAULT '0.00'"); } catch (_) {}
+
     // 创建虚拟机表
     db.exec(`
         CREATE TABLE IF NOT EXISTS vms (
@@ -315,6 +317,27 @@ function initDb() {
             ikuai_id TEXT DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    // 创建交易记录表
+    db.exec(`
+        CREATE TABLE IF NOT EXISTS transaction_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            order_no TEXT NOT NULL UNIQUE,
+            pay_time TEXT,
+            pay_method TEXT DEFAULT '',
+            trade_type TEXT NOT NULL DEFAULT 'recharge',
+            amount TEXT DEFAULT '0.00',
+            period TEXT DEFAULT NULL,
+            period_count INTEGER DEFAULT NULL,
+            balance_before TEXT DEFAULT '0.00',
+            balance_after TEXT DEFAULT '0.00',
+            resource_type TEXT DEFAULT NULL,
+            resource_id INTEGER DEFAULT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `);
 
@@ -732,7 +755,7 @@ module.exports = {
         update: (id, updates) => {
             // M-9 + R3-8 修复：列名白名单防 SQL 注入（列名与实际表结构匹配）
             const allowedColumns = ['username', 'email', 'password', 'password_salt', 'avatar', 'bio', 'role', 'is_active',
-                'must_change_password', 'emailVerified'];
+                'must_change_password', 'emailVerified', 'balance'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1459,5 +1482,54 @@ module.exports = {
             return db.prepare('SELECT external_port, type, vm_id, ct_id, ip, internal_port, protocol FROM port_forwards').all();
         },
         getByExternalPort: (port) => db.prepare('SELECT * FROM port_forwards WHERE external_port = ?').all(port),
+    },
+
+    // 交易记录操作
+    transactionRecords: {
+        create: (record) => {
+            const { lastInsertRowid } = db.prepare(`
+                INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).run(
+                record.user_id, record.order_no, record.pay_time || null, record.pay_method || '',
+                record.trade_type || 'recharge', record.amount || '0.00',
+                record.period || null, record.period_count || null,
+                record.balance_before || '0.00', record.balance_after || '0.00',
+                record.resource_type || null, record.resource_id || null,
+                new Date().toISOString()
+            );
+            return db.prepare('SELECT * FROM transaction_records WHERE id = ?').get(lastInsertRowid);
+        },
+        getAll: (params) => {
+            var sql = 'SELECT * FROM transaction_records WHERE 1=1';
+            var args = [];
+            if (params.user_id) { sql += ' AND user_id = ?'; args.push(params.user_id); }
+            if (params.trade_type) { sql += ' AND trade_type = ?'; args.push(params.trade_type); }
+            if (params.pay_method) { sql += ' AND pay_method = ?'; args.push(params.pay_method); }
+            if (params.order_no) { sql += ' AND order_no = ?'; args.push(params.order_no); }
+            if (params.start_time) { sql += ' AND pay_time >= ?'; args.push(params.start_time); }
+            if (params.end_time) { sql += ' AND pay_time <= ?'; args.push(params.end_time); }
+            sql += ' ORDER BY created_at DESC';
+            if (params.limit) { sql += ' LIMIT ?'; args.push(params.limit); }
+            if (params.offset) { sql += ' OFFSET ?'; args.push(params.offset); }
+            return db.prepare(sql).all(...args);
+        },
+        countAll: (params) => {
+            var sql = 'SELECT COUNT(*) as total FROM transaction_records WHERE 1=1';
+            var args = [];
+            if (params.user_id) { sql += ' AND user_id = ?'; args.push(params.user_id); }
+            if (params.trade_type) { sql += ' AND trade_type = ?'; args.push(params.trade_type); }
+            if (params.pay_method) { sql += ' AND pay_method = ?'; args.push(params.pay_method); }
+            if (params.order_no) { sql += ' AND order_no = ?'; args.push(params.order_no); }
+            if (params.start_time) { sql += ' AND pay_time >= ?'; args.push(params.start_time); }
+            if (params.end_time) { sql += ' AND pay_time <= ?'; args.push(params.end_time); }
+            return db.prepare(sql).get(...args)?.total || 0;
+        },
+        getByUserId: (userId, params) => {
+            return db.transactionRecords.getAll(Object.assign({}, params, { user_id: userId }));
+        },
+        getByOrderNo: (orderNo) => {
+            return db.prepare('SELECT * FROM transaction_records WHERE order_no = ?').get(orderNo);
+        }
     },
 };

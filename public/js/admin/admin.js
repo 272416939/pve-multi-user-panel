@@ -437,4 +437,43 @@
             alert('保存失败: ' + (e.message || '未知错误'));
         }
     };
+
+    // 财务管理 - 交易流水
+    $.financeFilter = ref({ start_time: '', end_time: '', pay_method: '', trade_type: '', order_no: '' });
+    $.transactionList = ref([]);
+    $.transactionTotal = ref(0);
+    $.financePage = ref(1);
+
+    $.loadTransactions = async function(page) {
+        $.financePage.value = page || 1;
+        try {
+            var params = { page: $.financePage.value, limit: 10 };
+            var f = $.financeFilter.value;
+            if (f.start_time) params.start_time = f.start_time;
+            if (f.end_time) params.end_time = f.end_time;
+            if (f.pay_method) params.pay_method = f.pay_method;
+            if (f.trade_type) params.trade_type = f.trade_type;
+            if (f.order_no) params.order_no = f.order_no;
+            var res = await api('/admin/transactions?' + new URLSearchParams(params));
+            $.transactionList.value = res.data || [];
+            $.transactionTotal.value = res.total || 0;
+        } catch (e) {
+            console.error('加载流水失败', e);
+        }
+    };
+
+    $.exportTransactions = async function() {
+        try {
+            var f = $.financeFilter.value;
+            var params = {};
+            if (f.start_time) params.start_time = f.start_time;
+            if (f.end_time) params.end_time = f.end_time;
+            if (f.pay_method) params.pay_method = f.pay_method;
+            if (f.trade_type) params.trade_type = f.trade_type;
+            if (f.order_no) params.order_no = f.order_no;
+            window.open('/api/admin/transactions/export?' + new URLSearchParams(params), '_blank');
+        } catch (e) {
+            alert('导出失败');
+        }
+    };
 })();
