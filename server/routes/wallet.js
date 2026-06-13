@@ -93,6 +93,9 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
             money: format2(numAmount),
             param: String(req.user.id)
         });
+
+        console.log('[钱包] pay_url:', result.url);
+        console.log('[钱包] params:', JSON.stringify(result.params));
         
         res.json({
             success: true,
