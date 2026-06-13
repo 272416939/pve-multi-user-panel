@@ -229,7 +229,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     const ctId = parseInt(req.params.id);
-    const { name, expiration_date, renewal_price, user_id } = req.body;
+    const { name, expiration_date, renewal_price, renewal_period, user_id } = req.body;
  
     const ct = await db.lxcContainers.getById(ctId);
     if (!ct) {

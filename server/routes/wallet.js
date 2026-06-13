@@ -229,7 +229,7 @@ router.post('/wallet/notify', async (req, res) => {
                 title: '充值到账通知',
                 content: '您已成功充值 ¥' + amount.toFixed(2) + '，当前余额 ¥' + balanceAfter.toFixed(2) + '。订单号：' + params.out_trade_no,
                 type: 1,
-                send_type: 'auto'
+                send_type: 1
             });
         } catch (e) {
             console.error('[钱包] 站内信发送失败:', e.message);
@@ -322,7 +322,7 @@ router.get('/wallet/return', async (req, res) => {
                 title: '充值到账通知',
                 content: '您已成功充值 ¥' + amount.toFixed(2) + '，当前余额 ¥' + balanceAfter.toFixed(2) + '。订单号：' + params.out_trade_no,
                 type: 1,
-                send_type: 'auto'
+                send_type: 1
             });
         } catch (e) {
             console.error('[钱包] 站内信发送失败:', e.message);
