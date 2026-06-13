@@ -110,7 +110,11 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
             payUrl = gatewayRes.payurl || gatewayRes.qrcode || gatewayRes.qr || gatewayRes.url;
         }
         if (!payUrl && gatewayRes && typeof gatewayRes === 'string') {
-            payUrl = gatewayRes;
+            var match = gatewayRes.match(/location\.replace\(['"](.+?)['"]\)/);
+            if (match) {
+                payUrl = baseUrl.replace(/\/+$/, '') + match[1];
+                console.log('[钱包] 从HTML中提取到支付URL:', payUrl);
+            }
         }
 
         if (payUrl) {
