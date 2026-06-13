@@ -885,7 +885,7 @@
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                     <td><span v-if="cnameDomain" class="text-primary">{{ vm.vm_id }}.{{ cnameDomain }}</span><span v-else class="text-muted">-</span></td>
                                     <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
-                                    <td>{{ vm.renewal_price || '-' }}</td>
+                                    <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
                                     <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                     <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
@@ -952,7 +952,7 @@
                                     <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
                                     <td><span v-if="cnameDomain" class="text-primary">{{ ct.ct_id }}.{{ cnameDomain }}</span><span v-else class="text-muted">-</span></td>
                                     <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.status && ct.status.maxdisk ? '/ ' + Math.round(ct.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
-                                    <td>{{ ct.renewal_price || '-' }}</td>
+                                    <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
                                     <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                     <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
@@ -1921,7 +1921,7 @@
                     <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '容器ID' : '虚拟机ID' }}</span><span class="info-value">{{ detailVm.vm_id || '-' }}</span></div>
                     <div class="info-item"><span class="info-label">内网IP</span><span class="info-value">{{ detailVm.ip || '-' }}</span></div>
                     <div class="info-item"><span class="info-label">硬件配置</span><span class="info-value">{{ detailVmConfigStr }}</span></div>
-                    <div class="info-item"><span class="info-label">续费价格</span><span class="info-value">{{ detailVm.renewal_price || '-' }}</span></div>
+                    <div class="info-item"><span class="info-label">续费价格</span><span class="info-value">{{ detailVm.renewal_price ? detailVm.renewal_price + '元/' + (detailVm.renewal_period === 'year' ? '年' : '月') : '-' }}</span></div>
                     <div class="info-item">
                         <span class="info-label">到期时间</span>
                         <span class="info-value" :class="detailVm.expiration_date && new Date(detailVm.expiration_date) < new Date() ? 'text-danger' : ''">{{ detailVm.expiration_date ? formatDate(detailVm.expiration_date) : '未设置' }}</span>
