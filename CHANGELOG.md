@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.1.9] - 2026-06-14
+
+### Added
+- feat(wallet): admin 交易流水增加支付流水号列
+  - 优先使用 api_trade_no 字段，fallback 到 trade_no
+  - 用户中心和 admin 后端 API 同步更新
+  - 表头「接口订单号」统一改为「支付流水号」
+
+### Fixed
+- fix(ui): 修复交易流水和支付配置子菜单选中时无高亮的问题
+  - switchSection 支持 highlight 选项自动高亮子菜单项
+  - switchAdminTab 补全 pay 映射
+
+---
+
 ## [2.1.8] - 2026-06-14
 
 ### Fixed
