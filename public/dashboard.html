@@ -910,7 +910,7 @@
                                     </td>
                                 </tr>
                                 <tr v-if="userVms.length === 0">
-                                    <td colspan="9" class="text-center text-muted py-4">暂无虚拟机</td>
+                                    <td colspan="8" class="text-center text-muted py-4">暂无虚拟机</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -942,7 +942,6 @@
                                     <th>续费价格</th>
                                     <th>镜像</th>
                                     <th>状态</th>
-                                    <th>到期时间</th>
                                     <th>操作</th>
                                 </tr>
                             </thead>
@@ -979,7 +978,7 @@
                                     </td>
                                 </tr>
                                 <tr v-if="userLxcContainers.length === 0">
-                                    <td colspan="9" class="text-center text-muted py-4">暂无容器</td>
+                                    <td colspan="8" class="text-center text-muted py-4">暂无容器</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1923,6 +1922,10 @@
                     <div class="info-item"><span class="info-label">内网IP</span><span class="info-value">{{ detailVm.ip || '-' }}</span></div>
                     <div class="info-item"><span class="info-label">硬件配置</span><span class="info-value">{{ detailVmConfigStr }}</span></div>
                     <div class="info-item"><span class="info-label">续费价格</span><span class="info-value">{{ detailVm.renewal_price || '-' }}</span></div>
+                    <div class="info-item">
+                        <span class="info-label">到期时间</span>
+                        <span class="info-value" :class="detailVm.expiration_date && new Date(detailVm.expiration_date) < new Date() ? 'text-danger' : ''">{{ detailVm.expiration_date ? formatDate(detailVm.expiration_date) : '未设置' }}</span>
+                    </div>
                     <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '镜像' : '操作系统' }}</span><span class="info-value">{{ detailVmOsStr }}</span></div>
                     <div class="info-item"><span class="info-label">运行状态</span><span class="info-value">{{ detailVmStatusStr }}</span></div>
                     <div class="info-item"><span class="info-label">运行时长</span><span class="info-value">{{ detailVmUptimeStr }}</span></div>
