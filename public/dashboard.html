@@ -1955,7 +1955,7 @@
                 <p v-if="renewResource">续费价格：¥{{ parseFloat(renewResource.renewal_price||0).toFixed(2) }} / {{ renewResource.renewal_period === 'year' ? '年' : '月' }}</p>
                 <p v-if="renewResource && renewResource.expire_time">到期时间：{{ renewResource.expire_time }} <span v-if="renewResource.expire_time" class="text-warning small">({{ daysUntilExpire(renewResource.expire_time) }})</span></p>
                 <div class="mb-3"><label class="form-label">续费数量({{ renewResource && renewResource.renewal_period === 'year' ? '年' : '月' }})</label>
-                    <input type="number" class="form-control" v-model.number="renewQuantity" min="1" style="max-width:120px;"></div>
+                    <input type="number" class="form-control" v-model.number="renewQuantity" min="1" step="1" style="max-width:120px;" @change="renewQuantity = Math.max(1, Math.floor(Math.abs(renewQuantity || 1)))"></div>
                 <p v-if="renewResource">应付金额：¥{{ (parseFloat(renewResource.renewal_price||0) * renewQuantity).toFixed(2) }}</p>
                 <p>当前余额：¥{{ walletBalance }}</p>
                 <div v-if="renewError" class="alert alert-danger py-2">{{ renewError }}</div>

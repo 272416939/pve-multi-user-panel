@@ -247,7 +247,7 @@
         var resource = $.renewResource.value;
         if (!resource) { $.renewError.value = '请选择续费资源'; return; }
         var qty = $.renewQuantity.value;
-        if (!qty || qty < 1) { $.renewError.value = '续费数量至少为1'; return; }
+        if (!Number.isInteger(qty) || qty < 1) { $.renewError.value = '续费数量必须为正整数'; return; }
         var price = parseFloat(resource.renewal_price || '0');
         var totalPrice = (price * qty).toFixed(2);
         var bal = parseFloat($.walletBalance.value);

@@ -326,8 +326,10 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         if (!type || !['vm', 'lxc'].includes(type)) {
             return res.status(400).json({ error: '无效的资源类型' });
         }
-        var qty = parseInt(quantity) || 1;
-        if (qty < 1) return res.status(400).json({ error: '续费数量至少为1' });
+        var qty = parseInt(quantity);
+        if (!Number.isInteger(parseFloat(quantity)) || qty < 1 || String(quantity).trim() !== String(qty)) {
+            return res.status(400).json({ error: '续费数量必须为正整数' });
+        }
         
         var resource;
         if (type === 'vm') {
