@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.1.18] - 2026-06-14
+
+### Fixed
+- fix(date): 全局修复 MySQL DATETIME `dateStrings:true` 后的时区显示 Bug
+  - 根因：`dateStrings:true` 返回无时区字符串（`"2026-06-14 09:00:00"`），`new Date()` 按本地解析少 8 小时
+  - `formatDate()` 自动检测空格分隔无时区日期并追加 `Z` 按 UTC 解析
+  - wallet.js/cdk.js/expiry-check.js/vm.js/lxc.js 所有 DB 日期运算添加 `Z`
+  - 影响范围：created_at / pay_time / expires_at / expiration_date 全部日期显示和运算一致
+  - 前端 req.body 传来的 ISO 日期（已含 Z）保持原样不重复追加
+
+---
+
 ## [2.1.17] - 2026-06-14
 
 ### Fixed
