@@ -482,8 +482,9 @@ router.get('/port-forwards/config', authMiddleware, async (req, res) => {
 router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
     try {
         const devices = [];
-        const myVms = await db.vms.getByUserId(req.user.id);
-        const myCts = await db.lxcContainers.getByUserId(req.user.id);
+        const isAdmin = req.user.role === 'admin';
+        const myVms = isAdmin ? await db.vms.getAll() : await db.vms.getByUserId(req.user.id);
+        const myCts = isAdmin ? await db.lxcContainers.getAll() : await db.lxcContainers.getByUserId(req.user.id);
         let dhcpLeases = [];
         let lanIps = [];
         if (ikuaiApi.isConfigured()) {
