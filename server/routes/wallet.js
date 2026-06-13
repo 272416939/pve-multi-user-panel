@@ -6,6 +6,8 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createPayClient, generateOrderId } = require('../sdk/pay');
 const dbg = require('../utils/debug');
 
+var pendingApiTradeNo = new Map();
+
 function safeError(e) {
     if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
     return '操作失败，请稍后重试';
@@ -119,6 +121,9 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         }
 
         if (payUrl) {
+            if (gatewayRes && gatewayRes.api_trade_no) {
+                pendingApiTradeNo.set(orderNo, gatewayRes.api_trade_no);
+            }
             res.json({ success: true, order_no: orderNo, redirect_url: payUrl });
         } else {
             console.error('[钱包] 网关未返回支付链接:', JSON.stringify(gatewayRes));
@@ -179,7 +184,8 @@ router.post('/wallet/notify', async (req, res) => {
         var balanceAfter = balanceBefore + amount;
         
         var tradeNo = params.trade_no || null;
-        var apiTradeNo = params.api_trade_no || null;
+        var apiTradeNo = params.api_trade_no || pendingApiTradeNo.get(params.out_trade_no) || null;
+        pendingApiTradeNo.delete(params.out_trade_no);
 
         await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
 
@@ -271,7 +277,9 @@ router.get('/wallet/return', async (req, res) => {
         var balanceBefore = parseFloat(user.balance || '0');
         var balanceAfter = balanceBefore + amount;
 
-        var tradeNo = params.trade_no || params.api_trade_no || null;
+        var tradeNo = params.trade_no || null;
+        var apiTradeNo = params.api_trade_no || pendingApiTradeNo.get(params.out_trade_no) || null;
+        pendingApiTradeNo.delete(params.out_trade_no);
 
         await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
 
@@ -284,7 +292,8 @@ router.get('/wallet/return', async (req, res) => {
             amount: amount.toFixed(2),
             balance_before: balanceBefore.toFixed(2),
             balance_after: balanceAfter.toFixed(2),
-            trade_no: tradeNo
+            trade_no: tradeNo,
+            api_trade_no: apiTradeNo
         });
 
         try {
