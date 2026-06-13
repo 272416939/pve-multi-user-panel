@@ -8,13 +8,11 @@ const CryptoJS = require('crypto-js');
 const QRCode = require('qrcode');
 const otplib = require('otplib');
 const db = require('../api/db');
-const { JWT_SECRET } = require('../utils/token');
+const { JWT_SECRET, generateToken } = require('../utils/token');
 const upload = require('../config/multer');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
-
-const generateToken = require('../utils/token');
 const { ttl: cache } = require('../utils/cache');
 const profileCache = cache('profile', 60000);
 
