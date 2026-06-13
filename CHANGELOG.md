@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.1.14] - 2026-06-14
+
+### Fixed
+- fix(date): 彻底修复 VM/LXC 到期时间编辑保存时区漂移 Bug
+  - 根因：`datetime-local` 输入框无时区 + JS `new Date()` 读写不对称
+  - `formatDateTimeLocal` 改用 `getUTC*()` 显示 UTC 时间，MySQL 格式加 Z 标记
+  - 所有保存操作 `new Date(val + 'Z').toISOString()` 统一视为 UTC
+  - 修复后编辑保存零偏移：读取 UTC → 显示 UTC → 保存 UTC，三步一致
+
+---
+
 ## [2.1.13] - 2026-06-14
 
 ### Fixed
