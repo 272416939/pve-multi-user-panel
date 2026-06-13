@@ -467,6 +467,14 @@
                    @click.prevent="switchSubTab('security')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><span class="nav-text">安全</span>
                 </a>
+                <a class="nav-item" :class="{ active: activeSubTab === 'wallet-recharge' }"
+                   @click.prevent="switchSubTab('wallet-recharge')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span><span class="nav-text">余额充值</span>
+                </a>
+                <a class="nav-item" :class="{ active: activeSubTab === 'wallet-transactions' }"
+                   @click.prevent="switchSubTab('wallet-transactions')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">交易明细</span>
+                </a>
             </Teleport>
 
             <div v-if="activeSubTab === 'settings'">
@@ -664,6 +672,97 @@
                                     <p class="text-muted small mb-0">剩余恢复码: {{ twofaRecoveryCount }} 个</p>
                                 </template>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 余额充值 -->
+            <div v-if="activeSubTab === 'wallet-recharge'">
+                <div class="module-header">
+                    <h4 class="module-title">余额充值</h4>
+                </div>
+                <div class="table-container" style="padding:24px;">
+                    <div class="mb-3">
+                        <span class="text-muted">当前余额：</span>
+                        <span class="fw-bold fs-5">¥{{ walletBalance }}</span>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">请输入充值金额</label>
+                        <input type="number" step="0.01" min="0.01" class="form-control" v-model="rechargeAmount" placeholder="如: 10.00" style="max-width:300px;">
+                        <small class="text-muted">最低充值 {{ payMethods.min_amount }} 元，最高 {{ payMethods.max_amount }} 元</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">支付方式</label>
+                        <div v-if="payMethods.alipay" class="form-check">
+                            <input class="form-check-input" type="radio" v-model="rechargeMethod" value="alipay" id="ucPayAlipay">
+                            <label class="form-check-label" for="ucPayAlipay">支付宝</label>
+                        </div>
+                        <div v-if="payMethods.wxpay" class="form-check">
+                            <input class="form-check-input" type="radio" v-model="rechargeMethod" value="wxpay" id="ucPayWxpay">
+                            <label class="form-check-label" for="ucPayWxpay">微信支付</label>
+                        </div>
+                        <div v-if="!payMethods.alipay && !payMethods.wxpay" class="text-muted small">暂无可用的支付方式</div>
+                    </div>
+                    <div v-if="rechargeError" class="alert alert-danger py-2 mb-3">{{ rechargeError }}</div>
+                    <button class="btn-glass" @click="submitRecharge" :disabled="!rechargeMethod || !rechargeAmount || rechargeSubmitting">
+                        <span v-if="rechargeSubmitting">提交中...</span>
+                        <span v-else>提交充值</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 交易明细 -->
+            <div v-if="activeSubTab === 'wallet-transactions'">
+                <div class="module-header">
+                    <h4 class="module-title">交易明细</h4>
+                </div>
+                <div class="table-container" style="padding:12px;">
+                    <div class="row g-2 mb-3 align-items-end">
+                        <div class="col-md-2">
+                            <label class="form-label small mb-1">开始时间</label>
+                            <input type="datetime-local" class="form-control form-control-sm" v-model="txFilter.start_time">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-1">结束时间</label>
+                            <input type="datetime-local" class="form-control form-control-sm" v-model="txFilter.end_time">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-1">交易类型</label>
+                            <select class="form-select form-select-sm" v-model="txFilter.trade_type">
+                                <option value="">全部</option>
+                                <option value="recharge">余额充值</option>
+                                <option value="renewal">服务器续费</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label small mb-1">订单号</label>
+                            <input type="text" class="form-control form-control-sm" v-model="txFilter.order_no" placeholder="精确搜索" @keyup.enter="loadTx(1)">
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-sm btn-glass" @click="loadTx(1)">查询</button>
+                            <button class="btn btn-sm btn-outline-secondary ms-1" @click="txFilter = {start_time:'',end_time:'',trade_type:'',order_no:''};loadTx(1);">重置</button>
+                        </div>
+                    </div>
+                    <table class="table table-hover table-sm">
+                        <thead><tr><th>支付时间</th><th>支付方式</th><th>商户订单号</th><th>类型</th><th>金额</th></tr></thead>
+                        <tbody>
+                            <tr v-for="tx in txList" :key="tx.id">
+                                <td>{{ tx.pay_time }}</td>
+                                <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method }}</td>
+                                <td><code style="font-size:11px;">{{ tx.order_no }}</code> <button class="btn btn-sm btn-link p-0 ms-1" @click="copyOrderNo(tx.order_no)" title="复制">📋</button></td>
+                                <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : 'badge bg-info'">{{ tx.trade_type === 'recharge' ? '余额充值' : '服务器续费' }}</span></td>
+                                <td>¥{{ tx.amount }}</td>
+                            </tr>
+                            <tr v-if="!txList || txList.length === 0"><td colspan="5" class="text-center text-muted py-4">暂无交易记录</td></tr>
+                        </tbody>
+                    </table>
+                    <div class="d-flex justify-content-between align-items-center mt-3" v-if="txTotal > 0">
+                        <small class="text-muted">共 {{ txTotal }} 条</small>
+                        <div>
+                            <button class="btn btn-sm btn-outline-secondary" :disabled="txPage <= 1" @click="loadTx(txPage - 1)">上一页</button>
+                            <span class="mx-2 text-muted small">{{ txPage }}</span>
+                            <button class="btn btn-sm btn-outline-secondary" :disabled="txPage * 10 >= txTotal" @click="loadTx(txPage + 1)">下一页</button>
                         </div>
                     </div>
                 </div>
@@ -894,6 +993,18 @@
                 const twofaDisablePassword = ref('');
                 const twofaRecoveryCodes = ref([]);
 
+                // 钱包
+                const walletBalance = ref('0.00');
+                const payMethods = ref({ alipay: false, wxpay: false, min_amount: 0.01, max_amount: 999999.99 });
+                const rechargeAmount = ref('');
+                const rechargeMethod = ref('');
+                const rechargeSubmitting = ref(false);
+                const rechargeError = ref('');
+                const txList = ref([]);
+                const txTotal = ref(0);
+                const txPage = ref(1);
+                const txFilter = ref({ start_time: '', end_time: '', trade_type: '', order_no: '' });
+
                 const parseMarkdown = (text) => {
                     if (!text) return '';
                     try {
@@ -946,6 +1057,66 @@
                         bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
                     });
                 };
+
+                // ===== 钱包相关 =====
+                const loadWalletBalance = async () => {
+                    try {
+                        const res = await api('/wallet/balance');
+                        walletBalance.value = res.balance || '0.00';
+                    } catch (e) { console.error('钱包余额加载失败', e); }
+                };
+
+                const loadPayMethods = async () => {
+                    try {
+                        const res = await api('/wallet/pay-config');
+                        payMethods.value = res;
+                    } catch (e) { console.error('支付配置加载失败', e); }
+                };
+
+                const submitRecharge = async () => {
+                    const amount = parseFloat(rechargeAmount.value);
+                    if (isNaN(amount) || amount <= 0) { rechargeError.value = '请输入有效的充值金额'; return; }
+                    const min = parseFloat(payMethods.value.min_amount || 0.01);
+                    if (amount < min) { rechargeError.value = '最低充值金额为 ' + min.toFixed(2) + ' 元'; return; }
+                    if (!rechargeMethod.value) { rechargeError.value = '请选择支付方式'; return; }
+                    rechargeSubmitting.value = true;
+                    rechargeError.value = '';
+                    try {
+                        const res = await api('/wallet/recharge', { method: 'POST', body: { amount: amount.toFixed(2), pay_method: rechargeMethod.value } });
+                        if (res.success && res.pay_url) {
+                            const form = document.createElement('form');
+                            form.method = 'POST'; form.action = res.pay_url; form.target = '_blank';
+                            for (const key in res.params) { const inp = document.createElement('input'); inp.type = 'hidden'; inp.name = key; inp.value = res.params[key]; form.appendChild(inp); }
+                            document.body.appendChild(form); form.submit(); document.body.removeChild(form);
+                            rechargeAmount.value = ''; rechargeMethod.value = '';
+                        } else { rechargeError.value = res.error || '创建订单失败'; }
+                    } catch (e) { rechargeError.value = '请求失败，请稍后重试'; }
+                    rechargeSubmitting.value = false;
+                };
+
+                const loadTx = async (page) => {
+                    txPage.value = page || 1;
+                    try {
+                        const params = { page: txPage.value, limit: 10 };
+                        const f = txFilter.value;
+                        if (f.start_time) params.start_time = f.start_time;
+                        if (f.end_time) params.end_time = f.end_time;
+                        if (f.trade_type) params.trade_type = f.trade_type;
+                        if (f.order_no) params.order_no = f.order_no;
+                        const res = await api('/wallet/transactions?' + new URLSearchParams(params));
+                        txList.value = res.data || [];
+                        txTotal.value = res.total || 0;
+                    } catch (e) { console.error('加载交易明细失败', e); }
+                };
+
+                const copyOrderNo = (orderNo) => {
+                    if (navigator.clipboard) { navigator.clipboard.writeText(orderNo).then(() => alert('订单号已复制')); }
+                    else { const el = document.createElement('textarea'); el.value = orderNo; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert('订单号已复制'); }
+                };
+
+                // 初始化加载钱包数据
+                loadWalletBalance();
+                loadPayMethods();
 
                 const confirmOk = () => {
                     const resolve = customConfirmResolve.value;
@@ -1553,6 +1724,7 @@
 
                 watch(activeSubTab, (val) => {
                     localStorage.setItem('ucenter_subtab', val);
+                    if (val === 'wallet-transactions') loadTx(1);
                 });
 
                 // 监听 user 变化同步 header
@@ -1623,7 +1795,10 @@
                     downloadRecoveryCodes,
                     regenerateRecoveryCodes,
                     openDisableTwofa,
-                    disableTwofa
+                    disableTwofa,
+                    walletBalance, payMethods, rechargeAmount, rechargeMethod, rechargeSubmitting, rechargeError,
+                    txList, txTotal, txPage, txFilter,
+                    submitRecharge, loadTx, copyOrderNo
                 };
             }
         };

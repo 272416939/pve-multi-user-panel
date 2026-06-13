@@ -728,11 +728,7 @@
                 <span id="headerUsername">用户名</span>
             </div>
             <ul class="dropdown-menu dropdown-menu-end">
-                <li><div class="dropdown-header small text-muted px-3 py-1">用户中心</div></li>
-                <li><a class="dropdown-item d-flex justify-content-between align-items-center" href="#">
-                    <span>余额</span>
-                    <span class="fw-bold">¥{{ walletBalance }}</span>
-                </a></li>
+                <li><a class="dropdown-item" href="user-center.html"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>用户中心</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item" href="#" onclick="logout()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>退出登录</a></li>
             </ul>
@@ -749,14 +745,6 @@
         <a id="dashboardAdminLink" href="admin.html" class="nav-item" style="display:none;">
             <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15l-5-5 5-5"/><path d="M19 10H7"/></svg></span>
             <span class="nav-text">管理后台</span>
-        </a>
-        <a class="nav-item" data-section="wallet-recharge" onclick="window.__dashboard.switchSection('wallet-recharge');return false;">
-            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span>
-            <span class="nav-text">余额充值</span>
-        </a>
-        <a class="nav-item" data-section="wallet-transactions" onclick="window.__dashboard.switchSection('wallet-transactions');return false;">
-            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-            <span class="nav-text">交易明细</span>
         </a>
     </nav>
 </aside>
@@ -1089,99 +1077,6 @@
         </div>
     </div>
 </div>
-
-            <!-- 余额充值 -->
-            <div v-show="activeSection === 'wallet-recharge'">
-                <div class="module-header">
-                    <h4 class="module-title">余额充值</h4>
-                </div>
-                <div class="table-container" style="padding:24px;">
-                    <div class="mb-3">
-                        <span class="text-muted">当前余额：</span>
-                        <span class="fw-bold fs-5">¥{{ walletBalance }}</span>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">请输入充值金额</label>
-                        <input type="number" step="0.01" min="0.01" class="form-control" v-model="rechargeAmount" placeholder="如: 10.00" style="max-width:300px;">
-                        <small class="text-muted">最低充值 {{ payMethods.min_amount }} 元，最高 {{ payMethods.max_amount }} 元</small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">支付方式</label>
-                        <div v-if="payMethods.alipay" class="form-check">
-                            <input class="form-check-input" type="radio" v-model="rechargeMethod" value="alipay" id="payAlipay">
-                            <label class="form-check-label" for="payAlipay">支付宝</label>
-                        </div>
-                        <div v-if="payMethods.wxpay" class="form-check">
-                            <input class="form-check-input" type="radio" v-model="rechargeMethod" value="wxpay" id="payWxpay">
-                            <label class="form-check-label" for="payWxpay">微信支付</label>
-                        </div>
-                        <div v-if="!payMethods.alipay && !payMethods.wxpay" class="text-muted small">暂无可用的支付方式</div>
-                    </div>
-                    <div v-if="rechargeError" class="alert alert-danger py-2 mb-3">{{ rechargeError }}</div>
-                    <button class="btn-glass" @click="submitRecharge" :disabled="!rechargeMethod || !rechargeAmount || rechargeSubmitting">
-                        <span v-if="rechargeSubmitting">提交中...</span>
-                        <span v-else>提交充值</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- 交易明细 -->
-            <div v-show="activeSection === 'wallet-transactions'">
-                <div class="module-header">
-                    <h4 class="module-title">交易明细</h4>
-                </div>
-                <div class="table-container" style="padding:12px;">
-                    <div class="row g-2 mb-3 align-items-end">
-                        <div class="col-md-2">
-                            <label class="form-label small mb-1">开始时间</label>
-                            <input type="datetime-local" class="form-control form-control-sm" v-model="txFilter.start_time">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small mb-1">结束时间</label>
-                            <input type="datetime-local" class="form-control form-control-sm" v-model="txFilter.end_time">
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small mb-1">交易类型</label>
-                            <select class="form-select form-select-sm" v-model="txFilter.trade_type">
-                                <option value="">全部</option>
-                                <option value="recharge">余额充值</option>
-                                <option value="renewal">服务器续费</option>
-                            </select>
-                        </div>
-                        <div class="col-md-2">
-                            <label class="form-label small mb-1">订单号</label>
-                            <input type="text" class="form-control form-control-sm" v-model="txFilter.order_no" placeholder="精确搜索" @keyup.enter="loadTransactions(1)">
-                        </div>
-                        <div class="col-md-2">
-                            <button class="btn btn-sm btn-glass" @click="loadTransactions(1)">查询</button>
-                            <button class="btn btn-sm btn-outline-secondary ms-1" @click="txFilter = {start_time:'',end_time:'',trade_type:'',order_no:''};loadTransactions(1);">重置</button>
-                        </div>
-                    </div>
-                    <table class="table table-hover table-sm">
-                        <thead>
-                            <tr><th>支付时间</th><th>支付方式</th><th>商户订单号</th><th>类型</th><th>金额</th></tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="tx in txList" :key="tx.id">
-                                <td>{{ tx.pay_time }}</td>
-                                <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method }}</td>
-                                <td><code style="font-size:11px;">{{ tx.order_no }}</code> <button class="btn btn-sm btn-link p-0 ms-1" @click="copyOrderNo(tx.order_no)" title="复制">📋</button></td>
-                                <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : 'badge bg-info'">{{ tx.trade_type === 'recharge' ? '余额充值' : '服务器续费' }}</span></td>
-                                <td>¥{{ tx.amount }}</td>
-                            </tr>
-                            <tr v-if="!txList || txList.length === 0"><td colspan="5" class="text-center text-muted py-4">暂无交易记录</td></tr>
-                        </tbody>
-                    </table>
-                    <div class="d-flex justify-content-between align-items-center mt-3" v-if="txTotal > 0">
-                        <small class="text-muted">共 {{ txTotal }} 条</small>
-                        <div>
-                            <button class="btn btn-sm btn-outline-secondary" :disabled="txPage <= 1" @click="loadTransactions(txPage - 1)">上一页</button>
-                            <span class="mx-2 text-muted small">{{ txPage }}</span>
-                            <button class="btn btn-sm btn-outline-secondary" :disabled="txPage * 10 >= txTotal" @click="loadTransactions(txPage + 1)">下一页</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
 <div class="modal fade" id="editVmModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
@@ -2102,8 +1997,6 @@
 <script src="js/dashboard/lxc.js?v=20260612"></script>
 <script src="js/dashboard/forward.js?v=20260612"></script>
 <script src="js/dashboard/message.js?v=20260612"></script>
-<script src="js/dashboard/wallet.js?v=20260612"></script>
-
 <script>
     var $ = window.__dashboard;
     var App = {
