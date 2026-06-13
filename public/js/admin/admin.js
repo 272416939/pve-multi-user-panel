@@ -418,7 +418,7 @@
     };
 
     // 支付配置
-    $.payConfig = ref({ base_url: '', pid: '', md5_key: '', v2_public_key: '', v2_private_key: '', v1_enabled: true, v2_enabled: false, alipay_enabled: true, wxpay_enabled: true });
+    $.payConfig = ref({ base_url: '', pid: '', md5_key: '', v2_public_key: '', v2_private_key: '', v1_enabled: true, v2_enabled: false, alipay_enabled: true, wxpay_enabled: true, min_amount: 0.01, max_amount: 999999.99 });
 
     $.loadPayConfig = async function() {
         try {

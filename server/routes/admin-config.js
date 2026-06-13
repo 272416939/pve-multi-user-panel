@@ -377,6 +377,8 @@ router.get('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         var v2Enabled = await getConfig('pay:v2_enabled') || '0';
         var alipayEnabled = await getConfig('pay:alipay_enabled') || '1';
         var wxpayEnabled = await getConfig('pay:wxpay_enabled') || '1';
+        var minAmount = await getConfig('pay:min_amount') || '0.01';
+        var maxAmount = await getConfig('pay:max_amount') || '999999.99';
 
         res.json({
             base_url: baseUrl,
@@ -387,7 +389,9 @@ router.get('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
             v1_enabled: v1Enabled === '1',
             v2_enabled: v2Enabled === '1',
             alipay_enabled: alipayEnabled === '1',
-            wxpay_enabled: wxpayEnabled === '1'
+            wxpay_enabled: wxpayEnabled === '1',
+            min_amount: parseFloat(minAmount) || 0.01,
+            max_amount: parseFloat(maxAmount) || 999999.99
         });
     } catch (e) {
         console.error('[支付配置]', e.message);
@@ -426,6 +430,16 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         }
         if (wxpay_enabled !== undefined) {
             await setConfig('pay:wxpay_enabled', wxpay_enabled ? '1' : '0');
+        }
+        if (min_amount !== undefined && min_amount !== null) {
+            var minVal = parseFloat(min_amount);
+            if (isNaN(minVal) || minVal < 0.01) minVal = 0.01;
+            await setConfig('pay:min_amount', String(minVal));
+        }
+        if (max_amount !== undefined && max_amount !== null) {
+            var maxVal = parseFloat(max_amount);
+            if (isNaN(maxVal) || maxVal < 0.01) maxVal = 999999.99;
+            await setConfig('pay:max_amount', String(maxVal));
         }
 
         res.json({ message: '支付配置保存成功' });

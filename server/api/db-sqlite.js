@@ -490,6 +490,8 @@ function initDefaultConfig() {
         'pay:v2_enabled': '0',
         'pay:alipay_enabled': '1',
         'pay:wxpay_enabled': '1',
+        'pay:min_amount': '0.01',
+        'pay:max_amount': '999999.99',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {

@@ -1827,6 +1827,15 @@
                                 <textarea class="form-control" rows="4" v-model="payConfig.v2_public_key" placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"></textarea>
                             </div>
                             <div class="col-12"><hr style="border-color:rgba(255,255,255,0.1);margin:4px 0 12px;"></div>
+                            <div class="col-12 mb-2"><label class="form-label fw-bold">充值金额限制</label></div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">最低充值金额（元）</label>
+                                <input type="number" step="0.01" min="0.01" class="form-control" v-model.number="payConfig.min_amount" placeholder="如: 0.01">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">最大充值金额（元）</label>
+                                <input type="number" step="0.01" min="0.01" class="form-control" v-model.number="payConfig.max_amount" placeholder="如: 999999.99">
+                            </div>
                             <div class="col-12 mb-2"><label class="form-label fw-bold">接口版本开关</label></div>
                             <div class="col-md-6 mb-3">
                                 <div class="form-check form-switch">
