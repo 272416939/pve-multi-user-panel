@@ -91,7 +91,9 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
             out_trade_no: orderNo,
             name: '账户余额充值',
             money: format2(numAmount),
-            param: String(req.user.id)
+            param: String(req.user.id),
+            notify_url: notifyUrl,
+            return_url: returnUrl
         };
 
         var gatewayRes;
