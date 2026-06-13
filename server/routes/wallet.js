@@ -75,7 +75,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         if (!pid) return res.status(400).json({ error: '支付接口未配置，请联系管理员' });
         
         var orderNo = generateOrderId('RECHARGE');
-        var siteUrl = process.env.SITE_URL || baseUrl;
+        var siteUrl = (process.env.SITE_URL || baseUrl).replace(/:\d+/, '');
         var notifyUrl = siteUrl.replace(/\/+$/, '') + '/api/wallet/notify';
         var returnUrl = siteUrl.replace(/\/+$/, '') + '/user-center.html';
         
