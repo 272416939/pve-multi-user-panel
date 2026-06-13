@@ -215,7 +215,11 @@ const formatBytes = (bytes) => {
 
 const formatDate = (date) => {
     if (!date) return '-';
-    return new Date(date).toLocaleString('zh-CN');
+    var d = typeof date === 'string' ? date : date;
+    if (!/[Zz]|[+-]\d{2}:\d{2}$/.test(d) && !d.includes('T')) {
+        d = d + 'Z';
+    }
+    return new Date(d).toLocaleString('zh-CN');
 };
 
 const formatUptime = (seconds) => {
@@ -234,7 +238,11 @@ const trimContent = (text) => {
 
 const formatDateTimeLocal = (dateStr) => {
     if (!dateStr) return '';
-    const date = new Date(dateStr);
+    var safe = dateStr;
+    if (!/[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr) && !dateStr.includes('T')) {
+        safe = dateStr + 'Z';
+    }
+    const date = new Date(safe);
     if (isNaN(date.getTime())) return '';
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');

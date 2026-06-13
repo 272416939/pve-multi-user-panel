@@ -393,7 +393,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         
         var oldExpiration = resource.expiration_date ? new Date(resource.expiration_date) : new Date();
         oldExpiration.setDate(oldExpiration.getDate() + addDays);
-        var newExpiration = oldExpiration.toISOString().slice(0, 19).replace('T', ' ');
+        var newExpiration = oldExpiration.toISOString();
         
         var newBalance = (balance - totalPrice).toFixed(2);
         await db.users.update(userId, { balance: newBalance });
