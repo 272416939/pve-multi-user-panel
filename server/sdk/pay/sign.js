@@ -58,9 +58,15 @@ function rsaSign(data, privateKey) {
   if (typeof privateKey === 'string' && privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
     privateKey = convertPkcs1ToPkcs8(privateKey);
   }
+  var keyObj;
+  if (typeof privateKey === 'string') {
+    keyObj = crypto.createPrivateKey({ key: privateKey, format: 'pem', type: 'pkcs8' });
+  } else {
+    keyObj = privateKey;
+  }
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(data);
-  return sign.sign(privateKey, 'base64');
+  return sign.sign(keyObj, 'base64');
 }
 
 function rsaVerify(data, signature, publicKey) {
