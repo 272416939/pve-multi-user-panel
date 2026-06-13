@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.1.12] - 2026-06-14
+
+### Fixed
+- fix(wallet): 通过网关查询 API 获取真实接口订单号（微信/支付宝单号）
+  - 支付网关回调参数不含 `api_trade_no`，需主动调用 `/api/pay/query` 查询
+  - 新增 `queryApiTradeNo()` 辅助函数，自动适配 V1 MD5 + V2 RSA 签名
+  - notify 和 return 回调统一使用查询接口获取真实接口订单号
+
+### Docs
+- docs: 更新 README 至 v2.1.11（支付功能介绍 + 更新日志精简）
+
+---
+
 ## [2.1.11] - 2026-06-14
 
 ### Fixed
