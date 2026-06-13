@@ -1037,6 +1037,29 @@
                     }
                 };
 
+                const handleEmailVerification = () => {
+                    var params = new URLSearchParams(window.location.search);
+                    var verified = params.get('email_verified');
+                    if (verified === '1') {
+                        setTimeout(function() { alert('邮箱验证成功！'); }, 500);
+                        var url = new URL(window.location);
+                        url.searchParams.delete('email_verified');
+                        url.searchParams.delete('reason');
+                        window.history.replaceState({}, '', url.toString());
+                    } else if (verified === '0') {
+                        var reason = params.get('reason');
+                        var msg = '邮箱验证失败';
+                        if (reason === 'expired') msg = '验证链接已过期，请重新发送验证邮件';
+                        else if (reason === 'user_not_found') msg = '用户不存在';
+                        else if (reason === 'error') msg = '验证过程出错，请重试';
+                        setTimeout(function() { alert(msg); }, 500);
+                        var url = new URL(window.location);
+                        url.searchParams.delete('email_verified');
+                        url.searchParams.delete('reason');
+                        window.history.replaceState({}, '', url.toString());
+                    }
+                };
+
                 const loadMemos = async () => {
                     memosLoading.value = true;
                     try {
@@ -1506,6 +1529,7 @@
                         syncHeaderUser();
                         await loadNavItems();
                         await loadProfile();
+                        handleEmailVerification();
                         if (window.location.hash === '#messages' || activeSubTab.value === 'messages') {
                             activeSubTab.value = 'messages';
                             await loadMessages();

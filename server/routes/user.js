@@ -399,7 +399,7 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         });
         
         try {
-            const verifyUrl = `${getSiteUrl(req)}?verifyEmail=${verifyToken}`;
+            const verifyUrl = `${getSiteUrl(req)}/api/user/verify-email/${verifyToken}`;
             const emailContent = `
                 <p>您好，</p>
                 <p>感谢您注册 PVE 多用户控制面板！</p>
@@ -441,21 +441,25 @@ router.get('/user/verify-email/:token', async (req, res) => {
         const verifyRecord = await db.passwordResetTokens.getByToken(token);
         
         if (!verifyRecord || verifyRecord.type !== 'email_verify' || new Date(verifyRecord.expiresAt) <= new Date()) {
-            return res.status(400).json({ error: '验证链接无效或已过期' });
+            const siteUrl = getSiteUrl(req) || '';
+            return res.redirect(siteUrl + '/user-center.html?email_verified=0&reason=expired');
         }
         
         const user = await db.users.getById(verifyRecord.user_id);
         if (!user) {
-            return res.status(404).json({ error: '用户不存在' });
+            const siteUrl = getSiteUrl(req) || '';
+            return res.redirect(siteUrl + '/user-center.html?email_verified=0&reason=user_not_found');
         }
         
         await db.users.update(verifyRecord.user_id, { emailVerified: true });
         await db.passwordResetTokens.delete(verifyRecord.id);
         
-        res.json({ message: '邮箱验证成功！' });
+        const siteUrl = getSiteUrl(req) || '';
+        res.redirect(siteUrl + '/user-center.html?email_verified=1');
     } catch (error) {
         console.error('验证邮箱失败', error);
-        res.status(500).json({ error: '验证失败' });
+        const siteUrl = getSiteUrl(req) || '';
+        res.redirect(siteUrl + '/user-center.html?email_verified=0&reason=error');
     }
 });
 
