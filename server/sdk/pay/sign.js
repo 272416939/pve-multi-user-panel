@@ -21,6 +21,13 @@ function toBase64Url(buf) {
   return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
+function fixKey(key) {
+  if (typeof key !== 'string') return key;
+  if (key.includes('\\n')) key = key.replace(/\\n/g, '\n');
+  if (!key.endsWith('\n')) key += '\n';
+  return key;
+}
+
 function parsePkcs1Der(der) {
   var pos = 0;
 
@@ -34,14 +41,14 @@ function parsePkcs1Der(der) {
   }
 
   var tag = der[pos++];
-  if (tag !== 0x30) throw new Error('Expected SEQUENCE (0x30), got ' + tag.toString(16));
+  if (tag !== 0x30) throw new Error('Expected SEQUENCE (0x30)');
   var seqLen = readLength();
   var end = pos + seqLen;
 
   var ints = [];
   while (pos < end) {
     tag = der[pos++];
-    if (tag !== 0x02) throw new Error('Expected INTEGER (0x02), got ' + tag.toString(16));
+    if (tag !== 0x02) throw new Error('Expected INTEGER (0x02)');
     var intLen = readLength();
     if (intLen > 0 && der[pos] === 0) { pos++; intLen--; }
     ints.push(der.slice(pos, pos + intLen));
@@ -60,30 +67,60 @@ function parsePkcs1Der(der) {
   };
 }
 
-function fixKey(key) {
-  if (typeof key !== 'string') return key;
-  if (key.includes('\\n')) key = key.replace(/\\n/g, '\n');
-  if (!key.endsWith('\n')) key += '\n';
-  return key;
-}
-
 function rsaSign(data, privateKey) {
   privateKey = fixKey(privateKey);
-  var keyObj;
-  if (typeof privateKey === 'string' && privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
-    var body = privateKey.replace(/-----[A-Z ]+-----/g, '').replace(/[\r\n\s]/g, '');
-    var der = Buffer.from(body, 'base64');
-    var jwk = parsePkcs1Der(der);
-    jwk.kty = 'RSA';
-    keyObj = crypto.createPrivateKey({ key: jwk, format: 'jwk' });
-  } else if (typeof privateKey === 'string') {
-    keyObj = crypto.createPrivateKey({ key: privateKey, format: 'pem', type: 'pkcs8' });
-  } else {
-    keyObj = privateKey;
+
+  if (typeof privateKey !== 'string') {
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(data);
+    return sign.sign(privateKey, 'base64');
   }
-  const sign = crypto.createSign('RSA-SHA256');
-  sign.update(data);
-  return sign.sign(keyObj, 'base64');
+
+  // 诊断: 私钥前60字符
+  var preview = privateKey.substring(0, 80);
+  console.log('[sign] key preview:', JSON.stringify(preview));
+
+  // 尝试1: PKCS#1 → JWK → KeyObject
+  if (privateKey.includes('-----BEGIN RSA PRIVATE KEY-----')) {
+    try {
+      var body = privateKey.replace(/-----[A-Z ]+-----/g, '').replace(/[\r\n\s]/g, '');
+      var der = Buffer.from(body, 'base64');
+      console.log('[sign] PKCS#1 body base64 len:', body.length, 'DER len:', der.length);
+      if (der.length === 0) throw new Error('base64解码后为空');
+      var jwk = parsePkcs1Der(der);
+      jwk.kty = 'RSA';
+      console.log('[sign] JWK n prefix:', jwk.n ? jwk.n.substring(0, 20) + '...' : 'EMPTY');
+      var keyObj = crypto.createPrivateKey({ key: jwk, format: 'jwk' });
+      console.log('[sign] JWK→KeyObject OK');
+      const sign = crypto.createSign('RSA-SHA256');
+      sign.update(data);
+      return sign.sign(keyObj, 'base64');
+    } catch (e) {
+      console.log('[sign] JWK fallback failed:', e.message.substring(0, 100));
+    }
+  }
+
+  // 尝试2: 直接用PEM(可能是PKCS#8)
+  try {
+    var keyObj = crypto.createPrivateKey({ key: privateKey, format: 'pem' });
+    console.log('[sign] PEM→KeyObject OK (no type hint)');
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(data);
+    return sign.sign(keyObj, 'base64');
+  } catch (e) {
+    console.log('[sign] PEM fallback failed:', e.message.substring(0, 100));
+  }
+
+  // 尝试3: 给sign.sign原始PEM字符串
+  try {
+    console.log('[sign] last resort: sign.sign(string)');
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(data);
+    return sign.sign(privateKey, 'base64');
+  } catch (e) {
+    console.error('[sign] ALL approaches failed. Last error:', e.message);
+    throw e;
+  }
 }
 
 function rsaVerify(data, signature, publicKey) {
