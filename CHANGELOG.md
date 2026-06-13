@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.10] - 2026-06-14
+
+### Fixed
+- fix(db): 新增 api_trade_no 字段到 transaction_records 表
+  - MySQL/SQLite 建表语句、迁移逻辑、create 方法同步更新
+  - 支付回调和同步回调分别存储 trade_no 和 api_trade_no
+  - 解决前端显示的一直是 trade_no 而非 api_trade_no 的问题
+
+---
+
 ## [2.1.9] - 2026-06-14
 
 ### Added

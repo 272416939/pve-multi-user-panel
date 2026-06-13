@@ -178,10 +178,11 @@ router.post('/wallet/notify', async (req, res) => {
         var balanceBefore = parseFloat(user.balance || '0');
         var balanceAfter = balanceBefore + amount;
         
-        var tradeNo = params.trade_no || params.api_trade_no || null;
-        
+        var tradeNo = params.trade_no || null;
+        var apiTradeNo = params.api_trade_no || null;
+
         await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
-        
+
         await db.transactionRecords.create({
             user_id: userId,
             order_no: params.out_trade_no,
@@ -191,7 +192,8 @@ router.post('/wallet/notify', async (req, res) => {
             amount: amount.toFixed(2),
             balance_before: balanceBefore.toFixed(2),
             balance_after: balanceAfter.toFixed(2),
-            trade_no: tradeNo
+            trade_no: tradeNo,
+            api_trade_no: apiTradeNo
         });
         
         try {

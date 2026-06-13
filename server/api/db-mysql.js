@@ -349,6 +349,7 @@ async function initDb() {
             resource_type VARCHAR(10) DEFAULT NULL,
             resource_id INT DEFAULT NULL,
             trade_no VARCHAR(200) DEFAULT NULL,
+            api_trade_no VARCHAR(200) DEFAULT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_tr_user_id (user_id),
             INDEX idx_tr_order_no (order_no)
@@ -395,6 +396,7 @@ async function migrateSchema() {
     await safeAlter('lxc_containers', 'dhcp_static_ip', "TEXT");
 
     await safeAlter('transaction_records', 'trade_no', 'VARCHAR(200) DEFAULT NULL');
+    await safeAlter('transaction_records', 'api_trade_no', 'VARCHAR(200) DEFAULT NULL');
 
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {
@@ -1536,8 +1538,8 @@ module.exports = {
     transactionRecords: {
         create: async (record) => {
             const [result] = await execute(
-                `INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     record.user_id, record.order_no, record.pay_time || null, record.pay_method || '',
                     record.trade_type || 'recharge', record.amount || '0.00',
@@ -1545,6 +1547,7 @@ module.exports = {
                     record.balance_before || '0.00', record.balance_after || '0.00',
                     record.resource_type || null, record.resource_id || null,
                     record.trade_no || null,
+                    record.api_trade_no || null,
                     mysqlNow()
                 ]
             );
