@@ -348,8 +348,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         if (price <= 0) return res.status(400).json({ error: '该资源未设置续费价格' });
 
         var period = resource.renewal_period || 'month';
-        var priceMult = period === 'year' ? 12 : 1;
-        var totalPrice = price * qty * priceMult;
+        var totalPrice = price * qty;
         var user = await db.users.getById(userId);
         var balance = parseFloat(user.balance || '0');
         

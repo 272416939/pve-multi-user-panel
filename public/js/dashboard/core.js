@@ -248,10 +248,8 @@
         if (!resource) { $.renewError.value = '请选择续费资源'; return; }
         var qty = $.renewQuantity.value;
         if (!qty || qty < 1) { $.renewError.value = '续费数量至少为1'; return; }
-        var isYear = resource.renewal_period === 'year';
         var price = parseFloat(resource.renewal_price || '0');
-        var mult = isYear ? 12 : 1;
-        var totalPrice = (price * qty * mult).toFixed(2);
+        var totalPrice = (price * qty).toFixed(2);
         var bal = parseFloat($.walletBalance.value);
         if (bal < parseFloat(totalPrice)) {
             $.renewError.value = '余额不足，应付 ¥' + totalPrice + '，当前余额 ¥' + bal.toFixed(2) + '，请先充值';
