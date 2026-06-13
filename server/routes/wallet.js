@@ -391,7 +391,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         
         var addDays = period === 'year' ? qty * 365 : qty * 30;
         
-        var oldExpiration = resource.expiration_date ? new Date(resource.expiration_date) : new Date();
+        var oldExpiration = resource.expiration_date ? new Date(resource.expiration_date + 'Z') : new Date();
         oldExpiration.setDate(oldExpiration.getDate() + addDays);
         var newExpiration = oldExpiration.toISOString();
         

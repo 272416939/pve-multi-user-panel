@@ -215,7 +215,11 @@ const formatBytes = (bytes) => {
 
 const formatDate = (date) => {
     if (!date) return '-';
-    return new Date(date).toLocaleString('zh-CN');
+    var d = typeof date === 'string' ? date : date;
+    if (typeof d === 'string' && !/[Zz]|[+-]\d{2}:\d{2}$/.test(d) && !d.includes('T')) {
+        d = d + 'Z';
+    }
+    return new Date(d).toLocaleString('zh-CN');
 };
 
 const formatUptime = (seconds) => {

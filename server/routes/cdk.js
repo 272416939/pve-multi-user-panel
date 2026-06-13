@@ -436,7 +436,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             // 计算新的到期时间
             let newExpirationDate;
             if (vm.expiration_date) {
-                const currentExp = new Date(vm.expiration_date);
+                const currentExp = new Date(vm.expiration_date + 'Z');
                 const now = new Date();
                 const baseDate = currentExp > now ? currentExp : now;
                 newExpirationDate = new Date(baseDate.getTime() + cdk.duration_days * 24 * 60 * 60 * 1000);

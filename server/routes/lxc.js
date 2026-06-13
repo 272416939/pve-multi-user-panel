@@ -70,7 +70,7 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
             ...ct,
             status: null,
             config: null,
-            isExpired: ct.expiration_date ? new Date(ct.expiration_date) < new Date() : false,
+            isExpired: ct.expiration_date ? new Date(ct.expiration_date + 'Z') < new Date() : false,
             destroyed: false,
             error: null
         }));
@@ -113,7 +113,7 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
                 ...ct,
                 status: null,
                 config: null,
-                isExpired: ct.expiration_date ? new Date(ct.expiration_date) < new Date() : false,
+                isExpired: ct.expiration_date ? new Date(ct.expiration_date + 'Z') < new Date() : false,
                 destroyed: false
             })));
         } catch (e2) {
@@ -383,10 +383,10 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date + 'Z') < new Date()) {
                 return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
-            if (isOwner && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            if (isOwner && ct.expiration_date && new Date(ct.expiration_date + 'Z') < new Date()) {
                 return res.status(403).json({ error: '容器已到期，无法开机' });
             }
         } else if (!isAdmin) {
@@ -413,7 +413,7 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date + 'Z') < new Date()) {
                 return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
@@ -440,7 +440,7 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date + 'Z') < new Date()) {
                 return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
@@ -467,7 +467,7 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date + 'Z') < new Date()) {
                 return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
@@ -538,7 +538,7 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date + 'Z') < new Date()) {
                 return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
@@ -689,7 +689,7 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date + 'Z') < new Date()) {
                 return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
@@ -756,7 +756,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date + 'Z') < new Date()) {
                 return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
