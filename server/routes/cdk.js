@@ -26,7 +26,7 @@ router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, 
             return res.status(400).json({ error: '请提供有效的续费天数' });
         }
  
-        const code = generateUniqueCdkCode();
+        const code = await generateUniqueCdkCode();
         const newCdk = await db.cdk.create({
             code,
             duration_days: parseInt(duration_days),
@@ -68,7 +68,7 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
  
         // 生成 CDK，轮询分配给多用户
         for (let i = 0; i < num; i++) {
-            const code = generateUniqueCdkCode();
+            const code = await generateUniqueCdkCode();
             const assignedUserId = targetUsers.length > 0 ? targetUsers[i % targetUsers.length].id : null;
             const newCdk = await db.cdk.create({
                 code,
