@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v1.8.0_beta23-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.1.11-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -75,22 +75,30 @@
 | 23 | **极客头像** | 基于用户名自动生成唯一的 SVG 电路板渐变头像 |
 | 24 | **导航动态化** | 三页面导航统一通过 API 渲染，角色感知 |
 
+### 💰 支付 & 交易（v2.0 新增）
+| # | 功能 | 说明 |
+|---|------|------|
+| 25 | **在线充值** | 支付宝/微信支付，V1 MD5 + V2 RSA 签名双模式 |
+| 26 | **余额续费** | 余额抵扣 VM/LXC 续费，支持月/年付 |
+| 27 | **交易流水** | 完整支付记录，支付流水号（transaction_id）、类型、金额 |
+| 28 | **支付配置** | 支付网关 PID/密钥/开关独立管理 |
+
 ### ⚡ 性能优化（v1.8.0-beta21~23）
 | # | 功能 | 说明 |
 |---|------|------|
-| 25 | **WS 状态推送** | VM/LXC CPU/内存/网络 3s 实时推送，替代 HTTP 整表轮询 |
-| 26 | **WS 监控图表** | 详情弹窗 4 组 Chart.js 图表通过 subscribe-detail 推送，消灭 3s HTTP 请求 |
-| 27 | **进程内 TTL 缓存** | profile(60s) + unread-count(10s) + PVE 状态(5s) 缓存，减少 DB/PVE 调用 |
-| 28 | **备份进度 WS 推送** | 备份/恢复完成后 pushToUser 实时通知，消灭 10s 前端轮询 |
-| 29 | **PVE 状态复用** | GET /user/vms 和 /user/lxc 优先命中 pushStatus 缓存，PVE API 调用减半 |
+| 29 | **WS 状态推送** | VM/LXC CPU/内存/网络 3s 实时推送，替代 HTTP 整表轮询 |
+| 30 | **WS 监控图表** | 详情弹窗 4 组 Chart.js 图表通过 subscribe-detail 推送，消灭 3s HTTP 请求 |
+| 31 | **进程内 TTL 缓存** | profile(60s) + unread-count(10s) + PVE 状态(5s) 缓存，减少 DB/PVE 调用 |
+| 32 | **备份进度 WS 推送** | 备份/恢复完成后 pushToUser 实时通知，消灭 10s 前端轮询 |
+| 33 | **PVE 状态复用** | GET /user/vms 和 /user/lxc 优先命中 pushStatus 缓存，PVE API 调用减半 |
 
 ### 🗄️ 基础设施（v1.8.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 30 | **MySQL 支持** | 可选远程 MySQL 5.7+，自动迁移 SQLite 数据 |
-| 31 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
-| 32 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
-| 33 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
+| 34 | **MySQL 支持** | 可选远程 MySQL 5.7+，自动迁移 SQLite 数据 |
+| 35 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
+| 36 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
+| 37 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
 
 ---
 
@@ -224,7 +232,7 @@ npm run dev
 │   │   ├── token.js
 │   │   ├── site-url.js
 │   │   └── cdk-generator.js
-│   ├── routes/                # 路由模块（12 个）
+│   ├── routes/                # 路由模块（13 个）
 │   │   ├── auth.js
 │   │   ├── user.js             # 用户中心 + 2FA + 设备管理 + Push ticket
 │   │   ├── admin-user.js
@@ -233,6 +241,8 @@ npm run dev
 │   │   ├── snapshot.js
 │   │   ├── backup.js
 │   │   ├── cdk.js
+│   │   ├── wallet.js           # 充值/续费/交易流水 + 支付回调
+│   │   ├── admin-wallet.js     # 管理后台交易流水/CSV 导出
 │   │   ├── message.js
 │   │   ├── admin-config.js
 │   │   └── network.js
@@ -247,14 +257,16 @@ npm run dev
 │   │   └── dhcp.js
 │   ├── schedule/
 │   │   └── tasks.js           # 定时任务
-│   └── api/
+│   ├── api/
 │       ├── db.js              # 数据库工厂（SQLite/MySQL 自动选择）
-│       ├── db-sqlite.js       # SQLite 驱��
+│       ├── db-sqlite.js       # SQLite 驱动
 │       ├── db-mysql.js        # MySQL 驱动（mysql2/promise 连接池）
 │       ├── redis.js           # Redis 缓存客户端（可选）
 │       ├── pve-api.js         # PVE REST API 封装
 │       ├── ikuai-api.js       # ikuai API 封装
 │       └── ssh-exec.js        # SSH 执行工具
+│   └── sdk/
+│       └── pay/               # 支付网关 SDK（V1 MD5 + V2 RSA）
 ├── data/
 │   └── pve-panel.db           # SQLite 数据库（自动生成）
 ├── images/                    # 头像存储（自动创建）
@@ -340,6 +352,7 @@ npm run dev
 | **LXC 容器管理** | 模板创建，分配/换绑，电源控制，终端，重置密码，销毁 |
 | **用户管理** | 创建/编辑/删除用户，邮箱管理，2FA 管理 |
 | **分配管理** | 将 VM/LXC 分配给用户，设置到期时间、续费价格 |
+| **财务管理** | 交易流水查询/CSV 导出，支付网关配置（PID/密钥/开关） |
 | **网络管理** | 端口转发配置，DHCP 配置，ikuai 接口同步 |
 | **SMTP 配置** | 邮件服务器，到期提醒天数，备份快照配置 |
 | **CDK 管理** | 生成/分发/导出 CDK 兑换码 |
@@ -353,6 +366,7 @@ npm run dev
 | **我的虚拟机** | 查看/操作 VM，VNC，端口转发，CDK 兑换续费 |
 | **我的 LXC 容器** | 查看/操作 LXC，终端，端口转发，重置密码 |
 | **用户中心** | 头像/邮箱/密码，2FA 设置，备忘录，消息管理 |
+| **账户余额** | 支付宝/微信在线充值，余额续费，交易明细查询 |
 
 ### 端口转发
 
@@ -436,6 +450,28 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ## 🔄 更新日志
 
 <details>
+<summary><b>v2.1.11</b> (2026-06-14) — 支付流水号修复</summary>
+
+- ✅ 支付回调读取 `transaction_id` 替代不存在的 `api_trade_no`
+- ✅ admin CSV 导出同步适配流水号
+- ✅ MySQL/SQLite 双驱 `api_trade_no` 列同步
+
+</details>
+
+<details>
+<summary><b>v2.1.0 ~ v2.1.9</b> (2026-06-14) — 支付系统 + UI 优化</summary>
+
+- ✅ 在线充值：支付宝/微信支付，V1 MD5 + V2 RSA 双模式
+- ✅ 余额续费：VM/LXC 月/年付
+- ✅ 交易流水：用户中心 + admin 查询/CSV 导出
+- ✅ admin 操作栏更多菜单（网络/控制台/终端）
+- ✅ 充值按钮美化 + 明暗模式适配
+- ✅ 侧边栏高亮修复（父级 + 子菜单）
+- ✅ 财务管理与系统设置位置互换
+
+</details>
+
+<details>
 <summary><b>v1.8.0-beta23</b> (2026-06-12) — 四项性能优化</summary>
 
 **① 详情监控 WS 推送：**
@@ -455,296 +491,28 @@ git fetch origin && git reset --hard origin/main && npm install --production
 - ✅ pushStatus 结果存入 statusCacheGlobal (5s TTL)
 - ✅ GET /user/vms + /user/lxc 优先命中缓存，PVE API 调用减半
 
-**涉及文件：** `server/utils/cache.js`（新增）· `push-proxy.js` · `backup-polling.js` · `message.js` · `user.js` · `vm.js` · `lxc.js` · `shared.js` · `dashboard/core.js` · `admin/core.js` · `package.json`
+</details>
+
+<details>
+<summary><b>v1.8.0-beta1~22</b> (2026-06) — MySQL + Redis + WS 重构</summary>
+
+- ✅ MySQL 支持（可选远程 5.7+，自动迁移 SQLite）
+- ✅ Redis 缓存（速率限制/VNC ticket/提醒追踪持久化）
+- ✅ WebSocket 统一推送：未读角标/实时监控/备份进度
+- ✅ 异步连接池 mysql2/promise（替换 sync-mysql）
+- ✅ LXC 管理 + XtermJS 终端 + 快照/备份
+- ✅ 自动更新系统（GitHub + Gitee 双源）
 
 </details>
 
 <details>
-<summary><b>v1.8.0-beta22</b> (2026-06-12) — LXC 误操作严重 Bug 修复</summary>
-
-**修复：**
-- ✅ 确认弹窗 `c.id === lxcConfirmState.ctId` → `c.ct_id === lxcConfirmState.ctId`
-- ✅ DB 自增 ID 与 PVE 真实 ID 永远不匹配 → find() 返回 undefined → 回退 [0]，导致误操作错误容器
-- ✅ admin.html + dashboard.html 两处同步修复
-
-**涉及文件：** `public/admin.html` · `public/dashboard.html` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta21</b> (2026-06-12) — WS status 推送替代 HTTP 轮询</summary>
-
-**架构变革：**
-- ✅ tick(10s) + HTTP GET /user/vms → subscribe + status(3s) + 原地更新卡片
-- ✅ push-proxy 对接 _applyRate 速率转换
-- ✅ tick 降频 10s→60s（仅兜底刷新）
-- ✅ shared.js initPushClient onOpen 回调 + subscribe 队列
-
-**涉及文件：** `push-proxy.js` · `shared.js` · `dashboard/core.js` · `admin/core.js` · `pve-rate.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta20</b> (2026-06-12) — pushStatus 并行查询 + emit 分组</summary>
-
-**优化：**
-- ✅ pushStatus 从串行 for-of → 并行 Promise.all（N 个 VM/LXC 同时查 PVE）
-- ✅ 检查后端 WS 是否活跃再发送（避免无客户端时空推）
-- ✅ 心跳 ping/pong 修复 → 改用 ws.on('pong') 监听
-
-**涉及文件：** `push-proxy.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta19</b> (2026-06-12) — VM 列表字段补全 + 图标对齐</summary>
-
-**修复：**
-- ✅ admin lxcList 补全 `os` 字段映射（template_name 回退 config.ostype）
-- ✅ 管理员 VM 列表补全 `username` 字段
-- ✅ dashboard 内部转发按钮图标对齐修复
-
-**涉及文件：** `server/routes/vm.js` · `server/routes/lxc.js` · `public/dashboard.html` · `public/admin.html` · `public/js/admin/vm.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta18</b> (2026-06-12) — CDK 优化 + CORS 修复</summary>
-
-**修复：**
-- ✅ CORS 白名单支持带端口域名（`https://domain.com:443`）
-- ✅ CDK 兑换优化：兑换后自动拉取最新 VM 列表
-- ✅ CDK 配额检查：后台创建时校验未使用 CDK + 已分配 VM 总数
-
-**涉及文件：** `server/server.js` · `server/routes/cdk.js` · `public/js/dashboard/cdk.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta17</b> (2026-06-12) — VM 详情监控 + LXC 列表修复</summary>
-
-**新特性 & 修复：**
-- ✅ VM/LXC 详情弹窗：4 组 Chart.js 实时监控图表（CPU/内存/网络/磁盘）
-- ✅ 管理员 LXC 列表补全用户名字段（username）
-- ✅ push-proxy 修复：emit 时检查 ws.readyState 防止 crash
-
-**涉及文件：** `push-proxy.js` · `dashboard/core.js` · `admin/core.js` · `dashboard.html` · `admin.html` · `lxc.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta16</b> (2026-06-12) — WebSocket 在线订阅</summary>
-
-**新特性：**
-- ✅ push-proxy subscribe/unsubscribe 在线订阅机制
-- ✅ 用户 VM/LXC 变更后无需刷新页面，WS 自动更新
-- ✅ 连接时自动推送当前未读数
-
-**涉及文件：** `push-proxy.js` · `shared.js` · `dashboard/core.js` · `admin/core.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta15</b> (2026-06-12) — WebSocket 统一推送</summary>
-
-**新特性：**
-- ✅ 统一 WebSocket 推送通道 `/ws/push`，JWT ticket 认证
-- ✅ 未读消息角标由 30s HTTP 轮询 → 服务端主动推送
-- ✅ 30s ping/pong 心跳检测假死连接，自动清理
-- ✅ 前端 `PushClient` 断线 5 秒自动重连
-
-**安全设计：**
-- ✅ CSWSH 防护：WebSocket 连接用 JWT ticket（type='push', 5min 过期, HS256）
-- ✅ 心跳防假死：60 秒无 pong 即 terminate
-- ✅ 断开自动清理 `SUBSCRIPTIONS` Map
-
-**涉及文件：**
-`server/websocket/push-proxy.js`（新增）· `server/routes/user.js` · `server/server.js` · `public/js/shared.js` · `public/js/dashboard/core.js` · `public/js/admin/core.js` · `public/user-center.html` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta14</b> (2026-06-12) — 设备列表去重</summary>
-
-**修复：**
-- ✅ 同设备多次登录，设备管理页不再出现重复记录
-- ✅ 新增 `revokeByUserAndDevice` 双驱方法，登录前自动撤销同设备旧 token
-
-**涉及文件：**
-`server/routes/auth.js` · `server/api/db-sqlite.js` · `server/api/db-mysql.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta13</b> (2026-06-12) — 登录状态持久化修复</summary>
-
-**修复：**
-- ✅ shared.js 刷新 token 后正确保存新 refreshToken（2 处遗漏）
-- ✅ 根除「几分钟自动退出登录」问题：二次刷新不再用已撤销的旧 token
-- ✅ JWT 过期时间从 15 分钟延长至 60 分钟
-
-**涉及文件：**
-`public/js/shared.js` · `server/utils/token.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta12</b> (2026-06-12) — CDK 跨驱动崩溃修复</summary>
-
-**修复：**
-- ✅ CDK CAS `db.db.prepare()` 在 MySQL 下崩溃 → 改为 `db.cdk.markAsUsed` 统一调用
-- ✅ SQLite + MySQL `markAsUsed` 双双添加 `AND is_used=0` CAS 保护
-- ✅ 全局 `db.db.` 调用清零（3 处 → 0）
-
-**涉及文件：**
-`server/routes/cdk.js` · `server/api/db-sqlite.js` · `server/api/db-mysql.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta11</b> (2026-06-12) — 自动更新排序修复</summary>
-
-**修复：**
-- ✅ auto-update `per_page=1` → `per_page=20`（Gitee + GitHub 共 4 处）
-- ✅ GitHub API 按标签时间戳排序不可靠，改为拉取 20 条后按 `published_at` 降序取最新
-
-**涉及文件：**
-`server/routes/admin-config.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta10</b> (2026-06-12) — Terminal vmid 修复</summary>
-
-**修复：**
-- ✅ `url.searchParams.get('vmid')` 返回字符串，`Number.isInteger` 拒绝校验
-- ✅ `parseInt` 双防护（调用端 + 函数内部）
-
-**涉及文件：**
-`server/websocket/terminal-proxy.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta9</b> (2026-06-12) — Redis 缓存层</summary>
-
-**新特性：**
-- ✅ 可选 Redis 缓存：5 个独立环境变量配置（HOST/PORT/PASSWORD/DB/PREFIX）
-- ✅ 未配置时自动回退进程内存，零破坏性兼容
-- ✅ 速率限制/VNC ticket/到期提醒追踪迁移到 Redis
-- ✅ 新增 `server/api/redis.js` + `server/middleware/rate-limiter.js`
-- ✅ ioredis 连接池，失败自动降级到内存模式
-
-**涉及文件：**
-`package.json` · `server/api/redis.js`（新增）· `server/middleware/rate-limiter.js`（新增）· `.env.example` · `server/server.js` · `server/routes/auth.js` · `server/routes/cdk.js` · `server/routes/vm.js` · `server/routes/lxc.js` · `server/websocket/vnc-proxy.js` · `server/services/expiry-check.js`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta8</b> (2026-06-12) — SQLite bio 白名单修复</summary>
-
-**修复：**
-- ✅ db-sqlite.js `users.update` 白名单补入 `bio` 列，与 MySQL 版本对齐
-
-**涉及文件：**
-`package.json` · `server/api/db-sqlite.js`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta7</b> (2026-06-12) — await 补全修复</summary>
-
-**修复：**
-- ✅ 7 个路由/服务文件 57 处 db 调用补全 await（修复 `forwardRules.slice` 报错）
-
-**涉及文件：**
-`server/routes/network.js` · `server/routes/message.js` · `server/routes/backup.js` · `server/routes/admin-config.js` · `server/routes/snapshot.js` · `server/api/ikuai-api.js` · `package.json`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta6</b> (2026-06-12) — MySQL 异步连接池 + 审计修复</summary>
-
-**核心变更：**
-- ✅ sync-mysql 单连接 → mysql2/promise 异步连接池（10 连接，utf8mb4）
-- ✅ 23 个路由/中间件/服务文件同步改 async/await
-- ✅ 修复 7 个安全审计漏洞：is_active 列缺失、白名单错误、crypto 兼容性等
-
-**涉及文件：**
-`package.json` · `server/api/db-mysql.js` · `server/api/db-sqlite.js` · `server/api/db.js` · `server/routes/*` · `server/middleware/auth.js` · `server/services/*` · `server/utils/*`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta5</b> (2026-06-12) — 迁移性能优化</summary>
-
-**优化：**
-- ✅ 迁移专用裸查询（无重试避免雪崩）+ 批量多行 INSERT（每批 50 行）
-- ✅ 迁移后延迟 2 秒重建连接，连接数降低 95%+
-
-**涉及文件：**
-`package.json` · `server/api/db-mysql.js`
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta1~4</b> (2026-06-11) — MySQL 数据库支持</summary>
-
-**新特性：**
-- ✅ 新增 `DB_TYPE=mysql` 支持，SQLite 自动迁移
-- ✅ 数据库工厂层 `db.js`，路由透明切换
-- ✅ 修复 charset/连接恢复/重复键冲突等迁移问题
-
-**涉及文件：**
-`server/api/db.js`（新增）· `server/api/db-mysql.js`（新增，1561 行）· `server/schedule/tasks.js`（新增）· 18 个路由/服务文件统一 `require('../api/db')`
-
-</details>
-
-<details>
-<summary><b>v1.7.4</b> (2026-06-09) — CDK 表单输入框高度统一</summary>
-
-**优化：**
-- ✅ 所有输入框统一使用 form-control-sm，高度一致（31px）
-- ✅ 标签输入框新增 sm 紧凑变体，与其他输入框对齐
-
-**涉及文件：**
-`package.json` · `public/admin.html` · `public/css/components.css`
-
-</details>
-
-<details>
-<summary><b>v1.7.0 ~ v1.7.3</b> (2026-06-09) — 系统更新优化</summary>
-
-- ✅ CDK 表单布局优化、更新源选择器、版本号显示修复
-
-</details>
-
-<details>
-<summary><b>v1.6.0 ~ v1.6.9</b> (2026-06-07~09) — 自动更新 + 模块化重构</summary>
-
-- ✅ 后端架构重构：5766 行 → 11 个模块
-- ✅ 前端 CSS/JS 模块化拆分
-- ✅ 自动更新系统：检查/日志/一键更新
-- ✅ Gitee 国内源支持
-
-</details>
-
-<details>
-<summary><b>v1.5.0</b> (2026-06-06) — LXC 容器管理</summary>
-
-- ✅ LXC 完整 CRUD：创建/分配/操作/销毁
-- ✅ LXC XtermJS 终端：SSH + PTY 直连 `lxc-console`
-- ✅ LXC 快照/备份/CDK 续费 + 到期检查
-
-</details>
-
-<details>
-<summary><b>v1.0.0 ~ v1.4.1</b> (2026-05~06) — 核心功能</summary>
+<summary><b>v1.0.0 ~ v1.7.x</b> (2026-05~06) — 核心功能</summary>
 
 - ✅ 多租户系统、虚拟机管理、VNC 控制台
 - ✅ JWT 认证 + Refresh Token + 2FA
 - ✅ CDK 兑换码、站内消息、SMTP 邮件
 - ✅ 快照管理、备份恢复、DHCP 静态绑定、端口转发
+- ✅ 系统自动更新、模块化重构
 
 </details>
 
