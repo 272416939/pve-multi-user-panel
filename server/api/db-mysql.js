@@ -426,6 +426,10 @@ async function initDefaultConfig() {
         'dhcp:dns1': '119.29.29.29',
         'dhcp:dns2': '223.5.5.5',
         'pay:base_url': 'https://pay.microgg.cn/',
+        'pay:v1_enabled': '1',
+        'pay:v2_enabled': '0',
+        'pay:alipay_enabled': '1',
+        'pay:wxpay_enabled': '1',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {

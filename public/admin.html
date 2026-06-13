@@ -1826,6 +1826,36 @@
                                 <label class="form-label">V2 RSA 平台公钥</label>
                                 <textarea class="form-control" rows="4" v-model="payConfig.v2_public_key" placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"></textarea>
                             </div>
+                            <div class="col-12"><hr style="border-color:rgba(255,255,255,0.1);margin:4px 0 12px;"></div>
+                            <div class="col-12 mb-2"><label class="form-label fw-bold">接口版本开关</label></div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="payV1Switch" v-model="payConfig.v1_enabled">
+                                    <label class="form-check-label" for="payV1Switch">启用 V1 (MD5签名)</label>
+                                </div>
+                                <small class="text-muted">基于 submit.php / mapi.php / api.php 的 MD5 签名接口</small>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="payV2Switch" v-model="payConfig.v2_enabled">
+                                    <label class="form-check-label" for="payV2Switch">启用 V2 (RSA签名)</label>
+                                </div>
+                                <small class="text-muted">基于 /api/pay/* 的 RSA-SHA256 签名接口，需填写上方密钥</small>
+                            </div>
+                            <div class="col-12"><hr style="border-color:rgba(255,255,255,0.1);margin:4px 0 12px;"></div>
+                            <div class="col-12 mb-2"><label class="form-label fw-bold">支付方式</label></div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="payAlipaySwitch" v-model="payConfig.alipay_enabled">
+                                    <label class="form-check-label" for="payAlipaySwitch">支付宝</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" id="payWxpaySwitch" v-model="payConfig.wxpay_enabled">
+                                    <label class="form-check-label" for="payWxpaySwitch">微信支付</label>
+                                </div>
+                            </div>
                         </div>
                         <button type="button" class="btn-glass" @click="savePayConfig" style="margin-top:12px;">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> 保存配置

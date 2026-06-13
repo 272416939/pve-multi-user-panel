@@ -373,13 +373,21 @@ router.get('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         var md5Key = await getConfig('pay:md5_key') || '';
         var v2PublicKey = await getConfig('pay:v2_public_key') || '';
         var v2PrivateKey = await getConfig('pay:v2_private_key') || '';
+        var v1Enabled = await getConfig('pay:v1_enabled') || '1';
+        var v2Enabled = await getConfig('pay:v2_enabled') || '0';
+        var alipayEnabled = await getConfig('pay:alipay_enabled') || '1';
+        var wxpayEnabled = await getConfig('pay:wxpay_enabled') || '1';
 
         res.json({
             base_url: baseUrl,
             pid: pid,
             md5_key: maskSecret(md5Key),
             v2_public_key: maskSecret(v2PublicKey),
-            v2_private_key: maskSecret(v2PrivateKey)
+            v2_private_key: maskSecret(v2PrivateKey),
+            v1_enabled: v1Enabled === '1',
+            v2_enabled: v2Enabled === '1',
+            alipay_enabled: alipayEnabled === '1',
+            wxpay_enabled: wxpayEnabled === '1'
         });
     } catch (e) {
         console.error('[支付配置]', e.message);
@@ -390,7 +398,7 @@ router.get('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
 router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var setConfig = db.config.set;
-        var { base_url, pid, md5_key, v2_public_key, v2_private_key } = req.body;
+        var { base_url, pid, md5_key, v2_public_key, v2_private_key, v1_enabled, v2_enabled, alipay_enabled, wxpay_enabled } = req.body;
 
         if (base_url !== undefined) {
             await setConfig('pay:base_url', base_url.trim() || 'https://pay.microgg.cn/');
@@ -406,6 +414,18 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         }
         if (v2_private_key !== undefined && !isMasked(v2_private_key)) {
             await setConfig('pay:v2_private_key', v2_private_key.trim());
+        }
+        if (v1_enabled !== undefined) {
+            await setConfig('pay:v1_enabled', v1_enabled ? '1' : '0');
+        }
+        if (v2_enabled !== undefined) {
+            await setConfig('pay:v2_enabled', v2_enabled ? '1' : '0');
+        }
+        if (alipay_enabled !== undefined) {
+            await setConfig('pay:alipay_enabled', alipay_enabled ? '1' : '0');
+        }
+        if (wxpay_enabled !== undefined) {
+            await setConfig('pay:wxpay_enabled', wxpay_enabled ? '1' : '0');
         }
 
         res.json({ message: '支付配置保存成功' });
