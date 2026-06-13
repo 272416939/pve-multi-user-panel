@@ -402,7 +402,7 @@ router.get('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
 router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var setConfig = db.config.set;
-        var { base_url, pid, md5_key, v2_public_key, v2_private_key, v1_enabled, v2_enabled, alipay_enabled, wxpay_enabled } = req.body;
+        var { base_url, pid, md5_key, v2_public_key, v2_private_key, v1_enabled, v2_enabled, alipay_enabled, wxpay_enabled, min_amount, max_amount } = req.body;
 
         if (base_url !== undefined) {
             await setConfig('pay:base_url', base_url.trim() || 'https://pay.microgg.cn/');
@@ -431,16 +431,25 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         if (wxpay_enabled !== undefined) {
             await setConfig('pay:wxpay_enabled', wxpay_enabled ? '1' : '0');
         }
-        if (min_amount !== undefined && min_amount !== null) {
-            var minVal = parseFloat(min_amount);
-            if (isNaN(minVal) || minVal < 0.01) minVal = 0.01;
-            await setConfig('pay:min_amount', String(minVal));
+        var minHasVal = min_amount !== undefined && min_amount !== null && min_amount !== '';
+        var maxHasVal = max_amount !== undefined && max_amount !== null && max_amount !== '';
+        var minNum = minHasVal ? parseFloat(min_amount) : NaN;
+        var maxNum = maxHasVal ? parseFloat(max_amount) : NaN;
+
+        if (minHasVal) {
+            if (isNaN(minNum)) return res.status(400).json({ error: '最低充值金额必须为有效数字' });
+            if (minNum <= 0) return res.status(400).json({ error: '最低充值金额不能为负数或零' });
         }
-        if (max_amount !== undefined && max_amount !== null) {
-            var maxVal = parseFloat(max_amount);
-            if (isNaN(maxVal) || maxVal < 0.01) maxVal = 999999.99;
-            await setConfig('pay:max_amount', String(maxVal));
+        if (maxHasVal) {
+            if (isNaN(maxNum)) return res.status(400).json({ error: '最大充值金额必须为有效数字' });
+            if (maxNum <= 0) return res.status(400).json({ error: '最大充值金额不能为负数或零' });
         }
+        if (minHasVal && maxHasVal && maxNum < minNum) {
+            return res.status(400).json({ error: '最大充值金额不能小于最低充值金额' });
+        }
+
+        if (minHasVal) await setConfig('pay:min_amount', String(minNum));
+        if (maxHasVal) await setConfig('pay:max_amount', String(maxNum));
 
         res.json({ message: '支付配置保存成功' });
     } catch (e) {
