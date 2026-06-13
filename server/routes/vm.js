@@ -625,6 +625,32 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
         // 更新数据库记录
         if (vmRecord) await db.vms.update(vmRecord.id, { dhcp_static_ip: finalIp });
 
+        // 更新端口转发规则中的 IP
+        if (finalIp) {
+            try {
+                const rules = await db.portForwards.getByVmId(vmid);
+                for (const rule of rules) {
+                    await db.portForwards.update(rule.id, { ip: finalIp });
+                    if (rule.ikuai_id) {
+                        try {
+                            await ikuaiApi.editPortForward(rule.ikuai_id, {
+                                ip: finalIp,
+                                internal_port: rule.internal_port,
+                                external_port: rule.external_port,
+                                protocol: rule.protocol,
+                                comment: rule.name || '',
+                                interface: await db.config.get('forward:wan_interface') || ''
+                            });
+                        } catch (e) {
+                            console.error(`端口转发 ${rule.id} ikuai 同步失败:`, e.message);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error(`VM ${vmid} 更新端口转发 IP 失败:`, e.message);
+            }
+        }
+
         res.json({ success: true, ip: finalIp, message: `已设置静态IP ${finalIp}（通过爱快DHCP绑定）` });
     } catch (error) {
         dbg('[vm/reset-ip]', error.message);
