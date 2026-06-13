@@ -106,6 +106,8 @@ async function initDb() {
         )
     `);
 
+    try { await execute('ALTER TABLE vms ADD COLUMN renewal_period VARCHAR(20) DEFAULT \'month\''); } catch (_) {}
+
     // 创建虚拟机提醒记录表
     await execute(`
         CREATE TABLE IF NOT EXISTS vm_reminders (
@@ -294,6 +296,8 @@ async function initDb() {
         )
     `);
 
+    try { await execute('ALTER TABLE lxc_containers ADD COLUMN renewal_period VARCHAR(20) DEFAULT \'month\''); } catch (_) {}
+
     // 创建 LXC 提醒记录表
     await execute(`
         CREATE TABLE IF NOT EXISTS lxc_reminders (
@@ -421,6 +425,7 @@ async function initDefaultConfig() {
         'dhcp:gateway': '10.0.0.1',
         'dhcp:dns1': '119.29.29.29',
         'dhcp:dns2': '223.5.5.5',
+        'pay:base_url': 'https://pay.microgg.cn/',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {
@@ -677,7 +682,7 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'vm_id', 'user_id', 'username', 'expiration_date',
-                'renewal_price', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1295,7 +1300,7 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'ct_id', 'user_id', 'username', 'expiration_date',
-                'renewal_price', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

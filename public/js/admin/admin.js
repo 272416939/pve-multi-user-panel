@@ -9,7 +9,7 @@
     $.showCreateUser = ref(false);
     $.createUserForm = ref({ username: '', password: '', role: 'user', email: '', emailVerified: false });
     $.editUserForm = ref({ id: null, username: '', password: '', role: 'user', email: '', emailVerified: false, totp_enabled: false });
-    $.assignForm = ref({ vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '' });
+    $.assignForm = ref({ vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month' });
     $.smtpConfig = ref({ host: '', port: 587, secure: false, user: '', password: '', from: '', enabled: false });
     $.reminderConfig = ref({ days1: 7, days2: 3, days3: 1 });
     $.snapshotConfig = ref({ max_per_vm: 5, daily_create_limit: 20, daily_restore_limit: 10 });
@@ -415,5 +415,26 @@
     // ==================== initAdmin ====================
     $.initAdmin = function() {
         // 无特殊生命周期逻辑
+    };
+
+    // 支付配置
+    $.payConfig = ref({ base_url: '', pid: '', md5_key: '', v2_public_key: '', v2_private_key: '' });
+
+    $.loadPayConfig = async function() {
+        try {
+            var config = await api('/admin/pay/config');
+            $.payConfig.value = config;
+        } catch (e) {
+            console.error('加载支付配置失败', e);
+        }
+    };
+
+    $.savePayConfig = async function() {
+        try {
+            await api('/admin/pay/config', { method: 'PUT', body: $.payConfig.value });
+            alert('支付配置保存成功！');
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        }
     };
 })();

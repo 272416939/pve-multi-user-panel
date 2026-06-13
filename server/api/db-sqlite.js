@@ -78,6 +78,9 @@ function initDb() {
         )
     `);
 
+    try { db.exec('ALTER TABLE vms ADD COLUMN renewal_period TEXT DEFAULT \'month\''); } catch (_) {}
+    try { db.exec('ALTER TABLE vms ADD COLUMN backup_storage TEXT DEFAULT \'\''); } catch (_) {}
+
     // 创建虚拟机提醒记录表
     db.exec(`
         CREATE TABLE IF NOT EXISTS vm_reminders (
@@ -280,6 +283,8 @@ function initDb() {
         )
     `);
 
+    try { db.exec('ALTER TABLE lxc_containers ADD COLUMN renewal_period TEXT DEFAULT \'month\''); } catch (_) {}
+
     // 创建 LXC 提醒记录表
     db.exec(`
         CREATE TABLE IF NOT EXISTS lxc_reminders (
@@ -480,6 +485,7 @@ function initDefaultConfig() {
         'dhcp:gateway': '10.0.0.1',
         'dhcp:dns1': '119.29.29.29',
         'dhcp:dns2': '223.5.5.5',
+        'pay:base_url': 'https://pay.microgg.cn/',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {
@@ -766,7 +772,7 @@ module.exports = {
         update: (id, updates) => {
             // M-9: 列名白名单防 SQL 注入
             const allowedColumns = ['name', 'vm_id', 'user_id', 'username', 'expiration_date',
-                'renewal_price', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'backup_storage', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1290,7 +1296,7 @@ module.exports = {
         update: (id, updates) => {
             // M-9: 列名白名单防 SQL 注入
             const allowedColumns = ['name', 'ct_id', 'user_id', 'username', 'expiration_date',
-                'renewal_price', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

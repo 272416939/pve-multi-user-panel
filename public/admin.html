@@ -816,8 +816,15 @@
                                             <input type="datetime-local" class="form-control" v-model="assignForm.expiration_date" step="1" onfocus="this.showPicker?.()">
                                         </div>
                                         <div class="col-md-2 mb-3">
-                                            <label class="form-label">续费价格（可选）</label>
-                                            <input type="text" class="form-control" v-model="assignForm.renewal_price" placeholder="如: ¥50/月">
+                                            <label class="form-label">续费价格</label>
+                                            <input type="number" step="0.01" min="0" class="form-control" v-model="assignForm.renewal_price" placeholder="如: 50.00">
+                                        </div>
+                                        <div class="col-md-1 mb-3">
+                                            <label class="form-label">周期</label>
+                                            <select class="form-select" v-model="assignForm.renewal_period">
+                                                <option value="month">月（30天计）</option>
+                                                <option value="year">年（365天计）</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <button type="submit" class="btn-glass" formnovalidate>分配</button>
@@ -1035,8 +1042,15 @@
                                             <input type="datetime-local" class="form-control" v-model="lxcAssignForm.expiration_date" step="1" onfocus="this.showPicker?.()">
                                         </div>
                                         <div class="col-md-2 mb-3">
-                                            <label class="form-label">续费价格（可选）</label>
-                                            <input type="text" class="form-control" v-model="lxcAssignForm.renewal_price" placeholder="如: ¥50/月">
+                                            <label class="form-label">续费价格</label>
+                                            <input type="number" step="0.01" min="0" class="form-control" v-model="lxcAssignForm.renewal_price" placeholder="如: 50.00">
+                                        </div>
+                                        <div class="col-md-1 mb-3">
+                                            <label class="form-label">周期</label>
+                                            <select class="form-select" v-model="lxcAssignForm.renewal_period">
+                                                <option value="month">月（30天计）</option>
+                                                <option value="year">年（365天计）</option>
+                                            </select>
                                         </div>
                                     </div>
                                     <button type="submit" class="btn-glass" formnovalidate>分配</button>
@@ -1784,6 +1798,40 @@
                         </div>
                     </div>
 
+                <!-- 支付配置 -->
+                <div v-if="activeSection === 'settings' && activeTab === 'pay'">
+                    <div class="module-header">
+                        <h4 class="module-title">支付API对接信息</h4>
+                    </div>
+                    <div class="table-container" style="padding:24px;">
+                        <div class="row g-3">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">接口地址</label>
+                                <input type="text" class="form-control" v-model="payConfig.base_url" placeholder="https://pay.microgg.cn/">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">商户ID</label>
+                                <input type="number" class="form-control" v-model="payConfig.pid" placeholder="商户号">
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">V1 MD5秘钥</label>
+                                <input type="password" class="form-control" v-model="payConfig.md5_key" placeholder="商户MD5签名密钥">
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">V2 RSA 商户私钥</label>
+                                <textarea class="form-control" rows="4" v-model="payConfig.v2_private_key" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
+                            </div>
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">V2 RSA 平台公钥</label>
+                                <textarea class="form-control" rows="4" v-model="payConfig.v2_public_key" placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"></textarea>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-glass" @click="savePayConfig" style="margin-top:12px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> 保存配置
+                        </button>
+                    </div>
+                </div>
+
                 </div>
                 <!-- end 系统设置区域 -->
 
@@ -2100,8 +2148,15 @@
                                         <input type="datetime-local" class="form-control" v-model="editVmForm.expiration_date" step="1" onfocus="this.showPicker?.()">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">续费价格（可选）</label>
-                                        <input type="text" class="form-control" v-model="editVmForm.renewal_price" placeholder="如: ¥50/月">
+                                        <label class="form-label">续费价格</label>
+                                        <input type="number" step="0.01" min="0" class="form-control" v-model="editVmForm.renewal_price" placeholder="如: 50.00">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">计费周期</label>
+                                        <select class="form-select" v-model="editVmForm.renewal_period">
+                                            <option value="month">月（30天计）</option>
+                                            <option value="year">年（365天计）</option>
+                                        </select>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">备份存储位置</label>
@@ -2595,8 +2650,15 @@
                                         <input type="datetime-local" class="form-control" v-model="editLxcForm.expiration_date" step="1" onfocus="this.showPicker?.()">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">续费价格（可选）</label>
-                                        <input type="text" class="form-control" v-model="editLxcForm.renewal_price" placeholder="如: ¥50/月">
+                                        <label class="form-label">续费价格</label>
+                                        <input type="number" step="0.01" min="0" class="form-control" v-model="editLxcForm.renewal_price" placeholder="如: 50.00">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">计费周期</label>
+                                        <select class="form-select" v-model="editLxcForm.renewal_period">
+                                            <option value="month">月（30天计）</option>
+                                            <option value="year">年（365天计）</option>
+                                        </select>
                                     </div>
                                     <div class="d-flex gap-2">
                                         <button type="submit" class="btn btn-primary" formnovalidate>保存</button>

@@ -19,7 +19,7 @@
     $.lxcIpLoading = Vue.ref(false);
     $.selectedLxc = ref(null);
     $.lxcConfirmState = ref({ ctId: null, action: null });
-    $.editLxcForm = ref({ id: null, ct_id: null, name: '', expiration_date: '', renewal_price: '', user_id: null });
+    $.editLxcForm = ref({ id: null, ct_id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null });
     $.availableLxc = ref([]);
     $.assignedLxc = ref([]);
 
@@ -149,7 +149,7 @@
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.lxcAssignForm.value, { expiration_date: expDate }))
             });
-            $.lxcAssignForm.value = { ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '' };
+            $.lxcAssignForm.value = { ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month' };
             await $.loadLxcContainers();
             await $.loadUserLxcContainers();
         } catch (e) {
@@ -170,6 +170,7 @@
                     name: f.name,
                     expiration_date: expDate,
                     renewal_price: f.renewal_price,
+                    renewal_period: f.renewal_period || 'month',
                     user_id: f.user_id
                 })
             });

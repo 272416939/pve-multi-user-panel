@@ -415,7 +415,7 @@ watch($.user, function(u) {
     $.switchAdminTab = function(tab) {
         // Determine which group this tab belongs to
         var manageTabs = ['users', 'cdk', 'messages'];
-        var settingsTabs = ['smtp', 'snapshot-backup', 'network'];
+        var settingsTabs = ['smtp', 'snapshot-backup', 'network', 'pay'];
         var section;
         var submenuId;
 
@@ -700,6 +700,9 @@ $.initDetailCharts = function() {
             }
             if (newTab === 'network') {
                 $.loadForwardRules('all');
+            }
+            if (newTab === 'pay') {
+                $.loadPayConfig();
             }
         });
 

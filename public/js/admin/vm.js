@@ -9,7 +9,7 @@
     $.userVms = ref([]);
     $.vmsLoading = ref(false);
     $.confirmState = ref({ vmId: null, action: null });
-    $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', user_id: null, backup_storage: '' });
+    $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, backup_storage: '' });
     $.availableVms = ref([]);
     $.assignedVms = ref([]);
 
@@ -161,6 +161,7 @@
                     name: $.editVmForm.value.name,
                     expiration_date: expDate,
                     renewal_price: $.editVmForm.value.renewal_price,
+                    renewal_period: $.editVmForm.value.renewal_period || 'month',
                     user_id: $.editVmForm.value.user_id,
                     backup_storage: $.editVmForm.value.backup_storage || null
                 })
@@ -207,7 +208,7 @@
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.assignForm.value, { expiration_date: expDate }))
             });
-            $.assignForm.value = { vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '' };
+            $.assignForm.value = { vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month' };
             $.loadData();
             $.loadAssignData();
         } catch (e) {

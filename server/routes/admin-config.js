@@ -16,6 +16,20 @@ function safeError(e) {
     if (isDebug) return e.response?.data?.message || e.message || String(e);
     return '操作失败，请稍后重试';
 }
+
+function maskSecret(value) {
+    if (!value || value.length < 5) return value || '';
+    if (value.includes('****')) return value;
+    if (value.length <= 6) return value[0] + '****' + value[value.length - 1];
+    var prefix = value.substring(0, 4);
+    var suffix = value.substring(value.length - 4);
+    return prefix + '****' + suffix;
+}
+
+function isMasked(value) {
+    return value && value.includes('****');
+}
+
 router.get('/admin/storage', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const storages = await pveApi.getStorageList();
@@ -346,6 +360,58 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
         setTimeout(() => process.exit(0), 1000);
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
+    }
+});
+
+// ========== 支付配置 ==========
+
+router.get('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var getConfig = db.config.get;
+        var baseUrl = await getConfig('pay:base_url') || 'https://pay.microgg.cn/';
+        var pid = await getConfig('pay:pid') || '';
+        var md5Key = await getConfig('pay:md5_key') || '';
+        var v2PublicKey = await getConfig('pay:v2_public_key') || '';
+        var v2PrivateKey = await getConfig('pay:v2_private_key') || '';
+
+        res.json({
+            base_url: baseUrl,
+            pid: pid,
+            md5_key: maskSecret(md5Key),
+            v2_public_key: maskSecret(v2PublicKey),
+            v2_private_key: maskSecret(v2PrivateKey)
+        });
+    } catch (e) {
+        console.error('[支付配置]', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var setConfig = db.config.set;
+        var { base_url, pid, md5_key, v2_public_key, v2_private_key } = req.body;
+
+        if (base_url !== undefined) {
+            await setConfig('pay:base_url', base_url.trim() || 'https://pay.microgg.cn/');
+        }
+        if (pid !== undefined) {
+            await setConfig('pay:pid', String(pid).trim());
+        }
+        if (md5_key !== undefined && !isMasked(md5_key)) {
+            await setConfig('pay:md5_key', md5_key.trim());
+        }
+        if (v2_public_key !== undefined && !isMasked(v2_public_key)) {
+            await setConfig('pay:v2_public_key', v2_public_key.trim());
+        }
+        if (v2_private_key !== undefined && !isMasked(v2_private_key)) {
+            await setConfig('pay:v2_private_key', v2_private_key.trim());
+        }
+
+        res.json({ message: '支付配置保存成功' });
+    } catch (e) {
+        console.error('[支付配置]', e.message);
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
