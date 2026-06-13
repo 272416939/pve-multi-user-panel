@@ -1115,6 +1115,20 @@
                 loadWalletBalance();
                 loadPayMethods();
 
+                const handleReturnPayment = async () => {
+                    var qs = window.location.search;
+                    if (!qs || qs.indexOf('trade_status=TRADE_SUCCESS') === -1) return;
+                    try {
+                        var res = await api('/wallet/return' + qs);
+                        if (res.success) {
+                            window.history.replaceState({}, '', window.location.pathname + (activeSubTab.value !== 'settings' ? '#' + activeSubTab.value : ''));
+                            loadWalletBalance();
+                        }
+                    } catch (e) {
+                        console.error('同步回调处理失败', e);
+                    }
+                };
+
                 const confirmOk = () => {
                     const resolve = customConfirmResolve.value;
                     if (resolve) {
@@ -1695,6 +1709,7 @@
                     if (userData) {
                         user.value = userData;
                         syncHeaderUser();
+                        await handleReturnPayment();
                         await loadNavItems();
                         await loadProfile();
                         handleEmailVerification();

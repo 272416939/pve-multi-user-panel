@@ -197,6 +197,74 @@ router.post('/wallet/notify', async (req, res) => {
     }
 });
 
+// ========== 支付同步跳转处理 (GET, 处理return_url, 备用: 网关notify_url不通时) ==========
+router.get('/wallet/return', async (req, res) => {
+    try {
+        var params = req.query;
+        console.log('[钱包] 同步回调(GET):', params.out_trade_no, params.trade_status);
+
+        if (params.trade_status !== 'TRADE_SUCCESS') {
+            return res.json({ success: false, error: '支付未完成' });
+        }
+
+        var md5Key = await db.config.get('pay:md5_key');
+        var v2PublicKey = await db.config.get('pay:v2_public_key');
+
+        var valid = false;
+        if (params.sign_type === 'RSA' && v2PublicKey) {
+            var { rsaVerify, buildSignStr } = require('../sdk/pay/sign');
+            var signStr = buildSignStr(params);
+            valid = rsaVerify(signStr, decodeURIComponent(params.sign), v2PublicKey);
+        } else if (md5Key) {
+            var { md5Sign } = require('../sdk/pay/sign');
+            var expected = md5Sign(params, md5Key);
+            valid = expected === (params.sign || '').toLowerCase();
+        }
+
+        if (!valid) {
+            console.error('[钱包] 同步回调验签失败:', params.out_trade_no);
+            return res.json({ success: false, error: '签名验证失败' });
+        }
+
+        var existing = await db.transactionRecords.getByOrderNo(params.out_trade_no);
+        if (existing) {
+            return res.json({ success: true, msg: '已处理', order_no: params.out_trade_no });
+        }
+
+        var userId = params.param ? parseInt(params.param) : null;
+        if (!userId) {
+            return res.json({ success: false, error: '无法识别用户' });
+        }
+
+        var user = await db.users.getById(userId);
+        if (!user) return res.json({ success: false, error: '用户不存在' });
+
+        var amount = parseFloat(params.money || '0');
+        var balanceBefore = parseFloat(user.balance || '0');
+        var balanceAfter = balanceBefore + amount;
+
+        await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
+
+        await db.transactionRecords.create({
+            user_id: userId,
+            order_no: params.out_trade_no,
+            pay_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            pay_method: params.type || '',
+            trade_type: 'recharge',
+            amount: amount.toFixed(2),
+            balance_before: balanceBefore.toFixed(2),
+            balance_after: balanceAfter.toFixed(2)
+        });
+
+        console.log('[钱包] 同步回调入账成功:', params.out_trade_no, amount.toFixed(2));
+
+        res.json({ success: true, order_no: params.out_trade_no, balance: balanceAfter.toFixed(2) });
+    } catch (e) {
+        console.error('[钱包] 同步回调失败:', e.message);
+        res.json({ success: false, error: '处理异常' });
+    }
+});
+
 // ========== 余额抵扣续费 ==========
 router.post('/wallet/renew', authMiddleware, async (req, res) => {
     try {
