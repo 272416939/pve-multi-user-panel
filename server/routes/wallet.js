@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createPayClient, generateOrderId } = require('../sdk/pay');
+const dbg = require('../utils/debug');
 
 function safeError(e) {
     if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
@@ -99,10 +100,10 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         var gatewayRes;
         if (v2Enabled && v2PrivateKey) {
             gatewayRes = await payClient._post('/api/pay/submit', payParams);
-            console.log('[钱包] 网关响应:', JSON.stringify(gatewayRes));
+            dbg('[钱包] 网关响应:', JSON.stringify(gatewayRes));
         } else {
             gatewayRes = await payClient.apiPay(payParams);
-            console.log('[钱包] 网关响应(V1):', JSON.stringify(gatewayRes));
+            dbg('[钱包] 网关响应(V1):', JSON.stringify(gatewayRes));
         }
 
         var payUrl = null;
@@ -113,7 +114,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
             var match = gatewayRes.match(/location\.replace\(['"](.+?)['"]\)/);
             if (match) {
                 payUrl = baseUrl.replace(/\/+$/, '') + match[1];
-                console.log('[钱包] 从HTML中提取到支付URL:', payUrl);
+                dbg('[钱包] 从HTML中提取到支付URL:', payUrl);
             }
         }
 
@@ -133,7 +134,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
 router.post('/wallet/notify', async (req, res) => {
     try {
         var params = req.body;
-        console.log('[钱包] 支付回调:', params.out_trade_no, params.trade_status);
+        dbg('[钱包] 支付回调:', params.out_trade_no, params.trade_status);
         
         if (params.trade_status !== 'TRADE_SUCCESS') {
             return res.send('fail');
@@ -201,7 +202,7 @@ router.post('/wallet/notify', async (req, res) => {
 router.get('/wallet/return', async (req, res) => {
     try {
         var params = req.query;
-        console.log('[钱包] 同步回调(GET):', params.out_trade_no, params.trade_status);
+        dbg('[钱包] 同步回调(GET):', params.out_trade_no, params.trade_status);
 
         if (params.trade_status !== 'TRADE_SUCCESS') {
             return res.json({ success: false, error: '支付未完成' });
@@ -256,7 +257,7 @@ router.get('/wallet/return', async (req, res) => {
             balance_after: balanceAfter.toFixed(2)
         });
 
-        console.log('[钱包] 同步回调入账成功:', params.out_trade_no, amount.toFixed(2));
+        dbg('[钱包] 同步回调入账成功:', params.out_trade_no, amount.toFixed(2));
 
         res.json({ success: true, order_no: params.out_trade_no, balance: balanceAfter.toFixed(2) });
     } catch (e) {
