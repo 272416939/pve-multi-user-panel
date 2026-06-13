@@ -25,6 +25,12 @@
     $.dropdownPos = ref({ top: 0, left: 0 });
     $.cnameDomain = ref('');
 
+    $.walletBalance = ref('0.00');
+    $.renewShow = ref(false);
+    $.renewResource = ref(null);
+    $.renewQuantity = ref(1);
+    $.renewError = ref('');
+
     // ===== 详情弹窗状态 =====
     $.showVmDetail = ref(false);
     $.detailVm = ref({});
@@ -225,6 +231,54 @@
     $.execDropdownAction = function(fn) {
         fn();
         $.closeDropdown();
+    };
+
+    $.loadWalletBalance = async function() {
+        try {
+            var res = await api('/wallet/balance');
+            $.walletBalance.value = res.balance || '0.00';
+        } catch (e) {
+            $.walletBalance.value = '0.00';
+        }
+    };
+
+    $.submitRenew = async function() {
+        $.renewError.value = '';
+        var resource = $.renewResource.value;
+        if (!resource) { $.renewError.value = '请选择续费资源'; return; }
+        var qty = $.renewQuantity.value;
+        if (!qty || qty < 1) { $.renewError.value = '续费数量至少为1'; return; }
+        var isYear = resource.renewal_period === 'year';
+        var price = parseFloat(resource.renewal_price || '0');
+        var mult = isYear ? 12 : 1;
+        var totalPrice = (price * qty * mult).toFixed(2);
+        var bal = parseFloat($.walletBalance.value);
+        if (bal < parseFloat(totalPrice)) {
+            $.renewError.value = '余额不足，应付 ¥' + totalPrice + '，当前余额 ¥' + bal.toFixed(2) + '，请先充值';
+            return;
+        }
+        try {
+            var res = await api('/wallet/renew', {
+                method: 'POST',
+                body: {
+                    type: resource.vm_id !== undefined ? 'vm' : 'lxc',
+                    vmid: resource.vm_id,
+                    ctid: resource.ct_id,
+                    quantity: qty
+                }
+            });
+            if (res.success) {
+                $.renewShow.value = false;
+                $.walletBalance.value = parseFloat(res.balance).toFixed(2);
+                alert('续费成功！已从余额中扣除 ¥' + totalPrice + '，新到期时间：' + (res.new_expiration || '已更新'));
+                $.loadData();
+                $.loadLxcContainers();
+            } else {
+                $.renewError.value = res.error || '续费失败';
+            }
+        } catch (e) {
+            $.renewError.value = '请求失败，请稍后重试';
+        }
     };
 
     $.loadUserData = async function() {
@@ -504,6 +558,7 @@
                 await $.loadLxcContainers();
                 await $.loadCnameDomain();
                 $.loadUnreadCount();
+                $.loadWalletBalance();
                 initPushClient(function(msg) {
                     if (msg.type === 'unread') {
                         $.unreadCount.value = msg.count;

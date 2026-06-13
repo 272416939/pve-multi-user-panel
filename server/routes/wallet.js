@@ -346,8 +346,10 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         
         var price = parseFloat(resource.renewal_price || '0');
         if (price <= 0) return res.status(400).json({ error: '该资源未设置续费价格' });
-        
-        var totalPrice = price * qty;
+
+        var period = resource.renewal_period || 'month';
+        var priceMult = period === 'year' ? 12 : 1;
+        var totalPrice = price * qty * priceMult;
         var user = await db.users.getById(userId);
         var balance = parseFloat(user.balance || '0');
         
@@ -355,7 +357,6 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '当前账户余额不足，无法使用余额抵扣，请先充值后再续费' });
         }
         
-        var period = resource.renewal_period || 'month';
         var addDays = period === 'year' ? qty * 365 : qty * 30;
         
         var oldExpiration = resource.expiration_date ? new Date(resource.expiration_date) : new Date();
@@ -391,9 +392,10 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
             success: true,
             message: '续费成功',
             order_no: orderNo,
+            balance: newBalance,
             balance_before: balance.toFixed(2),
             balance_after: newBalance,
-            expiration_date: newExpiration
+            new_expiration: newExpiration
         });
     } catch (e) {
         console.error('[钱包] renew:', e.message);
