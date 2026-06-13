@@ -6,8 +6,6 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createPayClient, generateOrderId } = require('../sdk/pay');
 const dbg = require('../utils/debug');
 
-var pendingApiTradeNo = new Map();
-
 function safeError(e) {
     if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
     return '操作失败，请稍后重试';
@@ -121,9 +119,6 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         }
 
         if (payUrl) {
-            if (gatewayRes && gatewayRes.api_trade_no) {
-                pendingApiTradeNo.set(orderNo, gatewayRes.api_trade_no);
-            }
             res.json({ success: true, order_no: orderNo, redirect_url: payUrl });
         } else {
             console.error('[钱包] 网关未返回支付链接:', JSON.stringify(gatewayRes));
@@ -184,8 +179,7 @@ router.post('/wallet/notify', async (req, res) => {
         var balanceAfter = balanceBefore + amount;
         
         var tradeNo = params.trade_no || null;
-        var apiTradeNo = params.api_trade_no || pendingApiTradeNo.get(params.out_trade_no) || null;
-        pendingApiTradeNo.delete(params.out_trade_no);
+        var apiTradeNo = params.transaction_id || null;
 
         await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
 
@@ -278,8 +272,7 @@ router.get('/wallet/return', async (req, res) => {
         var balanceAfter = balanceBefore + amount;
 
         var tradeNo = params.trade_no || null;
-        var apiTradeNo = params.api_trade_no || pendingApiTradeNo.get(params.out_trade_no) || null;
-        pendingApiTradeNo.delete(params.out_trade_no);
+        var apiTradeNo = params.transaction_id || null;
 
         await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
 
