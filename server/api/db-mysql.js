@@ -24,14 +24,6 @@ function mysqlNow() {
 function mysqlToday() {
     return mysqlNow().slice(0, 10);
 }
-function toMysqlDatetime(val) {
-    if (!val) return null;
-    if (typeof val === 'string') {
-        return val.replace('T', ' ').replace('Z', '').slice(0, 19);
-    }
-    return mysqlNow();
-}
-
 // 连接池单例
 let pool = null;
 
@@ -63,6 +55,10 @@ function sanitizeParams(params) {
 
 // 核心 async 查询函数
 async function execute(sql, params = []) {
+    if (typeof sql !== 'string') {
+        console.error(`[db-mysql] execute() 收到非字符串 SQL, type=${typeof sql}, value=`, sql);
+        sql = String(sql || '');
+    }
     return getPool().execute(sql, sanitizeParams(params));
 }
 async function queryOne(sql, params = []) {
@@ -770,6 +766,8 @@ module.exports = {
         getUnused: () => queryAll('SELECT * FROM cdk_codes WHERE is_used = 0'),
         getUsed: () => queryAll('SELECT * FROM cdk_codes WHERE is_used = 1'),
         create: async (cdk) => {
+            const created = cdk.created_at ? String(cdk.created_at).replace('T', ' ').replace('Z', '').slice(0, 19) : mysqlNow();
+            const expires = cdk.expires_at ? String(cdk.expires_at).replace('T', ' ').replace('Z', '').slice(0, 19) : null;
             const [result] = await execute(
                 `INSERT INTO cdk_codes (code, duration_days, created_by, target_user_id, created_at, expires_at, batch_id)
                  VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -778,8 +776,8 @@ module.exports = {
                     cdk.duration_days,
                     cdk.created_by,
                     cdk.target_user_id || null,
-                    toMysqlDatetime(cdk.created_at) || mysqlNow(),
-                    toMysqlDatetime(cdk.expires_at),
+                    created,
+                    expires,
                     cdk.batch_id || null
                 ]
             );
