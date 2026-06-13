@@ -38,12 +38,15 @@ function convertPkcs1ToPkcs8(pem) {
   ]);
   var algId = Buffer.concat([Buffer.from('30', 'hex'), Buffer.from([rsaOidBlock.length]), rsaOidBlock]);
 
-  var octetHdr = Buffer.concat([Buffer.from('04', 'hex'), encodeDerLength(pkcs1Der.length)]);
-  var inner = Buffer.concat([
-    Buffer.from('020100', 'hex'), // version = 0
-    algId,
-    octetHdr,
+  var octetContent = Buffer.concat([
+    Buffer.from('04', 'hex'),
+    encodeDerLength(pkcs1Der.length),
     pkcs1Der
+  ]);
+  var inner = Buffer.concat([
+    Buffer.from('020100', 'hex'),
+    algId,
+    octetContent
   ]);
 
   var seqHdr = Buffer.concat([Buffer.from('30', 'hex'), encodeDerLength(inner.length)]);
