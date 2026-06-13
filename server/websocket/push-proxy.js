@@ -125,7 +125,8 @@ async function pushStatus() {
     }
 }
 
-async function checkResourceOwnership(userId, vmid, isLxc) {
+async function checkResourceOwnership(userId, role, vmid, isLxc) {
+    if (role === 'admin') return true;
     try {
         const db = getDb();
         if (isLxc) {
@@ -159,6 +160,7 @@ pushProxy.on('connection', async (clientWs, request) => {
     const info = {
         userId: decoded.userId,
         username: decoded.username,
+        role: decoded.role || 'user',
         vms: new Set(),
         lxcs: new Set(),
         detailVms: new Set(),
@@ -194,7 +196,7 @@ pushProxy.on('connection', async (clientWs, request) => {
             switch (msg.type) {
                 case 'subscribe':
                     if (msg.vmid && Number.isInteger(msg.vmid)) {
-                        if (!(await checkResourceOwnership(decoded.userId, msg.vmid, msg.isLxc))) {
+                        if (!(await checkResourceOwnership(decoded.userId, info.role, msg.vmid, msg.isLxc))) {
                             break;
                         }
                         if (msg.isLxc) {
@@ -206,7 +208,7 @@ pushProxy.on('connection', async (clientWs, request) => {
                     break;
                 case 'subscribe-detail':
                     if (msg.vmid && Number.isInteger(msg.vmid)) {
-                        if (!(await checkResourceOwnership(decoded.userId, msg.vmid, msg.isLxc))) {
+                        if (!(await checkResourceOwnership(decoded.userId, info.role, msg.vmid, msg.isLxc))) {
                             break;
                         }
                         if (msg.isLxc) {
