@@ -1281,14 +1281,15 @@ module.exports = {
         getByCtId: (ctId) => db.prepare('SELECT * FROM lxc_containers WHERE ct_id = ?').all(ctId),
         create: (ct) => {
             const { lastInsertRowid } = db.prepare(`
-                INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             `).run(
                 ct.ct_id,
                 ct.user_id,
                 ct.name || '',
                 ct.expiration_date || null,
                 ct.renewal_price || '',
+                ct.renewal_period || 'month',
                 new Date().toISOString()
             );
             return db.prepare('SELECT * FROM lxc_containers WHERE id = ?').get(lastInsertRowid);

@@ -128,7 +128,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
-    const { vm_id, user_id, name, expiration_date, renewal_price } = req.body;
+    const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period } = req.body;
  
     if (!vm_id || !user_id) {
         return res.status(400).json({ error: '请选择虚拟机和用户' });
@@ -151,7 +151,8 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         user_id: parsedUserId,
         name,
         expiration_date,
-        renewal_price: renewal_price || ''
+        renewal_price: renewal_price || '',
+        renewal_period: renewal_period || 'month'
     });
     
     // DHCP 静态绑定：分配 IP
@@ -231,7 +232,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     const vmId = parseInt(req.params.id);
-    const { name, expiration_date, renewal_price, user_id } = req.body;
+    const { name, expiration_date, renewal_price, renewal_period, user_id } = req.body;
     
     const vm = await db.vms.getById(vmId);
     if (!vm) {
@@ -262,6 +263,10 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     
     if (isAdmin && renewal_price !== undefined) {
         updates.renewal_price = renewal_price;
+    }
+
+    if (isAdmin && renewal_period !== undefined) {
+        updates.renewal_period = renewal_period;
     }
     
     // 只有管理员可以重新分配给其他用户

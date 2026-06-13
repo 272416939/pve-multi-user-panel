@@ -7,7 +7,7 @@
     // ===== 状态 =====
     $.userVms = ref([]);
     $.confirmState = ref({ vmId: null, action: null });
-    $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', user_id: null });
+    $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null });
     $.cdkRedeemForm = ref({ code: '', vm_id: '', container_id: '' });
     $.cdkRedeemStep = ref('input');
     $.cdkRedeemError = ref('');
@@ -143,6 +143,7 @@
             name: vm.name || '',
             expiration_date: formatDateTimeLocal(vm.expiration_date),
             renewal_price: vm.renewal_price || '',
+            renewal_period: vm.renewal_period || 'month',
             user_id: vm.user_id || null
         };
         $.bsModalShow('editVmModal');
@@ -160,6 +161,7 @@
                     name: $.editVmForm.value.name,
                     expiration_date: expDate,
                     renewal_price: $.editVmForm.value.renewal_price,
+                    renewal_period: $.editVmForm.value.renewal_period,
                     user_id: $.editVmForm.value.user_id
                 })
             });

@@ -124,7 +124,7 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
-    const { ct_id, user_id, name, expiration_date, renewal_price } = req.body;
+    const { ct_id, user_id, name, expiration_date, renewal_price, renewal_period } = req.body;
  
     if (!ct_id || !user_id) {
         return res.status(400).json({ error: '请选择容器和用户' });
@@ -147,7 +147,8 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         user_id: parsedUserId,
         name,
         expiration_date,
-        renewal_price: renewal_price || ''
+        renewal_price: renewal_price || '',
+        renewal_period: renewal_period || 'month'
     });
  
     try {
@@ -256,6 +257,10 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
  
     if (isAdmin && renewal_price !== undefined) {
         updates.renewal_price = renewal_price;
+    }
+
+    if (isAdmin && renewal_period !== undefined) {
+        updates.renewal_period = renewal_period;
     }
  
     if (isAdmin && user_id !== undefined && user_id !== ct.user_id) {

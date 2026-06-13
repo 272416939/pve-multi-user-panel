@@ -1285,14 +1285,15 @@ module.exports = {
         getByCtId: (ctId) => queryAll('SELECT * FROM lxc_containers WHERE ct_id = ?', [ctId]),
         create: async (ct) => {
             const [result] = await execute(
-                `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
                     ct.ct_id,
                     ct.user_id,
                     ct.name || '',
                     ct.expiration_date || null,
                     ct.renewal_price || '',
+                    ct.renewal_period || 'month',
                     mysqlNow()
                 ]
             );

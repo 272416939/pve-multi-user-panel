@@ -8,7 +8,7 @@
     $.lxcLoading = ref(false);
     $.userLxcContainers = ref([]);
     $.lxcConfirmState = ref({ ctId: null, action: null });
-    $.editLxcForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', user_id: null });
+    $.editLxcForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null });
     $.lxcPasswordForm = ref({ password: '', confirm: '' });
     $.lxcPasswordError = ref('');
     $.lxcPasswordResetCtId = ref(null);
@@ -174,6 +174,7 @@
             name: ct.name || '',
             expiration_date: formatDateTimeLocal(ct.expiration_date),
             renewal_price: ct.renewal_price || '',
+            renewal_period: ct.renewal_period || 'month',
             user_id: ct.user_id || null
         };
         $.bsModalShow('editLxcModal');
@@ -191,6 +192,7 @@
                     name: $.editLxcForm.value.name,
                     expiration_date: expDate,
                     renewal_price: $.editLxcForm.value.renewal_price,
+                    renewal_period: $.editLxcForm.value.renewal_period,
                     user_id: $.editLxcForm.value.user_id
                 })
             });
