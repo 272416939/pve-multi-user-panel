@@ -85,24 +85,38 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         } else {
             payClient = createPayClient({ pid: pid, key: md5Key, baseUrl: baseUrl, notifyUrl: notifyUrl, returnUrl: returnUrl });
         }
-        
-        var result = payClient.submitPay({
+
+        var payParams = {
             type: pay_method,
             out_trade_no: orderNo,
             name: '账户余额充值',
             money: format2(numAmount),
             param: String(req.user.id)
-        });
+        };
 
-        console.log('[钱包] pay_url:', result.url);
-        console.log('[钱包] params:', JSON.stringify(result.params));
-        
-        res.json({
-            success: true,
-            order_no: orderNo,
-            pay_url: result.url,
-            params: result.params
-        });
+        var gatewayRes;
+        if (v2Enabled && v2PrivateKey) {
+            gatewayRes = await payClient._post('/api/pay/submit', payParams);
+            console.log('[钱包] 网关响应:', JSON.stringify(gatewayRes));
+        } else {
+            gatewayRes = await payClient.apiPay(payParams);
+            console.log('[钱包] 网关响应(V1):', JSON.stringify(gatewayRes));
+        }
+
+        var payUrl = null;
+        if (gatewayRes && gatewayRes.code === 1) {
+            payUrl = gatewayRes.payurl || gatewayRes.qrcode || gatewayRes.qr || gatewayRes.url;
+        }
+        if (!payUrl && gatewayRes && typeof gatewayRes === 'string') {
+            payUrl = gatewayRes;
+        }
+
+        if (payUrl) {
+            res.json({ success: true, order_no: orderNo, redirect_url: payUrl });
+        } else {
+            console.error('[钱包] 网关未返回支付链接:', JSON.stringify(gatewayRes));
+            res.status(502).json({ error: '支付网关响应异常，请稍后重试' });
+        }
     } catch (e) {
         console.error('[钱包] recharge:', e.message);
         res.status(500).json({ error: safeError(e) });

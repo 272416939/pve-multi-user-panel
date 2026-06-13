@@ -1083,11 +1083,8 @@
                     rechargeError.value = '';
                     try {
                         const res = await api('/wallet/recharge', { method: 'POST', body: { amount: amount.toFixed(2), pay_method: rechargeMethod.value } });
-                        if (res.success && res.pay_url) {
-                            const form = document.createElement('form');
-                            form.method = 'POST'; form.action = res.pay_url; form.target = '_blank';
-                            for (const key in res.params) { const inp = document.createElement('input'); inp.type = 'hidden'; inp.name = key; inp.value = res.params[key]; form.appendChild(inp); }
-                            document.body.appendChild(form); form.submit(); document.body.removeChild(form);
+                        if (res.success && res.redirect_url) {
+                            window.open(res.redirect_url, '_blank');
                             rechargeAmount.value = ''; rechargeMethod.value = '';
                         } else { rechargeError.value = res.error || '创建订单失败'; }
                     } catch (e) { rechargeError.value = '请求失败，请稍后重试'; }
