@@ -757,9 +757,7 @@
                                             <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                             <td>
                                                 <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
-                                                <button class="table-btn" @click="openDeviceForward(vm, 'vm')" title="端口转发">网络</button>
                                                 <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
-                                                    <button class="table-btn" @click="openVncConsole(vm.vm_id)" title="VNC控制台">控制台</button>
                                                     <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
                                                     <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
                                                     <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
@@ -773,6 +771,8 @@
                                                     <ul class="dropdown-menu-table">
                                                         <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
                                                         <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
+                                                        <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
+                                                        <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                                         <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
                                                         <li><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
                                                     </ul>
@@ -1172,9 +1172,7 @@
                                                 <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                                 <td>
                                                     <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
-                                                    <button class="table-btn" @click="openDeviceForward(ct, 'lxc')" title="端口转发">网络</button>
                                                     <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
-                                                        <button class="table-btn" @click="openLxcTerminal(ct.ct_id)">终端</button>
                                                         <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
                                                         <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
                                                         <button class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
@@ -1188,6 +1186,8 @@
                                                         <ul class="dropdown-menu-table">
                                                             <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
                                                             <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
+                                                            <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
+                                                            <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
                                                             <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
                                                             <li><a href="#" @click.prevent="openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
                                                             <li><a href="#" @click.prevent="openResetLxcPasswordModal(ct)" class="text-warning">重置密码</a></li>

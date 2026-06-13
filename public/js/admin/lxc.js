@@ -340,6 +340,7 @@
             name: ct.name || '',
             expiration_date: formatDateTimeLocal(ct.expiration_date),
             renewal_price: ct.renewal_price || '',
+            renewal_period: ct.renewal_period || 'month',
             user_id: ct.user_id || null
         };
         $.bsModalShow('editLxcModal');

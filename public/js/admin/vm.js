@@ -143,6 +143,7 @@
             name: vm.name || '',
             expiration_date: formatDateTimeLocal(vm.expiration_date),
             renewal_price: vm.renewal_price || '',
+            renewal_period: vm.renewal_period || 'month',
             user_id: vm.user_id || null,
             backup_storage: vm.backup_storage || ''
         };
