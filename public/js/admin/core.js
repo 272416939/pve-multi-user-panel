@@ -590,8 +590,8 @@ $.initDetailCharts = function() {
         if (!vm || !s) return;
         var cpuVal = typeof s.cpu === 'number' ? Math.round(s.cpu * 100) : 0;
         var memVal = (s.mem && s.maxmem) ? Math.round(s.mem / s.maxmem * 100) : 0;
-        var netInVal = typeof s.netin === 'number' ? +(s.netin / 1048576).toFixed(2) : 0;
-        var netOutVal = typeof s.netout === 'number' ? +(s.netout / 1048576).toFixed(2) : 0;
+        var netInVal = typeof s.netin === 'number' ? +(s.netin * 8 / 1000000).toFixed(2) : 0;
+        var netOutVal = typeof s.netout === 'number' ? +(s.netout * 8 / 1000000).toFixed(2) : 0;
         var diskReadVal = typeof s.diskread === 'number' ? +(s.diskread / 1048576).toFixed(2) : 0;
         var diskWriteVal = typeof s.diskwrite === 'number' ? +(s.diskwrite / 1048576).toFixed(2) : 0;
 
