@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.5.3] - 2026-06-15
+
+### Fixed
+- fix(admin): 模板VM下拉显示修复（改用全部VM列表，无名称时显示 VM xx）
+- fix(admin): 修复 core.js packagePage 对象重复定义冲突导致分配页无法打开
+- fix(admin): 模板/套餐管理侧边栏移入后台管理子菜单
+
+---
+
 ## [2.5.2] - 2026-06-15
 
 ### Fixed
