@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.1] - 2026-06-14
+
+### Fixed
+- fix(ikuai): getMacGroups 数据路径改为多兜底 `data?.data || data || []`
+  - 修复 MAC 分组列表不显示分组名称的问题（部分 iKuai 版本返回结构不同）
+
+---
+
 ## [2.3.0] - 2026-06-14
 
 ### Added
