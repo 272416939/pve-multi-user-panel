@@ -1,0 +1,94 @@
+(function() {
+    var $ = window.__admin;
+    var Vue = window.Vue;
+    var ref = Vue.ref;
+
+    $.templatePage = {};
+    var tp = $.templatePage;
+
+    tp.vmTemplateForm = ref({ id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20,
+        network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', description: '', status: 'active' });
+    tp.lxcTemplateForm = ref({ id: null, name: '', ostemplate: '', storage: 'local', cores: 1, memory: 512,
+        swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1,
+        features: '', description: '', status: 'active' });
+    tp.vmTemplates = ref([]);
+    tp.lxcTemplates = ref([]);
+    tp.templateVmIdList = ref([]);
+    tp.lxctemplateOstemplateList = ref([]);
+    tp.lxctemplateStorageList = ref([]);
+
+    tp.loadVmTemplates = async function() {
+        try { tp.vmTemplates.value = await api('/admin/vm-templates'); } catch (e) {}
+    };
+
+    tp.loadLxcTemplates = async function() {
+        try { tp.lxcTemplates.value = await api('/admin/lxc-templates'); } catch (e) {}
+    };
+
+    tp.openVmTemplateForm = function(t) {
+        if (t) {
+            tp.vmTemplateForm.value = Object.assign({}, t);
+        } else {
+            tp.vmTemplateForm.value = { id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20,
+                network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', description: '', status: 'active' };
+        }
+        $.bsModalShow('vmTemplateModal');
+    };
+
+    tp.saveVmTemplate = async function() {
+        var f = tp.vmTemplateForm.value;
+        var body = JSON.stringify(f);
+        try {
+            if (f.id) {
+                await api('/admin/vm-templates/' + f.id, { method: 'PUT', body: body });
+            } else {
+                await api('/admin/vm-templates', { method: 'POST', body: body });
+            }
+            $.bsModalHide('vmTemplateModal');
+            await tp.loadVmTemplates();
+        } catch (e) { alert(e.message); }
+    };
+
+    tp.deleteVmTemplate = async function(id) {
+        if (!await window.customConfirm('确定删除此 VM 模板？')) return;
+        try {
+            await api('/admin/vm-templates/' + id, { method: 'DELETE' });
+            await tp.loadVmTemplates();
+        } catch (e) { alert(e.message); }
+    };
+
+    tp.openLxcTemplateForm = function(t) {
+        if (t) {
+            tp.lxcTemplateForm.value = Object.assign({}, t);
+        } else {
+            tp.lxcTemplateForm.value = { id: null, name: '', ostemplate: '', storage: 'local', cores: 1, memory: 512,
+                swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1,
+                features: '', description: '', status: 'active' };
+        }
+        $.bsModalShow('lxcTemplateModal');
+    };
+
+    tp.saveLxcTemplate = async function() {
+        var f = tp.lxcTemplateForm.value;
+        var body = JSON.stringify(f);
+        try {
+            if (f.id) {
+                await api('/admin/lxc-templates/' + f.id, { method: 'PUT', body: body });
+            } else {
+                await api('/admin/lxc-templates', { method: 'POST', body: body });
+            }
+            $.bsModalHide('lxcTemplateModal');
+            await tp.loadLxcTemplates();
+        } catch (e) { alert(e.message); }
+    };
+
+    tp.deleteLxcTemplate = async function(id) {
+        if (!await window.customConfirm('确定删除此 LXC 模板？')) return;
+        try {
+            await api('/admin/lxc-templates/' + id, { method: 'DELETE' });
+            await tp.loadLxcTemplates();
+        } catch (e) { alert(e.message); }
+    };
+
+    $.initTemplate = function() {};
+})();

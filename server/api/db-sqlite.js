@@ -350,6 +350,78 @@ function initDb() {
         db.exec('CREATE INDEX IF NOT EXISTS idx_messages_created ON messages(created_at)');
     } catch (e) {}
 
+    // vm_templates 表
+    db.exec(`CREATE TABLE IF NOT EXISTS vm_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL DEFAULT '',
+        template_vmid INTEGER NOT NULL DEFAULT 0,
+        cores INTEGER NOT NULL DEFAULT 1,
+        memory INTEGER NOT NULL DEFAULT 1024,
+        disk_size INTEGER NOT NULL DEFAULT 20,
+        network_bridge TEXT NOT NULL DEFAULT 'vmbr0',
+        network_model TEXT NOT NULL DEFAULT 'virtio',
+        os_type TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    )`);
+
+    // lxc_templates 表
+    db.exec(`CREATE TABLE IF NOT EXISTS lxc_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL DEFAULT '',
+        ostemplate TEXT NOT NULL DEFAULT '',
+        storage TEXT NOT NULL DEFAULT 'local',
+        cores INTEGER NOT NULL DEFAULT 1,
+        memory INTEGER NOT NULL DEFAULT 512,
+        swap INTEGER NOT NULL DEFAULT 512,
+        disk_size INTEGER NOT NULL DEFAULT 8,
+        network_bridge TEXT NOT NULL DEFAULT 'vmbr0',
+        network_mode TEXT NOT NULL DEFAULT 'dhcp',
+        unprivileged INTEGER NOT NULL DEFAULT 1,
+        features TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    )`);
+
+    // vm_packages 表
+    db.exec(`CREATE TABLE IF NOT EXISTS vm_packages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL DEFAULT '',
+        template_id INTEGER NOT NULL DEFAULT 0,
+        cores INTEGER NOT NULL DEFAULT 1,
+        memory INTEGER NOT NULL DEFAULT 1024,
+        disk_size INTEGER NOT NULL DEFAULT 20,
+        monthly_price REAL NOT NULL DEFAULT 0,
+        quarterly_price REAL NOT NULL DEFAULT 0,
+        yearly_price REAL NOT NULL DEFAULT 0,
+        description TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    )`);
+
+    // lxc_packages 表
+    db.exec(`CREATE TABLE IF NOT EXISTS lxc_packages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL DEFAULT '',
+        template_id INTEGER NOT NULL DEFAULT 0,
+        cores INTEGER NOT NULL DEFAULT 1,
+        memory INTEGER NOT NULL DEFAULT 512,
+        swap INTEGER NOT NULL DEFAULT 512,
+        disk_size INTEGER NOT NULL DEFAULT 8,
+        monthly_price REAL NOT NULL DEFAULT 0,
+        quarterly_price REAL NOT NULL DEFAULT 0,
+        yearly_price REAL NOT NULL DEFAULT 0,
+        description TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'active',
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    )`);
+
     // 初始化默认配置
     initDefaultConfig();
 
@@ -1559,5 +1631,118 @@ module.exports = {
         getByOrderNo: (orderNo) => {
             return db.prepare('SELECT * FROM transaction_records WHERE order_no = ?').get(orderNo);
         }
+    },
+
+    // VM 模板操作
+    vmTemplates: {
+        getAll: () => db.prepare('SELECT * FROM vm_templates ORDER BY id DESC').all(),
+        getById: (id) => db.prepare('SELECT * FROM vm_templates WHERE id = ?').get(id),
+        create: (data) => {
+            const stmt = db.prepare(`INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, description, status) VALUES (@name, @template_vmid, @cores, @memory, @disk_size, @network_bridge, @network_model, @os_type, @description, @status)`);
+            const info = stmt.run({
+                name: data.name || '', template_vmid: data.template_vmid || 0, cores: data.cores || 1,
+                memory: data.memory || 1024, disk_size: data.disk_size || 20,
+                network_bridge: data.network_bridge || 'vmbr0', network_model: data.network_model || 'virtio',
+                os_type: data.os_type || '', description: data.description || '', status: data.status || 'active'
+            });
+            return db.prepare('SELECT * FROM vm_templates WHERE id = ?').get(info.lastInsertRowid);
+        },
+        update: (id, updates) => {
+            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'description', 'status'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            updates.updated_at = new Date().toISOString().replace('T',' ').slice(0,19);
+            const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
+            const stmt = db.prepare(`UPDATE vm_templates SET ${fields} WHERE id = @id`);
+            stmt.run({ ...updates, id });
+            return db.prepare('SELECT * FROM vm_templates WHERE id = ?').get(id);
+        },
+        delete: (id) => db.prepare('DELETE FROM vm_templates WHERE id = ?').run(id)
+    },
+
+    // LXC 模板操作
+    lxcTemplates: {
+        getAll: () => db.prepare('SELECT * FROM lxc_templates ORDER BY id DESC').all(),
+        getById: (id) => db.prepare('SELECT * FROM lxc_templates WHERE id = ?').get(id),
+        create: (data) => {
+            const stmt = db.prepare(`INSERT INTO lxc_templates (name, ostemplate, storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, description, status) VALUES (@name, @ostemplate, @storage, @cores, @memory, @swap, @disk_size, @network_bridge, @network_mode, @unprivileged, @features, @description, @status)`);
+            const info = stmt.run({
+                name: data.name || '', ostemplate: data.ostemplate || '', storage: data.storage || 'local',
+                cores: data.cores || 1, memory: data.memory || 512, swap: data.swap || 512,
+                disk_size: data.disk_size || 8, network_bridge: data.network_bridge || 'vmbr0',
+                network_mode: data.network_mode || 'dhcp', unprivileged: data.unprivileged !== undefined ? data.unprivileged : 1,
+                features: data.features || '', description: data.description || '', status: data.status || 'active'
+            });
+            return db.prepare('SELECT * FROM lxc_templates WHERE id = ?').get(info.lastInsertRowid);
+        },
+        update: (id, updates) => {
+            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'status'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            updates.updated_at = new Date().toISOString().replace('T',' ').slice(0,19);
+            const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
+            const stmt = db.prepare(`UPDATE lxc_templates SET ${fields} WHERE id = @id`);
+            stmt.run({ ...updates, id });
+            return db.prepare('SELECT * FROM lxc_templates WHERE id = ?').get(id);
+        },
+        delete: (id) => db.prepare('DELETE FROM lxc_templates WHERE id = ?').run(id)
+    },
+
+    // VM 套餐操作
+    vmPackages: {
+        getAll: () => db.prepare('SELECT * FROM vm_packages ORDER BY id DESC').all(),
+        getById: (id) => db.prepare('SELECT * FROM vm_packages WHERE id = ?').get(id),
+        create: (data) => {
+            const stmt = db.prepare(`INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, description, status) VALUES (@name, @template_id, @cores, @memory, @disk_size, @monthly_price, @quarterly_price, @yearly_price, @description, @status)`);
+            const info = stmt.run({
+                name: data.name || '', template_id: data.template_id || 0, cores: data.cores || 1,
+                memory: data.memory || 1024, disk_size: data.disk_size || 20,
+                monthly_price: data.monthly_price || 0, quarterly_price: data.quarterly_price || 0,
+                yearly_price: data.yearly_price || 0, description: data.description || '', status: data.status || 'active'
+            });
+            return db.prepare('SELECT * FROM vm_packages WHERE id = ?').get(info.lastInsertRowid);
+        },
+        update: (id, updates) => {
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'description', 'status'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            updates.updated_at = new Date().toISOString().replace('T',' ').slice(0,19);
+            const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
+            const stmt = db.prepare(`UPDATE vm_packages SET ${fields} WHERE id = @id`);
+            stmt.run({ ...updates, id });
+            return db.prepare('SELECT * FROM vm_packages WHERE id = ?').get(id);
+        },
+        delete: (id) => db.prepare('DELETE FROM vm_packages WHERE id = ?').run(id)
+    },
+
+    // LXC 套餐操作
+    lxcPackages: {
+        getAll: () => db.prepare('SELECT * FROM lxc_packages ORDER BY id DESC').all(),
+        getById: (id) => db.prepare('SELECT * FROM lxc_packages WHERE id = ?').get(id),
+        create: (data) => {
+            const stmt = db.prepare(`INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, description, status) VALUES (@name, @template_id, @cores, @memory, @swap, @disk_size, @monthly_price, @quarterly_price, @yearly_price, @description, @status)`);
+            const info = stmt.run({
+                name: data.name || '', template_id: data.template_id || 0, cores: data.cores || 1,
+                memory: data.memory || 512, swap: data.swap || 512, disk_size: data.disk_size || 8,
+                monthly_price: data.monthly_price || 0, quarterly_price: data.quarterly_price || 0,
+                yearly_price: data.yearly_price || 0, description: data.description || '', status: data.status || 'active'
+            });
+            return db.prepare('SELECT * FROM lxc_packages WHERE id = ?').get(info.lastInsertRowid);
+        },
+        update: (id, updates) => {
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'swap', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'description', 'status'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            updates.updated_at = new Date().toISOString().replace('T',' ').slice(0,19);
+            const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
+            const stmt = db.prepare(`UPDATE lxc_packages SET ${fields} WHERE id = @id`);
+            stmt.run({ ...updates, id });
+            return db.prepare('SELECT * FROM lxc_packages WHERE id = ?').get(id);
+        },
+        delete: (id) => db.prepare('DELETE FROM lxc_packages WHERE id = ?').run(id)
     },
 };

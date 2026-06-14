@@ -172,6 +172,22 @@ class PveApi {
     return response.data;
   }
 
+  async cloneVm(templateVmid, newVmid, params) {
+    if (!this.node) {
+      await this.detectNode();
+    }
+    const searchParams = new URLSearchParams();
+    searchParams.append('newid', String(newVmid));
+    if (params && params.name) searchParams.append('name', params.name);
+    if (params && params.target) searchParams.append('target', params.target);
+    const response = await this.axiosInstance.post(
+      `${this.host}/api2/json/nodes/${this.node}/qemu/${templateVmid}/clone`,
+      searchParams.toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 300000 }
+    );
+    return response.data;
+  }
+
   async getStorageList() {
     if (!this.node) {
       await this.detectNode();

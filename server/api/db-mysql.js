@@ -357,6 +357,78 @@ async function initDb() {
         )
     `);
 
+    // vm_templates 表
+    await execute(`CREATE TABLE IF NOT EXISTS vm_templates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL DEFAULT '',
+        template_vmid INT NOT NULL DEFAULT 0,
+        cores INT NOT NULL DEFAULT 1,
+        memory INT NOT NULL DEFAULT 1024,
+        disk_size INT NOT NULL DEFAULT 20,
+        network_bridge VARCHAR(50) NOT NULL DEFAULT 'vmbr0',
+        network_model VARCHAR(50) NOT NULL DEFAULT 'virtio',
+        os_type VARCHAR(100) NOT NULL DEFAULT '',
+        description TEXT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        updated_at DATETIME NOT NULL DEFAULT NOW()
+    )`);
+
+    // lxc_templates 表
+    await execute(`CREATE TABLE IF NOT EXISTS lxc_templates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL DEFAULT '',
+        ostemplate VARCHAR(255) NOT NULL DEFAULT '',
+        storage VARCHAR(100) NOT NULL DEFAULT 'local',
+        cores INT NOT NULL DEFAULT 1,
+        memory INT NOT NULL DEFAULT 512,
+        swap INT NOT NULL DEFAULT 512,
+        disk_size INT NOT NULL DEFAULT 8,
+        network_bridge VARCHAR(50) NOT NULL DEFAULT 'vmbr0',
+        network_mode VARCHAR(20) NOT NULL DEFAULT 'dhcp',
+        unprivileged INT NOT NULL DEFAULT 1,
+        features TEXT NOT NULL,
+        description TEXT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        updated_at DATETIME NOT NULL DEFAULT NOW()
+    )`);
+
+    // vm_packages 表
+    await execute(`CREATE TABLE IF NOT EXISTS vm_packages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL DEFAULT '',
+        template_id INT NOT NULL DEFAULT 0,
+        cores INT NOT NULL DEFAULT 1,
+        memory INT NOT NULL DEFAULT 1024,
+        disk_size INT NOT NULL DEFAULT 20,
+        monthly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        quarterly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        yearly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        description TEXT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        updated_at DATETIME NOT NULL DEFAULT NOW()
+    )`);
+
+    // lxc_packages 表
+    await execute(`CREATE TABLE IF NOT EXISTS lxc_packages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL DEFAULT '',
+        template_id INT NOT NULL DEFAULT 0,
+        cores INT NOT NULL DEFAULT 1,
+        memory INT NOT NULL DEFAULT 512,
+        swap INT NOT NULL DEFAULT 512,
+        disk_size INT NOT NULL DEFAULT 8,
+        monthly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        quarterly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        yearly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        description TEXT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        updated_at DATETIME NOT NULL DEFAULT NOW()
+    )`);
+
     // 初始化默认配置
     await initDefaultConfig();
 
@@ -1588,5 +1660,154 @@ module.exports = {
         getByOrderNo: (orderNo) => {
             return queryOne('SELECT * FROM transaction_records WHERE order_no = ?', [orderNo]);
         }
+    },
+
+    // VM 模板操作
+    vmTemplates: {
+        getAll: () => queryAll('SELECT * FROM vm_templates ORDER BY id DESC'),
+        getById: (id) => queryOne('SELECT * FROM vm_templates WHERE id = ?', [id]),
+        create: async (data) => {
+            const [result] = await execute(
+                `INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    data.name || '', data.template_vmid || 0, data.cores || 1,
+                    data.memory || 1024, data.disk_size || 20,
+                    data.network_bridge || 'vmbr0', data.network_model || 'virtio',
+                    data.os_type || '', data.description || '', data.status || 'active'
+                ]
+            );
+            return queryOne('SELECT * FROM vm_templates WHERE id = ?', [result.insertId]);
+        },
+        update: async (id, updates) => {
+            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'description', 'status'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            const fields = [];
+            const values = [];
+            for (const [key, value] of Object.entries(updates)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+            fields.push('updated_at = ?');
+            values.push(mysqlNow());
+            values.push(id);
+            await execute(`UPDATE vm_templates SET ${fields.join(', ')} WHERE id = ?`, values);
+            return queryOne('SELECT * FROM vm_templates WHERE id = ?', [id]);
+        },
+        delete: (id) => execute('DELETE FROM vm_templates WHERE id = ?', [id])
+    },
+
+    // LXC 模板操作
+    lxcTemplates: {
+        getAll: () => queryAll('SELECT * FROM lxc_templates ORDER BY id DESC'),
+        getById: (id) => queryOne('SELECT * FROM lxc_templates WHERE id = ?', [id]),
+        create: async (data) => {
+            const [result] = await execute(
+                `INSERT INTO lxc_templates (name, ostemplate, storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    data.name || '', data.ostemplate || '', data.storage || 'local',
+                    data.cores || 1, data.memory || 512, data.swap || 512,
+                    data.disk_size || 8, data.network_bridge || 'vmbr0',
+                    data.network_mode || 'dhcp', data.unprivileged !== undefined ? data.unprivileged : 1,
+                    data.features || '', data.description || '', data.status || 'active'
+                ]
+            );
+            return queryOne('SELECT * FROM lxc_templates WHERE id = ?', [result.insertId]);
+        },
+        update: async (id, updates) => {
+            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'status'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            const fields = [];
+            const values = [];
+            for (const [key, value] of Object.entries(updates)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+            fields.push('updated_at = ?');
+            values.push(mysqlNow());
+            values.push(id);
+            await execute(`UPDATE lxc_templates SET ${fields.join(', ')} WHERE id = ?`, values);
+            return queryOne('SELECT * FROM lxc_templates WHERE id = ?', [id]);
+        },
+        delete: (id) => execute('DELETE FROM lxc_templates WHERE id = ?', [id])
+    },
+
+    // VM 套餐操作
+    vmPackages: {
+        getAll: () => queryAll('SELECT * FROM vm_packages ORDER BY id DESC'),
+        getById: (id) => queryOne('SELECT * FROM vm_packages WHERE id = ?', [id]),
+        create: async (data) => {
+            const [result] = await execute(
+                `INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    data.name || '', data.template_id || 0, data.cores || 1,
+                    data.memory || 1024, data.disk_size || 20,
+                    data.monthly_price || 0, data.quarterly_price || 0,
+                    data.yearly_price || 0, data.description || '', data.status || 'active'
+                ]
+            );
+            return queryOne('SELECT * FROM vm_packages WHERE id = ?', [result.insertId]);
+        },
+        update: async (id, updates) => {
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'description', 'status'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            const fields = [];
+            const values = [];
+            for (const [key, value] of Object.entries(updates)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+            fields.push('updated_at = ?');
+            values.push(mysqlNow());
+            values.push(id);
+            await execute(`UPDATE vm_packages SET ${fields.join(', ')} WHERE id = ?`, values);
+            return queryOne('SELECT * FROM vm_packages WHERE id = ?', [id]);
+        },
+        delete: (id) => execute('DELETE FROM vm_packages WHERE id = ?', [id])
+    },
+
+    // LXC 套餐操作
+    lxcPackages: {
+        getAll: () => queryAll('SELECT * FROM lxc_packages ORDER BY id DESC'),
+        getById: (id) => queryOne('SELECT * FROM lxc_packages WHERE id = ?', [id]),
+        create: async (data) => {
+            const [result] = await execute(
+                `INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    data.name || '', data.template_id || 0, data.cores || 1,
+                    data.memory || 512, data.swap || 512, data.disk_size || 8,
+                    data.monthly_price || 0, data.quarterly_price || 0,
+                    data.yearly_price || 0, data.description || '', data.status || 'active'
+                ]
+            );
+            return queryOne('SELECT * FROM lxc_packages WHERE id = ?', [result.insertId]);
+        },
+        update: async (id, updates) => {
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'swap', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'description', 'status'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            const fields = [];
+            const values = [];
+            for (const [key, value] of Object.entries(updates)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+            fields.push('updated_at = ?');
+            values.push(mysqlNow());
+            values.push(id);
+            await execute(`UPDATE lxc_packages SET ${fields.join(', ')} WHERE id = ?`, values);
+            return queryOne('SELECT * FROM lxc_packages WHERE id = ?', [id]);
+        },
+        delete: (id) => execute('DELETE FROM lxc_packages WHERE id = ?', [id])
     },
 };

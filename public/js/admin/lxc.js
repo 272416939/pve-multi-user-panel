@@ -714,5 +714,15 @@
         watch(function() { return $.activeTabLxc.value; }, function(val) {
             if (val === 'network') $.loadForwardRules('lxc');
         });
+        watch(function() { return $.packagePage.lxcProvisionForm.value.package_id; }, function(newVal) {
+            if (!newVal) return;
+            var pkg = $.packagePage.lxcPackages.value.find(function(p) { return String(p.id) === String(newVal); });
+            if (pkg) {
+                $.lxcAssignForm.value.name = pkg.name + '-' + Math.random().toString(36).slice(2, 6);
+                $.lxcAssignForm.value.renewal_price = pkg.monthly_price;
+                var d = new Date(); d.setMonth(d.getMonth() + 1);
+                $.lxcAssignForm.value.expiration_date = d.toISOString().slice(0, 16);
+            }
+        });
     };
 })();

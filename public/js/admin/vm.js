@@ -655,5 +655,15 @@
         watch(function() { return $.activeTabVm.value; }, function(val) {
             if (val === 'network') $.loadForwardRules('vm');
         });
+        watch(function() { return $.packagePage.vmProvisionForm.value.package_id; }, function(newVal) {
+            if (!newVal) return;
+            var pkg = $.packagePage.vmPackages.value.find(function(p) { return String(p.id) === String(newVal); });
+            if (pkg) {
+                $.assignForm.value.name = pkg.name + '-' + Math.random().toString(36).slice(2, 6);
+                $.assignForm.value.renewal_price = pkg.monthly_price;
+                var d = new Date(); d.setMonth(d.getMonth() + 1);
+                $.assignForm.value.expiration_date = d.toISOString().slice(0, 16);
+            }
+        });
     };
 })();
