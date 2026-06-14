@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.24] - 2026-06-14
+
+### Changed
+- refactor(email): 钱包邮件统一使用 `createEmailTemplate` HTML 模板
+  - 充值到账邮件从纯文本 → 统一紫色渐变 HTML 模板（金额/余额/订单号/时间 + 链接）
+  - 余额续费邮件从纯文本 → 统一模板（资源名/续费详情/到期时间/金额/余额变动/订单号）
+  - 顶部统一 import，移除 3 处 inline require
+
+---
+
 ## [2.1.23] - 2026-06-14
 
 ### Fixed
