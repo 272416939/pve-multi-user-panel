@@ -19,7 +19,8 @@
     $.lxcIpLoading = Vue.ref(false);
     $.selectedLxc = ref(null);
     $.lxcConfirmState = ref({ ctId: null, action: null });
-    $.editLxcForm = ref({ id: null, ct_id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, mac_group_id: '' });
+    $.editLxcForm = ref({ id: null, ct_id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, mac_group_id: '', status: null });
+    $.destroyLxcConfirmText = ref('');
     $.availableLxc = ref([]);
     $.assignedLxc = ref([]);
 
@@ -184,7 +185,7 @@
 
     $.removeLxc = async function() {
         var f = $.editLxcForm.value;
-        if (!await window.customConfirm('确定移除此 LXC 容器分配？')) return;
+        if (!await window.customConfirm('确定移除此 LXC 容器分配（仅解绑，不删除 PVE 数据）？')) return;
         try {
             await api('/user/lxc/' + f.id, { method: 'DELETE' });
             $.bsModalHide('editLxcModal');
@@ -195,11 +196,24 @@
         }
     };
 
-    $.destroyLxc = async function(ct) {
+    $.removeLxcById = async function(id) {
+        if (!await window.customConfirm('确定移除此 LXC 容器分配（仅解绑）？')) return;
+        try {
+            await api('/user/lxc/' + id, { method: 'DELETE' });
+            await $.loadLxcContainers();
+            await $.loadUserLxcContainers();
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
+    $.destroyLxc = async function() {
+        var ct = $.editLxcForm.value;
         $.bsModalHide('destroyLxcModal');
-        if (!await window.customConfirm('⚠️ 确定要销毁此 LXC 容器并清除所有数据？此操作不可恢复！\n\n请手动输入 "yes" 确认。')) return;
+        if (!await window.customConfirm('⚠️ 确定要销毁此 LXC 容器并清除所有数据？此操作不可恢复！')) return;
         try {
             await api('/lxc/' + ct.ct_id + '/destroy', { method: 'POST' });
+            $.bsModalHide('editLxcModal');
             await $.loadUserLxcContainers();
             await $.loadLxcContainers();
             alert('LXC 容器已销毁');
@@ -343,7 +357,8 @@
             renewal_price: ct.renewal_price || '',
             renewal_period: ct.renewal_period || 'month',
             user_id: ct.user_id || null,
-            mac_group_id: ct.ikuai_mac_group_id || ''
+            mac_group_id: ct.ikuai_mac_group_id || '',
+            status: ct.status || null
         };
         $.bsModalShow('editLxcModal');
     };
@@ -657,12 +672,23 @@
         $.bsModalShow('destroyLxcModal');
     };
 
+    $.openDestroyLxcModalFromList = function(ct) {
+        $.editLxcForm.value = {
+            ct_id: ct.ct_id,
+            name: ct.name || '',
+            id: ct.id
+        };
+        $.destroyLxcConfirmText.value = '';
+        $.bsModalShow('destroyLxcModal');
+    };
+
     $.confirmDestroyLxc = async function() {
-        var ct = $.selectedLxc.value;
+        var ct = $.editLxcForm.value;
         if (!ct) return;
         $.bsModalHide('destroyLxcModal');
         try {
             await api('/lxc/' + ct.ct_id + '/destroy', { method: 'POST' });
+            $.bsModalHide('editLxcModal');
             await $.loadUserLxcContainers();
             await $.loadLxcContainers();
             alert('LXC 容器已销毁');

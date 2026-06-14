@@ -339,6 +339,17 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
     if (ct) {
         removedCtInfo = { name: ct.name, ct_id: ct.ct_id, user_id: ct.user_id };
     }
+    // 检查容器状态，必须关机才能移除
+    if (ct && ct.ct_id) {
+        try {
+            const status = await pveApi.getLxcStatus(ct.ct_id);
+            if (status && status.status === 'running') {
+                return res.status(400).json({ error: '容器正在运行，请先关机后再移除' });
+            }
+        } catch (e) {
+            console.warn(`[lxc] 查询 ${ct.ct_id} 状态失败（继续执行移除）:`, e.message);
+        }
+    }
     await db.lxcContainers.reminders.clear(ctId);
     // 级联清理端口转发
     try {
@@ -353,6 +364,16 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
     // 清理 DHCP 静态绑定
     if (ct && ct.ct_id) {
         removeDhcpStaticBinding('lxc', ct.ct_id);
+    }
+    // MAC 分组清理
+    if (ct && ct.ct_id && ct.ikuai_mac_group_id) {
+        try {
+            const macConfig = await pveApi.getLxcConfig(ct.ct_id);
+            const cmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+            if (cmac) {
+                await ikuaiApi.removeMacFromGroup(ct.ikuai_mac_group_id, cmac[0]);
+            }
+        } catch (e) { console.error('LXC MAC分组删除失败:', e.message); }
     }
     await db.lxcContainers.delete(ctId);
     if (removedCtInfo) {

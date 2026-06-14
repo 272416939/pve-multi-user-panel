@@ -9,7 +9,7 @@
     $.userVms = ref([]);
     $.vmsLoading = ref(false);
     $.confirmState = ref({ vmId: null, action: null });
-    $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, backup_storage: '', mac_group_id: '' });
+    $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, backup_storage: '', mac_group_id: '', status: null });
     $.availableVms = ref([]);
     $.assignedVms = ref([]);
 
@@ -146,7 +146,8 @@
             renewal_period: vm.renewal_period || 'month',
             user_id: vm.user_id || null,
             backup_storage: vm.backup_storage || '',
-            mac_group_id: vm.ikuai_mac_group_id || ''
+            mac_group_id: vm.ikuai_mac_group_id || '',
+            status: vm.status || null
         };
         $.bsModalShow('editVmModal');
     };
@@ -198,6 +199,36 @@
             } catch (e) {
                 alert(e.message);
             }
+        }
+    };
+
+    $.openDestroyVmModal = function(vm) {
+        $.destroyVmConfirmText.value = '';
+        $.destroyVmTarget.value = { vm_id: vm.vm_id, name: vm.name || '' };
+        $.bsModalShow('destroyVmModal');
+    };
+
+    $.destroyVmConfirmText = ref('');
+    $.destroyVmTarget = ref(null);
+
+    $.openDestroyVmConfirm = function() {
+        $.destroyVmConfirmText.value = '';
+        $.destroyVmTarget.value = $.editVmForm.value;
+        $.bsModalShow('destroyVmModal');
+    };
+
+    $.confirmDestroyVm = async function() {
+        var vm = $.destroyVmTarget.value;
+        if (!vm) return;
+        $.bsModalHide('destroyVmModal');
+        try {
+            await api('/vm/' + vm.vm_id + '/destroy', { method: 'POST' });
+            $.bsModalHide('editVmModal');
+            await $.loadData();
+            await $.loadAssignData();
+            alert('虚拟机已销毁');
+        } catch (e) {
+            alert(e.message);
         }
     };
 

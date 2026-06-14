@@ -703,5 +703,64 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
     }
 });
 
+router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+        const force = req.query.force === '1';
+
+        if (!force) {
+            try {
+                const status = await pveApi.getVmStatus(vmid);
+                if (status && status.status === 'running') {
+                    return res.status(400).json({ error: '虚拟机正在运行，请先关机后再销毁' });
+                }
+            } catch (e) {
+                console.warn(`[vm] 查询 ${vmid} 状态失败（继续执行销毁）:`, e.message);
+            }
+        }
+
+        const assignedVms = (await db.vms.getAll()).filter(v => v.vm_id === vmid);
+        for (const vm of assignedVms) {
+            await db.vms.reminders.clear(vm.id);
+            try {
+                const vmForwards = await db.portForwards.getByVmId(vm.vm_id);
+                for (const fw of vmForwards) {
+                    if (fw.ikuai_id) {
+                        try { await ikuaiApi.deletePortForward(fw.ikuai_id); } catch (e) {}
+                    }
+                }
+                await db.portForwards.deleteByDevice('vm', vm.vm_id);
+            } catch (e) { console.error('清理端口转发失败:', e.message); }
+            if (vm && vm.vm_id) {
+                removeDhcpStaticBinding('vm', vm.vm_id);
+            }
+            if (vm && vm.vm_id && vm.ikuai_mac_group_id) {
+                try {
+                    const macConfig = await pveApi.getVmConfig(vm.vm_id);
+                    const vmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+                    if (vmac) {
+                        await ikuaiApi.removeMacFromGroup(vm.ikuai_mac_group_id, vmac[0]);
+                    }
+                } catch (e) { console.error('VM MAC分组删除失败:', e.message); }
+            }
+            await db.vms.delete(vm.id);
+        }
+
+        try {
+            await pveApi.destroyVm(vmid);
+            console.log(`[vm] PVE 虚拟机 ${vmid} 已销毁`);
+        } catch (e) {
+            console.error(`[vm] PVE 销毁 ${vmid} 失败:`, e.message);
+            return res.status(500).json({ error: 'PVE 销毁虚拟机失败：' + e.message });
+        }
+
+        res.json({ message: '虚拟机已销毁' });
+    } catch (error) {
+        console.error('销毁虚拟机失败:', error);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
 
 module.exports = router;
+

@@ -768,7 +768,8 @@
                                                 </div>
                                                 <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
                                                     <button class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
-                                                    <button class="table-btn btn-danger" @click="removeVmById(vm.id)">删除</button>
+                                                    <button class="table-btn btn-warning" @click="removeVmById(vm.id)">移除</button>
+                                                    <button class="table-btn btn-danger" @click="openDestroyVmModal(vm)">销毁</button>
                                                 </div>
                                                 <div class="dropdown-table">
                                                     <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
@@ -1197,7 +1198,8 @@
                                                     </div>
                                                     <div class="btn-group-table" v-if="!ct.status || ct.status.status !== 'running'">
                                                         <button class="table-btn btn-primary" @click="startLxc(ct.ct_id)">启动</button>
-                                                        <button class="table-btn btn-danger" @click="removeLcxById(ct.id)">删除</button>
+                                                        <button class="table-btn btn-warning" @click="removeLxcById(ct.id)">移除</button>
+                                                        <button class="table-btn btn-danger" @click="openDestroyLxcModalFromList(ct)">销毁</button>
                                                     </div>
                                                     <div class="dropdown-table">
                                                         <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
@@ -2327,7 +2329,8 @@
                                     </div>
                                     <div class="d-flex gap-2">
                                         <button type="submit" class="btn btn-primary" formnovalidate>保存</button>
-                                        <button type="button" class="btn btn-outline-danger" @click="removeVm">移除</button>
+                                        <button type="button" class="btn btn-outline-warning" @click="removeVm" :disabled="editVmForm.status && editVmForm.status.status === 'running'" :title="editVmForm.status && editVmForm.status.status === 'running' ? '请先关机后操作' : '移除分配（仅解绑）'">移除（仅解绑）</button>
+                                        <button type="button" class="btn btn-outline-danger" @click="openDestroyVmConfirm" :disabled="editVmForm.status && editVmForm.status.status === 'running'" :title="editVmForm.status && editVmForm.status.status === 'running' ? '请先关机后操作' : '销毁虚拟机（删除 PVE 数据）'">销毁（删除 PVE）</button>
                                     </div>
                                 </form>
                             </div>
@@ -2828,7 +2831,8 @@
                                     </div>
                                     <div class="d-flex gap-2">
                                         <button type="submit" class="btn btn-primary" formnovalidate>保存</button>
-                                        <button type="button" class="btn btn-outline-danger" @click="removeLxc">移除</button>
+                                        <button type="button" class="btn btn-outline-warning" @click="removeLxc" :disabled="editLxcForm.status && editLxcForm.status.status === 'running'" :title="editLxcForm.status && editLxcForm.status.status === 'running' ? '请先关机后操作' : '移除分配（仅解绑）'">移除（仅解绑）</button>
+                                        <button type="button" class="btn btn-outline-danger" @click="bsModalShow('destroyLxcModal')" :disabled="editLxcForm.status && editLxcForm.status.status === 'running'" :title="editLxcForm.status && editLxcForm.status.status === 'running' ? '请先关机后操作' : '销毁容器（删除 PVE 数据）'">销毁（删除 PVE）</button>
                                     </div>
                                 </form>
                             </div>
@@ -3055,7 +3059,7 @@
                                 </div>
                                 <h5 class="text-danger mb-3">⚠️ 销毁容器确认</h5>
                                 <p class="text-muted small mb-3">
-                                    此操作将<strong class="text-danger">永久销毁</strong>容器 <strong>{{ selectedLxc ? (selectedLxc.name || 'CT ' + selectedLxc.ct_id) : '' }}</strong> 及其所有数据，<br>
+                                    此操作将<strong class="text-danger">永久销毁</strong>容器 <strong>{{ editLxcForm.name || 'CT ' + editLxcForm.ct_id }}</strong> 及其所有数据，<br>
                                     包括磁盘、快照、备份等。<br>
                                     <span class="text-danger">此操作不可恢复！</span>
                                 </p>
@@ -3066,6 +3070,37 @@
                                 <div class="d-flex gap-2 justify-content-center">
                                     <button type="button" class="btn btn-danger" :disabled="destroyLxcConfirmText !== 'yes'" @click="confirmDestroyLxc">确认销毁</button>
                                     <button type="button" class="btn btn-outline-secondary" @click="bsModalHide('destroyLxcModal'); destroyLxcConfirmText = ''">取消</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </Teleport>
+
+                <!-- VM 销毁确认弹窗 -->
+                <Teleport to="body">
+                <div class="modal fade" id="destroyVmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+                    <div class="modal-dialog modal-sm modal-dialog-centered">
+                        <div class="modal-content border-danger">
+                            <div class="modal-body text-center py-4">
+                                <div class="mb-3">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                                    </svg>
+                                </div>
+                                <h5 class="text-danger mb-3">⚠️ 销毁虚拟机确认</h5>
+                                <p class="text-muted small mb-3">
+                                    此操作将<strong class="text-danger">永久销毁</strong>虚拟机 <strong>{{ destroyVmTarget ? (destroyVmTarget.name || 'VM ' + destroyVmTarget.vm_id) : '' }}</strong> 及其所有数据，<br>
+                                    包括磁盘、快照、备份等。<br>
+                                    <span class="text-danger">此操作不可恢复！</span>
+                                </p>
+                                <div class="mb-3">
+                                    <label class="form-label small text-muted">请输入 <code>yes</code> 确认销毁</label>
+                                    <input type="text" class="form-control form-control-sm text-center" v-model="destroyVmConfirmText" placeholder="输入 yes">
+                                </div>
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <button type="button" class="btn btn-danger" :disabled="destroyVmConfirmText !== 'yes'" @click="confirmDestroyVm">确认销毁</button>
+                                    <button type="button" class="btn btn-outline-secondary" @click="bsModalHide('destroyVmModal'); destroyVmConfirmText = ''">取消</button>
                                 </div>
                             </div>
                         </div>

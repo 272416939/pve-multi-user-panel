@@ -164,6 +164,14 @@ class PveApi {
     return response.data;
   }
 
+  async destroyVm(vmid) {
+    if (!this.node) {
+      await this.detectNode();
+    }
+    const response = await this.axiosInstance.delete(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}`);
+    return response.data;
+  }
+
   async getStorageList() {
     if (!this.node) {
       await this.detectNode();
