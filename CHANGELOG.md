@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.5] - 2026-06-14
+
+### Fixed
+- fix(ikuai): addr_pool 分隔符从空格改为逗号（匹配爱快真实数据格式）
+  - getMacGroups: split(/,/) 解析 MAC 列表
+  - addMacToGroup/removeMacFromGroup: join(',') 拼回 addr_pool
+
+---
+
 ## [2.3.4] - 2026-06-14
 
 ### Fixed
