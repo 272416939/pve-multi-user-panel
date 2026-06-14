@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.1.26] - 2026-06-14
+
+### Fixed
+- fix(ui): 移除浏览器控制台 debug 输出（dashboard + admin）
+- fix(ui): 修复 LXC 详情图表 WebSocket 实时更新不生效
+  - `dv._isLxc ? 'ct_id' : 'vm_id'` → 固定 `'vm_id'`，因 openLxcDetail 将 ct_id 存入 vm_id
+
+---
+
 ## [2.1.25] - 2026-06-14
 
 ### Fixed
