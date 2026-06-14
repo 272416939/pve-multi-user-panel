@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.7] - 2026-06-15
+
+### Fixed
+- fix(admin): 分配页套餐下拉 .value 引用 + packagePage 兜底初始化
+
+---
+
 ## [2.5.6] - 2026-06-15
 
 ### Fixed
