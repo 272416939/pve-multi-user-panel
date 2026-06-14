@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.4] - 2026-06-14
+
+### Fixed
+- fix(ikuai): 修正 func_name 为 `macgroup`（来自爱快后台真实抓包）
+  - 文档写的是 `route_object_mac` 但实际爱快 v3.x 后台发出的是 `macgroup`
+  - TYPE 同步修正为 `total,data`（与真实请求一致）
+
+---
+
 ## [2.3.3] - 2026-06-14
 
 ### Fixed
