@@ -161,23 +161,23 @@ watch($.user, function(u) {
         var section;
         var subId;
         if (page === 'vm-templates') {
-            section = 'manage';
-            subId = 'manage-vm-templates';
+            section = 'templates';
+            subId = 'templates-vm';
             $.activeTabTemplates.value = 'vm';
             window.templatePage.loadVmTemplates();
         } else if (page === 'lxc-templates') {
-            section = 'manage';
-            subId = 'manage-lxc-templates';
+            section = 'templates';
+            subId = 'templates-lxc';
             $.activeTabTemplates.value = 'lxc';
             window.templatePage.loadLxcTemplates();
         } else if (page === 'vm-packages') {
-            section = 'manage';
-            subId = 'manage-vm-packages';
+            section = 'packages';
+            subId = 'packages-vm';
             $.activeTabPackages.value = 'vm';
             window.packagePage.loadVmPackages();
         } else if (page === 'lxc-packages') {
-            section = 'manage';
-            subId = 'manage-lxc-packages';
+            section = 'packages';
+            subId = 'packages-lxc';
             $.activeTabPackages.value = 'lxc';
             window.packagePage.loadLxcPackages();
         }
@@ -461,7 +461,7 @@ watch($.user, function(u) {
 
     $.switchAdminTab = function(tab) {
         // Determine which group this tab belongs to
-        var manageTabs = ['users', 'cdk', 'messages', 'vm-packages', 'lxc-packages'];
+        var manageTabs = ['users', 'cdk', 'messages'];
         var settingsTabs = ['smtp', 'snapshot-backup', 'network', 'pay'];
         var section;
         var submenuId;
@@ -493,10 +493,6 @@ watch($.user, function(u) {
             'users': 'manage-users',
             'cdk': 'manage-cdk',
             'messages': 'manage-messages',
-            'vm-templates': 'manage-vm-templates',
-            'lxc-templates': 'manage-lxc-templates',
-            'vm-packages': 'manage-vm-packages',
-            'lxc-packages': 'manage-lxc-packages',
             'smtp': 'settings-smtp',
             'snapshot-backup': 'settings-snapshot-backup',
             'network': 'settings-network',
@@ -504,8 +500,6 @@ watch($.user, function(u) {
         };
         var target = document.querySelector('[data-subsection="' + (subMap[tab] || 'admin-' + tab) + '"]');
         if (target) target.classList.add('active');
-        if (tab === 'vm-packages' && window.packagePage) window.packagePage.loadVmPackages();
-        if (tab === 'lxc-packages' && window.packagePage) window.packagePage.loadLxcPackages();
     };
 
     // ==================== 详情弹窗函数 ====================
