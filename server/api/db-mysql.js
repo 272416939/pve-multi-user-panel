@@ -720,7 +720,7 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'vm_id', 'user_id', 'username', 'expiration_date',
-                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
