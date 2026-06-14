@@ -33,7 +33,7 @@
     tp.allStorages = ref([]);
 
     tp.loadPveTemplateVms = async function() {
-        try { tp.pveTemplateVms.value = await api('/pve/vms?template_only=1'); } catch (e) {}
+        try { tp.pveTemplateVms.value = await api('/pve/vms'); } catch (e) {}
     };
 
     tp.loadAllStorages = async function() {
@@ -129,4 +129,5 @@
             }
         });
     };
+    window.templatePage = tp;
 })();

@@ -130,4 +130,5 @@
     };
 
     admin.packagePage = $;
+    window.packagePage = $;
 })();

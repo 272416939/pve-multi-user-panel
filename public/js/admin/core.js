@@ -33,42 +33,6 @@ $.detailVmChartData = null;
     $.activeTabTemplates = ref('vm');
     $.activeTabPackages = ref('vm');
 
-    // packagePage 对象：挂载到 $ 上，Vue 模板中可自动解包
-    $.packagePage = {
-        vmPackages: ref([]),
-        lxcPackages: ref([]),
-        vmProvisionForm: ref({ package_id: '' }),
-        lxcProvisionForm: ref({ package_id: '' }),
-        loadVmPackages: function() {
-            if ($.packagePage.vmPackages.value.length === 0) {
-                api('/admin/packages?type=vm').then(function(data) {
-                    $.packagePage.vmPackages.value = data || [];
-                }).catch(function(e) {
-                    console.error('加载VM套餐失败', e);
-                });
-            }
-        },
-        loadLxcPackages: function() {
-            if ($.packagePage.lxcPackages.value.length === 0) {
-                api('/admin/packages?type=lxc').then(function(data) {
-                    $.packagePage.lxcPackages.value = data || [];
-                }).catch(function(e) {
-                    console.error('加载LXC套餐失败', e);
-                });
-            }
-        }
-    };
-
-    // templatePage 对象：挂载到 $ 上
-    $.templatePage = {
-        loadVmTemplates: function() {
-            // 预留：加载 VM 模板列表
-        },
-        loadLxcTemplates: function() {
-            // 预留：加载 LXC 模板列表
-        }
-    };
-
     // ==================== 工具函数注册到$ ====================
     $.formatMemory = formatMemory;
     $.formatBytes = formatBytes;
@@ -197,25 +161,25 @@ watch($.user, function(u) {
         var section;
         var subId;
         if (page === 'vm-templates') {
-            section = 'templates';
-            subId = 'templates-vm';
+            section = 'manage';
+            subId = 'manage-vm-templates';
             $.activeTabTemplates.value = 'vm';
-            $.templatePage.loadVmTemplates();
+            window.templatePage.loadVmTemplates();
         } else if (page === 'lxc-templates') {
-            section = 'templates';
-            subId = 'templates-lxc';
+            section = 'manage';
+            subId = 'manage-lxc-templates';
             $.activeTabTemplates.value = 'lxc';
-            $.templatePage.loadLxcTemplates();
+            window.templatePage.loadLxcTemplates();
         } else if (page === 'vm-packages') {
-            section = 'packages';
-            subId = 'packages-vm';
+            section = 'manage';
+            subId = 'manage-vm-packages';
             $.activeTabPackages.value = 'vm';
-            $.packagePage.loadVmPackages();
+            window.packagePage.loadVmPackages();
         } else if (page === 'lxc-packages') {
-            section = 'packages';
-            subId = 'packages-lxc';
+            section = 'manage';
+            subId = 'manage-lxc-packages';
             $.activeTabPackages.value = 'lxc';
-            $.packagePage.loadLxcPackages();
+            window.packagePage.loadLxcPackages();
         }
         if (!section) return;
         $.switchSection(section);
@@ -540,8 +504,8 @@ watch($.user, function(u) {
         };
         var target = document.querySelector('[data-subsection="' + (subMap[tab] || 'admin-' + tab) + '"]');
         if (target) target.classList.add('active');
-        if (tab === 'vm-packages' && $.packagePage) $.packagePage.loadVmPackages();
-        if (tab === 'lxc-packages' && $.packagePage) $.packagePage.loadLxcPackages();
+        if (tab === 'vm-packages' && window.packagePage) window.packagePage.loadVmPackages();
+        if (tab === 'lxc-packages' && window.packagePage) window.packagePage.loadLxcPackages();
     };
 
     // ==================== 详情弹窗函数 ====================
