@@ -420,6 +420,33 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
             resource_id: resource.vm_id || resource.ct_id || resource.id
         });
         
+        var resourceName = resource.name || (type === 'vm' ? 'VM ' + resource.vm_id : 'CT ' + resource.ct_id);
+        var periodStr = period === 'year' ? qty + '年' : qty + '个月';
+        var expiryDisplay = newExpiration ? new Date(newExpiration).toLocaleString('zh-CN') : '永久有效';
+        var msgContent = '资源名称：' + resourceName + '\n续费详情：' + periodStr + '\n到期时间：' + expiryDisplay + '\n实付金额：¥' + totalPrice.toFixed(2) + '\n余额变动：¥' + balance.toFixed(2) + ' → ¥' + newBalance + '\n订单号：' + orderNo;
+        var emailContent = '资源名称：' + resourceName + '\n续费详情：' + periodStr + '\n到期时间：' + expiryDisplay + '\n实付金额：¥' + totalPrice.toFixed(2) + '\n余额变动：¥' + balance.toFixed(2) + ' → ¥' + newBalance + '\n订单号：' + orderNo + '\n时间：' + new Date().toLocaleString('zh-CN');
+        
+        try {
+            await db.messages.create({
+                uid: userId,
+                title: '资源续费成功',
+                content: msgContent,
+                type: 2,
+                send_type: 1
+            });
+        } catch (e) {
+            console.error('[钱包] 续费站内信发送失败:', e.message);
+        }
+        
+        try {
+            if (user.email && user.email_verified && user.email.includes('@')) {
+                const emailUtil = require('../utils/email');
+                await emailUtil.send(user.email, '资源续费成功 - PVE管理面板', emailContent);
+            }
+        } catch (e) {
+            console.error('[钱包] 续费邮件发送失败:', e.message);
+        }
+        
         res.json({
             success: true,
             message: '续费成功',
