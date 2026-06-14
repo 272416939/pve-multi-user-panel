@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.4.0] - 2026-06-15
+
+### Added
+- feat(admin): 新增 VM 销毁功能（PVE 彻底删除 + 级联清理端口转发/DHCP/MAC）
+- feat(admin): 编辑弹窗增加"移除（仅解绑）"和"销毁（删除 PVE）"双按钮
+  - 运行中 disabled 并提示"请先关机后操作"
+  - 销毁需输入 yes 二次确认
+- feat(admin): 已分配列表关机行同步增加移除+销毁按钮
+- feat(api): pve-api.js 新增 `destroyVm(vmid)` 方法
+
+### Fixed
+- fix(lxc): LXC 移除端点补充 MAC 分组清理（之前漏掉导致爱快残留）
+- fix(lxc): LXC 移除端点增加关机状态检查（与 VM 一致）
+
+---
+
 ## [2.3.7] - 2026-06-14
 
 ### Fixed
