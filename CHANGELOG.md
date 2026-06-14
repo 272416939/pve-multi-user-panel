@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.3.7] - 2026-06-14
+
+### Fixed
+- fix(db): vms.update allowedColumns 追加 `ikuai_mac_group_id`
+  - SQLite + MySQL 双驱同步修复，之前该字段被白名单静默过滤导致无法持久化
+
+---
+
 ## [2.3.6] - 2026-06-14
 
 ### Fixed
