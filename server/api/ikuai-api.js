@@ -296,77 +296,82 @@ class IkuaiApi {
         return result;
     }
 
-    // MAC 分组：获取分组列表
+    // MAC 分组（爱快对象组）：获取分组列表
+    // func_name: route_object_mac, action: show
     async getMacGroups() {
         try {
             await this._ensureLogin();
-            const result = await this.client.call('mac_group', 'show', {
+            const result = await this.client.call('route_object_mac', 'show', {
                 TYPE: 'data,total',
                 limit: '0,500',
                 ORDER_BY: '',
                 ORDER: ''
             });
-            console.log('[ikuai] mac_group show 完整响应: Result=' + result?.Result + ' ErrMsg=' + (result?.ErrMsg || ''));
-            console.log('[ikuai] mac_group show Data: ' + JSON.stringify(result?.Data).slice(0, 500));
-
-            if (result?.Result === 30000) {
-                const raw = result.Data;
-                const list = raw?.data || raw?.rows || raw || [];
-                if (!Array.isArray(list)) {
-                    console.log('[ikuai] mac_group show Data 不是数组，类型:', typeof list, JSON.stringify(list).slice(0, 300));
-                    return [];
-                }
-                return list.map(item => ({
-                    id: item.id || '',
-                    group_name: item.group_name || '',
-                    comment: item.comment || '',
-                    enabled: item.enabled || 'yes',
-                    members: (item.members || item.group_value || []).map(m => ({
-                        mac: (m.mac || '').toLowerCase(),
-                        comment: m.comment || ''
-                    }))
-                }));
+            if (result?.Result !== 30000) {
+                console.error('[ikuai] route_object_mac show 失败: Result=' + result?.Result + ' ErrMsg=' + (result?.ErrMsg || ''));
+                return [];
             }
-            console.error('[ikuai] mac_group show 失败: Result=' + result?.Result + ' ErrMsg=' + (result?.ErrMsg || ''));
-            return [];
+            const list = result.Data?.data || result.Data || [];
+            if (!Array.isArray(list)) {
+                console.log('[ikuai] route_object_mac show Data 不是数组，类型:', typeof list);
+                return [];
+            }
+            return list.map(item => ({
+                id: item.id || '',
+                group_name: item.group_name || '',
+                comment: item.comment || '',
+                enabled: item.enabled || 'yes',
+                members: (item.group_value || item.members || []).map(m => ({
+                    mac: (m.mac || '').toLowerCase(),
+                    comment: m.comment || ''
+                }))
+            }));
         } catch (e) {
             console.error('[ikuai] 获取 MAC 分组列表失败:', e.message);
             return [];
         }
     }
 
-    // MAC 分组：添加 MAC 到分组
+    // MAC 分组：添加 MAC 到分组（获取当前列表 → 追加 → edit 整体更新）
     async addMacToGroup(groupId, mac, comment) {
         await this._ensureLogin();
-        const result = await this.client.call('mac_group', 'add_mac', {
-            id: Number(groupId),
-            mac: mac,
-            comment: comment || ''
-        });
-        console.log(`[ikuai] MAC 分组 add_mac: Result=${result?.Result} ErrMsg=${result?.ErrMsg || ''}`);
-        if (result?.Result !== 30000) {
-            throw new Error(result?.ErrMsg || `Result=${result?.Result}`);
+        var current = await this._getMacGroupById(groupId);
+        if (!current) throw new Error('MAC 分组 ID=' + groupId + ' 不存在');
+        var exists = (current.group_value || []).find(function(m) { return m.mac.toLowerCase() === mac.toLowerCase(); });
+        if (exists) {
+            console.log(`[ikuai] MAC 分组新增: mac=${mac} 已存在，跳过`);
+            return;
         }
+        var newList = (current.group_value || []).concat([{ mac: mac.toLowerCase(), comment: comment || '' }]);
+        var result = await this.client.call('route_object_mac', 'edit', {
+            id: groupId,
+            group_name: current.group_name,
+            group_value: newList
+        });
+        if (result?.Result !== 30000) throw new Error(result?.ErrMsg || 'Result=' + result?.Result);
         console.log(`[ikuai] MAC 分组新增: groupId=${groupId}, mac=${mac}`);
-        return result?.Data;
     }
 
-    // MAC 分组：从分组删除 MAC
+    // MAC 分组：从分组删除 MAC（获取当前列表 → 过滤 → edit 整体更新）
     async removeMacFromGroup(groupId, mac) {
         await this._ensureLogin();
-        const result = await this.client.call('mac_group', 'del_mac', {
-            id: Number(groupId),
-            mac: mac
-        });
-        console.log(`[ikuai] MAC 分组 del_mac: Result=${result?.Result} ErrMsg=${result?.ErrMsg || ''}`);
-        if (result?.Result !== 30000) {
-            throw new Error(result?.ErrMsg || `Result=${result?.Result}`);
+        var current = await this._getMacGroupById(groupId);
+        if (!current) throw new Error('MAC 分组 ID=' + groupId + ' 不存在');
+        var newList = (current.group_value || []).filter(function(m) { return m.mac.toLowerCase() !== mac.toLowerCase(); });
+        if (newList.length === (current.group_value || []).length) {
+            console.log(`[ikuai] MAC 分组删除: mac=${mac} 不在分组中，跳过`);
+            return;
         }
+        var result = await this.client.call('route_object_mac', 'edit', {
+            id: groupId,
+            group_name: current.group_name,
+            group_value: newList
+        });
+        if (result?.Result !== 30000) throw new Error(result?.ErrMsg || 'Result=' + result?.Result);
         console.log(`[ikuai] MAC 分组删除: groupId=${groupId}, mac=${mac}`);
-        return result?.Data;
     }
 
-    // MAC 分组：更新分组内 MAC（先删除旧 MAC，再添加新 MAC）
+    // MAC 分组：更新分组内 MAC（先删旧，再加新）
     async updateMacInGroup(groupId, oldMac, newMac, comment) {
         if (oldMac && oldMac !== newMac) {
             try { await this.removeMacFromGroup(groupId, oldMac); } catch (e) {}
@@ -374,6 +379,15 @@ class IkuaiApi {
         if (newMac) {
             return await this.addMacToGroup(groupId, newMac, comment);
         }
+    }
+
+    // 内部：获取单个 MAC 分组的完整数据
+    async _getMacGroupById(groupId) {
+        var groups = await this.getMacGroups();
+        for (var i = 0; i < groups.length; i++) {
+            if (String(groups[i].id) === String(groupId)) return groups[i];
+        }
+        return null;
     }
 }
 
