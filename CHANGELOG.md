@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.25] - 2026-06-14
+
+### Fixed
+- fix(security): 支付回调端点添加 IP 速率限制（R6-1/R6-2）
+  - `POST /api/wallet/notify` 添加滑动窗口限速（60秒/30次），超限返回 429
+  - `GET /api/wallet/return` 复用同一限速器
+- fix(security): CSV 导出用户名双引号按 RFC 4180 转义（R6-3）
+
+---
+
 ## [2.1.24] - 2026-06-14
 
 ### Changed
