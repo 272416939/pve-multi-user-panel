@@ -12,6 +12,21 @@ function safeError(e) {
     return '操作失败，请稍后重试';
 }
 
+var callbackRateLimiter = new Map();
+function checkCallbackRate(ip) {
+    var now = Date.now();
+    var windowMs = 60000;
+    var maxRequests = 30;
+    var record = callbackRateLimiter.get(ip);
+    if (!record || now - record.windowStart > windowMs) {
+        callbackRateLimiter.set(ip, { windowStart: now, count: 1 });
+        return true;
+    }
+    if (record.count >= maxRequests) return false;
+    record.count++;
+    return true;
+}
+
 async function queryApiTradeNo(outTradeNo) {
     try {
         var pid = await db.config.get('pay:pid');
@@ -160,6 +175,9 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
 
 // ========== 支付异步回调 (公开端点) ==========
 router.post('/wallet/notify', async (req, res) => {
+    if (!checkCallbackRate(req.ip)) {
+        return res.status(429).send('Too Many Requests');
+    }
     try {
         var params = req.body;
         dbg('[钱包] 支付回调:', params.out_trade_no, params.trade_status);
@@ -262,6 +280,9 @@ router.post('/wallet/notify', async (req, res) => {
 
 // ========== 支付同步跳转处理 (GET, 处理return_url, 备用: 网关notify_url不通时) ==========
 router.get('/wallet/return', async (req, res) => {
+    if (!checkCallbackRate(req.ip)) {
+        return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+    }
     try {
         var params = req.query;
         dbg('[钱包] 同步回调(GET):', params.out_trade_no, params.trade_status);

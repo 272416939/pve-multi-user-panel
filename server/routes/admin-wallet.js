@@ -89,7 +89,7 @@ router.get('/admin/transactions/export', authMiddleware, adminMiddleware, async 
         for (var r of list) {
             rows.push([
                 r.pay_time || '',
-                '"' + (userMap[r.user_id] || '-') + '"',
+                '"' + (userMap[r.user_id] || '-').replace(/"/g, '""') + '"',
                 r.pay_method === 'alipay' ? '支付宝' : r.pay_method === 'wxpay' ? '微信支付' : r.pay_method,
                 r.order_no,
                 r.api_trade_no || r.trade_no || '',
