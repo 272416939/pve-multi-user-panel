@@ -145,7 +145,7 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
             cores: pkg.cores || template.cores,
             memory: pkg.memory || template.memory,
             swap: pkg.swap || template.swap,
-            rootfs: (template.storage || 'local') + ':' + (pkg.disk_size || template.disk_size),
+            rootfs: (template.rootfs_storage || template.storage || 'local-lvm') + ':' + (pkg.disk_size || template.disk_size),
             net0: 'name=eth0,bridge=' + (template.network_bridge || 'vmbr0') + ',ip=' + (template.network_mode === 'dhcp' ? 'dhcp' : ''),
             unprivileged: template.unprivileged !== undefined ? template.unprivileged : 1,
             features: template.features || '',

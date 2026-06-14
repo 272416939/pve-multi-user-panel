@@ -477,6 +477,8 @@ async function migrateSchema() {
     await safeAlter('vm_templates', 'clone_mode', "VARCHAR(20) NOT NULL DEFAULT 'full'");
     await safeAlter('vm_templates', 'cpu_affinity', "VARCHAR(255) NOT NULL DEFAULT ''");
 
+    await safeAlter('lxc_templates', 'rootfs_storage', "VARCHAR(100) DEFAULT 'local-lvm'");
+
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {
         const orphaned = await queryAll("SELECT id, pve_upid FROM backups WHERE vm_id = 0 AND ct_id IS NULL AND type = 'vm'");
@@ -1713,10 +1715,11 @@ module.exports = {
         getById: (id) => queryOne('SELECT * FROM lxc_templates WHERE id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO lxc_templates (name, ostemplate, storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.ostemplate || '', data.storage || 'local',
+                    data.rootfs_storage || 'local-lvm',
                     data.cores || 1, data.memory || 512, data.swap || 512,
                     data.disk_size || 8, data.network_bridge || 'vmbr0',
                     data.network_mode || 'dhcp', data.unprivileged !== undefined ? data.unprivileged : 1,
@@ -1726,7 +1729,7 @@ module.exports = {
             return queryOne('SELECT * FROM lxc_templates WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'status'];
+            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'rootfs_storage', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

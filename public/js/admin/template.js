@@ -86,8 +86,9 @@
     tp.openLxcTemplateForm = function(t) {
         if (t) {
             tp.lxcTemplateForm.value = Object.assign({}, t);
+            tp.lxcTemplateForm.value.rootfs_storage = t.rootfs_storage || 'local-lvm';
         } else {
-            tp.lxcTemplateForm.value = { id: null, name: '', ostemplate: '', storage: '', cores: 1, memory: 512,
+            tp.lxcTemplateForm.value = { id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512,
                 swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1,
                 features: '', description: '', status: 'active' };
         }

@@ -391,6 +391,8 @@ function initDb() {
         updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     )`);
 
+    try { db.exec('ALTER TABLE lxc_templates ADD COLUMN rootfs_storage TEXT NOT NULL DEFAULT "local-lvm"'); } catch (e) {}
+
     // vm_packages 表
     db.exec(`CREATE TABLE IF NOT EXISTS vm_packages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1674,9 +1676,10 @@ module.exports = {
         getAll: () => db.prepare('SELECT * FROM lxc_templates ORDER BY id DESC').all(),
         getById: (id) => db.prepare('SELECT * FROM lxc_templates WHERE id = ?').get(id),
         create: (data) => {
-            const stmt = db.prepare(`INSERT INTO lxc_templates (name, ostemplate, storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, description, status) VALUES (@name, @ostemplate, @storage, @cores, @memory, @swap, @disk_size, @network_bridge, @network_mode, @unprivileged, @features, @description, @status)`);
+            const stmt = db.prepare(`INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, description, status) VALUES (@name, @ostemplate, @storage, @rootfs_storage, @cores, @memory, @swap, @disk_size, @network_bridge, @network_mode, @unprivileged, @features, @description, @status)`);
             const info = stmt.run({
                 name: data.name || '', ostemplate: data.ostemplate || '', storage: data.storage || 'local',
+                rootfs_storage: data.rootfs_storage || 'local-lvm',
                 cores: data.cores || 1, memory: data.memory || 512, swap: data.swap || 512,
                 disk_size: data.disk_size || 8, network_bridge: data.network_bridge || 'vmbr0',
                 network_mode: data.network_mode || 'dhcp', unprivileged: data.unprivileged !== undefined ? data.unprivileged : 1,
@@ -1685,7 +1688,7 @@ module.exports = {
             return db.prepare('SELECT * FROM lxc_templates WHERE id = ?').get(info.lastInsertRowid);
         },
         update: (id, updates) => {
-            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'status'];
+            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'rootfs_storage', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

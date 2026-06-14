@@ -3315,7 +3315,7 @@
                                     <div class="col-md-6"><label class="form-label">目标存储</label>
                                         <select class="form-select" v-model="templatePage.vmTemplateForm.value.target_storage">
                                             <option value="">请选择存储池</option>
-                                            <option v-for="s in templatePage.allStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} ({{ (s.maxdisk/1073741824).toFixed(0) }}GB)</option>
+                                            <option v-for="s in templatePage.allStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }}{{ s.maxdisk ? ' (' + (s.maxdisk/1073741824).toFixed(0) + 'GB)' : '' }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-6"><label class="form-label">网络桥接</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.network_bridge"></div>
@@ -3355,9 +3355,15 @@
                             <div class="modal-body">
                                 <div class="row g-3">
                                     <div class="col-md-6"><label class="form-label">模板名称</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.name"></div>
-                                    <div class="col-md-6"><label class="form-label">存储池</label>
+                                    <div class="col-md-6"><label class="form-label">模板存储</label>
                                         <select class="form-select" v-model="templatePage.lxcTemplateForm.value.storage">
                                             <option value="">请选择存储池</option>
+                                            <option v-for="s in templatePage.lxcStorages.value" :key="s.id" :value="s.id">{{ s.id }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6"><label class="form-label">容器存储</label>
+                                        <select class="form-select" v-model="templatePage.lxcTemplateForm.value.rootfs_storage">
+                                            <option value="">请选择容器存储位置</option>
                                             <option v-for="s in templatePage.lxcStorages.value" :key="s.id" :value="s.id">{{ s.id }}</option>
                                         </select>
                                     </div>
@@ -3758,7 +3764,7 @@
                 if (!$.templatePage.vmTemplates) $.templatePage.vmTemplates = Vue.ref([]);
                 if (!$.templatePage.lxcTemplates) $.templatePage.lxcTemplates = Vue.ref([]);
                 if (!$.templatePage.vmTemplateForm) $.templatePage.vmTemplateForm = Vue.ref({ id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20, network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', target_storage: 'local-lvm', clone_mode: 'full', cpu_affinity: '', description: '', status: 'active' });
-                if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: '', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1, features: '', description: '', status: 'active' });
+                if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1, features: '', description: '', status: 'active' });
                 if (!$.templatePage.lxcStorages) $.templatePage.lxcStorages = Vue.ref([]);
                 if (!$.templatePage.lxcOstemplates) $.templatePage.lxcOstemplates = Vue.ref([]);
                 $.initCore();
