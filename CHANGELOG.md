@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.23] - 2026-06-14
+
+### Fixed
+- fix(email): wallet.js `email_verified` → `emailVerified`
+  - 数据库字段是驼峰 `emailVerified`，wallet.js 用了下划线 → `undefined`
+  - 条件永远 false，充值/续费邮件自始至终从未真正执行
+  - 3 处修复：notify 回调 / return 回调 / 余额续费
+
+---
+
 ## [2.1.22] - 2026-06-14
 
 ### Fixed
