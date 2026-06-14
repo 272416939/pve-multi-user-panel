@@ -550,7 +550,6 @@
                 $.user.value = userData;
                 var adminLink = document.getElementById('dashboardAdminLink');
                 if (adminLink) adminLink.style.display = userData.role === 'admin' ? '' : 'none';
-                console.log('[dashboard] 用户角色:', userData.role, '管理员链接显示:', adminLink ? adminLink.style.display : '未找到元素');
                 await $.loadNavItems();
                 await $.loadData();
                 await $.loadLxcContainers();
@@ -579,7 +578,7 @@
                             }
                             if (u.isDetail && $.showVmDetail.value && $.detailVm.value) {
                                 var dv = $.detailVm.value;
-                                var dvIdField = dv._isLxc ? 'ct_id' : 'vm_id';
+                                var dvIdField = 'vm_id';
                                 if (u.vmid === dv[dvIdField]) {
                                     $.feedDetailCharts(u.status);
                                 }

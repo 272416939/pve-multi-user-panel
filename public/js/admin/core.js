@@ -462,7 +462,6 @@ watch($.user, function(u) {
 
     // ==================== 详情弹窗函数 ====================
     $.openVmDetail = function(vm) {
-        console.log('openVmDetail called', vm);
         var detailVm = Object.assign({}, vm);
         // IP优先取ip字段，其次dhcp_static_ip回写
         detailVm.ip = detailVm.ip || detailVm.dhcp_static_ip || '-';
@@ -656,7 +655,7 @@ $.initDetailCharts = function() {
                             }
                             if (u.isDetail && $.showVmDetail.value && $.detailVm.value) {
                                 var dv = $.detailVm.value;
-                                var dvIdField = dv._isLxc ? 'ct_id' : 'vm_id';
+                                var dvIdField = 'vm_id';
                                 if (u.vmid === dv[dvIdField]) {
                                     $.feedDetailCharts(u.status);
                                 }
