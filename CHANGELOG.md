@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.22] - 2026-06-14
+
+### Fixed
+- fix(email): wallet.js 邮件发送 `emailUtil.send` → `sendEmail`
+  - email.js 导出的是 `sendEmail`，`emailUtil.send` 为 `undefined` → TypeError 被 try/catch 吞掉
+  - 3 处修复：notify 回调 / return 回调 / 余额续费
+  - 影响：充值邮件和续费邮件从未成功发送（VM/LXC 等其他功能正常）
+
+---
+
 ## [2.1.21] - 2026-06-14
 
 ### Added
