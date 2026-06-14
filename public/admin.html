@@ -1119,7 +1119,7 @@
                                                 <label class="form-label fw-bold">📦 套餐快速开通</label>
                                                 <select class="form-select form-select-sm" v-model="packagePage.lxcProvisionForm.package_id" style="max-width:400px;">
                                                     <option value="">-- 选择套餐（自动填充参数） --</option>
-                                                    <option v-for="p in packagePage.lxcPackages" :key="p.id" :value="p.id" v-show="p.status === 'active'">{{ p.name }} ({{ p.cores }}核/{{ p.memory }}MB/{{ p.disk_size }}GB)</option>
+                                                    <option v-for="p in packagePage.lxcPackages.value" :key="p.id" :value="p.id" v-show="p.status === 'active'">{{ p.name }} ({{ p.cores }}核/{{ p.memory }}MB/{{ p.disk_size }}GB)</option>
                                                 </select>
                                                 <small class="text-muted">选择套餐后将自动填充资源配置和价格</small>
                                             </div>
