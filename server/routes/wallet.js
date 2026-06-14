@@ -425,7 +425,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '当前账户余额不足，无法使用余额抵扣，请先充值后再续费' });
         }
         
-        var addDays = period === 'year' ? qty * 365 : qty * 30;
+        var addDays = period === 'year' ? qty * 365 : period === 'quarter' ? qty * 90 : qty * 30;
         
         var oldExpiration = resource.expiration_date ? new Date(resource.expiration_date + 'Z') : new Date();
         oldExpiration.setDate(oldExpiration.getDate() + addDays);

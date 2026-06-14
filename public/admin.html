@@ -778,7 +778,7 @@
                                             <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                             <td><span v-if="networkConfig.cname_domain" class="text-primary">{{ vm.vm_id }}.{{ networkConfig.cname_domain }}</span><span v-else class="text-muted">-</span></td>
                                             <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
-                                            <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
+                                            <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                             <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                             <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                             <td>
@@ -861,6 +861,7 @@
                                             <label class="form-label">周期</label>
                                             <select class="form-select" v-model="assignForm.renewal_period">
                                                 <option value="month">月（30天计）</option>
+                                                <option value="quarter">季（90天计）</option>
                                                 <option value="year">年（365天计）</option>
                                             </select>
                                         </div>
@@ -1104,6 +1105,7 @@
                                             <label class="form-label">周期</label>
                                             <select class="form-select" v-model="lxcAssignForm.renewal_period">
                                                 <option value="month">月（30天计）</option>
+                                                <option value="quarter">季（180天计）</option>
                                                 <option value="year">年（365天计）</option>
                                             </select>
                                         </div>
@@ -1328,7 +1330,12 @@
                         </div>
                     </div>
 
-                    <div v-if="activeTab === 'vm-packages'" class="tab-panel">
+                </div>
+                <!-- end packages -->
+
+                <div v-if="activeSection === 'packages'">
+
+                    <div v-if="activeTabPackages === 'vm'" class="tab-panel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0">VM 套餐管理</h5>
                             <button class="btn btn-primary btn-sm" @click="packagePage.openVmPackageForm(null)">+ 新建套餐</button>
@@ -1363,7 +1370,7 @@
                         </div>
                     </div>
 
-                    <div v-if="activeTab === 'lxc-packages'" class="tab-panel">
+                    <div v-if="activeTabPackages === 'lxc'" class="tab-panel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0">LXC 套餐管理</h5>
                             <button class="btn btn-primary btn-sm" @click="packagePage.openLxcPackageForm(null)">+ 新建套餐</button>
@@ -1393,7 +1400,7 @@
                     </div>
 
                 </div>
-                <!-- end manage(users) -->
+                <!-- end packages -->
 
                 <div v-if="activeSection === 'settings'">
                     <!-- SMTP 配置 -->
@@ -3004,6 +3011,7 @@
                                         <label class="form-label">计费周期</label>
                                         <select class="form-select" v-model="editLxcForm.renewal_period">
                                             <option value="month">月（30天计）</option>
+                                            <option value="quarter">季（90天计）</option>
                                             <option value="year">年（365天计）</option>
                                         </select>
                                     </div>
@@ -3710,7 +3718,7 @@
                         <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '容器ID' : '虚拟机ID' }}</span><span class="info-value">{{ detailVm.vm_id || '-' }}</span></div>
                         <div class="info-item"><span class="info-label">内网IP</span><span class="info-value">{{ detailVm.ip || '-' }}</span></div>
                         <div class="info-item"><span class="info-label">硬件配置</span><span class="info-value">{{ detailVmConfigStr }}</span></div>
-                        <div class="info-item"><span class="info-label">续费价格</span><span class="info-value">{{ detailVm.renewal_price ? detailVm.renewal_price + '元/' + (detailVm.renewal_period === 'year' ? '年' : '月') : '-' }}</span></div>
+                        <div class="info-item"><span class="info-label">续费价格</span><span class="info-value">{{ detailVm.renewal_price ? detailVm.renewal_price + '元/' + (detailVm.renewal_period === 'year' ? '年' : detailVm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
                         <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '镜像' : '操作系统' }}</span><span class="info-value">{{ detailVmOsStr }}</span></div>
                         <div class="info-item"><span class="info-label">运行状态</span><span class="info-value">{{ detailVmStatusStr }}</span></div>
                         <div class="info-item"><span class="info-label">运行时长</span><span class="info-value">{{ detailVmUptimeStr }}</span></div>
