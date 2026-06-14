@@ -19,7 +19,7 @@ function safeError(e) {
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const vms = await pveApi.getVms();
+        const vms = await pveApi.getVms(req.query.template_only ? { templateOnly: true } : {});
         
         // 获取已分配的VMID
         const assignedVms = await db.vms.getAll();

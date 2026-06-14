@@ -50,12 +50,23 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         var newVmid = await pveApi.getNextAvailableVmid();
 
         // Clone VM
-        await pveApi.cloneVm(template.template_vmid, newVmid, { name: randomName });
+        await pveApi.cloneVm(template.template_vmid, newVmid, {
+            name: randomName,
+            target: template.target_storage || undefined,
+            clone_mode: template.clone_mode || 'full'
+        });
 
         // 应用套餐配置（CPU/内存）
         try {
             await pveApi.updateVmConfig(newVmid, { cores: pkg.cores, memory: pkg.memory });
         } catch (configErr) { console.error('[package] VM config update failed:', configErr.message); }
+
+        // CPU 亲和性
+        if (template.cpu_affinity) {
+            try {
+                await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
+            } catch (affErr) { console.error('[package] VM affinity config failed:', affErr.message); }
+        }
 
         // 创建分配记录
         var newVm = await db.vms.create({

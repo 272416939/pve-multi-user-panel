@@ -1716,7 +1716,7 @@
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>ID</th><th>名称</th><th>模板 VM</th><th>CPU</th><th>内存</th><th>磁盘</th><th>网桥</th><th>状态</th><th>操作</th>
+                                        <th>ID</th><th>名称</th><th>模板 VM</th><th>CPU</th><th>内存</th><th>目标存储</th><th>克隆模式</th><th>网桥</th><th>状态</th><th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1726,7 +1726,8 @@
                                         <td>{{ t.template_vmid }}</td>
                                         <td>{{ t.cores }}核</td>
                                         <td>{{ t.memory }}MB</td>
-                                        <td>{{ t.disk_size }}GB</td>
+                                        <td>{{ t.target_storage }}</td>
+                                        <td>{{ t.clone_mode === 'full' ? '完整克隆' : '链接克隆' }}</td>
                                         <td>{{ t.network_bridge }}</td>
                                         <td><span :class="t.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ t.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
@@ -1736,7 +1737,7 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr v-if="templatePage.vmTemplates.value.length === 0"><td colspan="9" class="text-center text-muted">暂无 VM 模板</td></tr>
+                                    <tr v-if="templatePage.vmTemplates.value.length === 0"><td colspan="10" class="text-center text-muted">暂无 VM 模板</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1759,7 +1760,7 @@
                                     <tr v-for="t in templatePage.lxcTemplates.value" :key="t.id">
                                         <td>{{ t.id }}</td>
                                         <td>{{ t.name }}</td>
-                                        <td class="text-truncate" style="max-width:200px">{{ t.ostemplate }}</td>
+                                        <td>{{ t.ostemplate.split('/').pop() }}</td>
                                         <td>{{ t.storage }}</td>
                                         <td>{{ t.cores }}核</td>
                                         <td>{{ t.memory }}MB</td>
@@ -3303,11 +3304,30 @@
                             <div class="modal-body">
                                 <div class="row g-3">
                                     <div class="col-md-6"><label class="form-label">模板名称</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.name"></div>
-                                    <div class="col-md-6"><label class="form-label">模板 VM ID</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.template_vmid"></div>
-                                    <div class="col-md-4"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.cores"></div>
-                                    <div class="col-md-4"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.memory"></div>
-                                    <div class="col-md-4"><label class="form-label">磁盘 (GB)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.disk_size"></div>
+                                    <div class="col-md-6"><label class="form-label">模板 VM</label>
+                                        <select class="form-select" v-model="templatePage.vmTemplateForm.value.template_vmid">
+                                            <option value="">请选择 PVE 模板 VM</option>
+                                            <option v-for="v in templatePage.pveTemplateVms.value" :key="v.vmid" :value="v.vmid">{{ v.vmid }} - {{ v.name || '无名称' }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.cores"></div>
+                                    <div class="col-md-6"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.memory"></div>
+                                    <div class="col-md-6"><label class="form-label">目标存储</label>
+                                        <select class="form-select" v-model="templatePage.vmTemplateForm.value.target_storage">
+                                            <option value="">请选择存储池</option>
+                                            <option v-for="s in templatePage.allStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} ({{ (s.maxdisk/1073741824).toFixed(0) }}GB)</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-6"><label class="form-label">网络桥接</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.network_bridge"></div>
+                                    <div class="col-md-6"><label class="form-label">克隆模式</label>
+                                        <select class="form-select" v-model="templatePage.vmTemplateForm.value.clone_mode">
+                                            <option value="full">完整克隆（独立磁盘）</option>
+                                            <option value="linked">链接克隆（共享基础磁盘）</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6"><label class="form-label">CPU 亲和性（可选）</label>
+                                        <input class="form-control" v-model="templatePage.vmTemplateForm.value.cpu_affinity" placeholder="如 0-11, 留空不绑定">
+                                    </div>
                                     <div class="col-md-6"><label class="form-label">网卡型号</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.network_model"></div>
                                     <div class="col-md-6"><label class="form-label">操作系统类型</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.os_type"></div>
                                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="templatePage.vmTemplateForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
@@ -3335,8 +3355,18 @@
                             <div class="modal-body">
                                 <div class="row g-3">
                                     <div class="col-md-6"><label class="form-label">模板名称</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.name"></div>
-                                    <div class="col-md-6"><label class="form-label">存储池</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.storage"></div>
-                                    <div class="col-12"><label class="form-label">模板路径 (ostemplate)</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.ostemplate" placeholder="local:vztmpl/ubuntu-22.04..."></div>
+                                    <div class="col-md-6"><label class="form-label">存储池</label>
+                                        <select class="form-select" v-model="templatePage.lxcTemplateForm.value.storage">
+                                            <option value="">请选择存储池</option>
+                                            <option v-for="s in templatePage.lxcStorages.value" :key="s.id" :value="s.id">{{ s.id }}</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-12"><label class="form-label">模板路径 (ostemplate)</label>
+                                        <select class="form-select" v-model="templatePage.lxcTemplateForm.value.ostemplate">
+                                            <option value="">请先选择存储池</option>
+                                            <option v-for="t in templatePage.lxcOstemplates.value" :key="t.volid" :value="t.volid">{{ t.volid }}</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-3"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="templatePage.lxcTemplateForm.value.cores"></div>
                                     <div class="col-md-3"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model="templatePage.lxcTemplateForm.value.memory"></div>
                                     <div class="col-md-3"><label class="form-label">Swap (MB)</label><input class="form-control" type="number" v-model="templatePage.lxcTemplateForm.value.swap"></div>
@@ -3727,8 +3757,10 @@
                 if (!$.templatePage) $.templatePage = {};
                 if (!$.templatePage.vmTemplates) $.templatePage.vmTemplates = Vue.ref([]);
                 if (!$.templatePage.lxcTemplates) $.templatePage.lxcTemplates = Vue.ref([]);
-                if (!$.templatePage.vmTemplateForm) $.templatePage.vmTemplateForm = Vue.ref({ id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20, network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', description: '', status: 'active' });
-                if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: 'local', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1, features: '', description: '', status: 'active' });
+                if (!$.templatePage.vmTemplateForm) $.templatePage.vmTemplateForm = Vue.ref({ id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20, network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', target_storage: 'local-lvm', clone_mode: 'full', cpu_affinity: '', description: '', status: 'active' });
+                if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: '', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1, features: '', description: '', status: 'active' });
+                if (!$.templatePage.lxcStorages) $.templatePage.lxcStorages = Vue.ref([]);
+                if (!$.templatePage.lxcOstemplates) $.templatePage.lxcOstemplates = Vue.ref([]);
                 $.initCore();
                 $.initVm();
                 $.initLxc();

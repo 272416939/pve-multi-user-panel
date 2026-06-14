@@ -35,7 +35,7 @@ class PveApi {
     return response.data.data;
   }
 
-  async getVms() {
+  async getVms(options) {
     if (!this.node) {
       await this.detectNode();
     }
@@ -44,7 +44,10 @@ class PveApi {
     }
     const url = `${this.host}/api2/json/nodes/${this.node}/qemu`;
     const response = await this.axiosInstance.get(url);
-    const vms = response.data.data || [];
+    var vms = response.data.data || [];
+    if (options && options.templateOnly) {
+      vms = vms.filter(function(vm) { return vm.template === 1; });
+    }
     return vms;
   }
 
@@ -180,6 +183,9 @@ class PveApi {
     searchParams.append('newid', String(newVmid));
     if (params && params.name) searchParams.append('name', params.name);
     if (params && params.target) searchParams.append('target', params.target);
+    if (params && params.clone_mode === 'full') {
+      searchParams.append('full', '1');
+    }
     const response = await this.axiosInstance.post(
       `${this.host}/api2/json/nodes/${this.node}/qemu/${templateVmid}/clone`,
       searchParams.toString(),
@@ -195,6 +201,14 @@ class PveApi {
     const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage`);
     const storages = response.data.data || [];
     return storages.filter(s => s.content && s.content.split(',').includes('backup'));
+  }
+
+  async getAllStorages() {
+    if (!this.node) {
+      await this.detectNode();
+    }
+    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage`);
+    return response.data.data || [];
   }
 
   async getLxcStorageList() {

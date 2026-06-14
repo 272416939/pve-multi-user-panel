@@ -458,4 +458,13 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
     }
 });
 
+router.get('/admin/storages/all', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const storages = await pveApi.getAllStorages();
+        res.json(storages);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = router;

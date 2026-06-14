@@ -473,6 +473,10 @@ async function migrateSchema() {
     await safeAlter('transaction_records', 'trade_no', 'VARCHAR(200) DEFAULT NULL');
     await safeAlter('transaction_records', 'api_trade_no', 'VARCHAR(200) DEFAULT NULL');
 
+    await safeAlter('vm_templates', 'target_storage', "VARCHAR(100) NOT NULL DEFAULT 'local-lvm'");
+    await safeAlter('vm_templates', 'clone_mode', "VARCHAR(20) NOT NULL DEFAULT 'full'");
+    await safeAlter('vm_templates', 'cpu_affinity', "VARCHAR(255) NOT NULL DEFAULT ''");
+
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {
         const orphaned = await queryAll("SELECT id, pve_upid FROM backups WHERE vm_id = 0 AND ct_id IS NULL AND type = 'vm'");
@@ -1668,19 +1672,23 @@ module.exports = {
         getById: (id) => queryOne('SELECT * FROM vm_templates WHERE id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, target_storage, clone_mode, cpu_affinity, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.template_vmid || 0, data.cores || 1,
                     data.memory || 1024, data.disk_size || 20,
                     data.network_bridge || 'vmbr0', data.network_model || 'virtio',
-                    data.os_type || '', data.description || '', data.status || 'active'
+                    data.os_type || '',
+                    data.target_storage || 'local-lvm',
+                    data.clone_mode || 'full',
+                    data.cpu_affinity || '',
+                    data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM vm_templates WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'description', 'status'];
+            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'target_storage', 'clone_mode', 'cpu_affinity', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
