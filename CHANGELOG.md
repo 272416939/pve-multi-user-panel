@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.3.2] - 2026-06-14
+
+### Fixed
+- fix(ikuai): getMacGroups 绕过 _call 直接获取原始响应添加调试日志
+  - 直接调用 client.call() 获取完整 Result/ErrMsg/Data
+  - 添加 console.log 打印完整响应结构（截取前500字符）
+  - addMacToGroup/removeMacFromGroup 同步改造
+
+---
+
 ## [2.3.1] - 2026-06-14
 
 ### Fixed
