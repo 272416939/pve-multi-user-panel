@@ -35,7 +35,7 @@
     tp.loadPveTemplateVms = async function() {
         try {
             var data = await api('/pve/vms');
-            tp.pveTemplateVms.value = (data.availableVms || []).concat(data.assignedVms || []);
+            tp.pveTemplateVms.value = (data.available || []).concat(data.assigned || []);
         } catch (e) {}
     };
 
