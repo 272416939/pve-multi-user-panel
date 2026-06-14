@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.8] - 2026-06-15
+
+### Fixed
+- fix(admin): PVE模板VMID下拉修复 available/assigned 字段名
+
+---
+
 ## [2.5.7] - 2026-06-15
 
 ### Fixed
