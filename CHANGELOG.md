@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.6.0] - 2026-06-15
+
+### Added
+- feat(admin): 分配VM/LXC新增季付周期（90天计）
+- feat(admin): 续费钱包支持季付（quarter=90天）
+
+### Fixed
+- fix(admin): 套餐管理页面独立 section 修复（不再归属后台管理）
+
+---
+
 ## [2.5.8] - 2026-06-15
 
 ### Fixed
