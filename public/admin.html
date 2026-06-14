@@ -876,7 +876,7 @@
                                                 <label class="form-label fw-bold">📦 套餐快速开通</label>
                                                 <select class="form-select form-select-sm" v-model="packagePage.vmProvisionForm.package_id" style="max-width:400px;">
                                                     <option value="">-- 选择套餐（自动填充参数） --</option>
-                                                    <option v-for="p in packagePage.vmPackages" :key="p.id" :value="p.id" v-show="p.status === 'active'">{{ p.name }} ({{ p.cores }}核/{{ p.memory }}MB/{{ p.disk_size }}GB)</option>
+                                                    <option v-for="p in packagePage.vmPackages.value" :key="p.id" :value="p.id" v-show="p.status === 'active'">{{ p.name }} ({{ p.cores }}核/{{ p.memory }}MB/{{ p.disk_size }}GB)</option>
                                                 </select>
                                                 <small class="text-muted">选择套餐后将自动填充资源配置和价格</small>
                                             </div>
@@ -3768,6 +3768,11 @@
                 if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1, features: '', description: '', status: 'active' });
                 if (!$.templatePage.lxcStorages) $.templatePage.lxcStorages = Vue.ref([]);
                 if (!$.templatePage.lxcOstemplates) $.templatePage.lxcOstemplates = Vue.ref([]);
+                if (!$.packagePage) $.packagePage = {};
+                if (!$.packagePage.vmPackages) $.packagePage.vmPackages = Vue.ref([]);
+                if (!$.packagePage.lxcPackages) $.packagePage.lxcPackages = Vue.ref([]);
+                if (!$.packagePage.vmProvisionForm) $.packagePage.vmProvisionForm = Vue.ref({ package_id: '' });
+                if (!$.packagePage.lxcProvisionForm) $.packagePage.lxcProvisionForm = Vue.ref({ package_id: '' });
                 $.initCore();
                 $.initVm();
                 $.initLxc();
