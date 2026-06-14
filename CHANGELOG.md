@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.6] - 2026-06-14
+
+### Fixed
+- fix(ikuai): 修复前端 `mac_group_id` 与后端 `req.body` 字段名不匹配
+  - POST/PUT vm.js + lxc.js 中 req.body 解构从 `ikuai_mac_group_id` 改为 `mac_group_id`
+  - 根因：前端表单 v-model 使用 `mac_group_id`，后端解构名不对导致永远取到 undefined
+
+---
+
 ## [2.3.5] - 2026-06-14
 
 ### Fixed
