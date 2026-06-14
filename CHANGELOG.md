@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.3.3] - 2026-06-14
+
+### Fixed
+- fix(ikuai): 修正 MAC 分组 func_name 为 `route_object_mac`（来自官方 v3.x API 文档）
+  - getMacGroups/addMacToGroup/removeMacFromGroup 全部切换
+  - add/remove 改为整体替换 edit 模式（获取分组完整列表 → 追加/过滤 → edit）
+
+---
+
 ## [2.3.2] - 2026-06-14
 
 ### Fixed
