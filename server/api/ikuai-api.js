@@ -305,7 +305,7 @@ class IkuaiApi {
                 ORDER_BY: '',
                 ORDER: ''
             });
-            const list = data?.data || [];
+            const list = data?.data || data || [];
             return list.map(item => ({
                 id: item.id || '',
                 group_name: item.group_name || '',
