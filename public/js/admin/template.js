@@ -33,7 +33,10 @@
     tp.allStorages = ref([]);
 
     tp.loadPveTemplateVms = async function() {
-        try { tp.pveTemplateVms.value = await api('/pve/vms'); } catch (e) {}
+        try {
+            var data = await api('/pve/vms');
+            tp.pveTemplateVms.value = (data.availableVms || []).concat(data.assignedVms || []);
+        } catch (e) {}
     };
 
     tp.loadAllStorages = async function() {

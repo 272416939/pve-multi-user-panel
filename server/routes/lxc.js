@@ -655,7 +655,12 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
 
 router.get('/lxc/templates', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const storages = await pveApi.getStorageList();
+        var targetStorage = req.query.storage || '';
+        if (targetStorage) {
+            var templates = await pveApi.getTemplates(targetStorage);
+            return res.json(templates.map(function(t) { return Object.assign({}, t, { storage: targetStorage }); }));
+        }
+        const storages = await pveApi.getAllStorages();
         const templatePromises = storages.map(async (s) => {
             try {
                 const templates = await pveApi.getTemplates(s.storage);
