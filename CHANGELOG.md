@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.3.0] - 2026-06-14
+
+### Added
+- feat(ikuai): 分配 VM/LXC 时自动同步爱快 MAC 分组
+  - 新增 `GET /api/ikuai/mac-groups` 端点（admin-only）
+  - 分配时提取 PVEMAC → 加入选定分组；移除/销毁时自动从分组删除
+  - 编辑时可重新分配 MAC 分组（先删后加）
+  - 前端分配/编辑表单增加 MAC 分组下拉框
+  - 新增 `ikuai_mac_group_id` 数据库字段（SQLite + MySQL 双驱同步）
+
+---
+
 ## [2.2.0] - 2026-06-14
 
 ### Changed
