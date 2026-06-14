@@ -12,14 +12,14 @@
     $.userLxcContainers = ref([]);
     $.lxcLoading = ref(false);
     $.lxcForm = ref({ ostemplate: '', hostname: '', password: '', confirmPassword: '', storage: '', cores: 1, memory: 512, swap: 512, disk: 8, net0Bridge: 'vmbr0', net0Ip: '', net0Mac: '', unprivileged: true, start: true });
-    $.lxcAssignForm = ref({ ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '' });
+    $.lxcAssignForm = ref({ ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', mac_group_id: '' });
     $.lxcPasswordForm = ref({ password: '', confirmPassword: '' });
     $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
     $.lxcIpError = Vue.ref('');
     $.lxcIpLoading = Vue.ref(false);
     $.selectedLxc = ref(null);
     $.lxcConfirmState = ref({ ctId: null, action: null });
-    $.editLxcForm = ref({ id: null, ct_id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null });
+    $.editLxcForm = ref({ id: null, ct_id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, mac_group_id: '' });
     $.availableLxc = ref([]);
     $.assignedLxc = ref([]);
 
@@ -149,7 +149,7 @@
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.lxcAssignForm.value, { expiration_date: expDate }))
             });
-            $.lxcAssignForm.value = { ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month' };
+            $.lxcAssignForm.value = { ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', mac_group_id: '' };
             await $.loadLxcContainers();
             await $.loadUserLxcContainers();
         } catch (e) {
@@ -171,7 +171,8 @@
                     expiration_date: expDate,
                     renewal_price: f.renewal_price,
                     renewal_period: f.renewal_period || 'month',
-                    user_id: f.user_id
+                    user_id: f.user_id,
+                    mac_group_id: f.mac_group_id || null
                 })
             });
             $.bsModalHide('editLxcModal');
@@ -341,7 +342,8 @@
             expiration_date: formatDateTimeLocal(ct.expiration_date),
             renewal_price: ct.renewal_price || '',
             renewal_period: ct.renewal_period || 'month',
-            user_id: ct.user_id || null
+            user_id: ct.user_id || null,
+            mac_group_id: ct.ikuai_mac_group_id || ''
         };
         $.bsModalShow('editLxcModal');
     };

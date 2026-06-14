@@ -473,6 +473,22 @@ function migrateSchema() {
         }
     }
 
+    try {
+        db.exec(`ALTER TABLE vms ADD COLUMN ikuai_mac_group_id TEXT DEFAULT ''`);
+    } catch (e) {
+        if (!e.message.includes('duplicate column name')) {
+            console.error('迁移 vms.ikuai_mac_group_id 字段失败:', e.message);
+        }
+    }
+
+    try {
+        db.exec(`ALTER TABLE lxc_containers ADD COLUMN ikuai_mac_group_id TEXT DEFAULT ''`);
+    } catch (e) {
+        if (!e.message.includes('duplicate column name')) {
+            console.error('迁移 lxc_containers.ikuai_mac_group_id 字段失败:', e.message);
+        }
+    }
+
     // 迁移 transaction_records 表 trade_no 字段
     try {
         db.exec(`ALTER TABLE transaction_records ADD COLUMN trade_no TEXT DEFAULT NULL`);
@@ -1337,7 +1353,7 @@ module.exports = {
         update: (id, updates) => {
             // M-9: 列名白名单防 SQL 注入
             const allowedColumns = ['name', 'ct_id', 'user_id', 'username', 'expiration_date',
-                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

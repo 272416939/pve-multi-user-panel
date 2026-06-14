@@ -295,6 +295,63 @@ class IkuaiApi {
         console.log(`[ikuai] DHCP 静态绑定删除成功: ID=${id}`);
         return result;
     }
+
+    // MAC 分组：获取分组列表
+    async getMacGroups() {
+        try {
+            const data = await this._call('mac_group', 'show', {
+                TYPE: 'data,total',
+                limit: '0,500',
+                ORDER_BY: '',
+                ORDER: ''
+            });
+            const list = data?.data || [];
+            return list.map(item => ({
+                id: item.id || '',
+                group_name: item.group_name || '',
+                comment: item.comment || '',
+                enabled: item.enabled || 'yes',
+                members: (item.members || item.group_value || []).map(m => ({
+                    mac: (m.mac || '').toLowerCase(),
+                    comment: m.comment || ''
+                }))
+            }));
+        } catch (e) {
+            console.error('[ikuai] 获取 MAC 分组列表失败:', e.message);
+            return [];
+        }
+    }
+
+    // MAC 分组：添加 MAC 到分组
+    async addMacToGroup(groupId, mac, comment) {
+        const result = await this._call('mac_group', 'add_mac', {
+            id: Number(groupId),
+            mac: mac,
+            comment: comment || ''
+        });
+        console.log(`[ikuai] MAC 分组新增: groupId=${groupId}, mac=${mac}`);
+        return result;
+    }
+
+    // MAC 分组：从分组删除 MAC
+    async removeMacFromGroup(groupId, mac) {
+        const result = await this._call('mac_group', 'del_mac', {
+            id: Number(groupId),
+            mac: mac
+        });
+        console.log(`[ikuai] MAC 分组删除: groupId=${groupId}, mac=${mac}`);
+        return result;
+    }
+
+    // MAC 分组：更新分组内 MAC（先删除旧 MAC，再添加新 MAC）
+    async updateMacInGroup(groupId, oldMac, newMac, comment) {
+        if (oldMac && oldMac !== newMac) {
+            try { await this.removeMacFromGroup(groupId, oldMac); } catch (e) {}
+        }
+        if (newMac) {
+            return await this.addMacToGroup(groupId, newMac, comment);
+        }
+    }
 }
 
 module.exports = new IkuaiApi();

@@ -124,7 +124,7 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
-    const { ct_id, user_id, name, expiration_date, renewal_price, renewal_period } = req.body;
+    const { ct_id, user_id, name, expiration_date, renewal_price, renewal_period, ikuai_mac_group_id } = req.body;
  
     if (!ct_id || !user_id) {
         return res.status(400).json({ error: '请选择容器和用户' });
@@ -150,6 +150,18 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         renewal_price: renewal_price || '',
         renewal_period: renewal_period || 'month'
     });
+ 
+    // MAC 分组同步
+    if (ikuai_mac_group_id) {
+        try {
+            var macCfg = await pveApi.getLxcConfig(parsedCtId);
+            var cmac = macCfg?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+            if (cmac) {
+                await ikuaiApi.addMacToGroup(ikuai_mac_group_id, cmac[0], (name || 'CT ' + ct_id) + ' 容器');
+                await db.lxcContainers.update(newCt.id, { ikuai_mac_group_id: ikuai_mac_group_id });
+            }
+        } catch (e) { console.error('LXC ' + parsedCtId + ' MAC分组同步失败:', e.message); }
+    }
  
     try {
         const user = await db.users.getById(parseInt(user_id));
@@ -229,7 +241,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     const ctId = parseInt(req.params.id);
-    const { name, expiration_date, renewal_price, renewal_period, user_id } = req.body;
+    const { name, expiration_date, renewal_price, renewal_period, user_id, ikuai_mac_group_id } = req.body;
  
     const ct = await db.lxcContainers.getById(ctId);
     if (!ct) {
@@ -282,6 +294,24 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
                 });
             }
         } catch (e) {}
+    }
+
+    // MAC 分组变更
+    const newMacGroupId = req.body.ikuai_mac_group_id;
+    if (isAdmin && newMacGroupId !== undefined && newMacGroupId !== ct.ikuai_mac_group_id) {
+        try {
+            const macConfig = await pveApi.getLxcConfig(ct.ct_id);
+            const cmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+            if (cmac) {
+                if (ct.ikuai_mac_group_id) {
+                    try { await ikuaiApi.removeMacFromGroup(ct.ikuai_mac_group_id, cmac[0]); } catch (e) {}
+                }
+                if (newMacGroupId) {
+                    await ikuaiApi.addMacToGroup(newMacGroupId, cmac[0], (ct.name || 'CT ' + ct.ct_id) + ' 容器');
+                }
+                updates.ikuai_mac_group_id = newMacGroupId || '';
+            }
+        } catch (e) { console.error('LXC MAC分组更新失败:', e.message); }
     }
  
     await db.lxcContainers.update(ctId, updates);
@@ -978,6 +1008,16 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
             // 清理 DHCP 静态绑定
             if (ct && ct.ct_id) {
                 removeDhcpStaticBinding('lxc', ct.ct_id);
+            }
+            // MAC 分组清理
+            if (ct && ct.ct_id && ct.ikuai_mac_group_id) {
+                try {
+                    const macConfig = await pveApi.getLxcConfig(ct.ct_id);
+                    const cmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+                    if (cmac) {
+                        await ikuaiApi.removeMacFromGroup(ct.ikuai_mac_group_id, cmac[0]);
+                    }
+                } catch (e) { console.error('LXC MAC分组删除失败:', e.message); }
             }
             await db.lxcContainers.delete(ct.id);
         }

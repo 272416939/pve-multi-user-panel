@@ -128,7 +128,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
-    const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period } = req.body;
+    const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period, ikuai_mac_group_id } = req.body;
  
     if (!vm_id || !user_id) {
         return res.status(400).json({ error: '请选择虚拟机和用户' });
@@ -154,6 +154,18 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         renewal_price: renewal_price || '',
         renewal_period: renewal_period || 'month'
     });
+    
+    // MAC 分组同步
+    if (ikuai_mac_group_id) {
+        try {
+            var macCfg = await pveApi.getVmConfig(parsedVmId);
+            var vmac = macCfg?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+            if (vmac) {
+                await ikuaiApi.addMacToGroup(ikuai_mac_group_id, vmac[0], (name || 'VM ' + vm_id) + ' 虚拟机');
+                await db.vms.update(newVm.id, { ikuai_mac_group_id: ikuai_mac_group_id });
+            }
+        } catch (e) { console.error('VM ' + parsedVmId + ' MAC分组同步失败:', e.message); }
+    }
     
     // DHCP 静态绑定：分配 IP
     try {
@@ -232,7 +244,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     const vmId = parseInt(req.params.id);
-    const { name, expiration_date, renewal_price, renewal_period, user_id } = req.body;
+    const { name, expiration_date, renewal_price, renewal_period, user_id, ikuai_mac_group_id } = req.body;
     
     const vm = await db.vms.getById(vmId);
     if (!vm) {
@@ -275,7 +287,25 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
         updates.reminderSent = false;
         await db.vms.reminders.clear(vmId);
     }
-    
+
+    // MAC 分组变更
+    const newMacGroupId = req.body.ikuai_mac_group_id;
+    if (isAdmin && newMacGroupId !== undefined && newMacGroupId !== vm.ikuai_mac_group_id) {
+        try {
+            const macConfig = await pveApi.getVmConfig(vm.vm_id);
+            const vmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+            if (vmac) {
+                if (vm.ikuai_mac_group_id) {
+                    try { await ikuaiApi.removeMacFromGroup(vm.ikuai_mac_group_id, vmac[0]); } catch (e) {}
+                }
+                if (newMacGroupId) {
+                    await ikuaiApi.addMacToGroup(newMacGroupId, vmac[0], (vm.name || 'VM ' + vm.vm_id) + ' 虚拟机');
+                }
+                updates.ikuai_mac_group_id = newMacGroupId || '';
+            }
+        } catch (e) { console.error('VM MAC分组更新失败:', e.message); }
+    }
+
     await db.vms.update(vmId, updates);
     
     // 管理员延长到期时间后，如果虚拟机之前因到期停机，尝试自动开机
@@ -329,6 +359,16 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     // 清理 DHCP 静态绑定
     if (vm && vm.vm_id) {
         removeDhcpStaticBinding('vm', vm.vm_id);
+    }
+    // MAC 分组清理
+    if (vm && vm.vm_id && vm.ikuai_mac_group_id) {
+        try {
+            const macConfig = await pveApi.getVmConfig(vm.vm_id);
+            const vmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+            if (vmac) {
+                await ikuaiApi.removeMacFromGroup(vm.ikuai_mac_group_id, vmac[0]);
+            }
+        } catch (e) { console.error('VM MAC分组删除失败:', e.message); }
     }
     await db.vms.delete(vmId);
     // 发送移除通知

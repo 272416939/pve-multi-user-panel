@@ -841,6 +841,13 @@
                                                 <option value="year">年（365天计）</option>
                                             </select>
                                         </div>
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">MAC分组</label>
+                                            <select class="form-select" v-model="assignForm.mac_group_id">
+                                                <option value="">不加入分组</option>
+                                                <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                                            </select>
+                                        </div>
                                     </div>
                                     <button type="submit" class="btn-glass" formnovalidate>分配</button>
                                 </form>
@@ -1065,6 +1072,13 @@
                                             <select class="form-select" v-model="lxcAssignForm.renewal_period">
                                                 <option value="month">月（30天计）</option>
                                                 <option value="year">年（365天计）</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">MAC分组</label>
+                                            <select class="form-select" v-model="lxcAssignForm.mac_group_id">
+                                                <option value="">不加入分组</option>
+                                                <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
                                             </select>
                                         </div>
                                     </div>
@@ -2304,6 +2318,13 @@
                                         </select>
                                         <small class="text-muted">为该虚拟机指定专用备份存储位置，留空则使用全局默认</small>
                                     </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">MAC分组</label>
+                                        <select class="form-select" v-model="editVmForm.mac_group_id">
+                                            <option value="">不加入分组</option>
+                                            <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                                        </select>
+                                    </div>
                                     <div class="d-flex gap-2">
                                         <button type="submit" class="btn btn-primary" formnovalidate>保存</button>
                                         <button type="button" class="btn btn-outline-danger" @click="removeVm">移除</button>
@@ -2796,6 +2817,13 @@
                                         <select class="form-select" v-model="editLxcForm.renewal_period">
                                             <option value="month">月（30天计）</option>
                                             <option value="year">年（365天计）</option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">MAC分组</label>
+                                        <select class="form-select" v-model="editLxcForm.mac_group_id">
+                                            <option value="">不加入分组</option>
+                                            <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
                                         </select>
                                     </div>
                                     <div class="d-flex gap-2">

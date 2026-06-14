@@ -9,7 +9,7 @@
     $.showCreateUser = ref(false);
     $.createUserForm = ref({ username: '', password: '', role: 'user', email: '', emailVerified: false });
     $.editUserForm = ref({ id: null, username: '', password: '', role: 'user', email: '', emailVerified: false, totp_enabled: false });
-    $.assignForm = ref({ vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month' });
+    $.assignForm = ref({ vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', mac_group_id: '' });
     $.smtpConfig = ref({ host: '', port: 587, secure: false, user: '', password: '', from: '', enabled: false });
     $.reminderConfig = ref({ days1: 7, days2: 3, days3: 1 });
     $.snapshotConfig = ref({ max_per_vm: 5, daily_create_limit: 20, daily_restore_limit: 10 });
@@ -87,6 +87,16 @@
     $.cdkRedeemError = ref('');
     $.cdkRedeemMessage = ref('');
     $.cdkVmDropdownOpen = ref(false);
+
+    // 爱快 MAC 分组列表
+    $.macGroups = ref([]);
+    $.loadMacGroups = async function() {
+        try {
+            $.macGroups.value = await api('/ikuai/mac-groups');
+        } catch (e) {
+            $.macGroups.value = [];
+        }
+    };
 
     // ==================== 函数 ====================
     // 用户管理
@@ -471,9 +481,23 @@
             if (f.pay_method) params.pay_method = f.pay_method;
             if (f.trade_type) params.trade_type = f.trade_type;
             if (f.order_no) params.order_no = f.order_no;
-            window.open('/api/admin/transactions/export?' + new URLSearchParams(params), '_blank');
+            var token = localStorage.getItem('token');
+            var resp = await fetch('/api/admin/transactions/export?' + new URLSearchParams(params), {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!resp.ok) {
+                var err = await resp.json().catch(function() { return { error: '导出失败' }; });
+                throw new Error(err.error || '导出失败');
+            }
+            var blob = await resp.blob();
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'transaction_history.csv';
+            a.click();
+            URL.revokeObjectURL(url);
         } catch (e) {
-            alert('导出失败');
+            alert('导出失败: ' + (e.message || ''));
         }
     };
 })();

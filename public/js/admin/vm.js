@@ -9,7 +9,7 @@
     $.userVms = ref([]);
     $.vmsLoading = ref(false);
     $.confirmState = ref({ vmId: null, action: null });
-    $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, backup_storage: '' });
+    $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, backup_storage: '', mac_group_id: '' });
     $.availableVms = ref([]);
     $.assignedVms = ref([]);
 
@@ -145,7 +145,8 @@
             renewal_price: vm.renewal_price || '',
             renewal_period: vm.renewal_period || 'month',
             user_id: vm.user_id || null,
-            backup_storage: vm.backup_storage || ''
+            backup_storage: vm.backup_storage || '',
+            mac_group_id: vm.ikuai_mac_group_id || ''
         };
         $.bsModalShow('editVmModal');
     };
@@ -164,7 +165,8 @@
                     renewal_price: $.editVmForm.value.renewal_price,
                     renewal_period: $.editVmForm.value.renewal_period || 'month',
                     user_id: $.editVmForm.value.user_id,
-                    backup_storage: $.editVmForm.value.backup_storage || null
+                    backup_storage: $.editVmForm.value.backup_storage || null,
+                    mac_group_id: $.editVmForm.value.mac_group_id || null
                 })
             });
             $.bsModalHide('editVmModal');
@@ -209,7 +211,7 @@
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.assignForm.value, { expiration_date: expDate }))
             });
-            $.assignForm.value = { vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month' };
+            $.assignForm.value = { vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', mac_group_id: '' };
             $.loadData();
             $.loadAssignData();
         } catch (e) {

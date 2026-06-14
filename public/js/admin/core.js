@@ -621,6 +621,7 @@ $.initDetailCharts = function() {
                 await $.loadNavItems();
                 await $.loadAssignData();
                 await $.loadData();
+                await $.loadMacGroups();
                 // Auto-expand submenu based on current section
                 if ($.activeSection.value === 'vms' || $.activeSection.value === 'lxc') {
                     setTimeout(function() {

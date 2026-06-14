@@ -395,6 +395,8 @@ async function migrateSchema() {
     await safeAlter('backups', 'rootfs_storage', "TEXT");
     await safeAlter('vms', 'dhcp_static_ip', "TEXT");
     await safeAlter('lxc_containers', 'dhcp_static_ip', "TEXT");
+    await safeAlter('vms', 'ikuai_mac_group_id', "TEXT");
+    await safeAlter('lxc_containers', 'ikuai_mac_group_id', "TEXT");
 
     await safeAlter('transaction_records', 'trade_no', 'VARCHAR(200) DEFAULT NULL');
     await safeAlter('transaction_records', 'api_trade_no', 'VARCHAR(200) DEFAULT NULL');
@@ -1337,7 +1339,7 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'ct_id', 'user_id', 'username', 'expiration_date',
-                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
