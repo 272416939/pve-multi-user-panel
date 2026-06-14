@@ -236,7 +236,7 @@ router.post('/wallet/notify', async (req, res) => {
         }
 
         try {
-            if (user.email && user.email_verified && user.email.includes('@')) {
+            if (user.email && user.emailVerified && user.email.includes('@')) {
                 const { sendEmail } = require('../utils/email');
                 await sendEmail(user.email, '充值到账通知 - PVE管理面板',
                     '您已成功充值 ¥' + amount.toFixed(2) + '\n当前余额 ¥' + balanceAfter.toFixed(2) + '\n订单号：' + params.out_trade_no + '\n时间：' + new Date().toLocaleString('zh-CN'));
@@ -329,7 +329,7 @@ router.get('/wallet/return', async (req, res) => {
         }
 
         try {
-            if (user.email && user.email_verified && user.email.includes('@')) {
+            if (user.email && user.emailVerified && user.email.includes('@')) {
                 const { sendEmail } = require('../utils/email');
                 await sendEmail(user.email, '充值到账通知 - PVE管理面板',
                     '您已成功充值 ¥' + amount.toFixed(2) + '\n当前余额 ¥' + balanceAfter.toFixed(2) + '\n订单号：' + params.out_trade_no + '\n时间：' + new Date().toLocaleString('zh-CN'));
@@ -439,7 +439,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         }
         
         try {
-            if (user.email && user.email_verified && user.email.includes('@')) {
+            if (user.email && user.emailVerified && user.email.includes('@')) {
                 const { sendEmail } = require('../utils/email');
                 await sendEmail(user.email, '资源续费成功 - PVE管理面板', emailContent);
             }
