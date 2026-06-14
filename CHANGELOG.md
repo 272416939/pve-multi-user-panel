@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.5.5] - 2026-06-15
+
+### Fixed
+- fix(admin): VM模板下拉修复（合并 availableVms + assignedVms 数组）
+- fix(lxc): LXC模板存储过滤修复（getAllStorages 替代 getLxcStorageList）
+
+---
+
 ## [2.5.4] - 2026-06-15
 
 ### Fixed
