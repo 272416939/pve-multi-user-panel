@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.5.6] - 2026-06-15
+
+### Fixed
+- fix(admin): 分配页套餐下拉 .value 引用修复（packagePage.vmPackages → .value）
+
+---
+
 ## [2.5.5] - 2026-06-15
 
 ### Fixed
