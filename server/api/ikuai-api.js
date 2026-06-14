@@ -321,10 +321,10 @@ class IkuaiApi {
                 group_name: item.group_name || '',
                 comment: item.comment || '',
                 enabled: item.enabled || 'yes',
-                members: (item.group_value || item.members || []).map(m => ({
-                    mac: (m.mac || '').toLowerCase(),
-                    comment: m.comment || ''
-                }))
+                addr_pool: item.addr_pool || '',
+                members: (item.addr_pool || '').split(/,/).filter(Boolean).map(function(m) {
+                    return { mac: m.toLowerCase(), comment: '' };
+                })
             }));
         } catch (e) {
             console.error('[ikuai] 获取 MAC 分组列表失败:', e.message);
@@ -332,43 +332,51 @@ class IkuaiApi {
         }
     }
 
-    // MAC 分组：添加 MAC 到分组（获取当前列表 → 追加 → edit 整体更新）
+    // MAC 分组：添加 MAC 到分组（addr_pool 空格分隔 → 追加 → edit）
     async addMacToGroup(groupId, mac, comment) {
         await this._ensureLogin();
         var current = await this._getMacGroupById(groupId);
         if (!current) throw new Error('MAC 分组 ID=' + groupId + ' 不存在');
-        var exists = (current.group_value || []).find(function(m) { return m.mac.toLowerCase() === mac.toLowerCase(); });
-        if (exists) {
-            console.log(`[ikuai] MAC 分组新增: mac=${mac} 已存在，跳过`);
+        var pool = (current.addr_pool || '').trim();
+        var macs = pool ? pool.split(/,/) : [];
+        var normalized = mac.toLowerCase();
+        if (macs.indexOf(normalized) >= 0) {
+            console.log('[ikuai] MAC 分组新增: mac=' + normalized + ' 已存在，跳过');
             return;
         }
-        var newList = (current.group_value || []).concat([{ mac: mac.toLowerCase(), comment: comment || '' }]);
+        macs.push(normalized);
         var result = await this.client.call('macgroup', 'edit', {
             id: groupId,
             group_name: current.group_name,
-            group_value: newList
+            addr_pool: macs.join(','),
+            comment: current.comment || ''
         });
         if (result?.Result !== 30000) throw new Error(result?.ErrMsg || 'Result=' + result?.Result);
-        console.log(`[ikuai] MAC 分组新增: groupId=${groupId}, mac=${mac}`);
+        console.log('[ikuai] MAC 分组新增: groupId=' + groupId + ', mac=' + normalized);
     }
 
-    // MAC 分组：从分组删除 MAC（获取当前列表 → 过滤 → edit 整体更新）
+    // MAC 分组：从分组删除 MAC（addr_pool → 过滤 → edit）
     async removeMacFromGroup(groupId, mac) {
         await this._ensureLogin();
         var current = await this._getMacGroupById(groupId);
         if (!current) throw new Error('MAC 分组 ID=' + groupId + ' 不存在');
-        var newList = (current.group_value || []).filter(function(m) { return m.mac.toLowerCase() !== mac.toLowerCase(); });
-        if (newList.length === (current.group_value || []).length) {
-            console.log(`[ikuai] MAC 分组删除: mac=${mac} 不在分组中，跳过`);
+        var pool = (current.addr_pool || '').trim();
+        var macs = pool ? pool.split(/,/) : [];
+        var normalized = mac.toLowerCase();
+        var idx = macs.indexOf(normalized);
+        if (idx < 0) {
+            console.log('[ikuai] MAC 分组删除: mac=' + normalized + ' 不在分组中，跳过');
             return;
         }
+        macs.splice(idx, 1);
         var result = await this.client.call('macgroup', 'edit', {
             id: groupId,
             group_name: current.group_name,
-            group_value: newList
+            addr_pool: macs.join(','),
+            comment: current.comment || ''
         });
         if (result?.Result !== 30000) throw new Error(result?.ErrMsg || 'Result=' + result?.Result);
-        console.log(`[ikuai] MAC 分组删除: groupId=${groupId}, mac=${mac}`);
+        console.log('[ikuai] MAC 分组删除: groupId=' + groupId + ', mac=' + normalized);
     }
 
     // MAC 分组：更新分组内 MAC（先删旧，再加新）
