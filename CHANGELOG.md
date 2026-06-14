@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.5.2] - 2026-06-15
+
+### Fixed
+- fix(admin): LXC模板新增 rootfs_storage 容器存储位置字段
+  - DB 新增 rootfs_storage 列，与 storage（模板存储）分离
+  - 弹窗新增"容器存储"下拉（PVE rootdir 存储池）
+  - 套餐开通 rootfs 优先使用 rootfs_storage
+- fix(admin): VM目标存储下拉 NaN 修复
+  - dir 类型存储无 maxdisk 时不再显示 NaN
+
+---
+
 ## [2.5.1] - 2026-06-15
 
 ### Added
