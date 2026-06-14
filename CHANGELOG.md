@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.5.1] - 2026-06-15
+
+### Added
+- feat(admin): 模板管理交互优化
+  - VM模板 vmid → PVE模板VM下拉选择 (GET /pve/vms?template_only=1)
+  - 磁盘 → 目标存储池下拉 (GET /admin/storages/all)
+  - 新增克隆模式下拉 (完整克隆/链接克隆)
+  - 新增 CPU亲和性可选绑定 (如 0-11)
+  - LXC模板存储池和模板路径改为PVE下拉选择 (联动加载)
+- feat(api): pve-api 新增 getAllStorages(), getVms支持templateOnly过滤, cloneVm支持full参数
+
+---
+
 ## [2.5.0] - 2026-06-15
 
 ### Added
