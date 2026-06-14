@@ -128,7 +128,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
-    const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period, ikuai_mac_group_id } = req.body;
+    const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id } = req.body;
  
     if (!vm_id || !user_id) {
         return res.status(400).json({ error: '请选择虚拟机和用户' });
@@ -156,13 +156,13 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     });
     
     // MAC 分组同步
-    if (ikuai_mac_group_id) {
+    if (mac_group_id) {
         try {
             var macCfg = await pveApi.getVmConfig(parsedVmId);
             var vmac = macCfg?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (vmac) {
-                await ikuaiApi.addMacToGroup(ikuai_mac_group_id, vmac[0], (name || 'VM ' + vm_id) + ' 虚拟机');
-                await db.vms.update(newVm.id, { ikuai_mac_group_id: ikuai_mac_group_id });
+                await ikuaiApi.addMacToGroup(mac_group_id, vmac[0], (name || 'VM ' + vm_id) + ' 虚拟机');
+                await db.vms.update(newVm.id, { ikuai_mac_group_id: mac_group_id });
             }
         } catch (e) { console.error('VM ' + parsedVmId + ' MAC分组同步失败:', e.message); }
     }
@@ -289,7 +289,7 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     }
 
     // MAC 分组变更
-    const newMacGroupId = req.body.ikuai_mac_group_id;
+    const newMacGroupId = req.body.mac_group_id;
     if (isAdmin && newMacGroupId !== undefined && newMacGroupId !== vm.ikuai_mac_group_id) {
         try {
             const macConfig = await pveApi.getVmConfig(vm.vm_id);

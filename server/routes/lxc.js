@@ -124,7 +124,7 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
-    const { ct_id, user_id, name, expiration_date, renewal_price, renewal_period, ikuai_mac_group_id } = req.body;
+    const { ct_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id } = req.body;
  
     if (!ct_id || !user_id) {
         return res.status(400).json({ error: '请选择容器和用户' });
@@ -152,13 +152,13 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     });
  
     // MAC 分组同步
-    if (ikuai_mac_group_id) {
+    if (mac_group_id) {
         try {
             var macCfg = await pveApi.getLxcConfig(parsedCtId);
             var cmac = macCfg?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (cmac) {
-                await ikuaiApi.addMacToGroup(ikuai_mac_group_id, cmac[0], (name || 'CT ' + ct_id) + ' 容器');
-                await db.lxcContainers.update(newCt.id, { ikuai_mac_group_id: ikuai_mac_group_id });
+                await ikuaiApi.addMacToGroup(mac_group_id, cmac[0], (name || 'CT ' + ct_id) + ' 容器');
+                await db.lxcContainers.update(newCt.id, { ikuai_mac_group_id: mac_group_id });
             }
         } catch (e) { console.error('LXC ' + parsedCtId + ' MAC分组同步失败:', e.message); }
     }
@@ -297,7 +297,7 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     }
 
     // MAC 分组变更
-    const newMacGroupId = req.body.ikuai_mac_group_id;
+    const newMacGroupId = req.body.mac_group_id;
     if (isAdmin && newMacGroupId !== undefined && newMacGroupId !== ct.ikuai_mac_group_id) {
         try {
             const macConfig = await pveApi.getLxcConfig(ct.ct_id);
