@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.1.20] - 2026-06-14
+
+### Fixed
+- fix(date): datetime-local 保存改用 `replace('T',' ')` 确保跨浏览器本地时间解析
+  - `new Date("YYYY-MM-DDTHH:MM")` 在部分浏览器中可能被当作 UTC 解析（非标准行为）
+  - `new Date("YYYY-MM-DD HH:MM")` 在所有浏览器中均按本地时间解析
+  - 7 处保存统一改为 `new Date(val.replace('T',' ')).toISOString()`，根除漂移
+
+---
+
 ## [2.1.19] - 2026-06-14
 
 ### Fixed
