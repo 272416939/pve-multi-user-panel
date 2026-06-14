@@ -297,23 +297,23 @@ class IkuaiApi {
     }
 
     // MAC 分组（爱快对象组）：获取分组列表
-    // func_name: route_object_mac, action: show
+    // func_name: macgroup, action: show
     async getMacGroups() {
         try {
             await this._ensureLogin();
-            const result = await this.client.call('route_object_mac', 'show', {
-                TYPE: 'data,total',
+            const result = await this.client.call('macgroup', 'show', {
+                TYPE: 'total,data',
                 limit: '0,500',
                 ORDER_BY: '',
                 ORDER: ''
             });
             if (result?.Result !== 30000) {
-                console.error('[ikuai] route_object_mac show 失败: Result=' + result?.Result + ' ErrMsg=' + (result?.ErrMsg || ''));
+                console.error('[ikuai] macgroup show 失败: Result=' + result?.Result + ' ErrMsg=' + (result?.ErrMsg || ''));
                 return [];
             }
             const list = result.Data?.data || result.Data || [];
             if (!Array.isArray(list)) {
-                console.log('[ikuai] route_object_mac show Data 不是数组，类型:', typeof list);
+                console.log('[ikuai] macgroup show Data 不是数组，类型:', typeof list);
                 return [];
             }
             return list.map(item => ({
@@ -343,7 +343,7 @@ class IkuaiApi {
             return;
         }
         var newList = (current.group_value || []).concat([{ mac: mac.toLowerCase(), comment: comment || '' }]);
-        var result = await this.client.call('route_object_mac', 'edit', {
+        var result = await this.client.call('macgroup', 'edit', {
             id: groupId,
             group_name: current.group_name,
             group_value: newList
@@ -362,7 +362,7 @@ class IkuaiApi {
             console.log(`[ikuai] MAC 分组删除: mac=${mac} 不在分组中，跳过`);
             return;
         }
-        var result = await this.client.call('route_object_mac', 'edit', {
+        var result = await this.client.call('macgroup', 'edit', {
             id: groupId,
             group_name: current.group_name,
             group_value: newList
