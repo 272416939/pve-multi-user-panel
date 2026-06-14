@@ -153,7 +153,7 @@
         try {
             var expDate = null;
             if ($.editVmForm.value.expiration_date) {
-                expDate = new Date($.editVmForm.value.expiration_date).toISOString();
+                expDate = new Date($.editVmForm.value.expiration_date.replace('T', ' ')).toISOString();
             }
             await api('/user/vms/' + $.editVmForm.value.id, {
                 method: 'PUT',

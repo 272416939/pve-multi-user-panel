@@ -143,7 +143,7 @@
         try {
             var expDate = null;
             if ($.lxcAssignForm.value.expiration_date) {
-                expDate = new Date($.lxcAssignForm.value.expiration_date).toISOString();
+                expDate = new Date($.lxcAssignForm.value.expiration_date.replace('T', ' ')).toISOString();
             }
             await api('/user/lxc', {
                 method: 'POST',
@@ -162,7 +162,7 @@
         try {
             var expDate = null;
             if (f.expiration_date) {
-                expDate = new Date(f.expiration_date + 'Z').toISOString();
+                expDate = new Date(f.expiration_date.replace('T', ' ')).toISOString();
             }
             await api('/user/lxc/' + f.id, {
                 method: 'PUT',
