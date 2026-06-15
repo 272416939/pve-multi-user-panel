@@ -29,6 +29,7 @@
     $.renewShow = ref(false);
     $.renewResource = ref(null);
     $.renewQuantity = ref(1);
+    $.renewFormPeriod = ref('month');
     $.renewError = ref('');
 
     // ===== 套餐订购状态 =====
@@ -67,7 +68,7 @@
         var str = (vm.config.sockets || 1) + '*' + (vm.config.cores || 1) + '核 ' + formatMemory(vm.config.memory);
         var diskStr = '';
         if (vm.status && vm.status.maxdisk) {
-            diskStr = $.formatBytes(vm.status.maxdisk);
+            diskStr = $.formatBytes(vm.status.maxdisk, true);
         } else {
             var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
             for (var i = 0; i < diskKeys.length; i++) {
@@ -75,7 +76,7 @@
                 if (dv) {
                     var m = dv.match(/size=(\d+[KMGT]?)/i);
                     if (m) { diskStr = m[1]; break; }
-                    if (vm.status && vm.status.maxdisk) diskStr = $.formatBytes(vm.status.maxdisk);
+                    if (vm.status && vm.status.maxdisk) diskStr = $.formatBytes(vm.status.maxdisk, true);
                 }
             }
         }
@@ -262,14 +263,45 @@
         }
     };
 
+    $.renewPeriodLabel = function(period) {
+        if (period === 'year') return '年';
+        if (period === 'quarter') return '季';
+        return '月';
+    };
+
+    $.calcRenewTotal = function() {
+        var resource = $.renewResource.value;
+        if (!resource) return 0;
+        var storedPeriod = resource.renewal_period || 'month';
+        var storedPrice = parseFloat(resource.renewal_price || '0');
+        var period = $.renewFormPeriod.value;
+        var qty = $.renewQuantity.value || 1;
+
+        if (period === storedPeriod) {
+            return storedPrice * qty;
+        }
+        var monthsMap = { month: 1, quarter: 3, year: 12 };
+        var storedMonths = monthsMap[storedPeriod] || 1;
+        var monthlyBase = storedPrice / storedMonths;
+        var newMonths = monthsMap[period] || 1;
+        return monthlyBase * newMonths * qty;
+    };
+
+    $.openRenewModal = function(resource) {
+        $.renewResource.value = resource;
+        $.renewFormPeriod.value = resource.renewal_period || 'month';
+        $.renewQuantity.value = 1;
+        $.renewError.value = '';
+        $.renewShow.value = true;
+    };
+
     $.submitRenew = async function() {
         $.renewError.value = '';
         var resource = $.renewResource.value;
         if (!resource) { $.renewError.value = '请选择续费资源'; return; }
         var qty = $.renewQuantity.value;
         if (!Number.isInteger(qty) || qty < 1) { $.renewError.value = '续费数量必须为正整数'; return; }
-        var price = parseFloat(resource.renewal_price || '0');
-        var totalPrice = (price * qty).toFixed(2);
+        var totalPrice = $.calcRenewTotal().toFixed(2);
         var bal = parseFloat($.walletBalance.value);
         if (bal < parseFloat(totalPrice)) {
             $.renewError.value = '余额不足，应付 ¥' + totalPrice + '，当前余额 ¥' + bal.toFixed(2) + '，请先充值';
@@ -282,7 +314,8 @@
                     type: resource.vm_id !== undefined ? 'vm' : 'lxc',
                     vmid: resource.vm_id,
                     ctid: resource.ct_id,
-                    quantity: qty
+                    quantity: qty,
+                    period: $.renewFormPeriod.value
                 }
             });
             if (res.success) {

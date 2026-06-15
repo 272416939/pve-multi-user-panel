@@ -6,6 +6,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createPayClient, generateOrderId } = require('../sdk/pay');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const dbg = require('../utils/debug');
+const { getPeriodMonths } = require('../utils/order-utils');
 
 function safeError(e) {
     if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
@@ -386,16 +387,18 @@ router.get('/wallet/return', async (req, res) => {
 // ========== 余额抵扣续费 ==========
 router.post('/wallet/renew', authMiddleware, async (req, res) => {
     try {
-        var { type, vmid, ctid, quantity } = req.body;
+        var { type, vmid, ctid, quantity, period_count } = req.body;
         var userId = req.user.id;
         var isAdmin = req.user.role === 'admin';
         
         if (!type || !['vm', 'lxc'].includes(type)) {
             return res.status(400).json({ error: '无效的资源类型' });
         }
-        var qty = parseInt(quantity);
+        var qty = parseInt(period_count || quantity);
         if (!Number.isInteger(parseFloat(quantity)) || qty < 1 || String(quantity).trim() !== String(qty)) {
-            return res.status(400).json({ error: '续费数量必须为正整数' });
+            if (!period_count) {
+                return res.status(400).json({ error: '续费数量必须为正整数' });
+            }
         }
         
         var resource;
@@ -416,8 +419,18 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         var price = parseFloat(resource.renewal_price || '0');
         if (price <= 0) return res.status(400).json({ error: '该资源未设置续费价格' });
 
-        var period = resource.renewal_period || 'month';
-        var totalPrice = price * qty;
+        var period = req.body.period || resource.renewal_period || 'month';
+
+        // 如果用户选择了不同的周期，重新计算单价
+        var actualPrice = parseFloat(resource.renewal_price || '0');
+        if (period !== (resource.renewal_period || 'month')) {
+            var originalMonths = getPeriodMonths(resource.renewal_period || 'month');
+            var monthlyBase = actualPrice / originalMonths;
+            var newMonths = getPeriodMonths(period);
+            actualPrice = monthlyBase * newMonths;
+        }
+        var totalPrice = actualPrice * qty;
+
         var user = await db.users.getById(userId);
         var balance = parseFloat(user.balance || '0');
         
@@ -457,7 +470,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         });
         
         var resourceName = resource.name || (type === 'vm' ? 'VM ' + resource.vm_id : 'CT ' + resource.ct_id);
-        var periodStr = period === 'year' ? qty + '年' : qty + '个月';
+        var periodStr = period === 'year' ? qty + '年' : period === 'quarter' ? qty + '季' : qty + '个月';
         var expiryDisplay = newExpiration ? new Date(newExpiration).toLocaleString('zh-CN') : '永久有效';
         var msgContent = '资源名称：' + resourceName + '\n续费详情：' + periodStr + '\n到期时间：' + expiryDisplay + '\n实付金额：¥' + totalPrice.toFixed(2) + '\n余额变动：¥' + balance.toFixed(2) + ' → ¥' + newBalance + '\n订单号：' + orderNo;
         var resourceTypeLabel = type === 'vm' ? '虚拟机' : 'LXC 容器';

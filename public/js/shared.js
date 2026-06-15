@@ -201,13 +201,21 @@ const formatMemory = (mb) => {
     return Math.round(mb) + ' MB';
 };
 
-const formatBytes = (bytes) => {
+const formatBytes = (bytes, binary) => {
     if (!bytes) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    var units;
+    var divisor;
+    if (binary) {
+        units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+        divisor = 1024;
+    } else {
+        units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+        divisor = 1000;
+    }
     let unitIndex = 0;
     let value = bytes;
-    while (value >= 1000 && unitIndex < units.length - 1) {
-        value /= 1000;
+    while (value >= divisor && unitIndex < units.length - 1) {
+        value /= divisor;
         unitIndex++;
     }
     return value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2) + ' ' + units[unitIndex];

@@ -55,7 +55,7 @@ $.detailVmConfigStr = computed(function() {
     // 磁盘容量：优先取status.maxdisk，其次从config磁盘字段提取size
     var diskStr = '';
     if (vm.status && vm.status.maxdisk) {
-        diskStr = $.formatBytes(vm.status.maxdisk);
+        diskStr = $.formatBytes(vm.status.maxdisk, true);
     } else {
         var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
         for (var i = 0; i < diskKeys.length; i++) {
@@ -63,7 +63,7 @@ $.detailVmConfigStr = computed(function() {
             if (dv) {
                 var m = dv.match(/size=(\d+[KMGT]?)/i);
                 if (m) { diskStr = m[1]; break; }
-                if (vm.status && vm.status.maxdisk) diskStr = $.formatBytes(vm.status.maxdisk);
+                if (vm.status && vm.status.maxdisk) diskStr = $.formatBytes(vm.status.maxdisk, true);
             }
         }
     }
