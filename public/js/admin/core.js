@@ -278,6 +278,36 @@ watch($.user, function(u) {
         }
     };
 
+    $.submitRecharge = async function() {
+        $.rechargeError.value = '';
+        var amount = parseFloat($.rechargeAmount.value);
+        if (!amount || amount <= 0 || !isFinite(amount)) {
+            $.rechargeError.value = '请输入有效的充值金额';
+            return;
+        }
+        var user = $.rechargeUser.value;
+        if (!user || !user.id) {
+            $.rechargeError.value = '请选择用户';
+            return;
+        }
+        try {
+            var res = await api('/admin/users/' + user.id + '/recharge', {
+                method: 'POST',
+                body: { amount: amount }
+            });
+            if (res.success) {
+                $.rechargeShow.value = false;
+                $.rechargeAmount.value = 0;
+                alert('充值成功！用户余额已更新为 ¥' + res.balance);
+                $.loadData();
+            } else {
+                $.rechargeError.value = res.error || '充值失败';
+            }
+        } catch (e) {
+            $.rechargeError.value = '请求失败，请稍后重试';
+        }
+    };
+
     $.loadUnreadCount = async function() {
         try {
             var data = await api('/messages/unread-count');

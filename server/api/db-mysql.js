@@ -1841,8 +1841,8 @@ module.exports = {
 
     // LXC 套餐操作
     lxcPackages: {
-        getAll: () => queryAll('SELECT * FROM lxc_packages ORDER BY id DESC'),
-        getById: (id) => queryOne('SELECT * FROM lxc_packages WHERE id = ?', [id]),
+        getAll: () => queryAll('SELECT p.*, t.name as template_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id ORDER BY p.id DESC'),
+        getById: (id) => queryOne('SELECT p.*, t.name as template_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id WHERE p.id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
                 `INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, description, status)

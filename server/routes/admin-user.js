@@ -116,4 +116,50 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     res.json({ message: '用户更新成功' });
 });
 
+// 管理员手动为用户充值
+router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var userId = parseInt(req.params.id);
+        var amount = parseFloat(req.body.amount);
+
+        if (!amount || amount <= 0 || !isFinite(amount)) {
+            return res.status(400).json({ error: '充值金额必须为正数' });
+        }
+
+        var user = await db.users.getById(userId);
+        if (!user) return res.status(404).json({ error: '用户不存在' });
+
+        var oldBalance = parseFloat(user.balance || '0');
+        var newBalance = oldBalance + amount;
+        await db.users.update(userId, { balance: newBalance.toFixed(2) });
+
+        var now = new Date();
+        var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
+        var orderNo = 'ADMIN_RECHARGE_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
+
+        await db.transactionRecords.create({
+            user_id: userId, order_no: orderNo, pay_time: now.toISOString().slice(0, 19).replace('T', ' '),
+            pay_method: 'manual', trade_type: 'admin_recharge',
+            amount: amount.toFixed(2),
+            period: 'month', period_count: 1,
+            balance_before: oldBalance.toFixed(2),
+            balance_after: newBalance.toFixed(2),
+            trade_no: '', api_trade_no: ''
+        });
+
+        try {
+            await db.messages.create({
+                uid: userId, title: '余额充值成功',
+                content: '管理员为您充值 ¥' + amount.toFixed(2) + '，当前余额：¥' + newBalance.toFixed(2) + '。',
+                type: 1, is_read: 0, send_type: 1
+            });
+        } catch (e) { console.error('[admin] recharge message failed', e); }
+
+        res.json({ success: true, balance: newBalance.toFixed(2), message: '充值成功' });
+    } catch (e) {
+        console.error('[admin] recharge error:', e.message);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 module.exports = router;

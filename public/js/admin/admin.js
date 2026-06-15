@@ -24,6 +24,10 @@
     $.cdkUserSearch = ref('');
     $.cdkUserSearchOpen = ref(false);
     $.selectedCdkIds = ref([]);
+    $.rechargeShow = ref(false);
+    $.rechargeUser = ref(null);
+    $.rechargeAmount = ref(0);
+    $.rechargeError = ref('');
 
     $.filteredUsers = computed(function() {
         var q = $.cdkUserSearch.value.toLowerCase().trim();

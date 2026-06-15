@@ -124,9 +124,7 @@
     };
 
     $.getTemplateName = function(p) {
-        var opts = p.template_id ? $.vmTemplateOptions.value : $.lxcTemplateOptions.value;
-        var t = opts.find(function(o) { return String(o.id) === String(p.template_id); });
-        return t ? t.name : '未知模板';
+        return p.template_name || '<span class="text-secondary">模板已删除</span>';
     };
 
     admin.packagePage = $;

@@ -1277,6 +1277,7 @@
                                             <th>头像</th>
                                             <th>用户名</th>
                                             <th>邮箱</th>
+                                            <th>余额</th>
                                             <th>邮箱验证</th>
                                             <th>2FA</th>
                                             <th>角色</th>
@@ -1293,6 +1294,7 @@
                                             </td>
                                             <td>{{ u.username }}</td>
                                             <td>{{ u.email || '-' }}</td>
+                                            <td>{{ parseFloat(u.balance||0).toFixed(2) }}</td>
                                             <td>
                                                 <span class="badge" :class="u.emailVerified ? 'bg-success' : 'bg-warning'">
                                                     {{ u.emailVerified ? '已验证' : '未验证' }}
@@ -1302,6 +1304,7 @@
                                             <td><span class="badge" :class="u.role === 'admin' ? 'bg-primary' : 'bg-secondary'">{{ u.role }}</span></td>
                                             <td>{{ formatDate(u.created_at) }}</td>
                                             <td>
+                                                <button class="btn btn-sm btn-success me-1" @click="rechargeUser = u; rechargeShow = true">充值</button>
                                                 <button class="table-btn btn-primary" @click="editUser(u)">编辑</button>
                                                 <button class="table-btn btn-danger" @click="deleteUser(u.id)" :disabled="u.username === 'admin'">删除</button>
                                             </td>
@@ -1331,7 +1334,7 @@
                                     <tr v-for="p in packagePage.vmPackages.value" :key="p.id">
                                         <td>{{ p.id }}</td>
                                         <td>{{ p.name }}</td>
-                                        <td>{{ packagePage.getTemplateName(p) }}</td>
+                                        <td v-html="packagePage.getTemplateName(p)"></td>
                                         <td>{{ p.cores }}核</td>
                                         <td>{{ p.memory }}MB</td>
                                         <td>{{ p.disk_size }}GB</td>
@@ -2413,6 +2416,31 @@
                     </div>
                 </div>
                 </Teleport>
+
+                <!-- 充值弹窗 -->
+                <div v-if="rechargeShow" class="modal" style="display:block;background:rgba(0,0,0,0.5);" @click.self="rechargeShow = false">
+                    <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">为用户充值</h5>
+                                <button class="btn-close" @click="rechargeShow = false"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p>用户名：<strong>{{ rechargeUser?.username }}</strong></p>
+                                <p>当前余额：¥{{ parseFloat(rechargeUser?.balance||0).toFixed(2) }}</p>
+                                <div class="mb-3">
+                                    <label class="form-label">充值金额（元）</label>
+                                    <input type="number" class="form-control" v-model.number="rechargeAmount" min="0.01" step="0.01" placeholder="输入充值金额">
+                                </div>
+                                <div v-if="rechargeError" class="alert alert-danger py-2">{{ rechargeError }}</div>
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-secondary" @click="rechargeShow = false">取消</button>
+                                <button class="btn btn-primary" @click="submitRecharge">确认充值</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- 测试邮件模态框 -->
                 <Teleport to="body">
