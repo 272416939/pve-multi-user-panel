@@ -1354,9 +1354,10 @@
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-primary" @click="packagePage.openVmPackageForm(p)">编辑</button>
-                                                <button class="btn btn-outline-danger" @click="packagePage.deleteVmPackage(p.id)">删除</button>
-                                            </div>
+                            <button class="btn btn-outline-primary" @click="packagePage.openVmPackageForm(p)">编辑</button>
+                            <button class="btn btn-outline-info" @click="packagePage.restockVmPackage(p)">补货</button>
+                            <button class="btn btn-outline-danger" @click="packagePage.deleteVmPackage(p.id)">删除</button>
+                        </div>
                                         </td>
                                     </tr>
                                     <tr v-if="packagePage.vmPackages.value.length === 0"><td colspan="14" class="text-center text-muted">暂无套餐</td></tr>
@@ -1385,11 +1386,12 @@
                                         <td>{{ p.stock !== null && p.stock !== undefined ? (p.stock - (p.sold_count || 0)) : '-' }}</td>
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
-                                                <button class="btn btn-outline-primary" @click="packagePage.openLxcPackageForm(p)">编辑</button>
-                                                <button class="btn btn-outline-danger" @click="packagePage.deleteLxcPackage(p.id)">删除</button>
-                                            </div>
-                                        </td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" @click="packagePage.openLxcPackageForm(p)">编辑</button>
+                            <button class="btn btn-outline-info" @click="packagePage.restockLxcPackage(p)">补货</button>
+                            <button class="btn btn-outline-danger" @click="packagePage.deleteLxcPackage(p.id)">删除</button>
+                        </div>
+                    </td>
                                     </tr>
                                     <tr v-if="packagePage.lxcPackages.value.length === 0"><td colspan="15" class="text-center text-muted">暂无套餐</td></tr>
                                 </tbody>
@@ -3735,10 +3737,7 @@
                                         <label class="form-label">已销售</label>
                                         <input type="text" class="form-control" :value="packagePage.vmPackageForm.value.sold_count || 0" disabled readonly>
                                     </div>
-                                    <div class="col-md-4" style="display:flex;align-items:flex-end;">
-                                        <button class="btn btn-outline-info btn-sm" @click="packagePage.restockVmPackage(packagePage.vmPackageForm.value)">补货</button>
-                                    </div>
-                                    <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="packagePage.vmPackageForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
+                    <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="packagePage.vmPackageForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="packagePage.vmPackageForm.value.description"></textarea></div>
                                 </div>
                             </div>
@@ -3782,10 +3781,7 @@
                                         <label class="form-label">已销售</label>
                                         <input type="text" class="form-control" :value="packagePage.lxcPackageForm.value.sold_count || 0" disabled readonly>
                                     </div>
-                                    <div class="col-md-3" style="display:flex;align-items:flex-end;">
-                                        <button class="btn btn-outline-info btn-sm" @click="packagePage.restockLxcPackage(packagePage.lxcPackageForm.value)">补货</button>
-                                    </div>
-                                    <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="packagePage.lxcPackageForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
+                    <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="packagePage.lxcPackageForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="packagePage.lxcPackageForm.value.description"></textarea></div>
                                 </div>
                             </div>
