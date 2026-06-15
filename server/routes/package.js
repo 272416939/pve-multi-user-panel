@@ -61,7 +61,6 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         await pveApi.cloneVm(template.template_vmid, newVmid, {
             name: randomName,
-            target: template.target_storage || undefined,
             clone_mode: template.clone_mode || 'full'
         });
 
@@ -269,7 +268,6 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         // Clone VM
         await pveApi.cloneVm(template.template_vmid, newVmid, {
             name: randomName,
-            target: template.target_storage || undefined,
             clone_mode: template.clone_mode || 'full'
         });
 
