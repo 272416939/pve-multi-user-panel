@@ -1026,35 +1026,6 @@
 
 <!-- 套餐订购页 -->
 <div v-if="activeSection === 'order'">
-    <div class="modal fade" id="orderModal" tabindex="-1" data-bs-focus="false">
-        <div class="modal-dialog"><div class="modal-content" style="background:var(--bg-modal)">
-            <div class="modal-header"><h5 class="modal-title">确认订购</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body">
-                <div class="mb-3"><strong>{{ orderPackage.name }}</strong></div>
-                <div class="mb-3"><label class="form-label">计费周期</label>
-                    <select class="form-select" v-model="orderForm.period">
-                        <option value="month">月付 (30天)</option>
-                        <option value="quarter">季付 (90天)</option>
-                        <option value="year">年付 (365天)</option>
-                    </select>
-                </div>
-                <div class="mb-3"><label class="form-label">数量</label>
-                    <input type="number" class="form-control" v-model="orderForm.quantity" min="1" max="10">
-                </div>
-                <div class="mb-3" v-if="macGroups && macGroups.length > 0"><label class="form-label">MAC分组 (可选)</label>
-                    <select class="form-select" v-model="orderForm.mac_group_id">
-                        <option value="">不加入分组</option>
-                        <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
-                    </select>
-                </div>
-                <div class="alert alert-info">应付款：<strong>{{ orderTotal }} 元</strong></div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button class="btn btn-primary" @click="confirmOrder" :disabled="orderLoading">{{ orderLoading ? '处理中...' : '确认开通' }}</button>
-            </div>
-        </div></div>
-    </div>
     <div v-if="activeTabOrder === 'vm'">
         <h4 class="mb-4">VM 虚拟机套餐</h4>
         <div class="package-cards">
@@ -2086,6 +2057,39 @@
     </template>
 </div>
 
+</Teleport>
+
+<!-- 套餐订购弹窗（Teleport到body，避免被main-wrap层叠上下文压制） -->
+<Teleport to="body">
+<div class="modal fade" id="orderModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
+        <div class="modal-header"><h5 class="modal-title">确认订购</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+            <div class="mb-3"><strong>{{ orderPackage.name }}</strong></div>
+            <div class="mb-3"><label class="form-label">计费周期</label>
+                <select class="form-select" v-model="orderForm.period">
+                    <option value="month">月付 (30天)</option>
+                    <option value="quarter">季付 (90天)</option>
+                    <option value="year">年付 (365天)</option>
+                </select>
+            </div>
+            <div class="mb-3"><label class="form-label">数量</label>
+                <input type="number" class="form-control" v-model="orderForm.quantity" min="1" max="10">
+            </div>
+            <div class="mb-3" v-if="macGroups && macGroups.length > 0"><label class="form-label">MAC分组 (可选)</label>
+                <select class="form-select" v-model="orderForm.mac_group_id">
+                    <option value="">不加入分组</option>
+                    <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                </select>
+            </div>
+            <div class="alert alert-info">应付款：<strong>{{ orderTotal }} 元</strong></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+            <button class="btn btn-primary" @click="confirmOrder" :disabled="orderLoading">{{ orderLoading ? '处理中...' : '确认开通' }}</button>
+        </div>
+    </div></div>
+</div>
 </Teleport>
 
 <div class="text-center py-4 mt-4 text-muted small">
