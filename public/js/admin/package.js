@@ -97,8 +97,10 @@
         var add = parseInt(input);
         if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
         var newStock = (pkg.stock || 0) + add;
-        await api('/admin/vm-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
-        await $.loadVmPackages();
+        try {
+            await api('/admin/vm-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
+            await $.loadVmPackages();
+        } catch (e) { alert('补货失败：' + e.message); }
     };
 
     $.restockLxcPackage = async function(pkg) {
@@ -107,8 +109,10 @@
         var add = parseInt(input);
         if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
         var newStock = (pkg.stock || 0) + add;
-        await api('/admin/lxc-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
-        await $.loadLxcPackages();
+        try {
+            await api('/admin/lxc-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
+            await $.loadLxcPackages();
+        } catch (e) { alert('补货失败：' + e.message); }
     };
 
     $.provisionVm = async function() {
