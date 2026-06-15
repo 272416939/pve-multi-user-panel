@@ -3818,6 +3818,21 @@
                 if (!$.packagePage.vmTemplateOptions) $.packagePage.vmTemplateOptions = Vue.ref([]);
                 if (!$.packagePage.lxcPackageForm) $.packagePage.lxcPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0, monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active' });
                 if (!$.packagePage.lxcTemplateOptions) $.packagePage.lxcTemplateOptions = Vue.ref([]);
+                // 端口转发及MAC分组组件所需ref——确保在网络/ikuai模块未就绪时也不崩溃
+                if (!$.macGroups) $.macGroups = Vue.ref([]);
+                if (!$.userForwardCount) $.userForwardCount = Vue.ref(0);
+                if (!$.maxForwardPerUser) $.maxForwardPerUser = Vue.ref(10);
+                if (!$.selectedForwardIds) $.selectedForwardIds = Vue.ref([]);
+                if (!$.forwardRulesLoading) $.forwardRulesLoading = Vue.ref(false);
+                if (!$.forwardRules) $.forwardRules = Vue.ref([]);
+                if (!$.paginatedVmForwardRules) $.paginatedVmForwardRules = Vue.ref([]);
+                if (!$.forwardVmPage) $.forwardVmPage = Vue.ref(1);
+                if (!$.vmForwardTotal) $.vmForwardTotal = Vue.ref(0);
+                if (!$.paginatedLxcForwardRules) $.paginatedLxcForwardRules = Vue.ref([]);
+                if (!$.forwardLxcPage) $.forwardLxcPage = Vue.ref(1);
+                if (!$.lxcForwardTotal) $.lxcForwardTotal = Vue.ref(0);
+                if (!$.isEditingForward) $.isEditingForward = Vue.ref(false);
+                if (!$.showForwardModal) $.showForwardModal = Vue.ref(false);
                 $.initCore();
                 $.initVm();
                 $.initLxc();
