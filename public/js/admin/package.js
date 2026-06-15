@@ -4,9 +4,11 @@
     var $ = {};
 
     $.vmPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
-        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null, sort_order: 0 });
+        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null, sort_order: 0,
+        cpu_model: '', bandwidth: 0 });
     $.lxcPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
-        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null, sort_order: 0 });
+        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null, sort_order: 0,
+        cpu_model: '', bandwidth: 0 });
     $.vmPackages = Vue.ref([]);
     $.lxcPackages = Vue.ref([]);
     $.vmTemplateOptions = Vue.ref([]);
@@ -36,7 +38,8 @@
             f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : null);
         } else {
             $.vmPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
-                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null };
+                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null,
+                cpu_model: '', bandwidth: 0 };
         }
         $.loadVmTemplateOptions().then(function() { admin.bsModalShow('vmPackageModal'); });
     };
@@ -67,7 +70,8 @@
             f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : null);
         } else {
             $.lxcPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
-                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null };
+                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null,
+                cpu_model: '', bandwidth: 0 };
         }
         $.loadLxcTemplateOptions().then(function() { admin.bsModalShow('lxcPackageModal'); });
     };

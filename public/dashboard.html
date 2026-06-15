@@ -1041,9 +1041,11 @@
             <div class="package-card" v-for="p in vmPackages" :key="p.id" v-show="p.status === 'active'">
                 <div class="package-card-header">{{ p.name }}</div>
                 <div class="package-card-body">
-                    <div class="package-spec"><span class="spec-label">CPU</span><span class="spec-value">{{ p.cores }} 核</span></div>
+                    <div class="package-spec"><span class="spec-label">CPU 型号</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
+                    <div class="package-spec"><span class="spec-label">vCPU 数量</span><span class="spec-value">{{ p.cores }} 核</span></div>
                     <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
                     <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
+                    <div class="package-spec"><span class="spec-label">带宽</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
                     <div class="package-desc">备注：{{ p.description || '无' }}</div>
                     <div class="package-stock">库存：{{ p.stock !== null && p.stock !== undefined ? (p.stock - (p.sold_count || 0)) + ' / ' + p.stock : '无限' }}</div>
                     <div class="package-prices">
@@ -1063,9 +1065,11 @@
             <div class="package-card" v-for="p in lxcPackages" :key="p.id" v-show="p.status === 'active'">
                 <div class="package-card-header">{{ p.name }}</div>
                 <div class="package-card-body">
-                    <div class="package-spec"><span class="spec-label">CPU</span><span class="spec-value">{{ p.cores }} 核</span></div>
+                    <div class="package-spec"><span class="spec-label">CPU 型号</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
+                    <div class="package-spec"><span class="spec-label">vCPU 数量</span><span class="spec-value">{{ p.cores }} 核</span></div>
                     <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
                     <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
+                    <div class="package-spec"><span class="spec-label">带宽</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
                     <div class="package-desc">备注：{{ p.description || '无' }}</div>
                     <div class="package-stock">库存：{{ p.stock !== null && p.stock !== undefined ? (p.stock - (p.sold_count || 0)) + ' / ' + p.stock : '无限' }}</div>
                     <div class="package-prices">
