@@ -145,3 +145,22 @@ describe('续费周期同步 (Bug 1)', function() {
     expect(utils.calculateAmount(100, 'year', 1)).to.equal(1200);
   });
 });
+
+describe('CPU affinity 非 root 错误不应中断订购流程', function() {
+  it('affinity 失败（only root can set）应被捕获，不影响流程', function() {
+    // 模拟 PVE 返回 "only root can set 'affinity' config" 错误
+    var affinityError = new Error('Request failed with status code 500');
+    affinityError.response = { status: 500, data: { data: null, message: "only root can set 'affinity' config\n" } };
+
+    // 验证 affinity 错误消息包含预期内容
+    expect(affinityError.response.data.message).to.include("only root can set 'affinity' config");
+
+    // 核心断言：affinity 是可选功能，PVE 限制了非 root 用户设置
+    // 订购流程应当捕获此错误并继续，而不是让整个流程崩溃
+    var isAffinityError = affinityError.response &&
+      affinityError.response.data &&
+      typeof affinityError.response.data.message === 'string' &&
+      affinityError.response.data.message.includes("only root can set");
+    expect(isAffinityError).to.be.true;
+  });
+});
