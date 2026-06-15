@@ -1094,7 +1094,9 @@
                                 document.activeElement.blur();
                             }
                         }, { once: true });
-                        bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                        var oldModal = bootstrap.Modal.getInstance(el);
+                        if (oldModal) oldModal.dispose();
+                        new bootstrap.Modal(el, { focus: false }).show();
                     }
                 };
 
@@ -1115,7 +1117,9 @@
                                 document.activeElement.blur();
                             }
                         }, { once: true });
-                        bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                        var oldModal = bootstrap.Modal.getInstance(el);
+                        if (oldModal) oldModal.dispose();
+                        new bootstrap.Modal(el, { focus: false }).show();
                     });
                 };
 
@@ -1235,8 +1239,9 @@
                     }
                     const el = document.getElementById(id);
                     if (!el) return;
-                    const modal = bootstrap.Modal.getOrCreateInstance(el, { focus: false });
-                    modal.show();
+                    const old = bootstrap.Modal.getInstance(el);
+                    if (old) old.dispose();
+                    new bootstrap.Modal(el, { focus: false }).show();
                 };
                 const bsModalHide = (id) => {
                     if (document.activeElement && document.activeElement !== document.body) {
@@ -1649,7 +1654,9 @@
                     document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
                     document.body.classList.remove('modal-open');
                     document.body.style.removeProperty('padding-right');
-                    bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                    var oldModal = bootstrap.Modal.getInstance(el);
+                    if (oldModal) oldModal.dispose();
+                    new bootstrap.Modal(el, { focus: false }).show();
                 };
 
                 const copySingleCode = async (code) => {
@@ -1676,7 +1683,9 @@
                     document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
                     document.body.classList.remove('modal-open');
                     document.body.style.removeProperty('padding-right');
-                    bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                    var oldModal = bootstrap.Modal.getInstance(el);
+                    if (oldModal) oldModal.dispose();
+                    new bootstrap.Modal(el, { focus: false }).show();
                 };
 
                 const downloadRecoveryCodes = () => {
@@ -1712,7 +1721,9 @@
                         document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
                         document.body.classList.remove('modal-open');
                         document.body.style.removeProperty('padding-right');
-                        bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+                        var oldModal = bootstrap.Modal.getInstance(el);
+                        if (oldModal) oldModal.dispose();
+                        new bootstrap.Modal(el, { focus: false }).show();
                     } catch (e) {
                         bsModalShow('twofaRecoveryModal');
                         await new Promise(r => setTimeout(r, 300));
