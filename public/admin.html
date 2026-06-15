@@ -3850,7 +3850,18 @@
                         dd.classList.add('open');
                     }
                 };
-                return $;
+                return new Proxy($, {
+                    get: function(target, key, receiver) {
+                        if (key === '__v_skip' || key === '$el' || key === '$data') return undefined;
+                        var val = Reflect.get(target, key, receiver);
+                        if (val === undefined && typeof key === 'string' && !key.startsWith('__') && !key.startsWith('$')) {
+                            console.warn('[AUTO-REF] missing $.' + key + ', creating default ref([])');
+                            val = Vue.ref([]);
+                            target[key] = val;
+                        }
+                        return val;
+                    }
+                });
             }
         };
         var app = Vue.createApp(App);
