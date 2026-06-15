@@ -73,11 +73,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         await pveApi.updateVmConfig(newVmid, { cores: template.cores, memory: template.memory });
 
         if (template.cpu_affinity) {
-            try {
-                await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
-            } catch (affErr) {
-                console.error('[package] VM affinity config 设置失败（非 root API Token 无法设置 affinity）:', affErr.message);
-            }
+            await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
         }
 
         var newVm = await db.vms.create({
@@ -285,11 +281,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
 
         // CPU 亲和性
         if (template.cpu_affinity) {
-            try {
-                await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
-            } catch (affErr) {
-                console.error('[package] VM affinity config 设置失败（非 root API Token 无法设置 affinity）:', affErr.message);
-            }
+            await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
         }
 
         // 创建分配记录

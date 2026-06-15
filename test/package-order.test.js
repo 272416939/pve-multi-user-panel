@@ -146,21 +146,24 @@ describe('续费周期同步 (Bug 1)', function() {
   });
 });
 
-describe('CPU affinity 非 root 错误不应中断订购流程', function() {
-  it('affinity 失败（only root can set）应被捕获，不影响流程', function() {
-    // 模拟 PVE 返回 "only root can set 'affinity' config" 错误
-    var affinityError = new Error('Request failed with status code 500');
-    affinityError.response = { status: 500, data: { data: null, message: "only root can set 'affinity' config\n" } };
+describe('CPU affinity 错误应中断订购流程', function() {
+  it('affinity 设置失败时 updateVmConfig 应抛出错误不被吞掉', function() {
+    // cores/memory update 是必需功能，try/catch 已被移除
+    // affinity 同样是必需功能，try/catch 也已被移除
+    // 此测试验证 package.js 中两处 affinity 配置代码没有 try/catch 包裹
+    var fs = require('fs');
+    var source = fs.readFileSync('e:\\code\\pve管理面板\\server\\routes\\package.js', 'utf8');
 
-    // 验证 affinity 错误消息包含预期内容
-    expect(affinityError.response.data.message).to.include("only root can set 'affinity' config");
+    // 用户订购路由中的 affinity 不应有 try
+    var userRouteMatch = source.match(/if\s*\(template\.cpu_affinity\)\s*\{[\s\S]*?await pveApi\.updateVmConfig\(newVmid,\s*\{ affinity:[\s\S]*?\}\s*\)/);
+    expect(userRouteMatch, '用户路由 affinity 应直接调用 updateVmConfig 无 try/catch').to.exist;
 
-    // 核心断言：affinity 是可选功能，PVE 限制了非 root 用户设置
-    // 订购流程应当捕获此错误并继续，而不是让整个流程崩溃
-    var isAffinityError = affinityError.response &&
-      affinityError.response.data &&
-      typeof affinityError.response.data.message === 'string' &&
-      affinityError.response.data.message.includes("only root can set");
-    expect(isAffinityError).to.be.true;
+    // 管理路由中的 affinity 不应有 try
+    var adminRouteMatch = source.match(/if\s*\(template\.cpu_affinity\)\s*\{[\s\S]*?await pveApi\.updateVmConfig\(newVmid,\s*\{ affinity:[\s\S]*?\}\s*\)/g);
+    expect(adminRouteMatch, '管理路由 affinity 应直接调用 updateVmConfig 无 try/catch').to.have.lengthOf(2);
+
+    // 验证两处都没有 try 关键字包围
+    // "if (template.cpu_affinity) {\n            await pveApi.updateVmConfig" 直接出现表示无 try/catch
+    expect(source).to.not.match(/if\s*\(template\.cpu_affinity\)\s*\{\s*try\s*\{/);
   });
 });
