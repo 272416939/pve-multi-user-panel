@@ -5,11 +5,11 @@
 @import url('./features.css');
 
 /* 交易类型徽标 - 适配明暗主题 */
-.badge-renewal {
-    background: #0d9488 !important;
+.badge.badge-renewal {
+    background-color: #0d9488 !important;
     color: #fff !important;
 }
-body[data-theme="light"] .badge-renewal {
-    background: #0f766e !important;
+body[data-theme="light"] .badge.badge-renewal {
+    background-color: #0f766e !important;
     color: #fff !important;
 }
