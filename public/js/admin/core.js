@@ -291,7 +291,7 @@ watch($.user, function(u) {
             return;
         }
         try {
-            var res = await api('/admin/users/' + user.id + '/recharge', {
+            var res = await api('/users/' + user.id + '/recharge', {
                 method: 'POST',
                 body: { amount: amount }
             });
