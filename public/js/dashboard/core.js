@@ -105,7 +105,7 @@
         return typeof vm.status.uptime !== 'undefined' ? $.formatUptime(vm.status.uptime) : '-';
     });
 
-    // ===== 工具函数注册到 $（从 shared.js 全局函数引用） =====
+    // ===== 工具函数注册到 $（从 shared.js 或 window 全局函数引用） =====
     $.formatMemory = formatMemory;
     $.formatBytes = formatBytes;
     $.formatDate = formatDate;
@@ -113,6 +113,7 @@
     $.trimContent = trimContent;
     $.getGeekAvatar = getGeekAvatar;
     $.formatDateTimeLocal = formatDateTimeLocal;
+    $.parseMarkdown = window.parseMarkdown || function(t) { return t || ''; };
 
     // ===== 用户数据变化时同步 Header 头像/用户名 + 管理员链接 =====
     watch($.user, function(u) {
