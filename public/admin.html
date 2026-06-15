@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN" data-theme="dark">
 <head>
     <script>(function(){try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);else if(window.matchMedia('(prefers-color-scheme:light)').matches)document.documentElement.setAttribute('data-theme','light')}catch(e){}})()</script>
@@ -1327,7 +1327,7 @@
                                     <tr><th>ID</th><th>套餐名</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付</th><th>年付</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="p in packagePage.vmPackages.value" :key="p.id">
+                                    <tr v-for="p in (packagePage.vmPackages || {value:[]}).value" :key="p.id">
                                         <td>{{ p.id }}</td>
                                         <td>{{ p.name }}</td>
                                         <td>{{ packagePage.getTemplateName(p) }}</td>
@@ -1345,7 +1345,7 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr v-if="packagePage.vmPackages.value.length === 0"><td colspan="11" class="text-center text-muted">暂无套餐</td></tr>
+                                    <tr v-if="(packagePage.vmPackages || {value:[]}).value.length === 0"><td colspan="11" class="text-center text-muted">暂无套餐</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1362,7 +1362,7 @@
                                     <tr><th>ID</th><th>套餐名</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付</th><th>年付</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="p in packagePage.lxcPackages.value" :key="p.id">
+                                    <tr v-for="p in (packagePage.lxcPackages || {value:[]}).value" :key="p.id">
                                         <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ packagePage.getTemplateName(p) }}</td>
                                         <td>{{ p.cores }}核</td><td>{{ p.memory }}MB</td><td>{{ p.swap }}MB</td><td>{{ p.disk_size }}GB</td>
                                         <td>{{ p.monthly_price }}元</td><td>{{ p.quarterly_price }}元</td><td>{{ p.yearly_price }}元</td>
@@ -1374,7 +1374,7 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr v-if="packagePage.lxcPackages.value.length === 0"><td colspan="12" class="text-center text-muted">暂无套餐</td></tr>
+                                    <tr v-if="(packagePage.lxcPackages || {value:[]}).value.length === 0"><td colspan="12" class="text-center text-muted">暂无套餐</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1709,7 +1709,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="t in templatePage.vmTemplates.value" :key="t.id">
+                                    <tr v-for="t in (templatePage.vmTemplates || {value:[]}).value" :key="t.id">
                                         <td>{{ t.id }}</td>
                                         <td>{{ t.name }}</td>
                                         <td>{{ t.template_vmid }}</td>
@@ -1726,7 +1726,7 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr v-if="templatePage.vmTemplates.value.length === 0"><td colspan="10" class="text-center text-muted">暂无 VM 模板</td></tr>
+                                    <tr v-if="(templatePage.vmTemplates || {value:[]}).value.length === 0"><td colspan="10" class="text-center text-muted">暂无 VM 模板</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1746,7 +1746,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="t in templatePage.lxcTemplates.value" :key="t.id">
+                                    <tr v-for="t in (templatePage.lxcTemplates || {value:[]}).value" :key="t.id">
                                         <td>{{ t.id }}</td>
                                         <td>{{ t.name }}</td>
                                         <td>{{ t.ostemplate.split('/').pop() }}</td>
@@ -1762,7 +1762,7 @@
                                             </div>
                                         </td>
                                     </tr>
-                                    <tr v-if="templatePage.lxcTemplates.value.length === 0"><td colspan="9" class="text-center text-muted">暂无 LXC 模板</td></tr>
+                                    <tr v-if="(templatePage.lxcTemplates || {value:[]}).value.length === 0"><td colspan="9" class="text-center text-muted">暂无 LXC 模板</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -3326,7 +3326,7 @@
                     <div class="modal-dialog modal-lg modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ templatePage.vmTemplateForm.value.id ? '编辑 VM 模板' : '新建 VM 模板' }}</h5>
+                                <h5 class="modal-title">{{ (templatePage.vmTemplateForm || {value:{}}).value.id ? '编辑 VM 模板' : '新建 VM 模板' }}</h5>
                                 <button type="button" class="btn-close" @click="bsModalHide('vmTemplateModal')"></button>
                             </div>
                             <div class="modal-body">
@@ -3335,7 +3335,7 @@
                                     <div class="col-md-6"><label class="form-label">模板 VM</label>
                                         <select class="form-select" v-model="templatePage.vmTemplateForm.value.template_vmid">
                                             <option value="">请选择 PVE 模板 VM</option>
-                                            <option v-for="v in templatePage.pveTemplateVms.value" :key="v.vmid" :value="v.vmid">{{ v.name || 'VM ' + v.vmid }} ({{ v.vmid }})</option>
+                                            <option v-for="v in (templatePage.pveTemplateVms || {value:[]}).value" :key="v.vmid" :value="v.vmid">{{ v.name || 'VM ' + v.vmid }} ({{ v.vmid }})</option>
                                         </select>
                                     </div>
                                     <div class="col-md-6"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.cores"></div>
@@ -3343,7 +3343,7 @@
                                     <div class="col-md-6"><label class="form-label">目标存储</label>
                                         <select class="form-select" v-model="templatePage.vmTemplateForm.value.target_storage">
                                             <option value="">请选择存储池</option>
-                                            <option v-for="s in templatePage.allStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }}{{ s.maxdisk ? ' (' + (s.maxdisk/1073741824).toFixed(0) + 'GB)' : '' }}</option>
+                                            <option v-for="s in (templatePage.allStorages || {value:[]}).value" :key="s.storage" :value="s.storage">{{ s.storage }}{{ s.maxdisk ? ' (' + (s.maxdisk/1073741824).toFixed(0) + 'GB)' : '' }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-6"><label class="form-label">网络桥接</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.network_bridge"></div>
@@ -3383,7 +3383,7 @@
                     <div class="modal-dialog modal-lg modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ templatePage.lxcTemplateForm.value.id ? '编辑 LXC 模板' : '新建 LXC 模板' }}</h5>
+                                <h5 class="modal-title">{{ (templatePage.lxcTemplateForm || {value:{}}).value.id ? '编辑 LXC 模板' : '新建 LXC 模板' }}</h5>
                                 <button type="button" class="btn-close" @click="bsModalHide('lxcTemplateModal')"></button>
                             </div>
                             <div class="modal-body">
@@ -3392,19 +3392,19 @@
                                     <div class="col-md-6"><label class="form-label">模板存储</label>
                                         <select class="form-select" v-model="templatePage.lxcTemplateForm.value.storage">
                                             <option value="">请选择存储池</option>
-                                            <option v-for="s in templatePage.lxcStorages.value" :key="s.id" :value="s.id">{{ s.id }}</option>
+                                            <option v-for="s in (templatePage.lxcStorages || {value:[]}).value" :key="s.id" :value="s.id">{{ s.id }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-6"><label class="form-label">容器存储</label>
                                         <select class="form-select" v-model="templatePage.lxcTemplateForm.value.rootfs_storage">
                                             <option value="">请选择容器存储位置</option>
-                                            <option v-for="s in templatePage.lxcStorages.value" :key="s.id" :value="s.id">{{ s.id }}</option>
+                                            <option v-for="s in (templatePage.lxcStorages || {value:[]}).value" :key="s.id" :value="s.id">{{ s.id }}</option>
                                         </select>
                                     </div>
                                     <div class="col-12"><label class="form-label">模板路径 (ostemplate)</label>
                                         <select class="form-select" v-model="templatePage.lxcTemplateForm.value.ostemplate">
                                             <option value="">请先选择存储池</option>
-                                            <option v-for="t in templatePage.lxcOstemplates.value" :key="t.volid" :value="t.volid">{{ t.volid }}</option>
+                                            <option v-for="t in (templatePage.lxcOstemplates || {value:[]}).value" :key="t.volid" :value="t.volid">{{ t.volid }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-3"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="templatePage.lxcTemplateForm.value.cores"></div>
@@ -3644,7 +3644,7 @@
                     <div class="modal-dialog modal-lg modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ packagePage.vmPackageForm.value.id ? '编辑 VM 套餐' : '新建 VM 套餐' }}</h5>
+                                <h5 class="modal-title">{{ (packagePage.vmPackageForm || {value:{}}).value.id ? '编辑 VM 套餐' : '新建 VM 套餐' }}</h5>
                                 <button type="button" class="btn-close" @click="bsModalHide('vmPackageModal')"></button>
                             </div>
                             <div class="modal-body">
@@ -3652,7 +3652,7 @@
                                     <div class="col-md-6"><label class="form-label">套餐名称</label><input class="form-control" v-model="packagePage.vmPackageForm.value.name"></div>
                                     <div class="col-md-6"><label class="form-label">关联模板</label><select class="form-select" v-model="packagePage.vmPackageForm.value.template_id">
                                         <option value="">请选择</option>
-                                        <option v-for="t in packagePage.vmTemplateOptions.value" :key="t.id" :value="t.id">{{ t.name }}</option>
+                                        <option v-for="t in (packagePage.vmTemplateOptions || {value:[]}).value" :key="t.id" :value="t.id">{{ t.name }}</option>
                                     </select></div>
                                     <div class="col-md-4"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="packagePage.vmPackageForm.value.cores"></div>
                                     <div class="col-md-4"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model="packagePage.vmPackageForm.value.memory"></div>
@@ -3679,7 +3679,7 @@
                     <div class="modal-dialog modal-lg modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ packagePage.lxcPackageForm.value.id ? '编辑 LXC 套餐' : '新建 LXC 套餐' }}</h5>
+                                <h5 class="modal-title">{{ (packagePage.lxcPackageForm || {value:{}}).value.id ? '编辑 LXC 套餐' : '新建 LXC 套餐' }}</h5>
                                 <button type="button" class="btn-close" @click="bsModalHide('lxcPackageModal')"></button>
                             </div>
                             <div class="modal-body">
@@ -3687,7 +3687,7 @@
                                     <div class="col-md-6"><label class="form-label">套餐名称</label><input class="form-control" v-model="packagePage.lxcPackageForm.value.name"></div>
                                     <div class="col-md-6"><label class="form-label">关联模板</label><select class="form-select" v-model="packagePage.lxcPackageForm.value.template_id">
                                         <option value="">请选择</option>
-                                        <option v-for="t in packagePage.lxcTemplateOptions.value" :key="t.id" :value="t.id">{{ t.name }}</option>
+                                        <option v-for="t in (packagePage.lxcTemplateOptions || {value:[]}).value" :key="t.id" :value="t.id">{{ t.name }}</option>
                                     </select></div>
                                     <div class="col-md-3"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="packagePage.lxcPackageForm.value.cores"></div>
                                     <div class="col-md-3"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model="packagePage.lxcPackageForm.value.memory"></div>
@@ -3850,18 +3850,7 @@
                         dd.classList.add('open');
                     }
                 };
-                return new Proxy($, {
-                    get: function(target, key, receiver) {
-                        if (key === '__v_skip' || key === '$el' || key === '$data') return undefined;
-                        var val = Reflect.get(target, key, receiver);
-                        if (val === undefined && typeof key === 'string' && !key.startsWith('__') && !key.startsWith('$')) {
-                            console.warn('[AUTO-REF] missing $.' + key + ', creating default ref([])');
-                            val = Vue.ref([]);
-                            target[key] = val;
-                        }
-                        return val;
-                    }
-                });
+                return $;
             }
         };
         var app = Vue.createApp(App);
