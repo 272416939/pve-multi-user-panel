@@ -6,6 +6,6 @@
 
 /* 交易类型徽标 - 适配明暗主题 */
 .badge-renewal {
-    background: var(--color-gray) !important;
+    background: #14b8a6 !important;
     color: #fff !important;
 }
