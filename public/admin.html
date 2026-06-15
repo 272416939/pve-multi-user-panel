@@ -2,6 +2,8 @@
 <html lang="zh-CN" data-theme="dark">
 <head>
     <script>(function(){try{var t=localStorage.getItem('theme');if(t)document.documentElement.setAttribute('data-theme',t);else if(window.matchMedia('(prefers-color-scheme:light)').matches)document.documentElement.setAttribute('data-theme','light')}catch(e){}})()</script>
+    <style>:root{color-scheme:dark}html[data-theme="light"]{color-scheme:light}</style>
+    <script>!function(){var d=document.documentElement;new MutationObserver(function(){document.body&&(document.body.setAttribute('data-theme',d.getAttribute('data-theme')||'dark'),this.disconnect())}).observe(d,{childList:!0,subtree:!0})}()</script>
 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -4116,6 +4118,7 @@
                     var html = document.documentElement;
                     var newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
                     html.setAttribute('data-theme', newTheme);
+                    if (document.body) document.body.setAttribute('data-theme', newTheme);
                     localStorage.setItem('theme', newTheme);
                 });
             }

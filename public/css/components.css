@@ -431,15 +431,6 @@ input[type="time"] {
   border-radius: 10px;
   transition: all 0.3s ease;
   padding: 10px 15px;
-  color-scheme: light dark;
-}
-
-body[data-theme="dark"] .form-control,
-body[data-theme="dark"] .form-select,
-body[data-theme="dark"] input[type="date"],
-body[data-theme="dark"] input[type="datetime-local"],
-body[data-theme="dark"] input[type="time"] {
-  color-scheme: dark;
 }
 
 body[data-theme="light"] .form-control,
