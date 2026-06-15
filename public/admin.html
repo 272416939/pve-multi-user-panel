@@ -3804,6 +3804,7 @@
                 if (!$.templatePage.vmTemplates) $.templatePage.vmTemplates = Vue.ref([]);
                 if (!$.templatePage.lxcTemplates) $.templatePage.lxcTemplates = Vue.ref([]);
                 if (!$.templatePage.allStorages) $.templatePage.allStorages = Vue.ref([]);
+                if (!$.templatePage.pveTemplateVms) $.templatePage.pveTemplateVms = Vue.ref([]);
                 if (!$.templatePage.vmTemplateForm) $.templatePage.vmTemplateForm = Vue.ref({ id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20, network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', target_storage: 'local-lvm', clone_mode: 'full', cpu_affinity: '', description: '', status: 'active' });
                 if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1, features: '', description: '', status: 'active' });
                 if (!$.templatePage.lxcStorages) $.templatePage.lxcStorages = Vue.ref([]);
@@ -3813,6 +3814,10 @@
                 if (!$.packagePage.lxcPackages) $.packagePage.lxcPackages = Vue.ref([]);
                 if (!$.packagePage.vmProvisionForm) $.packagePage.vmProvisionForm = Vue.ref({ package_id: '' });
                 if (!$.packagePage.lxcProvisionForm) $.packagePage.lxcProvisionForm = Vue.ref({ package_id: '' });
+                if (!$.packagePage.vmPackageForm) $.packagePage.vmPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0, monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active' });
+                if (!$.packagePage.vmTemplateOptions) $.packagePage.vmTemplateOptions = Vue.ref([]);
+                if (!$.packagePage.lxcPackageForm) $.packagePage.lxcPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0, monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active' });
+                if (!$.packagePage.lxcTemplateOptions) $.packagePage.lxcTemplateOptions = Vue.ref([]);
                 $.initCore();
                 $.initVm();
                 $.initLxc();
