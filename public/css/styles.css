@@ -3,3 +3,9 @@
 @import url('./layout.css');
 @import url('./components.css');
 @import url('./features.css');
+
+/* 交易类型徽标 - 适配明暗主题 */
+.badge-renewal {
+    background: var(--color-gray) !important;
+    color: #fff !important;
+}
