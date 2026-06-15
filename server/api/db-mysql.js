@@ -1846,7 +1846,7 @@ module.exports = {
         create: async (data) => {
             const [result] = await execute(
                 `INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.template_id || 0, data.cores || 1,
                     data.memory || 512, data.swap || 512, data.disk_size || 8,
