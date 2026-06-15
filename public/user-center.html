@@ -770,6 +770,8 @@
                             <select class="form-select form-select-sm" v-model="txFilter.trade_type">
                                 <option value="">全部</option>
                                 <option value="recharge">余额充值</option>
+                                <option value="admin_recharge">后台充值</option>
+                                <option value="new_order">新购服务器</option>
                                 <option value="renewal">服务器续费</option>
                             </select>
                         </div>
@@ -790,7 +792,7 @@
                                 <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method }}</td>
                                 <td><code style="font-size:11px;">{{ tx.order_no }}</code> <button class="btn btn-sm btn-link p-0 ms-1" @click="copyOrderNo(tx.order_no)" title="复制">📋</button></td>
                                 <td><code style="font-size:11px;">{{ tx.trade_no || '-' }}</code></td>
-                                <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : 'badge bg-info'">{{ tx.trade_type === 'recharge' ? '余额充值' : '服务器续费' }}</span></td>
+                                <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : 'badge badge-renewal'">{{ tx.trade_type === 'recharge' ? '余额充值' : tx.trade_type === 'admin_recharge' ? '后台充值' : tx.trade_type === 'new_order' ? '新购服务器' : '服务器续费' }}</span></td>
                                 <td>¥{{ tx.amount }}</td>
                             </tr>
                             <tr v-if="!txList || txList.length === 0"><td colspan="6" class="text-center text-muted py-4">暂无交易记录</td></tr>
