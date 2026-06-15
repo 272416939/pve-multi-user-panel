@@ -139,6 +139,10 @@ watch($.user, function(u) {
             return;
         }
         $.activeSection.value = id;
+        // 切换 section 时清理残留 modal backdrop（Teleport 移除后 backdrop 会孤悬）
+        document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
         // Close sidebar on mobile after navigation
         if (window.innerWidth <= 768) {
             var sb = document.getElementById('sidebar');
@@ -322,10 +326,17 @@ watch($.user, function(u) {
     $.bsModalShow = function(id) {
         document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
         document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        if (document.activeElement && document.activeElement !== document.body) {
+            document.activeElement.blur();
+        }
         var el = document.getElementById(id);
         if (!el) return;
         var old = bootstrap.Modal.getInstance(el);
-        if (old) old.dispose();
+        if (old) {
+            old.hide();
+            old.dispose();
+        }
         new bootstrap.Modal(el, { focus: false }).show();
     };
 
@@ -334,9 +345,20 @@ watch($.user, function(u) {
             document.activeElement.blur();
         }
         var el = document.getElementById(id);
-        if (el) {
-            var modal = bootstrap.Modal.getInstance(el);
-            if (modal) modal.hide();
+        if (!el) return;
+        var modal = bootstrap.Modal.getInstance(el);
+        if (modal) {
+            el.addEventListener('hidden.bs.modal', function cleanup() {
+                el.removeEventListener('hidden.bs.modal', cleanup);
+                document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+            }, { once: true });
+            modal.hide();
+        } else {
+            document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
         }
     };
 

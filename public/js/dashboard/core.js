@@ -151,8 +151,9 @@
         $.customAlertMessage.value = message;
         var el = document.getElementById('customAlertModal');
         if (el) {
-            var modal = bootstrap.Modal.getOrCreateInstance(el);
-            modal.show();
+            var old = bootstrap.Modal.getInstance(el);
+            if (old) old.dispose();
+            new bootstrap.Modal(el).show();
         }
     };
 
@@ -404,19 +405,40 @@
     $.bsModalShow = function(id) {
         document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
         document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        if (document.activeElement && document.activeElement !== document.body) {
+            document.activeElement.blur();
+        }
         var el = document.getElementById(id);
         if (!el) return;
-        // 始终销毁旧实例再创建，确保 focus:false 生效（getOrCreateInstance 在实例已存在时忽略选项）
         var old = bootstrap.Modal.getInstance(el);
         if (old) old.dispose();
         new bootstrap.Modal(el, { focus: false }).show();
+        // 延迟清理：捕获 hide 过渡动画完成后可能残留的 backdrop
+        setTimeout(function() {
+            var leftovers = document.querySelectorAll('.modal-backdrop');
+            if (leftovers.length > 1) {
+                for (var i = 0; i < leftovers.length - 1; i++) leftovers[i].remove();
+            }
+        }, 400);
     };
 
     $.bsModalHide = function(id) {
         var el = document.getElementById(id);
-        if (el) {
-            var modal = bootstrap.Modal.getInstance(el);
-            if (modal) modal.hide();
+        if (!el) return;
+        var modal = bootstrap.Modal.getInstance(el);
+        if (modal) {
+            el.addEventListener('hidden.bs.modal', function cleanup() {
+                el.removeEventListener('hidden.bs.modal', cleanup);
+                document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+            }, { once: true });
+            modal.hide();
+        } else {
+            document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('padding-right');
         }
     };
 
@@ -623,6 +645,14 @@
     var _origSwitchSection = $.switchSection;
     $.switchSection = function(section) {
         _origSwitchSection(section);
+        // 切换 section 时清理打开 modal 的残留 backdrop（Vue 移除 DOM 后 backdrop 会孤悬）
+        document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        document.querySelectorAll('.modal.show').forEach(function(m) {
+            var inst = bootstrap.Modal.getInstance(m);
+            if (inst) inst.hide();
+        });
         if (section === 'order') {
             $.loadPackages();
             $.loadMacGroups();
