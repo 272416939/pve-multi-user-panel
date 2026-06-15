@@ -31,6 +31,26 @@
     $.renewQuantity = ref(1);
     $.renewError = ref('');
 
+    // ===== 套餐订购状态 =====
+    $.vmPackages = ref([]);
+    $.lxcPackages = ref([]);
+    $.activeTabOrder = ref('vm');
+    $.orderForm = ref({ period: 'month', quantity: 1, mac_group_id: '' });
+    $.orderPackage = ref({});
+    $.orderType = ref('vm');
+    $.orderLoading = ref(false);
+    $.macGroups = ref([]);
+    
+    $.orderTotal = computed(function() {
+        var p = $.orderPackage.value;
+        if (!p || !p.id) return '0.00';
+        var price = 0;
+        if ($.orderForm.value.period === 'month') price = parseFloat(p.monthly_price) || 0;
+        else if ($.orderForm.value.period === 'quarter') price = parseFloat(p.quarterly_price) || 0;
+        else price = parseFloat(p.yearly_price) || 0;
+        return (price * (parseInt($.orderForm.value.quantity) || 1)).toFixed(2);
+    });
+
     // ===== 详情弹窗状态 =====
     $.showVmDetail = ref(false);
     $.detailVm = ref({});
@@ -537,6 +557,73 @@
         $.fetchDetailStatus();
         if(isRunning){
             sendPush({ type: 'subscribe-detail', vmid: vm.vm_id, isLxc: isLxc });
+        }
+    };
+
+    // ===== 套餐订购函数 =====
+    $.loadPackages = async function() {
+        try {
+            $.vmPackages.value = await api('/admin/vm-packages');
+            $.lxcPackages.value = await api('/admin/lxc-packages');
+        } catch(e) { console.error('加载套餐失败', e); }
+    };
+    
+    $.loadMacGroups = async function() {
+        try { $.macGroups.value = await api('/ikuai/mac-groups'); } catch(e) {}
+    };
+    
+    $.openOrderModal = function(pkg, type) {
+        $.orderPackage.value = pkg;
+        $.orderType.value = type;
+        $.orderForm.value = { period: 'month', quantity: 1, mac_group_id: '' };
+        $.bsModalShow('orderModal');
+    };
+    
+    $.confirmOrder = async function() {
+        $.orderLoading.value = true;
+        try {
+            var endpoint = $.orderType.value === 'vm' ? '/admin/vm-packages/' + $.orderPackage.value.id + '/provision' : '/admin/lxc-packages/' + $.orderPackage.value.id + '/provision';
+            var body = {
+                user_id: $.user.value.id,
+                period: $.orderForm.value.period,
+                period_count: parseInt($.orderForm.value.quantity) || 1,
+                mac_group_id: $.orderForm.value.mac_group_id || ''
+            };
+            await api(endpoint, { method: 'POST', body: JSON.stringify(body) });
+            $.bsModalHide('orderModal');
+            alert('开通成功！请查看订单详情。');
+        } catch(e) {
+            alert('开通失败：' + (e.message || '未知错误'));
+        }
+        $.orderLoading.value = false;
+    };
+    
+    $.switchSubOrder = function(tab) {
+        $.switchSection('order');
+        $.activeTabOrder.value = tab;
+        document.querySelectorAll('#submenu-order .nav-item').forEach(function(item) { item.classList.remove('active'); });
+        var target = document.querySelector('[data-subsection="order-' + tab + '"]');
+        if (target) target.classList.add('active');
+        var el = document.getElementById('submenu-order');
+        if (el) el.classList.add('open');
+        var parent = el ? el.previousElementSibling : null;
+        if (parent) parent.classList.add('expanded');
+    };
+    
+    $.toggleSubmenu = function(id) {
+        var el = document.getElementById('submenu-' + id);
+        if (el) el.classList.toggle('open');
+        var trigger = el ? el.previousElementSibling : null;
+        if (trigger) trigger.classList.toggle('expanded');
+    };
+
+    // 扩展 switchSection 以支持 order
+    var _origSwitchSection = $.switchSection;
+    $.switchSection = function(section) {
+        _origSwitchSection(section);
+        if (section === 'order') {
+            $.loadPackages();
+            $.loadMacGroups();
         }
     };
 

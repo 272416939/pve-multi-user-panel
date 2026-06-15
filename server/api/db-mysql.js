@@ -357,6 +357,29 @@ async function initDb() {
         )
     `);
 
+    // 创建 orders 表
+    await execute(`CREATE TABLE IF NOT EXISTS orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        order_no VARCHAR(32) UNIQUE NOT NULL,
+        user_id INT NOT NULL,
+        type VARCHAR(10) NOT NULL DEFAULT 'vm',
+        package_id INT NOT NULL,
+        template_id INT DEFAULT 0,
+        period VARCHAR(20) NOT NULL DEFAULT 'month',
+        period_count INT NOT NULL DEFAULT 1,
+        amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        cores INT DEFAULT 0,
+        memory INT DEFAULT 0,
+        disk_size INT DEFAULT 0,
+        resource_name VARCHAR(255) DEFAULT '',
+        resource_id VARCHAR(50) DEFAULT '',
+        status VARCHAR(20) NOT NULL DEFAULT 'completed',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_orders_user (user_id),
+        INDEX idx_orders_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
     // vm_templates 表
     await execute(`CREATE TABLE IF NOT EXISTS vm_templates (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -478,6 +501,8 @@ async function migrateSchema() {
     await safeAlter('vm_templates', 'cpu_affinity', "VARCHAR(255) NOT NULL DEFAULT ''");
 
     await safeAlter('lxc_templates', 'rootfs_storage', "VARCHAR(100) DEFAULT 'local-lvm'");
+    await safeAlter('vm_templates', 'mac_group_id', "TEXT");
+    await safeAlter('lxc_templates', 'mac_group_id', "TEXT");
 
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {
@@ -1668,14 +1693,42 @@ module.exports = {
         }
     },
 
+    // 订单操作
+    orders: {
+        create: async (data) => {
+            const [result] = await execute(
+                `INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    data.order_no, data.user_id, data.type || 'vm',
+                    data.package_id, data.template_id || 0,
+                    data.period || 'month', data.period_count || 1,
+                    data.amount || '0.00', data.cores || 0, data.memory || 0,
+                    data.disk_size || 0, data.resource_name || '',
+                    data.resource_id || '', data.status || 'completed'
+                ]
+            );
+            return queryOne('SELECT * FROM orders WHERE id = ?', [result.insertId]);
+        },
+        getByUser: (userId) => queryAll('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', [userId]),
+        getAll: async (page, limit) => {
+            page = page || 1; limit = limit || 20;
+            const offset = (page - 1) * limit;
+            const rows = await queryAll('SELECT * FROM orders ORDER BY id DESC LIMIT ? OFFSET ?', [limit, offset]);
+            const totalRow = await queryOne('SELECT COUNT(*) as total FROM orders');
+            return { rows, total: totalRow.total, page, limit };
+        },
+        getByOrderNo: (orderNo) => queryOne('SELECT * FROM orders WHERE order_no = ?', [orderNo]),
+    },
+
     // VM 模板操作
     vmTemplates: {
         getAll: () => queryAll('SELECT * FROM vm_templates ORDER BY id DESC'),
         getById: (id) => queryOne('SELECT * FROM vm_templates WHERE id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, target_storage, clone_mode, cpu_affinity, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, target_storage, clone_mode, cpu_affinity, mac_group_id, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.template_vmid || 0, data.cores || 1,
                     data.memory || 1024, data.disk_size || 20,
@@ -1684,13 +1737,14 @@ module.exports = {
                     data.target_storage || 'local-lvm',
                     data.clone_mode || 'full',
                     data.cpu_affinity || '',
+                    data.mac_group_id || '',
                     data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM vm_templates WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'target_storage', 'clone_mode', 'cpu_affinity', 'description', 'status'];
+            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'target_storage', 'clone_mode', 'cpu_affinity', 'mac_group_id', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1723,13 +1777,13 @@ module.exports = {
                     data.cores || 1, data.memory || 512, data.swap || 512,
                     data.disk_size || 8, data.network_bridge || 'vmbr0',
                     data.network_mode || 'dhcp', data.unprivileged !== undefined ? data.unprivileged : 1,
-                    data.features || '', data.description || '', data.status || 'active'
+                    data.features || '', data.mac_group_id || '', data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM lxc_templates WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'rootfs_storage', 'status'];
+            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'rootfs_storage', 'mac_group_id', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

@@ -624,6 +624,7 @@
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-finance">
                     <a class="nav-item" data-subsection="finance-transactions" onclick="window.__admin.switchSection('finance',{highlight:'finance-transactions'});window.__admin.activeTab.value='transactions';return false;"><span class="nav-text">交易流水</span></a>
+                    <a class="nav-item" data-subsection="finance-orders" onclick="window.__admin.switchSection('finance',{highlight:'finance-orders'});window.__admin.activeTab.value='orders';return false;"><span class="nav-text">订单管理</span></a>
                 </div>
 
                 <!-- 系统设置 -->
@@ -872,16 +873,6 @@
                                                 <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
                                             </select>
                                         </div>
-                                        <div class="col-12 mb-3">
-                                            <div class="border-top pt-3" style="border-color:rgba(255,255,255,0.08)!important;">
-                                                <label class="form-label fw-bold">📦 套餐快速开通</label>
-                                                <select class="form-select form-select-sm" v-model="packagePage.vmProvisionForm.package_id" style="max-width:400px;">
-                                                    <option value="">-- 选择套餐（自动填充参数） --</option>
-                                                    <option v-for="p in packagePage.vmPackages.value" :key="p.id" :value="p.id" v-show="p.status === 'active'">{{ p.name }} ({{ p.cores }}核/{{ p.memory }}MB/{{ p.disk_size }}GB)</option>
-                                                </select>
-                                                <small class="text-muted">选择套餐后将自动填充资源配置和价格</small>
-                                            </div>
-                                        </div>
                                     </div>
                                     <button type="submit" class="btn-glass" formnovalidate>分配</button>
                                 </form>
@@ -1115,16 +1106,6 @@
                                                 <option value="">不加入分组</option>
                                                 <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
                                             </select>
-                                        </div>
-                                        <div class="col-12 mb-3">
-                                            <div class="border-top pt-3" style="border-color:rgba(255,255,255,0.08)!important;">
-                                                <label class="form-label fw-bold">📦 套餐快速开通</label>
-                                                <select class="form-select form-select-sm" v-model="packagePage.lxcProvisionForm.package_id" style="max-width:400px;">
-                                                    <option value="">-- 选择套餐（自动填充参数） --</option>
-                                                    <option v-for="p in packagePage.lxcPackages.value" :key="p.id" :value="p.id" v-show="p.status === 'active'">{{ p.name }} ({{ p.cores }}核/{{ p.memory }}MB/{{ p.disk_size }}GB)</option>
-                                                </select>
-                                                <small class="text-muted">选择套餐后将自动填充资源配置和价格</small>
-                                            </div>
                                         </div>
                                     </div>
                                     <button type="submit" class="btn-glass" formnovalidate>分配</button>
@@ -2176,6 +2157,44 @@
                                 <button class="btn btn-sm btn-outline-secondary" :disabled="financePage <= 1" @click="loadTransactions(financePage - 1)">上一页</button>
                                 <span class="mx-2 text-muted small">{{ financePage }}</span>
                                 <button class="btn btn-sm btn-outline-secondary" :disabled="financePage * 10 >= transactionTotal" @click="loadTransactions(financePage + 1)">下一页</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 订单管理 -->
+                    <div v-if="activeTab === 'orders'">
+                        <div class="module-header">
+                            <h4 class="module-title">订单管理</h4>
+                        </div>
+                        <div class="card">
+                            <div class="table-responsive">
+                                <table class="table table-striped mb-0">
+                                    <thead>
+                                        <tr><th>订单号</th><th>用户名</th><th>套餐</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>状态</th><th>开通时间</th></tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="o in orders" :key="o.id">
+                                            <td><code>{{ o.order_no }}</code></td>
+                                            <td>{{ o.username }}</td>
+                                            <td>{{ o.package_name }}</td>
+                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : 'badge bg-success'">{{ o.type === 'vm' ? 'VM' : 'LXC' }}</span></td>
+                                            <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
+                                            <td>{{ o.period_count }}</td>
+                                            <td>{{ o.amount }} 元</td>
+                                            <td><span class="badge" :class="o.status === 'completed' ? 'bg-success' : 'bg-warning'">{{ o.status === 'completed' ? '已开通' : o.status }}</span></td>
+                                            <td>{{ formatDate(o.created_at) }}</td>
+                                        </tr>
+                                        <tr v-if="!orders || orders.length === 0"><td colspan="9" class="text-center text-muted">暂无订单</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <!-- 分页 -->
+                        <div class="d-flex justify-content-between align-items-center mt-3" v-if="orderTotal > 20">
+                            <small class="text-muted">共 {{ orderTotal }} 条</small>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-outline-secondary" :disabled="orderPage <= 1" @click="loadOrders(orderPage-1)">上一页</button>
+                                <button class="btn btn-sm btn-outline-secondary" :disabled="orderPage*20 >= orderTotal" @click="loadOrders(orderPage+1)">下一页</button>
                             </div>
                         </div>
                     </div>
@@ -3340,6 +3359,12 @@
                                     <div class="col-md-6"><label class="form-label">网卡型号</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.network_model"></div>
                                     <div class="col-md-6"><label class="form-label">操作系统类型</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.os_type"></div>
                                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="templatePage.vmTemplateForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
+                                    <div class="col-md-6"><label class="form-label">MAC分组</label>
+                                        <select class="form-select" v-model="templatePage.vmTemplateForm.value.mac_group_id">
+                                            <option value="">不加入分组</option>
+                                            <option v-for="g in $.macGroups.value" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                                        </select>
+                                    </div>
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="templatePage.vmTemplateForm.value.description"></textarea></div>
                                 </div>
                             </div>
@@ -3391,6 +3416,12 @@
                                     <div class="col-md-6"><label class="form-label">非特权容器</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.unprivileged"><option :value="1">是</option><option :value="0">否</option></select></div>
                                     <div class="col-md-6"><label class="form-label">特性</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.features" placeholder="nesting=1,fuse=1"></div>
                                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
+                                    <div class="col-md-6"><label class="form-label">MAC分组</label>
+                                        <select class="form-select" v-model="templatePage.lxcTemplateForm.value.mac_group_id">
+                                            <option value="">不加入分组</option>
+                                            <option v-for="g in $.macGroups.value" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                                        </select>
+                                    </div>
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="templatePage.lxcTemplateForm.value.description"></textarea></div>
                                 </div>
                             </div>

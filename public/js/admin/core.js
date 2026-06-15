@@ -752,6 +752,9 @@ $.initDetailCharts = function() {
             if (newTab === 'pay') {
                 $.loadPayConfig();
             }
+            if (newTab === 'orders') {
+                $.loadOrders(1);
+            }
         });
 
         watch($.activeSection, function(val) {

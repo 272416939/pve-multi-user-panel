@@ -16,7 +16,8 @@ router.get('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, r
 // VM 模板创建
 router.post('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        var t = await db.vmTemplates.create(req.body);
+        var { mac_group_id = '' } = req.body;
+        var t = await db.vmTemplates.create({ ...req.body, mac_group_id });
         res.json(t);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -26,7 +27,8 @@ router.post('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, 
 // VM 模板更新
 router.put('/admin/vm-templates/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        var t = await db.vmTemplates.update(parseInt(req.params.id), req.body);
+        var { mac_group_id = '' } = req.body;
+        var t = await db.vmTemplates.update(parseInt(req.params.id), { ...req.body, mac_group_id });
         res.json(t);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -54,12 +56,20 @@ router.get('/admin/lxc-templates', authMiddleware, adminMiddleware, async (req, 
 
 // LXC 模板创建
 router.post('/admin/lxc-templates', authMiddleware, adminMiddleware, async (req, res) => {
-    try { var t = await db.lxcTemplates.create(req.body); res.json(t); } catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        var { mac_group_id = '' } = req.body;
+        var t = await db.lxcTemplates.create({ ...req.body, mac_group_id });
+        res.json(t);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // LXC 模板更新
 router.put('/admin/lxc-templates/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { var t = await db.lxcTemplates.update(parseInt(req.params.id), req.body); res.json(t); } catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        var { mac_group_id = '' } = req.body;
+        var t = await db.lxcTemplates.update(parseInt(req.params.id), { ...req.body, mac_group_id });
+        res.json(t);
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // LXC 模板删除

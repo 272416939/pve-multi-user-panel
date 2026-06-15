@@ -508,6 +508,10 @@
                    @click.prevent="switchSubTab('wallet-transactions')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">交易明细</span>
                 </a>
+                <a class="nav-item" :class="{ active: activeSubTab === 'orders' }"
+                   @click.prevent="switchSubTab('orders'); loadMyOrders()">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span><span class="nav-text">我的订单</span>
+                </a>
             </Teleport>
 
             <div v-if="activeSubTab === 'settings'">
@@ -801,6 +805,28 @@
                     </div>
                 </div>
             </div>
+            <div v-if="activeSubTab === 'orders'">
+                <div class="module-header">
+                    <h4 class="module-title">我的订单</h4>
+                </div>
+                <div class="table-container" style="padding:12px;">
+                    <table class="table table-hover table-sm">
+                        <thead><tr><th>订单号</th><th>套餐</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>时间</th></tr></thead>
+                        <tbody>
+                            <tr v-for="o in myOrders" :key="o.id">
+                                <td><code style="font-size:11px;">{{ o.order_no }}</code></td>
+                                <td>{{ o.package_name }}</td>
+                                <td><span :class="o.type === 'vm' ? 'badge bg-info' : 'badge bg-success'">{{ o.type === 'vm' ? 'VM' : 'LXC' }}</span></td>
+                                <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
+                                <td>{{ o.period_count }}</td>
+                                <td>¥{{ o.amount }}</td>
+                                <td>{{ formatDate(o.created_at) }}</td>
+                            </tr>
+                            <tr v-if="!myOrders || myOrders.length === 0"><td colspan="7" class="text-center text-muted py-4">暂无订单记录</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <Teleport to="body">
@@ -1038,6 +1064,7 @@
                 const txTotal = ref(0);
                 const txPage = ref(1);
                 const txFilter = ref({ start_time: '', end_time: '', trade_type: '', order_no: '' });
+                const myOrders = ref([]);
 
                 const parseMarkdown = (text) => {
                     if (!text) return '';
@@ -1143,6 +1170,10 @@
                 const copyOrderNo = (orderNo) => {
                     if (navigator.clipboard) { navigator.clipboard.writeText(orderNo).then(() => alert('订单号已复制')); }
                     else { const el = document.createElement('textarea'); el.value = orderNo; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert('订单号已复制'); }
+                };
+
+                const loadMyOrders = async () => {
+                    try { myOrders.value = await api('/orders'); } catch (e) { console.error('加载订单失败', e); }
                 };
 
                 // 初始化加载钱包数据
@@ -1843,8 +1874,8 @@
                     openDisableTwofa,
                     disableTwofa,
                     walletBalance, payMethods, rechargeAmount, rechargeMethod, rechargeSubmitting, rechargeError,
-                    txList, txTotal, txPage, txFilter,
-                    submitRecharge, loadTx, copyOrderNo
+                    txList, txTotal, txPage, txFilter, myOrders,
+                    submitRecharge, loadTx, copyOrderNo, loadMyOrders
                 };
             }
         };

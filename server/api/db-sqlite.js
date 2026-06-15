@@ -343,6 +343,28 @@ function initDb() {
         )
     `);
 
+    // 创建 orders 表
+    db.exec(`CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_no TEXT UNIQUE NOT NULL,
+        user_id INTEGER NOT NULL,
+        type TEXT NOT NULL DEFAULT 'vm',
+        package_id INTEGER NOT NULL,
+        template_id INTEGER DEFAULT 0,
+        period TEXT NOT NULL DEFAULT 'month',
+        period_count INTEGER NOT NULL DEFAULT 1,
+        amount TEXT NOT NULL DEFAULT '0.00',
+        cores INTEGER DEFAULT 0,
+        memory INTEGER DEFAULT 0,
+        disk_size INTEGER DEFAULT 0,
+        resource_name TEXT DEFAULT '',
+        resource_id TEXT DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'completed',
+        created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    )`);
+    try { db.exec('ALTER TABLE orders ADD COLUMN mac_group_id TEXT DEFAULT ""'); } catch (e) {}
+
     // 创建消息索引
     try {
         db.exec('CREATE INDEX IF NOT EXISTS idx_messages_uid ON messages(uid)');
@@ -370,6 +392,7 @@ function initDb() {
     try { db.exec('ALTER TABLE vm_templates ADD COLUMN target_storage TEXT NOT NULL DEFAULT "local-lvm"'); } catch (e) {}
     try { db.exec('ALTER TABLE vm_templates ADD COLUMN clone_mode TEXT NOT NULL DEFAULT "full"'); } catch (e) {}
     try { db.exec('ALTER TABLE vm_templates ADD COLUMN cpu_affinity TEXT NOT NULL DEFAULT ""'); } catch (e) {}
+    try { db.exec('ALTER TABLE vm_templates ADD COLUMN mac_group_id TEXT DEFAULT ""'); } catch (e) {}
 
     // lxc_templates 表
     db.exec(`CREATE TABLE IF NOT EXISTS lxc_templates (
@@ -392,6 +415,7 @@ function initDb() {
     )`);
 
     try { db.exec('ALTER TABLE lxc_templates ADD COLUMN rootfs_storage TEXT NOT NULL DEFAULT "local-lvm"'); } catch (e) {}
+    try { db.exec('ALTER TABLE lxc_templates ADD COLUMN mac_group_id TEXT DEFAULT ""'); } catch (e) {}
 
     // vm_packages 表
     db.exec(`CREATE TABLE IF NOT EXISTS vm_packages (
@@ -1639,12 +1663,37 @@ module.exports = {
         }
     },
 
+    // 订单操作
+    orders: {
+        create: (data) => {
+            const stmt = db.prepare(`INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (@order_no, @user_id, @type, @package_id, @template_id, @period, @period_count, @amount, @cores, @memory, @disk_size, @resource_name, @resource_id, @status)`);
+            const info = stmt.run({
+                order_no: data.order_no, user_id: data.user_id, type: data.type || 'vm',
+                package_id: data.package_id, template_id: data.template_id || 0,
+                period: data.period || 'month', period_count: data.period_count || 1,
+                amount: data.amount || '0.00', cores: data.cores || 0, memory: data.memory || 0,
+                disk_size: data.disk_size || 0, resource_name: data.resource_name || '',
+                resource_id: data.resource_id || '', status: data.status || 'completed'
+            });
+            return db.prepare('SELECT * FROM orders WHERE id = ?').get(info.lastInsertRowid);
+        },
+        getByUser: (userId) => db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC').all(userId),
+        getAll: (page, limit) => {
+            page = page || 1; limit = limit || 20;
+            const offset = (page - 1) * limit;
+            const rows = db.prepare('SELECT * FROM orders ORDER BY id DESC LIMIT ? OFFSET ?').all(limit, offset);
+            const total = db.prepare('SELECT COUNT(*) as total FROM orders').get().total;
+            return { rows, total, page, limit };
+        },
+        getByOrderNo: (orderNo) => db.prepare('SELECT * FROM orders WHERE order_no = ?').get(orderNo),
+    },
+
     // VM 模板操作
     vmTemplates: {
         getAll: () => db.prepare('SELECT * FROM vm_templates ORDER BY id DESC').all(),
         getById: (id) => db.prepare('SELECT * FROM vm_templates WHERE id = ?').get(id),
         create: (data) => {
-            const stmt = db.prepare(`INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, target_storage, clone_mode, cpu_affinity, description, status) VALUES (@name, @template_vmid, @cores, @memory, @disk_size, @network_bridge, @network_model, @os_type, @target_storage, @clone_mode, @cpu_affinity, @description, @status)`);
+            const stmt = db.prepare(`INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, target_storage, clone_mode, cpu_affinity, mac_group_id, description, status) VALUES (@name, @template_vmid, @cores, @memory, @disk_size, @network_bridge, @network_model, @os_type, @target_storage, @clone_mode, @cpu_affinity, @mac_group_id, @description, @status)`);
             const info = stmt.run({
                 name: data.name || '', template_vmid: data.template_vmid || 0, cores: data.cores || 1,
                 memory: data.memory || 1024, disk_size: data.disk_size || 20,
@@ -1653,12 +1702,13 @@ module.exports = {
                 target_storage: data.target_storage || 'local-lvm',
                 clone_mode: data.clone_mode || 'full',
                 cpu_affinity: data.cpu_affinity || '',
+                mac_group_id: data.mac_group_id || '',
                 description: data.description || '', status: data.status || 'active'
             });
             return db.prepare('SELECT * FROM vm_templates WHERE id = ?').get(info.lastInsertRowid);
         },
         update: (id, updates) => {
-            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'target_storage', 'clone_mode', 'cpu_affinity', 'description', 'status'];
+            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'target_storage', 'clone_mode', 'cpu_affinity', 'mac_group_id', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1688,7 +1738,7 @@ module.exports = {
             return db.prepare('SELECT * FROM lxc_templates WHERE id = ?').get(info.lastInsertRowid);
         },
         update: (id, updates) => {
-            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'rootfs_storage', 'status'];
+            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'rootfs_storage', 'mac_group_id', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

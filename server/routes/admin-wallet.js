@@ -111,4 +111,28 @@ router.get('/admin/transactions/export', authMiddleware, adminMiddleware, async 
     }
 });
 
+// ========== 管理员订单查询 ==========
+router.get('/admin/orders', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var page = parseInt(req.query.page) || 1;
+        var limit = parseInt(req.query.limit) || 20;
+        var result = await db.orders.getAll(page, limit);
+        var rows = await Promise.all(result.rows.map(async function(order) {
+            var user = await db.users.getById(order.user_id);
+            var packageName = '';
+            if (order.type === 'vm') {
+                var pkg = await db.vmPackages.getById(order.package_id);
+                packageName = pkg ? pkg.name : '';
+            } else if (order.type === 'lxc') {
+                var pkg = await db.lxcPackages.getById(order.package_id);
+                packageName = pkg ? pkg.name : '';
+            }
+            return Object.assign({}, order, { username: user ? user.username : '', package_name: packageName });
+        }));
+        res.json({ rows: rows, total: result.total, page: result.page, limit: result.limit });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

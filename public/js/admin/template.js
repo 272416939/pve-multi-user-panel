@@ -8,10 +8,10 @@
 
     tp.vmTemplateForm = ref({ id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20,
         network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', target_storage: 'local-lvm', clone_mode: 'full',
-        cpu_affinity: '', description: '', status: 'active' });
+        cpu_affinity: '', mac_group_id: '', description: '', status: 'active' });
     tp.lxcTemplateForm = ref({ id: null, name: '', ostemplate: '', storage: 'local', cores: 1, memory: 512,
         swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1,
-        features: '', description: '', status: 'active' });
+        features: '', mac_group_id: '', description: '', status: 'active' });
     tp.vmTemplates = ref([]);
     tp.lxcTemplates = ref([]);
     tp.templateVmIdList = ref([]);
@@ -54,10 +54,11 @@
     tp.openVmTemplateForm = function(t) {
         if (t) {
             tp.vmTemplateForm.value = Object.assign({}, t);
+            tp.vmTemplateForm.value.mac_group_id = t.mac_group_id || '';
         } else {
             tp.vmTemplateForm.value = { id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20,
                 network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', target_storage: 'local-lvm', clone_mode: 'full',
-                cpu_affinity: '', description: '', status: 'active' };
+                cpu_affinity: '', mac_group_id: '', description: '', status: 'active' };
         }
         tp.loadPveTemplateVms();
         tp.loadAllStorages();
@@ -90,10 +91,11 @@
         if (t) {
             tp.lxcTemplateForm.value = Object.assign({}, t);
             tp.lxcTemplateForm.value.rootfs_storage = t.rootfs_storage || 'local-lvm';
+            tp.lxcTemplateForm.value.mac_group_id = t.mac_group_id || '';
         } else {
             tp.lxcTemplateForm.value = { id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512,
                 swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1,
-                features: '', description: '', status: 'active' };
+                features: '', mac_group_id: '', description: '', status: 'active' };
         }
         tp.loadLxcStorages();
         if (tp.lxcTemplateForm.value.storage) {

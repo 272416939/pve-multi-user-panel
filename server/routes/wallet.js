@@ -540,4 +540,25 @@ router.get('/wallet/transactions', authMiddleware, async (req, res) => {
     }
 });
 
+// ========== 用户订单查询 ==========
+router.get('/orders', authMiddleware, async (req, res) => {
+    try {
+        var rows = await db.orders.getByUser(req.user.id);
+        rows = await Promise.all(rows.map(async function(order) {
+            var packageName = '';
+            if (order.type === 'vm') {
+                var pkg = await db.vmPackages.getById(order.package_id);
+                packageName = pkg ? pkg.name : '';
+            } else if (order.type === 'lxc') {
+                var pkg = await db.lxcPackages.getById(order.package_id);
+                packageName = pkg ? pkg.name : '';
+            }
+            return Object.assign({}, order, { package_name: packageName });
+        }));
+        res.json(rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 module.exports = router;

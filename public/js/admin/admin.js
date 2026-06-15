@@ -500,4 +500,19 @@
             alert('导出失败: ' + (e.message || ''));
         }
     };
+
+    // 订单管理
+    $.orders = Vue.ref([]);
+    $.orderPage = Vue.ref(1);
+    $.orderTotal = Vue.ref(0);
+
+    $.loadOrders = async function(page) {
+        page = page || 1;
+        $.orderPage.value = page;
+        try {
+            var data = await api('/admin/orders?page=' + page + '&limit=20');
+            $.orders.value = data.rows || [];
+            $.orderTotal.value = data.total || 0;
+        } catch(e) { console.error('加载订单失败', e); }
+    };
 })();
