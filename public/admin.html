@@ -3679,7 +3679,7 @@
                     <div class="modal-dialog modal-lg modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ (packagePage.lxcPackageForm || {value:{}}).value.id ? '编辑 LXC 套餐' : '新建 LXC 套餐' }}</h5>
+                                <h5 class="modal-title">{{ (packagePage.lxcPackageForm || {value:undefined}).value.id ? '编辑 LXC 套餐' : '新建 LXC 套餐' }}</h5>
                                 <button type="button" class="btn-close" @click="bsModalHide('lxcPackageModal')"></button>
                             </div>
                             <div class="modal-body">
