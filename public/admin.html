@@ -3445,6 +3445,27 @@
                                     <div class="col-md-3"><label class="form-label">磁盘 (GB)</label><input class="form-control" type="number" v-model="templatePage.lxcTemplateForm.value.disk_size"></div>
                                     <div class="col-md-6"><label class="form-label">网桥</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.network_bridge"></div>
                                     <div class="col-md-6"><label class="form-label">网络模式</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.network_mode"><option value="dhcp">DHCP</option><option value="static">静态</option></select></div>
+                                    <div class="col-md-6" v-if="templatePage.lxcTemplateForm.value.network_mode === 'static'">
+                                        <label class="form-label">IPv4 地址</label>
+                                        <input class="form-control" v-model="templatePage.lxcTemplateForm.value.ip4_addr" placeholder="如: 192.168.1.100/24">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mt-3">
+                                            <input class="form-check-input" type="checkbox" v-model="templatePage.lxcTemplateForm.value.ipv6_enabled" :true-value="1" :false-value="0" id="lxcTemplateIpv6">
+                                            <label class="form-check-label" for="lxcTemplateIpv6">启用 IPv6</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6" v-if="templatePage.lxcTemplateForm.value.ipv6_enabled">
+                                        <label class="form-label">IPv6 模式</label>
+                                        <select class="form-select" v-model="templatePage.lxcTemplateForm.value.ip6_mode">
+                                            <option value="dhcp">DHCP</option>
+                                            <option value="static">静态</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6" v-if="templatePage.lxcTemplateForm.value.ipv6_enabled && templatePage.lxcTemplateForm.value.ip6_mode === 'static'">
+                                        <label class="form-label">IPv6 地址</label>
+                                        <input class="form-control" v-model="templatePage.lxcTemplateForm.value.ip6_addr" placeholder="如: 2001:db8::1/64">
+                                    </div>
                                     <div class="col-md-6"><label class="form-label">非特权容器</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.unprivileged"><option :value="1">是</option><option :value="0">否</option></select></div>
                                     <div class="col-md-6"><label class="form-label">特性</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.features" placeholder="nesting=1,fuse=1"></div>
                                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
@@ -3838,7 +3859,7 @@
                 if (!$.templatePage.allStorages) $.templatePage.allStorages = Vue.ref([]);
                 if (!$.templatePage.pveTemplateVms) $.templatePage.pveTemplateVms = Vue.ref([]);
                 if (!$.templatePage.vmTemplateForm) $.templatePage.vmTemplateForm = Vue.ref({ id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20, network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', target_storage: 'local-lvm', clone_mode: 'full', cpu_affinity: '', description: '', status: 'active' });
-                if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1, features: '', description: '', status: 'active' });
+                if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', ipv6_enabled: 1, ip6_mode: 'dhcp', ip6_addr: '', ip4_addr: '', unprivileged: 1, features: '', description: '', status: 'active' });
                 if (!$.templatePage.lxcStorages) $.templatePage.lxcStorages = Vue.ref([]);
                 if (!$.templatePage.lxcOstemplates) $.templatePage.lxcOstemplates = Vue.ref([]);
                 if (!$.packagePage) $.packagePage = {};

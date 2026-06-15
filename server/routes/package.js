@@ -192,7 +192,22 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             storage: template.storage || 'local', hostname: randomName,
             cores: template.cores, memory: template.memory, swap: template.swap,
             rootfs: (template.rootfs_storage || template.storage || 'local-lvm') + ':' + (template.disk_size),
-            net0: 'name=eth0,bridge=' + (template.network_bridge || 'vmbr0') + ',ip=' + (template.network_mode === 'dhcp' ? 'dhcp' : ''),
+            net0: (function(){
+                var n = 'name=eth0,bridge=' + (template.network_bridge || 'vmbr0');
+                if (template.network_mode === 'dhcp') {
+                    n += ',ip=dhcp';
+                } else if (template.ip4_addr) {
+                    n += ',ip=' + template.ip4_addr;
+                }
+                if (template.ipv6_enabled != 0) {
+                    if (template.ip6_mode === 'dhcp') {
+                        n += ',ip6=dhcp';
+                    } else if (template.ip6_mode === 'static' && template.ip6_addr) {
+                        n += ',ip6=' + template.ip6_addr;
+                    }
+                }
+                return n;
+            })(),
             unprivileged: template.unprivileged !== undefined ? template.unprivileged : 1,
             features: template.features || '', start: 0
         });
@@ -509,7 +524,22 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
             memory: template.memory,
             swap: template.swap,
             rootfs: (template.rootfs_storage || template.storage || 'local-lvm') + ':' + (template.disk_size),
-            net0: 'name=eth0,bridge=' + (template.network_bridge || 'vmbr0') + ',ip=' + (template.network_mode === 'dhcp' ? 'dhcp' : ''),
+            net0: (function(){
+                var n = 'name=eth0,bridge=' + (template.network_bridge || 'vmbr0');
+                if (template.network_mode === 'dhcp') {
+                    n += ',ip=dhcp';
+                } else if (template.ip4_addr) {
+                    n += ',ip=' + template.ip4_addr;
+                }
+                if (template.ipv6_enabled != 0) {
+                    if (template.ip6_mode === 'dhcp') {
+                        n += ',ip6=dhcp';
+                    } else if (template.ip6_mode === 'static' && template.ip6_addr) {
+                        n += ',ip6=' + template.ip6_addr;
+                    }
+                }
+                return n;
+            })(),
             unprivileged: template.unprivileged !== undefined ? template.unprivileged : 1,
             features: template.features || '',
             start: 0

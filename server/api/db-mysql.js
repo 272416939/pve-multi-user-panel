@@ -409,6 +409,10 @@ async function initDb() {
         disk_size INT NOT NULL DEFAULT 8,
         network_bridge VARCHAR(50) NOT NULL DEFAULT 'vmbr0',
         network_mode VARCHAR(20) NOT NULL DEFAULT 'dhcp',
+        ipv6_enabled TINYINT(1) NOT NULL DEFAULT 1,
+        ip6_mode VARCHAR(20) NOT NULL DEFAULT 'dhcp',
+        ip6_addr TEXT NOT NULL,
+        ip4_addr TEXT NOT NULL,
         unprivileged INT NOT NULL DEFAULT 1,
         features TEXT NOT NULL,
         description TEXT NOT NULL,
@@ -503,6 +507,10 @@ async function migrateSchema() {
     await safeAlter('lxc_templates', 'rootfs_storage', "VARCHAR(100) DEFAULT 'local-lvm'");
     await safeAlter('vm_templates', 'mac_group_id', "TEXT");
     await safeAlter('lxc_templates', 'mac_group_id', "TEXT");
+    await safeAlter('lxc_templates', 'ipv6_enabled', "TINYINT(1) NOT NULL DEFAULT 1");
+    await safeAlter('lxc_templates', 'ip6_mode', "VARCHAR(20) NOT NULL DEFAULT 'dhcp'");
+    await safeAlter('lxc_templates', 'ip6_addr', "TEXT NOT NULL");
+    await safeAlter('lxc_templates', 'ip4_addr', "TEXT NOT NULL");
 
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {
@@ -1770,21 +1778,24 @@ module.exports = {
         getById: (id) => queryOne('SELECT * FROM lxc_templates WHERE id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, mac_group_id, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, ipv6_enabled, ip6_mode, ip6_addr, ip4_addr, unprivileged, features, mac_group_id, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.ostemplate || '', data.storage || 'local',
                     data.rootfs_storage || 'local-lvm',
                     data.cores || 1, data.memory || 512, data.swap || 512,
                     data.disk_size || 8, data.network_bridge || 'vmbr0',
-                    data.network_mode || 'dhcp', data.unprivileged !== undefined ? data.unprivileged : 1,
+                    data.network_mode || 'dhcp',
+                    data.ipv6_enabled !== undefined ? data.ipv6_enabled : 1,
+                    data.ip6_mode || 'dhcp', data.ip6_addr || '', data.ip4_addr || '',
+                    data.unprivileged !== undefined ? data.unprivileged : 1,
                     data.features || '', data.mac_group_id || '', data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM lxc_templates WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'rootfs_storage', 'mac_group_id', 'status'];
+            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'ipv6_enabled', 'ip6_mode', 'ip6_addr', 'ip4_addr', 'unprivileged', 'features', 'description', 'rootfs_storage', 'mac_group_id', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

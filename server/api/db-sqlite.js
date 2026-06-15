@@ -406,6 +406,10 @@ function initDb() {
         disk_size INTEGER NOT NULL DEFAULT 8,
         network_bridge TEXT NOT NULL DEFAULT 'vmbr0',
         network_mode TEXT NOT NULL DEFAULT 'dhcp',
+        ipv6_enabled INTEGER NOT NULL DEFAULT 1,
+        ip6_mode TEXT NOT NULL DEFAULT 'dhcp',
+        ip6_addr TEXT NOT NULL DEFAULT '',
+        ip4_addr TEXT NOT NULL DEFAULT '',
         unprivileged INTEGER NOT NULL DEFAULT 1,
         features TEXT NOT NULL DEFAULT '',
         description TEXT NOT NULL DEFAULT '',
@@ -416,6 +420,19 @@ function initDb() {
 
     try { db.exec('ALTER TABLE lxc_templates ADD COLUMN rootfs_storage TEXT NOT NULL DEFAULT "local-lvm"'); } catch (e) {}
     try { db.exec('ALTER TABLE lxc_templates ADD COLUMN mac_group_id TEXT DEFAULT ""'); } catch (e) {}
+
+    try {
+        db.prepare(`ALTER TABLE lxc_templates ADD COLUMN ipv6_enabled INTEGER NOT NULL DEFAULT 1`).run();
+    } catch (e) {}
+    try {
+        db.prepare(`ALTER TABLE lxc_templates ADD COLUMN ip6_mode TEXT NOT NULL DEFAULT 'dhcp'`).run();
+    } catch (e) {}
+    try {
+        db.prepare(`ALTER TABLE lxc_templates ADD COLUMN ip6_addr TEXT NOT NULL DEFAULT ''`).run();
+    } catch (e) {}
+    try {
+        db.prepare(`ALTER TABLE lxc_templates ADD COLUMN ip4_addr TEXT NOT NULL DEFAULT ''`).run();
+    } catch (e) {}
 
     // vm_packages 表
     db.exec(`CREATE TABLE IF NOT EXISTS vm_packages (
@@ -1727,19 +1744,23 @@ module.exports = {
         getAll: () => db.prepare('SELECT * FROM lxc_templates ORDER BY id DESC').all(),
         getById: (id) => db.prepare('SELECT * FROM lxc_templates WHERE id = ?').get(id),
         create: (data) => {
-            const stmt = db.prepare(`INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, description, status) VALUES (@name, @ostemplate, @storage, @rootfs_storage, @cores, @memory, @swap, @disk_size, @network_bridge, @network_mode, @unprivileged, @features, @description, @status)`);
+            const stmt = db.prepare(`INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, ipv6_enabled, ip6_mode, ip6_addr, ip4_addr, unprivileged, features, mac_group_id, description, status) VALUES (@name, @ostemplate, @storage, @rootfs_storage, @cores, @memory, @swap, @disk_size, @network_bridge, @network_mode, @ipv6_enabled, @ip6_mode, @ip6_addr, @ip4_addr, @unprivileged, @features, @mac_group_id, @description, @status)`);
             const info = stmt.run({
                 name: data.name || '', ostemplate: data.ostemplate || '', storage: data.storage || 'local',
                 rootfs_storage: data.rootfs_storage || 'local-lvm',
                 cores: data.cores || 1, memory: data.memory || 512, swap: data.swap || 512,
                 disk_size: data.disk_size || 8, network_bridge: data.network_bridge || 'vmbr0',
-                network_mode: data.network_mode || 'dhcp', unprivileged: data.unprivileged !== undefined ? data.unprivileged : 1,
-                features: data.features || '', description: data.description || '', status: data.status || 'active'
+                network_mode: data.network_mode || 'dhcp',
+                ipv6_enabled: data.ipv6_enabled !== undefined ? data.ipv6_enabled : 1,
+                ip6_mode: data.ip6_mode || 'dhcp', ip6_addr: data.ip6_addr || '', ip4_addr: data.ip4_addr || '',
+                unprivileged: data.unprivileged !== undefined ? data.unprivileged : 1,
+                features: data.features || '', mac_group_id: data.mac_group_id || '',
+                description: data.description || '', status: data.status || 'active'
             });
             return db.prepare('SELECT * FROM lxc_templates WHERE id = ?').get(info.lastInsertRowid);
         },
         update: (id, updates) => {
-            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'unprivileged', 'features', 'description', 'rootfs_storage', 'mac_group_id', 'status'];
+            const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'ipv6_enabled', 'ip6_mode', 'ip6_addr', 'ip4_addr', 'unprivileged', 'features', 'description', 'rootfs_storage', 'mac_group_id', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
