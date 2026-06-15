@@ -652,6 +652,22 @@ function migrateSchema() {
             console.error('迁移 lxc_packages.sold_count 字段失败:', e.message);
         }
     }
+
+    // 迁移套餐排序字段
+    try {
+        db.exec(`ALTER TABLE vm_packages ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`);
+    } catch (e) {
+        if (!e.message.includes('duplicate column name')) {
+            console.error('迁移 vm_packages.sort_order 字段失败:', e.message);
+        }
+    }
+    try {
+        db.exec(`ALTER TABLE lxc_packages ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`);
+    } catch (e) {
+        if (!e.message.includes('duplicate column name')) {
+            console.error('迁移 lxc_packages.sort_order 字段失败:', e.message);
+        }
+    }
 }
 
 // 初始化默认配置
@@ -1812,20 +1828,20 @@ module.exports = {
 
     // VM 套餐操作
     vmPackages: {
-        getAll: () => db.prepare('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id ORDER BY p.id DESC').all(),
+        getAll: () => db.prepare('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id ORDER BY p.sort_order ASC, p.id DESC').all(),
         getById: (id) => db.prepare('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id WHERE p.id = ?').get(id),
         create: (data) => {
-            const stmt = db.prepare(`INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, stock, description, status) VALUES (@name, @template_id, @cores, @memory, @disk_size, @monthly_price, @quarterly_price, @yearly_price, @stock, @description, @status)`);
+            const stmt = db.prepare(`INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, stock, sort_order, description, status) VALUES (@name, @template_id, @cores, @memory, @disk_size, @monthly_price, @quarterly_price, @yearly_price, @stock, @sort_order, @description, @status)`);
             const info = stmt.run({
                 name: data.name || '', template_id: data.template_id || 0, cores: data.cores || 1,
                 memory: data.memory || 1024, disk_size: data.disk_size || 20,
                 monthly_price: data.monthly_price || 0, quarterly_price: data.quarterly_price || 0,
-                yearly_price: data.yearly_price || 0, stock: data.stock || null, description: data.description || '', status: data.status || 'active'
+                yearly_price: data.yearly_price || 0, stock: data.stock || null, sort_order: data.sort_order || 0, description: data.description || '', status: data.status || 'active'
             });
             return db.prepare('SELECT * FROM vm_packages WHERE id = ?').get(info.lastInsertRowid);
         },
         update: (id, updates) => {
-            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'sold_count', 'description', 'status'];
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'sold_count', 'sort_order', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1840,20 +1856,20 @@ module.exports = {
 
     // LXC 套餐操作
     lxcPackages: {
-        getAll: () => db.prepare('SELECT p.*, t.name as template_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id ORDER BY p.id DESC').all(),
+        getAll: () => db.prepare('SELECT p.*, t.name as template_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id ORDER BY p.sort_order ASC, p.id DESC').all(),
         getById: (id) => db.prepare('SELECT p.*, t.name as template_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id WHERE p.id = ?').get(id),
         create: (data) => {
-            const stmt = db.prepare(`INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, stock, description, status) VALUES (@name, @template_id, @cores, @memory, @swap, @disk_size, @monthly_price, @quarterly_price, @yearly_price, @stock, @description, @status)`);
+            const stmt = db.prepare(`INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, stock, sort_order, description, status) VALUES (@name, @template_id, @cores, @memory, @swap, @disk_size, @monthly_price, @quarterly_price, @yearly_price, @stock, @sort_order, @description, @status)`);
             const info = stmt.run({
                 name: data.name || '', template_id: data.template_id || 0, cores: data.cores || 1,
                 memory: data.memory || 512, swap: data.swap || 512, disk_size: data.disk_size || 8,
                 monthly_price: data.monthly_price || 0, quarterly_price: data.quarterly_price || 0,
-                yearly_price: data.yearly_price || 0, stock: data.stock || null, description: data.description || '', status: data.status || 'active'
+                yearly_price: data.yearly_price || 0, stock: data.stock || null, sort_order: data.sort_order || 0, description: data.description || '', status: data.status || 'active'
             });
             return db.prepare('SELECT * FROM lxc_packages WHERE id = ?').get(info.lastInsertRowid);
         },
         update: (id, updates) => {
-            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'swap', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'sold_count', 'description', 'status'];
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'swap', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'sold_count', 'sort_order', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

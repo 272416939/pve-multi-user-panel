@@ -516,6 +516,9 @@ async function migrateSchema() {
     await safeAlter('vm_packages', 'sold_count', "INT NOT NULL DEFAULT 0");
     await safeAlter('lxc_packages', 'stock', 'INT');
     await safeAlter('lxc_packages', 'sold_count', "INT NOT NULL DEFAULT 0");
+
+    await safeAlter('vm_packages', 'sort_order', "INT NOT NULL DEFAULT 0");
+    await safeAlter('lxc_packages', 'sort_order', "INT NOT NULL DEFAULT 0");
     await safeAlter('lxc_templates', 'mac_group_id', "TEXT");
     await safeAlter('lxc_templates', 'ipv6_enabled', "TINYINT(1) NOT NULL DEFAULT 1");
     await safeAlter('lxc_templates', 'ip6_mode', "VARCHAR(20) NOT NULL DEFAULT 'dhcp'");
@@ -1827,23 +1830,23 @@ module.exports = {
 
     // VM 套餐操作
     vmPackages: {
-        getAll: () => queryAll('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id ORDER BY p.id DESC'),
+        getAll: () => queryAll('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id ORDER BY p.sort_order ASC, p.id DESC'),
         getById: (id) => queryOne('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id WHERE p.id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, stock, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, stock, sort_order, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.template_id || 0, data.cores || 1,
                     data.memory || 1024, data.disk_size || 20,
                     data.monthly_price || 0, data.quarterly_price || 0,
-                    data.yearly_price || 0, data.stock || null, data.description || '', data.status || 'active'
+                    data.yearly_price || 0, data.stock || null, data.sort_order || 0, data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM vm_packages WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'sold_count', 'description', 'status'];
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'sold_count', 'sort_order', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1864,23 +1867,23 @@ module.exports = {
 
     // LXC 套餐操作
     lxcPackages: {
-        getAll: () => queryAll('SELECT p.*, t.name as template_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id ORDER BY p.id DESC'),
+        getAll: () => queryAll('SELECT p.*, t.name as template_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id ORDER BY p.sort_order ASC, p.id DESC'),
         getById: (id) => queryOne('SELECT p.*, t.name as template_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id WHERE p.id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, stock, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, stock, sort_order, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.template_id || 0, data.cores || 1,
                     data.memory || 512, data.swap || 512, data.disk_size || 8,
                     data.monthly_price || 0, data.quarterly_price || 0,
-                    data.yearly_price || 0, data.stock || null, data.description || '', data.status || 'active'
+                    data.yearly_price || 0, data.stock || null, data.sort_order || 0, data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM lxc_packages WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'swap', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'sold_count', 'description', 'status'];
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'swap', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'sold_count', 'sort_order', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

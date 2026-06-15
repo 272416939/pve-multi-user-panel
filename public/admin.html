@@ -3737,6 +3737,10 @@
                                         <label class="form-label">已销售</label>
                                         <input type="text" class="form-control" :value="packagePage.vmPackageForm.value.sold_count || 0" disabled readonly>
                                     </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">排序（数字越小越前）</label>
+                                        <input type="number" class="form-control" v-model.number="packagePage.vmPackageForm.value.sort_order" step="1">
+                                    </div>
                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="packagePage.vmPackageForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="packagePage.vmPackageForm.value.description"></textarea></div>
                                 </div>
@@ -3780,6 +3784,10 @@
                                     <div class="col-md-3">
                                         <label class="form-label">已销售</label>
                                         <input type="text" class="form-control" :value="packagePage.lxcPackageForm.value.sold_count || 0" disabled readonly>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">排序（数字越小越前）</label>
+                                        <input type="number" class="form-control" v-model.number="packagePage.lxcPackageForm.value.sort_order" step="1">
                                     </div>
                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="packagePage.lxcPackageForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="packagePage.lxcPackageForm.value.description"></textarea></div>
