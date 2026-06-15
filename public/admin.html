@@ -3362,7 +3362,7 @@
                                     <div class="col-md-6"><label class="form-label">MAC分组</label>
                                         <select class="form-select" v-model="templatePage.vmTemplateForm.value.mac_group_id">
                                             <option value="">不加入分组</option>
-                                            <option v-for="g in $.macGroups.value" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                                            <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
                                         </select>
                                     </div>
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="templatePage.vmTemplateForm.value.description"></textarea></div>
@@ -3419,7 +3419,7 @@
                                     <div class="col-md-6"><label class="form-label">MAC分组</label>
                                         <select class="form-select" v-model="templatePage.lxcTemplateForm.value.mac_group_id">
                                             <option value="">不加入分组</option>
-                                            <option v-for="g in $.macGroups.value" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                                            <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
                                         </select>
                                     </div>
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="templatePage.lxcTemplateForm.value.description"></textarea></div>
