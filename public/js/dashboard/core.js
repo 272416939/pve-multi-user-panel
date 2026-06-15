@@ -563,13 +563,13 @@
     // ===== 套餐订购函数 =====
     $.loadPackages = async function() {
         try {
-            $.vmPackages.value = await api('/admin/vm-packages');
-            $.lxcPackages.value = await api('/admin/lxc-packages');
+            $.vmPackages.value = await api('/vm-packages');
+            $.lxcPackages.value = await api('/lxc-packages');
         } catch(e) { console.error('加载套餐失败', e); }
     };
     
     $.loadMacGroups = async function() {
-        try { $.macGroups.value = await api('/ikuai/mac-groups'); } catch(e) {}
+        try { $.macGroups.value = await api('/mac-groups'); } catch(e) {}
     };
     
     $.openOrderModal = function(pkg, type) {
@@ -582,9 +582,8 @@
     $.confirmOrder = async function() {
         $.orderLoading.value = true;
         try {
-            var endpoint = $.orderType.value === 'vm' ? '/admin/vm-packages/' + $.orderPackage.value.id + '/provision' : '/admin/lxc-packages/' + $.orderPackage.value.id + '/provision';
+            var endpoint = $.orderType.value === 'vm' ? '/vm-packages/' + $.orderPackage.value.id + '/order' : '/lxc-packages/' + $.orderPackage.value.id + '/order';
             var body = {
-                user_id: $.user.value.id,
                 period: $.orderForm.value.period,
                 period_count: parseInt($.orderForm.value.quantity) || 1,
                 mac_group_id: $.orderForm.value.mac_group_id || ''
