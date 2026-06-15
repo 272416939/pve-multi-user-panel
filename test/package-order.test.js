@@ -146,24 +146,21 @@ describe('续费周期同步 (Bug 1)', function() {
   });
 });
 
-describe('CPU affinity 错误应中断订购流程', function() {
-  it('affinity 设置失败时 updateVmConfig 应抛出错误不被吞掉', function() {
-    // cores/memory update 是必需功能，try/catch 已被移除
-    // affinity 同样是必需功能，try/catch 也已被移除
-    // 此测试验证 package.js 中两处 affinity 配置代码没有 try/catch 包裹
+describe('CPU affinity 设置', function() {
+  it('setVmAffinity 函数存在且可调用', function() {
+    var utils = require('../server/utils/order-utils');
+    expect(utils.setVmAffinity).to.be.a('function');
+  });
+
+  it('package.js 中两处 affinity 设置都使用 setVmAffinity 而非 PVE API', function() {
     var fs = require('fs');
     var source = fs.readFileSync('e:\\code\\pve管理面板\\server\\routes\\package.js', 'utf8');
 
-    // 用户订购路由中的 affinity 不应有 try
-    var userRouteMatch = source.match(/if\s*\(template\.cpu_affinity\)\s*\{[\s\S]*?await pveApi\.updateVmConfig\(newVmid,\s*\{ affinity:[\s\S]*?\}\s*\)/);
-    expect(userRouteMatch, '用户路由 affinity 应直接调用 updateVmConfig 无 try/catch').to.exist;
+    // 验证不再通过 PVE API 设置 affinity
+    expect(source).to.not.match(/updateVmConfig\(newVmid,\s*\{ affinity:/);
 
-    // 管理路由中的 affinity 不应有 try
-    var adminRouteMatch = source.match(/if\s*\(template\.cpu_affinity\)\s*\{[\s\S]*?await pveApi\.updateVmConfig\(newVmid,\s*\{ affinity:[\s\S]*?\}\s*\)/g);
-    expect(adminRouteMatch, '管理路由 affinity 应直接调用 updateVmConfig 无 try/catch').to.have.lengthOf(2);
-
-    // 验证两处都没有 try 关键字包围
-    // "if (template.cpu_affinity) {\n            await pveApi.updateVmConfig" 直接出现表示无 try/catch
-    expect(source).to.not.match(/if\s*\(template\.cpu_affinity\)\s*\{\s*try\s*\{/);
+    // 验证两处都改用 setVmAffinity
+    var matches = source.match(/setVmAffinity\(newVmid,\s*template\.cpu_affinity\)/g);
+    expect(matches).to.have.lengthOf(2);
   });
 });

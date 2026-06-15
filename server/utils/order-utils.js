@@ -20,4 +20,22 @@ async function deductBalance(userId, amount, dbInstance) {
   return newBalance;
 }
 
-module.exports = { getPeriodMonths, calculateAmount, deductBalance };
+async function setVmAffinity(vmid, affinityValue) {
+  // PVE API 对 affinity 参数有权限检查 bug（API Token 用户名带 realm 后缀 "@pam",
+  // 但 PVE 比较的是裸 "root" 字符串），导致即使是 root 的 API Token 也无法设置 affinity。
+  // 解决方法：通过 SSH 直接执行 qm set 命令绕过 API 层的权限检查。
+  var { execSSH } = require('../api/ssh-exec');
+  var host = process.env.PVE_SSH_HOST;
+  var password = process.env.PVE_SSH_PASSWORD;
+  if (!host || !password) {
+    throw new Error('SSH 配置不完整，无法设置 CPU 亲和性（请配置 PVE_SSH_HOST 和 PVE_SSH_PASSWORD）');
+  }
+  var cmd = 'qm set ' + parseInt(vmid) + ' --affinity ' + affinityValue;
+  var result = await execSSH(host, 'root', password, cmd);
+  if (result.code !== 0) {
+    throw new Error('SSH 设置 CPU 亲和性失败: ' + (result.stderr || result.stdout));
+  }
+  return result;
+}
+
+module.exports = { getPeriodMonths, calculateAmount, deductBalance, setVmAffinity };

@@ -7,7 +7,7 @@ var ikuaiApi = require('../api/ikuai-api');
 var { generateVmName, generateLxcName } = require('../utils/random-name');
 var { removeDhcpStaticBinding } = require('../services/dhcp');
 var { createEmailTemplate, sendEmail } = require('../utils/email');
-var { calculateAmount, deductBalance } = require('../utils/order-utils');
+var { calculateAmount, deductBalance, setVmAffinity } = require('../utils/order-utils');
 
 function safeError(e) { return process.env.DEBUG === 'true' ? e.message : '服务器错误'; }
 
@@ -73,7 +73,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         await pveApi.updateVmConfig(newVmid, { cores: template.cores, memory: template.memory });
 
         if (template.cpu_affinity) {
-            await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
+            await setVmAffinity(newVmid, template.cpu_affinity);
         }
 
         var newVm = await db.vms.create({
@@ -281,7 +281,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
 
         // CPU 亲和性
         if (template.cpu_affinity) {
-            await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
+            await setVmAffinity(newVmid, template.cpu_affinity);
         }
 
         // 创建分配记录
