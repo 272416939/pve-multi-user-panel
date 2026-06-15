@@ -43,11 +43,11 @@
     $.orderTotal = computed(function() {
         var p = $.orderPackage.value;
         if (!p || !p.id) return '0.00';
-        var price = 0;
-        if ($.orderForm.value.period === 'month') price = parseFloat(p.monthly_price) || 0;
-        else if ($.orderForm.value.period === 'quarter') price = parseFloat(p.quarterly_price) || 0;
-        else price = parseFloat(p.yearly_price) || 0;
-        return (price * (parseInt($.orderForm.value.quantity) || 1)).toFixed(2);
+        var monthly = parseFloat(p.monthly_price) || 0;
+        var months = 1;
+        if ($.orderForm.value.period === 'quarter') months = 3;
+        else if ($.orderForm.value.period === 'year') months = 12;
+        return (monthly * months * (parseInt($.orderForm.value.quantity) || 1)).toFixed(2);
     });
 
     // ===== 详情弹窗状态 =====
