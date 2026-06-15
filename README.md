@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.2.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.7.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -455,7 +455,7 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ## 🔄 更新日志
 
 <details>
-<summary><b>v2.2.0</b> (2026-06-16) — 套餐管理系统 + Cloud-init 密码</summary>
+<summary><b>v2.7.0</b> (2026-06-16) — 套餐管理系统 + Cloud-init 密码</summary>
 
 - ✅ VM Cloud-init 密码自动配置：订购/开通时生成 12 位随机密码，站内信+邮件通知
 - ✅ VM 列表显示默认账号（ciuser），未安装 Cloud-init 驱动显示提示
