@@ -5,7 +5,7 @@ var db = require('../api/db');
 var pveApi = require('../api/pve-api');
 var ikuaiApi = require('../api/ikuai-api');
 var { generateVmName, generateLxcName } = require('../utils/random-name');
-var { removeDhcpStaticBinding } = require('../services/dhcp');
+var { createDhcpStaticBinding, removeDhcpStaticBinding } = require('../services/dhcp');
 var { createEmailTemplate, sendEmail } = require('../utils/email');
 var { calculateAmount, deductBalance, setVmAffinity } = require('../utils/order-utils');
 
@@ -95,6 +95,17 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             } catch (macErr) { console.error('[package] VM MAC sync failed:', macErr.message); }
         }
 
+        // DHCP 静态绑定
+        try {
+            var dhcpMac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
+            if (dhcpMac) {
+                var dhcpIp = await createDhcpStaticBinding('vm', newVmid, dhcpMac[0], '');
+                if (dhcpIp) {
+                    await db.vms.update(newVm.id, { dhcp_static_ip: dhcpIp });
+                }
+            }
+        } catch (dhcpErr) { console.error('[package] VM DHCP绑定失败:', dhcpErr.message); }
+
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
         var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
@@ -180,14 +191,34 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
         if (finalMacGroupId) {
             try {
-                var ctCfg = await pveApi.getLxcConfig(newVmid);
-                var cmac = ctCfg && ctCfg.net0 ? ctCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
-                if (cmac) {
-                    await ikuaiApi.addMacToGroup(finalMacGroupId, cmac[0], randomName);
+                // LXC 刚创建时 config.net0 可能不含 MAC，先启动再获取
+                var lxcStatus = await pveApi.getLxcStatus(newVmid);
+                var needStart = lxcStatus && lxcStatus.status === 'stopped';
+                if (needStart) {
+                    await pveApi.startLxc(newVmid);
+                    // 等待 PVE 分配 MAC
+                    await new Promise(function(r) { setTimeout(r, 3000); });
+                }
+                var lxcCfg = await pveApi.getLxcConfig(newVmid);
+                var lmac = lxcCfg && lxcCfg.net0 ? lxcCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
+                if (lmac) {
+                    await ikuaiApi.addMacToGroup(finalMacGroupId, lmac[0], randomName);
                     await db.lxcContainers.update(newCt.id, { ikuai_mac_group_id: finalMacGroupId });
                 }
             } catch (macErr) { console.error('[package] LXC MAC sync failed:', macErr.message); }
         }
+
+        // DHCP 静态绑定
+        try {
+            var lxcDhcpCfg = await pveApi.getLxcConfig(newVmid);
+            var dhcpLxcMac = lxcDhcpCfg && lxcDhcpCfg.net0 ? lxcDhcpCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
+            if (dhcpLxcMac) {
+                var dhcpLxcIp = await createDhcpStaticBinding('lxc', newVmid, dhcpLxcMac[0], '');
+                if (dhcpLxcIp) {
+                    await db.lxcContainers.update(newCt.id, { dhcp_static_ip: dhcpLxcIp });
+                }
+            }
+        } catch (dhcpErr) { console.error('[package] LXC DHCP绑定失败:', dhcpErr.message); }
 
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');

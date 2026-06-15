@@ -808,14 +808,15 @@ module.exports = {
         getById: (id) => queryOne('SELECT * FROM vms WHERE id = ?', [id]),
         create: async (vm) => {
             const [result] = await execute(
-                `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
                     vm.vm_id,
                     vm.user_id,
                     vm.name || '',
                     vm.expiration_date || null,
                     vm.renewal_price || '',
+                    vm.renewal_period || 'month',
                     mysqlNow()
                 ]
             );
