@@ -324,7 +324,9 @@ watch($.user, function(u) {
         document.body.classList.remove('modal-open');
         var el = document.getElementById(id);
         if (!el) return;
-        bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+        var old = bootstrap.Modal.getInstance(el);
+        if (old) old.dispose();
+        new bootstrap.Modal(el, { focus: false }).show();
     };
 
     $.bsModalHide = function(id) {

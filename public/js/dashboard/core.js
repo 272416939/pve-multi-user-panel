@@ -406,7 +406,10 @@
         document.body.classList.remove('modal-open');
         var el = document.getElementById(id);
         if (!el) return;
-        bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+        // 始终销毁旧实例再创建，确保 focus:false 生效（getOrCreateInstance 在实例已存在时忽略选项）
+        var old = bootstrap.Modal.getInstance(el);
+        if (old) old.dispose();
+        new bootstrap.Modal(el, { focus: false }).show();
     };
 
     $.bsModalHide = function(id) {
