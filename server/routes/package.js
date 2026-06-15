@@ -160,7 +160,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         if (template.ciuser && vmUpdateCfg.cipassword) {
             try {
                 await db.messages.create({
-                    uid: userId, title: '服务器 root 密码',
+                    uid: userId, title: '服务器账号信息',
                     content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + template.ciuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。',
                     type: 2, send_type: 1
                 });
@@ -168,7 +168,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             try {
                 var ciUser = await db.users.getById(userId);
                 if (ciUser && ciUser.email && ciUser.emailVerified) {
-                    var ciEmailHtml = createEmailTemplate('服务器 root 密码',
+                    var ciEmailHtml = createEmailTemplate('服务器账号信息',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
                         '<p style="margin-bottom: 4px;">账号：' + template.ciuser + '</p>' +
@@ -176,7 +176,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                         '</div><div class="divider"></div>' +
                         '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
                     );
-                    await sendEmail(ciUser.email, '服务器 root 密码 - PVE 管理面板', ciEmailHtml);
+                    await sendEmail(ciUser.email, '服务器账号信息 - PVE 管理面板', ciEmailHtml);
                 }
             } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
         }
@@ -502,7 +502,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         if (template.ciuser && adminVmCfg.cipassword) {
             try {
                 await db.messages.create({
-                    uid: userId, title: '服务器 root 密码',
+                    uid: userId, title: '服务器账号信息',
                     content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + template.ciuser + '\n密码：' + adminVmCfg.cipassword + '\n请尽快修改密码。',
                     type: 2, send_type: 1
                 });
@@ -510,7 +510,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
             try {
                 var adminCiUser = await db.users.getById(userId);
                 if (adminCiUser && adminCiUser.email && adminCiUser.emailVerified) {
-                    var adminCiHtml = createEmailTemplate('服务器 root 密码',
+                    var adminCiHtml = createEmailTemplate('服务器账号信息',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
                         '<p style="margin-bottom: 4px;">账号：' + template.ciuser + '</p>' +
@@ -518,7 +518,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
                         '</div><div class="divider"></div>' +
                         '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
                     );
-                    await sendEmail(adminCiUser.email, '服务器 root 密码 - PVE 管理面板', adminCiHtml);
+                    await sendEmail(adminCiUser.email, '服务器账号信息 - PVE 管理面板', adminCiHtml);
                 }
             } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
         }
