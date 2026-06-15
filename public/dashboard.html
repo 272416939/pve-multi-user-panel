@@ -1044,11 +1044,8 @@
                     <div class="package-spec"><span class="spec-label">CPU</span><span class="spec-value">{{ p.cores }} 核</span></div>
                     <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
                     <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
-                    <div class="package-desc" v-if="p.description">{{ p.description }}</div>
-                    <div class="package-stock" v-if="p.stock !== null && p.stock !== undefined">
-                        <span v-if="(p.stock - (p.sold_count || 0)) > 0" class="stock-remain">剩余库存：{{ p.stock - (p.sold_count || 0) }}</span>
-                        <span v-else class="stock-soldout">已售罄</span>
-                    </div>
+                    <div class="package-desc">备注：{{ p.description || '无' }}</div>
+                    <div class="package-stock">库存：{{ p.stock !== null && p.stock !== undefined ? (p.stock - (p.sold_count || 0)) + ' / ' + p.stock : '无限' }}</div>
                     <div class="package-prices">
                         <span class="price-item">月付 {{ p.monthly_price }}元</span>
                         <span class="price-item">季付 {{ p.quarterly_price }}元</span>
@@ -1069,11 +1066,8 @@
                     <div class="package-spec"><span class="spec-label">CPU</span><span class="spec-value">{{ p.cores }} 核</span></div>
                     <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
                     <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
-                    <div class="package-desc" v-if="p.description">{{ p.description }}</div>
-                    <div class="package-stock" v-if="p.stock !== null && p.stock !== undefined">
-                        <span v-if="(p.stock - (p.sold_count || 0)) > 0" class="stock-remain">剩余库存：{{ p.stock - (p.sold_count || 0) }}</span>
-                        <span v-else class="stock-soldout">已售罄</span>
-                    </div>
+                    <div class="package-desc">备注：{{ p.description || '无' }}</div>
+                    <div class="package-stock">库存：{{ p.stock !== null && p.stock !== undefined ? (p.stock - (p.sold_count || 0)) + ' / ' + p.stock : '无限' }}</div>
                     <div class="package-prices">
                         <span class="price-item">月付 {{ p.monthly_price }}元</span>
                         <span class="price-item">季付 {{ p.quarterly_price }}元</span>
