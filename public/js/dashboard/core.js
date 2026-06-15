@@ -413,14 +413,10 @@
         if (!el) return;
         var old = bootstrap.Modal.getInstance(el);
         if (old) old.dispose();
-        new bootstrap.Modal(el, { focus: false }).show();
-        // 延迟清理：捕获 hide 过渡动画完成后可能残留的 backdrop
-        setTimeout(function() {
-            var leftovers = document.querySelectorAll('.modal-backdrop');
-            if (leftovers.length > 1) {
-                for (var i = 0; i < leftovers.length - 1; i++) leftovers[i].remove();
-            }
-        }, 400);
+        // nextTick 确保 Vue 重新渲染稳定后再初始化 Bootstrap Modal
+        Vue.nextTick(function() {
+            new bootstrap.Modal(el, { focus: false }).show();
+        });
     };
 
     $.bsModalHide = function(id) {
@@ -601,7 +597,8 @@
         $.orderPackage.value = pkg;
         $.orderType.value = type;
         $.orderForm.value = { period: 'month', quantity: 1, mac_group_id: '' };
-        $.bsModalShow('orderModal');
+        // 用 nextTick 确保 Vue 完成 DOM 更新后再显示 Modal
+        Vue.nextTick(function() { $.bsModalShow('orderModal'); });
     };
     
     $.confirmOrder = async function() {

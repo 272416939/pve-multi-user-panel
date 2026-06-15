@@ -333,11 +333,10 @@ watch($.user, function(u) {
         var el = document.getElementById(id);
         if (!el) return;
         var old = bootstrap.Modal.getInstance(el);
-        if (old) {
-            old.hide();
-            old.dispose();
-        }
-        new bootstrap.Modal(el, { focus: false }).show();
+        if (old) old.dispose();
+        Vue.nextTick(function() {
+            new bootstrap.Modal(el, { focus: false }).show();
+        });
     };
 
     $.bsModalHide = function(id) {

@@ -1241,7 +1241,7 @@
                     if (!el) return;
                     const old = bootstrap.Modal.getInstance(el);
                     if (old) old.dispose();
-                    new bootstrap.Modal(el, { focus: false }).show();
+                    window.Vue.nextTick(() => new bootstrap.Modal(el, { focus: false }).show());
                 };
                 const bsModalHide = (id) => {
                     if (document.activeElement && document.activeElement !== document.body) {
