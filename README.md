@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.1.11-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.2.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -41,64 +41,69 @@
 | 5 | **LXC 容器管理** | 模板创建、分配换绑、重置密码、销毁 |
 | 6 | **LXC XtermJS 终端** | SSH + PTY 直连，无需 PVE termproxy 代理 |
 | 7 | **LXC 重置 IP** | 手动输入/DHCP/随机三种模式，自动同步绑定 |
+| 8 | **VM Cloud-init 密码** | 订购时自动生成随机密码（站内信+邮件），支持重置密码 |
 
 ### 🔐 安全 & 认证
 | # | 功能 | 说明 |
 |---|------|------|
-| 8 | **JWT 认证** | 无状态 JWT + Refresh Token 自动续期 |
-| 9 | **二次验证 (2FA)** | TOTP 双因素认证，支持 Google Authenticator |
-| 10 | **权限控制** | 用户仅可见操作已分配的虚拟机/容器 |
-| 11 | **全站统一弹窗** | 自定义深色科技风格 Modal 替代原生 alert/confirm |
-| 12 | **速率限制** | 登录/2FA/忘记密码/CDK 兑换自动限速，支持 Redis |
+| 9 | **JWT 认证** | 无状态 JWT + Refresh Token 自动续期 |
+| 10 | **二次验证 (2FA)** | TOTP 双因素认证，支持 Google Authenticator |
+| 11 | **权限控制** | 用户仅可见操作已分配的虚拟机/容器 |
+| 12 | **全站统一弹窗** | 自定义深色科技风格 Modal 替代原生 alert/confirm |
+| 13 | **速率限制** | 登录/2FA/忘记密码/CDK 兑换自动限速，支持 Redis |
 
 ### 🛠️ 管理功能
 | # | 功能 | 说明 |
 |---|------|------|
-| 13 | **虚拟机快照管理** | 创建/回滚/删除，配置全局限制（每 VM 上限、每日次数） |
-| 14 | **虚拟机备份恢复** | PVE 停止模式 + zstd 压缩，异步轮询进度 |
-| 15 | **CDK 兑换码系统** | 批量生成、CSV 导出、指定用户分配、自动通知 |
-| 16 | **DHCP 静态绑定** | VM/LXC 分配时自动创建，解绑销毁自动删除 |
-| 17 | **端口转发管理** | ikuai 自动同步，随机端口、冲突检查 |
+| 14 | **虚拟机快照管理** | 创建/回滚/删除，配置全局限制（每 VM 上限、每日次数） |
+| 15 | **虚拟机备份恢复** | PVE 停止模式 + zstd 压缩，异步轮询进度 |
+| 16 | **CDK 兑换码系统** | 批量生成、CSV 导出、指定用户分配、自动通知 |
+| 17 | **DHCP 静态绑定** | VM/LXC 分配时自动创建，解绑销毁自动删除 |
+| 18 | **端口转发管理** | ikuai 自动同步，随机端口、冲突检查 |
+| 19 | **套餐库存管理** | 可选销售库存上限，售罄自动禁用，支持补货 |
 
 ### 📬 消息 & 通知
 | # | 功能 | 说明 |
 |---|------|------|
-| 18 | **站内消息系统** | 系统公告、续费提醒、客服私聊，未读角标 WS 实时推送 |
-| 19 | **SMTP 邮件** | 到期提醒、续费通知、CDK 兑换成功邮件 |
-| 20 | **到期提醒** | 自定义多个提醒时间点，持久化不重复发送 |
+| 20 | **站内消息系统** | 系统公告、续费提醒、客服私聊，未读角标 WS 实时推送 |
+| 21 | **SMTP 邮件** | 到期提醒、续费通知、CDK 兑换成功邮件 |
+| 22 | **到期提醒** | 自定义多个提醒时间点，持久化不重复发送 |
 
 ### 🎨 界面 & 体验
 | # | 功能 | 说明 |
 |---|------|------|
-| 21 | **现代化界面** | 深色科技风格 + 毛玻璃效果 + 霓虹光晕 |
-| 22 | **响应式设计** | 适配各种屏幕尺寸 |
-| 23 | **极客头像** | 基于用户名自动生成唯一的 SVG 电路板渐变头像 |
-| 24 | **导航动态化** | 三页面导航统一通过 API 渲染，角色感知 |
+| 23 | **现代化界面** | 深色科技风格 + 毛玻璃效果 + 霓虹光晕 |
+| 24 | **响应式设计** | 适配各种屏幕尺寸 |
+| 25 | **极客头像** | 基于用户名自动生成唯一的 SVG 电路板渐变头像 |
+| 26 | **导航动态化** | 三页面导航统一通过 API 渲染，角色感知 |
+| 27 | **套餐排序** | 自定义排序值，数字越小排越前 |
+| 28 | **套餐自定义字段** | CPU 型号、带宽 (Mbps) 可配置 |
+| 29 | **套餐备注 Markdown** | 备注支持 Markdown 语法渲染 |
 
 ### 💰 支付 & 交易（v2.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 25 | **在线充值** | 支付宝/微信支付，V1 MD5 + V2 RSA 签名双模式 |
-| 26 | **余额续费** | 余额抵扣 VM/LXC 续费，支持月/年付 |
-| 27 | **交易流水** | 完整支付记录，支付流水号（transaction_id）、类型、金额 |
-| 28 | **支付配置** | 支付网关 PID/密钥/开关独立管理 |
+| 30 | **在线充值** | 支付宝/微信支付，V1 MD5 + V2 RSA 签名双模式 |
+| 31 | **余额续费** | 余额抵扣 VM/LXC 续费，支持月/年付 |
+| 32 | **交易流水** | 完整支付记录，支付流水号（transaction_id）、类型、金额 |
+| 33 | **支付配置** | 支付网关 PID/密钥/开关独立管理 |
 
 ### ⚡ 性能优化（v1.8.0-beta21~23）
 | # | 功能 | 说明 |
 |---|------|------|
-| 29 | **WS 状态推送** | VM/LXC CPU/内存/网络 3s 实时推送，替代 HTTP 整表轮询 |
-| 30 | **WS 监控图表** | 详情弹窗 4 组 Chart.js 图表通过 subscribe-detail 推送，消灭 3s HTTP 请求 |
-| 31 | **进程内 TTL 缓存** | profile(60s) + unread-count(10s) + PVE 状态(5s) 缓存，减少 DB/PVE 调用 |
-| 32 | **备份进度 WS 推送** | 备份/恢复完成后 pushToUser 实时通知，消灭 10s 前端轮询 |
-| 33 | **PVE 状态复用** | GET /user/vms 和 /user/lxc 优先命中 pushStatus 缓存，PVE API 调用减半 |
+| 34 | **WS 状态推送** | VM/LXC CPU/内存/网络 3s 实时推送，替代 HTTP 整表轮询 |
+| 35 | **WS 监控图表** | 详情弹窗 4 组 Chart.js 图表通过 subscribe-detail 推送，消灭 3s HTTP 请求 |
+| 36 | **进程内 TTL 缓存** | profile(60s) + unread-count(10s) + PVE 状态(5s) 缓存，减少 DB/PVE 调用 |
+| 37 | **备份进度 WS 推送** | 备份/恢复完成后 pushToUser 实时通知，消灭 10s 前端轮询 |
+| 38 | **PVE 状态复用** | GET /user/vms 和 /user/lxc 优先命中 pushStatus 缓存，PVE API 调用减半 |
 
 ### 🗄️ 基础设施（v1.8.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 34 | **MySQL 支持** | 可选远程 MySQL 5.7+，自动迁移 SQLite 数据 |
-| 35 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
-| 36 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
-| 37 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
+| 39 | **MySQL 支持** | 可选远程 MySQL 5.7+，自动迁移 SQLite 数据 |
+| 40 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
+| 41 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
+| 42 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
 
 ---
 
@@ -448,6 +453,21 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v2.2.0</b> (2026-06-16) — 套餐管理系统 + Cloud-init 密码</summary>
+
+- ✅ VM Cloud-init 密码自动配置：订购/开通时生成 12 位随机密码，站内信+邮件通知
+- ✅ VM 列表显示默认账号（ciuser），未安装 Cloud-init 驱动显示提示
+- ✅ VM 重置密码：需关机状态，校验 Cloud-init 驱动存在
+- ✅ 套餐库存管理：stock/sold_count 字段，订购检查库存，售罄自动禁用
+- ✅ 补货功能：表格操作列一键补货，try/catch 错误提示
+- ✅ 套餐排序自定义（sort_order 数字越小排越前）
+- ✅ 套餐卡片新增 CPU 型号 + 带宽 (Mbps) 字段
+- ✅ 套餐卡片布局优化：备注/库存占位符固定高度，避免卡片高矮不一
+- ✅ 套餐备注支持 Markdown 渲染（marked + DOMPurify）
+
+</details>
 
 <details>
 <summary><b>v2.1.11</b> (2026-06-14) — 支付流水号修复</summary>
