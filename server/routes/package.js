@@ -10,6 +10,14 @@ var { createEmailTemplate, sendEmail } = require('../utils/email');
 
 function safeError(e) { return process.env.DEBUG === 'true' ? e.message : '服务器错误'; }
 
+function logPveError(e) {
+    console.error('[package] PVE API 错误详情:', e.message);
+    if (e.response) {
+        console.error('[package] PVE 响应状态:', e.response.status);
+        console.error('[package] PVE 响应数据:', JSON.stringify(e.response.data || ''));
+    }
+}
+
 // ===== 用户侧：套餐列表（无需 admin） =====
 router.get('/vm-packages', authMiddleware, async (req, res) => {
     try { res.json(await db.vmPackages.getAll()); } catch (e) { res.status(500).json({ error: e.message }); }
@@ -39,6 +47,17 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         var randomName = generateVmName();
         var newVmid = await pveApi.getNextAvailableVmid();
+
+        // 检查模板 VM 状态，full clone 需要模板处于停止状态
+        try {
+            var tmplStatus = await pveApi.getVmStatus(template.template_vmid);
+            if (tmplStatus && tmplStatus.status === 'running') {
+                console.error('[package] 模板 VM ' + template.template_vmid + ' 正在运行，无法进行 full clone');
+                return res.status(400).json({ error: '模板虚拟机正在运行，请先停止后再订购' });
+            }
+        } catch (statusErr) {
+            console.error('[package] 检查模板 VM 状态失败:', statusErr.message);
+        }
 
         await pveApi.cloneVm(template.template_vmid, newVmid, {
             name: randomName,
@@ -110,6 +129,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         res.json({ message: 'VM 开通成功', vm: newVm, name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
         console.error('[package] 用户订购 VM 失败:', e.message);
+        logPveError(e);
         res.status(500).json({ error: safeError(e) });
     }
 });
@@ -198,6 +218,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         res.json({ message: 'LXC 开通成功', ct: newCt, name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
         console.error('[package] 用户订购 LXC 失败:', e.message);
+        logPveError(e);
         res.status(500).json({ error: safeError(e) });
     }
 });
