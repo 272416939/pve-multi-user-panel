@@ -433,6 +433,8 @@ async function initDb() {
         monthly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         quarterly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         yearly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        stock INT,
+        sold_count INT NOT NULL DEFAULT 0,
         description TEXT NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'active',
         created_at DATETIME NOT NULL DEFAULT NOW(),
@@ -451,6 +453,8 @@ async function initDb() {
         monthly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         quarterly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         yearly_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        stock INT,
+        sold_count INT NOT NULL DEFAULT 0,
         description TEXT NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'active',
         created_at DATETIME NOT NULL DEFAULT NOW(),
@@ -508,6 +512,10 @@ async function migrateSchema() {
     await safeAlter('lxc_templates', 'rootfs_storage', "VARCHAR(100) DEFAULT 'local-lvm'");
     await safeAlter('vm_templates', 'mac_group_id', "TEXT");
     await safeAlter('vm_templates', 'ciuser', "VARCHAR(100) NOT NULL DEFAULT ''");
+    await safeAlter('vm_packages', 'stock', 'INT');
+    await safeAlter('vm_packages', 'sold_count', "INT NOT NULL DEFAULT 0");
+    await safeAlter('lxc_packages', 'stock', 'INT');
+    await safeAlter('lxc_packages', 'sold_count', "INT NOT NULL DEFAULT 0");
     await safeAlter('lxc_templates', 'mac_group_id', "TEXT");
     await safeAlter('lxc_templates', 'ipv6_enabled', "TINYINT(1) NOT NULL DEFAULT 1");
     await safeAlter('lxc_templates', 'ip6_mode', "VARCHAR(20) NOT NULL DEFAULT 'dhcp'");
@@ -1823,19 +1831,19 @@ module.exports = {
         getById: (id) => queryOne('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id WHERE p.id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, stock, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.template_id || 0, data.cores || 1,
                     data.memory || 1024, data.disk_size || 20,
                     data.monthly_price || 0, data.quarterly_price || 0,
-                    data.yearly_price || 0, data.description || '', data.status || 'active'
+                    data.yearly_price || 0, data.stock || null, data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM vm_packages WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'description', 'status'];
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1860,19 +1868,19 @@ module.exports = {
         getById: (id) => queryOne('SELECT p.*, t.name as template_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id WHERE p.id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, stock, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.template_id || 0, data.cores || 1,
                     data.memory || 512, data.swap || 512, data.disk_size || 8,
                     data.monthly_price || 0, data.quarterly_price || 0,
-                    data.yearly_price || 0, data.description || '', data.status || 'active'
+                    data.yearly_price || 0, data.stock || null, data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM lxc_packages WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'swap', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'description', 'status'];
+            const allowedColumns = ['name', 'template_id', 'cores', 'memory', 'swap', 'disk_size', 'monthly_price', 'quarterly_price', 'yearly_price', 'stock', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

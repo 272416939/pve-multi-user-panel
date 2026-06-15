@@ -724,6 +724,11 @@
     .package-btn { display: block; width: 100%; margin-top: 14px; padding: 10px; border: none; border-radius: 10px; background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; transition: opacity 0.2s; }
     .package-btn:hover { opacity: 0.9; }
     .package-empty { grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted); }
+    .package-stock { margin-top: 10px; padding: 6px 0; font-size: 13px; font-weight: 600; }
+    .stock-remain { color: var(--color-primary, #667eea); }
+    .stock-soldout { color: #ef4444; }
+    .package-btn:disabled { opacity: 0.5; cursor: not-allowed; background: linear-gradient(135deg, #9ca3af, #6b7280); }
+    .package-btn:disabled:hover { opacity: 0.5; }
     @media (max-width: 768px) { .package-cards { grid-template-columns: 1fr; } }
     @media (min-width: 769px) and (max-width: 1024px) { .package-cards { grid-template-columns: repeat(2, 1fr); } }
 
@@ -1040,12 +1045,16 @@
                     <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
                     <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
                     <div class="package-desc" v-if="p.description">{{ p.description }}</div>
+                    <div class="package-stock" v-if="p.stock !== null && p.stock !== undefined">
+                        <span v-if="(p.stock - (p.sold_count || 0)) > 0" class="stock-remain">剩余库存：{{ p.stock - (p.sold_count || 0) }}</span>
+                        <span v-else class="stock-soldout">已售罄</span>
+                    </div>
                     <div class="package-prices">
                         <span class="price-item">月付 {{ p.monthly_price }}元</span>
                         <span class="price-item">季付 {{ p.quarterly_price }}元</span>
                         <span class="price-item">年付 {{ p.yearly_price }}元</span>
                     </div>
-                    <button class="package-btn" @click="openOrderModal(p, 'vm')">立即开通</button>
+                    <button class="package-btn" :disabled="p.stock !== null && p.stock !== undefined && (p.stock - (p.sold_count || 0)) <= 0" @click="openOrderModal(p, 'vm')">{{ (p.stock !== null && p.stock !== undefined && (p.stock - (p.sold_count || 0)) <= 0) ? '已售罄' : '立即开通' }}</button>
                 </div>
             </div>
             <div class="package-empty" v-if="vmPackages.length === 0">暂无可用套餐</div>
@@ -1061,12 +1070,16 @@
                     <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
                     <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
                     <div class="package-desc" v-if="p.description">{{ p.description }}</div>
+                    <div class="package-stock" v-if="p.stock !== null && p.stock !== undefined">
+                        <span v-if="(p.stock - (p.sold_count || 0)) > 0" class="stock-remain">剩余库存：{{ p.stock - (p.sold_count || 0) }}</span>
+                        <span v-else class="stock-soldout">已售罄</span>
+                    </div>
                     <div class="package-prices">
                         <span class="price-item">月付 {{ p.monthly_price }}元</span>
                         <span class="price-item">季付 {{ p.quarterly_price }}元</span>
                         <span class="price-item">年付 {{ p.yearly_price }}元</span>
                     </div>
-                    <button class="package-btn" @click="openOrderModal(p, 'lxc')">立即开通</button>
+                    <button class="package-btn" :disabled="p.stock !== null && p.stock !== undefined && (p.stock - (p.sold_count || 0)) <= 0" @click="openOrderModal(p, 'lxc')">{{ (p.stock !== null && p.stock !== undefined && (p.stock - (p.sold_count || 0)) <= 0) ? '已售罄' : '立即开通' }}</button>
                 </div>
             </div>
             <div class="package-empty" v-if="lxcPackages.length === 0">暂无可用套餐</div>

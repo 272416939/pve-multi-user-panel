@@ -4,9 +4,9 @@
     var $ = {};
 
     $.vmPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
-        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active' });
+        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null });
     $.lxcPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
-        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active' });
+        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null });
     $.vmPackages = Vue.ref([]);
     $.lxcPackages = Vue.ref([]);
     $.vmTemplateOptions = Vue.ref([]);
@@ -30,14 +30,20 @@
     };
 
     $.openVmPackageForm = function(p) {
-        if (p) { $.vmPackageForm.value = Object.assign({}, p); }
-        else { $.vmPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
-            monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active' }; }
+        if (p) {
+            $.vmPackageForm.value = Object.assign({}, p);
+            var f = $.vmPackageForm.value;
+            f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : null);
+        } else {
+            $.vmPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
+                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null };
+        }
         $.loadVmTemplateOptions().then(function() { admin.bsModalShow('vmPackageModal'); });
     };
 
     $.saveVmPackage = async function() {
         var f = $.vmPackageForm.value;
+        if (f.stock === '' || f.stock === undefined) f.stock = null;
         try {
             if (f.id) {
                 await api('/admin/vm-packages/' + f.id, { method: 'PUT', body: JSON.stringify(f) });
@@ -55,14 +61,20 @@
     };
 
     $.openLxcPackageForm = function(p) {
-        if (p) { $.lxcPackageForm.value = Object.assign({}, p); }
-        else { $.lxcPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
-            monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active' }; }
+        if (p) {
+            $.lxcPackageForm.value = Object.assign({}, p);
+            var f = $.lxcPackageForm.value;
+            f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : null);
+        } else {
+            $.lxcPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
+                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null };
+        }
         $.loadLxcTemplateOptions().then(function() { admin.bsModalShow('lxcPackageModal'); });
     };
 
     $.saveLxcPackage = async function() {
         var f = $.lxcPackageForm.value;
+        if (f.stock === '' || f.stock === undefined) f.stock = null;
         try {
             if (f.id) {
                 await api('/admin/lxc-packages/' + f.id, { method: 'PUT', body: JSON.stringify(f) });
@@ -77,6 +89,26 @@
     $.deleteLxcPackage = async function(id) {
         if (!await window.customConfirm('确定删除此套餐？')) return;
         try { await api('/admin/lxc-packages/' + id, { method: 'DELETE' }); await $.loadLxcPackages(); } catch (e) { alert(e.message); }
+    };
+
+    $.restockVmPackage = async function(pkg) {
+        var input = prompt('请输入补货数量（正整数）：');
+        if (input === null) return;
+        var add = parseInt(input);
+        if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
+        var newStock = (pkg.stock || 0) + add;
+        await api('/admin/vm-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
+        await $.loadVmPackages();
+    };
+
+    $.restockLxcPackage = async function(pkg) {
+        var input = prompt('请输入补货数量（正整数）：');
+        if (input === null) return;
+        var add = parseInt(input);
+        if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
+        var newStock = (pkg.stock || 0) + add;
+        await api('/admin/lxc-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
+        await $.loadLxcPackages();
     };
 
     $.provisionVm = async function() {

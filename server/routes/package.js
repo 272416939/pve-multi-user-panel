@@ -50,6 +50,9 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         var pkg = await db.vmPackages.getById(packageId);
         if (!pkg) return res.status(404).json({ error: '套餐不存在' });
+        if (pkg.stock !== null && pkg.sold_count >= pkg.stock) {
+            return res.status(400).json({ error: '该套餐已售罄' });
+        }
 
         var template = await db.vmTemplates.getById(pkg.template_id);
         if (!template) return res.status(404).json({ error: '关联模板不存在' });
@@ -139,6 +142,11 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             trade_no: '', api_trade_no: ''
         });
 
+        // 增加已售数量
+        try {
+            await db.vmPackages.update(pkg.id, { sold_count: (pkg.sold_count || 0) + 1 });
+        } catch (soldErr) { console.error('[package] 更新已售数量失败:', soldErr.message); }
+
         try {
             await db.messages.create({
                 uid: userId, title: '服务器开通成功',
@@ -204,6 +212,9 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
         var pkg = await db.lxcPackages.getById(packageId);
         if (!pkg) return res.status(404).json({ error: '套餐不存在' });
+        if (pkg.stock !== null && pkg.sold_count >= pkg.stock) {
+            return res.status(400).json({ error: '该套餐已售罄' });
+        }
 
         var template = await db.lxcTemplates.getById(pkg.template_id);
         if (!template) return res.status(404).json({ error: '关联模板不存在' });
@@ -297,6 +308,11 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''
         });
+
+        // 增加已售数量
+        try {
+            await db.lxcPackages.update(pkg.id, { sold_count: (pkg.sold_count || 0) + 1 });
+        } catch (soldErr) { console.error('[package] 更新已售数量失败:', soldErr.message); }
 
         try {
             await db.messages.create({
