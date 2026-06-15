@@ -1804,8 +1804,8 @@ module.exports = {
 
     // VM 套餐操作
     vmPackages: {
-        getAll: () => queryAll('SELECT * FROM vm_packages ORDER BY id DESC'),
-        getById: (id) => queryOne('SELECT * FROM vm_packages WHERE id = ?', [id]),
+        getAll: () => queryAll('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id ORDER BY p.id DESC'),
+        getById: (id) => queryOne('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id WHERE p.id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
                 `INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, description, status)

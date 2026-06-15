@@ -1753,8 +1753,8 @@ module.exports = {
 
     // VM 套餐操作
     vmPackages: {
-        getAll: () => db.prepare('SELECT * FROM vm_packages ORDER BY id DESC').all(),
-        getById: (id) => db.prepare('SELECT * FROM vm_packages WHERE id = ?').get(id),
+        getAll: () => db.prepare('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id ORDER BY p.id DESC').all(),
+        getById: (id) => db.prepare('SELECT p.*, t.name as template_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id WHERE p.id = ?').get(id),
         create: (data) => {
             const stmt = db.prepare(`INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, description, status) VALUES (@name, @template_id, @cores, @memory, @disk_size, @monthly_price, @quarterly_price, @yearly_price, @description, @status)`);
             const info = stmt.run({
