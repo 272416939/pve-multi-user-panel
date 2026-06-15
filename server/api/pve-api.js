@@ -183,6 +183,7 @@ class PveApi {
     searchParams.append('newid', String(newVmid));
     if (params && params.name) searchParams.append('name', params.name);
     if (params && params.target) searchParams.append('target', params.target);
+    if (params && params.storage) searchParams.append('storage', params.storage);
     if (params && params.clone_mode === 'full') {
       searchParams.append('full', '1');
     }

@@ -7,6 +7,7 @@ var ikuaiApi = require('../api/ikuai-api');
 var { generateVmName, generateLxcName } = require('../utils/random-name');
 var { removeDhcpStaticBinding } = require('../services/dhcp');
 var { createEmailTemplate, sendEmail } = require('../utils/email');
+var { calculateAmount, deductBalance } = require('../utils/order-utils');
 
 function safeError(e) { return process.env.DEBUG === 'true' ? e.message : '服务器错误'; }
 
@@ -61,6 +62,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         await pveApi.cloneVm(template.template_vmid, newVmid, {
             name: randomName,
+            storage: template.target_storage || undefined,
             clone_mode: template.clone_mode || 'full'
         });
 
@@ -93,17 +95,18 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
         var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
-        var amount = pkg.monthly_price || 0;
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
+        await deductBalance(userId, totalAmount, db);
         await db.orders.create({
             order_no: orderNo, user_id: userId, type: 'vm', package_id: pkg.id,
             template_id: template.id, period: period, period_count: period_count,
-            amount: amount, cores: template.cores, memory: template.memory,
+            amount: totalAmount, cores: template.cores, memory: template.memory,
             disk_size: template.disk_size, resource_name: randomName, resource_id: String(newVmid),
             mac_group_id: finalMacGroupId || ''
         });
         await db.transactionRecords.create({
             user_id: userId, order_no: orderNo, pay_time: now.toISOString(),
-            pay_method: 'balance', trade_type: 'new_order', amount: amount,
+            pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''
         });
@@ -182,17 +185,18 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
         var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
-        var amount = pkg.monthly_price || 0;
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
+        await deductBalance(userId, totalAmount, db);
         await db.orders.create({
             order_no: orderNo, user_id: userId, type: 'lxc', package_id: pkg.id,
             template_id: template.id, period: period, period_count: period_count,
-            amount: amount, cores: template.cores, memory: template.memory,
+            amount: totalAmount, cores: template.cores, memory: template.memory,
             disk_size: template.disk_size, resource_name: randomName, resource_id: String(newVmid),
             mac_group_id: finalMacGroupId || ''
         });
         await db.transactionRecords.create({
             user_id: userId, order_no: orderNo, pay_time: now.toISOString(),
-            pay_method: 'balance', trade_type: 'new_order', amount: amount,
+            pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''
         });
@@ -268,6 +272,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         // Clone VM
         await pveApi.cloneVm(template.template_vmid, newVmid, {
             name: randomName,
+            storage: template.target_storage || undefined,
             clone_mode: template.clone_mode || 'full'
         });
 
@@ -309,18 +314,18 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
         var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
-        var amount = pkg.monthly_price || 0;
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
         // 写入 orders 表
         await db.orders.create({
             order_no: orderNo, user_id: userId, type: 'vm', package_id: pkg.id,
             template_id: template.id, period: period, period_count: period_count,
-            amount: amount, cores: template.cores, memory: template.memory,
+            amount: totalAmount, cores: template.cores, memory: template.memory,
             disk_size: template.disk_size, resource_name: randomName, resource_id: String(newVmid)
         });
         // 写入 transaction_records
         await db.transactionRecords.create({
             user_id: userId, order_no: orderNo, pay_time: now.toISOString(),
-            pay_method: 'balance', trade_type: 'new_order', amount: amount,
+            pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''
         });
@@ -438,18 +443,18 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
         var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
-        var amount = pkg.monthly_price || 0;
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
         // 写入 orders 表
         await db.orders.create({
             order_no: orderNo, user_id: userId, type: 'lxc', package_id: pkg.id,
             template_id: template.id, period: period, period_count: period_count,
-            amount: amount, cores: template.cores, memory: template.memory,
+            amount: totalAmount, cores: template.cores, memory: template.memory,
             disk_size: template.disk_size, resource_name: randomName, resource_id: String(newVmid)
         });
         // 写入 transaction_records
         await db.transactionRecords.create({
             user_id: userId, order_no: orderNo, pay_time: now.toISOString(),
-            pay_method: 'balance', trade_type: 'new_order', amount: amount,
+            pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''
         });
