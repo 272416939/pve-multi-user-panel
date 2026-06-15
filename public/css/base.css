@@ -3,7 +3,6 @@
 
 /* ========== CSS Variables — Dark Theme (Default) ========== */
 :root {
-  color-scheme: dark;
   /* Backgrounds */
   --bg-main: #0f0c29;
   --bg-card: rgba(255, 255, 255, 0.05);
@@ -41,10 +40,6 @@
   --sidebar-width: 220px;
   --header-height: 64px;
   --radius: 16px;
-}
-
-html[data-theme="light"] {
-  color-scheme: light;
 }
 
 /* ========== Light Theme ========== */
