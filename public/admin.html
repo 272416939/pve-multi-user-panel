@@ -3864,7 +3864,12 @@
                 if (instance.type) compName = instance.type.name || instance.type.__name || 'VueComponent';
                 else compName = 'root';
             }
+            // Try to extract the template snippet from error stack
+            var errStack = err && err.stack ? err.stack : '';
             var detail = msg + ' [comp=' + compName + ', hook=' + info + ']';
+            // Find which property might be undefined by extracting from the message
+            var missingMatch = msg.match(/Cannot read properties of undefined \(reading '([^']+)'\)/);
+            if (missingMatch) detail += ' [prop=' + missingMatch[1] + ']';
             var el = document.createElement('div');
             el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#dc3545;color:#fff;padding:12px 20px;font-size:13px;font-family:monospace;max-height:120px;overflow:auto';
             el.textContent = '[Vue Error] ' + detail;
