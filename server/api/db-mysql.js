@@ -1769,8 +1769,8 @@ module.exports = {
         getById: (id) => queryOne('SELECT * FROM lxc_templates WHERE id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, unprivileged, features, mac_group_id, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.ostemplate || '', data.storage || 'local',
                     data.rootfs_storage || 'local-lvm',
