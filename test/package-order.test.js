@@ -115,3 +115,33 @@ describe('套餐订购业务逻辑', function() {
     });
   });
 });
+
+describe('订购流程 - 先扣费后创建 (Bug 2)', function() {
+  it('余额不足时应该抛错而不是执行 PVE', function() {
+    var utils = require('../server/utils/order-utils');
+    var mockDb = {
+      users: {
+        getById: function(id) { return Promise.resolve({ id: id, balance: '0.50' }); },
+        update: function() { return Promise.resolve(); }
+      }
+    };
+    return utils.deductBalance(1, 100, mockDb).then(function() {
+      throw new Error('应该失败');
+    }).catch(function(e) {
+      expect(e.message).to.include('余额不足');
+    });
+  });
+});
+
+describe('续费周期同步 (Bug 1)', function() {
+  it('季付: getPeriodMonths + calculateAmount 组合正确', function() {
+    var utils = require('../server/utils/order-utils');
+    var singlePeriodPrice = utils.calculateAmount(100, 'quarter', 1);
+    expect(singlePeriodPrice).to.equal(300);
+    expect(utils.getPeriodMonths('quarter')).to.equal(3);
+  });
+  it('年付: 单周期价格 = monthly * 12', function() {
+    var utils = require('../server/utils/order-utils');
+    expect(utils.calculateAmount(100, 'year', 1)).to.equal(1200);
+  });
+});

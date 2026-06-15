@@ -46,6 +46,9 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
+        await deductBalance(userId, totalAmount, db);
+
         var randomName = generateVmName();
         var newVmid = await pveApi.getNextAvailableVmid();
 
@@ -60,25 +63,22 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             console.error('[package] 检查模板 VM 状态失败:', statusErr.message);
         }
 
-        await pveApi.cloneVm(template.template_vmid, newVmid, {
+        var upid = await pveApi.cloneVm(template.template_vmid, newVmid, {
             name: randomName,
             storage: template.target_storage || undefined,
             clone_mode: template.clone_mode || 'full'
         });
+        await pveApi.waitForTask(upid);
 
-        try {
-            await pveApi.updateVmConfig(newVmid, { cores: template.cores, memory: template.memory });
-        } catch (configErr) { console.error('[package] VM config update failed:', configErr.message); }
+        await pveApi.updateVmConfig(newVmid, { cores: template.cores, memory: template.memory });
 
         if (template.cpu_affinity) {
-            try {
-                await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
-            } catch (affErr) { console.error('[package] VM affinity config failed:', affErr.message); }
+            await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
         }
 
         var newVm = await db.vms.create({
             vm_id: newVmid, user_id: userId, name: randomName, expiration_date: null,
-            renewal_price: String(pkg.monthly_price), renewal_period: 'month'
+            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1)), renewal_period: period
         });
 
         if (finalMacGroupId) {
@@ -95,8 +95,6 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
         var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
-        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
-        await deductBalance(userId, totalAmount, db);
         await db.orders.create({
             order_no: orderNo, user_id: userId, type: 'vm', package_id: pkg.id,
             template_id: template.id, period: period, period_count: period_count,
@@ -153,6 +151,9 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
+        await deductBalance(userId, totalAmount, db);
+
         var randomName = generateLxcName();
         var newVmid = await pveApi.getNextAvailableVmid();
 
@@ -168,7 +169,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
         var newCt = await db.lxcContainers.create({
             ct_id: newVmid, user_id: userId, name: randomName, expiration_date: null,
-            renewal_price: String(pkg.monthly_price), renewal_period: 'month'
+            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1)), renewal_period: period
         });
 
         if (finalMacGroupId) {
@@ -185,8 +186,6 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
         var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
-        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
-        await deductBalance(userId, totalAmount, db);
         await db.orders.create({
             order_no: orderNo, user_id: userId, type: 'lxc', package_id: pkg.id,
             template_id: template.id, period: period, period_count: period_count,
@@ -270,22 +269,19 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         var newVmid = await pveApi.getNextAvailableVmid();
 
         // Clone VM
-        await pveApi.cloneVm(template.template_vmid, newVmid, {
+        var upid = await pveApi.cloneVm(template.template_vmid, newVmid, {
             name: randomName,
             storage: template.target_storage || undefined,
             clone_mode: template.clone_mode || 'full'
         });
+        await pveApi.waitForTask(upid);
 
         // 应用模板配置（CPU/内存）
-        try {
-            await pveApi.updateVmConfig(newVmid, { cores: template.cores, memory: template.memory });
-        } catch (configErr) { console.error('[package] VM config update failed:', configErr.message); }
+        await pveApi.updateVmConfig(newVmid, { cores: template.cores, memory: template.memory });
 
         // CPU 亲和性
         if (template.cpu_affinity) {
-            try {
-                await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
-            } catch (affErr) { console.error('[package] VM affinity config failed:', affErr.message); }
+            await pveApi.updateVmConfig(newVmid, { affinity: template.cpu_affinity });
         }
 
         // 创建分配记录

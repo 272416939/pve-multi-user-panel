@@ -192,7 +192,30 @@ class PveApi {
       searchParams.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 300000 }
     );
-    return response.data;
+    return response.data.data;
+  }
+
+  async waitForTask(upid, timeout = 300000) {
+    const pollInterval = 2000;
+    const startTime = Date.now();
+
+    while (true) {
+      const elapsed = Date.now() - startTime;
+      if (elapsed >= timeout) {
+        throw new Error(`Task ${upid} timed out after ${timeout / 1000} seconds`);
+      }
+
+      const taskStatus = await this.getTaskStatus(upid);
+
+      if (taskStatus.status === 'stopped') {
+        if (taskStatus.exitstatus === 'OK') {
+          return taskStatus;
+        }
+        throw new Error(`Task failed: ${taskStatus.exitstatus}`);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
   }
 
   async getStorageList() {
