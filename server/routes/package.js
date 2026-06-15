@@ -140,6 +140,11 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             }
         } catch (e) { console.error('[package] VM 邮件发送失败', e); }
 
+        // 自动开机
+        try {
+            await pveApi.startVm(newVmid);
+        } catch (startErr) { console.error('[package] VM 自动开机失败:', startErr.message); }
+
         res.json({ message: 'VM 开通成功', vm: newVm, name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
         console.error('[package] 用户订购 VM 失败:', e.message);
@@ -253,6 +258,11 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
                 await sendEmail(user.email, '容器开通成功', emailHtml);
             }
         } catch (e) { console.error('[package] LXC 邮件发送失败', e); }
+
+        // 自动开机
+        try {
+            await pveApi.startLxc(newVmid);
+        } catch (startErr) { console.error('[package] LXC 自动开机失败:', startErr.message); }
 
         res.json({ message: 'LXC 开通成功', ct: newCt, name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
@@ -385,6 +395,11 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
             }
         } catch (e) { console.error('[package] VM 邮件发送失败', e); }
 
+        // 自动开机
+        try {
+            await pveApi.startVm(newVmid);
+        } catch (startErr) { console.error('[package] VM 自动开机失败:', startErr.message); }
+
         res.json({ message: 'VM 开通成功', vm: newVm, name: randomName, vmid: newVmid });
     } catch (e) {
         console.error('[package] VM 套餐开通失败:', e.message);
@@ -513,6 +528,11 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
                 await sendEmail(user.email, '服务器开通成功', emailHtml);
             }
         } catch (e) { console.error('[package] LXC 邮件发送失败', e); }
+
+        // 自动开机
+        try {
+            await pveApi.startLxc(newVmid);
+        } catch (startErr) { console.error('[package] LXC 自动开机失败:', startErr.message); }
 
         res.json({ message: 'LXC 开通成功', ct: newCt, name: randomName, vmid: newVmid });
     } catch (e) {

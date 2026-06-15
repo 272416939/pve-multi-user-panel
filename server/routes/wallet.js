@@ -7,6 +7,7 @@ const { createPayClient, generateOrderId } = require('../sdk/pay');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const dbg = require('../utils/debug');
 const { getPeriodMonths } = require('../utils/order-utils');
+const pveApi = require('../api/pve-api');
 
 function safeError(e) {
     if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
@@ -452,6 +453,22 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         } else {
             await db.lxcContainers.update(resource.id, { expiration_date: newExpiration });
         }
+        
+        // 续费后自动开机
+        try {
+            var renewVmid = type === 'vm' ? resource.vm_id : resource.ct_id;
+            if (type === 'vm') {
+                var renewStatus = await pveApi.getVmStatus(renewVmid);
+                if (renewStatus && renewStatus.status === 'stopped') {
+                    await pveApi.startVm(renewVmid);
+                }
+            } else {
+                var renewLxcStatus = await pveApi.getLxcStatus(renewVmid);
+                if (renewLxcStatus && renewLxcStatus.status === 'stopped') {
+                    await pveApi.startLxc(renewVmid);
+                }
+            }
+        } catch (startErr) { console.error('[wallet] 续费自动开机失败:', startErr.message); }
         
         var orderNo = generateOrderId('RENEWAL');
         await db.transactionRecords.create({
