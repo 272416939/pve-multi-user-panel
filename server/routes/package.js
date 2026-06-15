@@ -8,8 +8,19 @@ var { generateVmName, generateLxcName } = require('../utils/random-name');
 var { createDhcpStaticBinding, removeDhcpStaticBinding } = require('../services/dhcp');
 var { createEmailTemplate, sendEmail } = require('../utils/email');
 var { calculateAmount, deductBalance, setVmAffinity } = require('../utils/order-utils');
+var { execSSHWithStdin } = require('../api/ssh-exec');
+var crypto = require('crypto');
 
 function safeError(e) { return process.env.DEBUG === 'true' ? e.message : '服务器错误'; }
+
+function generateRandomPassword() {
+    var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    var pwd = '';
+    for (var i = 0; i < 12; i++) {
+        pwd += chars[crypto.randomInt(0, chars.length)];
+    }
+    return pwd;
+}
 
 function logPveError(e) {
     console.error('[package] PVE API 错误详情:', e.message);
@@ -263,6 +274,45 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         try {
             await pveApi.startLxc(newVmid);
         } catch (startErr) { console.error('[package] LXC 自动开机失败:', startErr.message); }
+
+        // 生成随机 root 密码并设置
+        var lxcPassword = '';
+        try {
+            lxcPassword = generateRandomPassword();
+            var sshHost = process.env.PVE_SSH_HOST;
+            var sshPass = process.env.PVE_SSH_PASSWORD;
+            if (sshHost && sshPass) {
+                await execSSHWithStdin(sshHost, 'root', sshPass,
+                    'lxc-attach -n ' + newVmid + ' -- chpasswd',
+                    'root:' + lxcPassword + '\n', 30000
+                );
+            }
+        } catch (pwdErr) { console.error('[package] LXC 设置密码失败:', pwdErr.message); }
+
+        // 发送密码通知（站内信）
+        if (lxcPassword) {
+            try {
+                await db.messages.create({
+                    uid: userId, title: '容器 root 密码',
+                    content: '您的容器 ' + randomName + ' 的 root 密码已设置。\nRoot 账号：root\n密码：' + lxcPassword + '\n请尽快修改密码。',
+                    type: 2, send_type: 1
+                });
+            } catch (e) { console.error('[package] LXC 密码通知发送失败', e); }
+            try {
+                var pwdUser = await db.users.getById(userId);
+                if (pwdUser && pwdUser.email && pwdUser.emailVerified) {
+                    var pwdEmailHtml = createEmailTemplate('容器 root 密码',
+                        '<div class="info-box" style="border-left-color: #667eea;">' +
+                        '<p style="margin-bottom: 8px;"><strong>您的容器 ' + randomName + ' 已开通</strong></p>' +
+                        '<p style="margin-bottom: 4px;">Root 账号：root</p>' +
+                        '<p style="margin-bottom: 4px;">密码：' + lxcPassword + '</p>' +
+                        '</div><div class="divider"></div>' +
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                    );
+                    await sendEmail(pwdUser.email, '容器 root 密码 - PVE 管理面板', pwdEmailHtml);
+                }
+            } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
+        }
 
         res.json({ message: 'LXC 开通成功', ct: newCt, name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
@@ -533,6 +583,45 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         try {
             await pveApi.startLxc(newVmid);
         } catch (startErr) { console.error('[package] LXC 自动开机失败:', startErr.message); }
+
+        // 生成随机 root 密码并设置
+        var adminLxcPwd = '';
+        try {
+            adminLxcPwd = generateRandomPassword();
+            var sshHost = process.env.PVE_SSH_HOST;
+            var sshPass = process.env.PVE_SSH_PASSWORD;
+            if (sshHost && sshPass) {
+                await execSSHWithStdin(sshHost, 'root', sshPass,
+                    'lxc-attach -n ' + newVmid + ' -- chpasswd',
+                    'root:' + adminLxcPwd + '\n', 30000
+                );
+            }
+        } catch (pwdErr) { console.error('[package] LXC 设置密码失败:', pwdErr.message); }
+
+        // 发送密码通知（站内信）
+        if (adminLxcPwd) {
+            try {
+                await db.messages.create({
+                    uid: userId, title: '容器 root 密码',
+                    content: '您的容器 ' + randomName + ' 的 root 密码已设置。\nRoot 账号：root\n密码：' + adminLxcPwd + '\n请尽快修改密码。',
+                    type: 2, send_type: 1
+                });
+            } catch (e) { console.error('[package] LXC 密码通知发送失败', e); }
+            try {
+                var adminPwdUser = await db.users.getById(userId);
+                if (adminPwdUser && adminPwdUser.email && adminPwdUser.emailVerified) {
+                    var adminPwdEmailHtml = createEmailTemplate('容器 root 密码',
+                        '<div class="info-box" style="border-left-color: #667eea;">' +
+                        '<p style="margin-bottom: 8px;"><strong>您的容器 ' + randomName + ' 已开通</strong></p>' +
+                        '<p style="margin-bottom: 4px;">Root 账号：root</p>' +
+                        '<p style="margin-bottom: 4px;">密码：' + adminLxcPwd + '</p>' +
+                        '</div><div class="divider"></div>' +
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                    );
+                    await sendEmail(adminPwdUser.email, '容器 root 密码 - PVE 管理面板', adminPwdEmailHtml);
+                }
+            } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
+        }
 
         res.json({ message: 'LXC 开通成功', ct: newCt, name: randomName, vmid: newVmid });
     } catch (e) {
