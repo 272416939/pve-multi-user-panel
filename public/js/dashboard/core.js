@@ -32,6 +32,12 @@
     $.renewFormPeriod = ref('month');
     $.renewError = ref('');
 
+    $.vmPwdShow = ref(false);
+    $.vmPwdResource = ref(null);
+    $.vmPwdCiuser = ref('');
+    $.vmPwdNewPassword = ref('');
+    $.vmPwdError = ref('');
+
     // ===== 套餐订购状态 =====
     $.vmPackages = ref([]);
     $.lxcPackages = ref([]);
@@ -295,6 +301,21 @@
         $.renewShow.value = true;
     };
 
+    $.openVmPasswordReset = async function(vm) {
+        $.vmPwdResource.value = vm;
+        $.vmPwdNewPassword.value = '';
+        $.vmPwdError.value = '';
+        $.vmPwdCiuser.value = vm.config?.ciuser || false;
+        if ($.vmPwdCiuser.value === false) {
+            $.vmPwdShow.value = true;
+            return;
+        }
+        if (vm.status && vm.status.status !== 'stopped') {
+            $.vmPwdError.value = '请先关机后再重置密码';
+        }
+        $.vmPwdShow.value = true;
+    };
+
     $.submitRenew = async function() {
         $.renewError.value = '';
         var resource = $.renewResource.value;
@@ -329,6 +350,21 @@
             }
         } catch (e) {
             $.renewError.value = '请求失败，请稍后重试';
+        }
+    };
+
+    $.submitVmPasswordReset = async function() {
+        $.vmPwdError.value = '';
+        var vm = $.vmPwdResource.value;
+        if (!vm) { $.vmPwdError.value = '请选择虚拟机'; return; }
+        var pwd = $.vmPwdNewPassword.value;
+        if (!pwd || pwd.length < 6) { $.vmPwdError.value = '密码长度至少 6 位'; return; }
+        try {
+            await api('/vm/' + vm.vm_id + '/reset-password', { method: 'POST', body: JSON.stringify({ password: pwd }) });
+            $.vmPwdShow.value = false;
+            alert('密码重置成功');
+        } catch (e) {
+            $.vmPwdError.value = e.message;
         }
     };
 

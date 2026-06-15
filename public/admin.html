@@ -763,6 +763,7 @@
                                             <th>VMID</th>
                                             <th>用户</th>
                                             <th>主机名称</th>
+                                            <th>默认账号</th>
                                             <th>内网IP</th>
                                             <th>CNAME域名</th>
                                             <th>配置</th>
@@ -777,6 +778,7 @@
                                             <td>{{ vm.vm_id }}</td>
                                             <td>{{ vm.username || '-' }}</td>
                                             <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
+                                            <td>{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</td>
                                             <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                             <td><span v-if="networkConfig.cname_domain" class="text-primary">{{ vm.vm_id }}.{{ networkConfig.cname_domain }}</span><span v-else class="text-muted">-</span></td>
                                             <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
@@ -809,7 +811,7 @@
                                             </td>
                                         </tr>
                                         <tr v-if="userVms.length === 0">
-                                            <td colspan="9" class="text-center text-muted py-4">暂无虚拟机</td>
+                                            <td colspan="10" class="text-center text-muted py-4">暂无虚拟机</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -3395,6 +3397,7 @@
                                     </div>
                                     <div class="col-md-6"><label class="form-label">网卡型号</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.network_model"></div>
                                     <div class="col-md-6"><label class="form-label">操作系统类型</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.os_type"></div>
+                                    <div class="col-md-6"><label class="form-label">Cloud-init 用户</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.ciuser" placeholder="如 root"></div>
                                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="templatePage.vmTemplateForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
                                     <div class="col-md-6"><label class="form-label">MAC分组</label>
                                         <select class="form-select" v-model="templatePage.vmTemplateForm.value.mac_group_id">

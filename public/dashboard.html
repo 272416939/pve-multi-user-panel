@@ -904,6 +904,7 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>主机名称</th>
+                                    <th>默认账号</th>
                                     <th>内网IP</th>
                                     <th>CNAME域名</th>
                                     <th>配置</th>
@@ -917,6 +918,7 @@
                                 <tr v-for="vm in userVms" :key="vm.id">
                                     <td>{{ vm.vm_id }}</td>
                                     <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
+                                    <td>{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</td>
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                     <td><span v-if="cnameDomain" class="text-primary">{{ vm.vm_id }}.{{ cnameDomain }}</span><span v-else class="text-muted">-</span></td>
                                     <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
@@ -940,13 +942,14 @@
                                                 {label:'网络', action:function(){ openDeviceForward(vm, 'vm') }},
                                                 {label:'控制台', action:function(){ openVncConsole(vm.vm_id) }},
                                                 {label:'续费', action:function(){ renewResource = vm; renewShow = true; }},
+                                                {label:'重置密码', action:function(){ openVmPasswordReset(vm) }},
                                                 {label:'编辑', action:function(){ editVm(vm) }}
                                             ])">更多</button>
                                         </div>
                                     </td>
                                 </tr>
                                 <tr v-if="userVms.length === 0">
-                                    <td colspan="8" class="text-center text-muted py-4">暂无虚拟机</td>
+                                    <td colspan="9" class="text-center text-muted py-4">暂无虚拟机</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -2052,6 +2055,34 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" @click="renewShow = false">取消</button>
                 <button class="btn btn-glass" @click="submitRenew">确认续费</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VM 重置密码弹窗 -->
+<div v-if="vmPwdShow" class="modal" style="display:block;background:rgba(0,0,0,0.5);" @click.self="vmPwdShow = false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">重置密码</h5><button class="btn-close" @click="vmPwdShow = false"></button></div>
+            <div class="modal-body">
+                <div v-if="vmPwdCiuser === false" class="alert alert-danger py-2 mb-0">当前虚拟机未配置Cloud-init驱动，请联系管理员！</div>
+                <div v-else>
+                    <p v-if="vmPwdResource">资源：{{ vmPwdResource.name || ('VM ' + vmPwdResource.vm_id) }}</p>
+                    <p v-if="vmPwdResource">账号：{{ vmPwdCiuser }}</p>
+                    <div class="mb-3">
+                        <label class="form-label">新密码</label>
+                        <input type="password" class="form-control" v-model="vmPwdNewPassword" placeholder="至少6位">
+                    </div>
+                    <div v-if="vmPwdError" class="alert alert-danger py-2">{{ vmPwdError }}</div>
+                </div>
+            </div>
+            <div class="modal-footer" v-if="vmPwdCiuser !== false">
+                <button class="btn btn-secondary" @click="vmPwdShow = false">取消</button>
+                <button class="btn btn-glass" @click="submitVmPasswordReset" :disabled="!vmPwdNewPassword || vmPwdNewPassword.length < 6">确认重置</button>
+            </div>
+            <div class="modal-footer" v-else>
+                <button class="btn btn-secondary" @click="vmPwdShow = false">关闭</button>
             </div>
         </div>
     </div>

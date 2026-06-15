@@ -57,7 +57,8 @@
             tp.vmTemplateForm.value.mac_group_id = t.mac_group_id || '';
         } else {
             tp.vmTemplateForm.value = { id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20,
-                network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', target_storage: 'local-lvm', clone_mode: 'full',
+                network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', ciuser: '',
+                target_storage: 'local-lvm', clone_mode: 'full',
                 cpu_affinity: '', mac_group_id: '', description: '', status: 'active' };
         }
         tp.loadPveTemplateVms();

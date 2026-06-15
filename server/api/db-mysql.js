@@ -391,6 +391,7 @@ async function initDb() {
         network_bridge VARCHAR(50) NOT NULL DEFAULT 'vmbr0',
         network_model VARCHAR(50) NOT NULL DEFAULT 'virtio',
         os_type VARCHAR(100) NOT NULL DEFAULT '',
+        ciuser VARCHAR(100) NOT NULL DEFAULT '',
         description TEXT NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'active',
         created_at DATETIME NOT NULL DEFAULT NOW(),
@@ -506,6 +507,7 @@ async function migrateSchema() {
 
     await safeAlter('lxc_templates', 'rootfs_storage', "VARCHAR(100) DEFAULT 'local-lvm'");
     await safeAlter('vm_templates', 'mac_group_id', "TEXT");
+    await safeAlter('vm_templates', 'ciuser', "VARCHAR(100) NOT NULL DEFAULT ''");
     await safeAlter('lxc_templates', 'mac_group_id', "TEXT");
     await safeAlter('lxc_templates', 'ipv6_enabled', "TINYINT(1) NOT NULL DEFAULT 1");
     await safeAlter('lxc_templates', 'ip6_mode', "VARCHAR(20) NOT NULL DEFAULT 'dhcp'");
@@ -1736,13 +1738,14 @@ module.exports = {
         getById: (id) => queryOne('SELECT * FROM vm_templates WHERE id = ?', [id]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, target_storage, clone_mode, cpu_affinity, mac_group_id, description, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, ciuser, target_storage, clone_mode, cpu_affinity, mac_group_id, description, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', data.template_vmid || 0, data.cores || 1,
                     data.memory || 1024, data.disk_size || 20,
                     data.network_bridge || 'vmbr0', data.network_model || 'virtio',
                     data.os_type || '',
+                    data.ciuser || '',
                     data.target_storage || 'local-lvm',
                     data.clone_mode || 'full',
                     data.cpu_affinity || '',
@@ -1753,7 +1756,7 @@ module.exports = {
             return queryOne('SELECT * FROM vm_templates WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'target_storage', 'clone_mode', 'cpu_affinity', 'mac_group_id', 'description', 'status'];
+            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'ciuser', 'target_storage', 'clone_mode', 'cpu_affinity', 'mac_group_id', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

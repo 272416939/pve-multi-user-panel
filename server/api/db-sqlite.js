@@ -383,6 +383,7 @@ function initDb() {
         network_bridge TEXT NOT NULL DEFAULT 'vmbr0',
         network_model TEXT NOT NULL DEFAULT 'virtio',
         os_type TEXT NOT NULL DEFAULT '',
+        ciuser TEXT NOT NULL DEFAULT '',
         description TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'active',
         created_at TEXT NOT NULL DEFAULT (datetime('now','localtime')),
@@ -393,6 +394,7 @@ function initDb() {
     try { db.exec('ALTER TABLE vm_templates ADD COLUMN clone_mode TEXT NOT NULL DEFAULT "full"'); } catch (e) {}
     try { db.exec('ALTER TABLE vm_templates ADD COLUMN cpu_affinity TEXT NOT NULL DEFAULT ""'); } catch (e) {}
     try { db.exec('ALTER TABLE vm_templates ADD COLUMN mac_group_id TEXT DEFAULT ""'); } catch (e) {}
+    try { db.exec('ALTER TABLE vm_templates ADD COLUMN ciuser TEXT NOT NULL DEFAULT ""'); } catch (e) {}
 
     // lxc_templates 表
     db.exec(`CREATE TABLE IF NOT EXISTS lxc_templates (
@@ -1711,12 +1713,13 @@ module.exports = {
         getAll: () => db.prepare('SELECT * FROM vm_templates ORDER BY id DESC').all(),
         getById: (id) => db.prepare('SELECT * FROM vm_templates WHERE id = ?').get(id),
         create: (data) => {
-            const stmt = db.prepare(`INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, target_storage, clone_mode, cpu_affinity, mac_group_id, description, status) VALUES (@name, @template_vmid, @cores, @memory, @disk_size, @network_bridge, @network_model, @os_type, @target_storage, @clone_mode, @cpu_affinity, @mac_group_id, @description, @status)`);
+            const stmt = db.prepare(`INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, ciuser, target_storage, clone_mode, cpu_affinity, mac_group_id, description, status) VALUES (@name, @template_vmid, @cores, @memory, @disk_size, @network_bridge, @network_model, @os_type, @ciuser, @target_storage, @clone_mode, @cpu_affinity, @mac_group_id, @description, @status)`);
             const info = stmt.run({
                 name: data.name || '', template_vmid: data.template_vmid || 0, cores: data.cores || 1,
                 memory: data.memory || 1024, disk_size: data.disk_size || 20,
                 network_bridge: data.network_bridge || 'vmbr0', network_model: data.network_model || 'virtio',
                 os_type: data.os_type || '',
+                ciuser: data.ciuser || '',
                 target_storage: data.target_storage || 'local-lvm',
                 clone_mode: data.clone_mode || 'full',
                 cpu_affinity: data.cpu_affinity || '',
@@ -1726,7 +1729,7 @@ module.exports = {
             return db.prepare('SELECT * FROM vm_templates WHERE id = ?').get(info.lastInsertRowid);
         },
         update: (id, updates) => {
-            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'target_storage', 'clone_mode', 'cpu_affinity', 'mac_group_id', 'description', 'status'];
+            const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'ciuser', 'target_storage', 'clone_mode', 'cpu_affinity', 'mac_group_id', 'description', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

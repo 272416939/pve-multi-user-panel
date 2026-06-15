@@ -81,7 +81,12 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         });
         await pveApi.waitForTask(upid);
 
-        await pveApi.updateVmConfig(newVmid, { cores: template.cores, memory: template.memory });
+        var vmUpdateCfg = { cores: template.cores, memory: template.memory };
+        if (template.ciuser) {
+            vmUpdateCfg.ciuser = template.ciuser;
+            vmUpdateCfg.cipassword = generateRandomPassword();
+        }
+        await pveApi.updateVmConfig(newVmid, vmUpdateCfg);
 
         if (template.cpu_affinity) {
             await setVmAffinity(newVmid, template.cpu_affinity);
@@ -150,6 +155,31 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                 await sendEmail(user.email, '服务器开通成功', emailHtml);
             }
         } catch (e) { console.error('[package] VM 邮件发送失败', e); }
+
+        // Cloud-init 密码通知
+        if (template.ciuser && vmUpdateCfg.cipassword) {
+            try {
+                await db.messages.create({
+                    uid: userId, title: '服务器 root 密码',
+                    content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + template.ciuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。',
+                    type: 2, send_type: 1
+                });
+            } catch (e) { console.error('[package] VM 密码通知发送失败', e); }
+            try {
+                var ciUser = await db.users.getById(userId);
+                if (ciUser && ciUser.email && ciUser.emailVerified) {
+                    var ciEmailHtml = createEmailTemplate('服务器 root 密码',
+                        '<div class="info-box" style="border-left-color: #667eea;">' +
+                        '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
+                        '<p style="margin-bottom: 4px;">账号：' + template.ciuser + '</p>' +
+                        '<p style="margin-bottom: 4px;">密码：' + vmUpdateCfg.cipassword + '</p>' +
+                        '</div><div class="divider"></div>' +
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                    );
+                    await sendEmail(ciUser.email, '服务器 root 密码 - PVE 管理面板', ciEmailHtml);
+                }
+            } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
+        }
 
         // 自动开机
         try {
@@ -392,7 +422,12 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         await pveApi.waitForTask(upid);
 
         // 应用模板配置（CPU/内存）
-        await pveApi.updateVmConfig(newVmid, { cores: template.cores, memory: template.memory });
+        var adminVmCfg = { cores: template.cores, memory: template.memory };
+        if (template.ciuser) {
+            adminVmCfg.ciuser = template.ciuser;
+            adminVmCfg.cipassword = generateRandomPassword();
+        }
+        await pveApi.updateVmConfig(newVmid, adminVmCfg);
 
         // CPU 亲和性
         if (template.cpu_affinity) {
@@ -462,6 +497,31 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
                 await sendEmail(user.email, '服务器开通成功', emailHtml);
             }
         } catch (e) { console.error('[package] VM 邮件发送失败', e); }
+
+        // Cloud-init 密码通知
+        if (template.ciuser && adminVmCfg.cipassword) {
+            try {
+                await db.messages.create({
+                    uid: userId, title: '服务器 root 密码',
+                    content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + template.ciuser + '\n密码：' + adminVmCfg.cipassword + '\n请尽快修改密码。',
+                    type: 2, send_type: 1
+                });
+            } catch (e) { console.error('[package] VM 密码通知发送失败', e); }
+            try {
+                var adminCiUser = await db.users.getById(userId);
+                if (adminCiUser && adminCiUser.email && adminCiUser.emailVerified) {
+                    var adminCiHtml = createEmailTemplate('服务器 root 密码',
+                        '<div class="info-box" style="border-left-color: #667eea;">' +
+                        '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
+                        '<p style="margin-bottom: 4px;">账号：' + template.ciuser + '</p>' +
+                        '<p style="margin-bottom: 4px;">密码：' + adminVmCfg.cipassword + '</p>' +
+                        '</div><div class="divider"></div>' +
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                    );
+                    await sendEmail(adminCiUser.email, '服务器 root 密码 - PVE 管理面板', adminCiHtml);
+                }
+            } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
+        }
 
         // 自动开机
         try {

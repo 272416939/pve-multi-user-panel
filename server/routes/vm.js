@@ -703,6 +703,53 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
     }
 });
 
+router.post('/vm/:vmid/reset-password', authMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+        const { password } = req.body;
+
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+            return res.status(400).json({ error: '无效的虚拟机 ID' });
+        }
+
+        if (!password || password.length < 6) {
+            return res.status(400).json({ error: '密码长度至少 6 位' });
+        }
+
+        const allVms = await db.vms.getAll();
+        const vm = allVms.find(v => v.vm_id === vmid);
+        const isAdmin = req.user.role === 'admin';
+
+        if (vm) {
+            const isOwner = req.user.id === vm.user_id;
+            if (!isOwner && !isAdmin) {
+                return res.status(403).json({ error: '无权限操作此虚拟机' });
+            }
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date + 'Z') < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+            }
+        } else if (!isAdmin) {
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
+        }
+
+        const config = await pveApi.getVmConfig(vmid);
+        if (!config || !config.ciuser) {
+            return res.status(400).json({ error: '当前虚拟机未配置Cloud-init驱动，请联系管理员！' });
+        }
+
+        const status = await pveApi.getVmStatus(vmid);
+        if (status && status.status !== 'stopped') {
+            return res.status(400).json({ error: '请先关机后再重置密码' });
+        }
+
+        await pveApi.updateVmConfig(vmid, { cipassword: password });
+
+        res.json({ message: '密码重置成功' });
+    } catch (error) {
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
 router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
