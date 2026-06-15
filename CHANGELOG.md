@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.7.0] - 2026-06-15
+
+### Added
+- feat: 套餐订购系统 — Dashboard 侧边栏套餐开通入口，卡片式展示，响应式+明暗适配
+- feat: 订单系统 — 订购生成订单号，orders 表 + transaction_records 双记录
+- feat: 模板 MAC 分组绑定 — vm/lxc_templates 新增 mac_group_id，开通自动继承
+- feat: 用户中心"我的订单" — 订单历史查看
+- feat: Admin 订单管理 — 财务管理子菜单，全平台订单分页
+
+### Changed
+- refactor: 套餐开通改为使用关联模板配置（非套餐参数）
+
+---
+
 ## [2.6.0] - 2026-06-15
 
 ### Added
