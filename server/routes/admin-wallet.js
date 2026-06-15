@@ -93,7 +93,7 @@ router.get('/admin/transactions/export', authMiddleware, adminMiddleware, async 
                 r.pay_method === 'alipay' ? '支付宝' : r.pay_method === 'wxpay' ? '微信支付' : r.pay_method,
                 r.order_no,
                 r.api_trade_no || r.trade_no || '',
-                r.trade_type === 'recharge' ? '余额充值' : '服务器续费',
+                r.trade_type === 'recharge' ? '余额充值' : r.trade_type === 'admin_recharge' ? '后台充值' : r.trade_type === 'new_order' ? '新购服务器' : '服务器续费',
                 parseFloat(r.amount).toFixed(2),
                 parseFloat(r.balance_before).toFixed(2),
                 parseFloat(r.balance_after).toFixed(2)

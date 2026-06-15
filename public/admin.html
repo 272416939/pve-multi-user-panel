@@ -2113,6 +2113,8 @@
                                     <option value="">全部</option>
                                     <option value="recharge">余额充值</option>
                                     <option value="renewal">服务器续费</option>
+                                    <option value="admin_recharge">后台充值</option>
+                                    <option value="new_order">新购服务器</option>
                                 </select>
                             </div>
                             <div class="col-md-2">
@@ -2142,7 +2144,7 @@
                                 <tr v-for="tx in transactionList" :key="tx.id">
                                     <td>{{ formatDate(tx.pay_time) }}</td>
                                     <td>{{ tx.username }}</td>
-                                    <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method }}</td>
+                                    <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method === 'manual' ? '系统' : tx.pay_method }}</td>
                                     <td><code style="font-size:11px;">{{ tx.order_no }}</code></td>
                                     <td><code style="font-size:11px;">{{ tx.trade_no || '-' }}</code></td>
                                     <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : 'badge bg-info'">{{ tx.trade_type === 'recharge' ? '余额充值' : '服务器续费' }}</span></td>

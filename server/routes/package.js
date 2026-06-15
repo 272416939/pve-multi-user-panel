@@ -76,8 +76,11 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             await setVmAffinity(newVmid, template.cpu_affinity);
         }
 
+        var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
+        var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
+
         var newVm = await db.vms.create({
-            vm_id: newVmid, user_id: userId, name: randomName, expiration_date: null,
+            vm_id: newVmid, user_id: userId, name: randomName, expiration_date: expDate.toISOString(),
             renewal_price: String(calculateAmount(pkg.monthly_price, period, 1)), renewal_period: period
         });
 
@@ -167,8 +170,11 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             features: template.features || '', start: 0
         });
 
+        var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
+        var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
+
         var newCt = await db.lxcContainers.create({
-            ct_id: newVmid, user_id: userId, name: randomName, expiration_date: null,
+            ct_id: newVmid, user_id: userId, name: randomName, expiration_date: expDate.toISOString(),
             renewal_price: String(calculateAmount(pkg.monthly_price, period, 1)), renewal_period: period
         });
 
