@@ -11,7 +11,7 @@
     $.lxcStorageList = ref([]);
     $.userLxcContainers = ref([]);
     $.lxcLoading = ref(false);
-    $.lxcForm = ref({ ostemplate: '', hostname: '', password: '', confirmPassword: '', storage: '', cores: 1, memory: 512, swap: 512, disk: 8, net0Bridge: 'vmbr0', net0Ip: '', net0Mac: '', unprivileged: true, start: true, ipv6_enabled: 1, ip6_mode: 'dhcp', ip6_addr: '' });
+    $.lxcForm = ref({ ostemplate: '', hostname: '', password: '', confirmPassword: '', storage: '', cores: 1, memory: 512, swap: 512, disk: 8, features: '', net0Bridge: 'vmbr0', net0Ip: '', net0Mac: '', net0Ip6: '', unprivileged: true, start: true });
     $.lxcAssignForm = ref({ ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', mac_group_id: '' });
     $.lxcPasswordForm = ref({ password: '', confirmPassword: '' });
     $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
@@ -114,12 +114,10 @@
         var net0 = 'name=eth0,bridge=' + (f.net0Bridge || 'vmbr0');
         if (f.net0Ip) net0 += ',ip=' + f.net0Ip;
         if (f.net0Mac) net0 += ',hwaddr=' + f.net0Mac;
-        if (f.ipv6_enabled != 0) {
-            if (f.ip6_mode === 'dhcp') {
-                net0 += ',ip6=dhcp';
-            } else if (f.ip6_mode === 'static' && f.ip6_addr) {
-                net0 += ',ip6=' + f.ip6_addr;
-            }
+        if (f.net0Ip6) {
+            net0 += ',ip6=' + f.net0Ip6;
+        } else {
+            net0 += ',ip6=dhcp';
         }
         try {
             await api('/lxc/create', {
@@ -135,10 +133,11 @@
                     disk: f.disk,
                     net0: net0,
                     unprivileged: f.unprivileged,
-                    start: f.start
+                    start: f.start,
+                    features: f.features
                 })
             });
-            $.lxcForm.value = { ostemplate: '', hostname: '', password: '', confirmPassword: '', storage: '', cores: 1, memory: 512, swap: 512, disk: 8, net0Bridge: 'vmbr0', net0Ip: '', net0Mac: '', unprivileged: true, start: true, ipv6_enabled: 1, ip6_mode: 'dhcp', ip6_addr: '' };
+            $.lxcForm.value = { ostemplate: '', hostname: '', password: '', confirmPassword: '', storage: '', cores: 1, memory: 512, swap: 512, disk: 8, features: '', net0Bridge: 'vmbr0', net0Ip: '', net0Mac: '', net0Ip6: '', unprivileged: true, start: true };
             alert('LXC 容器创建成功');
             await $.loadLxcContainers();
         } catch (e) {

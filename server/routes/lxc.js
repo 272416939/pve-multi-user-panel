@@ -687,7 +687,7 @@ router.get('/lxc/storages', authMiddleware, adminMiddleware, async (req, res) =>
 
 router.post('/lxc/create', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { ostemplate, hostname, password, storage, cores, memory, swap, disk, net0, unprivileged, start, description } = req.body;
+        const { ostemplate, hostname, password, storage, cores, memory, swap, disk, net0, unprivileged, start, description, features } = req.body;
  
         if (!ostemplate) {
             return res.status(400).json({ error: '请选择模板' });
@@ -707,7 +707,8 @@ router.post('/lxc/create', authMiddleware, adminMiddleware, async (req, res) => 
             rootfs: rootfs,
             net0: net0 || 'name=eth0,bridge=vmbr0,ip=dhcp,ip6=dhcp',
             unprivileged: unprivileged ? 1 : 0,
-            start: start ? 1 : 0
+            start: start ? 1 : 0,
+            features: features || ''
         };
         if (description) params.description = description;
  

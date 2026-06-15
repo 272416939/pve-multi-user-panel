@@ -287,7 +287,10 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
         // 自动开机
         try {
-            await pveApi.startLxc(newVmid);
+            var autoLxcStatus = await pveApi.getLxcStatus(newVmid);
+            if (autoLxcStatus && autoLxcStatus.status === 'stopped') {
+                await pveApi.startLxc(newVmid);
+            }
         } catch (startErr) { console.error('[package] LXC 自动开机失败:', startErr.message); }
 
         // 生成随机 root 密码并设置
@@ -611,7 +614,10 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
 
         // 自动开机
         try {
-            await pveApi.startLxc(newVmid);
+            var adminAutoLxc = await pveApi.getLxcStatus(newVmid);
+            if (adminAutoLxc && adminAutoLxc.status === 'stopped') {
+                await pveApi.startLxc(newVmid);
+            }
         } catch (startErr) { console.error('[package] LXC 自动开机失败:', startErr.message); }
 
         // 生成随机 root 密码并设置
