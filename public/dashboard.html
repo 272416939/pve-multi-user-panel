@@ -2075,13 +2075,6 @@
             </div>
             <div class="mb-3"><label class="form-label">数量</label>
                 <input type="number" class="form-control" v-model="orderForm.quantity" min="1" max="10">
-            </div>
-            <div class="mb-3" v-if="macGroups && macGroups.length > 0"><label class="form-label">MAC分组 (可选)</label>
-                <select class="form-select" v-model="orderForm.mac_group_id">
-                    <option value="">不加入分组</option>
-                    <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
-                </select>
-            </div>
             <div class="alert alert-info">应付款：<strong>{{ orderTotal }} 元</strong></div>
         </div>
         <div class="modal-footer">

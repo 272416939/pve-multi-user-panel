@@ -39,7 +39,6 @@
     $.orderPackage = ref({});
     $.orderType = ref('vm');
     $.orderLoading = ref(false);
-    $.macGroups = ref([]);
     
     $.orderTotal = computed(function() {
         var p = $.orderPackage.value;
@@ -589,14 +588,10 @@
         } catch(e) { console.error('加载套餐失败', e); }
     };
     
-    $.loadMacGroups = async function() {
-        try { $.macGroups.value = await api('/mac-groups'); } catch(e) {}
-    };
-    
     $.openOrderModal = function(pkg, type) {
         $.orderPackage.value = pkg;
         $.orderType.value = type;
-        $.orderForm.value = { period: 'month', quantity: 1, mac_group_id: '' };
+        $.orderForm.value = { period: 'month', quantity: 1 };
         // 用 nextTick 确保 Vue 完成 DOM 更新后再显示 Modal
         Vue.nextTick(function() { $.bsModalShow('orderModal'); });
     };
@@ -607,8 +602,7 @@
             var endpoint = $.orderType.value === 'vm' ? '/vm-packages/' + $.orderPackage.value.id + '/order' : '/lxc-packages/' + $.orderPackage.value.id + '/order';
             var body = {
                 period: $.orderForm.value.period,
-                period_count: parseInt($.orderForm.value.quantity) || 1,
-                mac_group_id: $.orderForm.value.mac_group_id || ''
+                period_count: parseInt($.orderForm.value.quantity) || 1
             };
             await api(endpoint, { method: 'POST', body: JSON.stringify(body) });
             $.bsModalHide('orderModal');
@@ -652,7 +646,6 @@
         });
         if (section === 'order') {
             $.loadPackages();
-            $.loadMacGroups();
         }
     };
 
