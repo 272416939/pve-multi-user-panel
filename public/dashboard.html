@@ -1007,7 +1007,7 @@
                                                 {label:'备份', action:function(){ openLxcBackupPanel(ct) }},
                                                 {label:'网络', action:function(){ openDeviceForward(ct, 'lxc') }},
                                                 {label:'终端', action:function(){ openLxcTerminal(ct.ct_id) }},
-                                                {label:'续费', action:function(){ $.openRenewModal(ct); }},
+                                                {label:'续费', action:function(){ renewResource = ct; renewShow = true; }},
                                                 {label:'编辑', action:function(){ editLxc(ct) }},
                                                 {label:'重置密码', action:function(){ openLxcPasswordReset(ct) }, cls:'text-warning'}
                                             ])">更多</button>
