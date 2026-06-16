@@ -255,14 +255,14 @@ const formatDateTimeLocal = (dateStr) => {
     // MySQL 本地时间格式 YYYY-MM-DD HH:MM:SS — 按组件解析为本地时间
     if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(safe)) {
         var parts = safe.split(/[- :]/);
-        var d = new Date(+parts[0], +parts[1] - 1, +parts[2], +parts[3], +parts[4], +parts[5]);
-        if (isNaN(d.getTime())) return '';
-        var y = d.getFullYear();
-        var m = String(d.getMonth() + 1).padStart(2, '0');
-        var day = String(d.getDate()).padStart(2, '0');
-        var h = String(d.getHours()).padStart(2, '0');
-        var min = String(d.getMinutes()).padStart(2, '0');
-        return y + '-' + m + '-' + day + 'T' + h + ':' + min;
+        var dt = new Date(+parts[0], +parts[1] - 1, +parts[2], +parts[3], +parts[4], +parts[5]);
+        if (isNaN(dt.getTime())) return '';
+        var y2 = dt.getFullYear();
+        var m2 = String(dt.getMonth() + 1).padStart(2, '0');
+        var d2 = String(dt.getDate()).padStart(2, '0');
+        var h2 = String(dt.getHours()).padStart(2, '0');
+        var mi2 = String(dt.getMinutes()).padStart(2, '0');
+        return y2 + '-' + m2 + '-' + d2 + 'T' + h2 + ':' + mi2;
     }
     if (!/[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr) && !dateStr.includes('T')) {
         safe = dateStr + 'Z';
