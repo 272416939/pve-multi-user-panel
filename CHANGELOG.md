@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.8.1] - 2026-06-17
+
+### Changed
+- chore(release): 跳过 v2.8.0，直接发布 v2.8.1
+
+---
+
+## [2.8.0] - 2026-06-17
+
+### Changed
+- refactor(frontend): 提取4个HTML页面内联CSS/JS到独立文件，HTML仅通过link/script src引用
+- docs: 创建AGENT.md前端开发规范文档，记录CSS/JS架构规则和禁止内联原则
+
+### Added
+- feat: 新增 public/css/{admin,dashboard,login,user-center}.css 页面专用样式文件
+- feat: 新增 public/js/{theme-init,app-version}.js 共享脚本文件
+- feat: 新增 public/js/{admin/dashboard/login/user-center}-page.js 页面专用JS文件
+
+---
+
 ## [2.7.1] - 2026-06-16
 
 ### Added
