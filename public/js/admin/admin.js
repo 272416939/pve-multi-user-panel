@@ -538,7 +538,7 @@
             if ($.orderFilter.start_time) params.set('start_time', $.orderFilter.start_time);
             if ($.orderFilter.end_time) params.set('end_time', $.orderFilter.end_time);
             var token = localStorage.getItem('token');
-            var resp = await fetch('/admin/orders/export?' + params.toString(), {
+            var resp = await fetch('/api/admin/orders/export?' + params.toString(), {
                 headers: { 'Authorization': 'Bearer ' + token }
             });
             if (!resp.ok) { alert('导出失败'); return; }
