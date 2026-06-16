@@ -1741,11 +1741,31 @@ module.exports = {
             return queryOne('SELECT * FROM orders WHERE id = ?', [result.insertId]);
         },
         getByUser: (userId) => queryAll('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', [userId]),
-        getAll: async (page, limit) => {
-            page = page || 1; limit = limit || 20;
-            const offset = (page - 1) * limit;
-            const rows = await queryAll('SELECT * FROM orders ORDER BY id DESC LIMIT ? OFFSET ?', [limit, offset]);
-            const totalRow = await queryOne('SELECT COUNT(*) as total FROM orders');
+        getAll: async (params) => {
+            var page = params.page || 1;
+            var limit = params.limit || 20;
+            var offset = (page - 1) * limit;
+            var where = [];
+            var args = [];
+            if (params.order_no) { where.push('o.order_no = ?'); args.push(params.order_no); }
+            if (params.type) { where.push('o.type = ?'); args.push(params.type); }
+            if (params.status) { where.push('o.status = ?'); args.push(params.status); }
+            if (params.start_time) { where.push('o.created_at >= ?'); args.push(params.start_time); }
+            if (params.end_time) { where.push('o.created_at <= ?'); args.push(params.end_time); }
+            var whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+            var countArgs = args.slice();
+            var totalRow = await queryOne('SELECT COUNT(*) as total FROM orders o ' + whereClause, countArgs);
+            args.push(limit, offset);
+            var rows = await queryAll(`
+                SELECT o.*, u.username,
+                    COALESCE(vp.name, lxp.name, '') as package_name
+                FROM orders o
+                LEFT JOIN users u ON o.user_id = u.id
+                LEFT JOIN vm_packages vp ON o.type = 'vm' AND o.package_id = vp.id
+                LEFT JOIN lxc_packages lxp ON o.type = 'lxc' AND o.package_id = lxp.id
+                ${whereClause}
+                ORDER BY o.id DESC LIMIT ? OFFSET ?
+            `, args);
             return { rows, total: totalRow.total, page, limit };
         },
         getByOrderNo: (orderNo) => queryOne('SELECT * FROM orders WHERE order_no = ?', [orderNo]),

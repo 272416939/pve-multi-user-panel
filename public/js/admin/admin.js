@@ -509,14 +509,37 @@
     $.orders = Vue.ref([]);
     $.orderPage = Vue.ref(1);
     $.orderTotal = Vue.ref(0);
+    $.orderFilter = Vue.reactive({ order_no: '', type: '', status: '', start_time: '', end_time: '' });
 
     $.loadOrders = async function(page) {
         page = page || 1;
         $.orderPage.value = page;
         try {
-            var data = await api('/admin/orders?page=' + page + '&limit=20');
+            var params = new URLSearchParams();
+            params.set('page', page);
+            params.set('limit', '20');
+            if ($.orderFilter.order_no) params.set('order_no', $.orderFilter.order_no);
+            if ($.orderFilter.type) params.set('type', $.orderFilter.type);
+            if ($.orderFilter.status) params.set('status', $.orderFilter.status);
+            if ($.orderFilter.start_time) params.set('start_time', $.orderFilter.start_time);
+            if ($.orderFilter.end_time) params.set('end_time', $.orderFilter.end_time);
+            var data = await api('/admin/orders?' + params.toString());
             $.orders.value = data.rows || [];
             $.orderTotal.value = data.total || 0;
         } catch(e) { console.error('加载订单失败', e); }
     };
+
+    $.exportOrders = async function() {
+        try {
+            var params = new URLSearchParams();
+            if ($.orderFilter.order_no) params.set('order_no', $.orderFilter.order_no);
+            if ($.orderFilter.type) params.set('type', $.orderFilter.type);
+            if ($.orderFilter.status) params.set('status', $.orderFilter.status);
+            if ($.orderFilter.start_time) params.set('start_time', $.orderFilter.start_time);
+            if ($.orderFilter.end_time) params.set('end_time', $.orderFilter.end_time);
+            window.open('/admin/orders/export?' + params.toString(), '_blank');
+        } catch(e) { console.error('导出订单失败', e); }
+    };
+
+    $.searchOrders = function() { $.loadOrders(1); };
 })();

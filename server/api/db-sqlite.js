@@ -1780,11 +1780,31 @@ module.exports = {
             return db.prepare('SELECT * FROM orders WHERE id = ?').get(info.lastInsertRowid);
         },
         getByUser: (userId) => db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC').all(userId),
-        getAll: (page, limit) => {
-            page = page || 1; limit = limit || 20;
-            const offset = (page - 1) * limit;
-            const rows = db.prepare('SELECT * FROM orders ORDER BY id DESC LIMIT ? OFFSET ?').all(limit, offset);
-            const total = db.prepare('SELECT COUNT(*) as total FROM orders').get().total;
+        getAll: (params) => {
+            var page = params.page || 1;
+            var limit = params.limit || 20;
+            var offset = (page - 1) * limit;
+            var where = [];
+            var args = [];
+            if (params.order_no) { where.push('o.order_no = ?'); args.push(params.order_no); }
+            if (params.type) { where.push('o.type = ?'); args.push(params.type); }
+            if (params.status) { where.push('o.status = ?'); args.push(params.status); }
+            if (params.start_time) { where.push('o.created_at >= ?'); args.push(params.start_time); }
+            if (params.end_time) { where.push('o.created_at <= ?'); args.push(params.end_time); }
+            var whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
+            var countArgs = args.slice();
+            var total = db.prepare('SELECT COUNT(*) as total FROM orders o ' + whereClause).get(...countArgs).total;
+            args.push(limit, offset);
+            var rows = db.prepare(`
+                SELECT o.*, u.username,
+                    COALESCE(vp.name, lxp.name, '') as package_name
+                FROM orders o
+                LEFT JOIN users u ON o.user_id = u.id
+                LEFT JOIN vm_packages vp ON o.type = 'vm' AND o.package_id = vp.id
+                LEFT JOIN lxc_packages lxp ON o.type = 'lxc' AND o.package_id = lxp.id
+                ${whereClause}
+                ORDER BY o.id DESC LIMIT ? OFFSET ?
+            `).all(...args);
             return { rows, total, page, limit };
         },
         getByOrderNo: (orderNo) => db.prepare('SELECT * FROM orders WHERE order_no = ?').get(orderNo),

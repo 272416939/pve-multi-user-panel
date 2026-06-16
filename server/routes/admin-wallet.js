@@ -111,25 +111,52 @@ router.get('/admin/transactions/export', authMiddleware, adminMiddleware, async 
     }
 });
 
-// ========== 管理员订单查询 ==========
+// ========== 管理员订单查询（含筛选） ==========
 router.get('/admin/orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        var page = parseInt(req.query.page) || 1;
-        var limit = parseInt(req.query.limit) || 20;
-        var result = await db.orders.getAll(page, limit);
-        var rows = await Promise.all(result.rows.map(async function(order) {
-            var user = await db.users.getById(order.user_id);
-            var packageName = '';
-            if (order.type === 'vm') {
-                var pkg = await db.vmPackages.getById(order.package_id);
-                packageName = pkg ? pkg.name : '';
-            } else if (order.type === 'lxc') {
-                var pkg = await db.lxcPackages.getById(order.package_id);
-                packageName = pkg ? pkg.name : '';
-            }
-            return Object.assign({}, order, { username: user ? user.username : '', package_name: packageName });
-        }));
-        res.json({ rows: rows, total: result.total, page: result.page, limit: result.limit });
+        var params = {};
+        params.page = parseInt(req.query.page) || 1;
+        params.limit = parseInt(req.query.limit) || 20;
+        if (req.query.order_no) params.order_no = req.query.order_no;
+        if (req.query.type) params.type = req.query.type;
+        if (req.query.status) params.status = req.query.status;
+        if (req.query.start_time) params.start_time = req.query.start_time;
+        if (req.query.end_time) params.end_time = req.query.end_time;
+        var result = await db.orders.getAll(params);
+        res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ========== 管理员订单导出 CSV ==========
+router.get('/admin/orders/export', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var params = {};
+        if (req.query.order_no) params.order_no = req.query.order_no;
+        if (req.query.type) params.type = req.query.type;
+        if (req.query.status) params.status = req.query.status;
+        if (req.query.start_time) params.start_time = req.query.start_time;
+        if (req.query.end_time) params.end_time = req.query.end_time;
+        // 导出全部，不分页
+        params.limit = 999999;
+        params.page = 1;
+        var result = await db.orders.getAll(params);
+        // 生成 CSV 行列：订单号,用户名,套餐名,类型,周期,数量,金额,状态,创建时间
+        var csvRows = ['订单号,用户名,套餐名,类型,周期,数量,金额,状态,创建时间'];
+        result.rows.forEach(function(o) {
+            var typeName = o.type === 'vm' ? 'VM' : 'LXC';
+            var periodName = o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付';
+            var statusName = o.status === 'completed' ? '已开通' : o.status;
+            csvRows.push([
+                o.order_no, o.username || '', o.package_name || '', typeName,
+                periodName, o.period_count, o.amount, statusName, o.created_at
+            ].join(','));
+        });
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', 'attachment; filename="orders.csv"');
+        // 添加 BOM 确保 Excel 正确识别 UTF-8
+        res.send('\ufeff' + csvRows.join('\n'));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
