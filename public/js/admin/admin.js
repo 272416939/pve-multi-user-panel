@@ -537,7 +537,13 @@
             if ($.orderFilter.status) params.set('status', $.orderFilter.status);
             if ($.orderFilter.start_time) params.set('start_time', $.orderFilter.start_time);
             if ($.orderFilter.end_time) params.set('end_time', $.orderFilter.end_time);
-            window.open('/admin/orders/export?' + params.toString(), '_blank');
+            var a = document.createElement('a');
+            a.href = '/admin/orders/export?' + params.toString();
+            a.download = 'orders.csv';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         } catch(e) { console.error('导出订单失败', e); }
     };
 
