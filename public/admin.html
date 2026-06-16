@@ -2099,7 +2099,8 @@
 
                 <!-- 财务管理 - 交易流水 -->
                 <div v-if="activeSection === 'finance'">
-                    <div class="module-header">
+                    <div v-if="activeTab === 'transactions'">
+                        <div class="module-header">
                         <h4 class="module-title">交易流水</h4>
                     </div>
                     <div class="table-container" style="padding:12px;">
@@ -2180,6 +2181,7 @@
                                 <button class="btn btn-sm btn-outline-secondary" :disabled="financePage * 10 >= transactionTotal" @click="loadTransactions(financePage + 1)">下一页</button>
                             </div>
                         </div>
+                    </div>
                     </div>
 
                     <!-- 订单管理 -->

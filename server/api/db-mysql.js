@@ -17,9 +17,11 @@ function generateRandomPassword(length = 16) {
     return result;
 }
 
-// MySQL 5.7 兼容的日期格式: YYYY-MM-DD HH:MM:SS（非 ISO 8601）
+// MySQL 5.7 兼容的日期格式: YYYY-MM-DD HH:MM:SS（本地时间）
 function mysqlNow() {
-    return new Date().toISOString().slice(0, 19).replace('T', ' ');
+    var d = new Date();
+    var local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 19).replace('T', ' ');
 }
 function mysqlToday() {
     return mysqlNow().slice(0, 10);

@@ -224,6 +224,11 @@ const formatBytes = (bytes, binary) => {
 const formatDate = (date) => {
     if (!date) return '-';
     var d = typeof date === 'string' ? date : date;
+    // MySQL 本地时间格式 YYYY-MM-DD HH:MM:SS — 按组件解析为本地时间
+    if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(d)) {
+        var parts = d.split(/[- :]/);
+        return new Date(+parts[0], +parts[1] - 1, +parts[2], +parts[3], +parts[4], +parts[5]).toLocaleString('zh-CN');
+    }
     if (typeof d === 'string' && !/[Zz]|[+-]\d{2}:\d{2}$/.test(d) && !d.includes('T')) {
         d = d + 'Z';
     }
@@ -247,6 +252,18 @@ const trimContent = (text) => {
 const formatDateTimeLocal = (dateStr) => {
     if (!dateStr) return '';
     var safe = dateStr;
+    // MySQL 本地时间格式 YYYY-MM-DD HH:MM:SS — 按组件解析为本地时间
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(safe)) {
+        var parts = safe.split(/[- :]/);
+        var d = new Date(+parts[0], +parts[1] - 1, +parts[2], +parts[3], +parts[4], +parts[5]);
+        if (isNaN(d.getTime())) return '';
+        var y = d.getFullYear();
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        var h = String(d.getHours()).padStart(2, '0');
+        var min = String(d.getMinutes()).padStart(2, '0');
+        return y + '-' + m + '-' + day + 'T' + h + ':' + min;
+    }
     if (!/[Zz]|[+-]\d{2}:\d{2}$/.test(dateStr) && !dateStr.includes('T')) {
         safe = dateStr + 'Z';
     }
