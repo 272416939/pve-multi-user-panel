@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.7.1] - 2026-06-16
+
+### Added
+- feat(orders): 订单管理增加筛选栏/导出CSV/分页改进
+
+### Fixed
+- fix(orders): 导出去掉async防止浏览器弹窗拦截
+- fix(orders): 导出改用fetch+Blob携带Authorization header
+- fix(orders): 导出URL添加/api前缀匹配后端路由挂载路径
+- fix(timezone): MySQL存储UTC改为本地时间，消除8小时偏差
+- fix(timezone): 修复formatDateTimeLocal变量名冲突
+
+---
+
 ## [2.7.0] - 2026-06-15
 
 ### Added
