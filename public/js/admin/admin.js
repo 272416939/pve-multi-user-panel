@@ -529,7 +529,7 @@
         } catch(e) { console.error('加载订单失败', e); }
     };
 
-    $.exportOrders = function() {
+    $.exportOrders = async function() {
         try {
             var params = new URLSearchParams();
             if ($.orderFilter.order_no) params.set('order_no', $.orderFilter.order_no);
@@ -537,13 +537,20 @@
             if ($.orderFilter.status) params.set('status', $.orderFilter.status);
             if ($.orderFilter.start_time) params.set('start_time', $.orderFilter.start_time);
             if ($.orderFilter.end_time) params.set('end_time', $.orderFilter.end_time);
+            var token = localStorage.getItem('token');
+            var resp = await fetch('/admin/orders/export?' + params.toString(), {
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            if (!resp.ok) { alert('导出失败'); return; }
+            var blob = await resp.blob();
+            var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
-            a.href = '/admin/orders/export?' + params.toString();
+            a.href = url;
             a.download = 'orders.csv';
-            a.style.display = 'none';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         } catch(e) { console.error('导出订单失败', e); }
     };
 
