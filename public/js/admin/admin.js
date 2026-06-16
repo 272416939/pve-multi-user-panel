@@ -529,7 +529,7 @@
         } catch(e) { console.error('加载订单失败', e); }
     };
 
-    $.exportOrders = async function() {
+    $.exportOrders = function() {
         try {
             var params = new URLSearchParams();
             if ($.orderFilter.order_no) params.set('order_no', $.orderFilter.order_no);
