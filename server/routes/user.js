@@ -184,15 +184,15 @@ router.get('/user/nav', authMiddleware, (req, res) => {
     const items = [];
 
     if (isAdmin) {
-        items.push({ id: 'vms', label: '虚拟机管理', href: 'admin.html?section=vms' });
-        items.push({ id: 'lxc', label: 'LXC容器管理', href: 'admin.html?section=lxc' });
-        items.push({ id: 'admin', label: '管理后台', href: 'admin.html?section=admin' });
+        items.push({ id: 'vms', label: '虚拟机管理', href: 'admin?section=vms' });
+        items.push({ id: 'lxc', label: 'LXC容器管理', href: 'admin?section=lxc' });
+        items.push({ id: 'admin', label: '管理后台', href: 'admin?section=admin' });
     } else {
-        items.push({ id: 'vms', label: '我的虚拟机', href: 'dashboard.html' });
-        items.push({ id: 'lxc', label: '我的LXC容器', href: 'dashboard.html?section=lxc' });
+        items.push({ id: 'vms', label: '我的虚拟机', href: 'dashboard' });
+        items.push({ id: 'lxc', label: '我的LXC容器', href: 'dashboard?section=lxc' });
     }
 
-    items.push({ id: 'user-center', label: '用户中心', href: 'user-center.html' });
+    items.push({ id: 'user-center', label: '用户中心', href: 'user-center' });
 
     res.json({ items });
 });
@@ -442,24 +442,24 @@ router.get('/user/verify-email/:token', async (req, res) => {
         
         if (!verifyRecord || verifyRecord.type !== 'email_verify' || new Date(verifyRecord.expiresAt) <= new Date()) {
             const siteUrl = getSiteUrl(req) || '';
-            return res.redirect(siteUrl + '/user-center.html?email_verified=0&reason=expired');
+            return res.redirect(siteUrl + '/user-center?email_verified=0&reason=expired');
         }
-        
+
         const user = await db.users.getById(verifyRecord.user_id);
         if (!user) {
             const siteUrl = getSiteUrl(req) || '';
-            return res.redirect(siteUrl + '/user-center.html?email_verified=0&reason=user_not_found');
+            return res.redirect(siteUrl + '/user-center?email_verified=0&reason=user_not_found');
         }
-        
+
         await db.users.update(verifyRecord.user_id, { emailVerified: true });
         await db.passwordResetTokens.delete(verifyRecord.id);
-        
+
         const siteUrl = getSiteUrl(req) || '';
-        res.redirect(siteUrl + '/user-center.html?email_verified=1');
+        res.redirect(siteUrl + '/user-center?email_verified=1');
     } catch (error) {
         console.error('验证邮箱失败', error);
         const siteUrl = getSiteUrl(req) || '';
-        res.redirect(siteUrl + '/user-center.html?email_verified=0&reason=error');
+        res.redirect(siteUrl + '/user-center?email_verified=0&reason=error');
     }
 });
 

@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.7.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.9.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -223,71 +223,107 @@ npm run dev
 ```
 .
 ├── server/
-│   ├── server.js              # 入口文件
+│   ├── server.js              # 入口文件（Express + EJS + WS 升级）
 │   ├── config/
 │   │   └── multer.js          # 文件上传配置
 │   ├── middleware/
-│   │   ├── auth.js            # JWT 认证 + 权限中间件
+│   │   ├── auth.js            # JWT 认证 + 权限中间件（算法固定 HS256）
 │   │   └── rate-limiter.js    # 统一速率限制（Redis/内存双模式）
 │   ├── utils/                 # 工具模块
 │   │   ├── debug.js
 │   │   ├── pve-rate.js
-│   │   ├── cache.js            # TTL Map 进程内缓存
-│   │   ├── email.js
+│   │   ├── cache.js           # TTL Map 进程内缓存
+│   │   ├── email.js           # 邮件发送（createEmailTemplate 统一模板）
 │   │   ├── token.js
 │   │   ├── site-url.js
-│   │   └── cdk-generator.js
-│   ├── routes/                # 路由模块（13 个）
-│   │   ├── auth.js
-│   │   ├── user.js             # 用户中心 + 2FA + 设备管理 + Push ticket
-│   │   ├── admin-user.js
-│   │   ├── vm.js
-│   │   ├── lxc.js
-│   │   ├── snapshot.js
-│   │   ├── backup.js
-│   │   ├── cdk.js
-│   │   ├── wallet.js           # 充值/续费/交易流水 + 支付回调
-│   │   ├── admin-wallet.js     # 管理后台交易流水/CSV 导出
-│   │   ├── message.js
-│   │   ├── admin-config.js
-│   │   └── network.js
+│   │   ├── cdk-generator.js
+│   │   └── order-utils.js     # 订购工具（扣余额/计算金额/affinity）
+│   ├── routes/                # 路由模块（16 个）
+│   │   ├── auth.js            # 认证 + 2FA + 忘记密码
+│   │   ├── user.js            # 用户中心 + 2FA + 设备 + Push ticket
+│   │   ├── admin-user.js      # 用户管理
+│   │   ├── vm.js              # VM 管理
+│   │   ├── lxc.js             # LXC 管理
+│   │   ├── snapshot.js        # 快照
+│   │   ├── backup.js          # 备份恢复
+│   │   ├── cdk.js             # CDK 兑换码
+│   │   ├── wallet.js          # 充值/续费/交易流水 + 支付回调
+│   │   ├── admin-wallet.js    # 管理后台交易流水/CSV 导出
+│   │   ├── message.js         # 站内消息
+│   │   ├── admin-config.js    # 系统配置（SMTP/到期/快照/支付等）
+│   │   ├── network.js         # 端口转发 + DHCP + ikuai 同步
+│   │   ├── package.js         # VM/LXC 套餐订购
+│   │   ├── template.js        # VM/LXC 模板管理
+│   │   └── ikuai.js           # ikuai MAC 分组
 │   ├── websocket/
-│   │   ├── vnc-proxy.js       # VNC WebSocket 代理
-│   │   ├── terminal-proxy.js  # xterm.js SSH PTY 代理
-│   │   └── push-proxy.js      # 统一状态推送（未读角标/实时监控）
+│   │   ├── vnc-proxy.js       # VNC WebSocket 代理（ticket + Redis 校验）
+│   │   ├── terminal-proxy.js  # xterm.js SSH PTY 代理（JWT HS256 固定）
+│   │   └── push-proxy.js      # 统一状态推送（未读角标/实时监控/备份进度）
 │   ├── services/
-│   │   ├── expiry-check.js
-│   │   ├── backup-polling.js
-│   │   ├── ikuai-sync.js
-│   │   └── dhcp.js
+│   │   ├── expiry-check.js    # 到期检查与提醒
+│   │   ├── backup-polling.js  # 备份/恢复进度轮询
+│   │   ├── ikuai-sync.js      # ikuai 定时同步
+│   │   └── dhcp.js            # DHCP 静态绑定工具
 │   ├── schedule/
 │   │   └── tasks.js           # 定时任务
 │   ├── api/
-│       ├── db.js              # 数据库工厂（SQLite/MySQL 自动选择）
-│       ├── db-sqlite.js       # SQLite 驱动
-│       ├── db-mysql.js        # MySQL 驱动（mysql2/promise 连接池）
-│       ├── redis.js           # Redis 缓存客户端（可选）
-│       ├── pve-api.js         # PVE REST API 封装
-│       ├── ikuai-api.js       # ikuai API 封装
-│       └── ssh-exec.js        # SSH 执行工具
+│   │   ├── db.js              # 数据库工厂（SQLite/MySQL 自动选择）
+│   │   ├── db-sqlite.js       # SQLite 驱动（列名白名单防 SQL 注入）
+│   │   ├── db-mysql.js        # MySQL 驱动（mysql2/promise 连接池 + 列名白名单）
+│   │   ├── redis.js           # Redis 缓存客户端（可选）
+│   │   ├── pve-api.js         # PVE REST API 封装
+│   │   ├── ikuai-api.js       # ikuai API 封装
+│   │   └── ssh-exec.js        # SSH 执行工具（vmid 白名单 + stdin 传密码）
 │   └── sdk/
 │       └── pay/               # 支付网关 SDK（V1 MD5 + V2 RSA）
+├── views/                     # EJS 模板（服务端渲染）
+│   ├── partials/
+│   │   ├── header.ejs         # 统一顶栏（品牌/刷新/主题/消息/用户菜单）
+│   │   ├── sidebar-admin.ejs  # admin 侧边栏
+│   │   ├── sidebar-dashboard.ejs  # dashboard 侧边栏
+│   │   └── sidebar-user-center.ejs # user-center 侧边栏
+│   └── pages/
+│       ├── admin.ejs          # 管理后台
+│       ├── dashboard.ejs      # 用户仪表盘
+│       ├── user-center.ejs    # 用户中心
+│       ├── login.ejs          # 登录页（独立结构，无侧边栏）
+│       ├── vnc.ejs            # VNC 控制台（全屏独立样式）
+│       └── terminal.ejs       # xterm.js 终端（全屏独立样式）
 ├── data/
 │   └── pve-panel.db           # SQLite 数据库（自动生成）
 ├── images/                    # 头像存储（自动创建）
 ├── public/
-│   ├── login.html             # 登录页
-│   ├── dashboard.html         # 用户仪表盘
-│   ├── admin.html             # 管理后台
-│   ├── user-center.html       # 用户中心
-│   ├── vnc.html               # VNC 控制台
-│   ├── terminal.html          # xterm.js 终端
-│   ├── css/                   # 样式文件（5 个）
+│   ├── css/                   # 页面业务 CSS
+│   │   ├── admin.css
+│   │   ├── dashboard.css
+│   │   ├── login.css
+│   │   └── user-center.css
+│   ├── shared/css/            # 共享 CSS 层（按层叠顺序加载）
+│   │   ├── tokens.css         # CSS 变量定义（:root + [data-theme]）
+│   │   ├── layout.css         # 通用布局（sidebar/header/main-wrap/响应式）
+│   │   ├── components.css     # 通用组件（btn-glass/table/modal/card/badge）
+│   │   ├── pv-buttons.css     # Web Component 按钮样式补充
+│   │   └── theme.css          # 主题适配（[data-theme="dark/light"] 覆盖）
+│   ├── components/            # Web Components（7 个 pv-* 自定义元素）
+│   │   ├── pv-button.js       # 按钮（variant/size/disabled）
+│   │   ├── pv-badge.js        # 徽标
+│   │   ├── pv-card.js         # 卡片
+│   │   ├── pv-modal.js        # 模态框
+│   │   ├── pv-table.js        # 表格
+│   │   ├── pv-dropdown.js     # 下拉菜单
+│   │   └── pv-toast.js        # 通知
 │   ├── js/
 │   │   ├── shared.js          # 公共函数 + PushClient WebSocket
-│   │   ├── admin/             # 5 个管理后台模块
-│   │   └── dashboard/         # 5 个用户面板模块
-│   └── novnc/                 # noVNC 库
+│   │   ├── theme-init.js      # 主题初始化（所有页面共用）
+│   │   ├── app-version.js     # 版本号获取
+│   │   ├── login-page.js      # 登录页 Vue 应用
+│   │   ├── user-center-page.js# 用户中心 Vue 应用
+│   │   ├── admin/             # 管理后台模块（core/admin/vm/lxc/network/update/package/template + admin-template-* 拆分模块）
+│   │   └── dashboard/         # 用户面板模块（core/vm/lxc/forward/message + dashboard-template-*）
+│   ├── novnc/                 # noVNC 库
+│   ├── vnc.html               # VNC 独立全屏页面
+│   └── terminal.html          # xterm.js 独立全屏页面
+├── test/                      # Mocha + Chai 测试
 ├── .env.example               # 配置模板
 └── package.json
 ```
@@ -453,6 +489,52 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v2.9.0</b> (2026-06-18) — 安全审计修复 + 充值支付 UX 优化</summary>
+
+基于 `pve-security-guard` Skill 对 v2.8.1 全量代码进行安全审计，对比 v2.1.25 基线（65 个漏洞已 100% 修复）识别新增漏洞并修复。修复后进行全局复查，发现并修复 3 项安全审计遗漏。同时优化充值支付流程 UX，新增等待弹窗、轮询检测和结果提示。
+
+**严重 (CRITICAL)**
+- 🔧 修复 `terminal-proxy.js` JWT 算法未固定漏洞：`jwt.verify` 添加 `{ algorithms: ['HS256'] }` 参数，防止 token 伪造攻击未授权连接 LXC 终端
+
+**高危 (HIGH)**
+- 🔧 修复 `cdk.js` 引用未导入的 `pveApi` 和 `dbg` 导致 CDK 续费流程 ReferenceError 完全不可用
+- 🔧 修复 8 个路由文件共 26 处错误信息泄露：统一使用 `safeError(e)` 函数，生产环境返回通用错误信息，仅 `DEBUG=true` 时返回详细错误
+  - 涉及文件：`admin-user.js`、`admin-wallet.js`、`wallet.js`、`template.js`、`package.js`、`admin-config.js`、`network.js`、`vm.js`、`cdk.js`
+
+**中危 (MEDIUM)**
+- 🔧 修复 `message.js` `deleteAll` 异步操作缺少 `await` 导致响应先于删除完成的竞态问题
+- 🔧 修复 `wallet.js` 3 处支付回跳 URL 使用已废弃的 `/user-center.html`（EJS 迁移后应为 `/user-center`），导致支付完成回跳 404
+
+**低危 (LOW)**
+- 🔧 修复 `vm.js` 单处错误信息泄露
+
+**复查阶段额外修复（安全审计遗漏）**
+- 🔧 修复 `cdk.js` line 42 字符串拼接错误泄露（`'生成 CDK 失败: ' + error.message` → `safeError(error)`）
+- 🔧 修复 `user.js` 10 处旧路由引用：`/user/nav` API 导航菜单 href（admin.html/dashboard.html/user-center.html）+ 邮箱验证回调 redirect（/user-center.html）
+- 🔧 修复 `vm.js`/`lxc.js` 3 处 VNC/terminal 代理 URL 使用旧 `.html` 路径（/vnc.html → /vnc，/terminal.html → /terminal）
+
+**充值支付 UX 优化**
+- ✨ 新增"等待充值中"弹窗：显示订单号、金额、旋转图标、"等待支付完成..."提示、取消支付按钮
+- ✨ 新增订单状态轮询机制：每 2 秒查询 `GET /api/wallet/order-status/:order_no`，超时 10 分钟自动停止
+- ✨ 新增"充值结果"弹窗：成功显示"恭喜您充值成功：xx.xx元"，失败/取消/超时显示对应提示
+- ✨ 新增支付窗口关闭检测：用户关闭支付窗口时最后查询一次订单状态，已支付显示成功，未支付显示取消
+- ✨ 新增弹窗拦截检测：`window.open` 返回 null 时提示"支付窗口被浏览器拦截"
+- ✨ 新增重复提交防护：轮询进行中再次点击充值按钮被拦截
+- ✨ 新增页面卸载清理：`beforeUnmount` 钩子清除 `setInterval` 定时器，避免内存泄漏
+
+**充值支付安全防护**
+- 🔒 新增 IDOR 防护：订单状态查询端点校验 `transaction_records.user_id === req.user.id`，非本人返回 403
+- 🔒 新增用户级限速：订单状态查询端点限制 30 次/分钟（基于 `req.user.id`），超限返回 429
+- 🔒 新增订单号格式校验：正则 `^RECHARGE\d{14}\d{4,6}$`，非法格式返回 400
+- 🔒 信息泄露防护：未支付/不存在订单仅返回 `{ status: 'pending' }`，不泄露订单是否存在
+- 🔒 XSS 防护：弹窗中所有动态数据使用 Vue `{{ }}` 插值（自动转义），禁止 `innerHTML`
+- 🔒 金额格式校验：显示前校验正则 `^\d+\.\d{2}$`，不合法显示 `--`
+
+**已确认安全项（17 条）**：JWT 算法固定（auth/push-proxy）、VNC ticket + Redis 校验 + userId 防跨用户、SQLite/MySQL 列名白名单防 SQL 注入、SSH stdin 传密码防注入、vmid 白名单校验、VM/LXC 权限校验 + 到期检查、CDK CAS 防并发、钱包回调限速 + 签名验证、头像魔数校验、默认密码 `crypto.randomBytes` 生成、密码加盐 SHA256、refresh token DB 查询、CSP 头配置、trust proxy 启用等。
+
+</details>
 
 <details>
 <summary><b>v2.7.0</b> (2026-06-16) — 套餐管理系统 + Cloud-init 密码</summary>

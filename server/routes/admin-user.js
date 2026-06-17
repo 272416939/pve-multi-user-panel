@@ -5,6 +5,11 @@ const CryptoJS = require('crypto-js');
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 
+function safeError(e) {
+    if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
+    return '操作失败，请稍后重试';
+}
+
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
     const users = (await db.users.getAll()).map(({ password, ...rest }) => rest);
     res.json(users);
@@ -158,7 +163,7 @@ router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, 
         res.json({ success: true, balance: newBalance.toFixed(2), message: '充值成功' });
     } catch (e) {
         console.error('[admin] recharge error:', e.message);
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 

@@ -568,7 +568,7 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         // 安全修复：注册 ticket 到校验存储，WebSocket 代理连接时会校验
         await vncProxy.registerTicket(result.ticket, vmid, req.user.id);
 
-        const proxyUrl = `/vnc.html?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&type=lxc&userId=${req.user.id}`;
+        const proxyUrl = `/vnc?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&type=lxc&userId=${req.user.id}`;
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC VNC 控制台失败:', error.message);
@@ -618,7 +618,7 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
             { expiresIn: '5m' }
         );
 
-        const proxyUrl = `/terminal.html?vmid=${vmid}&token=${encodeURIComponent(terminalTicket)}`;
+        const proxyUrl = `/terminal?vmid=${vmid}&token=${encodeURIComponent(terminalTicket)}`;
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC 终端失败:', error.message);

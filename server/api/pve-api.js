@@ -113,7 +113,7 @@ class PveApi {
     if (!this.node) {
       await this.detectNode();
     }
-    const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/status/reset`);
+    const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/status/reboot`);
     return response.data;
   }
 

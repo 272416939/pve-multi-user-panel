@@ -1,0 +1,400 @@
+/* ============================================
+   PV Buttons — 纯 CSS 按钮样式系统
+   所有变体通过 class 驱动，不依赖 inline style
+   ============================================ */
+
+/* ---------- 1. 基础重置 ---------- */
+.pv-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  line-height: 1.5 !important;
+  font-family: inherit !important;
+  user-select: none !important;
+  outline: none !important;
+  vertical-align: middle !important;
+  position: relative !important;
+  /* 注意：不用 overflow:hidden，否则会裁剪 hover 时的 box-shadow 动态阴影 */
+  border-style: solid !important;
+  border-width: 1px !important;
+  cursor: pointer !important;
+  transition: all 0.25s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease, opacity 0.15s ease !important;
+}
+
+/* ---------- 2. 高光层伪元素（非 close 变体） ---------- */
+.pv-btn:not(.pv-btn-close)::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent) !important;
+  pointer-events: none !important;
+  border-radius: inherit !important;
+}
+
+/* ============================================
+   3. glass 系列变体 — 页面主操作按钮
+   ============================================ */
+
+/* .pv-btn-glass — 默认玻璃态主操作按钮 */
+.pv-btn-glass {
+  padding: 7px 20px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15)) !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: rgba(99,102,241,0.3) !important;
+  box-shadow: 0 2px 10px rgba(99,102,241,0.15) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.pv-btn-glass:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.32), rgba(139,92,246,0.25)) !important;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.28) !important;
+  border-color: rgba(99,102,241,0.45) !important;
+}
+
+/* .pv-btn-glass-active — 激活状态玻璃按钮 */
+.pv-btn-glass-active {
+  padding: 4px 14px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  border-radius: 6px !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.28), rgba(139,92,246,0.18)) !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: rgba(99,102,241,0.4) !important;
+  box-shadow: 0 2px 10px rgba(99,102,241,0.18) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.pv-btn-glass-active:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.4), rgba(139,92,246,0.28)) !important;
+  box-shadow: 0 4px 16px rgba(99,102,241,0.32) !important;
+  border-color: rgba(99,102,241,0.55) !important;
+}
+
+/* .pv-btn-glass-inactive — 非激活状态玻璃按钮 */
+.pv-btn-glass-inactive {
+  padding: 4px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+  background: var(--bg-input, #1e293b) !important;
+  color: var(--text-secondary, #94a3b8) !important;
+  border-color: var(--border-color, #334155) !important;
+  box-shadow: none !important;
+}
+.pv-btn-glass-inactive:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.08)) !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: rgba(99,102,241,0.35) !important;
+}
+
+/* ============================================
+   4. table 系列变体 — 表格行操作按钮
+   ============================================ */
+
+/* .pv-btn-table — 默认表格行按钮 */
+.pv-btn-table {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(129,140,248,0.12)) !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: rgba(129,140,248,0.25) !important;
+  box-shadow:
+    0 2px 8px rgba(99,102,241,0.12),
+    inset 0 1px 0 rgba(255,255,255,0.06)
+    !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.pv-btn-table:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.34), rgba(129,140,248,0.22)) !important;
+  border-color: rgba(129,140,248,0.42) !important;
+  box-shadow:
+    0 4px 14px rgba(99,102,241,0.22),
+    inset 0 1px 0 rgba(255,255,255,0.1)
+    !important;
+}
+
+/* .pv-btn-table-primary — 表格行主要操作按钮 */
+.pv-btn-table-primary {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.35), rgba(129,140,248,0.25)) !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: rgba(129,140,248,0.35) !important;
+  box-shadow:
+    0 2px 10px rgba(99,102,241,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.08)
+    !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.pv-btn-table-primary:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.5), rgba(129,140,248,0.38)) !important;
+  border-color: rgba(129,140,248,0.52) !important;
+  box-shadow:
+    0 4px 18px rgba(99,102,241,0.32),
+    inset 0 1px 0 rgba(255,255,255,0.12)
+    !important;
+}
+
+/* .pv-btn-table-danger — 表格行危险操作按钮 */
+.pv-btn-table-danger {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, rgba(239,68,68,0.239), rgba(220,38,38,0.22)) !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: rgba(239,68,68,0.3) !important;
+  box-shadow:
+    0 2px 10px rgba(239,68,68,0.15),
+    inset 0 1px 0 rgba(255,255,255,0.05)
+    !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.pv-btn-table-danger:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(239,68,68,0.38), rgba(220,38,38,0.34)) !important;
+  border-color: rgba(239,68,68,0.48) !important;
+  box-shadow:
+    0 4px 18px rgba(239,68,68,0.26),
+    inset 0 1px 0 rgba(255,255,255,0.09)
+    !important;
+}
+
+/* ============================================
+   5. primary / danger — 通用操作按钮
+   （复用 table-primary / table-danger 样式）
+   ============================================ */
+
+/* .pv-btn-primary — 通用主要操作按钮 */
+.pv-btn-primary {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.35), rgba(129,140,248,0.25)) !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: rgba(129,140,248,0.35) !important;
+  box-shadow:
+    0 2px 10px rgba(99,102,241,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.08)
+    !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.pv-btn-primary:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.5), rgba(129,140,248,0.38)) !important;
+  border-color: rgba(129,140,248,0.52) !important;
+  box-shadow:
+    0 4px 18px rgba(99,102,241,0.32),
+    inset 0 1px 0 rgba(255,255,255,0.12)
+    !important;
+}
+
+/* .pv-btn-danger — 通用危险操作按钮 */
+.pv-btn-danger {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, rgba(239,68,68,0.239), rgba(220,38,38,0.22)) !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: rgba(239,68,68,0.3) !important;
+  box-shadow:
+    0 2px 10px rgba(239,68,68,0.15),
+    inset 0 1px 0 rgba(255,255,255,0.05)
+    !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+.pv-btn-danger:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(239,68,68,0.38), rgba(220,38,38,0.34)) !important;
+  border-color: rgba(239,68,68,0.48) !important;
+  box-shadow:
+    0 4px 18px rgba(239,68,68,0.26),
+    inset 0 1px 0 rgba(255,255,255,0.09)
+    !important;
+}
+
+/* ============================================
+   6. 辅助按钮
+   ============================================ */
+
+/* .pv-btn-warning — 警告/注意按钮 */
+.pv-btn-warning {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: linear-gradient(135deg, rgba(250,204,21,0.98), rgba(245,158,11,0.96)) !important;
+  color: #212529 !important;
+  border-color: rgba(202,138,4,0.6) !important;
+  box-shadow: 0 2px 8px rgba(250,204,21,0.2) !important;
+}
+.pv-btn-warning:hover {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.08) !important;
+  box-shadow: 0 4px 14px rgba(250,204,21,0.32) !important;
+}
+
+/* .pv-btn-outline — 描边按钮 */
+.pv-btn-outline {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--color-primary, #818cf8) !important;
+  border-color: var(--color-primary, #818cf8) !important;
+  box-shadow: none !important;
+}
+.pv-btn-outline:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.06)) !important;
+  box-shadow: 0 2px 10px rgba(99,102,241,0.12) !important;
+}
+
+/* .pv-btn-secondary — 次要按钮 */
+.pv-btn-secondary {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: var(--bg-hover, #1e293b) !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: var(--border-color, #334155) !important;
+  box-shadow: none !important;
+}
+.pv-btn-secondary:hover {
+  transform: translateY(-1px) !important;
+  background: var(--bg-hover, #334155) !important;
+  border-color: rgba(148,163,184,0.35) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+}
+
+/* .pv-btn-link — 链接式按钮 */
+.pv-btn-link {
+  padding: 5px 10px !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.pv-btn-link:hover {
+  text-decoration: underline !important;
+  opacity: 0.85 !important;
+}
+
+/* .pv-btn-ghost — 头部图标按钮（透明背景，无遮罩） */
+.pv-btn-ghost {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: var(--glass-text-muted, #94a3b8) !important;
+  border: 1px solid var(--border-color, #334155) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.pv-btn-ghost:hover {
+  background: var(--glass-accent, rgba(99,102,241,0.1)) !important;
+  border-color: var(--glass-accent, rgba(99,102,241,0.3)) !important;
+  color: var(--color-primary, #818cf8) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+/* 触摸设备上点击后立即恢复，避免遮罩残留 */
+.pv-btn-ghost:active {
+  background: transparent !important;
+  border-color: var(--border-color, #334155) !important;
+  transform: none !important;
+}
+.pv-btn-ghost:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+/* 移动端触摸后不保留任何视觉残留 */
+@media (hover: none) and (pointer: coarse) {
+  .pv-btn-ghost:active, .pv-btn-ghost:focus {
+    background: transparent !important;
+    border-color: var(--border-color, #334155) !important;
+  }
+}
+/* ghost 变体无 ::before 高光层 */
+.pv-btn-ghost::before { display: none !important; }
+
+/* ============================================
+   7. close 变体 — 模态框关闭按钮
+   ============================================ */
+
+.pv-btn-close {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  max-width: 26px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: var(--text-secondary, #94a3b8) !important;
+  border-color: transparent !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+  opacity: 0.6 !important;
+  box-shadow: none !important;
+  /* close 变体无 ::before 高光层，由 :not(.pv-btn-close) 选择器排除 */
+}
+.pv-btn-close:hover {
+  opacity: 1 !important;
+  color: var(--text-primary, #e2e8f0) !important;
+  background: rgba(239,68,68,0.1) !important;
+  /* close 变体 hover 无 translateY 上浮效果 */
+}
+
+/* ============================================
+   8. 公共交互规则
+   ============================================ */
+
+/* 非 close 变体的 active 状态：回弹归位 */
+.pv-btn:not(.pv-btn-close):active {
+  transform: translateY(0) !important;
+}
+
+/* 键盘焦点可见性 */
+.pv-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(102,126,234,0.3) !important;
+}
+
+/* 禁用状态 */
+.pv-btn:disabled,
+.pv-btn.disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+}

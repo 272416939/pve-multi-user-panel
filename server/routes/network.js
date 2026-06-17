@@ -475,7 +475,7 @@ router.get('/port-forwards/config', authMiddleware, async (req, res) => {
             remaining: Math.max(0, maxPerUser - totalCount)
         });
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 

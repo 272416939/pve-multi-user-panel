@@ -567,7 +567,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         await vncProxy.registerTicket(result.ticket, vmid, req.user.id);
 
         // 返回代理页面，通过我们的服务器转发 VNC 流量
-        const proxyUrl = `/vnc.html?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&userId=${req.user.id}`;
+        const proxyUrl = `/vnc?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&userId=${req.user.id}`;
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 VNC 控制台失败:', error.message);
@@ -798,7 +798,7 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             console.log(`[vm] PVE 虚拟机 ${vmid} 已销毁`);
         } catch (e) {
             console.error(`[vm] PVE 销毁 ${vmid} 失败:`, e.message);
-            return res.status(500).json({ error: 'PVE 销毁虚拟机失败：' + e.message });
+            return res.status(500).json({ error: 'PVE 销毁虚拟机失败：' + safeError(e) });
         }
 
         res.json({ message: '虚拟机已销毁' });

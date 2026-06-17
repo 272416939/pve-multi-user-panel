@@ -1,6 +1,6 @@
 {
     "name": "pve-multi-user-panel",
-    "version": "2.8.1",
+    "version": "2.9.0",
     "description": "Proxmox Virtual Environment 多用户控制面板",
     "main": "server/server.js",
     "scripts": {
@@ -22,6 +22,7 @@
         "cors": "^2.8.5",
         "crypto-js": "^4.2.0",
         "dotenv": "^16.3.1",
+        "ejs": "^6.0.1",
         "express": "^4.22.2",
         "ioredis": "^5.6.1",
         "jsonwebtoken": "^9.0.3",

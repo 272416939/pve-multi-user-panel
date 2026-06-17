@@ -85,7 +85,7 @@ router.delete('/messages/:id', authMiddleware, async (req, res) => {
 
 router.delete('/messages', authMiddleware, async (req, res) => {
     try {
-        db.messages.deleteAll(req.user.id);
+        await db.messages.deleteAll(req.user.id);
         res.json({ message: '消息已清空' });
     } catch (error) {
         res.status(500).json({ error: '清空消息失败' });

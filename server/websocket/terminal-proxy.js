@@ -9,7 +9,7 @@ const terminalProxy = new WebSocketServer({ noServer: true });
 // 验证 terminal ticket（包含 vmid + userId + 过期时间）
 function validateTicket(token) {
     try {
-        const decoded = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
         // 检查是否为 terminal 类型 ticket
         if (decoded.type !== 'terminal') return null;
         // 检查是否过期

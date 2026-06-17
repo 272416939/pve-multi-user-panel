@@ -1,38 +1,6 @@
-<!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
-<head>
-    <script src="js/theme-init.js"></script>
-    <script src="js/app-version.js" defer></script>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PVE 多用户控制面板 | 登录</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="css/styles.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
-    <link href="css/login.css" rel="stylesheet">
-</head>
-<body class="login-page">
-
-    <!-- Glassmorphism Login Card -->
-    <div class="login-card">
-        <!-- Theme Toggle Button -->
-        <div style="position:absolute;top:12px;right:12px;">
-            <button id="themeToggle" style="background:none;border:1px solid var(--login-border-input);border-radius:8px;width:36px;height:36px;cursor:pointer;color:var(--login-text-label);display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;" title="切换主题" aria-label="切换主题">
-                <svg class="theme-icon theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-                <svg class="theme-icon theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-            </button>
-        </div>
-
-        <!-- Card Header: Logo / Title -->
-        <div class="login-logo">PVE Panel</div>
-        <div class="login-subtitle">欢迎回来，请登录您的账户</div>
-
-        <!-- Vue Mount Point -->
-        <div id="app"></div>
-    </div>
-
-    <template id="appTemplate">
-        <div>
+(function() {
+  var el = document.getElementById("appTemplate");
+  if (el) el.innerHTML = `        <div>
             <div v-if="!showResetPassword" class="row justify-content-center">
                 <div class="col-md-12">
                     <div class="card">
@@ -53,10 +21,10 @@
                                         <span class="login-field-error" v-if="loginPasswordError">{{ loginPasswordError }}</span>
                                     </div>
                                     <div class="login-form-error" v-if="loginError">{{ loginError }}</div>
-                                    <button type="submit" class="btn btn-primary w-100">登录</button>
+                                    <pv-button type="submit" variant="primary" style="width:100%">登录</pv-button>
                                 </form>
                                 <div class="mt-3 text-center">
-                                    <button type="button" class="btn btn-link text-primary p-0" @click="showResetPassword = true">忘记密码？</button>
+                                    <pv-button type="button" variant="link" @click="showResetPassword = true">忘记密码？</pv-button>
                                 </div>
                             </div>
                             <div v-else>
@@ -69,8 +37,8 @@
                                     <span class="login-field-error" v-if="twofaError">{{ twofaError }}</span>
                                 </div>
                                 <p class="text-muted small text-center mb-3" style="font-size:0.82rem;line-height:1.5;">请输入身份验证器中的 6 位验证码，或使用恢复码登录</p>
-                                <button type="button" class="btn btn-primary w-100 mb-2" @click="verifyTwofa">验证</button>
-                                <button type="button" class="btn btn-outline-secondary w-100" @click="backToLogin">返回</button>
+                                <pv-button type="button" variant="primary" @click="verifyTwofa">验证</pv-button>
+                                <pv-button type="button" variant="secondary" @click="backToLogin">返回</pv-button>
                             </div>
                         </div>
                     </div>
@@ -92,8 +60,8 @@
                                     </div>
                                     <div v-if="resetMessage" class="alert alert-success">{{ resetMessage }}</div>
                                     <div class="d-flex gap-2">
-                                        <button type="submit" class="btn btn-primary">发送重置链接</button>
-                                        <button type="button" class="btn btn-outline-secondary" @click="showResetPassword = false">返回</button>
+                                        <pv-button type="submit" variant="primary" >发送重置链接</pv-button>
+                                        <pv-button type="button" variant="secondary" @click="showResetPassword = false">返回</pv-button>
                                     </div>
                                 </form>
                             </div>
@@ -109,7 +77,7 @@
                                     </div>
                                     <div v-if="resetError" class="alert alert-danger">{{ resetError }}</div>
                                     <div v-if="resetSuccess" class="alert alert-success">{{ resetSuccess }}</div>
-                                    <button type="submit" class="btn btn-primary w-100">重置密码</button>
+                                    <pv-button type="submit" variant="primary" >重置密码</pv-button>
                                 </form>
                             </div>
                         </div>
@@ -131,7 +99,7 @@
                             <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customAlertMessage }}</p>
                         </div>
                         <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                            <button type="button" class="btn btn-primary px-4" data-bs-dismiss="modal">确定</button>
+                            <pv-button type="button" variant="primary" data-bs-dismiss="modal">确定</pv-button>
                         </div>
                     </div>
                 </div>
@@ -149,8 +117,8 @@
                             <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customConfirmMessage }}</p>
                         </div>
                         <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
-                            <button type="button" class="btn btn-outline-light px-3" @click="confirmCancel">取消</button>
-                            <button type="button" class="btn btn-primary px-3" @click="confirmOk">确定</button>
+                            <pv-button type="button" variant="outline" @click="confirmCancel">取消</pv-button>
+                            <pv-button type="button" variant="primary" @click="confirmOk">确定</pv-button>
                         </div>
                     </div>
                 </div>
@@ -167,21 +135,10 @@
                     <input type="password" v-model="forceNewPassword" placeholder="新密码（至少8位）" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup.enter="submitForceChangePwd" />
                     <input type="password" v-model="forceConfirmPassword" placeholder="确认新密码" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup.enter="submitForceChangePwd" />
                     <div v-if="forcePwdError" style="color:var(--login-color-error);font-size:12px;margin-bottom:12px">{{ forcePwdError }}</div>
-                    <button type="button" @click="submitForceChangePwd" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--login-gradient-primary);color:#fff;font-size:14px;cursor:pointer;font-weight:600">确认修改</button>
+                    <pv-button type="button" @click="submitForceChangePwd" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--login-gradient-primary);color:#fff;font-size:14px;cursor:pointer;font-weight:600">确认修改</pv-button>
                 </div>
             </div>
             </Teleport>
         </div>
-    </template>
-
-    <!-- Version Info (Fixed at Bottom) -->
-    <div class="login-version-info">
-        PVE 管理面板 <span id="appVersion"></span>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="js/shared.js"></script>
-    <script src="js/login-page.js"></script>
-</body>
-</html>
+    `;
+})();

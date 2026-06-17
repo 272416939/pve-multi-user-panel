@@ -463,7 +463,7 @@ router.get('/admin/storages/all', authMiddleware, adminMiddleware, async (req, r
         const storages = await pveApi.getAllStorages();
         res.json(storages);
     } catch (e) {
-        res.status(500).json({ error: e.message });
+        res.status(500).json({ error: safeError(e) });
     }
 });
 

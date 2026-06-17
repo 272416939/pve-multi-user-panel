@@ -338,19 +338,8 @@ const { createApp, ref, onMounted, nextTick } = Vue;
             }
         };
 
-        createApp(App).mount('#app');
+        var app = createApp(App);
+        app.mount('#app');
 
-(function() {
-    var btn = document.getElementById('themeToggle');
-    if (!btn) return;
-    btn.addEventListener('click', function() {
-        var current = document.documentElement.getAttribute('data-theme') || 'dark';
-        var next = current === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        document.documentElement.style.colorScheme = next;
-        var cm = document.querySelector('meta[name="color-scheme"]');
-        if (cm) cm.content = next;
-        if (document.body) document.body.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
-    });
-})();
+// Theme toggle — 统一使用 theme-init.js
+if (window.initThemeToggle) window.initThemeToggle();

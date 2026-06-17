@@ -319,19 +319,8 @@ app.component('vm-port-forward-list', {
   document.addEventListener('DOMContentLoaded', function() {
       // 注意：侧边栏导航点击已由 Vue @click.prevent + switchSection() 统一处理（含移动端自动收起）
 
-      var themeBtn = document.getElementById('themeToggle');
-      if (themeBtn) {
-          themeBtn.addEventListener('click', function() {
-              var html = document.documentElement;
-              var newTheme = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-              html.setAttribute('data-theme', newTheme);
-              html.style.colorScheme = newTheme;
-              var cm = document.querySelector('meta[name="color-scheme"]');
-              if (cm) cm.content = newTheme;
-              if (document.body) document.body.setAttribute('data-theme', newTheme);
-              localStorage.setItem('theme', newTheme);
-          });
-      }
+      // 统一主题切换（theme-init.js 中的 window.initThemeToggle）
+      if (window.initThemeToggle) window.initThemeToggle();
 
       function syncHeaderUser() {
           if (window.__admin && window.__admin.user && window.__admin.user.value) {

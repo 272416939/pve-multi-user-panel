@@ -9,6 +9,7 @@
     $.userVms = ref([]);
     $.vmsLoading = ref(false);
     $.confirmState = ref({ vmId: null, action: null });
+    $.vmOpTimestamps = ref(new Map());
     $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, backup_storage: '', mac_group_id: '', status: null });
     $.availableVms = ref([]);
     $.assignedVms = ref([]);
@@ -82,50 +83,55 @@
         else if (action === 'stop') $.stopVm(vm.vm_id);
     };
 
+    // 操作冷却期（ms），防止重复点击导致 PVE 卡死
+    var VM_OP_COOLDOWN = 8000;
+    function vmIsOperating(vmid) {
+        var t = $.vmOpTimestamps.value.get(vmid);
+        if (!t) return false;
+        if (Date.now() - t > VM_OP_COOLDOWN) { var m = new Map($.vmOpTimestamps.value); m.delete(vmid); $.vmOpTimestamps.value = m; return false; }
+        return true;
+    }
+    function vmMarkOperating(vmid) { var m = new Map($.vmOpTimestamps.value); m.set(vmid, Date.now()); $.vmOpTimestamps.value = m; }
+
     $.startVm = async function(vmid) {
+        if (vmIsOperating(vmid)) return alert('虚拟机正在操作中，请勿重复点击！');
+        vmMarkOperating(vmid);
         try {
             await api('/vm/' + vmid + '/start', { method: 'POST' });
             await $.loadData();
-        } catch (e) {
-            alert(e.message);
-        }
+        } catch (e) { alert(e.message); }
     };
 
     $.shutdownVm = async function(vmid) {
+        if (vmIsOperating(vmid)) return alert('虚拟机正在操作中，请勿重复点击！');
+        vmMarkOperating(vmid);
         try {
             await api('/vm/' + vmid + '/shutdown', { method: 'POST' });
             $.confirmState.value = { vmId: null, action: null };
             await $.loadData();
-            // 延迟再次刷新，等待 PVE 完成关机状态变更
             setTimeout(function() { $.loadData(); }, 4000);
-        } catch (e) {
-            $.confirmState.value = { vmId: null, action: null };
-            alert(e.message);
-        }
+        } catch (e) { $.confirmState.value = { vmId: null, action: null }; alert(e.message); }
     };
 
     $.stopVm = async function(vmid) {
+        if (vmIsOperating(vmid)) return alert('虚拟机正在操作中，请勿重复点击！');
+        vmMarkOperating(vmid);
         try {
             await api('/vm/' + vmid + '/stop', { method: 'POST' });
             $.confirmState.value = { vmId: null, action: null };
             await $.loadData();
-            // 延迟再次刷新，确保状态已更新
             setTimeout(function() { $.loadData(); }, 2000);
-        } catch (e) {
-            $.confirmState.value = { vmId: null, action: null };
-            alert(e.message);
-        }
+        } catch (e) { $.confirmState.value = { vmId: null, action: null }; alert(e.message); }
     };
 
     $.rebootVm = async function(vmid) {
+        if (vmIsOperating(vmid)) return alert('虚拟机正在操作中，请勿重复点击！');
+        vmMarkOperating(vmid);
         try {
             await api('/vm/' + vmid + '/reboot', { method: 'POST' });
             $.confirmState.value = { vmId: null, action: null };
             await $.loadData();
-        } catch (e) {
-            $.confirmState.value = { vmId: null, action: null };
-            alert(e.message);
-        }
+        } catch (e) { $.confirmState.value = { vmId: null, action: null }; alert(e.message); }
     };
 
     $.openVncConsole = async function(vmid) {

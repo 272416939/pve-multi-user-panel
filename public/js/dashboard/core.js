@@ -20,6 +20,8 @@
     $.activeSection = ref(new URLSearchParams(window.location.search).get('section') || 'overview');
     $.navItems = ref([]);
     $.users = ref([]);
+    $.storageList = ref([]);
+    $.macGroups = ref([]);
     $.openDropdownId = ref(null); // 当前打开的下拉菜单ID，格式 'vm-123' 或 'lxc-456'
     $.dropdownItems = ref([]); // 当前下拉菜单的 [{label, action, cls}]
     $.dropdownPos = ref({ top: 0, left: 0 });
@@ -259,6 +261,18 @@
     $.execDropdownAction = function(fn) {
         fn();
         $.closeDropdown();
+    };
+
+    // 内联下拉菜单（与 admin 端一致，避免 Teleport 模板缺失问题）
+    $.toggleAdminDropdown = function(target) {
+        var dd = target.parentElement;
+        var isOpen = dd.classList.contains('open');
+        document.querySelectorAll('.dropdown-table.open').forEach(function(el) {
+            el.classList.remove('open');
+        });
+        if (!isOpen) {
+            dd.classList.add('open');
+        }
     };
 
     $.loadWalletBalance = async function() {

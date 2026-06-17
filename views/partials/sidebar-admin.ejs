@@ -1,0 +1,81 @@
+<aside class="sidebar" id="sidebar">
+    <nav class="sidebar-nav">
+        <a class="nav-item" :class="{ active: activeSection === 'overview' }" href="#" @click.prevent="switchSection('overview')">
+            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+            <span class="nav-text">总览</span>
+        </a>
+        <a class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('vms');return false;">
+            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
+            <span class="nav-text">虚拟机管理</span>
+            <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </a>
+        <div class="nav-submenu" id="submenu-vms">
+            <a class="nav-item" data-subsection="vms-manage" href="#" @click.prevent="switchSection('vms-manage')"><span class="nav-text">虚拟机列表</span></a>
+            <a class="nav-item" data-subsection="vms-assign" href="#" @click.prevent="switchSection('vms-assign')"><span class="nav-text">分配虚拟机</span></a>
+            <a class="nav-item" data-subsection="vms-network" href="#" @click.prevent="switchSection('vms-network')"><span class="nav-text">VM 端口转发管理</span></a>
+        </div>
+        <a class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('lxc');return false;">
+            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>
+            <span class="nav-text">LXC 容器管理</span>
+            <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </a>
+        <div class="nav-submenu" id="submenu-lxc">
+            <a class="nav-item" data-subsection="lxc-create" href="#" @click.prevent="switchSection('lxc-create')"><span class="nav-text">新建 LXC 容器</span></a>
+            <a class="nav-item" data-subsection="lxc-assign" href="#" @click.prevent="switchSection('lxc-assign')"><span class="nav-text">分配 LXC 容器</span></a>
+            <a class="nav-item" data-subsection="lxc-manage" href="#" @click.prevent="switchSection('lxc-manage')"><span class="nav-text">容器管理</span></a>
+            <a class="nav-item" data-subsection="lxc-network" href="#" @click.prevent="switchSection('lxc-network')"><span class="nav-text">CT 端口转发管理</span></a>
+        </div>
+        <a class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('manage');return false;">
+            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+            <span class="nav-text">后台管理</span>
+            <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </a>
+        <div class="nav-submenu" id="submenu-manage">
+            <a class="nav-item" data-subsection="manage-users" href="#" @click.prevent="switchSection('manage-users')"><span class="nav-text">用户管理</span></a>
+            <a class="nav-item" data-subsection="manage-cdk" href="#" @click.prevent="switchSection('manage-cdk')"><span class="nav-text">CDK 管理</span></a>
+            <a class="nav-item" data-subsection="manage-messages" href="#" @click.prevent="switchSection('manage-messages')"><span class="nav-text">消息管理</span></a>
+        </div>
+        <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('templates');return false;">
+            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+            <span class="nav-text">模板管理</span>
+            <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </a>
+        <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-templates">
+            <a class="nav-item" data-subsection="templates-vm" href="#" @click.prevent="switchSection('templates-vm')"><span class="nav-text">VM 模板</span></a>
+            <a class="nav-item" data-subsection="templates-lxc" href="#" @click.prevent="switchSection('templates-lxc')"><span class="nav-text">LXC 模板</span></a>
+        </div>
+        <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('packages');return false;">
+            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/></svg></span>
+            <span class="nav-text">套餐管理</span>
+            <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </a>
+        <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-packages">
+            <a class="nav-item" data-subsection="packages-vm" href="#" @click.prevent="switchSection('packages-vm')"><span class="nav-text">VM 套餐</span></a>
+            <a class="nav-item" data-subsection="packages-lxc" href="#" @click.prevent="switchSection('packages-lxc')"><span class="nav-text">LXC 套餐</span></a>
+        </div>
+        <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('finance');return false;">
+            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span>
+            <span class="nav-text">财务管理</span>
+            <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </a>
+        <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-finance">
+            <a class="nav-item" data-subsection="finance-transactions" href="#" @click.prevent="switchSection('finance-transactions')"><span class="nav-text">交易流水</span></a>
+            <a class="nav-item" data-subsection="finance-orders" href="#" @click.prevent="switchSection('finance-orders')"><span class="nav-text">订单管理</span></a>
+        </div>
+        <a class="nav-item has-children" href="#" onclick="window.__admin.toggleSubmenu('settings');return false;">
+            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+            <span class="nav-text">系统设置</span>
+            <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+        </a>
+        <div class="nav-submenu" id="submenu-settings">
+            <a class="nav-item" data-subsection="settings-smtp" href="#" @click.prevent="switchSection('settings-smtp')"><span class="nav-text">SMTP 配置</span></a>
+            <a class="nav-item" data-subsection="settings-snapshot" href="#" @click.prevent="switchSection('settings-snapshot')"><span class="nav-text">快照&amp;备份配置</span></a>
+            <a class="nav-item" data-subsection="settings-network" href="#" @click.prevent="switchSection('settings-network')"><span class="nav-text">网络管理</span></a>
+            <a class="nav-item" data-subsection="settings-payment" href="#" @click.prevent="switchSection('settings-payment')"><span class="nav-text">支付配置</span></a>
+        </div>
+        <a class="nav-item" :class="{ active: activeSection === 'system-update' }" href="#" @click.prevent="switchSection('system-update')">
+            <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg></span>
+            <span class="nav-text">系统更新</span>
+        </a>
+    </nav>
+</aside>

@@ -13,6 +13,8 @@ function safeError(e) {
 }
 
 const { checkRateLimit } = require('../middleware/rate-limiter');
+const pveApi = require('../api/pve-api');
+const dbg = require('../utils/debug');
 
 async function checkCdkRateLimit(userId, ip) {
     return checkRateLimit(`ratelimit:cdk:${userId}:${ip}`, 5, 60000);
@@ -37,7 +39,7 @@ router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, 
         res.json(newCdk);
     } catch (error) {
         console.error('生成 CDK 失败:', error);
-        res.status(500).json({ error: '生成 CDK 失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -513,7 +515,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
         }
     } catch (error) {
         console.error('兑换 CDK 失败:', error);
-        res.status(500).json({ error: '兑换 CDK 失败: ' + error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 

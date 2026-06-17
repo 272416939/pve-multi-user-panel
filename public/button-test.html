@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<title>pv-button 样式测试</title>
+<link href="shared/css/tokens.css" rel="stylesheet">
+<style>
+  body { padding: 40px; background: #0f172a; color: #e2e8f0; font-family: system-ui; }
+  h2 { margin-bottom: 16px; }
+  .group { margin: 20px 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .label { color: #94a3b8; font-size: 12px; min-width: 100px; }
+</style>
+</head>
+<body>
+<h1>pv-button 各 variant 效果测试</h1>
+
+<div class="group">
+  <span class="label">glass (CDK兑换):</span>
+  <pv-button variant="glass">CDK 兑换</pv-button>
+</div>
+
+<div class="group">
+  <span class="label">table-primary:</span>
+  <pv-button variant="table-primary">详情</pv-button>
+  <pv-button variant="table-primary">开机</pv-button>
+  <pv-button variant="table-primary">启动</pv-button>
+</div>
+
+<div class="group">
+  <span class="label">table-danger:</span>
+  <pv-button variant="table-danger">停止</pv-button>
+  <pv-button variant="table-danger">销毁</pv-button>
+</div>
+
+<div class="group">
+  <span class="label">table (更多/移除):</span>
+  <pv-button variant="table">更多</pv-button>
+  <pv-button variant="table">移除</pv-button>
+</div>
+
+<div class="group">
+  <span class="label">primary:</span>
+  <pv-button variant="primary">保存</pv-button>
+</div>
+
+<div class="group">
+  <span class="label">danger:</span>
+  <pv-button variant="danger">删除</pv-button>
+</div>
+
+<script src="components/pv-button.js"></script>
+<script>
+  // 强制重新定义组件（绕过已注册错误）
+  try {
+    // 如果已注册，先检查当前样式
+    const btn = document.querySelector('pv-button');
+    if (btn) {
+      const shadow = btn.shadowRoot;
+      if (shadow) {
+        const style = shadow.querySelector('style');
+        console.log('✅ pv-button Shadow DOM 已加载, style length:', style ? style.textContent.length : 'none');
+        console.log('variant 属性:', btn.getAttribute('variant'));
+      } else {
+        console.log('❌ pv-button 无 Shadow DOM!');
+      }
+    }
+  } catch(e) {
+    console.error('检查出错:', e);
+  }
+</script>
+</body>
+</html>

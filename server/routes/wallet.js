@@ -29,6 +29,8 @@ function checkCallbackRate(ip) {
     return true;
 }
 
+var orderStatusRateLimiter = new Map();
+
 async function queryApiTradeNo(outTradeNo) {
     try {
         var pid = await db.config.get('pay:pid');
@@ -123,7 +125,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         var orderNo = generateOrderId('RECHARGE');
         var siteUrl = process.env.SITE_URL || baseUrl;
         var notifyUrl = siteUrl.replace(/\/+$/, '') + '/api/wallet/notify';
-        var returnUrl = siteUrl.replace(/\/+$/, '') + '/user-center.html';
+        var returnUrl = siteUrl.replace(/\/+$/, '') + '/user-center';
         
         var payClient;
         if (v2Enabled && v2PrivateKey && v2PublicKey) {
@@ -266,7 +268,7 @@ router.post('/wallet/notify', async (req, res) => {
                         <p style="margin-bottom: 4px;">📋 订单编号：<strong>${params.out_trade_no}</strong></p>
                         <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center.html">用户中心</a> 查看余额详情。</p>`);
+                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`);
                 await sendEmail(user.email, '充值到账通知 - PVE管理面板', rechargeHtml);
             }
         } catch (e) {
@@ -369,7 +371,7 @@ router.get('/wallet/return', async (req, res) => {
                         <p style="margin-bottom: 4px;">📋 订单编号：<strong>${params.out_trade_no}</strong></p>
                         <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center.html">用户中心</a> 查看余额详情。</p>`);
+                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`);
                 await sendEmail(user.email, '充值到账通知 - PVE管理面板', rechargeHtml);
             }
         } catch (e) {
@@ -382,6 +384,59 @@ router.get('/wallet/return', async (req, res) => {
     } catch (e) {
         console.error('[钱包] 同步回调失败:', e.message);
         res.json({ success: false, error: '处理异常' });
+    }
+});
+
+// ========== 充值订单状态查询 ==========
+router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) => {
+    try {
+        var orderNo = req.params.order_no;
+
+        // 订单号格式校验：RECHARGE + 14位时间戳 + 4-6位随机数
+        if (!/^RECHARGE\d{14}\d{4,6}$/.test(orderNo)) {
+            return res.status(400).json({ error: '无效的订单号格式' });
+        }
+
+        // 用户级限速：30 次/分钟
+        var rateKey = 'order-status:' + req.user.id;
+        var now = Date.now();
+        var windowMs = 60000;
+        var maxRequests = 30;
+        if (!orderStatusRateLimiter) {
+            var orderStatusRateLimiter = new Map();
+        }
+        var record = orderStatusRateLimiter.get(rateKey);
+        if (!record || now - record.windowStart > windowMs) {
+            orderStatusRateLimiter.set(rateKey, { windowStart: now, count: 1 });
+        } else {
+            if (record.count >= maxRequests) {
+                return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+            }
+            record.count++;
+        }
+
+        // 查询订单记录
+        var txRecord = await db.transactionRecords.getByOrderNo(orderNo);
+
+        if (txRecord) {
+            // 已支付 — 校验订单归属
+            if (txRecord.user_id !== req.user.id) {
+                return res.status(403).json({ error: '无权查询此订单' });
+            }
+            // 查询用户最新余额
+            var user = await db.users.getById(req.user.id);
+            res.json({
+                status: 'paid',
+                amount: txRecord.amount,
+                balance: user ? user.balance : txRecord.balance_after
+            });
+        } else {
+            // 未支付或不存在 — 不泄露订单是否存在
+            res.json({ status: 'pending' });
+        }
+    } catch (e) {
+        console.error('[钱包] order-status:', e.message);
+        res.status(500).json({ error: safeError(e) });
     }
 });
 
@@ -587,7 +642,7 @@ router.get('/orders', authMiddleware, async (req, res) => {
         }));
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 

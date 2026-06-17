@@ -32,11 +32,11 @@ function logPveError(e) {
 
 // ===== 用户侧：套餐列表（无需 admin） =====
 router.get('/vm-packages', authMiddleware, async (req, res) => {
-    try { res.json(await db.vmPackages.getAll()); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { res.json(await db.vmPackages.getAll()); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.get('/lxc-packages', authMiddleware, async (req, res) => {
-    try { res.json(await db.lxcPackages.getAll()); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { res.json(await db.lxcPackages.getAll()); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 // ===== 用户侧：套餐订购（自动取当前用户） =====
@@ -388,19 +388,19 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
 // ===== VM 套餐（管理员） =====
 router.get('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.vmPackages.getAll()); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { res.json(await db.vmPackages.getAll()); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.post('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.vmPackages.create(req.body)); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { res.json(await db.vmPackages.create(req.body)); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.put('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.vmPackages.update(parseInt(req.params.id), req.body)); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { res.json(await db.vmPackages.update(parseInt(req.params.id), req.body)); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.delete('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { await db.vmPackages.delete(parseInt(req.params.id)); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { await db.vmPackages.delete(parseInt(req.params.id)); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 // VM 套餐开通（核心）
@@ -553,19 +553,19 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
 
 // ===== LXC 套餐 =====
 router.get('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.lxcPackages.getAll()); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { res.json(await db.lxcPackages.getAll()); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.lxcPackages.create(req.body)); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { res.json(await db.lxcPackages.create(req.body)); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.put('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.lxcPackages.update(parseInt(req.params.id), req.body)); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { res.json(await db.lxcPackages.update(parseInt(req.params.id), req.body)); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.delete('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { await db.lxcPackages.delete(parseInt(req.params.id)); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: e.message }); }
+    try { await db.lxcPackages.delete(parseInt(req.params.id)); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 // LXC 套餐开通（核心）

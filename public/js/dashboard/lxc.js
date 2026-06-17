@@ -8,6 +8,7 @@
     $.lxcLoading = ref(false);
     $.userLxcContainers = ref([]);
     $.lxcConfirmState = ref({ ctId: null, action: null });
+    $.lxcOpTimestamps = ref(new Map());
     $.editLxcForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null });
     $.lxcPasswordForm = ref({ password: '', confirm: '' });
     $.lxcPasswordError = ref('');
@@ -102,46 +103,51 @@
         }
     };
 
+    // ===== LXC 操作函数 =====
+    // 操作冷却期（ms），防止重复点击导致 PVE 卡死
+    var LXC_OP_COOLDOWN = 8000;
+    function lxcIsOperating(ctId) {
+        var t = $.lxcOpTimestamps.value.get(ctId);
+        if (!t) return false;
+        if (Date.now() - t > LXC_OP_COOLDOWN) { var m = new Map($.lxcOpTimestamps.value); m.delete(ctId); $.lxcOpTimestamps.value = m; return false; }
+        return true;
+    }
+    function lxcMarkOperating(ctId) { var m = new Map($.lxcOpTimestamps.value); m.set(ctId, Date.now()); $.lxcOpTimestamps.value = m; }
+
     $.startLxc = async function(ctId) {
-        try {
-            await api('/lxc/' + ctId + '/start', { method: 'POST' });
-            await $.loadLxcContainers();
-        } catch (e) {
-            alert(e.message);
-        }
+        if (lxcIsOperating(ctId)) return alert('容器正在操作中，请勿重复点击！');
+        lxcMarkOperating(ctId);
+        try { await api('/lxc/' + ctId + '/start', { method: 'POST' }); await $.loadLxcContainers(); }
+        catch (e) { alert(e.message); }
     };
 
     $.shutdownLxc = async function(ctId) {
+        if (lxcIsOperating(ctId)) return alert('容器正在操作中，请勿重复点击！');
+        lxcMarkOperating(ctId);
         try {
             await api('/lxc/' + ctId + '/shutdown', { method: 'POST' });
             $.lxcConfirmState.value = { ctId: null, action: null };
             await $.loadLxcContainers();
             setTimeout(function() { $.loadLxcContainers(); }, 4000);
-        } catch (e) {
-            $.lxcConfirmState.value = { ctId: null, action: null };
-            alert(e.message);
-        }
+        } catch (e) { $.lxcConfirmState.value = { ctId: null, action: null }; alert(e.message); }
     };
 
     $.stopLxc = async function(ctId) {
+        if (lxcIsOperating(ctId)) return alert('容器正在操作中，请勿重复点击！');
+        lxcMarkOperating(ctId);
         try {
             await api('/lxc/' + ctId + '/stop', { method: 'POST' });
             $.lxcConfirmState.value = { ctId: null, action: null };
             await $.loadLxcContainers();
             setTimeout(function() { $.loadLxcContainers(); }, 2000);
-        } catch (e) {
-            $.lxcConfirmState.value = { ctId: null, action: null };
-            alert(e.message);
-        }
+        } catch (e) { $.lxcConfirmState.value = { ctId: null, action: null }; alert(e.message); }
     };
 
     $.rebootLxc = async function(ctId) {
-        try {
-            await api('/lxc/' + ctId + '/reboot', { method: 'POST' });
-            await $.loadLxcContainers();
-        } catch (e) {
-            alert(e.message);
-        }
+        if (lxcIsOperating(ctId)) return alert('容器正在操作中，请勿重复点击！');
+        lxcMarkOperating(ctId);
+        try { await api('/lxc/' + ctId + '/reboot', { method: 'POST' }); await $.loadLxcContainers(); }
+        catch (e) { alert(e.message); }
     };
 
     $.openLxcTerminal = async function(ctId) {

@@ -125,7 +125,7 @@ router.get('/admin/orders', authMiddleware, adminMiddleware, async (req, res) =>
         var result = await db.orders.getAll(params);
         res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 
@@ -158,7 +158,7 @@ router.get('/admin/orders/export', authMiddleware, adminMiddleware, async (req, 
         // 添加 BOM 确保 Excel 正确识别 UTF-8
         res.send('\ufeff' + csvRows.join('\n'));
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        res.status(500).json({ error: safeError(error) });
     }
 });
 

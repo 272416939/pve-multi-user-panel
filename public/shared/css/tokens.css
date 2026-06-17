@@ -1,0 +1,73 @@
+/* ========== Unified Dual-Theme CSS Variable System ========== */
+/* 来源: admin.css :root + [data-theme] 变量定义，合并 dashboard.css 和 user-center.css 独有变量 */
+/* ===== Dark Mode (Default) ===== */
+:root {
+    --bg-page: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+    --bg-sidebar: rgba(15, 23, 42, 0.9);
+    --bg-card: rgba(30, 30, 50, 0.75);
+    --bg-header: rgba(15, 23, 42, 0.9);
+    --bg-input: rgba(15, 23, 42, 0.6);
+    --bg-hover: rgba(99, 102, 241, 0.12);
+    --bg-modal: rgba(15, 23, 42, 0.95);
+    --text-primary: #e2e8f0;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --border-color: rgba(129, 140, 248, 0.15);
+    --border-light: rgba(129, 140, 248, 0.08);
+    --color-primary: #818cf8;
+    --color-primary-hover: #a5b4fc;
+    --color-danger: #f87171;
+    --color-success: #34d399;
+    --color-warning: #fbbf24;
+    --color-info: #38bdf8;
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --glass-bg: rgba(15, 23, 42, 0.9);
+    --glass-border: rgba(129, 140, 248, 0.15);
+    --glass-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    --glass-accent: rgba(129, 140, 248, 0.5);
+    --glass-accent-hover: rgba(129, 140, 248, 0.75);
+    --glass-text: #e2e8f0;
+    --glass-text-muted: #64748b;
+    --glass-surface: rgba(30, 30, 50, 0.75);
+    --glass-blur: blur(12px);
+    --accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --accent-glow: rgba(129, 140, 248, 0.35);
+    --header-height: 64px;
+    --sidebar-width: 220px;
+}
+
+/* ===== Light Mode ===== */
+[data-theme="light"] {
+    --bg-page: linear-gradient(135deg, #f0f4ff 0%, #e6e9ff 100%);
+    --bg-sidebar: rgba(255, 255, 255, 0.9);
+    --bg-card: rgba(255, 255, 255, 0.85);
+    --bg-header: rgba(255, 255, 255, 0.9);
+    --bg-input: rgba(255, 255, 255, 0.7);
+    --bg-hover: rgba(99, 102, 241, 0.06);
+    --bg-modal: rgba(255, 255, 255, 0.96);
+    --text-primary: #334155;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --border-color: rgba(99, 102, 241, 0.1);
+    --border-light: rgba(99, 102, 241, 0.05);
+    --color-primary: #6366f1;
+    --color-primary-hover: #818cf8;
+    --color-danger: #ef4444;
+    --color-success: #10b981;
+    --color-warning: #f59e0b;
+    --color-info: #3b82f6;
+    --shadow-sm: 0 2px 8px rgba(99, 102, 241, 0.05);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
+    --shadow-lg: 0 8px 32px rgba(99, 102, 241, 0.08);
+    --glass-bg: rgba(255, 255, 255, 0.9);
+    --glass-border: rgba(99, 102, 241, 0.1);
+    --glass-shadow: 0 4px 20px rgba(99, 102, 241, 0.05);
+    --glass-accent: rgba(99, 102, 241, 0.5);
+    --glass-accent-hover: rgba(99, 102, 241, 0.75);
+    --glass-text: #334155;
+    --glass-text-muted: #64748b;
+    --glass-surface: rgba(255, 255, 255, 0.85);
+    --accent-glow: rgba(99, 102, 241, 0.25);
+}

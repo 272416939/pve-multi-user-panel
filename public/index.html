@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PVE 多用户控制面板 | 虚拟机管理系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="css/styles.css" rel="stylesheet">
+    <link href="shared/css/tokens.css" rel="stylesheet">
+    <link href="shared/css/layout.css" rel="stylesheet">
     <style>
         body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
         .loading-spinner { text-align: center; }
@@ -24,18 +25,18 @@
         
         if (resetTokenParam) {
             // 有重置密码 token，保留参数跳转到登录页
-            window.location.replace('login.html?resetPassword=' + resetTokenParam);
+            window.location.replace('login?resetPassword=' + resetTokenParam);
         } else {
             const token = localStorage.getItem('token');
             if (token) {
                 try {
                     const payload = JSON.parse(atob(token.split('.')[1]));
-                    window.location.replace(payload.role === 'admin' ? 'admin.html' : 'dashboard.html');
+                    window.location.replace(payload.role === 'admin' ? 'admin' : 'dashboard');
                 } catch (e) {
-                    window.location.replace('dashboard.html');
+                    window.location.replace('dashboard');
                 }
             } else {
-                window.location.replace('login.html');
+                window.location.replace('login');
             }
         }
     </script>

@@ -27,6 +27,10 @@ const PORT = process.env.PORT || 3000;
 // R3-2 补充: 反向代理环境下 req.ip 需要信任代理头才能获取真实客户端IP
 app.set('trust proxy', true);
 
+// EJS 模板引擎配置
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, '..', 'views'));
+
 app.use(cors({
     origin: function (origin, callback) {
         const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
@@ -99,7 +103,8 @@ app.use(express.static(path.join(__dirname, '../public'), {
 }));
 // 自动注入JS缓存版本号：HTML中 ?v=xxx 统一替换为当前 package.json 版本
 app.use((req, res, next) => {
-    if (!req.path.endsWith('.html')) return next();
+    const isEjsPage = ['/admin', '/dashboard', '/user-center', '/login'].includes(req.path);
+    if (!req.path.endsWith('.html') && !isEjsPage) return next();
     const origSend = res.send.bind(res);
     res.send = function (body) {
         if (typeof body === 'string' && body.includes('<script')) {
@@ -162,6 +167,22 @@ httpServer.on('upgrade', (request, socket, head) => {
         socket.destroy();
     }
 });
+
+// 旧 URL 重定向到 EJS 路由
+app.get('/admin.html', (req, res) => res.redirect(301, '/admin'));
+app.get('/dashboard.html', (req, res) => res.redirect(301, '/dashboard'));
+app.get('/user-center.html', (req, res) => res.redirect(301, '/user-center'));
+app.get('/login.html', (req, res) => res.redirect(301, '/login'));
+app.get('/vnc.html', (req, res) => res.redirect(301, '/vnc'));
+app.get('/terminal.html', (req, res) => res.redirect(301, '/terminal'));
+
+// EJS 页面路由
+app.get('/admin', (req, res) => res.render('pages/admin', { title: '管理后台', page: 'admin' }));
+app.get('/dashboard', (req, res) => res.render('pages/dashboard', { title: '仪表盘', page: 'dashboard' }));
+app.get('/user-center', (req, res) => res.render('pages/user-center', { title: '用户中心', page: 'user-center' }));
+app.get('/login', (req, res) => res.render('pages/login', { title: '登录', page: 'login' }));
+app.get('/vnc', (req, res) => res.render('pages/vnc'));
+app.get('/terminal', (req, res) => res.render('pages/terminal'));
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../public', 'index.html'));

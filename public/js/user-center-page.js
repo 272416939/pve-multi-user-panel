@@ -1,4 +1,4 @@
-const { createApp, ref, onMounted, onUnmounted, watch } = Vue;
+const { createApp, ref, onMounted, onUnmounted, onBeforeUnmount, watch } = Vue;
 
 const App = {
     template: '#appTemplate',
@@ -42,6 +42,15 @@ const App = {
         const txPage = ref(1);
         const txFilter = ref({ start_time: '', end_time: '', trade_type: '', order_no: '' });
         const myOrders = ref([]);
+
+        // 充值轮询相关
+        const rechargePendingOrderNo = ref('');
+        const rechargePendingAmount = ref('');
+        const rechargeResultType = ref(''); // success / fail / cancel / timeout
+        const rechargeResultTitle = ref('');
+        const rechargeResultAmount = ref('');
+        let rechargePollingTimer = null;
+        let rechargePayWin = null;
 
         const parseMarkdown = (text) => {
             if (!text) return '';
@@ -116,9 +125,14 @@ const App = {
         };
 
         const submitRecharge = async () => {
+            // 重复提交防护
+            if (rechargePollingTimer) {
+                rechargeError.value = '已有充值进行中，请先完成或取消';
+                return;
+            }
             const amount = parseFloat(rechargeAmount.value);
             if (isNaN(amount) || amount <= 0) { rechargeError.value = '请输入有效的充值金额'; return; }
-            const min = parseFloat(payMethods.value.min_amount || 0.01);
+            const min = parseFloat(payMethods.value.min_amount) || 0.01;
             if (amount < min) { rechargeError.value = '最低充值金额为 ' + min.toFixed(2) + ' 元'; return; }
             if (!rechargeMethod.value) { rechargeError.value = '请选择支付方式'; return; }
             rechargeSubmitting.value = true;
@@ -126,11 +140,140 @@ const App = {
             try {
                 const res = await api('/wallet/recharge', { method: 'POST', body: { amount: amount.toFixed(2), pay_method: rechargeMethod.value } });
                 if (res.success && res.redirect_url) {
-                    window.open(res.redirect_url, '_blank');
-                    rechargeAmount.value = ''; rechargeMethod.value = '';
+                    // 打开支付窗口
+                    rechargePayWin = window.open(res.redirect_url, '_blank');
+                    if (!rechargePayWin) {
+                        rechargeError.value = '支付窗口被浏览器拦截，请允许弹窗后重试';
+                        rechargeSubmitting.value = false;
+                        return;
+                    }
+                    // 显示等待弹窗
+                    rechargePendingOrderNo.value = res.order_no;
+                    rechargePendingAmount.value = amount.toFixed(2);
+                    const modalEl = document.getElementById('rechargePendingModal');
+                    if (modalEl) {
+                        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                        modal.show();
+                    }
+                    // 启动轮询
+                    pollOrderStatus(res.order_no, rechargePayWin, amount.toFixed(2));
                 } else { rechargeError.value = res.error || '创建订单失败'; }
             } catch (e) { rechargeError.value = '请求失败，请稍后重试'; }
             rechargeSubmitting.value = false;
+        };
+
+        const pollOrderStatus = (orderNo, payWin, amount) => {
+            const startTime = Date.now();
+            const timeout = 10 * 60 * 1000; // 10 分钟
+            const interval = 2000; // 2 秒
+
+            rechargePollingTimer = setInterval(async () => {
+                // 检查超时
+                if (Date.now() - startTime > timeout) {
+                    stopPolling();
+                    closePendingModal();
+                    showRechargeResult('timeout', '');
+                    return;
+                }
+                // 检查支付窗口是否关闭
+                if (payWin && payWin.closed) {
+                    // 窗口关闭，最后查询一次
+                    try {
+                        const status = await api('/wallet/order-status/' + orderNo);
+                        stopPolling();
+                        closePendingModal();
+                        if (status.status === 'paid') {
+                            showRechargeResult('success', status.amount || amount);
+                            loadWalletBalance();
+                            rechargeAmount.value = '';
+                            rechargeMethod.value = '';
+                        } else {
+                            showRechargeResult('cancel', '');
+                        }
+                    } catch (e) {
+                        stopPolling();
+                        closePendingModal();
+                        showRechargeResult('cancel', '');
+                    }
+                    return;
+                }
+                // 查询订单状态
+                try {
+                    const status = await api('/wallet/order-status/' + orderNo);
+                    if (status.status === 'paid') {
+                        stopPolling();
+                        closePendingModal();
+                        // 关闭支付窗口
+                        if (payWin && !payWin.closed) { try { payWin.close(); } catch (e) {} }
+                        showRechargeResult('success', status.amount || amount);
+                        loadWalletBalance();
+                        rechargeAmount.value = '';
+                        rechargeMethod.value = '';
+                    }
+                } catch (e) {
+                    // 网络错误，继续轮询
+                }
+            }, interval);
+        };
+
+        const stopPolling = () => {
+            if (rechargePollingTimer) {
+                clearInterval(rechargePollingTimer);
+                rechargePollingTimer = null;
+            }
+        };
+
+        const closePendingModal = () => {
+            const el = document.getElementById('rechargePendingModal');
+            if (el) {
+                const modal = bootstrap.Modal.getInstance(el);
+                if (modal) modal.hide();
+            }
+        };
+
+        const showRechargeResult = (type, amount) => {
+            rechargeResultType.value = type;
+            if (type === 'success') {
+                rechargeResultTitle.value = '充值成功';
+                // 金额格式校验，不合法显示 --
+                rechargeResultAmount.value = /^\d+\.\d{2}$/.test(amount) ? amount : '--';
+            } else if (type === 'fail') {
+                rechargeResultTitle.value = '充值失败';
+                rechargeResultAmount.value = '';
+            } else if (type === 'cancel') {
+                rechargeResultTitle.value = '支付已取消';
+                rechargeResultAmount.value = '';
+            } else if (type === 'timeout') {
+                rechargeResultTitle.value = '支付超时';
+                rechargeResultAmount.value = '';
+            }
+            const el = document.getElementById('rechargeResultModal');
+            if (el) {
+                const modal = bootstrap.Modal.getOrCreateInstance(el);
+                modal.show();
+            }
+        };
+
+        const cancelRecharge = () => {
+            stopPolling();
+            // 关闭支付窗口
+            if (rechargePayWin && !rechargePayWin.closed) {
+                try { rechargePayWin.close(); } catch (e) {}
+            }
+            rechargePayWin = null;
+            closePendingModal();
+            showRechargeResult('cancel', '');
+        };
+
+        const closeRechargeResult = () => {
+            const el = document.getElementById('rechargeResultModal');
+            if (el) {
+                const modal = bootstrap.Modal.getInstance(el);
+                if (modal) modal.hide();
+            }
+            rechargeResultType.value = '';
+            rechargeResultTitle.value = '';
+            rechargeResultAmount.value = '';
         };
 
         const loadTx = async (page) => {
@@ -787,6 +930,10 @@ const App = {
         onUnmounted(() => {
         });
 
+        onBeforeUnmount(() => {
+            stopPolling();
+        });
+
         watch(activeSubTab, (val) => {
             localStorage.setItem('ucenter_subtab', val);
             if (val === 'wallet-transactions') loadTx(1);
@@ -863,12 +1010,15 @@ const App = {
             disableTwofa,
             walletBalance, payMethods, rechargeAmount, rechargeMethod, rechargeSubmitting, rechargeError,
             txList, txTotal, txPage, txFilter, myOrders,
-            submitRecharge, loadTx, copyOrderNo, loadMyOrders
+            submitRecharge, loadTx, copyOrderNo, loadMyOrders,
+            rechargePendingOrderNo, rechargePendingAmount, rechargeResultType, rechargeResultTitle, rechargeResultAmount,
+            pollOrderStatus, cancelRecharge, closeRechargeResult
         };
     }
 };
 
-createApp(App).mount('#app');
+var app = createApp(App);
+app.mount('#app');
 
 /* ===== Sidebar Toggle & Theme Switch ===== */
 function toggleSidebar() {
@@ -880,31 +1030,8 @@ function toggleSidebar() {
     }
 }
 
-// Theme toggle
-(function() {
-    var btn = document.getElementById('themeToggle');
-    var icon = document.getElementById('themeIconSvg');
-    if (!btn || !icon) return;
-    function updateIcon(theme) {
-        if (theme === 'light') {
-            icon.innerHTML = '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
-        } else {
-            icon.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
-        }
-    }
-    updateIcon(document.documentElement.getAttribute('data-theme') || 'dark');
-    btn.addEventListener('click', function() {
-        var current = document.documentElement.getAttribute('data-theme') || 'dark';
-        var next = current === 'dark' ? 'light' : 'dark';
-        document.documentElement.setAttribute('data-theme', next);
-        document.documentElement.style.colorScheme = next;
-        var cm = document.querySelector('meta[name="color-scheme"]');
-        if (cm) cm.content = next;
-        if (document.body) document.body.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
-        updateIcon(next);
-    });
-})();
+// Theme toggle — 统一使用 theme-init.js
+if (window.initThemeToggle) window.initThemeToggle();
 
 /* ===== Sidebar nav auto-close on mobile (与dashboard统一: 768px阈值) ===== */
 document.addEventListener('DOMContentLoaded', function() {

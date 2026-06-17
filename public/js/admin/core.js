@@ -365,7 +365,10 @@ watch($.user, function(u) {
         var old = bootstrap.Modal.getInstance(el);
         if (old) old.dispose();
         Vue.nextTick(function() {
-            new bootstrap.Modal(el, { focus: false }).show();
+            var freshEl = document.getElementById(id);
+            if (freshEl) {
+                new bootstrap.Modal(freshEl, { focus: false }).show();
+            }
         });
     };
 
@@ -718,11 +721,8 @@ $.initDetailCharts = function() {
                 await $.loadData();
                 await $.loadMacGroups();
                 // Auto-expand submenu based on current section
-                if ($.activeSection.value === 'vms' || $.activeSection.value === 'lxc') {
-                    setTimeout(function() {
-                        $.toggleSubmenu($.activeSection.value);
-                    }, 100);
-                } else if ($.activeSection.value === 'manage' || $.activeSection.value === 'settings') {
+                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance'];
+                if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
                         $.toggleSubmenu($.activeSection.value);
                     }, 100);

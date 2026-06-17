@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+    <script src="js/theme-init.js"></script>
+    <script src="js/app-version.js" defer></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PVE 多用户控制面板 | 管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="shared/css/tokens.css?_b=202606180100" rel="stylesheet">
+    <link href="shared/css/layout.css?_b=202606180100" rel="stylesheet">
+    <link href="shared/css/components.css?_b=202606184300" rel="stylesheet">
+    <link href="shared/css/theme.css?_b=202606180100" rel="stylesheet">
+    <link href="css/admin.css?_b=202606180910" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<div class="main-wrap" id="mainContent">
+    <!-- header 和 sidebar 由 Vue 模板内部管理，不使用 EJS partial -->
+    <template id="appTemplate"></template>
+
+    <div id="app"></div>
+    <!-- ===== Vue template 结束 ===== -->
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>window.__admin = {};</script>
+<script src="js/shared.js"></script>
+<script src="components/pv-button.js?_b=202606184000"></script>
+<!-- admin-template 模板片段（IIFE push 到 window.__adminTemplateParts, loader 最后 join） -->
+<script src="js/admin/admin-template-base.js?_b=202606180100"></script>
+<script src="js/admin/admin-template-overview.js?_b=202606170520"></script>
+<script src="js/admin/admin-template-vm.js?_b=202606182200"></script>
+<script src="js/admin/admin-template-lxc.js?_b=202606182200"></script>
+<script src="js/admin/admin-template-users.js?_b=202606170520"></script>
+<script src="js/admin/admin-template-packages.js?_b=202606180850"></script>
+<script src="js/admin/admin-template-settings.js?_b=202606170520"></script>
+<script src="js/admin/admin-template-cdk-messages.js?_b=202606180820"></script>
+<script src="js/admin/admin-template-templates.js?_b=202606170520"></script>
+<script src="js/admin/admin-template-finance.js?_b=202606170520"></script>
+<script src="js/admin/admin-template-update.js?_b=202606170520"></script>
+<script src="js/admin/admin-template-modals.js?_b=202606184000"></script>
+<!-- admin-template loader (join + inject) -->
+<script src="js/admin/admin-template.js?_b=202606182900"></script>
+<script src="js/admin/core.js?_b=202606180830"></script>
+<script src="js/admin/admin.js"></script>
+<script src="js/admin/vm.js"></script>
+<script src="js/admin/lxc.js"></script>
+<script src="js/admin/network.js"></script>
+<script src="js/admin/update.js"></script>
+<script src="js/admin/package.js"></script>
+<script src="js/admin/template.js"></script>
+<script src="js/admin/admin-page.js?_b=202606184100"></script>
+</body>
+</html>

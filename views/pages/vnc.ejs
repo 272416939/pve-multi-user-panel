@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+    <script src="js/theme-init.js"></script>
+    <script src="js/app-version.js" defer></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VNC 控制台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #000;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: #fff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        #toolbar {
+            background: #1a1a2e;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            flex-shrink: 0;
+        }
+        #toolbar .title { font-weight: 600; margin-right: auto; }
+        #toolbar .status { font-size: 11px; color: #aaa; }
+        #toolbar button {
+            background: #e94560; color: #fff; border: none;
+            padding: 5px 12px; border-radius: 3px; cursor: pointer; font-size: 12px;
+            touch-action: manipulation;
+        }
+        #toolbar button:hover { background: #d63851; }
+        #screen {
+            flex: 1; display: flex; align-items: center;
+            justify-content: center; position: relative; min-height: 0;
+        }
+        #screen canvas { display: block; }
+        #connecting { color: #888; font-size: 14px; }
+        .spinner {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid #555; border-top-color: #e94560;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            vertical-align: middle; margin-right: 6px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .ctrl-bar {
+            background: #16213e; padding: 6px 12px;
+            flex-shrink: 0; display: flex; flex-wrap: wrap;
+            gap: 4px; align-items: center;
+        }
+        .ctrl-bar .group-label {
+            color: #666; font-size: 11px; margin: 0 4px;
+            user-select: none;
+        }
+        .ctrl-bar button {
+            background: #0f3460; color: #ddd; border: 1px solid #1a4a7a;
+            padding: 4px 10px; border-radius: 3px; cursor: pointer;
+            font-size: 11px; white-space: nowrap;
+            touch-action: manipulation;
+        }
+        .ctrl-bar button:hover { background: #1a5a8a; color: #fff; }
+        .ctrl-bar button.primary {
+            background: #e94560; border-color: #e94560; color: #fff;
+        }
+        .ctrl-bar button.primary:hover { background: #d63851; }
+        #error-msg { color: #e94560; }
+    </style>
+</head>
+<body>
+    <div id="toolbar">
+        <span class="title"><span id="vmLabel"></span></span>
+        <span class="status" id="statusText">连接中...</span>
+        <button id="disconnectBtn" aria-label="断开连接">断开</button>
+    </div>
+    <div id="screen">
+        <div id="connecting">
+            <span class="spinner"></span>正在连接 VNC 控制台...
+        </div>
+    </div>
+    <div class="ctrl-bar">
+        <span class="group-label">系统</span>
+        <button id="ctrlAltDelBtn" class="primary" aria-label="发送 Ctrl+Alt+Del">Ctrl+Alt+Del</button>
+        <button id="winBtn" aria-label="发送 Win 键">⊞ Win</button>
+
+        <span class="group-label">快捷键</span>
+        <button id="altTabBtn" aria-label="发送 Alt+Tab">Alt+Tab</button>
+        <button id="altF4Btn" aria-label="发送 Alt+F4">Alt+F4</button>
+        <button id="winRBtn" aria-label="发送 Win+R">⊞+R 运行</button>
+        <button id="winDBtn" aria-label="发送 Win+D">⊞+D 桌面</button>
+        <button id="winEBtn" aria-label="发送 Win+E">⊞+E 资源管理器</button>
+        <button id="ctrlShiftEscBtn" aria-label="发送 Ctrl+Shift+Esc">Ctrl+Shift+Esc</button>
+
+        <span class="group-label">显示</span>
+        <button id="fullscreenBtn" aria-label="切换全屏">全屏</button>
+        <button id="scaleBtn" aria-label="切换缩放">适应窗口</button>
+    </div>
+
+    <script type="module">
+        import RFB from '/novnc/core/rfb.js';
+
+        const params = new URLSearchParams(location.search);
+        const node = params.get('node');
+        const vmid = params.get('vmid');
+        const port = params.get('port');
+        const ticket = params.get('ticket');
+        const type = params.get('type') || 'qemu';
+
+        const statusText = document.getElementById('statusText');
+        const connectingEl = document.getElementById('connecting');
+        const screenEl = document.getElementById('screen');
+        document.getElementById('vmLabel').textContent =  (type === 'lxc' ? 'CT ' : 'VM ') + vmid + ' - VNC 控制台';
+
+        if (!node || !vmid || !port || !ticket) {
+            statusText.textContent = '参数缺失';
+            connectingEl.innerHTML = '<span id="error-msg">缺少连接参数，请重新打开</span>';
+            throw new Error('missing params');
+        }
+
+        const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const userId = params.get('userId') || '';
+        const wsUrl = `${wsProto}//${location.host}/vnc-proxy?node=${node}&vmid=${vmid}&port=${port}&ticket=${encodeURIComponent(ticket)}&type=${encodeURIComponent(type || 'qemu')}&userId=${encodeURIComponent(userId)}`;
+
+        let rfb = null;
+        let scaled = true;
+
+        function onConnected() {
+            statusText.innerHTML = '已连接';
+            connectingEl.style.display = 'none';
+            document.getElementById('disconnectBtn').textContent = '已连接';
+        }
+
+        function onDisconnected() {
+            statusText.innerHTML = '已断开';
+            rfb = null;
+            document.getElementById('disconnectBtn').textContent = '断开';
+        }
+
+        function connectVnc() {
+            connectingEl.style.display = '';
+            statusText.textContent = '连接中...';
+            try {
+                rfb = new RFB(screenEl, wsUrl, {
+                    credentials: { password: ticket }
+                });
+                rfb.addEventListener('connect', onConnected);
+                rfb.addEventListener('disconnect', onDisconnected);
+                rfb.scaleViewport = scaled;
+                rfb.resizeSession = false;
+            } catch(e) {
+                connectingEl.innerHTML = '<span id="error-msg">连接失败: ' + e.message + '</span>';
+                statusText.textContent = '连接失败';
+            }
+        }
+
+        document.getElementById('disconnectBtn').addEventListener('click', function() {
+            if (rfb) { rfb.disconnect(); onDisconnected(); }
+            else { connectVnc(); }
+        });
+
+        document.getElementById('ctrlAltDelBtn').addEventListener('click', function() {
+            if (rfb) rfb.sendCtrlAltDel();
+        });
+
+        function sendKeys(keys) {
+            if (!rfb) return;
+            keys.forEach(function(k) { rfb.sendKey(k, null, true); });
+            keys.slice().reverse().forEach(function(k) { rfb.sendKey(k, null, false); });
+        }
+
+        function getKeyCode(key) {
+            var map = { 'Alt': 0xFFE9, 'Tab': 0xFF09, 'F4': 0xFF14, 'L_Win': 0xFFEB, 'R_Win': 0xFFEC, 'D': 0x64, 'E': 0x65, 'R': 0x72, 'Shift': 0xFFE1, 'ControlLeft': 0xFFE3, 'Escape': 0xFF1B };
+            return map[key] || 0;
+        }
+
+        document.getElementById('altTabBtn').addEventListener('click', function() { sendKeys([getKeyCode('Alt'), getKeyCode('Tab')]); });
+        document.getElementById('altF4Btn').addEventListener('click', function() { sendKeys([getKeyCode('Alt'), getKeyCode('F4')]); });
+        document.getElementById('winRBtn').addEventListener('click', function() { sendKeys([getKeyCode('L_Win'), getKeyCode('R')]); });
+        document.getElementById('winDBtn').addEventListener('click', function() { sendKeys([getKeyCode('L_Win'), getKeyCode('D')]); });
+        document.getElementById('winEBtn').addEventListener('click', function() { sendKeys([getKeyCode('L_Win'), getKeyCode('E')]); });
+        document.getElementById('ctrlShiftEscBtn').addEventListener('click', function() { sendKeys([getKeyCode('ControlLeft'), getKeyCode('Shift'), getKeyCode('Escape')]); });
+
+        document.getElementById('fullscreenBtn').addEventListener('click', function() {
+            if (document.fullscreenElement) { document.exitFullscreen(); }
+            else { document.documentElement.requestFullscreen(); }
+        });
+
+        document.getElementById('scaleBtn').addEventListener('click', function() {
+            scaled = !scaled;
+            if (rfb) rfb.scaleViewport = scaled;
+            this.textContent = scaled ? '原始大小' : '适应窗口';
+        });
+
+        connectVnc();
+    </script>
+</body>
+</html>
