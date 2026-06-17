@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.9.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.9.1-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -489,6 +489,26 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v2.9.1</b> (2026-06-18) — 自动更新功能优化</summary>
+
+修复自动更新功能在多种生产环境配置下的兼容性问题，确保公共仓库可免认证拉取。
+
+**Fixed**
+- 🔧 修复更新源选择逻辑：原代码假设 `origin=github`，当生产环境 `origin` 指向 gitee 时，选 github 源仍 fetch gitee
+- 🔧 改用完整 URL 免认证拉取公共仓库：不再依赖 remote 配置，避免 URL 被污染（如反引号）、缺少 remote、认证提示卡住等问题
+- 🔧 添加 `GIT_TERMINAL_PROMPT=0` 环境变量：禁止交互式认证提示，避免请求超时
+- 🔧 fetch 超时从 60s 提升到 90s：适应 GitHub 国内访问慢的情况
+- 🔧 reset 目标改为 `FETCH_HEAD`：配合 `git fetch <url> main` 使用，不再依赖 remote 名称
+- 🔧 主源失败时自动回退到另一个平台，成功响应包含回退提示
+
+**影响范围**
+- 仅修改 `server/routes/admin-config.js` 的 `POST /admin/system/update/execute` 端点
+- 不影响"检查更新"功能（仍通过 Release API 查询）
+- 不需要修改 `.env` 配置（`GITHUB_REPO` / `GITEE_REPO` 默认值已正确）
+
+</details>
 
 <details>
 <summary><b>v2.9.0</b> (2026-06-18) — 安全审计修复 + 充值支付 UX 优化</summary>

@@ -315,36 +315,47 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             // 忽略失败，继续执行
         }
 
-        // 确定更新源：根据用户选择，不可达则回退
-        let remote = 'origin';
-        if (userSource === 'gitee') {
+        // 确定更新源 URL：公共仓库支持免认证 fetch
+        // 使用完整 URL 拉取，避免 remote 配置问题（如 URL 被污染、缺少 remote、认证提示等）
+        const githubRepo = process.env.GITHUB_REPO || '272416939/pve-multi-user-panel';
+        const giteeRepo = process.env.GITEE_REPO || 'Allen0528/pve-multi-user-panel';
+        const sourceUrls = {
+            gitee: `https://gitee.com/${giteeRepo}.git`,
+            github: `https://github.com/${githubRepo}.git`
+        };
+        const primaryUrl = sourceUrls[userSource] || sourceUrls.gitee;
+        const fallbackUrl = userSource === 'gitee' ? sourceUrls.github : sourceUrls.gitee;
+
+        // fetch 阶段：使用完整 URL 免认证拉取公共仓库
+        // GIT_TERMINAL_PROMPT=0 禁止交互式认证提示（避免卡住等待输入）
+        const tryFetchUrl = (url) => {
             try {
-                execSync('git remote get-url gitee', { cwd: projectRoot, timeout: 5000, stdio: 'pipe' });
-                remote = 'gitee';
+                execSync(`git fetch ${url} main`, {
+                    cwd: projectRoot,
+                    timeout: 90000,
+                    stdio: 'pipe',
+                    env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
+                });
+                return true;
             } catch (e) {
-                // gitee 远程源不存在，使用 origin
+                return false;
             }
+        };
+
+        let usedFallback = false;
+        if (!tryFetchUrl(primaryUrl)) {
+            // 主源失败，尝试回退到另一个平台
+            if (!tryFetchUrl(fallbackUrl)) {
+                return res.status(500).json({
+                    error: `更新失败: git fetch 失败（${userSource} 源和 ${userSource === 'gitee' ? 'github' : 'gitee'} 源均不可达），请检查网络连接`
+                });
+            }
+            usedFallback = true;
         }
 
+        // reset 到 FETCH_HEAD（git fetch <url> <branch> 后最新提交在 FETCH_HEAD）
         try {
-            execSync(`git fetch ${remote}`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
-        } catch (error) {
-            const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
-            // 如果 gitee 失败，尝试回退 origin
-            if (remote === 'gitee') {
-                try {
-                    execSync('git fetch origin', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
-                    remote = 'origin';
-                } catch (e2) {
-                    const stderr2 = e2.stderr ? e2.stderr.toString().trim() : e2.message;
-                    return res.status(500).json({ error: '更新失败: git fetch 失败（gitee 和 origin 均不可达），请检查网络连接或远程仓库配置' });
-                }
-            } else {
-                return res.status(500).json({ error: '更新失败: git fetch 失败，请检查网络连接或远程仓库配置' });
-            }
-        }
-        try {
-            execSync(`git reset --hard ${remote}/main`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
+            execSync('git reset --hard FETCH_HEAD', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
         } catch (error) {
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
             return res.status(500).json({ error: '更新失败: git reset 失败，请检查仓库状态' });
@@ -355,7 +366,9 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
             return res.status(500).json({ error: '更新失败: npm install 失败，请检查网络或依赖配置' });
         }
-        res.json({ message: '更新成功，服务正在重启...' });
+        res.json({
+            message: '更新成功，服务正在重启...' + (usedFallback ? `（${userSource} 源不可达，已回退到 ${userSource === 'gitee' ? 'github' : 'gitee'} 源）` : '')
+        });
         console.log('\n[系统更新] 自动更新完成，服务即将重启（此为正常行为，非异常崩溃）\n');
         setTimeout(() => process.exit(0), 1000);
     } catch (error) {
