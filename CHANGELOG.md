@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.12.3] - 2026-06-23
+
+### Fixed
+- fix(pay): V2接口从/api/pay/submit改为/api/pay/create统一下单，微信扫码直接打开app
+- fix(pay): V1接口补充必填参数clientip和device（PC返回qrcode，手机返回payurl）
+- fix(pay): V1异步回调改为router.all兼容GET/POST（文档规定GET，原代码仅POST导致验签失败）
+- fix(pay): V1查询/退款接口改用pid+key直接传参，不参与MD5签名（符合文档规范）
+- fix(pay): 轮询改为setTimeout递归+429错误退避机制，限速30→60次/分钟
+- fix(pay): 新增checkPayStatus手动检查按钮，网关错误返回具体msg
+
+---
+
 ## [2.12.2] - 2026-06-23
 
 ### Fixed
