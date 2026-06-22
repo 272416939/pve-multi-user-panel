@@ -16,6 +16,7 @@
                                     <div class="mb-3">
                                         <label class="form-label" for="login-username">用户名</label>
                                         <input type="text" class="form-control" id="login-username" name="username" autocomplete="username" v-model="loginForm.username" @input="clearLoginErrors" required>
+                                        <div class="register-hint">支持使用用户名或已验证的邮箱登录</div>
                                         <span class="login-field-error" v-if="loginUsernameError">{{ loginUsernameError }}</span>
                                     </div>
                                     <div class="mb-3">
