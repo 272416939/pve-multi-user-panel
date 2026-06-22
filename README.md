@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.11.1-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.11.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -489,6 +489,31 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v2.11.2</b> (2026-06-22) — 外网接口下拉框交互优化 + SMTP 发件人名称支持</summary>
+
+修复外网接口下拉框交互体验，支持高亮已选接口和点击取消选择；修复下拉框被 CNAME 区块遮挡问题；修复设备端口转发弹窗关闭后再次打开仍显示表单界面的问题；新增 SMTP 发件人名称字段，支持自定义发件人显示名（如 OWO CLOUD）。
+
+**Fixed**
+- 🐛 外网接口下拉框：已选接口高亮显示（active 样式 + 勾选图标），点击已选接口可取消选择
+- 🐛 外网接口下拉框被 CNAME 域名设置区块遮挡：容器添加 `position: relative; z-index: 10`，下拉菜单 `z-index: 1080`
+- 🐛 设备端口转发弹窗关闭后再次打开仍显示表单界面：`openDeviceForward` 时重置 `showDeviceForm = false` 和 `editingDeviceRuleId = null`
+
+**Added**
+- ✨ SMTP 配置新增"发件人名称"字段，发送邮件时使用 `"名称 <邮箱>"` 格式（如 `OWO CLOUD <system-noreply@xlun.top>`）
+- ✨ 数据库新增 `smtp:from_name` 配置项，兼容旧数据（无 from_name 时使用纯邮箱地址）
+
+**影响范围**
+- `public/js/admin/admin-template-settings.js`（外网接口下拉框交互 + SMTP 表单新增 from_name 字段）
+- `public/js/admin/network.js`（新增 `isWanInterfaceSelected`/`toggleWanInterface` 方法，替换 `addWanInterface`）
+- `public/js/admin/admin.js`（smtpConfig 初始化新增 from_name 字段）
+- `public/js/dashboard/forward.js`（`openDeviceForward` 重置 showDeviceForm）
+- `server/routes/admin-config.js`（PUT `/admin/smtp` 处理 from_name 字段）
+- `server/api/db-sqlite.js` / `server/api/db-mysql.js`（`getSmtp`/`setSmtp` 增加 from_name 字段）
+- `server/utils/email.js`（`sendEmail` 构造 `"名称 <邮箱>"` 格式的 from 字段）
+
+</details>
 
 <details>
 <summary><b>v2.11.1</b> (2026-06-22) — 外网接口 UI 优化 + 设备端口转发 IP 只读</summary>

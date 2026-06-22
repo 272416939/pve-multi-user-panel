@@ -16,6 +16,8 @@
 
     // ===== 函数 =====
     $.openDeviceForward = async function(device, type) {
+        $.showDeviceForm.value = false; // 重置为列表页，避免上次关闭时停留在表单页
+        $.editingDeviceRuleId.value = null;
         $.currentDevice.type = type;
         $.currentDevice.deviceId = type === 'vm' ? device.vm_id : device.ct_id;
         $.currentDevice.name = device.name || '';

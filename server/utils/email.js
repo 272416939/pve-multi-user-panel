@@ -147,9 +147,16 @@ async function sendEmail(to, subject, html) {
         });
         
         await transporter.verify();
-        
+
+        // 构造发件人地址：优先使用配置的邮箱，未配置则使用 SMTP 用户名
+        const fromEmail = config.from || config.user;
+        // 若配置了发件人名称，则使用 "名称 <邮箱>" 格式
+        const fromField = config.from_name
+            ? `${config.from_name.replace(/[<>]/g, '').trim()} <${fromEmail}>`
+            : fromEmail;
+
         const mailOptions = {
-            from: config.from || config.user,
+            from: fromField,
             to: to,
             subject: subject,
             html: html

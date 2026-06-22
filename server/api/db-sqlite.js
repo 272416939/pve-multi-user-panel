@@ -1303,6 +1303,7 @@ module.exports = {
             user: db.prepare('SELECT value FROM config WHERE key = ?').get('smtp:user')?.value || '',
             password: db.prepare('SELECT value FROM config WHERE key = ?').get('smtp:password')?.value || '',
             from: db.prepare('SELECT value FROM config WHERE key = ?').get('smtp:from')?.value || '',
+            from_name: db.prepare('SELECT value FROM config WHERE key = ?').get('smtp:from_name')?.value || '',
             enabled: db.prepare('SELECT value FROM config WHERE key = ?').get('smtp:enabled')?.value === '1'
         }),
         setSmtp: (smtpConfig) => {
@@ -1314,6 +1315,7 @@ module.exports = {
             setConfig.run('smtp:password', smtpConfig.password !== undefined ? smtpConfig.password : 
                 (db.prepare('SELECT value FROM config WHERE key = ?').get('smtp:password')?.value || ''));
             setConfig.run('smtp:from', smtpConfig.from ?? '');
+            setConfig.run('smtp:from_name', smtpConfig.from_name ?? '');
             setConfig.run('smtp:enabled', smtpConfig.enabled ? '1' : '0');
         },
         getReminder: () => ({

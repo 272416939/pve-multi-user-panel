@@ -109,13 +109,26 @@
         } catch (e) { alert('保存失败: ' + e.message); }
     };
 
-    // 外网接口下拉框选择：追加到文本框（逗号分隔，去重）
-    $.addWanInterface = function(ifaceName) {
+    // 外网接口下拉框：判断接口是否已选中
+    $.isWanInterfaceSelected = function(ifaceName) {
+        if (!ifaceName) return false;
+        var current = ($.networkConfig.wan_interface || '').trim();
+        if (!current) return false;
+        var ifaces = current.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+        return ifaces.indexOf(ifaceName) >= 0;
+    };
+
+    // 外网接口下拉框：切换选中状态（已选则取消，未选则追加）
+    $.toggleWanInterface = function(ifaceName) {
         if (!ifaceName) return;
         var current = ($.networkConfig.wan_interface || '').trim();
         var ifaces = current ? current.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
-        if (ifaces.indexOf(ifaceName) >= 0) return; // 已存在则跳过
-        ifaces.push(ifaceName);
+        var idx = ifaces.indexOf(ifaceName);
+        if (idx >= 0) {
+            ifaces.splice(idx, 1); // 已存在则移除
+        } else {
+            ifaces.push(ifaceName); // 不存在则追加
+        }
         $.networkConfig.wan_interface = ifaces.join(',');
     };
 
@@ -268,6 +281,8 @@
 
     // 设备端口转发
     $.openDeviceForward = async function(device, type) {
+        $.showDeviceForm.value = false; // 重置为列表页，避免上次关闭时停留在表单页
+        $.editingDeviceRuleId.value = null;
         $.deviceModal.device = {
             deviceId: type === 'vm' ? device.vm_id : device.ct_id,
             type: type,

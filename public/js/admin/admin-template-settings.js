@@ -30,11 +30,14 @@
                                     </div>
                                     <div class="row mb-3">
                                         <div class="col-md-6">
-                                            <label class="form-label">发件人</label>
-                                            <input type="text" class="form-control" v-model="smtpConfig.from" placeholder="noreply@example.com">
+                                            <label class="form-label">发件人名称</label>
+                                            <input type="text" class="form-control" v-model="smtpConfig.from_name" placeholder="如：OWO CLOUD（留空则使用发件人邮箱）">
+                                            <small class="text-muted">收件人看到的发件人名称</small>
                                         </div>
                                         <div class="col-md-6">
-                                            <div class="form-check mt-4">
+                                            <label class="form-label">发件人邮箱</label>
+                                            <input type="email" class="form-control" v-model="smtpConfig.from" placeholder="noreply@example.com（留空则使用 SMTP 用户名）">
+                                            <div class="form-check mt-2">
                                                 <input type="checkbox" class="form-check-input" id="smtpSecure" v-model="smtpConfig.secure">
                                                 <label class="form-check-label" for="smtpSecure">使用 SSL/TLS</label>
                                             </div>
@@ -165,15 +168,16 @@
                                         <input type="number" class="form-control" v-model.number="networkConfig.max_per_user" min="0" max="100">
                                         <small class="text-muted">0=不限制，超过限制时用户无法新增转发</small>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-4" style="position: relative; z-index: 10;">
                                         <label class="form-label">默认外网接口</label>
                                         <div class="input-group">
                                             <input type="text" class="form-control" v-model="networkConfig.wan_interface" placeholder="点击右侧下拉框选择接口" readonly>
                                             <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" :disabled="wanInterfaceList.length === 0">选择</button>
-                                            <ul class="dropdown-menu dropdown-menu-end">
+                                            <ul class="dropdown-menu dropdown-menu-end" style="z-index: 1080;">
                                                 <li v-for="iface in wanInterfaceList" :key="iface.name">
-                                                    <a class="dropdown-item" href="#" @click.prevent="addWanInterface(iface.name)">
-                                                        {{ iface.name }} ({{ iface.ip || '拨号获取' }})
+                                                    <a class="dropdown-item d-flex justify-content-between align-items-center" :class="{ 'active': isWanInterfaceSelected(iface.name) }" href="#" @click.prevent="toggleWanInterface(iface.name)">
+                                                        <span>{{ iface.name }} ({{ iface.ip || '拨号获取' }})</span>
+                                                        <i v-if="isWanInterfaceSelected(iface.name)" class="bi bi-check-circle-fill text-primary ms-2"></i>
                                                     </a>
                                                 </li>
                                                 <li v-if="wanInterfaceList.length === 0"><span class="dropdown-item text-muted">暂无可用接口，请先刷新</span></li>

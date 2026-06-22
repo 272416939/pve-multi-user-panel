@@ -63,7 +63,7 @@ router.get('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { host, port, secure, user, password, from, enabled } = req.body;
+        const { host, port, secure, user, password, from, from_name, enabled } = req.body;
 
         const existingSmtp = await db.config.getSmtp();
         await db.config.setSmtp({
@@ -73,6 +73,7 @@ router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
             user: user || '',
             password: password !== undefined ? password : existingSmtp.password,
             from: from || '',
+            from_name: from_name || '',
             enabled: !!enabled
         });
 

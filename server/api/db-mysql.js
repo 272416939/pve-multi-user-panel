@@ -1139,6 +1139,7 @@ module.exports = {
             user: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:user']))?.value || '',
             password: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:password']))?.value || '',
             from: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:from']))?.value || '',
+            from_name: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:from_name']))?.value || '',
             enabled: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:enabled']))?.value === '1'
         }),
         setSmtp: async (smtpConfig) => {
@@ -1149,6 +1150,7 @@ module.exports = {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:user', smtpConfig.user ?? '']);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:password', smtpConfig.password !== undefined ? smtpConfig.password : currentPassword]);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:from', smtpConfig.from ?? '']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:from_name', smtpConfig.from_name ?? '']);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:enabled', smtpConfig.enabled ? '1' : '0']);
         },
         getReminder: async () => ({
