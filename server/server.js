@@ -79,8 +79,8 @@ app.use((req, res, next) => {
     // L-4 修复：CSP 策略（允许项目依赖的 CDN 资源）
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net",
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://jsd.owoser.cn",
+        "style-src 'self' 'unsafe-inline' https://jsd.owoser.cn https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
         "connect-src 'self' ws: wss: https:",

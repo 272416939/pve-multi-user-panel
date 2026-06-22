@@ -327,8 +327,13 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     line-height: 0;
 }
-.recharge-qr-img {
+.recharge-qr-container {
     width: 240px; height: 240px;
+    display: flex; align-items: center; justify-content: center;
+}
+.recharge-qr-container canvas,
+.recharge-qr-container img {
+    width: 240px !important; height: 240px !important;
     display: block;
     border-radius: 4px;
 }

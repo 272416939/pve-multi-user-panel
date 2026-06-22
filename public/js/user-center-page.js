@@ -1,4 +1,4 @@
-const { createApp, ref, onMounted, onUnmounted, onBeforeUnmount, watch } = Vue;
+const { createApp, ref, onMounted, onUnmounted, onBeforeUnmount, watch, nextTick } = Vue;
 
 const App = {
     template: '#appTemplate',
@@ -49,7 +49,7 @@ const App = {
         const rechargeResultType = ref(''); // success / fail / cancel / timeout
         const rechargeResultTitle = ref('');
         const rechargeResultAmount = ref('');
-        const rechargeQrUrl = ref('');          // PC 端二维码 base64
+        const rechargeQrLoading = ref(false);    // PC 端二维码生成中
         const rechargePayUrl = ref('');          // 支付链接（手机端跳转用）
         const rechargeIsMobile = ref(false);     // 是否手机端
         const rechargeShowHarmonyTip = ref(false); // 是否显示鸿蒙微信提示
@@ -177,28 +177,44 @@ const App = {
                     rechargeShowHarmonyTip.value = mobile && harmony && rechargeMethod.value === 'wxpay';
                     if (mobile) {
                         // 手机端：不生成二维码，显示跳转按钮
-                        rechargeQrUrl.value = '';
+                        rechargeQrLoading.value = false;
                     } else {
-                        // PC 端：用支付链接生成二维码
+                        // PC 端：用支付链接生成二维码（qrcodejs2 渲染到 DOM）
                         if (!window.QRCode) {
                             rechargeError.value = '二维码库加载失败，请刷新重试';
                             rechargeSubmitting.value = false;
                             return;
                         }
-                        try {
-                            rechargeQrUrl.value = await QRCode.toDataURL(payUrl, { width: 240, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
-                        } catch (e2) {
-                            console.error('二维码生成失败', e2);
-                            rechargeError.value = '二维码生成失败，请稍后重试';
-                            rechargeSubmitting.value = false;
-                            return;
-                        }
+                        rechargeQrLoading.value = true;
                     }
                     // 显示扫码支付弹窗
                     const modalEl = document.getElementById('rechargePendingModal');
                     if (modalEl) {
                         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
                         modal.show();
+                    }
+                    // PC 端：弹窗 DOM 渲染后生成二维码
+                    if (!mobile) {
+                        nextTick(() => {
+                            var qrContainer = document.getElementById('rechargeQrContainer');
+                            if (qrContainer) {
+                                qrContainer.innerHTML = '';
+                                try {
+                                    new QRCode(qrContainer, {
+                                        text: payUrl,
+                                        width: 240,
+                                        height: 240,
+                                        colorDark: '#000000',
+                                        colorLight: '#ffffff'
+                                    });
+                                    rechargeQrLoading.value = false;
+                                } catch (e2) {
+                                    console.error('二维码生成失败', e2);
+                                    rechargeError.value = '二维码生成失败，请稍后重试';
+                                    rechargeSubmitting.value = false;
+                                }
+                            }
+                        });
                     }
                     // 启动轮询
                     pollOrderStatus(res.order_no, amount.toFixed(2));
@@ -278,6 +294,9 @@ const App = {
 
         const cancelRecharge = () => {
             stopPolling();
+            // 清除二维码容器
+            var qrContainer = document.getElementById('rechargeQrContainer');
+            if (qrContainer) qrContainer.innerHTML = '';
             closePendingModal();
             showRechargeResult('cancel', '');
         };
@@ -1092,7 +1111,7 @@ const App = {
             txList, txTotal, txPage, txFilter, myOrders,
             submitRecharge, loadTx, copyOrderNo, loadMyOrders,
             rechargePendingOrderNo, rechargePendingAmount, rechargeResultType, rechargeResultTitle, rechargeResultAmount,
-            rechargeQrUrl, rechargePayUrl, rechargeIsMobile, rechargeShowHarmonyTip, isHarmonyDevice,
+            rechargeQrLoading, rechargePayUrl, rechargeIsMobile, rechargeShowHarmonyTip, isHarmonyDevice,
             pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay
         };
     }

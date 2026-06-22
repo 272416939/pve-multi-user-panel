@@ -453,10 +453,10 @@
                                 <template v-if="!rechargeIsMobile">
                                     <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">请使用{{ rechargeMethod === 'alipay' ? '支付宝' : '微信' }}扫码支付</h6>
                                     <div class="recharge-qr-wrap mb-3">
-                                        <img v-if="rechargeQrUrl" :src="rechargeQrUrl" alt="支付二维码" class="recharge-qr-img">
-                                        <div v-else class="recharge-qr-loading">
+                                        <div v-if="rechargeQrLoading" class="recharge-qr-loading">
                                             <div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div>
                                         </div>
+                                        <div id="rechargeQrContainer" class="recharge-qr-container"></div>
                                     </div>
                                 </template>
                                 <!-- 手机端：跳转按钮 -->
