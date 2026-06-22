@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.11.10] - 2026-06-23
+
+### Added
+- feat(modal): 新增 ModalZIndexManager 动态弹窗 z-index 管理器，后弹出的弹窗自动在上一层
+- feat(modal): 补充 dashboard 端缺失的 messageDetailModal 模板
+
+### Fixed
+- fix(modal): 修复续费弹窗和 VM 重置密码弹窗关闭按钮缺失（添加 variant=close）
+- fix(modal): 修复删除消息确认弹窗被消息详情弹窗遮挡（customConfirm 集成动态 z-index）
+- fix(modal): 移除所有硬编码 z-index（admin/dashboard/user-center/login 四个 CSS 文件 + 内联样式）
+
+---
+
 ## [2.8.1] - 2026-06-17
 
 ### Changed
