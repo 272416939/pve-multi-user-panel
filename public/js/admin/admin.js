@@ -3,6 +3,7 @@
     var Vue = window.Vue;
     var ref = Vue.ref;
     var computed = Vue.computed;
+    var watch = Vue.watch;
 
     // ==================== 状态 ====================
     $.users = ref([]);
@@ -28,6 +29,20 @@
     $.rechargeUser = ref(null);
     $.rechargeAmount = ref(0);
     $.rechargeError = ref('');
+
+    // ===== 非 Bootstrap 弹窗 z-index 监听（v-if 控制的弹窗）=====
+    var rechargeModalZIndex = null;
+    watch($.rechargeShow, function(val) {
+        if (val) {
+            Vue.nextTick(function() {
+                var el = document.getElementById('rechargeModalWrap');
+                if (el) rechargeModalZIndex = $.applyModalZIndex(el);
+            });
+        } else if (rechargeModalZIndex != null) {
+            window.ModalZIndexManager.release(rechargeModalZIndex);
+            rechargeModalZIndex = null;
+        }
+    });
 
     $.filteredUsers = computed(function() {
         var q = $.cdkUserSearch.value.toLowerCase().trim();

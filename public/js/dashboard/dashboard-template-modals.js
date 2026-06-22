@@ -630,12 +630,12 @@
 
 <!-- 续费弹窗 -->
 <Teleport to="body">
-<div v-if="renewShow" class="modal" style="display:block;background:rgba(0,0,0,0.5);z-index:11000;" @click.self="renewShow = false">
+<div v-if="renewShow" class="modal" style="display:block;background:rgba(0,0,0,0.5);" @click.self="renewShow = false">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">余额抵扣续费</h5>
-                <pv-button type="button" @click="renewShow = false"></pv-button>
+                <pv-button type="button" variant="close" @click="renewShow = false"></pv-button>
             </div>
             <div class="modal-body">
                 <p v-if="renewResource">续费资源：{{ renewResource.name || '资源' }}</p>
@@ -668,12 +668,12 @@
 
 <!-- VM 重置密码弹窗 -->
 <Teleport to="body">
-<div v-if="vmPwdShow" class="modal" style="display:block;background:rgba(0,0,0,0.5);z-index:11000;" @click.self="vmPwdShow = false">
+<div v-if="vmPwdShow" id="vmPwdModalWrap" class="modal" style="display:block;background:rgba(0,0,0,0.5);" @click.self="vmPwdShow = false">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">重置密码</h5>
-                <pv-button type="button" @click="vmPwdShow = false"></pv-button>
+                <pv-button type="button" variant="close" @click="vmPwdShow = false"></pv-button>
             </div>
             <div class="modal-body">
                 <div v-if="vmPwdCiuser === false" class="alert alert-danger py-2 mb-0">当前虚拟机未配置Cloud-init驱动，请联系管理员！</div>
@@ -766,6 +766,33 @@
             <pv-button type="button" @click="confirmOrder" :disabled="orderLoading" variant="primary">{{ orderLoading ? '处理中...' : '确认开通' }}</pv-button>
         </div>
     </div></div>
+</div>
+</Teleport>
+
+<!-- 消息详情弹窗 -->
+<Teleport to="body">
+<div class="modal fade" id="messageDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">{{ currentMsg.title }}</h5>
+                <pv-button type="button" variant="close" data-bs-dismiss="modal"></pv-button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <span class="message-type-badge" :class="'msg-type-' + currentMsg.type">
+                        {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[currentMsg.type] || '消息' }}
+                    </span>
+                    <span class="text-muted ms-2 small">{{ formatDate(currentMsg.created_at) }}</span>
+                </div>
+                <div class="message-detail-content" style="line-height:1.7;white-space:pre-wrap;">{{ currentMsg.content }}</div>
+            </div>
+            <div class="modal-footer">
+                <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger">删除</pv-button>
+                <pv-button type="button" data-bs-dismiss="modal">关闭</pv-button>
+            </div>
+        </div>
+    </div>
 </div>
 </Teleport>
 

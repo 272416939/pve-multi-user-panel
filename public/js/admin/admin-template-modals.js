@@ -116,7 +116,7 @@
                 </Teleport>
 
                 <!-- 充值弹窗 -->
-                <div v-if="rechargeShow" class="modal" style="display:block;background:rgba(0,0,0,0.5);" @click.self="rechargeShow = false">
+                <div v-if="rechargeShow" id="rechargeModalWrap" class="modal" style="display:block;background:rgba(0,0,0,0.5);" @click.self="rechargeShow = false">
                     <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
                         <div class="modal-content">
                             <div class="modal-header">

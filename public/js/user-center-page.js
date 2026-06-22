@@ -103,9 +103,30 @@ const App = {
                         document.activeElement.blur();
                     }
                 }, { once: true });
+                // 获取动态 z-index（customConfirmModal 不走 bsModalShow，需单独管理）
+                const zIndex = window.ModalZIndexManager.acquire();
+                el._modalZIndex = zIndex;
+                el.style.zIndex = zIndex;
+                // hidden 时释放 z-index（confirmOk/confirmCancel 均通过 modal.hide() 关闭）
+                el.addEventListener('hidden.bs.modal', function onHidden() {
+                    el.removeEventListener('hidden.bs.modal', onHidden);
+                    if (el._modalZIndex != null) {
+                        window.ModalZIndexManager.release(el._modalZIndex);
+                        el._modalZIndex = null;
+                        el.style.zIndex = '';
+                    }
+                }, { once: true });
                 var oldModal = bootstrap.Modal.getInstance(el);
                 if (oldModal) oldModal.dispose();
                 new bootstrap.Modal(el, { focus: false }).show();
+                // shown 后设置 backdrop z-index
+                el.addEventListener('shown.bs.modal', function onShown() {
+                    el.removeEventListener('shown.bs.modal', onShown);
+                    var backdrop = document.querySelector('.modal-backdrop');
+                    if (backdrop) {
+                        backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
+                    }
+                }, { once: true });
             });
         };
 
@@ -361,7 +382,22 @@ const App = {
             if (!el) return;
             const old = bootstrap.Modal.getInstance(el);
             if (old) old.dispose();
-            window.Vue.nextTick(() => new bootstrap.Modal(el, { focus: false }).show());
+            // 获取动态 z-index
+            const zIndex = window.ModalZIndexManager.acquire();
+            el._modalZIndex = zIndex;
+            el.style.zIndex = zIndex;
+            window.Vue.nextTick(() => {
+                const modal = new bootstrap.Modal(el, { focus: false });
+                modal.show();
+                // shown 后设置 backdrop z-index
+                el.addEventListener('shown.bs.modal', function onShown() {
+                    el.removeEventListener('shown.bs.modal', onShown);
+                    const backdrop = document.querySelector('.modal-backdrop');
+                    if (backdrop) {
+                        backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
+                    }
+                });
+            });
         };
         const bsModalHide = (id) => {
             if (document.activeElement && document.activeElement !== document.body) {
@@ -370,7 +406,22 @@ const App = {
             const el = document.getElementById(id);
             if (el) {
                 const modal = bootstrap.Modal.getInstance(el);
-                if (modal) modal.hide();
+                const zIndex = el._modalZIndex;
+                if (modal) {
+                    el.addEventListener('hidden.bs.modal', function cleanup() {
+                        el.removeEventListener('hidden.bs.modal', cleanup);
+                        if (zIndex != null) {
+                            window.ModalZIndexManager.release(zIndex);
+                            el._modalZIndex = null;
+                            el.style.zIndex = '';
+                        }
+                    }, { once: true });
+                    modal.hide();
+                } else if (zIndex != null) {
+                    window.ModalZIndexManager.release(zIndex);
+                    el._modalZIndex = null;
+                    el.style.zIndex = '';
+                }
             }
         };
         // 统一子Tab切换方法（侧边栏导航调用）

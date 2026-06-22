@@ -415,3 +415,43 @@ const logout = () => {
     localStorage.removeItem('refreshToken');
     window.location.href = 'login.html';
 };
+
+// ===== ModalZIndexManager: 统一弹窗 z-index 管理器 =====
+// 解决弹窗叠加时 z-index 硬编码导致后弹出的弹窗可能被先弹出的弹窗遮挡的问题
+window.ModalZIndexManager = (function() {
+    'use strict';
+    var BASE_Z_INDEX = 1050;  // 基准 z-index
+    var STEP = 10;            // 每次递增步长（留出 backdrop 空间）
+    var counter = BASE_Z_INDEX;
+    var activeZIndices = [];  // 当前活跃的 z-index 栈
+
+    return {
+        // 获取下一个可用 z-index（用于弹窗本身）
+        acquire: function() {
+            counter += STEP;
+            activeZIndices.push(counter);
+            return counter;
+        },
+        // 获取 backdrop 的 z-index（比当前弹窗小 5）
+        acquireBackdrop: function(modalZIndex) {
+            return modalZIndex - 5;
+        },
+        // 回收 z-index（弹窗关闭时调用）
+        release: function(zIndex) {
+            var idx = activeZIndices.indexOf(zIndex);
+            if (idx > -1) activeZIndices.splice(idx, 1);
+            // 如果没有活跃弹窗，重置计数器到基准值
+            if (activeZIndices.length === 0) {
+                counter = BASE_Z_INDEX;
+            }
+        },
+        // 获取当前活跃弹窗数量
+        getActiveCount: function() {
+            return activeZIndices.length;
+        },
+        // 获取当前最高 z-index
+        getTopZIndex: function() {
+            return activeZIndices.length > 0 ? activeZIndices[activeZIndices.length - 1] : BASE_Z_INDEX;
+        }
+    };
+})();

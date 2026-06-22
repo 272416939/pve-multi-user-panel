@@ -195,8 +195,29 @@
             $.customConfirmResolve.value = resolve;
             var el = document.getElementById('customConfirmModal');
             if (!el) { resolve(false); return; }
+            // 获取动态 z-index（customConfirmModal 不走 bsModalShow，需单独管理）
+            var zIndex = window.ModalZIndexManager.acquire();
+            el._modalZIndex = zIndex;
+            el.style.zIndex = zIndex;
+            // hidden 时释放 z-index（confirmOk/confirmCancel 均通过 modal.hide() 关闭）
+            el.addEventListener('hidden.bs.modal', function onHidden() {
+                el.removeEventListener('hidden.bs.modal', onHidden);
+                if (el._modalZIndex != null) {
+                    window.ModalZIndexManager.release(el._modalZIndex);
+                    el._modalZIndex = null;
+                    el.style.zIndex = '';
+                }
+            }, { once: true });
             var modal = bootstrap.Modal.getOrCreateInstance(el);
             modal.show();
+            // shown 后设置 backdrop z-index
+            el.addEventListener('shown.bs.modal', function onShown() {
+                el.removeEventListener('shown.bs.modal', onShown);
+                var backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) {
+                    backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
+                }
+            }, { once: true });
         });
     };
 
@@ -530,9 +551,22 @@
         if (!el) return;
         var old = bootstrap.Modal.getInstance(el);
         if (old) old.dispose();
+        // 获取动态 z-index
+        var zIndex = window.ModalZIndexManager.acquire();
+        el._modalZIndex = zIndex;
+        el.style.zIndex = zIndex;
         // nextTick 确保 Vue 重新渲染稳定后再初始化 Bootstrap Modal
         Vue.nextTick(function() {
-            new bootstrap.Modal(el, { focus: false }).show();
+            var modal = new bootstrap.Modal(el, { focus: false });
+            modal.show();
+            // shown 后设置 backdrop z-index
+            el.addEventListener('shown.bs.modal', function onShown() {
+                el.removeEventListener('shown.bs.modal', onShown);
+                var backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) {
+                    backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
+                }
+            });
         });
     };
 
@@ -540,20 +574,76 @@
         var el = document.getElementById(id);
         if (!el) return;
         var modal = bootstrap.Modal.getInstance(el);
+        var zIndex = el._modalZIndex;
         if (modal) {
             el.addEventListener('hidden.bs.modal', function cleanup() {
                 el.removeEventListener('hidden.bs.modal', cleanup);
+                if (zIndex != null) {
+                    window.ModalZIndexManager.release(zIndex);
+                    el._modalZIndex = null;
+                    el.style.zIndex = '';
+                }
                 document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
                 document.body.classList.remove('modal-open');
                 document.body.style.removeProperty('padding-right');
             }, { once: true });
             modal.hide();
         } else {
+            if (zIndex != null) {
+                window.ModalZIndexManager.release(zIndex);
+                el._modalZIndex = null;
+                el.style.zIndex = '';
+            }
             document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
             document.body.classList.remove('modal-open');
             document.body.style.removeProperty('padding-right');
         }
     };
+
+    // ===== 非 Bootstrap 弹窗 z-index 管理工具 =====
+    // 供 v-if 控制的自定义弹窗使用（如 renewShow/vmPwdShow）
+    $.applyModalZIndex = function(el) {
+        if (!el) return null;
+        var zIndex = window.ModalZIndexManager.acquire();
+        el._modalZIndex = zIndex;
+        el.style.zIndex = zIndex;
+        return zIndex;
+    };
+    $.releaseModalZIndex = function(el) {
+        if (!el) return;
+        var z = el._modalZIndex;
+        if (z != null) {
+            window.ModalZIndexManager.release(z);
+            el._modalZIndex = null;
+            el.style.zIndex = '';
+        }
+    };
+
+    // ===== 非 Bootstrap 弹窗 z-index 监听（v-if 控制的弹窗）=====
+    var renewModalZIndex = null;
+    watch($.renewShow, function(val) {
+        if (val) {
+            Vue.nextTick(function() {
+                var el = document.getElementById('renewModalWrap');
+                if (el) renewModalZIndex = $.applyModalZIndex(el);
+            });
+        } else if (renewModalZIndex != null) {
+            window.ModalZIndexManager.release(renewModalZIndex);
+            renewModalZIndex = null;
+        }
+    });
+    var vmPwdModalZIndex = null;
+    watch($.vmPwdShow, function(val) {
+        if (val) {
+            Vue.nextTick(function() {
+                var el = document.getElementById('vmPwdModalWrap');
+                if (el) vmPwdModalZIndex = $.applyModalZIndex(el);
+            });
+        } else if (vmPwdModalZIndex != null) {
+            window.ModalZIndexManager.release(vmPwdModalZIndex);
+            vmPwdModalZIndex = null;
+        }
+    });
 
     // ===== 详情弹窗函数 =====
     $.openVmDetail = function(vm) {

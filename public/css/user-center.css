@@ -1,6 +1,3 @@
-/* ========== 全局 & 模态框 z-index ========== */
-.modal-backdrop{z-index:1050!important}.modal{z-index:1055!important}
-
 /* ===== Nav Tabs 药丸风格 ===== */
 .nav-tabs {
     display: flex; gap: 4px; padding: 6px 8px;

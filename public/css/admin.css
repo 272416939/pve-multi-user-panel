@@ -1,5 +1,3 @@
-.modal-backdrop{z-index:10990!important}.modal{z-index:11000!important}
-
 /* Custom select dropdown (CDK 兑换等) */
 .custom-select { position: relative; }
 .custom-select-trigger {
