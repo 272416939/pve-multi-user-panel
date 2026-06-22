@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.12.4] - 2026-06-23
+
+### Fixed
+- fix(wallet): 修复点击确定关闭成功弹窗时一闪而过失败弹窗的问题（modal.hide() 后立即清空状态导致动画期间 v-if 切换到红色 X 图标，改用 hidden.bs.modal 事件在动画完成后清空）
+- fix(wallet): 支付宝手机端直接唤起 app，跳过 pay.microgg.cn → render.alipay.com 中转页（对 http(s) URL 包装 alipays scheme）
+- fix(wallet): 清理鸿蒙系统微信支付提示词（鸿蒙现已正常跳转，删除相关 ref/检测逻辑/模板提示/CSS 样式）
+
+---
+
 ## [2.12.3] - 2026-06-23
 
 ### Fixed
