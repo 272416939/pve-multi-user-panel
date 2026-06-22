@@ -297,15 +297,13 @@ httpServer.listen(PORT, async () => {
 
     console.log(`[system] 当前系统版本：v${pkg.version}`);
 
-    // MySQL 模式下异步初始化数据库（建表+迁移）
+    // 初始化数据库（建表+迁移，MySQL 唯一驱动）
     const db = require('./api/db');
-    if (process.env.DB_TYPE === 'mysql' && db.initDb) {
-        try {
-            await db.initDb();
-        } catch (error) {
-            console.error('[数据库] MySQL 初始化失败:', error.message);
-            process.exit(1);
-        }
+    try {
+        await db.initDb();
+    } catch (error) {
+        console.error('[数据库] MySQL 初始化失败:', error.message);
+        process.exit(1);
     }
 
     try {

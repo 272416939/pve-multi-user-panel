@@ -7,8 +7,7 @@
 [![Version](https://img.shields.io/badge/version-v2.11.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
-[![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![MySQL](https://img.shields.io/badge/MySQL-可选-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
 [![Redis](https://img.shields.io/badge/Redis-可选-dc382d?style=flat-square&labelColor=1a1740&logo=redis&logoColor=white)](https://redis.io/)
 [![License](https://img.shields.io/badge/license-MIT-f59e0b?style=flat-square&labelColor=1a1740)](LICENSE)
 
@@ -100,7 +99,7 @@
 ### 🗄️ 基础设施（v1.8.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 39 | **MySQL 支持** | 可选远程 MySQL 5.7+，自动迁移 SQLite 数据 |
+| 39 | **MySQL 数据库** | MySQL 5.7+ 唯一驱动，utf8mb4 编码，自动建表迁移 |
 | 40 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
 | 41 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
 | 42 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
@@ -168,11 +167,10 @@ npm run dev
 | `PVE_SSH_HOST` | PVE 宿主机 SSH 地址 | `10.0.0.2` |
 | `PVE_SSH_PASSWORD` | PVE root 密码 | — |
 
-### 数据库配置（可选）
+### 数据库配置（必填）
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `DB_TYPE` | 数据库类型：`sqlite` / `mysql` | `sqlite` |
 | `MYSQL_HOST` | MySQL 服务器地址 | — |
 | `MYSQL_PORT` | MySQL 端口 | `3306` |
 | `MYSQL_USER` | MySQL 用户名 | — |
@@ -180,7 +178,7 @@ npm run dev
 | `MYSQL_DATABASE` | MySQL 数据库名 | — |
 | `MYSQL_CONNECTION_LIMIT` | 连接池最大连接数 | `10` |
 
-> **注意:** 切换 `DB_TYPE=mysql` 后，系统会自动将 SQLite 数据迁移到 MySQL。已迁移的数据不会重复导入。
+> **注意:** 系统仅支持 MySQL 5.7+，启动时自动建表和迁移字段。字符集统一为 utf8mb4，完美支持 emoji。
 
 ### Redis 缓存配置（可选）
 
@@ -267,8 +265,7 @@ npm run dev
 │   ├── schedule/
 │   │   └── tasks.js           # 定时任务
 │   ├── api/
-│   │   ├── db.js              # 数据库工厂（SQLite/MySQL 自动选择）
-│   │   ├── db-sqlite.js       # SQLite 驱动（列名白名单防 SQL 注入）
+│   │   ├── db.js              # 数据库模块（MySQL 驱动加载）
 │   │   ├── db-mysql.js        # MySQL 驱动（mysql2/promise 连接池 + 列名白名单）
 │   │   ├── redis.js           # Redis 缓存客户端（可选）
 │   │   ├── pve-api.js         # PVE REST API 封装
@@ -289,8 +286,6 @@ npm run dev
 │       ├── login.ejs          # 登录页（独立结构，无侧边栏）
 │       ├── vnc.ejs            # VNC 控制台（全屏独立样式）
 │       └── terminal.ejs       # xterm.js 终端（全屏独立样式）
-├── data/
-│   └── pve-panel.db           # SQLite 数据库（自动生成）
 ├── images/                    # 头像存储（自动创建）
 ├── public/
 │   ├── css/                   # 页面业务 CSS
@@ -424,11 +419,10 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 - 到期后自动关机，续费提醒每日 1 次，最多 3 天
 - 提醒持久化到数据库/Redis，重启不重复发送
 
-### MySQL 模式
+### MySQL 配置
 
 ```bash
 # .env 中设置
-DB_TYPE=mysql
 MYSQL_HOST=10.0.0.16
 MYSQL_PORT=3306
 MYSQL_USER=root
@@ -436,7 +430,7 @@ MYSQL_PASSWORD=your-password
 MYSQL_DATABASE=pve_panel
 ```
 
-首次启动时自动从 SQLite 迁移所有数据到 MySQL（使用 ON DUPLICATE KEY UPDATE 安全插入）。字符集统一为 utf8mb4，完美支持 emoji。
+系统仅支持 MySQL 5.7+，启动时自动建表和字段迁移。字符集统一为 utf8mb4，完美支持 emoji。
 
 ### Redis 缓存
 
@@ -468,9 +462,7 @@ REDIS_PREFIX=pve:
 ### 注意事项
 
 - 不要删除或覆盖 `.env` 文件
-- 不要删除 `data/` 目录和数据库文件
 - 更新前端 JS 模块后需清除 Nginx 反向代理缓存
-- 切换 MySQL 模式前建议备份 `data/pve-panel.db`
 
 ---
 

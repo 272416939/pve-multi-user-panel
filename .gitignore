@@ -6,12 +6,6 @@ AGENT.md
 .jwt-secret
 .config
 
-# SQLite 数据库文件
-data/
-*.db
-*.db-shm
-*.db-wal
-
 # 用户上传的头像
 images/
 
