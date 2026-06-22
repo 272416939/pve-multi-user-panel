@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.13.1] - 2026-06-23
+
+### Added
+- feat(site): 新增站点设置功能（系统设置子标签）
+  - 新增 site:name、site:logo_text、site:login_title 三个配置项
+  - 新增 GET /api/site/config 公开接口和 GET/PUT /admin/site/config 管理员接口
+  - 新增 EJS 渲染中间件自动注入 siteConfig（60秒缓存）
+  - 站点名称、LOGO 文字、登录页文字全局动态化（title、LOGO、邮件模板）
+  - 管理后台系统设置新增"站点设置"子标签（含注册开关）
+  - 前端 admin/登录页 LOGO 通过 /api/site/config 动态渲染
+
+### Fixed
+- fix(pay): 修复支付宝手机端支付打开扫码界面而非支付界面
+  - 根因：openMobilePay 的 alipays scheme saId=10000007（扫一扫）应为 10000067（内部浏览器容器）
+  - 后端 wallet.js 网关返回解析新增 urlscheme 字段优先检查
+
+### Changed
+- chore(cdn): Google Fonts 域名替换为国内镜像
+  - fonts.googleapis.com → fonts.loli.net
+  - fonts.gstatic.com → gstatic.loli.net
+  - CSP 策略同步更新
+
+---
+
 ## [2.13.0] - 2026-06-23
 
 ### Added
