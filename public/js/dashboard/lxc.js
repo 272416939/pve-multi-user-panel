@@ -95,7 +95,10 @@
             $.lxcLoading.value = true;
         }
         try {
-            $.userLxcContainers.value = await api('/user/lxc');
+            var fresh = await api('/user/lxc');
+            // 保留正在开通中的占位记录（_provisioning 标记），避免 WebSocket tick 推送刷新时丢失
+            var provisioning = $.userLxcContainers.value.filter(function(c) { return c._provisioning; });
+            $.userLxcContainers.value = provisioning.concat(fresh);
         } catch (e) {
             console.error('加载LXC容器失败', e);
         } finally {

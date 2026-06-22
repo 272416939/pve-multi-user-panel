@@ -420,7 +420,10 @@
             $.loading.value = true;
         }
         try {
-            $.userVms.value = await api('/user/vms');
+            var fresh = await api('/user/vms');
+            // 保留正在开通中的占位记录（_provisioning 标记），避免 WebSocket tick 推送刷新时丢失
+            var provisioning = $.userVms.value.filter(function(v) { return v._provisioning; });
+            $.userVms.value = provisioning.concat(fresh);
             if ($.user.value && $.user.value.role === 'admin') {
                 try {
                     $.users.value = await api('/users');
