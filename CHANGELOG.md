@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.12.2] - 2026-06-23
+
+### Fixed
+- fix(cdn): 修复 qrcode@1.5.3 CDN 路径错误（build/qrcode.min.js 404）和 CommonJS 浏览器不兼容
+- fix(cdn): 换用 qrcodejs2@0.0.2 纯浏览器库，改用 new QRCode(element) DOM 渲染方式
+
+### Changed
+- chore(cdn): 全量替换 cdn.jsdelivr.net → jsd.owoser.cn 国内反代域名（8 文件 32 处）
+- chore(cdn): 涉及 EJS 模板、public/*.html、server.js CSP 策略
+
+---
+
 ## [2.12.1] - 2026-06-23
 
 ### Fixed
