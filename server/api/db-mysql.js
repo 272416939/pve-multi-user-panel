@@ -581,7 +581,7 @@ async function initDefaultConfig() {
         'forward:port_range_start': '50000',
         'forward:port_range_end': '60000',
         'forward:default_protocol': 'tcp',
-        'forward:wan_interface': 'adsl1',
+        'forward:wan_interface': '["adsl1"]',
         'forward:max_per_user': '10',
         'dhcp:ip_range_start': '10.0.0.110',
         'dhcp:ip_range_end': '10.0.0.199',

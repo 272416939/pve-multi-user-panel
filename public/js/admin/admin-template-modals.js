@@ -1376,7 +1376,49 @@
                                         </table>
                                     </div>
                                 </template>
-                                </Teleport>
+
+                                <!-- 添加/编辑表单 -->
+                                <template v-else>
+                                    <div class="mb-3">
+                                        <label class="form-label">规则名称</label>
+                                        <input type="text" class="form-control" v-model="deviceForm.name" placeholder="自定义备注，如 SSH 转发">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">目标 IP</label>
+                                        <input type="text" class="form-control" v-model="deviceForm.ip" placeholder="目标 IP">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">协议</label>
+                                        <div>
+                                            <label class="me-3"><input type="radio" v-model="deviceForm.protocol" value="tcp"> TCP</label>
+                                            <label class="me-3"><input type="radio" v-model="deviceForm.protocol" value="udp"> UDP</label>
+                                            <label class="me-3"><input type="radio" v-model="deviceForm.protocol" value="tcp+udp"> TCP+UDP</label>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">内网端口</label>
+                                            <input type="number" class="form-control" v-model.number="deviceForm.internal_port" min="1" max="65535">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">外网端口</label>
+                                            <div class="input-group">
+                                                <input type="number" class="form-control" :class="{ 'is-invalid': deviceCheckResult === false }" v-model.number="deviceForm.external_port" min="1" max="65535">
+                                                <pv-button type="button" @click="randomDevicePort" variant="outline">🎲</pv-button>
+                                            </div>
+                                            <small class="text-muted">可用范围: {{ networkConfig.port_range_start }}-{{ networkConfig.port_range_end }}</small>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <pv-button type="button" @click="cancelDeviceForm" variant="outline">取消</pv-button>
+                                        <pv-button type="button" @click="submitDeviceRule" variant="primary">{{ editingDeviceRuleId ? '保存' : '添加' }}</pv-button>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </Teleport>
 
                                 <!-- VM/LXC 操作确认弹窗 -->
                                 <Teleport to="body">

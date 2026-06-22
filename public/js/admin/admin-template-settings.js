@@ -166,12 +166,13 @@
                                         <small class="text-muted">0=不限制，超过限制时用户无法新增转发</small>
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label">默认外网接口</label>
-                                        <select class="form-select" v-model="networkConfig.wan_interface">
+                                        <label class="form-label">默认外网接口（可多选）</label>
+                                        <select class="form-select" v-model="networkConfig.wan_interface" multiple size="3">
                                             <option v-for="iface in wanInterfaceList" :key="iface.name" :value="iface.name">
                                                 {{ iface.name }} ({{ iface.ip || '拨号获取' }}) ··· {{ iface.status }}
                                             </option>
                                         </select>
+                                        <small class="text-muted">按住 Ctrl/⌘ 多选，端口转发将在所有选中接口上同时创建</small>
                                     </div>
                                     <div class="col-md-4 d-flex align-items-center" style="padding-top: 24px;">
                                         <pv-button style="border-color:rgba(99,102,241,0.2);background:rgba(99,102,241,0.08);color:#A5B4FC;" @click="refreshIfaceList" variant="glass">刷新接口</pv-button>

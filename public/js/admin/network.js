@@ -10,7 +10,7 @@
         port_range_start: 50000,
         port_range_end: 60000,
         default_protocol: 'tcp',
-        wan_interface: 'wan1',
+        wan_interface: [],
         max_per_user: 10,
         cname_domain: ''
     });
@@ -87,6 +87,10 @@
         try {
             var res = await api('/admin/network/config');
             Object.assign($.networkConfig, res);
+            // 确保 wan_interface 始终是数组（兼容旧格式单值）
+            if (!Array.isArray($.networkConfig.wan_interface)) {
+                $.networkConfig.wan_interface = $.networkConfig.wan_interface ? [$.networkConfig.wan_interface] : [];
+            }
             $.maxForwardPerUser.value = res.max_per_user || 10;
             // 从数据库加载缓存的接口列表（无需立即请求 ikuai）
             if (res.iface_list && res.iface_list.length > 0) {

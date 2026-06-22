@@ -677,17 +677,28 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
                 for (const rule of rules) {
                     await db.portForwards.update(rule.id, { ip: finalIp });
                     if (rule.ikuai_id) {
+                        // 解析 ikuai_id（兼容旧格式纯字符串和新格式 JSON 数组）
+                        let ikuaiIds = [];
                         try {
-                            await ikuaiApi.editPortForward(rule.ikuai_id, {
-                                ip: finalIp,
-                                internal_port: rule.internal_port,
-                                external_port: rule.external_port,
-                                protocol: rule.protocol,
-                                comment: rule.name || '',
-                                interface: await db.config.get('forward:wan_interface') || ''
-                            });
-                        } catch (e) {
-                            console.error(`端口转发 ${rule.id} ikuai 同步失败:`, e.message);
+                            const parsed = JSON.parse(rule.ikuai_id);
+                            ikuaiIds = Array.isArray(parsed) ? parsed : [{ interface: '', id: rule.ikuai_id }];
+                        } catch (_) {
+                            ikuaiIds = [{ interface: '', id: rule.ikuai_id }];
+                        }
+                        for (const item of ikuaiIds) {
+                            try {
+                                if (!item.id) continue;
+                                await ikuaiApi.editPortForward(item.id, {
+                                    ip: finalIp,
+                                    internal_port: rule.internal_port,
+                                    external_port: rule.external_port,
+                                    protocol: rule.protocol,
+                                    comment: rule.name || '',
+                                    interface: item.interface || ''
+                                });
+                            } catch (e) {
+                                console.error(`端口转发 ${rule.id} ikuai 同步失败:`, e.message);
+                            }
                         }
                     }
                 }

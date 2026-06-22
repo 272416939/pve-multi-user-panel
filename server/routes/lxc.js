@@ -976,19 +976,29 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
                 const rules = await db.portForwards.getByCtId(vmid);
                 for (const rule of rules) {
                     await db.portForwards.update(rule.id, { ip: newIp });
-                    // 同步更新 ikuai 端口映射
+                    // 同步更新 ikuai 端口映射（支持多接口）
                     if (rule.ikuai_id) {
+                        let ikuaiIds = [];
                         try {
-                            await ikuaiApi.editPortForward(rule.ikuai_id, {
-                                ip: newIp,
-                                internal_port: rule.internal_port,
-                                external_port: rule.external_port,
-                                protocol: rule.protocol,
-                                comment: rule.name || '',
-                                interface: await db.config.get('forward:wan_interface') || ''
-                            });
-                        } catch (e) {
-                            console.error(`端口转发 ${rule.id} ikuai 同步失败:`, e.message);
+                            const parsed = JSON.parse(rule.ikuai_id);
+                            ikuaiIds = Array.isArray(parsed) ? parsed : [{ interface: '', id: rule.ikuai_id }];
+                        } catch (_) {
+                            ikuaiIds = [{ interface: '', id: rule.ikuai_id }];
+                        }
+                        for (const item of ikuaiIds) {
+                            try {
+                                if (!item.id) continue;
+                                await ikuaiApi.editPortForward(item.id, {
+                                    ip: newIp,
+                                    internal_port: rule.internal_port,
+                                    external_port: rule.external_port,
+                                    protocol: rule.protocol,
+                                    comment: rule.name || '',
+                                    interface: item.interface || ''
+                                });
+                            } catch (e) {
+                                console.error(`端口转发 ${rule.id} ikuai 同步失败:`, e.message);
+                            }
                         }
                     }
                 }

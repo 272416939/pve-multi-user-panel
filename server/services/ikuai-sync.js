@@ -124,7 +124,7 @@ async function syncPortForwardsFromIkuai() {
                     enabled: rule.enabled === 'yes' || rule.enabled === '1' || rule.enabled === 1 ? 1 : 0,
                     source: 'ikuai_sync',
                     sync_status: 'synced',
-                    ikuai_id: String(rule.id || rule._id || '')
+                    ikuai_id: JSON.stringify([{ interface: rule.interface || '', id: String(rule.id || rule._id || '') }])
                 });
                 imported++;
             } catch (e) {

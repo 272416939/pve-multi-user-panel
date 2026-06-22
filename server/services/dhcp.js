@@ -109,22 +109,42 @@ async function updateDhcpStaticBindingIp(type, vmid, newIp) {
 }
 
 async function getWanInterface() {
-    const dbIface = await db.config.get('forward:wan_interface');
-    if (dbIface) return dbIface;
-    if (!ikuaiApi.isConfigured()) return '';
+    const ifaces = await getWanInterfaces();
+    return ifaces[0] || '';
+}
+
+// 支持多外网线路：返回所有已配置的外网接口数组
+async function getWanInterfaces() {
+    const raw = await db.config.get('forward:wan_interface');
+    // 新格式：JSON 数组字符串 ["wan1","wan2"]
+    if (raw) {
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                if (parsed.length > 0) return parsed.filter(Boolean);
+            } else if (typeof parsed === 'string' && parsed) {
+                return [parsed];
+            }
+        } catch (_) {
+            // 旧格式：单个接口名字符串
+            if (raw) return [raw];
+        }
+    }
+    // 未配置：自动检测
+    if (!ikuaiApi.isConfigured()) return [];
     try {
         const ifaces = await ikuaiApi.getInterfaces();
         const wanIfaces = ifaces.filter(i => i.type === 'wan');
         if (wanIfaces.length > 0) {
             const firstWan = wanIfaces[0].name;
-            await db.config.set('forward:wan_interface', firstWan);
+            await db.config.set('forward:wan_interface', JSON.stringify([firstWan]));
             console.log('[端口转发] 自动检测到外网接口:', firstWan);
-            return firstWan;
+            return [firstWan];
         }
     } catch (e) {
         console.error('[端口转发] 自动检测外网接口失败:', e.message);
     }
-    return '';
+    return [];
 }
 
-module.exports = { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, getWanInterface };
+module.exports = { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, getWanInterface, getWanInterfaces };
