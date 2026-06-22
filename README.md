@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.10.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.11.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -489,6 +489,25 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v2.11.0</b> (2026-06-22) — 端口转发多接口优化</summary>
+
+优化端口转发多外网接口实现方式，从"每接口创建独立规则"改为"一条规则绑定多接口"，同时将外网接口选择 UI 从多选下拉框改为文本输入框，避免漏选错选。
+
+**Changed**
+- 🔄 ikuai `addPortForward` 改为单次调用，`interface` 字段传逗号分隔值（如 `adsl1,adsl2`），ikuai 上只创建 1 条规则
+- 🔄 `ikuai_id` 存储格式保持 JSON 数组，但只有一个元素 `[{interface: "adsl1,adsl2", id: "123"}]`
+- 🔄 GET/PUT `/admin/network/config`：`wan_interface` 返回/接收逗号分隔字符串
+- 🔄 前端默认外网接口多选下拉框改为文本输入框，格式 `adsl1,adsl2`，下方显示可用接口列表提示
+
+**影响范围**
+- `server/routes/network.js`（核心：单规则多接口逻辑）
+- `server/routes/vm.js` / `server/routes/lxc.js`（注释更新，逻辑兼容）
+- `public/js/admin/admin-template-settings.js`（UI 改为文本框）
+- `public/js/admin/network.js`（`wan_interface` 适配字符串格式）
+
+</details>
 
 <details>
 <summary><b>v2.10.0</b> (2026-06-22) — 端口转发修复 + 外网接口多选</summary>
