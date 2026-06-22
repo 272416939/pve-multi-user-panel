@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.14.0] - 2026-06-23
+
+### BREAKING CHANGES
+- **feat!: 移除 SQLite 支持，仅保留 MySQL 驱动**
+  - 删除 `server/api/db-sqlite.js` 文件
+  - 移除 `better-sqlite3` 依赖（package.json + package-lock.json）
+  - 移除 `DB_TYPE` 环境变量，`db.js` 重写为直接导出 `db-mysql`
+  - 删除 `db-mysql.js` 中的 `migrateFromSQLite()` 函数及调用
+  - 简化 `server.js` 启动逻辑为无条件 `await db.initDb()`
+  - **迁移指南**：现有 SQLite 用户需先在 v2.13.5 完成数据迁移到 MySQL，或手动导出导入后再升级
+
+### Changed
+- 更新 `.env.example`：移除 `DB_TYPE`，MySQL 配置改为必填
+- 更新 `.gitignore`：移除 SQLite 数据库文件忽略规则（data/、*.db、*.db-shm、*.db-wal）
+- 更新 `README.md`：移除 SQLite 徽章、双驱架构描述、迁移说明
+- 更新 `AGENT.md`：移除双驱同步避坑点、`DB_TYPE` 环境变量、SQLite datetime 说明
+
+---
+
 ## [2.13.5] - 2026-06-23
 
 ### Added
