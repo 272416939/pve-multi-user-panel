@@ -4,10 +4,10 @@
     var $ = {};
 
     $.vmPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
-        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null, sort_order: 0,
+        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1, sort_order: 0,
         cpu_model: '', bandwidth: 0 });
     $.lxcPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
-        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null, sort_order: 0,
+        monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1, sort_order: 0,
         cpu_model: '', bandwidth: 0 });
     $.vmPackages = Vue.ref([]);
     $.lxcPackages = Vue.ref([]);
@@ -35,10 +35,11 @@
         if (p) {
             $.vmPackageForm.value = Object.assign({}, p);
             var f = $.vmPackageForm.value;
-            f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : null);
+            // 兼容旧数据：null/undefined 视为不限量(-1)
+            f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : -1);
         } else {
             $.vmPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
-                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null,
+                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1,
                 cpu_model: '', bandwidth: 0 };
         }
         $.loadVmTemplateOptions().then(function() { admin.bsModalShow('vmPackageModal'); });
@@ -46,7 +47,8 @@
 
     $.saveVmPackage = async function() {
         var f = $.vmPackageForm.value;
-        if (f.stock === '' || f.stock === undefined) f.stock = null;
+        // 空值或未定义视为不限量(-1)
+        if (f.stock === '' || f.stock === undefined || f.stock === null) f.stock = -1;
         try {
             if (f.id) {
                 await api('/admin/vm-packages/' + f.id, { method: 'PUT', body: JSON.stringify(f) });
@@ -67,10 +69,11 @@
         if (p) {
             $.lxcPackageForm.value = Object.assign({}, p);
             var f = $.lxcPackageForm.value;
-            f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : null);
+            // 兼容旧数据：null/undefined 视为不限量(-1)
+            f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : -1);
         } else {
             $.lxcPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
-                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: null,
+                monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1,
                 cpu_model: '', bandwidth: 0 };
         }
         $.loadLxcTemplateOptions().then(function() { admin.bsModalShow('lxcPackageModal'); });
@@ -78,7 +81,8 @@
 
     $.saveLxcPackage = async function() {
         var f = $.lxcPackageForm.value;
-        if (f.stock === '' || f.stock === undefined) f.stock = null;
+        // 空值或未定义视为不限量(-1)
+        if (f.stock === '' || f.stock === undefined || f.stock === null) f.stock = -1;
         try {
             if (f.id) {
                 await api('/admin/lxc-packages/' + f.id, { method: 'PUT', body: JSON.stringify(f) });
@@ -96,11 +100,20 @@
     };
 
     $.restockVmPackage = async function(pkg) {
-        var input = prompt('请输入补货数量（正整数）：');
-        if (input === null) return;
-        var add = parseInt(input);
-        if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
-        var newStock = (pkg.stock || 0) + add;
+        // -1 表示不限量，提示用户当前状态
+        if (pkg.stock === -1) {
+            if (!await window.customConfirm('当前套餐为不限量，是否要改为限量库存？')) return;
+            var input = prompt('请输入库存数量（正整数）：');
+            if (input === null) return;
+            var newStock = parseInt(input);
+            if (isNaN(newStock) || newStock < 0) { alert('请输入非负整数'); return; }
+        } else {
+            var input2 = prompt('请输入补货数量（正整数，将在当前库存基础上增加）：');
+            if (input2 === null) return;
+            var add = parseInt(input2);
+            if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
+            var newStock = (pkg.stock || 0) + add;
+        }
         try {
             await api('/admin/vm-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
             await $.loadVmPackages();
@@ -108,11 +121,20 @@
     };
 
     $.restockLxcPackage = async function(pkg) {
-        var input = prompt('请输入补货数量（正整数）：');
-        if (input === null) return;
-        var add = parseInt(input);
-        if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
-        var newStock = (pkg.stock || 0) + add;
+        // -1 表示不限量，提示用户当前状态
+        if (pkg.stock === -1) {
+            if (!await window.customConfirm('当前套餐为不限量，是否要改为限量库存？')) return;
+            var input = prompt('请输入库存数量（正整数）：');
+            if (input === null) return;
+            var newStock = parseInt(input);
+            if (isNaN(newStock) || newStock < 0) { alert('请输入非负整数'); return; }
+        } else {
+            var input2 = prompt('请输入补货数量（正整数，将在当前库存基础上增加）：');
+            if (input2 === null) return;
+            var add = parseInt(input2);
+            if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
+            var newStock = (pkg.stock || 0) + add;
+        }
         try {
             await api('/admin/lxc-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
             await $.loadLxcPackages();

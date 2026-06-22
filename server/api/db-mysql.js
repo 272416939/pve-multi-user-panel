@@ -1875,7 +1875,7 @@ module.exports = {
                     data.name || '', data.template_id || 0, data.cores || 1,
                     data.memory || 1024, data.disk_size || 20,
                     data.monthly_price || 0, data.quarterly_price || 0,
-                    data.yearly_price || 0, data.stock || null, data.sort_order || 0, data.cpu_model || '', data.bandwidth || 0, data.description || '', data.status || 'active'
+                    data.yearly_price || 0, (data.stock === '' || data.stock === undefined || data.stock === null) ? -1 : parseInt(data.stock), data.sort_order || 0, data.cpu_model || '', data.bandwidth || 0, data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM vm_packages WHERE id = ?', [result.insertId]);
@@ -1912,7 +1912,7 @@ module.exports = {
                     data.name || '', data.template_id || 0, data.cores || 1,
                     data.memory || 512, data.swap || 512, data.disk_size || 8,
                     data.monthly_price || 0, data.quarterly_price || 0,
-                    data.yearly_price || 0, data.stock || null, data.sort_order || 0, data.cpu_model || '', data.bandwidth || 0, data.description || '', data.status || 'active'
+                    data.yearly_price || 0, (data.stock === '' || data.stock === undefined || data.stock === null) ? -1 : parseInt(data.stock), data.sort_order || 0, data.cpu_model || '', data.bandwidth || 0, data.description || '', data.status || 'active'
                 ]
             );
             return queryOne('SELECT * FROM lxc_packages WHERE id = ?', [result.insertId]);

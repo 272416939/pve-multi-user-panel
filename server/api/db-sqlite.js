@@ -1904,7 +1904,7 @@ module.exports = {
                 name: data.name || '', template_id: data.template_id || 0, cores: data.cores || 1,
                 memory: data.memory || 1024, disk_size: data.disk_size || 20,
                 monthly_price: data.monthly_price || 0, quarterly_price: data.quarterly_price || 0,
-                yearly_price: data.yearly_price || 0, stock: data.stock || null, sort_order: data.sort_order || 0, cpu_model: data.cpu_model || '', bandwidth: data.bandwidth || 0, description: data.description || '', status: data.status || 'active'
+                yearly_price: data.yearly_price || 0, stock: (data.stock === '' || data.stock === undefined || data.stock === null) ? -1 : parseInt(data.stock), sort_order: data.sort_order || 0, cpu_model: data.cpu_model || '', bandwidth: data.bandwidth || 0, description: data.description || '', status: data.status || 'active'
             });
             return db.prepare('SELECT * FROM vm_packages WHERE id = ?').get(info.lastInsertRowid);
         },
@@ -1932,7 +1932,7 @@ module.exports = {
                 name: data.name || '', template_id: data.template_id || 0, cores: data.cores || 1,
                 memory: data.memory || 512, swap: data.swap || 512, disk_size: data.disk_size || 8,
                 monthly_price: data.monthly_price || 0, quarterly_price: data.quarterly_price || 0,
-                yearly_price: data.yearly_price || 0, stock: data.stock || null, sort_order: data.sort_order || 0, cpu_model: data.cpu_model || '', bandwidth: data.bandwidth || 0, description: data.description || '', status: data.status || 'active'
+                yearly_price: data.yearly_price || 0, stock: (data.stock === '' || data.stock === undefined || data.stock === null) ? -1 : parseInt(data.stock), sort_order: data.sort_order || 0, cpu_model: data.cpu_model || '', bandwidth: data.bandwidth || 0, description: data.description || '', status: data.status || 'active'
             });
             return db.prepare('SELECT * FROM lxc_packages WHERE id = ?').get(info.lastInsertRowid);
         },

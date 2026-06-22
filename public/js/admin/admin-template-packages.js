@@ -24,9 +24,9 @@
                                         <td>{{ p.monthly_price }}元</td>
                                         <td>{{ p.quarterly_price }}元</td>
                                         <td>{{ p.yearly_price }}元</td>
-                                        <td>{{ p.stock !== null && p.stock !== undefined ? p.stock : '不限' }}</td>
+                                        <td>{{ p.stock === -1 ? '不限' : p.stock }}</td>
                                         <td>{{ p.sold_count || 0 }}</td>
-                                        <td>{{ p.stock !== null && p.stock !== undefined ? (p.stock - (p.sold_count || 0)) : '-' }}</td>
+                                        <td>{{ p.stock === -1 ? '不限' : (p.stock - (p.sold_count || 0)) }}</td>
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
@@ -57,9 +57,9 @@
                                         <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ packagePage.getTemplateName(p) }}</td>
                                         <td>{{ p.cores }}核</td><td>{{ p.memory }}MB</td><td>{{ p.swap }}MB</td><td>{{ p.disk_size }}GB</td>
                                         <td>{{ p.monthly_price }}元</td><td>{{ p.quarterly_price }}元</td><td>{{ p.yearly_price }}元</td>
-                                        <td>{{ p.stock !== null && p.stock !== undefined ? p.stock : '不限' }}</td>
+                                        <td>{{ p.stock === -1 ? '不限' : p.stock }}</td>
                                         <td>{{ p.sold_count || 0 }}</td>
-                                        <td>{{ p.stock !== null && p.stock !== undefined ? (p.stock - (p.sold_count || 0)) : '-' }}</td>
+                                        <td>{{ p.stock === -1 ? '不限' : (p.stock - (p.sold_count || 0)) }}</td>
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
                         <div class="btn-group btn-group-sm">
@@ -100,7 +100,7 @@
                                     <div class="col-md-3"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.cores"></div>
                                     <div class="col-md-3"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.memory"></div>
                                     <div class="col-md-3"><label class="form-label">磁盘 (GB)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.disk_size"></div>
-                                    <div class="col-md-3"><label class="form-label">库存数量</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.stock" placeholder="不限留空"></div>
+                                    <div class="col-md-3"><label class="form-label">库存数量</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.stock" placeholder="-1 不限量，0 售罄"></div>
                                     <!-- 价格 -->
                                     <div class="col-md-4"><label class="form-label">月付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.monthly_price"></div>
                                     <div class="col-md-4"><label class="form-label">季付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.quarterly_price"></div>
@@ -145,7 +145,7 @@
                                     <div class="col-md-3"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.memory"></div>
                                     <div class="col-md-2"><label class="form-label">Swap (MB)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.swap"></div>
                                     <div class="col-md-2"><label class="form-label">磁盘 (GB)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.disk_size"></div>
-                                    <div class="col-md-2"><label class="form-label">库存</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.stock" placeholder="不限留空"></div>
+                                    <div class="col-md-2"><label class="form-label">库存</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.stock" placeholder="-1 不限量，0 售罄"></div>
                                     <!-- 价格 -->
                                     <div class="col-md-4"><label class="form-label">月付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.monthly_price"></div>
                                     <div class="col-md-4"><label class="form-label">季付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.quarterly_price"></div>

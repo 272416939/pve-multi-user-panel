@@ -50,7 +50,8 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         var pkg = await db.vmPackages.getById(packageId);
         if (!pkg) return res.status(404).json({ error: '套餐不存在' });
-        if (pkg.stock !== null && pkg.sold_count >= pkg.stock) {
+        // 库存校验：-1 表示不限量，0 表示售罄，null 兼容旧数据视为不限量
+        if (pkg.stock !== null && pkg.stock !== -1 && pkg.sold_count >= pkg.stock) {
             return res.status(400).json({ error: '该套餐已售罄' });
         }
 
@@ -212,7 +213,8 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
         var pkg = await db.lxcPackages.getById(packageId);
         if (!pkg) return res.status(404).json({ error: '套餐不存在' });
-        if (pkg.stock !== null && pkg.sold_count >= pkg.stock) {
+        // 库存校验：-1 表示不限量，0 表示售罄，null 兼容旧数据视为不限量
+        if (pkg.stock !== null && pkg.stock !== -1 && pkg.sold_count >= pkg.stock) {
             return res.status(400).json({ error: '该套餐已售罄' });
         }
 

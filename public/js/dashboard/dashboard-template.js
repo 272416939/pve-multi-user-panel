@@ -266,13 +266,13 @@
                     <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
                     <div class="package-spec"><span class="spec-label">带宽</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
                     <div class="package-desc">备注：<span v-html="parseMarkdown(p.description)"></span></div>
-                    <div class="package-stock">库存：{{ p.stock !== null && p.stock !== undefined ? (p.stock - (p.sold_count || 0)) + ' / ' + p.stock : '无限' }}</div>
+                    <div class="package-stock">库存：{{ p.stock === -1 ? '不限' : (p.stock - (p.sold_count || 0)) + ' / ' + p.stock }}</div>
                     <div class="package-prices">
                         <span class="price-item">月付 {{ p.monthly_price }}元</span>
                         <span class="price-item">季付 {{ p.quarterly_price }}元</span>
                         <span class="price-item">年付 {{ p.yearly_price }}元</span>
                     </div>
-                    <pv-button :disabled="p.stock !== null && p.stock !== undefined && (p.stock - (p.sold_count || 0)) <= 0" @click="openOrderModal(p, 'vm')">{{ (p.stock !== null && p.stock !== undefined && (p.stock - (p.sold_count || 0)) <= 0) ? '已售罄' : '立即开通' }}</pv-button>
+                    <pv-button :disabled="p.stock !== -1 && p.stock !== null && (p.stock - (p.sold_count || 0)) <= 0" @click="openOrderModal(p, 'vm')">{{ (p.stock !== -1 && p.stock !== null && (p.stock - (p.sold_count || 0)) <= 0) ? '已售罄' : '立即开通' }}</pv-button>
                 </div>
             </div>
             <div class="package-empty" v-if="vmPackages.length === 0">暂无可用套餐</div>
@@ -290,13 +290,13 @@
                     <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
                     <div class="package-spec"><span class="spec-label">带宽</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
                     <div class="package-desc">备注：<span v-html="parseMarkdown(p.description)"></span></div>
-                    <div class="package-stock">库存：{{ p.stock !== null && p.stock !== undefined ? (p.stock - (p.sold_count || 0)) + ' / ' + p.stock : '无限' }}</div>
+                    <div class="package-stock">库存：{{ p.stock === -1 ? '不限' : (p.stock - (p.sold_count || 0)) + ' / ' + p.stock }}</div>
                     <div class="package-prices">
                         <span class="price-item">月付 {{ p.monthly_price }}元</span>
                         <span class="price-item">季付 {{ p.quarterly_price }}元</span>
                         <span class="price-item">年付 {{ p.yearly_price }}元</span>
                     </div>
-                    <pv-button :disabled="p.stock !== null && p.stock !== undefined && (p.stock - (p.sold_count || 0)) <= 0" @click="openOrderModal(p, 'lxc')">{{ (p.stock !== null && p.stock !== undefined && (p.stock - (p.sold_count || 0)) <= 0) ? '已售罄' : '立即开通' }}</pv-button>
+                    <pv-button :disabled="p.stock !== -1 && p.stock !== null && (p.stock - (p.sold_count || 0)) <= 0" @click="openOrderModal(p, 'lxc')">{{ (p.stock !== -1 && p.stock !== null && (p.stock - (p.sold_count || 0)) <= 0) ? '已售罄' : '立即开通' }}</pv-button>
                 </div>
             </div>
             <div class="package-empty" v-if="lxcPackages.length === 0">暂无可用套餐</div>
