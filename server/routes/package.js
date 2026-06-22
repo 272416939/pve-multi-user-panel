@@ -51,7 +51,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         var pkg = await db.vmPackages.getById(packageId);
         if (!pkg) return res.status(404).json({ error: '套餐不存在' });
         // 库存校验：-1 表示不限量，0 表示售罄，null 兼容旧数据视为不限量
-        if (pkg.stock !== null && pkg.stock !== -1 && pkg.sold_count >= pkg.stock) {
+        if (pkg.stock !== null && pkg.stock !== -1 && pkg.stock <= 0) {
             return res.status(400).json({ error: '该套餐已售罄' });
         }
 
@@ -143,10 +143,14 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             trade_no: '', api_trade_no: ''
         });
 
-        // 增加已售数量
+        // 增加已售数量，并扣减剩余库存（-1 不限量不扣减）
         try {
-            await db.vmPackages.update(pkg.id, { sold_count: (pkg.sold_count || 0) + 1 });
-        } catch (soldErr) { console.error('[package] 更新已售数量失败:', soldErr.message); }
+            var vmUpdates = { sold_count: (pkg.sold_count || 0) + 1 };
+            if (pkg.stock !== null && pkg.stock !== -1 && pkg.stock > 0) {
+                vmUpdates.stock = pkg.stock - 1;
+            }
+            await db.vmPackages.update(pkg.id, vmUpdates);
+        } catch (soldErr) { console.error('[package] 更新库存失败:', soldErr.message); }
 
         try {
             await db.messages.create({
@@ -214,7 +218,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var pkg = await db.lxcPackages.getById(packageId);
         if (!pkg) return res.status(404).json({ error: '套餐不存在' });
         // 库存校验：-1 表示不限量，0 表示售罄，null 兼容旧数据视为不限量
-        if (pkg.stock !== null && pkg.stock !== -1 && pkg.sold_count >= pkg.stock) {
+        if (pkg.stock !== null && pkg.stock !== -1 && pkg.stock <= 0) {
             return res.status(400).json({ error: '该套餐已售罄' });
         }
 
@@ -311,10 +315,14 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             trade_no: '', api_trade_no: ''
         });
 
-        // 增加已售数量
+        // 增加已售数量，并扣减剩余库存（-1 不限量不扣减）
         try {
-            await db.lxcPackages.update(pkg.id, { sold_count: (pkg.sold_count || 0) + 1 });
-        } catch (soldErr) { console.error('[package] 更新已售数量失败:', soldErr.message); }
+            var lxcUpdates = { sold_count: (pkg.sold_count || 0) + 1 };
+            if (pkg.stock !== null && pkg.stock !== -1 && pkg.stock > 0) {
+                lxcUpdates.stock = pkg.stock - 1;
+            }
+            await db.lxcPackages.update(pkg.id, lxcUpdates);
+        } catch (soldErr) { console.error('[package] 更新库存失败:', soldErr.message); }
 
         try {
             await db.messages.create({

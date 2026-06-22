@@ -100,45 +100,29 @@
     };
 
     $.restockVmPackage = async function(pkg) {
-        // -1 表示不限量，提示用户当前状态
-        if (pkg.stock === -1) {
-            if (!await window.customConfirm('当前套餐为不限量，是否要改为限量库存？')) return;
-            var input = prompt('请输入库存数量（正整数）：');
-            if (input === null) return;
-            var newStock = parseInt(input);
-            if (isNaN(newStock) || newStock < 0) { alert('请输入非负整数'); return; }
-        } else {
-            var input2 = prompt('请输入补货数量（正整数，将在当前库存基础上增加）：');
-            if (input2 === null) return;
-            var add = parseInt(input2);
-            if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
-            var newStock = (pkg.stock || 0) + add;
-        }
+        // 直接设置新的库存数量（不累加）
+        var current = (pkg.stock === -1 || pkg.stock === null) ? '不限' : pkg.stock;
+        var input = prompt('请输入新的库存数量（-1 不限量，0 售罄，正整数剩余库存）\n当前库存：' + current, current === '不限' ? '-1' : String(current));
+        if (input === null) return;
+        var newStock = parseInt(input);
+        if (isNaN(newStock) || newStock < -1) { alert('请输入 -1 或非负整数'); return; }
         try {
             await api('/admin/vm-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
             await $.loadVmPackages();
-        } catch (e) { alert('补货失败：' + e.message); }
+        } catch (e) { alert('设置库存失败：' + e.message); }
     };
 
     $.restockLxcPackage = async function(pkg) {
-        // -1 表示不限量，提示用户当前状态
-        if (pkg.stock === -1) {
-            if (!await window.customConfirm('当前套餐为不限量，是否要改为限量库存？')) return;
-            var input = prompt('请输入库存数量（正整数）：');
-            if (input === null) return;
-            var newStock = parseInt(input);
-            if (isNaN(newStock) || newStock < 0) { alert('请输入非负整数'); return; }
-        } else {
-            var input2 = prompt('请输入补货数量（正整数，将在当前库存基础上增加）：');
-            if (input2 === null) return;
-            var add = parseInt(input2);
-            if (isNaN(add) || add <= 0) { alert('请输入正整数'); return; }
-            var newStock = (pkg.stock || 0) + add;
-        }
+        // 直接设置新的库存数量（不累加）
+        var current = (pkg.stock === -1 || pkg.stock === null) ? '不限' : pkg.stock;
+        var input = prompt('请输入新的库存数量（-1 不限量，0 售罄，正整数剩余库存）\n当前库存：' + current, current === '不限' ? '-1' : String(current));
+        if (input === null) return;
+        var newStock = parseInt(input);
+        if (isNaN(newStock) || newStock < -1) { alert('请输入 -1 或非负整数'); return; }
         try {
             await api('/admin/lxc-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
             await $.loadLxcPackages();
-        } catch (e) { alert('补货失败：' + e.message); }
+        } catch (e) { alert('设置库存失败：' + e.message); }
     };
 
     $.provisionVm = async function() {

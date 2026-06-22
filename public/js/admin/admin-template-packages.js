@@ -11,7 +11,7 @@
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
-                                    <tr><th>ID</th><th>套餐名</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付</th><th>年付</th><th>库存数量</th><th>销售数量</th><th>剩余库存</th><th>状态</th><th>操作</th></tr>
+                                    <tr><th>ID</th><th>套餐名</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付</th><th>年付</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="p in packagePage.vmPackages.value" :key="p.id">
@@ -24,9 +24,8 @@
                                         <td>{{ p.monthly_price }}元</td>
                                         <td>{{ p.quarterly_price }}元</td>
                                         <td>{{ p.yearly_price }}元</td>
-                                        <td>{{ p.stock === -1 ? '不限' : p.stock }}</td>
+                                        <td>{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</td>
                                         <td>{{ p.sold_count || 0 }}</td>
-                                        <td>{{ p.stock === -1 ? '不限' : (p.stock - (p.sold_count || 0)) }}</td>
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
                                             <div class="btn-group btn-group-sm">
@@ -36,7 +35,7 @@
                         </div>
                                         </td>
                                     </tr>
-                                    <tr v-if="packagePage.vmPackages.value.length === 0"><td colspan="14" class="text-center text-muted">暂无套餐</td></tr>
+                                    <tr v-if="packagePage.vmPackages.value.length === 0"><td colspan="13" class="text-center text-muted">暂无套餐</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -50,16 +49,15 @@
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
-                                    <tr><th>ID</th><th>套餐名</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付</th><th>年付</th><th>库存数量</th><th>销售数量</th><th>剩余库存</th><th>状态</th><th>操作</th></tr>
+                                    <tr><th>ID</th><th>套餐名</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付</th><th>年付</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="p in packagePage.lxcPackages.value" :key="p.id">
                                         <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ packagePage.getTemplateName(p) }}</td>
                                         <td>{{ p.cores }}核</td><td>{{ p.memory }}MB</td><td>{{ p.swap }}MB</td><td>{{ p.disk_size }}GB</td>
                                         <td>{{ p.monthly_price }}元</td><td>{{ p.quarterly_price }}元</td><td>{{ p.yearly_price }}元</td>
-                                        <td>{{ p.stock === -1 ? '不限' : p.stock }}</td>
+                                        <td>{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</td>
                                         <td>{{ p.sold_count || 0 }}</td>
-                                        <td>{{ p.stock === -1 ? '不限' : (p.stock - (p.sold_count || 0)) }}</td>
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
                         <div class="btn-group btn-group-sm">
@@ -69,7 +67,7 @@
                         </div>
                     </td>
                                     </tr>
-                                    <tr v-if="packagePage.lxcPackages.value.length === 0"><td colspan="15" class="text-center text-muted">暂无套餐</td></tr>
+                                    <tr v-if="packagePage.lxcPackages.value.length === 0"><td colspan="14" class="text-center text-muted">暂无套餐</td></tr>
                                 </tbody>
                             </table>
                         </div>
