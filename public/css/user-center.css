@@ -317,6 +317,45 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     vertical-align: middle;
 }
 
+/* ===== 充值扫码/跳转支付弹窗 ===== */
+.recharge-pay-modal { max-width: 360px; }
+.recharge-qr-wrap {
+    display: inline-block;
+    padding: 12px;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    line-height: 0;
+}
+.recharge-qr-img {
+    width: 240px; height: 240px;
+    display: block;
+    border-radius: 4px;
+}
+.recharge-qr-loading {
+    width: 240px; height: 240px;
+    display: flex; align-items: center; justify-content: center;
+}
+.recharge-pay-btn {
+    padding: 10px 32px;
+    font-size: 15px;
+    font-weight: 600;
+    border-radius: 8px;
+}
+.recharge-harmony-tip {
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #b45309;
+    background: rgba(245,158,11,0.12);
+    border: 1px solid rgba(245,158,11,0.3);
+}
+[data-theme="dark"] .recharge-harmony-tip {
+    color: #fbbf24;
+    background: rgba(245,158,11,0.15);
+    border-color: rgba(245,158,11,0.35);
+}
+
 /* 响应式 */
 @media (max-width: 576px) {
     .message-item { padding: 12px 14px; }

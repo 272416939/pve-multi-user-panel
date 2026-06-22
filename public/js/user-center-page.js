@@ -49,8 +49,12 @@ const App = {
         const rechargeResultType = ref(''); // success / fail / cancel / timeout
         const rechargeResultTitle = ref('');
         const rechargeResultAmount = ref('');
+        const rechargeQrUrl = ref('');          // PC 端二维码 base64
+        const rechargePayUrl = ref('');          // 支付链接（手机端跳转用）
+        const rechargeIsMobile = ref(false);     // 是否手机端
+        const rechargeShowHarmonyTip = ref(false); // 是否显示鸿蒙微信提示
+        const isHarmonyDevice = ref(false);      // 当前设备是否鸿蒙系统
         let rechargePollingTimer = null;
-        let rechargePayWin = null;
 
         const parseMarkdown = (text) => {
             if (!text) return '';
@@ -161,29 +165,49 @@ const App = {
             try {
                 const res = await api('/wallet/recharge', { method: 'POST', body: { amount: amount.toFixed(2), pay_method: rechargeMethod.value } });
                 if (res.success && res.redirect_url) {
-                    // 打开支付窗口
-                    rechargePayWin = window.open(res.redirect_url, '_blank');
-                    if (!rechargePayWin) {
-                        rechargeError.value = '支付窗口被浏览器拦截，请允许弹窗后重试';
-                        rechargeSubmitting.value = false;
-                        return;
-                    }
-                    // 显示等待弹窗
+                    const payUrl = res.redirect_url;
                     rechargePendingOrderNo.value = res.order_no;
                     rechargePendingAmount.value = amount.toFixed(2);
+                    rechargePayUrl.value = payUrl;
+                    // 设备检测
+                    const ua = navigator.userAgent || '';
+                    const mobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(ua);
+                    const harmony = /HarmonyOS|OpenHarmony|ArkWeb/i.test(ua);
+                    rechargeIsMobile.value = mobile;
+                    rechargeShowHarmonyTip.value = mobile && harmony && rechargeMethod.value === 'wxpay';
+                    if (mobile) {
+                        // 手机端：不生成二维码，显示跳转按钮
+                        rechargeQrUrl.value = '';
+                    } else {
+                        // PC 端：用支付链接生成二维码
+                        if (!window.QRCode) {
+                            rechargeError.value = '二维码库加载失败，请刷新重试';
+                            rechargeSubmitting.value = false;
+                            return;
+                        }
+                        try {
+                            rechargeQrUrl.value = await QRCode.toDataURL(payUrl, { width: 240, margin: 2, color: { dark: '#000000', light: '#ffffff' } });
+                        } catch (e2) {
+                            console.error('二维码生成失败', e2);
+                            rechargeError.value = '二维码生成失败，请稍后重试';
+                            rechargeSubmitting.value = false;
+                            return;
+                        }
+                    }
+                    // 显示扫码支付弹窗
                     const modalEl = document.getElementById('rechargePendingModal');
                     if (modalEl) {
                         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
                         modal.show();
                     }
                     // 启动轮询
-                    pollOrderStatus(res.order_no, rechargePayWin, amount.toFixed(2));
+                    pollOrderStatus(res.order_no, amount.toFixed(2));
                 } else { rechargeError.value = res.error || '创建订单失败'; }
             } catch (e) { rechargeError.value = '请求失败，请稍后重试'; }
             rechargeSubmitting.value = false;
         };
 
-        const pollOrderStatus = (orderNo, payWin, amount) => {
+        const pollOrderStatus = (orderNo, amount) => {
             const startTime = Date.now();
             const timeout = 10 * 60 * 1000; // 10 分钟
             const interval = 2000; // 2 秒
@@ -196,36 +220,12 @@ const App = {
                     showRechargeResult('timeout', '');
                     return;
                 }
-                // 检查支付窗口是否关闭
-                if (payWin && payWin.closed) {
-                    // 窗口关闭，最后查询一次
-                    try {
-                        const status = await api('/wallet/order-status/' + orderNo);
-                        stopPolling();
-                        closePendingModal();
-                        if (status.status === 'paid') {
-                            showRechargeResult('success', status.amount || amount);
-                            loadWalletBalance();
-                            rechargeAmount.value = '';
-                            rechargeMethod.value = '';
-                        } else {
-                            showRechargeResult('cancel', '');
-                        }
-                    } catch (e) {
-                        stopPolling();
-                        closePendingModal();
-                        showRechargeResult('cancel', '');
-                    }
-                    return;
-                }
                 // 查询订单状态
                 try {
                     const status = await api('/wallet/order-status/' + orderNo);
                     if (status.status === 'paid') {
                         stopPolling();
                         closePendingModal();
-                        // 关闭支付窗口
-                        if (payWin && !payWin.closed) { try { payWin.close(); } catch (e) {} }
                         showRechargeResult('success', status.amount || amount);
                         loadWalletBalance();
                         rechargeAmount.value = '';
@@ -277,13 +277,34 @@ const App = {
 
         const cancelRecharge = () => {
             stopPolling();
-            // 关闭支付窗口
-            if (rechargePayWin && !rechargePayWin.closed) {
-                try { rechargePayWin.close(); } catch (e) {}
-            }
-            rechargePayWin = null;
             closePendingModal();
             showRechargeResult('cancel', '');
+        };
+
+        // 手机端点击跳转到支付宝/微信 app
+        const openMobilePay = () => {
+            if (rechargePayUrl.value) {
+                window.location.href = rechargePayUrl.value;
+            }
+        };
+
+        // 手机端从支付 app 切回浏览器时，自动检测支付完成
+        const handleVisibilityChange = async () => {
+            if (document.visibilityState === 'visible' && rechargePollingTimer && rechargePendingOrderNo.value) {
+                try {
+                    const status = await api('/wallet/order-status/' + rechargePendingOrderNo.value);
+                    if (status.status === 'paid') {
+                        stopPolling();
+                        closePendingModal();
+                        showRechargeResult('success', status.amount || rechargePendingAmount.value);
+                        loadWalletBalance();
+                        rechargeAmount.value = '';
+                        rechargeMethod.value = '';
+                    }
+                } catch (e) {
+                    // 忽略错误，轮询会继续
+                }
+            }
         };
 
         const closeRechargeResult = () => {
@@ -333,6 +354,8 @@ const App = {
                 if (res.success) {
                     window.history.replaceState({}, '', window.location.pathname + (activeSubTab.value !== 'settings' ? '#' + activeSubTab.value : ''));
                     loadWalletBalance();
+                    // 显示充值成功弹窗
+                    showRechargeResult('success', res.amount || '');
                 }
             } catch (e) {
                 console.error('同步回调处理失败', e);
@@ -952,6 +975,10 @@ const App = {
         };
 
         onMounted(async () => {
+            // 鸿蒙系统检测（用于充值表单提示）
+            isHarmonyDevice.value = /HarmonyOS|OpenHarmony|ArkWeb/i.test(navigator.userAgent || '');
+            // 手机端从支付 app 切回时自动检测支付完成
+            document.addEventListener('visibilitychange', handleVisibilityChange);
             const userData = await authGuard();
             if (userData) {
                 user.value = userData;
@@ -983,6 +1010,7 @@ const App = {
 
         onBeforeUnmount(() => {
             stopPolling();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         });
 
         watch(activeSubTab, (val) => {
@@ -1063,7 +1091,8 @@ const App = {
             txList, txTotal, txPage, txFilter, myOrders,
             submitRecharge, loadTx, copyOrderNo, loadMyOrders,
             rechargePendingOrderNo, rechargePendingAmount, rechargeResultType, rechargeResultTitle, rechargeResultAmount,
-            pollOrderStatus, cancelRecharge, closeRechargeResult
+            rechargeQrUrl, rechargePayUrl, rechargeIsMobile, rechargeShowHarmonyTip, isHarmonyDevice,
+            pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay
         };
     }
 };

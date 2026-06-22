@@ -199,6 +199,9 @@
                                     </div>
                                     <div v-if="!payMethods.alipay && !payMethods.wxpay" class="text-muted small">暂无可用的支付方式</div>
                                 </div>
+                                <div v-if="rechargeMethod === 'wxpay' && isHarmonyDevice" class="alert alert-warning py-2 mb-3 small">
+                                    检测到鸿蒙系统，微信支付可能无法正常跳转，建议使用支付宝
+                                </div>
                                 <div v-if="rechargeError" class="alert alert-danger py-2 mb-3">{{ rechargeError }}</div>
                                 <pv-button variant="primary" @click="submitRecharge" :disabled="!rechargeMethod || !rechargeAmount || rechargeSubmitting">
                                     <span v-if="rechargeSubmitting">提交中...</span>
@@ -441,17 +444,33 @@
                     </div>
                 </div>
 
-                <!-- 等待充值中弹窗 -->
+                <!-- 扫码/跳转支付弹窗 -->
                 <div class="modal fade" id="rechargePendingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-                    <div class="modal-dialog modal-sm modal-dialog-centered">
+                    <div class="modal-dialog modal-dialog-centered recharge-pay-modal">
                         <div class="modal-content">
-                            <div class="modal-body text-center py-4">
-                                <div class="custom-alert-icon mb-3">
-                                    <div class="spinner-border text-primary" role="status" style="width: 36px; height: 36px;">
-                                        <span class="visually-hidden">加载中...</span>
+                            <div class="modal-body text-center py-4 px-4">
+                                <!-- PC 端：二维码扫码 -->
+                                <template v-if="!rechargeIsMobile">
+                                    <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">请使用{{ rechargeMethod === 'alipay' ? '支付宝' : '微信' }}扫码支付</h6>
+                                    <div class="recharge-qr-wrap mb-3">
+                                        <img v-if="rechargeQrUrl" :src="rechargeQrUrl" alt="支付二维码" class="recharge-qr-img">
+                                        <div v-else class="recharge-qr-loading">
+                                            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div>
+                                        </div>
                                     </div>
-                                </div>
-                                <h6 class="mb-2" style="color:var(--text-primary);font-size:15px;font-weight:600;">等待支付完成...</h6>
+                                </template>
+                                <!-- 手机端：跳转按钮 -->
+                                <template v-else>
+                                    <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">点击下方按钮进行支付</h6>
+                                    <div v-if="rechargeShowHarmonyTip" class="recharge-harmony-tip mb-3">
+                                        检测到鸿蒙系统，微信支付可能无法正常跳转，建议使用支付宝
+                                    </div>
+                                    <button type="button" class="btn btn-primary recharge-pay-btn mb-3" @click="openMobilePay">
+                                        打开{{ rechargeMethod === 'alipay' ? '支付宝' : '微信' }}支付
+                                    </button>
+                                    <p class="mb-0" style="color:var(--text-secondary);font-size:12px;">支付完成后请返回此页面</p>
+                                </template>
+                                <!-- 公共订单信息 -->
                                 <p class="mb-1" style="color:var(--text-secondary);font-size:13px;">订单号：{{ rechargePendingOrderNo }}</p>
                                 <p class="mb-0" style="color:var(--text-secondary);font-size:13px;">充值金额：<strong style="color:var(--color-primary);">¥{{ rechargePendingAmount }}</strong></p>
                             </div>
