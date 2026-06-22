@@ -39,33 +39,40 @@
                                             <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
                                             <td>{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</td>
                                             <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
-                                            <td><span v-if="networkConfig.cname_domain" class="text-primary">{{ vm.vm_id }}.{{ networkConfig.cname_domain }}</span><span v-else class="text-muted">-</span></td>
+                                            <td>
+                                                <template v-if="networkConfig.cname_domain">
+                                                    <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname" class="text-primary" style="line-height:1.5;">{{ cname }}</div>
+                                                </template>
+                                                <span v-else class="text-muted">-</span>
+                                            </td>
                                             <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
                                             <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                             <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                             <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                             <td>
-                                                <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
-                                                <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
-                                                    <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
-                                                    <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
-                                                    <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
-                                                </div>
-                                                <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
-                                                    <button class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
-                                                    <button class="table-btn btn-warning" @click="removeVmById(vm.id)">移除</button>
-                                                    <button class="table-btn btn-danger" @click="openDestroyVmModal(vm)">销毁</button>
-                                                </div>
-                                                <div class="dropdown-table">
-                                                    <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
-                                                    <ul class="dropdown-menu-table">
-                                                        <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
-                                                        <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
-                                                        <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
-                                                        <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
-                                                        <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
-                                                        <li><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
-                                                    </ul>
+                                                <div class="table-actions">
+                                                    <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
+                                                    <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
+                                                        <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
+                                                        <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
+                                                        <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
+                                                    </div>
+                                                    <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
+                                                        <button class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
+                                                        <button class="table-btn btn-warning" @click="removeVmById(vm.id)">移除</button>
+                                                        <button class="table-btn btn-danger" @click="openDestroyVmModal(vm)">销毁</button>
+                                                    </div>
+                                                    <div class="dropdown-table">
+                                                        <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                                        <ul class="dropdown-menu-table">
+                                                            <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
+                                                            <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
+                                                            <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
+                                                            <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
+                                                            <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
+                                                            <li><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
+                                                        </ul>
+                                                    </div>
                                                 </div>
                                             </td>
                                         </tr>

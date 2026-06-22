@@ -298,8 +298,9 @@ tr:hover td { background: var(--bg-hover); }
 .chart-card canvas { width: 100% !important; height: 220px !important; max-height: 220px; flex-shrink: 0; }
 
 /* ========== 表格内操作按钮组 ========== */
-.btn-group-table { display: inline-flex; gap: 2px; vertical-align: middle; }
-.dropdown-table { display: inline-block; position: relative; vertical-align: middle; margin-left: 4px; }
+.table-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; white-space: nowrap; }
+.btn-group-table { display: inline-flex; gap: 2px; align-items: center; }
+.dropdown-table { display: inline-block; position: relative; margin-left: 2px; }
 .dropdown-table .dropdown-toggle::after { display: none; }
 .dropdown-menu-table { display: none; position: absolute; right: 0; top: 100%; z-index: 1000;
     min-width: 120px; padding: 6px 0; background: var(--bg-modal); backdrop-filter: blur(16px);

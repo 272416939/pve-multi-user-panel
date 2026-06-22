@@ -146,7 +146,7 @@
                     <!-- 网络管理 -->
                     <div v-if="activeTab === 'network'">
                         <h4 class="module-title">端口转发配置</h4>
-                        <div class="card">
+                        <div class="card" style="position: relative; z-index: 3; overflow: visible;">
                             <div class="card-header"><h5 class="mb-0">全局设置</h5></div>
                             <div class="card-body">
                                 <div class="row mb-3">
@@ -168,7 +168,7 @@
                                         <input type="number" class="form-control" v-model.number="networkConfig.max_per_user" min="0" max="100">
                                         <small class="text-muted">0=不限制，超过限制时用户无法新增转发</small>
                                     </div>
-                                    <div class="col-md-4" style="position: relative; z-index: 10;">
+                                    <div class="col-md-4">
                                         <label class="form-label">默认外网接口</label>
                                         <div class="input-group">
                                             <input type="text" class="form-control" v-model="networkConfig.wan_interface" placeholder="点击右侧下拉框选择接口" readonly>
@@ -197,14 +197,15 @@
                         </div>
 
                         <!-- CNAME 域名配置 -->
-                        <div class="card mt-3">
+                        <div class="card mt-3" style="position: relative; z-index: 1;">
                             <div class="card-header"><h5 class="mb-0">CNAME 域名设置</h5></div>
                             <div class="card-body">
-                                <p class="text-muted small mb-3">配置统一公网域名，所有虚拟机/容器通过此域名访问（需在 DNS 服务商处将 CNAME 指向主机公网 IP）。</p>
+                                <p class="text-muted small mb-3">配置统一公网域名，所有虚拟机/容器通过此域名访问（需在 DNS 服务商处将 CNAME 指向主机公网 IP）。支持多线路，多个域名用英文逗号分隔。</p>
                                 <div class="row mb-3">
                                     <div class="col-md-6">
                                         <label class="form-label">CNAME 域名</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.cname_domain" placeholder="例如: pve.example.com">
+                                        <input type="text" class="form-control" v-model="networkConfig.cname_domain" placeholder="如: 电信pve.example.com,联通pve.example.com">
+                                        <small class="text-muted">格式: 线路名+域名，多个用英文逗号分隔。如 电信pve.example.com,联通pve.example.com</small>
                                     </div>
                                     <div class="col-md-6 d-flex align-items-end">
                                         <pv-button @click="saveNetworkConfig" variant="primary">💾 保存 CNAME</pv-button>

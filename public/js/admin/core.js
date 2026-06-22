@@ -394,6 +394,28 @@ watch($.user, function(u) {
         }
     };
 
+    // CNAME 多域名格式化：将逗号分隔的域名列表格式化为设备级 CNAME 数组
+    // 输入: "电信pve.example.com,联通pve.example.com", deviceId=100
+    // 输出: ["电信100.pve.example.com", "联通100.pve.example.com"]
+    $.formatCnameList = function(cnameDomain, deviceId) {
+        if (!cnameDomain) return [];
+        var domains = cnameDomain.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+        return domains.map(function(domain) {
+            // 提取前导中文字符作为线路名前缀
+            var match = domain.match(/^([\u4e00-\u9fa5]+)(.*)$/);
+            if (match) {
+                var prefix = match[1];
+                var rest = match[2];
+                if (rest.startsWith('.')) {
+                    return prefix + deviceId + rest;
+                }
+                return prefix + deviceId + '.' + rest;
+            }
+            // 无中文前缀，直接在域名前加 deviceId.
+            return deviceId + '.' + domain;
+        });
+    };
+
     $.confirmOk = function() {
         var resolve = $.customConfirmResolve.value;
         if (resolve) {

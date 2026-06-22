@@ -128,32 +128,39 @@
                                     <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
                                     <td>{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</td>
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
-                                    <td><span v-if="cnameDomain" class="text-primary">{{ vm.vm_id }}.{{ cnameDomain }}</span><span v-else class="text-muted">-</span></td>
+                                    <td>
+                                        <template v-if="cnameDomain">
+                                            <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname" class="text-primary" style="line-height:1.5;">{{ cname }}</div>
+                                        </template>
+                                        <span v-else class="text-muted">-</span>
+                                    </td>
                                     <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
                                     <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
                                     <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                     <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
-                                        <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
-                                        <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
-                                            <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
-                                            <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
-                                            <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
-                                        </div>
-                                        <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
-                                            <button class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
-                                        </div>
-                                        <div class="dropdown-table">
-                                            <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
-                                            <ul class="dropdown-menu-table">
-                                                <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
-                                                <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
-                                                <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
-                                                <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
-                                                <li><a href="#" @click.prevent="renewResource = vm; renewShow = true">续费</a></li>
-                                                <li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
-                                                <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
-                                            </ul>
+                                        <div class="table-actions">
+                                            <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
+                                            <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
+                                                <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
+                                                <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
+                                                <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
+                                            </div>
+                                            <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
+                                                <button class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
+                                            </div>
+                                            <div class="dropdown-table">
+                                                <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                                <ul class="dropdown-menu-table">
+                                                    <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
+                                                    <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
+                                                    <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
+                                                    <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
+                                                    <li><a href="#" @click.prevent="renewResource = vm; renewShow = true">续费</a></li>
+                                                    <li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
+                                                    <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
+                                                </ul>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>
@@ -198,32 +205,39 @@
                                     <td>{{ ct.ct_id }}</td>
                                     <td>{{ ct.name || ('CT ' + ct.ct_id) }}</td>
                                     <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
-                                    <td><span v-if="cnameDomain" class="text-primary">{{ ct.ct_id }}.{{ cnameDomain }}</span><span v-else class="text-muted">-</span></td>
+                                    <td>
+                                        <template v-if="cnameDomain">
+                                            <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname" class="text-primary" style="line-height:1.5;">{{ cname }}</div>
+                                        </template>
+                                        <span v-else class="text-muted">-</span>
+                                    </td>
                                     <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.status && ct.status.maxdisk ? '/ ' + Math.round(ct.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
                                     <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
                                     <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                     <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
-                                        <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
-                                        <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
-                                            <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
-                                            <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
-                                            <button class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
-                                        </div>
-                                        <div class="btn-group-table" v-if="!ct.status || ct.status.status !== 'running'">
-                                            <button class="table-btn btn-primary" @click="startLxc(ct.ct_id)">启动</button>
-                                        </div>
-                                        <div class="dropdown-table">
-                                            <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
-                                            <ul class="dropdown-menu-table">
-                                                <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
-                                                <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
-                                                <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
-                                                <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
-                                                <li><a href="#" @click.prevent="renewResource = ct; renewShow = true">续费</a></li>
-                                                <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
-                                                <li><a href="#" @click.prevent="openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
-                                            </ul>
+                                        <div class="table-actions">
+                                            <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
+                                            <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
+                                                <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
+                                                <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
+                                                <button class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
+                                            </div>
+                                            <div class="btn-group-table" v-if="!ct.status || ct.status.status !== 'running'">
+                                                <button class="table-btn btn-primary" @click="startLxc(ct.ct_id)">启动</button>
+                                            </div>
+                                            <div class="dropdown-table">
+                                                <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                                <ul class="dropdown-menu-table">
+                                                    <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
+                                                    <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
+                                                    <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
+                                                    <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
+                                                    <li><a href="#" @click.prevent="renewResource = ct; renewShow = true">续费</a></li>
+                                                    <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
+                                                    <li><a href="#" @click.prevent="openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
+                                                </ul>
+                                            </div>
                                         </div>
                                     </td>
                                 </tr>

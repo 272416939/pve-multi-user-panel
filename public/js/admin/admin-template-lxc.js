@@ -268,34 +268,41 @@
                                                 <td>{{ ct.username || '-' }}</td>
                                                 <td>{{ ct.name || ('CT ' + ct.ct_id) }}</td>
                                                 <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
-                                                <td><span v-if="networkConfig.cname_domain" class="text-primary">{{ ct.ct_id }}.{{ networkConfig.cname_domain }}</span><span v-else class="text-muted">-</span></td>
+                                                <td>
+                                                    <template v-if="networkConfig.cname_domain">
+                                                        <div v-for="cname in formatCnameList(networkConfig.cname_domain, ct.ct_id)" :key="cname" class="text-primary" style="line-height:1.5;">{{ cname }}</div>
+                                                    </template>
+                                                    <span v-else class="text-muted">-</span>
+                                                </td>
                                                 <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.status && ct.status.maxdisk ? '/ ' + Math.round(ct.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
                                                 <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
                                                 <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                                 <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                                 <td>
-                                                    <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
-                                                    <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
-                                                        <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
-                                                        <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
-                                                        <button class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
-                                                    </div>
-                                                    <div class="btn-group-table" v-if="!ct.status || ct.status.status !== 'running'">
-                                                        <button class="table-btn btn-primary" @click="startLxc(ct.ct_id)">启动</button>
-                                                        <button class="table-btn btn-warning" @click="removeLxcById(ct.id)">移除</button>
-                                                        <button class="table-btn btn-danger" @click="openDestroyLxcModalFromList(ct)">销毁</button>
-                                                    </div>
-                                                    <div class="dropdown-table">
-                                                        <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
-                                                        <ul class="dropdown-menu-table">
-                                                            <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
-                                                            <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
-                                                            <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
-                                                            <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
-                                                            <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
-                                                            <li><a href="#" @click.prevent="openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
-                                                            <li><a href="#" @click.prevent="openResetLxcPasswordModal(ct)" class="text-warning">重置密码</a></li>
-                                                        </ul>
+                                                    <div class="table-actions">
+                                                        <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
+                                                        <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
+                                                            <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
+                                                            <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
+                                                            <button class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
+                                                        </div>
+                                                        <div class="btn-group-table" v-if="!ct.status || ct.status.status !== 'running'">
+                                                            <button class="table-btn btn-primary" @click="startLxc(ct.ct_id)">启动</button>
+                                                            <button class="table-btn btn-warning" @click="removeLxcById(ct.id)">移除</button>
+                                                            <button class="table-btn btn-danger" @click="openDestroyLxcModalFromList(ct)">销毁</button>
+                                                        </div>
+                                                        <div class="dropdown-table">
+                                                            <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                                            <ul class="dropdown-menu-table">
+                                                                <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
+                                                                <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
+                                                                <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
+                                                                <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
+                                                                <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
+                                                                <li><a href="#" @click.prevent="openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
+                                                                <li><a href="#" @click.prevent="openResetLxcPasswordModal(ct)" class="text-warning">重置密码</a></li>
+                                                            </ul>
+                                                        </div>
                                                     </div>
                                                 </td>
                                             </tr>
