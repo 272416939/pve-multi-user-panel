@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.13.0] - 2026-06-23
+
+### Added
+- feat(auth): 新增用户自助注册功能（用户名/密码/邮箱/邮箱验证码）
+  - 新增 POST /api/register 和 POST /api/register/send-code 接口
+  - 新增 GET /api/register/status 公开接口供前端判断注册开关
+  - 新增 GET/PUT /admin/register/config 管理员配置接口
+  - 新增 register:enabled 配置项（默认关闭，管理员后台开启）
+  - 新增用户名黑名单模块（admin/root/system 等 36 个敏感词）
+  - 新增 db.users.getByEmail 和 passwordResetTokens.deleteByEmailAndType/getByEmailAndType 方法
+  - 新增 token.generateCode 6 位 crypto 安全随机数字码
+  - 验证码邮件使用 createEmailTemplate 生成 HTML，10 分钟有效期
+  - 密码强度校验：8 位以上 + 大小写字母 + 特殊字符（前后端一致）
+  - 限速：注册 3次/小时 per IP，发送验证码 1次/60秒 per email + 5次/小时 per IP
+- feat(auth): 登录支持用户名或邮箱（已验证邮箱可登录）
+- feat(frontend): 登录页新增 [登录][注册] 切换按钮组、注册视图、密码强度检测条（弱红/中黄/强绿）、发送验证码倒计时
+
+### Security
+- 用户名黑名单防止注册 admin/root 等敏感名
+- 密码使用 SHA256(salt+password) 加盐加密，salt 为 16 字节 crypto 随机数
+- 邮箱登录防枚举：不存在邮箱统一返回"用户名或密码不正确"
+- 邮箱未验证时拒绝邮箱登录并返回明确提示
+
+---
+
 ## [2.12.4] - 2026-06-23
 
 ### Fixed
