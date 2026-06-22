@@ -19,6 +19,9 @@
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
     $.customConfirmResolve = ref(null);
+    $.customPromptMessage = ref('');
+    $.customPromptValue = ref('');
+    $.customPromptResolve = ref(null);
     $.unreadCount = ref(0);
     $.destroyLxcConfirmText = ref('');
     $.currentMsg = ref({ title: '', content: '', type: 1, created_at: '' });
@@ -498,6 +501,39 @@ watch($.user, function(u) {
         }
     };
 
+    $.promptOk = function() {
+        var resolve = $.customPromptResolve.value;
+        var val = $.customPromptValue.value;
+        if (resolve) {
+            $.customPromptResolve.value = null;
+            resolve(val);
+        }
+        if (document.activeElement && document.activeElement !== document.body) {
+            document.activeElement.blur();
+        }
+        var el = document.getElementById('customPromptModal');
+        if (el) {
+            var modal = bootstrap.Modal.getInstance(el);
+            if (modal) modal.hide();
+        }
+    };
+
+    $.promptCancel = function() {
+        var resolve = $.customPromptResolve.value;
+        if (resolve) {
+            $.customPromptResolve.value = null;
+            resolve(null);
+        }
+        if (document.activeElement && document.activeElement !== document.body) {
+            document.activeElement.blur();
+        }
+        var el = document.getElementById('customPromptModal');
+        if (el) {
+            var modal = bootstrap.Modal.getInstance(el);
+            if (modal) modal.hide();
+        }
+    };
+
     $.showAlertAndWait = function(message) {
         return new Promise(function(resolve) {
             $.customAlertMessage.value = message;
@@ -574,6 +610,40 @@ watch($.user, function(u) {
                 if (backdrop) {
                     backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
                 }
+            }, { once: true });
+        });
+    };
+
+    // 自定义 Prompt 弹窗（带输入框，基于 Promise）
+    window.customPrompt = function(message, defaultValue) {
+        return new Promise(function(resolve) {
+            $.customPromptMessage.value = message;
+            $.customPromptValue.value = defaultValue || '';
+            $.customPromptResolve.value = resolve;
+            var el = document.getElementById('customPromptModal');
+            if (!el) { resolve(null); return; }
+            var zIndex = window.ModalZIndexManager.acquire();
+            el._modalZIndex = zIndex;
+            el.style.zIndex = zIndex;
+            el.addEventListener('hidden.bs.modal', function onHidden() {
+                el.removeEventListener('hidden.bs.modal', onHidden);
+                if (el._modalZIndex != null) {
+                    window.ModalZIndexManager.release(el._modalZIndex);
+                    el._modalZIndex = null;
+                    el.style.zIndex = '';
+                }
+            }, { once: true });
+            var modal = bootstrap.Modal.getOrCreateInstance(el);
+            modal.show();
+            el.addEventListener('shown.bs.modal', function onShown() {
+                el.removeEventListener('shown.bs.modal', onShown);
+                var backdrop = document.querySelector('.modal-backdrop');
+                if (backdrop) {
+                    backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
+                }
+                // 自动聚焦输入框并选中文本
+                var input = el.querySelector('#customPromptInput');
+                if (input) { input.focus(); input.select(); }
             }, { once: true });
         });
     };
@@ -881,6 +951,9 @@ $.initDetailCharts = function() {
                 if ($.activeTab.value === 'network') {
                     $.loadForwardRules('all');
                 }
+                if ($.activeTab.value === 'transactions') {
+                    $.loadTransactions(1);
+                }
                 // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
                 setInterval(function() {
                     var token = localStorage.getItem('token');
@@ -912,6 +985,9 @@ $.initDetailCharts = function() {
             }
             if (newTab === 'orders') {
                 $.loadOrders(1);
+            }
+            if (newTab === 'transactions') {
+                $.loadTransactions(1);
             }
         });
 

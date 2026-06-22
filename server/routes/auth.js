@@ -9,6 +9,8 @@ const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateA
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { isUsernameBlacklisted } = require('../utils/username-blacklist');
+const tokenStore = require('../utils/token-store');
+const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
 
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const RATELIMIT_PREFIX = 'ratelimit:login:';
@@ -259,10 +261,22 @@ router.post('/auth/refresh', async (req, res) => {
 
 router.post('/logout', async (req, res) => {
     const { refreshToken } = req.body;
+    // 将 access token 加入黑名单（从 Authorization header 读取）
+    const accessToken = req.headers.authorization?.replace('Bearer ', '');
+    if (accessToken) {
+        try {
+            const decoded = jwt.decode(accessToken);
+            if (decoded && decoded.exp) {
+                await blacklistToken(accessToken, decoded.exp);
+            }
+        } catch (e) {}
+    }
     if (refreshToken) {
         const record = await db.refreshTokens.getByToken(refreshToken);
         if (record) {
             await db.refreshTokens.revoke(record.id);
+            // 清除设备缓存
+            await invalidateDeviceCache(record.id);
         }
     }
     res.json({ message: '登出成功' });
@@ -288,16 +302,9 @@ router.post('/auth/forgot-password', async (req, res) => {
         }
         
         const token = generateToken();
-        const expiresAt = new Date(Date.now() + 3600000);
-        
-        await db.passwordResetTokens.deleteByType(user.id, 'password_reset');
-        
-        await db.passwordResetTokens.create({
-            userId: user.id,
-            token: token,
-            type: 'password_reset',
-            expiresAt: formatLocalDateTime(expiresAt)
-        });
+
+        // 使用 token-store 存储（优先 Redis，回退数据库）
+        await tokenStore.setResetToken(token, user.id, 3600);
         
         // H-10 修复：检查 SITE_URL 是否已配置
         const siteUrl = getSiteUrl(req);
@@ -337,13 +344,12 @@ router.post('/auth/forgot-password', async (req, res) => {
 router.get('/auth/reset-password/:token', async (req, res) => {
     try {
         const { token } = req.params;
-        
-        const resetToken = await db.passwordResetTokens.getByToken(token);
-        
-        if (!resetToken || resetToken.type !== 'password_reset' || new Date(resetToken.expiresAt) <= new Date()) {
+
+        const userId = await tokenStore.getResetToken(token);
+        if (!userId) {
             return res.status(400).json({ error: '链接无效或已过期' });
         }
-        
+
         res.json({ valid: true });
     } catch (error) {
         res.status(500).json({ error: '验证失败' });
@@ -362,28 +368,30 @@ router.post('/auth/reset-password', async (req, res) => {
             return res.status(400).json({ error: '密码至少需要 6 个字符' });
         }
         
-        const resetToken = await db.passwordResetTokens.getByToken(token);
-        
-        if (!resetToken || resetToken.type !== 'password_reset' || new Date(resetToken.expiresAt) <= new Date()) {
+        const userId = await tokenStore.getResetToken(token);
+        if (!userId) {
             return res.status(400).json({ error: '链接无效或已过期' });
         }
-        
-        const user = await db.users.getById(resetToken.user_id);
-        
+
+        const user = await db.users.getById(userId);
+
         if (!user) {
             return res.status(404).json({ error: '用户不存在' });
         }
-        
+
         const salt = crypto.randomBytes(16).toString('hex');
-        await db.users.update(resetToken.user_id, {
+        await db.users.update(userId, {
             password: CryptoJS.SHA256(salt + newPassword).toString(),
             password_salt: salt
         });
 
         // H-8 修复：密码重置后撤销该用户所有 refresh token
-        await db.refreshTokens.revokeByUserId(user.id);
+        await db.refreshTokens.revokeByUserId(userId);
+        // 清除用户活跃状态缓存，确保被禁用状态立即生效
+        await invalidateUserActiveCache(userId);
 
-        await db.passwordResetTokens.delete(resetToken.id);
+        // 删除已使用的 token
+        await tokenStore.delResetToken(token);
         
         res.json({ message: '密码重置成功，请使用新密码登录' });
     } catch (error) {
@@ -443,18 +451,8 @@ router.post('/register/send-code', async (req, res) => {
         // 生成 6 位验证码
         const code = generateCode();
 
-        // 删除该邮箱旧的 register_code token
-        await db.passwordResetTokens.deleteByEmailAndType(email, 'register_code');
-
-        // 存入 password_reset_tokens（userId=0，注册场景用户尚未创建）
-        const expiresAt = new Date(Date.now() + 600000); // 10 分钟
-        await db.passwordResetTokens.create({
-            userId: 0,
-            email,
-            token: code,
-            type: 'register_code',
-            expiresAt: formatLocalDateTime(expiresAt)
-        });
+        // 使用 token-store 存储验证码（优先 Redis，回退数据库，10 分钟有效期）
+        await tokenStore.setRegisterCode(email, code, 600);
 
         // 生成邮件 HTML
         var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
@@ -528,9 +526,9 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: '邮箱已被使用' });
         }
 
-        // 校验验证码
-        const codeRecord = await db.passwordResetTokens.getByEmailAndType(email, 'register_code');
-        if (!codeRecord || codeRecord.token !== code || new Date(codeRecord.expires_at) <= new Date()) {
+        // 校验验证码（通过 token-store，优先 Redis）
+        const storedCode = await tokenStore.getRegisterCode(email);
+        if (!storedCode || storedCode !== code) {
             return res.status(400).json({ error: '验证码错误或已过期' });
         }
 
@@ -547,8 +545,8 @@ router.post('/register', async (req, res) => {
         // 补充 salt（create 不接受 password_salt 字段）
         await db.users.update(newUser.id, { password_salt: salt });
 
-        // 删除该邮箱的 register_code token
-        await db.passwordResetTokens.deleteByEmailAndType(email, 'register_code');
+        // 删除已使用的验证码
+        await tokenStore.delRegisterCode(email);
 
         res.json({ success: true, message: '注册成功，请登录' });
     } catch (error) {

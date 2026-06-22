@@ -1254,11 +1254,34 @@
                                         <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
                                     </svg>
                                 </div>
-                                <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customConfirmMessage }}</p>
+                                <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;" v-html="customConfirmMessage"></p>
                             </div>
                             <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
                                 <pv-button type="button" @click="confirmCancel" variant="outline">取消</pv-button>
                                 <pv-button type="button" @click="confirmOk">确定</pv-button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </Teleport>
+
+                <!-- 自定义 Prompt 弹窗（带输入框） -->
+                <Teleport to="body">
+                <div class="modal fade" id="customPromptModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+                    <div class="modal-dialog modal-sm modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-body py-4 px-4">
+                                <div class="custom-alert-icon mb-3 text-center">
+                                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                                    </svg>
+                                </div>
+                                <p class="custom-alert-msg mb-3 text-center" style="color:var(--text-primary);font-size:14px;line-height:1.6;white-space:pre-line;">{{ customPromptMessage }}</p>
+                                <input type="text" class="form-control text-center" id="customPromptInput" v-model="customPromptValue" @keydown.enter="promptOk" autocomplete="off">
+                            </div>
+                            <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
+                                <pv-button type="button" @click="promptCancel" variant="outline">取消</pv-button>
+                                <pv-button type="button" @click="promptOk">确定</pv-button>
                             </div>
                         </div>
                     </div>

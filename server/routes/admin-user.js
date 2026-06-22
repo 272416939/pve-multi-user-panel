@@ -3,7 +3,10 @@ const router = express.Router();
 const crypto = require('crypto');
 const CryptoJS = require('crypto-js');
 const db = require('../api/db');
-const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const { authMiddleware, adminMiddleware, invalidateUserActiveCache } = require('../middleware/auth');
+const cacheStore = require('../utils/cache-store');
+// 用户列表缓存（30s TTL，低频变更场景）
+const userListCache = cacheStore.create('admin_users', 30);
 
 function safeError(e) {
     if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
@@ -11,8 +14,15 @@ function safeError(e) {
 }
 
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
-    const users = (await db.users.getAll()).map(({ password, ...rest }) => rest);
-    res.json(users);
+    try {
+        const cached = await userListCache.get('list');
+        if (cached) return res.json(cached);
+        const users = (await db.users.getAll()).map(({ password, ...rest }) => rest);
+        await userListCache.set('list', users);
+        res.json(users);
+    } catch (e) {
+        res.status(500).json({ error: '获取用户列表失败' });
+    }
 });
 
 router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
@@ -41,6 +51,7 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     });
     
     const { password: _, ...safeUser } = newUser;
+    await userListCache.del('list');
     res.json(safeUser);
 });
 
@@ -66,6 +77,8 @@ router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) =>
     await db.passwordResetTokens.deleteByUserId(userId);
 
     await db.users.delete(userId);
+    await userListCache.del('list');
+    await invalidateUserActiveCache(userId);
     res.json({ message: '用户删除成功' });
 });
 
@@ -117,7 +130,8 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     }
     
     await db.users.update(userId, updates);
-    
+    await userListCache.del('list');
+    await invalidateUserActiveCache(userId);
     res.json({ message: '用户更新成功' });
 });
 

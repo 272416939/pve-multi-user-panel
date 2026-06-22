@@ -541,10 +541,35 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         if (logo_text !== undefined) await setConfig('site:logo_text', logo_text);
         if (login_title !== undefined) await setConfig('site:login_title', login_title);
         if (register_enabled !== undefined) await setConfig('register:enabled', register_enabled ? '1' : '0');
+        // 清除站点配置缓存（Redis + 进程内存），确保下次请求重新加载
+        var redis = require('../api/redis').getRedisClient();
+        if (redis) { try { await redis.del('site_config'); } catch (e) {} }
+        if (req.app.locals.siteConfigCache) {
+            req.app.locals.siteConfigCache.data = null;
+            req.app.locals.siteConfigCache.expires = 0;
+        }
         res.json({ message: '站点配置保存成功' });
     } catch (e) {
         console.error('[admin] site config set:', e.message);
         res.status(500).json({ error: '保存站点配置失败' });
+    }
+});
+
+// POST /admin/cache/clear - 一键清除所有缓存（Redis + 内存）
+// 清除范围：用户列表/套餐列表/设备/用户活跃状态/JWT黑名单/未读消息/用户资料/站点配置/验证码/找回密码token/限速计数器
+router.post('/admin/cache/clear', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var cacheStore = require('../utils/cache-store');
+        await cacheStore.clearAll();
+        // 清除站点配置的进程内存缓存（clearAll 已清 Redis，这里补清 app.locals）
+        if (req.app.locals.siteConfigCache) {
+            req.app.locals.siteConfigCache.data = null;
+            req.app.locals.siteConfigCache.expires = 0;
+        }
+        res.json({ message: '所有缓存已清除' });
+    } catch (e) {
+        console.error('[admin] cache clear:', e.message);
+        res.status(500).json({ error: '清除缓存失败' });
     }
 });
 

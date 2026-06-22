@@ -433,6 +433,24 @@
                                 </pv-button>
                             </div>
                         </div>
+
+                        <!-- 危险操作：清除缓存 -->
+                        <div class="card mt-3" style="border-color: rgba(239, 68, 68, 0.3);">
+                            <div class="card-header" style="background: rgba(239, 68, 68, 0.05);">
+                                <h5 class="mb-0 text-danger">危险操作</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                    <div>
+                                        <strong>一键清除所有缓存</strong>
+                                        <p class="text-muted small mb-0">将清除 Redis 和内存中的全部缓存数据，包括：用户列表、套餐列表、设备状态、用户活跃状态、JWT 黑名单、未读消息、用户资料、站点配置、验证码、找回密码 Token、限速计数器等。<br>清除后所有用户需重新登录，进行中的操作可能受影响。</p>
+                                    </div>
+                                    <pv-button type="button" variant="danger" @click="clearAllCache" :disabled="cacheClearing">
+                                        {{ cacheClearing ? '清除中...' : '清除所有缓存' }}
+                                    </pv-button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                 </div>

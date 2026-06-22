@@ -13,8 +13,10 @@ const upload = require('../config/multer');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
-const { ttl: cache } = require('../utils/cache');
-const profileCache = cache('profile', 60000);
+const cacheStore = require('../utils/cache-store');
+const { invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
+// profileCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
+const profileCache = cacheStore.create('profile', 60);
 
 router.post('/user/2fa/setup', authMiddleware, async (req, res) => {
     try {
@@ -147,6 +149,7 @@ router.delete('/user/devices/:id', authMiddleware, async (req, res) => {
         return res.status(404).json({ error: '设备不存在' });
     }
     await db.refreshTokens.revoke(deviceId);
+    await invalidateDeviceCache(deviceId);
     res.json({ message: '设备已下线' });
 });
 
@@ -165,7 +168,7 @@ router.delete('/user/devices', authMiddleware, async (req, res) => {
 
 router.get('/user/profile', authMiddleware, async (req, res) => {
     try {
-        const cached = profileCache.get(req.user.id);
+        const cached = await profileCache.get(String(req.user.id));
         if (cached) return res.json(cached);
 
         const user = await db.users.getById(req.user.id);
@@ -173,7 +176,7 @@ router.get('/user/profile', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: '用户不存在' });
         }
         const { password, ...safeUser } = user;
-        profileCache.set(req.user.id, safeUser);
+        await profileCache.set(String(req.user.id), safeUser);
         res.json(safeUser);
     } catch (error) {
         res.status(500).json({ error: '获取用户信息失败' });
@@ -224,6 +227,8 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
             updates.must_change_password = 0;
             // H-8 修复：密码变更后撤销该用户所有 refresh token
             await db.refreshTokens.revokeByUserId(req.user.id);
+            // 清除用户活跃状态缓存
+            await invalidateUserActiveCache(req.user.id);
         }
         
         if (bio !== undefined) {
@@ -234,7 +239,7 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         
         const updatedUser = await db.users.getById(req.user.id);
         const { password: _, ...safeUser } = updatedUser;
-        profileCache.del(req.user.id);
+        await profileCache.del(String(req.user.id));
         res.json({ message: '资料更新成功', user: safeUser });
     } catch (error) {
         res.status(500).json({ error: '更新资料失败' });
@@ -349,6 +354,8 @@ router.post('/user/avatar', authMiddleware, upload.single('avatar'), async (req,
 
         const avatarPath = `/images/${req.file.filename}`;
         await db.users.update(req.user.id, { avatar: avatarPath });
+        // 失效 profileCache（修复头像更新后 60s 内仍返回旧 URL 的 bug）
+        await profileCache.del(String(req.user.id));
         if (process.env.DEBUG === 'true') console.log('[avatar] 上传成功:', req.file.path, '→', avatarPath);
 
         const updatedUser = await db.users.getById(req.user.id);

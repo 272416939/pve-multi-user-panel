@@ -1061,6 +1061,8 @@ const App = {
                 } else if (activeSubTab.value === 'security') {
                     await loadDevices();
                     await loadTwofaStatus();
+                } else if (activeSubTab.value === 'wallet-transactions') {
+                    await loadTx(1);
                 } else {
                     await loadMemos();
                 }

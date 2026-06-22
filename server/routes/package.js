@@ -10,6 +10,11 @@ var { createEmailTemplate, sendEmail } = require('../utils/email');
 var { calculateAmount, deductBalance, setVmAffinity } = require('../utils/order-utils');
 var { execSSHWithStdin } = require('../api/ssh-exec');
 var crypto = require('crypto');
+var cacheStore = require('../utils/cache-store');
+
+// 套餐列表缓存（5 分钟 TTL，低频变更场景）
+var vmPackageCache = cacheStore.create('vm_packages', 300);
+var lxcPackageCache = cacheStore.create('lxc_packages', 300);
 
 function safeError(e) { return process.env.DEBUG === 'true' ? e.message : '服务器错误'; }
 
@@ -43,11 +48,23 @@ function logPveError(e) {
 
 // ===== 用户侧：套餐列表（无需 admin） =====
 router.get('/vm-packages', authMiddleware, async (req, res) => {
-    try { res.json(await db.vmPackages.getAll()); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        var cached = await vmPackageCache.get('all');
+        if (cached) return res.json(cached);
+        var list = await db.vmPackages.getAll();
+        await vmPackageCache.set('all', list);
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.get('/lxc-packages', authMiddleware, async (req, res) => {
-    try { res.json(await db.lxcPackages.getAll()); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        var cached = await lxcPackageCache.get('all');
+        if (cached) return res.json(cached);
+        var list = await db.lxcPackages.getAll();
+        await lxcPackageCache.set('all', list);
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 // ===== 用户侧：套餐订购（自动取当前用户） =====
@@ -161,6 +178,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                 vmUpdates.stock = pkg.stock - 1;
             }
             await db.vmPackages.update(pkg.id, vmUpdates);
+            await vmPackageCache.del('all');
         } catch (soldErr) { console.error('[package] 更新库存失败:', soldErr.message); }
 
         try {
@@ -333,6 +351,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
                 lxcUpdates.stock = pkg.stock - 1;
             }
             await db.lxcPackages.update(pkg.id, lxcUpdates);
+            await lxcPackageCache.del('all');
         } catch (soldErr) { console.error('[package] 更新库存失败:', soldErr.message); }
 
         try {
@@ -409,19 +428,25 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
 // ===== VM 套餐（管理员） =====
 router.get('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.vmPackages.getAll()); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        var cached = await vmPackageCache.get('all');
+        if (cached) return res.json(cached);
+        var list = await db.vmPackages.getAll();
+        await vmPackageCache.set('all', list);
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.post('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.vmPackages.create(req.body)); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try { var r = await db.vmPackages.create(req.body); await vmPackageCache.del('all'); res.json(r); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.put('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.vmPackages.update(parseInt(req.params.id), req.body)); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try { var r = await db.vmPackages.update(parseInt(req.params.id), req.body); await vmPackageCache.del('all'); res.json(r); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.delete('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { await db.vmPackages.delete(parseInt(req.params.id)); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try { await db.vmPackages.delete(parseInt(req.params.id)); await vmPackageCache.del('all'); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 // VM 套餐开通（核心）
@@ -574,19 +599,25 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
 
 // ===== LXC 套餐 =====
 router.get('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.lxcPackages.getAll()); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        var cached = await lxcPackageCache.get('all');
+        if (cached) return res.json(cached);
+        var list = await db.lxcPackages.getAll();
+        await lxcPackageCache.set('all', list);
+        res.json(list);
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.lxcPackages.create(req.body)); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try { var r = await db.lxcPackages.create(req.body); await lxcPackageCache.del('all'); res.json(r); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.put('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { res.json(await db.lxcPackages.update(parseInt(req.params.id), req.body)); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try { var r = await db.lxcPackages.update(parseInt(req.params.id), req.body); await lxcPackageCache.del('all'); res.json(r); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.delete('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { await db.lxcPackages.delete(parseInt(req.params.id)); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try { await db.lxcPackages.delete(parseInt(req.params.id)); await lxcPackageCache.del('all'); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 // LXC 套餐开通（核心）

@@ -196,20 +196,47 @@ httpServer.on('upgrade', (request, socket, head) => {
 });
 
 // EJS 渲染中间件：注入站点配置到 res.locals.siteConfig
-var siteConfigCache = { data: null, expires: 0 };
+// 优先 Redis 缓存（多实例一致），回退到进程内存缓存
+app.locals.siteConfigCache = { data: null, expires: 0 };
+var redisClient = require('./api/redis').getRedisClient();
+var SITE_CONFIG_REDIS_KEY = 'site_config';
+var SITE_CONFIG_TTL = 60; // 秒
+
 async function getSiteConfigCached() {
     var now = Date.now();
-    if (siteConfigCache.data && now < siteConfigCache.expires) {
-        return siteConfigCache.data;
+    var cache = app.locals.siteConfigCache;
+    // 1. 进程内存缓存（最快）
+    if (cache.data && now < cache.expires) {
+        return cache.data;
     }
+    // 2. Redis 缓存（多实例一致）
+    if (redisClient) {
+        try {
+            var cached = await redisClient.get(SITE_CONFIG_REDIS_KEY);
+            if (cached) {
+                var parsed = JSON.parse(cached);
+                cache.data = parsed;
+                cache.expires = now + SITE_CONFIG_TTL * 1000;
+                return parsed;
+            }
+        } catch (e) {
+            console.warn('[site-config] Redis 读取失败，回退到数据库:', e.message);
+        }
+    }
+    // 3. 数据库查询
     try {
         var db = require('./api/db');
         var name = await db.config.get('site:name') || 'PVE 多用户控制面板';
         var logoText = await db.config.get('site:logo_text') || 'PVE 面板';
         var loginTitle = await db.config.get('site:login_title') || 'PVE Panel';
-        siteConfigCache.data = { name: name, logo_text: logoText, login_title: loginTitle };
-        siteConfigCache.expires = now + 60000; // 缓存 60 秒
-        return siteConfigCache.data;
+        var data = { name: name, logo_text: logoText, login_title: loginTitle };
+        cache.data = data;
+        cache.expires = now + SITE_CONFIG_TTL * 1000;
+        // 写入 Redis
+        if (redisClient) {
+            try { await redisClient.set(SITE_CONFIG_REDIS_KEY, JSON.stringify(data), 'EX', SITE_CONFIG_TTL); } catch (e) {}
+        }
+        return data;
     } catch (e) {
         return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel' };
     }

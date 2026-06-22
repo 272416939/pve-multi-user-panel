@@ -102,7 +102,7 @@
     $.restockVmPackage = async function(pkg) {
         // 直接设置新的库存数量（不累加）
         var current = (pkg.stock === -1 || pkg.stock === null) ? '不限' : pkg.stock;
-        var input = prompt('请输入新的库存数量（-1 不限量，0 售罄，正整数剩余库存）\n当前库存：' + current, current === '不限' ? '-1' : String(current));
+        var input = await customPrompt('请输入新的库存数量\n（-1 不限量，0 售罄，正整数剩余库存）\n当前库存：' + current, current === '不限' ? '-1' : String(current));
         if (input === null) return;
         var newStock = parseInt(input);
         if (isNaN(newStock) || newStock < -1) { alert('请输入 -1 或非负整数'); return; }
@@ -115,7 +115,7 @@
     $.restockLxcPackage = async function(pkg) {
         // 直接设置新的库存数量（不累加）
         var current = (pkg.stock === -1 || pkg.stock === null) ? '不限' : pkg.stock;
-        var input = prompt('请输入新的库存数量（-1 不限量，0 售罄，正整数剩余库存）\n当前库存：' + current, current === '不限' ? '-1' : String(current));
+        var input = await customPrompt('请输入新的库存数量\n（-1 不限量，0 售罄，正整数剩余库存）\n当前库存：' + current, current === '不限' ? '-1' : String(current));
         if (input === null) return;
         var newStock = parseInt(input);
         if (isNaN(newStock) || newStock < -1) { alert('请输入 -1 或非负整数'); return; }
