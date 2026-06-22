@@ -199,9 +199,6 @@
                                     </div>
                                     <div v-if="!payMethods.alipay && !payMethods.wxpay" class="text-muted small">暂无可用的支付方式</div>
                                 </div>
-                                <div v-if="rechargeMethod === 'wxpay' && isHarmonyDevice" class="alert alert-warning py-2 mb-3 small">
-                                    检测到鸿蒙系统，微信支付可能无法正常跳转，建议使用支付宝
-                                </div>
                                 <div v-if="rechargeError" class="alert alert-danger py-2 mb-3">{{ rechargeError }}</div>
                                 <pv-button variant="primary" @click="submitRecharge" :disabled="!rechargeMethod || !rechargeAmount || rechargeSubmitting">
                                     <span v-if="rechargeSubmitting">提交中...</span>
@@ -463,9 +460,6 @@
                                 <!-- 手机端：跳转按钮 -->
                                 <template v-else>
                                     <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">点击下方按钮进行支付</h6>
-                                    <div v-if="rechargeShowHarmonyTip" class="recharge-harmony-tip mb-3">
-                                        检测到鸿蒙系统，微信支付可能无法正常跳转，建议使用支付宝
-                                    </div>
                                     <button type="button" class="btn btn-primary recharge-pay-btn mb-3" @click="openMobilePay">
                                         打开{{ rechargeMethod === 'alipay' ? '支付宝' : '微信' }}支付
                                     </button>

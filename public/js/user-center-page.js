@@ -52,8 +52,6 @@ const App = {
         const rechargeQrLoading = ref(false);    // PC 端二维码生成中
         const rechargePayUrl = ref('');          // 支付链接（手机端跳转用）
         const rechargeIsMobile = ref(false);     // 是否手机端
-        const rechargeShowHarmonyTip = ref(false); // 是否显示鸿蒙微信提示
-        const isHarmonyDevice = ref(false);      // 当前设备是否鸿蒙系统
         let rechargePollingTimer = null;
 
         const parseMarkdown = (text) => {
@@ -172,9 +170,7 @@ const App = {
                     // 设备检测
                     const ua = navigator.userAgent || '';
                     const mobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(ua);
-                    const harmony = /HarmonyOS|OpenHarmony|ArkWeb/i.test(ua);
                     rechargeIsMobile.value = mobile;
-                    rechargeShowHarmonyTip.value = mobile && harmony && rechargeMethod.value === 'wxpay';
                     if (mobile) {
                         // 手机端：不生成二维码，显示跳转按钮
                         rechargeQrLoading.value = false;
@@ -314,9 +310,15 @@ const App = {
 
         // 手机端点击跳转到支付宝/微信 app
         const openMobilePay = () => {
-            if (rechargePayUrl.value) {
-                window.location.href = rechargePayUrl.value;
+            if (!rechargePayUrl.value) return;
+            let url = rechargePayUrl.value;
+            // 支付宝手机端：若返回的是 http/https 网页 URL（中转页），
+            // 包装成 alipays scheme 直接唤起支付宝 app 打开该支付页面，
+            // 避免 pay.microgg.cn → render.alipay.com 多次中转跳转
+            if (rechargeMethod.value === 'alipay' && /^https?:\/\//i.test(url)) {
+                url = 'alipays://platformapi/startapp?saId=10000007&clientversion=10.5.66&url=' + encodeURIComponent(url);
             }
+            window.location.href = url;
         };
 
         // 手动检查支付状态（用户点击"我已完成支付"按钮）
@@ -365,11 +367,25 @@ const App = {
             const el = document.getElementById('rechargeResultModal');
             if (el) {
                 const modal = bootstrap.Modal.getInstance(el);
-                if (modal) modal.hide();
+                if (modal) {
+                    // 等 Bootstrap 关闭动画完成后再清空状态，避免动画过程中
+                    // rechargeResultType 变空导致图标切到 v-else 的红色 X（看起来像失败弹窗一闪而过）
+                    el.addEventListener('hidden.bs.modal', () => {
+                        rechargeResultType.value = '';
+                        rechargeResultTitle.value = '';
+                        rechargeResultAmount.value = '';
+                    }, { once: true });
+                    modal.hide();
+                } else {
+                    rechargeResultType.value = '';
+                    rechargeResultTitle.value = '';
+                    rechargeResultAmount.value = '';
+                }
+            } else {
+                rechargeResultType.value = '';
+                rechargeResultTitle.value = '';
+                rechargeResultAmount.value = '';
             }
-            rechargeResultType.value = '';
-            rechargeResultTitle.value = '';
-            rechargeResultAmount.value = '';
         };
 
         const loadTx = async (page) => {
@@ -1029,8 +1045,6 @@ const App = {
         };
 
         onMounted(async () => {
-            // 鸿蒙系统检测（用于充值表单提示）
-            isHarmonyDevice.value = /HarmonyOS|OpenHarmony|ArkWeb/i.test(navigator.userAgent || '');
             // 手机端从支付 app 切回时自动检测支付完成
             document.addEventListener('visibilitychange', handleVisibilityChange);
             const userData = await authGuard();
@@ -1145,7 +1159,7 @@ const App = {
             txList, txTotal, txPage, txFilter, myOrders,
             submitRecharge, loadTx, copyOrderNo, loadMyOrders,
             rechargePendingOrderNo, rechargePendingAmount, rechargeResultType, rechargeResultTitle, rechargeResultAmount,
-            rechargeQrLoading, rechargePayUrl, rechargeIsMobile, rechargeShowHarmonyTip, isHarmonyDevice,
+            rechargeQrLoading, rechargePayUrl, rechargeIsMobile,
             pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay, checkPayStatus
         };
     }

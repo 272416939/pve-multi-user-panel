@@ -357,19 +357,6 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     padding: 5px 16px;
     border-radius: 6px;
 }
-.recharge-harmony-tip {
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-size: 12px;
-    color: #b45309;
-    background: rgba(245,158,11,0.12);
-    border: 1px solid rgba(245,158,11,0.3);
-}
-[data-theme="dark"] .recharge-harmony-tip {
-    color: #fbbf24;
-    background: rgba(245,158,11,0.15);
-    border-color: rgba(245,158,11,0.35);
-}
 
 /* 响应式 */
 @media (max-width: 576px) {
