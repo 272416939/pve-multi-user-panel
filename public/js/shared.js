@@ -221,6 +221,34 @@ const formatBytes = (bytes, binary) => {
     return value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2) + ' ' + units[unitIndex];
 };
 
+// 从 PVE config 中提取磁盘配置大小，优先返回配置值（如 40 GB），避免 maxdisk 字节换算偏差
+const formatDiskSize = (item) => {
+    if (!item) return '-';
+    // 优先从 config 提取配置的磁盘大小（如 scsi0: ...,size=40G 或 rootfs: ...,size=40G）
+    if (item.config) {
+        var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
+        for (var i = 0; i < diskKeys.length; i++) {
+            var dv = item.config[diskKeys[i]];
+            if (dv) {
+                var m = dv.match(/size=(\d+)([KMGT]?)/i);
+                if (m) {
+                    var num = parseInt(m[1]);
+                    var unit = (m[2] || 'G').toUpperCase();
+                    if (unit === 'T') return (num * 1024) + ' GB';
+                    if (unit === 'M') return (num / 1024).toFixed(1) + ' GB';
+                    if (unit === 'K') return (num / 1024 / 1024).toFixed(2) + ' GB';
+                    return num + ' GB';
+                }
+            }
+        }
+    }
+    // 兜底：用 status.maxdisk 换算（按 1024 进制）
+    if (item.status && item.status.maxdisk) {
+        return Math.round(item.status.maxdisk / 1073741824 * 10) / 10 + ' GB';
+    }
+    return '-';
+};
+
 const formatDate = (date) => {
     if (!date) return '-';
     var d = typeof date === 'string' ? date : date;

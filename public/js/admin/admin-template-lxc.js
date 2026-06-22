@@ -274,7 +274,7 @@
                                                     </template>
                                                     <span v-else class="text-muted">-</span>
                                                 </td>
-                                                <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.status && ct.status.maxdisk ? '/ ' + Math.round(ct.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
+                                                <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.config || ct.status ? '/ ' + formatDiskSize(ct) : '' }}</td>
                                                 <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
                                                 <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                                 <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>

@@ -755,7 +755,11 @@
             <div class="mb-3"><label class="form-label">数量</label>
                 <input type="number" class="form-control" v-model="orderForm.quantity" min="1" max="10">
             </div>
-            <div class="alert alert-info">应付款：<strong>{{ orderTotal }} 元</strong></div>
+            <div class="d-flex justify-content-between mb-2">
+                <span>当前余额：</span>
+                <strong>¥{{ walletBalance }}</strong>
+            </div>
+            <div class="alert alert-info">应付：<strong>{{ orderTotal }} 元</strong></div>
         </div>
         <div class="modal-footer">
             <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>

@@ -75,18 +75,26 @@
         if (!vm || !vm.config) return '-';
         var str = (vm.config.sockets || 1) + '*' + (vm.config.cores || 1) + '核 ' + formatMemory(vm.config.memory);
         var diskStr = '';
-        if (vm.status && vm.status.maxdisk) {
-            diskStr = $.formatBytes(vm.status.maxdisk, true);
-        } else {
-            var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
-            for (var i = 0; i < diskKeys.length; i++) {
-                var dv = vm.config[diskKeys[i]];
-                if (dv) {
-                    var m = dv.match(/size=(\d+[KMGT]?)/i);
-                    if (m) { diskStr = m[1]; break; }
-                    if (vm.status && vm.status.maxdisk) diskStr = $.formatBytes(vm.status.maxdisk, true);
+        // 优先从 config 提取配置的磁盘大小（如 size=40G），避免 maxdisk 字节换算偏差
+        var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
+        for (var i = 0; i < diskKeys.length; i++) {
+            var dv = vm.config[diskKeys[i]];
+            if (dv) {
+                var m = dv.match(/size=(\d+)([KMGT]?)/i);
+                if (m) {
+                    var num = parseInt(m[1]);
+                    var unit = (m[2] || 'G').toUpperCase();
+                    if (unit === 'T') diskStr = (num * 1024) + ' GB';
+                    else if (unit === 'M') diskStr = (num / 1024).toFixed(1) + ' GB';
+                    else if (unit === 'K') diskStr = (num / 1024 / 1024).toFixed(2) + ' GB';
+                    else diskStr = num + ' GB';
+                    break;
                 }
             }
+        }
+        // 兜底：用 status.maxdisk 换算
+        if (!diskStr && vm.status && vm.status.maxdisk) {
+            diskStr = $.formatBytes(vm.status.maxdisk, true);
         }
         if (diskStr) str += ' / ' + diskStr;
         return str;
@@ -110,6 +118,7 @@
     // ===== 工具函数注册到 $（从 shared.js 或 window 全局函数引用） =====
     $.formatMemory = formatMemory;
     $.formatBytes = formatBytes;
+    $.formatDiskSize = formatDiskSize;
     $.formatDate = formatDate;
     $.formatUptime = formatUptime;
     $.trimContent = trimContent;
@@ -698,25 +707,64 @@
         $.orderPackage.value = pkg;
         $.orderType.value = type;
         $.orderForm.value = { period: 'month', quantity: 1 };
+        // 刷新余额显示
+        $.loadWalletBalance();
         // 用 nextTick 确保 Vue 完成 DOM 更新后再显示 Modal
         Vue.nextTick(function() { $.bsModalShow('orderModal'); });
     };
     
     $.confirmOrder = async function() {
-        $.orderLoading.value = true;
+        var type = $.orderType.value;
+        var pkg = $.orderPackage.value;
+        var orderForm = { period: $.orderForm.value.period, period_count: parseInt($.orderForm.value.quantity) || 1 };
+
+        // 立即创建占位记录，显示"开通中"状态
+        var placeholderId = 'provisioning_' + Date.now();
+        var placeholder = {
+            id: placeholderId,
+            name: '开通中...',
+            status: { status: 'provisioning' },
+            config: null,
+            _provisioning: true
+        };
+        if (type === 'vm') {
+            placeholder.vm_id = '-';
+            $.userVms.value.unshift(placeholder);
+        } else {
+            placeholder.ct_id = '-';
+            $.userLxcContainers.value.unshift(placeholder);
+        }
+
+        // 关闭弹窗，用户无需等待
+        $.bsModalHide('orderModal');
+        $.orderLoading.value = false;
+
+        // 切换到对应列表页，让用户看到开通中状态
+        $.switchSection(type === 'vm' ? 'vm' : 'lxc');
+
+        // 异步调用订购 API
+        var endpoint = type === 'vm' ? '/vm-packages/' + pkg.id + '/order' : '/lxc-packages/' + pkg.id + '/order';
         try {
-            var endpoint = $.orderType.value === 'vm' ? '/vm-packages/' + $.orderPackage.value.id + '/order' : '/lxc-packages/' + $.orderPackage.value.id + '/order';
-            var body = {
-                period: $.orderForm.value.period,
-                period_count: parseInt($.orderForm.value.quantity) || 1
-            };
-            await api(endpoint, { method: 'POST', body: JSON.stringify(body) });
-            $.bsModalHide('orderModal');
-            alert('开通成功！请查看订单详情。');
+            await api(endpoint, { method: 'POST', body: JSON.stringify(orderForm) });
+            // API 成功，移除占位记录并重新加载列表
+            if (type === 'vm') {
+                $.userVms.value = $.userVms.value.filter(function(v) { return v.id !== placeholderId; });
+                await $.loadData();
+            } else {
+                $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
+                await $.loadLxcContainers();
+            }
+            // 刷新余额
+            $.loadWalletBalance();
         } catch(e) {
+            // API 失败，移除占位记录并提示
+            if (type === 'vm') {
+                $.userVms.value = $.userVms.value.filter(function(v) { return v.id !== placeholderId; });
+            } else {
+                $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
+            }
             alert('开通失败：' + (e.message || '未知错误'));
         }
-        $.orderLoading.value = false;
     };
     
     $.switchSubOrder = function(tab) {

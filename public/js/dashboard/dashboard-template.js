@@ -123,23 +123,41 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="vm in userVms" :key="vm.id">
+                                <tr v-for="vm in userVms" :key="vm.id" :class="{ 'row-provisioning': vm._provisioning }">
                                     <td>{{ vm.vm_id }}</td>
-                                    <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
-                                    <td>{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</td>
+                                    <td>
+                                        <template v-if="vm._provisioning">
+                                            <div class="provisioning-cell">
+                                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                                <span>{{ vm.name }}</span>
+                                            </div>
+                                        </template>
+                                        <template v-else>{{ vm.name || ('VM ' + vm.vm_id) }}</template>
+                                    </td>
+                                    <td>{{ vm.config?.ciuser || '-' }}</td>
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                     <td>
-                                        <template v-if="cnameDomain">
+                                        <template v-if="cnameDomain && !vm._provisioning">
                                             <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname" class="text-primary" style="line-height:1.5;">{{ cname }}</div>
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>
-                                    <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
+                                    <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm._provisioning ? '' : (vm.config || vm.status ? '/ ' + formatDiskSize(vm) : '') }}</td>
                                     <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
                                     <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
-                                    <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
-                                        <div class="table-actions">
+                                        <template v-if="vm._provisioning">
+                                            <span class="tag-pending">开通中</span>
+                                        </template>
+                                        <template v-else>
+                                            <span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span>
+                                        </template>
+                                    </td>
+                                    <td>
+                                        <div v-if="vm._provisioning" class="text-center text-muted py-2">
+                                            <small>正在开通中，请稍后刷新</small>
+                                        </div>
+                                        <div v-else class="table-actions">
                                             <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
                                             <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
                                                 <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
@@ -201,22 +219,40 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="ct in userLxcContainers" :key="ct.id">
+                                <tr v-for="ct in userLxcContainers" :key="ct.id" :class="{ 'row-provisioning': ct._provisioning }">
                                     <td>{{ ct.ct_id }}</td>
-                                    <td>{{ ct.name || ('CT ' + ct.ct_id) }}</td>
+                                    <td>
+                                        <template v-if="ct._provisioning">
+                                            <div class="provisioning-cell">
+                                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                                <span>{{ ct.name }}</span>
+                                            </div>
+                                        </template>
+                                        <template v-else>{{ ct.name || ('CT ' + ct.ct_id) }}</template>
+                                    </td>
                                     <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
                                     <td>
-                                        <template v-if="cnameDomain">
+                                        <template v-if="cnameDomain && !ct._provisioning">
                                             <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname" class="text-primary" style="line-height:1.5;">{{ cname }}</div>
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>
-                                    <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.status && ct.status.maxdisk ? '/ ' + Math.round(ct.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
+                                    <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct._provisioning ? '' : (ct.config || ct.status ? '/ ' + formatDiskSize(ct) : '') }}</td>
                                     <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
                                     <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
-                                    <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
                                     <td>
-                                        <div class="table-actions">
+                                        <template v-if="ct._provisioning">
+                                            <span class="tag-pending">开通中</span>
+                                        </template>
+                                        <template v-else>
+                                            <span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span>
+                                        </template>
+                                    </td>
+                                    <td>
+                                        <div v-if="ct._provisioning" class="text-center text-muted py-2">
+                                            <small>正在开通中，请稍后刷新</small>
+                                        </div>
+                                        <div v-else class="table-actions">
                                             <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
                                             <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
                                                 <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>

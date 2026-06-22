@@ -36,6 +36,7 @@ $.detailVmChartData = null;
     // ==================== 工具函数注册到$ ====================
     $.formatMemory = formatMemory;
     $.formatBytes = formatBytes;
+    $.formatDiskSize = formatDiskSize;
     $.formatDate = formatDate;
     $.formatUptime = formatUptime;
     $.trimContent = trimContent;
@@ -52,20 +53,27 @@ $.detailVmConfigStr = computed(function() {
     var vm = $.detailVm.value;
     if (!vm || !vm.config) return '-';
     var str = (vm.config.sockets || 1) + '*' + (vm.config.cores || 1) + '核 ' + formatMemory(vm.config.memory);
-    // 磁盘容量：优先取status.maxdisk，其次从config磁盘字段提取size
     var diskStr = '';
-    if (vm.status && vm.status.maxdisk) {
-        diskStr = $.formatBytes(vm.status.maxdisk, true);
-    } else {
-        var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
-        for (var i = 0; i < diskKeys.length; i++) {
-            var dv = vm.config[diskKeys[i]];
-            if (dv) {
-                var m = dv.match(/size=(\d+[KMGT]?)/i);
-                if (m) { diskStr = m[1]; break; }
-                if (vm.status && vm.status.maxdisk) diskStr = $.formatBytes(vm.status.maxdisk, true);
+    // 优先从 config 提取配置的磁盘大小（如 size=40G），避免 maxdisk 字节换算偏差
+    var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
+    for (var i = 0; i < diskKeys.length; i++) {
+        var dv = vm.config[diskKeys[i]];
+        if (dv) {
+            var m = dv.match(/size=(\d+)([KMGT]?)/i);
+            if (m) {
+                var num = parseInt(m[1]);
+                var unit = (m[2] || 'G').toUpperCase();
+                if (unit === 'T') diskStr = (num * 1024) + ' GB';
+                else if (unit === 'M') diskStr = (num / 1024).toFixed(1) + ' GB';
+                else if (unit === 'K') diskStr = (num / 1024 / 1024).toFixed(2) + ' GB';
+                else diskStr = num + ' GB';
+                break;
             }
         }
+    }
+    // 兜底：用 status.maxdisk 换算
+    if (!diskStr && vm.status && vm.status.maxdisk) {
+        diskStr = $.formatBytes(vm.status.maxdisk, true);
     }
     if (diskStr) str += ' / ' + diskStr;
     return str;

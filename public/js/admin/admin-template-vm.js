@@ -45,7 +45,7 @@
                                                 </template>
                                                 <span v-else class="text-muted">-</span>
                                             </td>
-                                            <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.status && vm.status.maxdisk ? '/ ' + Math.round(vm.status.maxdisk/1073741824*10)/10 + ' GB' : '' }}</td>
+                                            <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.config || vm.status ? '/ ' + formatDiskSize(vm) : '' }}</td>
                                             <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                             <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                             <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
