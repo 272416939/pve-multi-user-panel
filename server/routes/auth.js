@@ -450,16 +450,17 @@ router.post('/register/send-code', async (req, res) => {
         });
 
         // 生成邮件 HTML
-        var html = createEmailTemplate('注册验证码 - PVE管理面板',
+        var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
+        var html = createEmailTemplate('注册验证码 - ' + siteName,
             '<p>您好，您正在进行账号注册，验证码为：</p>' +
             '<div style="text-align:center;margin:20px 0;">' +
             '<span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#7c3aed;background:#f5f3ff;padding:12px 24px;border-radius:8px;display:inline-block;">' + code + '</span>' +
             '</div>' +
             '<p style="color:#666;">验证码有效期为 10 分钟，请尽快使用。</p>' +
-            '<p style="color:#999;font-size:12px;">如非本人操作，请忽略此邮件。</p>');
+            '<p style="color:#999;font-size:12px;">如非本人操作，请忽略此邮件。</p>', siteName);
 
         try {
-            await sendEmail(email, '注册验证码 - PVE管理面板', html);
+            await sendEmail(email, '注册验证码 - ' + siteName, html);
         } catch (sendErr) {
             console.error('[register] 邮件发送失败:', sendErr.message);
             return res.status(500).json({ error: '邮件发送失败，请检查邮箱配置或联系管理员' });

@@ -17,6 +17,9 @@
     $.storageList = ref([]);
     $.backupConfigForm = ref({ default_storage: 'local', max_per_vm: 3, daily_limit: 3 });
     $.testEmail = ref('');
+    $.siteLogoText = ref('PVE 面板');
+    $.siteConfigForm = ref({ name: '', logo_text: '', login_title: '', register_enabled: false });
+    $.siteConfigSaving = ref(false);
     $.cdkList = ref([]);
     $.cdkForm = ref({ duration_days: 30, count: 1, expires_at: '' });
     $.cdkResult = ref([]);
@@ -232,6 +235,37 @@
         } catch (e) {
             alert(e.message);
         }
+    };
+
+    // 站点配置
+    $.loadSiteConfig = async function() {
+        try {
+            var res = await api('/admin/site/config');
+            $.siteConfigForm.value = {
+                name: res.name || '',
+                logo_text: res.logo_text || '',
+                login_title: res.login_title || '',
+                register_enabled: !!res.register_enabled
+            };
+        } catch (e) {
+            console.error('加载站点配置失败:', e);
+        }
+    };
+
+    $.saveSiteConfig = async function() {
+        $.siteConfigSaving.value = true;
+        try {
+            await api('/admin/site/config', {
+                method: 'PUT',
+                body: JSON.stringify($.siteConfigForm.value)
+            });
+            alert('站点配置保存成功');
+            // 保存后刷新 LOGO 显示
+            $.siteLogoText.value = $.siteConfigForm.value.logo_text || 'PVE 面板';
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        }
+        $.siteConfigSaving.value = false;
     };
 
     // 快照配置

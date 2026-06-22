@@ -401,6 +401,40 @@
                     </div>
                 </div>
 
+                    <!-- 站点设置 -->
+                    <div v-if="activeSection === 'settings' && activeTab === 'site'">
+                        <h4 class="module-title">站点设置</h4>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="mb-3">
+                                    <label class="form-label">站点名称</label>
+                                    <input type="text" class="form-control" v-model="siteConfigForm.name" placeholder="站点名称（用于页面标题、邮件等）">
+                                    <small class="text-muted">显示在浏览器标签页标题、邮件模板等位置</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">LOGO 文字</label>
+                                    <input type="text" class="form-control" v-model="siteConfigForm.logo_text" placeholder="侧边栏 LOGO 文字">
+                                    <small class="text-muted">显示在管理后台和用户面板左上角</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">登录页 LOGO 文字</label>
+                                    <input type="text" class="form-control" v-model="siteConfigForm.login_title" placeholder="登录页 LOGO 文字">
+                                    <small class="text-muted">显示在登录页卡片上的 LOGO 文字</small>
+                                </div>
+                                <div class="mb-3">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="registerEnabled" v-model="siteConfigForm.register_enabled">
+                                        <label class="form-check-label" for="registerEnabled">允许用户注册</label>
+                                    </div>
+                                    <small class="text-muted">开启后登录页将显示注册入口</small>
+                                </div>
+                                <pv-button type="button" variant="glass" @click="saveSiteConfig" :disabled="siteConfigSaving">
+                                    {{ siteConfigSaving ? '保存中...' : '保存设置' }}
+                                </pv-button>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
                 <!-- end 系统设置区域 -->
 

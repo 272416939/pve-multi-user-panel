@@ -5,7 +5,7 @@
     <script src="js/app-version.js" defer></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PVE 多用户控制面板 | 管理后台</title>
+    <title><%= siteConfig.name %> | 管理后台</title>
     <link href="https://jsd.owoser.cn/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="shared/css/tokens.css?_b=202606180100" rel="stylesheet">
     <link href="shared/css/layout.css?_b=202606180100" rel="stylesheet">
@@ -31,13 +31,13 @@
 <script src="js/shared.js"></script>
 <script src="components/pv-button.js?_b=202606184000"></script>
 <!-- admin-template 模板片段（IIFE push 到 window.__adminTemplateParts, loader 最后 join） -->
-<script src="js/admin/admin-template-base.js?_b=202606180100"></script>
+<script src="js/admin/admin-template-base.js?_b=202606231200"></script>
 <script src="js/admin/admin-template-overview.js?_b=202606170520"></script>
 <script src="js/admin/admin-template-vm.js?_b=202606182200"></script>
 <script src="js/admin/admin-template-lxc.js?_b=202606182200"></script>
 <script src="js/admin/admin-template-users.js?_b=202606170520"></script>
 <script src="js/admin/admin-template-packages.js?_b=202606180850"></script>
-<script src="js/admin/admin-template-settings.js?_b=202606170520"></script>
+<script src="js/admin/admin-template-settings.js?_b=202606231200"></script>
 <script src="js/admin/admin-template-cdk-messages.js?_b=202606180820"></script>
 <script src="js/admin/admin-template-templates.js?_b=202606170520"></script>
 <script src="js/admin/admin-template-finance.js?_b=202606170520"></script>
@@ -45,8 +45,8 @@
 <script src="js/admin/admin-template-modals.js?_b=202606184000"></script>
 <!-- admin-template loader (join + inject) -->
 <script src="js/admin/admin-template.js?_b=202606182900"></script>
-<script src="js/admin/core.js?_b=202606180830"></script>
-<script src="js/admin/admin.js"></script>
+<script src="js/admin/core.js?_b=202606231200"></script>
+<script src="js/admin/admin.js?_b=202606231200"></script>
 <script src="js/admin/vm.js"></script>
 <script src="js/admin/lxc.js"></script>
 <script src="js/admin/network.js"></script>

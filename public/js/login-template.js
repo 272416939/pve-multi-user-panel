@@ -1,6 +1,8 @@
 (function() {
   var el = document.getElementById("appTemplate");
   if (el) el.innerHTML = `        <div>
+            <div class="login-logo">{{ siteLoginTitle }}</div>
+            <div class="login-subtitle">欢迎回来，请登录您的账户</div>
             <div v-if="!showResetPassword" class="row justify-content-center">
                 <div class="col-md-12">
                     <div class="card">

@@ -80,8 +80,8 @@ app.use((req, res, next) => {
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://jsd.owoser.cn",
-        "style-src 'self' 'unsafe-inline' https://jsd.owoser.cn https://fonts.googleapis.com",
-        "font-src 'self' https://fonts.gstatic.com",
+        "style-src 'self' 'unsafe-inline' https://jsd.owoser.cn https://fonts.loli.net",
+        "font-src 'self' https://gstatic.loli.net",
         "img-src 'self' data: blob: https:",
         "connect-src 'self' ws: wss: https:",
         "frame-ancestors 'self'",
@@ -129,6 +129,30 @@ app.get('/api/version', (req, res) => {
     res.json({ version: pkg.version });
 });
 
+// 公开接口：获取站点配置（供前端和登录页使用）
+app.get('/api/site/config', async (req, res) => {
+    try {
+        var db = require('./api/db');
+        var name = await db.config.get('site:name') || 'PVE 多用户控制面板';
+        var logoText = await db.config.get('site:logo_text') || 'PVE 面板';
+        var loginTitle = await db.config.get('site:login_title') || 'PVE Panel';
+        var registerEnabled = await db.config.get('register:enabled') || '0';
+        res.json({
+            name: name,
+            logo_text: logoText,
+            login_title: loginTitle,
+            register_enabled: registerEnabled === '1'
+        });
+    } catch (e) {
+        res.json({
+            name: 'PVE 多用户控制面板',
+            logo_text: 'PVE 面板',
+            login_title: 'PVE Panel',
+            register_enabled: false
+        });
+    }
+});
+
 app.use('/api', require('./routes/auth'));
 app.use('/api', require('./routes/user'));
 app.use('/api', require('./routes/admin-user'));
@@ -169,6 +193,35 @@ httpServer.on('upgrade', (request, socket, head) => {
     } else {
         socket.destroy();
     }
+});
+
+// EJS 渲染中间件：注入站点配置到 res.locals.siteConfig
+var siteConfigCache = { data: null, expires: 0 };
+async function getSiteConfigCached() {
+    var now = Date.now();
+    if (siteConfigCache.data && now < siteConfigCache.expires) {
+        return siteConfigCache.data;
+    }
+    try {
+        var db = require('./api/db');
+        var name = await db.config.get('site:name') || 'PVE 多用户控制面板';
+        var logoText = await db.config.get('site:logo_text') || 'PVE 面板';
+        var loginTitle = await db.config.get('site:login_title') || 'PVE Panel';
+        siteConfigCache.data = { name: name, logo_text: logoText, login_title: loginTitle };
+        siteConfigCache.expires = now + 60000; // 缓存 60 秒
+        return siteConfigCache.data;
+    } catch (e) {
+        return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel' };
+    }
+}
+
+app.use(async (req, res, next) => {
+    try {
+        res.locals.siteConfig = await getSiteConfigCached();
+    } catch (e) {
+        res.locals.siteConfig = { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel' };
+    }
+    next();
 });
 
 // 旧 URL 重定向到 EJS 路由

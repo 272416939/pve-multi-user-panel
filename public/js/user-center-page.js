@@ -313,10 +313,10 @@ const App = {
             if (!rechargePayUrl.value) return;
             let url = rechargePayUrl.value;
             // 支付宝手机端：若返回的是 http/https 网页 URL（中转页），
-            // 包装成 alipays scheme 直接唤起支付宝 app 打开该支付页面，
-            // 避免 pay.microgg.cn → render.alipay.com 多次中转跳转
+            // 包装成 alipays scheme 用内部浏览器容器打开（saId=10000067），
+            // saId=10000007 是扫一扫，会导致打开扫码界面而非支付界面
             if (rechargeMethod.value === 'alipay' && /^https?:\/\//i.test(url)) {
-                url = 'alipays://platformapi/startapp?saId=10000007&clientversion=10.5.66&url=' + encodeURIComponent(url);
+                url = 'alipays://platformapi/startapp?saId=10000067&url=' + encodeURIComponent(url);
             }
             window.location.href = url;
         };

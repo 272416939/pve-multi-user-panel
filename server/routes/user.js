@@ -27,7 +27,8 @@ router.post('/user/2fa/setup', authMiddleware, async (req, res) => {
         const secret = otplib.generateSecret();
         await db.twofa.setSecret(user.id, secret);
 
-        const otpauth = otplib.generateURI({ issuer: 'PVE管理面板', label: user.username, secret, type: 'totp' });
+        const siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
+        const otpauth = otplib.generateURI({ issuer: siteName, label: user.username, secret, type: 'totp' });
         const qrcode = await QRCode.toDataURL(otpauth);
 
         res.json({ secret, qrcode });
@@ -400,9 +401,10 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         
         try {
             const verifyUrl = `${getSiteUrl(req)}/api/user/verify-email/${verifyToken}`;
+            const siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
             const emailContent = `
                 <p>您好，</p>
-                <p>感谢您注册 PVE 多用户控制面板！</p>
+                <p>感谢您注册 ${siteName}！</p>
                 <p>请点击下方按钮验证您的邮箱地址：</p>
                 <p style="text-align: center;">
                     <a href="${verifyUrl}" class="btn" target="_blank">验证邮箱地址</a>
@@ -418,8 +420,8 @@ router.put('/user/email', authMiddleware, async (req, res) => {
             `;
             await sendEmail(
                 email,
-                '邮箱验证 - PVE 管理面板',
-                createEmailTemplate('请验证您的邮箱', emailContent)
+                '邮箱验证 - ' + siteName,
+                createEmailTemplate('请验证您的邮箱', emailContent, siteName)
             );
         } catch (emailError) {
             console.error('发送验证邮件失败，但邮箱已保存', emailError);

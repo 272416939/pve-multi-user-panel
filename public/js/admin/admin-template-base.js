@@ -5,7 +5,7 @@
         <header class="page-header">
             <div class="header-left">
                 <pv-button class="sidebar-toggle" variant="ghost" onclick="toggleSidebar()" aria-label="菜单"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></pv-button>
-                <span class="brand-logo">PVE 管理面板</span>
+                <span class="brand-logo">{{ siteLogoText }}</span>
             </div>
             <div class="header-right">
                 <pv-button id="themeToggle" variant="ghost" title="切换主题" aria-label="切换主题">
@@ -111,6 +111,7 @@
                     <a class="nav-item" data-subsection="settings-snapshot-backup" onclick="window.__admin.switchAdminTab('snapshot-backup');return false;"><span class="nav-text">快照&备份配置</span></a>
                     <a class="nav-item" data-subsection="settings-network" onclick="window.__admin.switchAdminTab('network');return false;"><span class="nav-text">网络管理</span></a>
                     <a class="nav-item" data-subsection="settings-pay" onclick="window.__admin.switchAdminTab('pay');return false;"><span class="nav-text">支付配置</span></a>
+                    <a class="nav-item" data-subsection="settings-site" onclick="window.__admin.switchAdminTab('site');return false;"><span class="nav-text">站点设置</span></a>
                 </div>
 
                 <!-- 系统更新（独立一级菜单） -->

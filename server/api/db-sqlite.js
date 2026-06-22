@@ -756,6 +756,9 @@ function initDefaultConfig() {
         'pay:min_amount': '0.01',
         'pay:max_amount': '999999.99',
         'register:enabled': '0',
+        'site:name': 'PVE 多用户控制面板',
+        'site:logo_text': 'PVE 面板',
+        'site:login_title': 'PVE Panel',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {

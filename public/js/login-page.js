@@ -56,6 +56,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                 // 注册功能
                 const currentView = ref('login');
                 const registerEnabled = ref(false);
+                const siteLoginTitle = ref('PVE Panel');
                 const registerForm = ref({ username: '', password: '', email: '', code: '' });
                 const registerError = ref('');
                 const registerSubmitting = ref(false);
@@ -384,10 +385,11 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                         return;
                     }
 
-                    // 获取注册开关
+                    // 获取站点配置（含注册开关和登录页 LOGO 文字）
                     try {
-                        const res = await api('/register/status');
-                        registerEnabled.value = res.enabled === true;
+                        const res = await api('/site/config');
+                        siteLoginTitle.value = res.login_title || 'PVE Panel';
+                        registerEnabled.value = res.register_enabled === true;
                     } catch (e) {
                         registerEnabled.value = false;
                     }
@@ -436,6 +438,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     // 注册功能
                     currentView,
                     registerEnabled,
+                    siteLoginTitle,
                     registerForm,
                     registerError,
                     registerSubmitting,

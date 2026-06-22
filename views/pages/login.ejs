@@ -5,13 +5,13 @@
     <script src="js/app-version.js" defer></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PVE 多用户控制面板 | 登录</title>
+    <title><%= siteConfig.name %> | 登录</title>
     <link href="https://jsd.owoser.cn/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="shared/css/tokens.css" rel="stylesheet">
     <link href="shared/css/layout.css" rel="stylesheet">
     <link href="shared/css/components.css?_b=202606184300" rel="stylesheet">
     <link href="shared/css/theme.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.loli.net/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
     <link href="css/login.css?_b=202606231000" rel="stylesheet">
 </head>
 <body class="login-page">
@@ -26,11 +26,7 @@
             </button>
         </div>
 
-        <!-- Card Header: Logo / Title -->
-        <div class="login-logo">PVE Panel</div>
-        <div class="login-subtitle">欢迎回来，请登录您的账户</div>
-
-        <!-- Vue Mount Point -->
+        <!-- Vue Mount Point (LOGO/subtitle rendered by Vue via /api/site/config) -->
         <div id="app"></div>
     </div>
 
@@ -38,14 +34,14 @@
 
     <!-- Version Info (Fixed at Bottom) -->
     <div class="login-version-info">
-        PVE 管理面板 <span id="appVersion"></span>
+        <%= siteConfig.name %> <span id="appVersion"></span>
     </div>
 
     <script src="https://jsd.owoser.cn/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
     <script src="https://jsd.owoser.cn/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/shared.js"></script>
     <script src="components/pv-button.js?_b=202606184000"></script>
-<script src="js/login-template.js?_b=202606231000"></script>
-<script src="js/login-page.js?_b=202606231000"></script>
+<script src="js/login-template.js?_b=202606231200"></script>
+<script src="js/login-page.js?_b=202606231200"></script>
 </body>
 </html>

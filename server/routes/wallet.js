@@ -181,9 +181,9 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         if (gatewayRes && gatewayRes.code === 0 && gatewayRes.pay_info) {
             payUrl = gatewayRes.pay_info;
         }
-        // V1/submit 接口: code=1 成功，payurl 为支付链接
+        // V1/submit 接口: code=1 成功，优先使用 urlscheme（可能是 alipays:// deep link）
         if (!payUrl && gatewayRes && gatewayRes.code === 1) {
-            payUrl = gatewayRes.payurl || gatewayRes.qrcode || gatewayRes.qr || gatewayRes.url;
+            payUrl = gatewayRes.urlscheme || gatewayRes.payurl || gatewayRes.qrcode || gatewayRes.qr || gatewayRes.url;
         }
         if (!payUrl && gatewayRes && typeof gatewayRes === 'string') {
             var match = gatewayRes.match(/location\.replace\(['"](.+?)['"]\)/);
@@ -291,6 +291,7 @@ router.all('/wallet/notify', async (req, res) => {
 
         try {
             if (user.email && user.emailVerified && user.email.includes('@')) {
+                var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
                 var rechargeHtml = createEmailTemplate('充值到账通知',
                     `<p>您好，您已成功 <strong>充值 ¥${amount.toFixed(2)}</strong>。</p>
                     <div class="info-box">
@@ -299,8 +300,8 @@ router.all('/wallet/notify', async (req, res) => {
                         <p style="margin-bottom: 4px;">📋 订单编号：<strong>${params.out_trade_no}</strong></p>
                         <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`);
-                await sendEmail(user.email, '充值到账通知 - PVE管理面板', rechargeHtml);
+                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`, siteName);
+                await sendEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);
             }
         } catch (e) {
             console.error('[钱包] 邮件发送失败:', e.message);
@@ -394,6 +395,7 @@ router.get('/wallet/return', async (req, res) => {
 
         try {
             if (user.email && user.emailVerified && user.email.includes('@')) {
+                var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
                 var rechargeHtml = createEmailTemplate('充值到账通知',
                     `<p>您好，您已成功 <strong>充值 ¥${amount.toFixed(2)}</strong>。</p>
                     <div class="info-box">
@@ -402,8 +404,8 @@ router.get('/wallet/return', async (req, res) => {
                         <p style="margin-bottom: 4px;">📋 订单编号：<strong>${params.out_trade_no}</strong></p>
                         <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`);
-                await sendEmail(user.email, '充值到账通知 - PVE管理面板', rechargeHtml);
+                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`, siteName);
+                await sendEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);
             }
         } catch (e) {
             console.error('[钱包] 邮件发送失败:', e.message);
@@ -592,6 +594,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         
         try {
             if (user.email && user.emailVerified && user.email.includes('@')) {
+                var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
                 var renewHtml = createEmailTemplate('资源续费成功',
                     `<p>您好，您的 <strong>${resourceTypeLabel}「${resourceName}」</strong> 已续费成功。</p>
                     <div class="info-box">
@@ -603,8 +606,8 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
                         <p style="margin-bottom: 4px;">📋 订单编号：<strong>${orderNo}</strong></p>
                         <p>⏰ 续费时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/">控制面板</a> 查看资源详情。</p>`);
-                await sendEmail(user.email, '资源续费成功 - PVE管理面板', renewHtml);
+                    <p>前往 <a href="${process.env.SITE_URL || ''}/">控制面板</a> 查看资源详情。</p>`, siteName);
+                await sendEmail(user.email, '资源续费成功 - ' + siteName, renewHtml);
             }
         } catch (e) {
             console.error('[钱包] 续费邮件发送失败:', e.message);

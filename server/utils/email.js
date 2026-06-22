@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 const db = require('../api/db');
 
-function createEmailTemplate(title, content) {
+function createEmailTemplate(title, content, siteName) {
     return `
         <!DOCTYPE html>
         <html lang="zh-CN">
@@ -109,7 +109,7 @@ function createEmailTemplate(title, content) {
         <body>
             <div class="email-container">
                 <div class="email-header">
-                    <h1>PVE 多用户控制面板</h1>
+                    <h1>${siteName || 'PVE 多用户控制面板'}</h1>
                     <p>${title}</p>
                 </div>
                 <div class="email-content">

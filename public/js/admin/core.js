@@ -611,7 +611,7 @@ watch($.user, function(u) {
     $.switchAdminTab = function(tab) {
         // Determine which group this tab belongs to
         var manageTabs = ['users', 'cdk', 'messages'];
-        var settingsTabs = ['smtp', 'snapshot-backup', 'network', 'pay'];
+        var settingsTabs = ['smtp', 'snapshot-backup', 'network', 'pay', 'site'];
         var section;
         var submenuId;
 
@@ -645,7 +645,8 @@ watch($.user, function(u) {
             'smtp': 'settings-smtp',
             'snapshot-backup': 'settings-snapshot-backup',
             'network': 'settings-network',
-            'pay': 'settings-pay'
+            'pay': 'settings-pay',
+            'site': 'settings-site'
         };
         var target = document.querySelector('[data-subsection="' + (subMap[tab] || 'admin-' + tab) + '"]');
         if (target) target.classList.add('active');
@@ -869,6 +870,10 @@ $.initDetailCharts = function() {
                     $.resubAll();
                 });
                 $.loadNetworkConfig();
+                // 加载站点 LOGO 文字（公开接口，非阻塞）
+                api('/site/config').then(function(res) {
+                    $.siteLogoText.value = res.logo_text || 'PVE 面板';
+                }).catch(function() {});
                 if ($.activeTab.value === 'network') {
                     $.loadForwardRules('all');
                 }
@@ -897,6 +902,9 @@ $.initDetailCharts = function() {
             }
             if (newTab === 'pay') {
                 $.loadPayConfig();
+            }
+            if (newTab === 'site') {
+                $.loadSiteConfig();
             }
             if (newTab === 'orders') {
                 $.loadOrders(1);

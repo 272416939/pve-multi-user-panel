@@ -510,4 +510,42 @@ router.put('/admin/register/config', authMiddleware, adminMiddleware, async (req
     }
 });
 
+// ========== 站点配置 ==========
+
+// GET /admin/site/config - 获取站点配置
+router.get('/admin/site/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var getConfig = db.config.get;
+        var name = await getConfig('site:name') || 'PVE 多用户控制面板';
+        var logoText = await getConfig('site:logo_text') || 'PVE 面板';
+        var loginTitle = await getConfig('site:login_title') || 'PVE Panel';
+        var registerEnabled = await getConfig('register:enabled') || '0';
+        res.json({
+            name: name,
+            logo_text: logoText,
+            login_title: loginTitle,
+            register_enabled: registerEnabled === '1'
+        });
+    } catch (e) {
+        console.error('[admin] site config get:', e.message);
+        res.status(500).json({ error: '获取站点配置失败' });
+    }
+});
+
+// PUT /admin/site/config - 保存站点配置
+router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var setConfig = db.config.set;
+        var { name, logo_text, login_title, register_enabled } = req.body;
+        if (name !== undefined) await setConfig('site:name', name);
+        if (logo_text !== undefined) await setConfig('site:logo_text', logo_text);
+        if (login_title !== undefined) await setConfig('site:login_title', login_title);
+        if (register_enabled !== undefined) await setConfig('register:enabled', register_enabled ? '1' : '0');
+        res.json({ message: '站点配置保存成功' });
+    } catch (e) {
+        console.error('[admin] site config set:', e.message);
+        res.status(500).json({ error: '保存站点配置失败' });
+    }
+});
+
 module.exports = router;
