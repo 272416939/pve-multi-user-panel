@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.12.1] - 2026-06-23
+
+### Fixed
+- fix(wallet): 修复 order-status 订单号正则与实际生成格式不匹配导致轮询完全失效
+- fix(wallet): 修复 /wallet/return 同步回调不返回 amount 字段导致金额显示异常
+- fix(wallet): 前端金额校验改为 parseFloat+toFixed(2)，兼容 number 类型
+
+---
+
 ## [2.12.0] - 2026-06-23
 
 ### Added
