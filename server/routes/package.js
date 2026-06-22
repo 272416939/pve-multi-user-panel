@@ -136,7 +136,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             mac_group_id: finalMacGroupId || ''
         });
         await db.transactionRecords.create({
-            user_id: userId, order_no: orderNo, pay_time: now.toISOString(),
+            user_id: userId, order_no: orderNo, pay_time: db.now(),
             pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''
@@ -303,7 +303,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             mac_group_id: finalMacGroupId || ''
         });
         await db.transactionRecords.create({
-            user_id: userId, order_no: orderNo, pay_time: now.toISOString(),
+            user_id: userId, order_no: orderNo, pay_time: db.now(),
             pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''
@@ -486,7 +486,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         });
         // 写入 transaction_records
         await db.transactionRecords.create({
-            user_id: userId, order_no: orderNo, pay_time: now.toISOString(),
+            user_id: userId, order_no: orderNo, pay_time: db.now(),
             pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''
@@ -660,7 +660,7 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         });
         // 写入 transaction_records
         await db.transactionRecords.create({
-            user_id: userId, order_no: orderNo, pay_time: now.toISOString(),
+            user_id: userId, order_no: orderNo, pay_time: db.now(),
             pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''

@@ -43,6 +43,7 @@ function getPool() {
             waitForConnections: true,
             connectTimeout: 10000,
             dateStrings: true,
+            timezone: '+08:00',
         });
     }
     return pool;
@@ -780,6 +781,10 @@ async function migrateFromSQLite() {
 module.exports = {
     // 数据库连接
     db: { connection: getPool },
+
+    // 时间工具函数（统一本地时间 YYYY-MM-DD HH:MM:SS）
+    now: mysqlNow,
+    today: mysqlToday,
 
     // 用户操作
     users: {

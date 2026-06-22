@@ -28,6 +28,16 @@ if (!fs.existsSync(dataDir)) {
     fs.mkdirSync(dataDir, { recursive: true });
 }
 
+// 统一本地时间工具函数：返回 YYYY-MM-DD HH:MM:SS 格式的本地时间
+function sqliteNow() {
+    var d = new Date();
+    var local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 19).replace('T', ' ');
+}
+function sqliteToday() {
+    return sqliteNow().slice(0, 10);
+}
+
 // 检查是否需要从旧JSON数据库迁移数据
 const jsonDbFile = path.join(__dirname, '../../db.json');
 let needMigration = false;
@@ -58,7 +68,7 @@ function initDb() {
             must_change_password INTEGER DEFAULT 0,
             password_salt TEXT DEFAULT '',
             is_active INTEGER DEFAULT 1,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT (datetime('now','localtime'))
         )
     `);
 
@@ -75,7 +85,7 @@ function initDb() {
             renewal_price TEXT DEFAULT '',
             reminderSent INTEGER DEFAULT 0,
             lastReminderDate TEXT DEFAULT '',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `);
@@ -101,8 +111,8 @@ function initDb() {
             user_id INTEGER NOT NULL,
             title TEXT DEFAULT '',
             content TEXT DEFAULT '',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            updated_at TEXT DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `);
@@ -280,7 +290,7 @@ function initDb() {
             renewal_price TEXT DEFAULT '',
             reminderSent INTEGER DEFAULT 0,
             lastReminderDate TEXT DEFAULT '',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `);
@@ -315,8 +325,8 @@ function initDb() {
             source TEXT DEFAULT 'panel',
             sync_status TEXT DEFAULT 'synced',
             ikuai_id TEXT DEFAULT '',
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT (datetime('now','localtime')),
+            updated_at TEXT DEFAULT (datetime('now','localtime'))
         )
     `);
 
@@ -338,7 +348,7 @@ function initDb() {
             resource_id INTEGER DEFAULT NULL,
             trade_no TEXT DEFAULT NULL,
             api_trade_no TEXT DEFAULT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now','localtime')),
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
     `);
@@ -767,7 +777,7 @@ function createDefaultAdmin() {
         db.prepare(`
             INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, must_change_password, password_salt, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `).run('admin', hashedPassword, 'admin', '', '', '', 0, 1, adminSalt, new Date().toISOString());
+        `).run('admin', hashedPassword, 'admin', '', '', '', 0, 1, adminSalt, sqliteNow());
 
         console.log('================================================');
         console.log('  ⚠ 默认管理员账号已创建（此信息仅显示一次）');
@@ -835,7 +845,7 @@ function migrateFromJson() {
                     user.bio || '',
                     user.email || '',
                     user.emailVerified ? 1 : 0,
-                    user.created_at || new Date().toISOString()
+                    user.created_at || sqliteNow()
                 );
             }
             console.log(`迁移了 ${jsonData.users.length} 个用户`);
@@ -861,13 +871,13 @@ function migrateFromJson() {
                     vm.expiration_date || null,
                     vm.reminderSent ? 1 : 0,
                     vm.lastReminderDate || '',
-                    vm.created_at || new Date().toISOString()
+                    vm.created_at || sqliteNow()
                 );
                 
                 // 迁移提醒记录
                 if (vm.reminders && vm.reminders.length > 0) {
                     for (const days of vm.reminders) {
-                        insertReminder.run(vm.id, days, new Date().toISOString());
+                        insertReminder.run(vm.id, days, sqliteNow());
                     }
                 }
             }
@@ -886,8 +896,8 @@ function migrateFromJson() {
                     memo.user_id,
                     memo.title || '',
                     memo.content || '',
-                    memo.created_at || new Date().toISOString(),
-                    memo.updated_at || new Date().toISOString()
+                    memo.created_at || sqliteNow(),
+                    memo.updated_at || sqliteNow()
                 );
             }
             console.log(`迁移了 ${jsonData.memos.length} 个备忘录`);
@@ -960,7 +970,11 @@ if (needMigration) {
 module.exports = {
     // 数据库连接
     db,
-    
+
+    // 时间工具函数（统一本地时间 YYYY-MM-DD HH:MM:SS）
+    now: sqliteNow,
+    today: sqliteToday,
+
     // 用户操作
     users: {
         getAll: () => db.prepare('SELECT * FROM users').all(),
@@ -978,7 +992,7 @@ module.exports = {
                 user.bio || '',
                 user.email || '',
                 user.emailVerified ? 1 : 0,
-                user.created_at || new Date().toISOString()
+                user.created_at || sqliteNow()
             );
             return db.prepare('SELECT * FROM users WHERE id = ?').get(lastInsertRowid);
         },
@@ -1025,7 +1039,7 @@ module.exports = {
                 vm.expiration_date || null,
                 vm.renewal_price || '',
                 vm.renewal_period || 'month',
-                new Date().toISOString()
+                sqliteNow()
             );
             return db.prepare('SELECT * FROM vms WHERE id = ?').get(lastInsertRowid);
         },
@@ -1065,7 +1079,7 @@ module.exports = {
                 db.prepare('INSERT INTO vm_reminders (vm_id, days, sent_at) VALUES (?, ?, ?)').run(
                     vmId,
                     days,
-                    new Date().toISOString()
+                    sqliteNow()
                 );
             },
             clear: (vmId) => db.prepare('DELETE FROM vm_reminders WHERE vm_id = ?').run(vmId),
@@ -1077,14 +1091,14 @@ module.exports = {
                 return result?.count || 0;
             },
             getTodayExpired: () => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = sqliteToday();
                 return db.prepare(`
                     SELECT vm_id FROM vm_reminders 
                     WHERE days = 0 AND sent_at LIKE ?
                 `).all(today + '%');
             },
             getTodayAll: () => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = sqliteToday();
                 return db.prepare(`
                     SELECT * FROM vm_reminders 
                     WHERE sent_at LIKE ?
@@ -1126,7 +1140,7 @@ module.exports = {
                 cdk.duration_days,
                 cdk.created_by,
                 cdk.target_user_id || null,
-                cdk.created_at || new Date().toISOString(),
+                cdk.created_at || sqliteNow(),
                 cdk.expires_at || null,
                 cdk.batch_id || null
             );
@@ -1138,12 +1152,12 @@ module.exports = {
                 info = db.prepare(`
                     UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_ct_id = ?, used_at = ?
                     WHERE id = ? AND is_used = 0
-                `).run(userId, vmId, ctId, new Date().toISOString(), id);
+                `).run(userId, vmId, ctId, sqliteNow(), id);
             } else {
                 info = db.prepare(`
                     UPDATE cdk_codes SET is_used = 1, used_by = ?, used_vm_id = ?, used_at = ?
                     WHERE id = ? AND is_used = 0
-                `).run(userId, vmId, new Date().toISOString(), id);
+                `).run(userId, vmId, sqliteNow(), id);
             }
             return { affected: info.changes, cdk: db.prepare('SELECT * FROM cdk_codes WHERE id = ?').get(id) };
         },
@@ -1186,8 +1200,8 @@ module.exports = {
                 memo.user_id,
                 memo.title || '',
                 memo.content || '',
-                new Date().toISOString(),
-                new Date().toISOString()
+                sqliteNow(),
+                sqliteNow()
             );
             return db.prepare('SELECT * FROM memos WHERE id = ?').get(lastInsertRowid);
         },
@@ -1205,7 +1219,7 @@ module.exports = {
                 values.push(value);
             }
             fields.push('updated_at = ?');
-            values.push(new Date().toISOString());
+            values.push(sqliteNow());
             values.push(id);
             
             db.prepare(`UPDATE memos SET ${fields.join(', ')} WHERE id = ?`).run(...values);
@@ -1251,7 +1265,7 @@ module.exports = {
                 data.link_url || '',
                 data.link_text || '',
                 data.batch_id || '',
-                new Date().toISOString()
+                sqliteNow()
             );
             return db.prepare('SELECT * FROM messages WHERE id = ?').get(lastInsertRowid);
         },
@@ -1346,7 +1360,7 @@ module.exports = {
                 data.device_name || '',
                 data.ip || '',
                 data.user_agent || '',
-                data.created_at || new Date().toISOString(),
+                data.created_at || sqliteNow(),
                 data.expires_at
             );
             return db.prepare('SELECT * FROM refresh_tokens WHERE id = ?').get(lastInsertRowid);
@@ -1392,11 +1406,11 @@ module.exports = {
     snapshotLogs: {
         add: (userId, vmId, action) => {
             db.prepare('INSERT INTO snapshot_logs (user_id, vm_id, action, created_at) VALUES (?, ?, ?, ?)').run(
-                userId, vmId, action, new Date().toISOString()
+                userId, vmId, action, sqliteNow()
             );
         },
         getDailyCount: (userId, action) => {
-            const today = new Date().toISOString().split('T')[0];
+            const today = sqliteToday();
             const result = db.prepare(`
                 SELECT COUNT(*) as count FROM snapshot_logs
                 WHERE user_id = ? AND action = ? AND created_at >= ?
@@ -1490,7 +1504,7 @@ module.exports = {
     backupLogs: {
         add: (userId, vmId, action) => db.prepare('INSERT INTO backup_logs (user_id, vm_id, action) VALUES (?, ?, ?)').run(userId, vmId, action),
         getDailyCount: (userId) => {
-            const today = new Date().toISOString().split('T')[0];
+            const today = sqliteToday();
             const result = db.prepare(`SELECT COUNT(*) as count FROM backup_logs WHERE user_id = ? AND action = 'create' AND created_at >= ?`).get(userId, today);
             return result?.count || 0;
         }
@@ -1552,7 +1566,7 @@ module.exports = {
                 ct.expiration_date || null,
                 ct.renewal_price || '',
                 ct.renewal_period || 'month',
-                new Date().toISOString()
+                sqliteNow()
             );
             return db.prepare('SELECT * FROM lxc_containers WHERE id = ?').get(lastInsertRowid);
         },
@@ -1592,7 +1606,7 @@ module.exports = {
                 db.prepare('INSERT INTO lxc_reminders (ct_id, days, sent_at) VALUES (?, ?, ?)').run(
                     ctId,
                     days,
-                    new Date().toISOString()
+                    sqliteNow()
                 );
             },
             clear: (ctId) => db.prepare('DELETE FROM lxc_reminders WHERE ct_id = ?').run(ctId),
@@ -1604,14 +1618,14 @@ module.exports = {
                 return result?.count || 0;
             },
             getTodayExpired: () => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = sqliteToday();
                 return db.prepare(`
                     SELECT ct_id FROM lxc_reminders 
                     WHERE days = 0 AND sent_at LIKE ?
                 `).all(today + '%');
             },
             getTodayAll: () => {
-                const today = new Date().toISOString().split('T')[0];
+                const today = sqliteToday();
                 return db.prepare(`
                     SELECT * FROM lxc_reminders 
                     WHERE sent_at LIKE ?
@@ -1683,8 +1697,8 @@ module.exports = {
                 data.source || 'panel',
                 data.sync_status || 'pending',
                 data.ikuai_id || '',
-                new Date().toISOString(),
-                new Date().toISOString()
+                sqliteNow(),
+                sqliteNow()
             );
             return db.prepare('SELECT * FROM port_forwards WHERE id = ?').get(result.lastInsertRowid);
         },
@@ -1702,7 +1716,7 @@ module.exports = {
                 fields.push(`${key} = ?`);
                 values.push(value);
             }
-            values.push(new Date().toISOString(), id);
+            values.push(sqliteNow(), id);
             db.prepare(`UPDATE port_forwards SET ${fields.join(', ')}, updated_at = ? WHERE id = ?`).run(...values);
             return db.prepare('SELECT * FROM port_forwards WHERE id = ?').get(id);
         },
@@ -1730,7 +1744,7 @@ module.exports = {
                 record.balance_before || '0.00', record.balance_after || '0.00',
                 record.resource_type || null, record.resource_id || null,
                 record.trade_no || null, record.api_trade_no || null,
-                new Date().toISOString()
+                sqliteNow()
             );
             return db.prepare('SELECT * FROM transaction_records WHERE id = ?').get(lastInsertRowid);
         },
@@ -1837,7 +1851,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
-            updates.updated_at = new Date().toISOString().replace('T',' ').slice(0,19);
+            updates.updated_at = sqliteNow();
             const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
             const stmt = db.prepare(`UPDATE vm_templates SET ${fields} WHERE id = @id`);
             stmt.run({ ...updates, id });
@@ -1871,7 +1885,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
-            updates.updated_at = new Date().toISOString().replace('T',' ').slice(0,19);
+            updates.updated_at = sqliteNow();
             const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
             const stmt = db.prepare(`UPDATE lxc_templates SET ${fields} WHERE id = @id`);
             stmt.run({ ...updates, id });
@@ -1899,7 +1913,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
-            updates.updated_at = new Date().toISOString().replace('T',' ').slice(0,19);
+            updates.updated_at = sqliteNow();
             const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
             const stmt = db.prepare(`UPDATE vm_packages SET ${fields} WHERE id = @id`);
             stmt.run({ ...updates, id });
@@ -1927,7 +1941,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
-            updates.updated_at = new Date().toISOString().replace('T',' ').slice(0,19);
+            updates.updated_at = sqliteNow();
             const fields = Object.keys(updates).map(k => `${k} = @${k}`).join(', ');
             const stmt = db.prepare(`UPDATE lxc_packages SET ${fields} WHERE id = @id`);
             stmt.run({ ...updates, id });

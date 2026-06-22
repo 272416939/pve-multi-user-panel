@@ -7,6 +7,9 @@ const pkg = require('../package.json');
 const { WebSocket } = require('ws');
 require('dotenv').config();
 
+// 统一设置服务器时区为 Asia/Shanghai，确保 new Date() 和数据库时间写入一致
+process.env.TZ = process.env.TZ || 'Asia/Shanghai';
+
 // 检查 .env 文件是否存在
 const envPath = path.join(__dirname, '..', '.env');
 const envExamplePath = path.join(__dirname, '..', '.env.example');

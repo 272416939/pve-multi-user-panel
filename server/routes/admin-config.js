@@ -285,7 +285,7 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
                 html_url: response.data.html_url || (source === 'gitee'
                     ? `https://gitee.com/${giteeRepo}/releases/tag/${response.data.tag_name}`
                     : `https://github.com/${githubRepo}/releases/tag/${response.data.tag_name}`),
-                published_at: response.data.published_at || response.data.created_at || new Date().toISOString()
+                published_at: response.data.published_at || response.data.created_at || db.now()
             }
         });
     } catch (error) {

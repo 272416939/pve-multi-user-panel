@@ -236,7 +236,7 @@ router.post('/wallet/notify', async (req, res) => {
         await db.transactionRecords.create({
             user_id: userId,
             order_no: params.out_trade_no,
-            pay_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            pay_time: db.now(),
             pay_method: params.type || '',
             trade_type: 'recharge',
             amount: amount.toFixed(2),
@@ -339,7 +339,7 @@ router.get('/wallet/return', async (req, res) => {
         await db.transactionRecords.create({
             user_id: userId,
             order_no: params.out_trade_no,
-            pay_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            pay_time: db.now(),
             pay_method: params.type || '',
             trade_type: 'recharge',
             amount: amount.toFixed(2),
@@ -529,7 +529,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         await db.transactionRecords.create({
             user_id: userId,
             order_no: orderNo,
-            pay_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            pay_time: db.now(),
             pay_method: 'balance',
             trade_type: 'renewal',
             amount: totalPrice.toFixed(2),

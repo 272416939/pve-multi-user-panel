@@ -143,7 +143,7 @@ router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, 
         var orderNo = 'ADMIN_RECHARGE_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
 
         await db.transactionRecords.create({
-            user_id: userId, order_no: orderNo, pay_time: now.toISOString().slice(0, 19).replace('T', ' '),
+            user_id: userId, order_no: orderNo, pay_time: db.now(),
             pay_method: 'manual', trade_type: 'admin_recharge',
             amount: amount.toFixed(2),
             period: 'month', period_count: 1,
