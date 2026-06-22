@@ -13,6 +13,17 @@ var crypto = require('crypto');
 
 function safeError(e) { return process.env.DEBUG === 'true' ? e.message : '服务器错误'; }
 
+// 将 Date 对象格式化为本地时间字符串 YYYY-MM-DD HH:MM:SS（避免 toISOString() 转换为 UTC）
+function formatLocalDate(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    var h = String(d.getHours()).padStart(2, '0');
+    var mi = String(d.getMinutes()).padStart(2, '0');
+    var s = String(d.getSeconds()).padStart(2, '0');
+    return y + '-' + m + '-' + dd + ' ' + h + ':' + mi + ':' + s;
+}
+
 function generateRandomPassword() {
     var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     var pwd = '';
@@ -100,7 +111,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
 
         var newVm = await db.vms.create({
-            vm_id: newVmid, user_id: userId, name: randomName, expiration_date: expDate.toISOString(),
+            vm_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
             renewal_price: String(calculateAmount(pkg.monthly_price, period, 1)), renewal_period: period
         });
 
@@ -263,7 +274,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
 
         var newCt = await db.lxcContainers.create({
-            ct_id: newVmid, user_id: userId, name: randomName, expiration_date: expDate.toISOString(),
+            ct_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
             renewal_price: String(calculateAmount(pkg.monthly_price, period, 1)), renewal_period: period
         });
 

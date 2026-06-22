@@ -191,10 +191,7 @@
 
     $.updateLxc = async function() {
         try {
-            var expDate = null;
-            if ($.editLxcForm.value.expiration_date) {
-                expDate = new Date($.editLxcForm.value.expiration_date.replace('T', ' ')).toISOString();
-            }
+            var expDate = toLocalDateTimeStr($.editLxcForm.value.expiration_date);
             await api('/user/lxc/' + $.editLxcForm.value.id, {
                 method: 'PUT',
                 body: JSON.stringify({

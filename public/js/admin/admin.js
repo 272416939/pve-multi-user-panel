@@ -283,10 +283,7 @@
     // CDK 管理
     $.generateCdkBatch = async function() {
         try {
-            var expires = null;
-            if ($.cdkForm.value.expires_at) {
-                expires = new Date($.cdkForm.value.expires_at.replace('T', ' ')).toISOString();
-            }
+            var expires = toLocalDateTimeStr($.cdkForm.value.expires_at);
             var result = await api('/admin/cdk/batch-generate', {
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.cdkForm.value, {

@@ -277,6 +277,17 @@ const trimContent = (text) => {
     return text ? text.replace(/\n/g, ' ') : '';
 };
 
+// 将 datetime-local 输入框的值（YYYY-MM-DDTHH:MM）转换为本地时间字符串 YYYY-MM-DD HH:MM:SS
+// 用于发送给后端保存，避免 toISOString() 转换为 UTC 导致时区偏差
+const toLocalDateTimeStr = (datetimeLocalValue) => {
+    if (!datetimeLocalValue) return null;
+    // datetime-local 格式：YYYY-MM-DDTHH:MM 或 YYYY-MM-DDTHH:MM:SS
+    var s = datetimeLocalValue.replace('T', ' ');
+    // 补齐秒数
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s)) s += ':00';
+    return s;
+};
+
 const formatDateTimeLocal = (dateStr) => {
     if (!dateStr) return '';
     var safe = dateStr;

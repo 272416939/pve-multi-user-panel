@@ -159,10 +159,7 @@
 
     $.updateVm = async function() {
         try {
-            var expDate = null;
-            if ($.editVmForm.value.expiration_date) {
-                expDate = new Date($.editVmForm.value.expiration_date.replace('T', ' ')).toISOString();
-            }
+            var expDate = toLocalDateTimeStr($.editVmForm.value.expiration_date);
             await api('/user/vms/' + $.editVmForm.value.id, {
                 method: 'PUT',
                 body: JSON.stringify({

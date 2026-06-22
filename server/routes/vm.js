@@ -72,7 +72,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
             ...vm,
             status: null,
             config: null,
-            isExpired: vm.expiration_date ? new Date(vm.expiration_date + 'Z') < new Date() : false,
+            isExpired: vm.expiration_date ? new Date(vm.expiration_date) < new Date() : false,
             destroyed: false,
             error: null
         }));
@@ -117,7 +117,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
                 ...vm,
                 status: null,
                 config: null,
-                isExpired: vm.expiration_date ? new Date(vm.expiration_date + 'Z') < new Date() : false,
+                isExpired: vm.expiration_date ? new Date(vm.expiration_date) < new Date() : false,
                 destroyed: false
             })));
         } catch (e2) {
@@ -199,7 +199,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
         try {
-            const expiryStr = expiration_date ? new Date(expiration_date + 'Z').toLocaleString('zh-CN') : '永久有效';
+            const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
             const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
             const emailContent = `
                 <p>您好 <strong>${assignedUser.username}</strong>，</p>
@@ -311,7 +311,7 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     // 管理员延长到期时间后，如果虚拟机之前因到期停机，尝试自动开机
     if (isAdmin && expiration_date !== undefined) {
         try {
-            const newExp = new Date(expiration_date + 'Z');
+            const newExp = new Date(expiration_date);
             if (newExp > new Date()) {
                 const currentStatus = await pveApi.getVmStatus(vm.vm_id);
                 if (currentStatus && currentStatus.status === 'stopped') {
@@ -430,10 +430,10 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date + 'Z') < new Date()) {
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
             }
-            if (isOwner && vm.expiration_date && new Date(vm.expiration_date + 'Z') < new Date()) {
+            if (isOwner && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '虚拟机已到期，无法开机' });
             }
         } else if (!isAdmin) {
@@ -460,7 +460,7 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date + 'Z') < new Date()) {
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
@@ -487,7 +487,7 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date + 'Z') < new Date()) {
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
@@ -514,7 +514,7 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
-            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date + 'Z') < new Date()) {
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {
@@ -737,7 +737,7 @@ router.post('/vm/:vmid/reset-password', authMiddleware, async (req, res) => {
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此虚拟机' });
             }
-            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date + 'Z') < new Date()) {
+            if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
                 return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
             }
         } else if (!isAdmin) {

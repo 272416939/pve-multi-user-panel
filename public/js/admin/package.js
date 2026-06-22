@@ -131,7 +131,7 @@
         var pkg = $.vmPackages.value.find(function(p) { return String(p.id) === String(f.package_id); });
         if (!pkg) return alert('套餐不存在');
         try {
-            var expDate = f.expiration_date ? new Date(f.expiration_date.replace('T', ' ')).toISOString() : null;
+            var expDate = toLocalDateTimeStr(f.expiration_date);
             await api('/admin/vm-packages/' + f.package_id + '/provision', {
                 method: 'POST',
                 body: JSON.stringify({
@@ -153,7 +153,7 @@
         var pkg = $.lxcPackages.value.find(function(p) { return String(p.id) === String(f.package_id); });
         if (!pkg) return alert('套餐不存在');
         try {
-            var expDate = f.expiration_date ? new Date(f.expiration_date.replace('T', ' ')).toISOString() : null;
+            var expDate = toLocalDateTimeStr(f.expiration_date);
             await api('/admin/lxc-packages/' + f.package_id + '/provision', {
                 method: 'POST',
                 body: JSON.stringify({

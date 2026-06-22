@@ -14,6 +14,17 @@ function safeError(e) {
     return '操作失败，请稍后重试';
 }
 
+// 将 Date 对象格式化为本地时间字符串 YYYY-MM-DD HH:MM:SS（避免 toISOString() 转换为 UTC）
+function formatLocalDate(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    var h = String(d.getHours()).padStart(2, '0');
+    var mi = String(d.getMinutes()).padStart(2, '0');
+    var s = String(d.getSeconds()).padStart(2, '0');
+    return y + '-' + m + '-' + dd + ' ' + h + ':' + mi + ':' + s;
+}
+
 var callbackRateLimiter = new Map();
 function checkCallbackRate(ip) {
     var now = Date.now();
@@ -496,9 +507,9 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         
         var addDays = period === 'year' ? qty * 365 : period === 'quarter' ? qty * 90 : qty * 30;
         
-        var oldExpiration = resource.expiration_date ? new Date(resource.expiration_date + 'Z') : new Date();
+        var oldExpiration = resource.expiration_date ? new Date(resource.expiration_date) : new Date();
         oldExpiration.setDate(oldExpiration.getDate() + addDays);
-        var newExpiration = oldExpiration.toISOString();
+        var newExpiration = formatLocalDate(oldExpiration);
         
         var newBalance = (balance - totalPrice).toFixed(2);
         await db.users.update(userId, { balance: newBalance });

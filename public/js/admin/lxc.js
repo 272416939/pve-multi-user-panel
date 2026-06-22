@@ -148,10 +148,7 @@
 
     $.assignLxc = async function() {
         try {
-            var expDate = null;
-            if ($.lxcAssignForm.value.expiration_date) {
-                expDate = new Date($.lxcAssignForm.value.expiration_date.replace('T', ' ')).toISOString();
-            }
+            var expDate = toLocalDateTimeStr($.lxcAssignForm.value.expiration_date);
             await api('/user/lxc', {
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.lxcAssignForm.value, { expiration_date: expDate }))
@@ -167,10 +164,7 @@
     $.updateLxc = async function() {
         var f = $.editLxcForm.value;
         try {
-            var expDate = null;
-            if (f.expiration_date) {
-                expDate = new Date(f.expiration_date.replace('T', ' ')).toISOString();
-            }
+            var expDate = toLocalDateTimeStr(f.expiration_date);
             await api('/user/lxc/' + f.id, {
                 method: 'PUT',
                 body: JSON.stringify({
@@ -745,7 +739,13 @@
                 $.lxcAssignForm.value.name = pkg.name + '-' + Math.random().toString(36).slice(2, 6);
                 $.lxcAssignForm.value.renewal_price = pkg.monthly_price;
                 var d = new Date(); d.setMonth(d.getMonth() + 1);
-                $.lxcAssignForm.value.expiration_date = d.toISOString().slice(0, 16);
+                // 使用本地时间格式填充 datetime-local，避免 toISOString() 转换为 UTC
+                var y = d.getFullYear();
+                var m = String(d.getMonth() + 1).padStart(2, '0');
+                var dd = String(d.getDate()).padStart(2, '0');
+                var h = String(d.getHours()).padStart(2, '0');
+                var mi = String(d.getMinutes()).padStart(2, '0');
+                $.lxcAssignForm.value.expiration_date = y + '-' + m + '-' + dd + 'T' + h + ':' + mi;
             }
         });
     };

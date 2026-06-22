@@ -12,6 +12,17 @@ function safeError(e) {
     return '操作失败，请稍后重试';
 }
 
+// 将 Date 对象格式化为本地时间字符串 YYYY-MM-DD HH:MM:SS（避免 toISOString() 转换为 UTC）
+function formatLocalDate(d) {
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    var h = String(d.getHours()).padStart(2, '0');
+    var mi = String(d.getMinutes()).padStart(2, '0');
+    var s = String(d.getSeconds()).padStart(2, '0');
+    return y + '-' + m + '-' + dd + ' ' + h + ':' + mi + ':' + s;
+}
+
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const pveApi = require('../api/pve-api');
 const dbg = require('../utils/debug');
@@ -360,7 +371,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
  
             // 更新容器到期时间
             await db.lxcContainers.update(targetId, {
-                expiration_date: newExpirationDate.toISOString(),
+                expiration_date: formatLocalDate(newExpirationDate),
                 reminderSent: false,
                 lastReminderDate: ''
             });
@@ -417,7 +428,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
  
             return res.json({
                 message: `兑换成功！LXC 容器到期时间已延长 ${cdk.duration_days} 天`,
-                new_expiration_date: newExpirationDate.toISOString()
+                new_expiration_date: formatLocalDate(newExpirationDate)
             });
         } else {
             // ===== 虚拟机续费 =====
@@ -438,7 +449,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             // 计算新的到期时间
             let newExpirationDate;
             if (vm.expiration_date) {
-                const currentExp = new Date(vm.expiration_date + 'Z');
+                const currentExp = new Date(vm.expiration_date);
                 const now = new Date();
                 const baseDate = currentExp > now ? currentExp : now;
                 newExpirationDate = new Date(baseDate.getTime() + cdk.duration_days * 24 * 60 * 60 * 1000);
@@ -448,7 +459,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
  
             // 更新虚拟机到期时间
             await db.vms.update(vm.id, {
-                expiration_date: newExpirationDate.toISOString(),
+                expiration_date: formatLocalDate(newExpirationDate),
                 reminderSent: false,
                 lastReminderDate: ''
             });
@@ -510,7 +521,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
  
             res.json({
                 message: `兑换成功！虚拟机到期时间已延长 ${cdk.duration_days} 天`,
-                new_expiration_date: newExpirationDate.toISOString()
+                new_expiration_date: formatLocalDate(newExpirationDate)
             });
         }
     } catch (error) {

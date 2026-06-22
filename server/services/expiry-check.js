@@ -245,7 +245,7 @@ async function checkExpiredLxc() {
 
         for (const ct of allCts) {
             if (!ct.expiration_date) continue;
-            const expDate = new Date(ct.expiration_date + 'Z');
+            const expDate = new Date(ct.expiration_date);
             const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
             const diffMs = expDate - today;
 
