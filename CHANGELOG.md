@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.14.1] - 2026-06-23
+
+### Changed
+- 清理磁盘后重新添加 `.gitignore` 中的 `data/` 忽略规则，防止旧 SQLite 遗留文件误提交
+
+---
+
 ## [2.14.0] - 2026-06-23
 
 ### BREAKING CHANGES

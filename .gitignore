@@ -9,6 +9,9 @@ AGENT.md
 # 用户上传的头像
 images/
 
+# 本地数据库数据（SQLite 遗留，已移除支持，防止误提交）
+data/
+
 # 依赖
 node_modules/
 
