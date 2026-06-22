@@ -327,7 +327,7 @@ router.get('/wallet/return', async (req, res) => {
 
         var existing = await db.transactionRecords.getByOrderNo(params.out_trade_no);
         if (existing) {
-            return res.json({ success: true, msg: '已处理', order_no: params.out_trade_no });
+            return res.json({ success: true, msg: '已处理', order_no: params.out_trade_no, amount: existing.amount });
         }
 
         var userId = params.param ? parseInt(params.param) : null;
@@ -391,7 +391,7 @@ router.get('/wallet/return', async (req, res) => {
 
         dbg('[钱包] 同步回调入账成功:', params.out_trade_no, amount.toFixed(2));
 
-        res.json({ success: true, order_no: params.out_trade_no, balance: balanceAfter.toFixed(2) });
+        res.json({ success: true, order_no: params.out_trade_no, amount: amount.toFixed(2), balance: balanceAfter.toFixed(2) });
     } catch (e) {
         console.error('[钱包] 同步回调失败:', e.message);
         res.json({ success: false, error: '处理异常' });
@@ -403,8 +403,8 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
     try {
         var orderNo = req.params.order_no;
 
-        // 订单号格式校验：RECHARGE + 14位时间戳 + 4-6位随机数
-        if (!/^RECHARGE\d{14}\d{4,6}$/.test(orderNo)) {
+        // 订单号格式校验：RECHARGE_<base36时间戳>_<12位hex随机>
+        if (!/^RECHARGE_[a-z0-9]+_[a-f0-9]{12}$/.test(orderNo)) {
             return res.status(400).json({ error: '无效的订单号格式' });
         }
 

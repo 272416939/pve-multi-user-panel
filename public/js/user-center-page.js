@@ -256,8 +256,9 @@ const App = {
             rechargeResultType.value = type;
             if (type === 'success') {
                 rechargeResultTitle.value = '充值成功';
-                // 金额格式校验，不合法显示 --
-                rechargeResultAmount.value = /^\d+\.\d{2}$/.test(amount) ? amount : '--';
+                // 金额格式化：兼容 string/number，统一输出两位小数
+                var num = parseFloat(amount);
+                rechargeResultAmount.value = isNaN(num) ? '--' : num.toFixed(2);
             } else if (type === 'fail') {
                 rechargeResultTitle.value = '充值失败';
                 rechargeResultAmount.value = '';
