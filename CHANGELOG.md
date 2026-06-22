@@ -1,5 +1,44 @@
 # Changelog
 
+## [2.13.5] - 2026-06-23
+
+### Added
+- feat(cache): Redis 缓存全面接入，提升系统性能与多实例一致性
+  - 新增 cache-store.js 通用缓存工具（Redis 优先 + 内存回退）
+  - 新增 token-store.js 验证码/找回密码 token 统一存储
+  - authMiddleware 接入设备缓存/JWT 黑名单/is_active 状态检查
+  - profileCache/unreadCache 迁移到 Redis 解决多实例缓存不一致
+  - 用户列表/套餐列表缓存接入，CRUD 时自动失效
+  - 站点配置三级缓存（内存→Redis→数据库）
+- feat(admin): 站点设置新增一键清除所有缓存功能
+  - 后端新增 POST /admin/cache/clear 接口
+  - 前端新增"危险操作"卡片，带红色警告样式
+  - 点击后弹出 HTML 格式二次确认弹窗，列出所有清除范围
+- feat(ui): 新增 customPrompt 组件替代浏览器默认 prompt
+  - 基于 Bootstrap Modal + Promise 模式
+  - 支持自动聚焦输入框、回车确认
+  - 套餐补货功能已改用 customPrompt
+
+### Changed
+- refactor(cache): 修复 ioredis keyPrefix 双前缀导致 SCAN+DEL 失效问题
+  - 新增 scanDel() 函数，SCAN 返回的 key 去掉前缀后再传给 DEL
+  - clearAll() 改为只删除带 REDIS_PREFIX 前缀的 key，不影响其他服务
+- style(login): 登录/注册按钮改用 Bootstrap 原生 btn 样式
+  - 新增 .login-submit-btn 样式统一按钮尺寸
+  - 登录按钮为渐变背景，注册按钮为透明背景+边框
+- feat(ui): 交易流水首次访问自动加载数据
+  - onMounted 中检查 activeTab 主动调用加载函数
+
+### Fixed
+- fix(cache): 修复头像更新后 60s 内返回旧 URL 的 bug
+  - 头像上传接口新增 profileCache.del() 失效缓存
+- fix(cache): 修复清空消息后未读数不更新的 bug
+  - DELETE /messages 接口新增 unreadCache.del() + pushUnreadCount()
+- fix(modal): customConfirm 模板支持 HTML 内容渲染
+  - {{ }} 文本插值改为 v-html，修复 lxc.js 等已有代码传入 HTML 被转义的问题
+
+---
+
 ## [2.13.4] - 2026-06-23
 
 ### Changed
