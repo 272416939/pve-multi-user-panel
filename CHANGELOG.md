@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.12.0] - 2026-06-23
+
+### Added
+- feat(wallet): 充值改为当前页二维码支付，PC 端用支付链接生成二维码显示在弹窗内
+- feat(wallet): 手机端显示跳转按钮唤起支付宝/微信 app，保留当前页面
+- feat(wallet): 支付完成检测三重保障（轮询 + visibilitychange 事件 + return_url 回调）
+- feat(wallet): 鸿蒙系统检测，选择微信支付时提示建议使用支付宝
+
+### Changed
+- refactor(wallet): 移除 window.open 打开新标签页的充值方式
+- refactor(wallet): 充值等待弹窗改造为扫码/跳转支付弹窗，支持 PC 二维码和手机跳转两种模式
+
+---
+
 ## [2.11.10] - 2026-06-23
 
 ### Added
