@@ -452,12 +452,13 @@
                                 <!-- PC 端：二维码扫码 -->
                                 <template v-if="!rechargeIsMobile">
                                     <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">请使用{{ rechargeMethod === 'alipay' ? '支付宝' : '微信' }}扫码支付</h6>
-                                    <div class="recharge-qr-wrap mb-3">
+                                    <div class="recharge-qr-wrap mb-2">
                                         <div v-if="rechargeQrLoading" class="recharge-qr-loading">
                                             <div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div>
                                         </div>
                                         <div id="rechargeQrContainer" class="recharge-qr-container"></div>
                                     </div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm recharge-check-btn mb-1" @click="checkPayStatus">我已完成支付</button>
                                 </template>
                                 <!-- 手机端：跳转按钮 -->
                                 <template v-else>

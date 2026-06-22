@@ -226,9 +226,10 @@ const App = {
         const pollOrderStatus = (orderNo, amount) => {
             const startTime = Date.now();
             const timeout = 10 * 60 * 1000; // 10 分钟
-            const interval = 2000; // 2 秒
+            let interval = 2000; // 默认 2 秒
+            let consecutiveErrors = 0; // 连续错误计数
 
-            rechargePollingTimer = setInterval(async () => {
+            const tick = async () => {
                 // 检查超时
                 if (Date.now() - startTime > timeout) {
                     stopPolling();
@@ -239,6 +240,8 @@ const App = {
                 // 查询订单状态
                 try {
                     const status = await api('/wallet/order-status/' + orderNo);
+                    consecutiveErrors = 0;
+                    interval = 2000; // 恢复正常间隔
                     if (status.status === 'paid') {
                         stopPolling();
                         closePendingModal();
@@ -246,16 +249,24 @@ const App = {
                         loadWalletBalance();
                         rechargeAmount.value = '';
                         rechargeMethod.value = '';
+                        return;
                     }
                 } catch (e) {
-                    // 网络错误，继续轮询
+                    consecutiveErrors++;
+                    // 遇到错误（如 429 限速）时退避，最多 10 秒
+                    interval = Math.min(2000 * consecutiveErrors, 10000);
                 }
-            }, interval);
+                // 安排下一次查询
+                rechargePollingTimer = setTimeout(tick, interval);
+            };
+
+            // 启动首次查询
+            rechargePollingTimer = setTimeout(tick, interval);
         };
 
         const stopPolling = () => {
             if (rechargePollingTimer) {
-                clearInterval(rechargePollingTimer);
+                clearTimeout(rechargePollingTimer);
                 rechargePollingTimer = null;
             }
         };
@@ -305,6 +316,29 @@ const App = {
         const openMobilePay = () => {
             if (rechargePayUrl.value) {
                 window.location.href = rechargePayUrl.value;
+            }
+        };
+
+        // 手动检查支付状态（用户点击"我已完成支付"按钮）
+        const checkPayStatus = async () => {
+            if (!rechargePendingOrderNo.value) return;
+            try {
+                const status = await api('/wallet/order-status/' + rechargePendingOrderNo.value);
+                if (status.status === 'paid') {
+                    stopPolling();
+                    closePendingModal();
+                    showRechargeResult('success', status.amount || rechargePendingAmount.value);
+                    loadWalletBalance();
+                    rechargeAmount.value = '';
+                    rechargeMethod.value = '';
+                } else {
+                    // 未支付，提示用户
+                    rechargeError.value = '暂未检测到支付成功，请确认支付完成后重试';
+                    setTimeout(() => { rechargeError.value = ''; }, 3000);
+                }
+            } catch (e) {
+                rechargeError.value = '查询失败，请稍后重试';
+                setTimeout(() => { rechargeError.value = ''; }, 3000);
             }
         };
 
@@ -1112,7 +1146,7 @@ const App = {
             submitRecharge, loadTx, copyOrderNo, loadMyOrders,
             rechargePendingOrderNo, rechargePendingAmount, rechargeResultType, rechargeResultTitle, rechargeResultAmount,
             rechargeQrLoading, rechargePayUrl, rechargeIsMobile, rechargeShowHarmonyTip, isHarmonyDevice,
-            pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay
+            pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay, checkPayStatus
         };
     }
 };

@@ -60,6 +60,32 @@ class PayClientV1 {
         }
     }
 
+    // V1 查询/退款类 API（api.php）使用 pid + key 直接作为参数，不参与 MD5 签名
+    async _apiGet(params) {
+        params = Object.assign({ pid: this.pid, key: this.key }, params);
+        var url = this.baseUrl + API_URL + '?' + qs.stringify(params);
+        try {
+            var res = await axios.get(url, { timeout: 15000 });
+            return res.data;
+        } catch (err) {
+            return { code: -1, msg: '支付网关请求失败' };
+        }
+    }
+
+    async _apiPost(params) {
+        params = Object.assign({ pid: this.pid, key: this.key }, params);
+        var url = this.baseUrl + API_URL;
+        try {
+            var res = await axios.post(url, qs.stringify(params), {
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                timeout: 15000
+            });
+            return res.data;
+        } catch (err) {
+            return { code: -1, msg: '支付网关请求失败' };
+        }
+    }
+
     submitPay(params) {
         params = params || {};
         params.notify_url = params.notify_url || this.notifyUrl;
@@ -87,23 +113,23 @@ class PayClientV1 {
 
     async queryOrder(params) {
         params = params || {};
-        return await this._get(API_URL, Object.assign({ act: 'order' }, params));
+        return await this._apiGet(Object.assign({ act: 'order' }, params));
     }
 
     async queryOrders(params) {
         params = params || {};
         if (!params.limit) params.limit = 20;
         if (params.limit > 50) params.limit = 50;
-        return await this._get(API_URL, Object.assign({ act: 'orders' }, params));
+        return await this._apiGet(Object.assign({ act: 'orders' }, params));
     }
 
     async queryMerchant() {
-        return await this._get(API_URL, { act: 'query' });
+        return await this._apiGet({ act: 'query' });
     }
 
     async refund(params) {
         params = params || {};
-        return await this._post(API_URL, Object.assign({ act: 'refund' }, params));
+        return await this._apiPost(Object.assign({ act: 'refund' }, params));
     }
 }
 

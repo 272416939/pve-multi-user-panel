@@ -155,17 +155,34 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
             return_url: returnUrl
         };
 
+        // 设备类型检测（用于统一下单接口）
+        var userAgent = req.headers['user-agent'] || '';
+        var isMobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(userAgent);
+        var clientIp = req.ip || '127.0.0.1';
+
         var gatewayRes;
         if (v2Enabled && v2PrivateKey) {
-            gatewayRes = await payClient._post('/api/pay/submit', payParams);
-            dbg('[钱包] 网关响应:', JSON.stringify(gatewayRes));
+            // V2: 使用统一下单接口 /api/pay/create，返回二维码链接（微信直接 weixin:// 唤起app）
+            payParams.method = 'web';
+            payParams.device = isMobile ? 'mobile' : 'pc';
+            payParams.clientip = clientIp;
+            gatewayRes = await payClient._post('/api/pay/create', payParams);
+            dbg('[钱包] 网关响应(create):', JSON.stringify(gatewayRes));
         } else {
+            // V1: /mapi.php 接口，clientip 为必填，device 可选
+            payParams.clientip = clientIp;
+            payParams.device = isMobile ? 'mobile' : 'pc';
             gatewayRes = await payClient.apiPay(payParams);
             dbg('[钱包] 网关响应(V1):', JSON.stringify(gatewayRes));
         }
 
         var payUrl = null;
-        if (gatewayRes && gatewayRes.code === 1) {
+        // V2 create 接口: code=0 成功，pay_info 为支付链接
+        if (gatewayRes && gatewayRes.code === 0 && gatewayRes.pay_info) {
+            payUrl = gatewayRes.pay_info;
+        }
+        // V1/submit 接口: code=1 成功，payurl 为支付链接
+        if (!payUrl && gatewayRes && gatewayRes.code === 1) {
             payUrl = gatewayRes.payurl || gatewayRes.qrcode || gatewayRes.qr || gatewayRes.url;
         }
         if (!payUrl && gatewayRes && typeof gatewayRes === 'string') {
@@ -179,8 +196,10 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         if (payUrl) {
             res.json({ success: true, order_no: orderNo, redirect_url: payUrl });
         } else {
+            // 返回网关的具体错误信息
+            var errMsg = (gatewayRes && gatewayRes.msg) ? gatewayRes.msg : '支付网关响应异常，请稍后重试';
             console.error('[钱包] 网关未返回支付链接:', JSON.stringify(gatewayRes));
-            res.status(502).json({ error: '支付网关响应异常，请稍后重试' });
+            res.status(502).json({ error: errMsg });
         }
     } catch (e) {
         console.error('[钱包] recharge:', e.message);
@@ -188,14 +207,15 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
     }
 });
 
-// ========== 支付异步回调 (公开端点) ==========
-router.post('/wallet/notify', async (req, res) => {
+// ========== 支付异步回调 (公开端点，V1 文档为 GET 请求，兼容 POST) ==========
+router.all('/wallet/notify', async (req, res) => {
     if (!checkCallbackRate(req.ip)) {
         return res.status(429).send('Too Many Requests');
     }
     try {
-        var params = req.body;
-        dbg('[钱包] 支付回调:', params.out_trade_no, params.trade_status);
+        // V1 文档回调为 GET，部分网关可能用 POST，合并 query + body
+        var params = Object.assign({}, req.query, req.body);
+        dbg('[钱包] 支付回调:', params.out_trade_no, params.trade_status, req.method);
         
         if (params.trade_status !== 'TRADE_SUCCESS') {
             return res.send('fail');
@@ -408,11 +428,11 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
             return res.status(400).json({ error: '无效的订单号格式' });
         }
 
-        // 用户级限速：30 次/分钟
+        // 用户级限速：60 次/分钟（轮询间隔 2 秒，每分钟最多 30 次查询，留余量避免卡在阈值）
         var rateKey = 'order-status:' + req.user.id;
         var now = Date.now();
         var windowMs = 60000;
-        var maxRequests = 30;
+        var maxRequests = 60;
         if (!orderStatusRateLimiter) {
             var orderStatusRateLimiter = new Map();
         }
