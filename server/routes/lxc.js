@@ -976,7 +976,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
                 const rules = await db.portForwards.getByCtId(vmid);
                 for (const rule of rules) {
                     await db.portForwards.update(rule.id, { ip: newIp });
-                    // 同步更新 ikuai 端口映射（支持多接口）
+                    // 同步更新 ikuai 端口映射（支持多接口，新格式下数组只有一个元素，interface 字段为逗号分隔值）
                     if (rule.ikuai_id) {
                         let ikuaiIds = [];
                         try {

@@ -34,14 +34,15 @@ router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req,
     try {
         let ifaceList = [];
         try { ifaceList = JSON.parse(await db.config.get('forward:iface_list') || '[]'); } catch (_) {}
-        // wan_interface 兼容旧格式（单值字符串）和新格式（JSON 数组）
-        let wanInterface = [];
+        // wan_interface 返回逗号分隔字符串（前端文本框使用），兼容旧格式（单值字符串）和新格式（JSON 数组）
+        let wanInterface = '';
         const rawWan = await db.config.get('forward:wan_interface');
         if (rawWan) {
             try {
                 const parsed = JSON.parse(rawWan);
-                wanInterface = Array.isArray(parsed) ? parsed : [parsed];
-            } catch (_) { wanInterface = [rawWan]; }
+                if (Array.isArray(parsed)) wanInterface = parsed.filter(Boolean).join(',');
+                else if (typeof parsed === 'string') wanInterface = parsed;
+            } catch (_) { wanInterface = rawWan; }
         }
         res.json({
             port_range_start: parseInt(await db.config.get('forward:port_range_start')) || 50000,
@@ -72,12 +73,12 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         await setConfig('forward:port_range_start', String(port_range_start ?? 50000));
         await setConfig('forward:port_range_end', String(port_range_end ?? 60000));
         await setConfig('forward:default_protocol', default_protocol || 'tcp');
-        // wan_interface 存储为 JSON 数组，兼容前端传入数组或单值
+        // wan_interface 存储为 JSON 数组，兼容前端传入逗号分隔字符串、数组或单值
         let wanIfaceToStore = [];
         if (Array.isArray(wan_interface)) {
             wanIfaceToStore = wan_interface.filter(Boolean);
-        } else if (wan_interface) {
-            wanIfaceToStore = [wan_interface];
+        } else if (typeof wan_interface === 'string') {
+            wanIfaceToStore = wan_interface.split(',').map(s => s.trim()).filter(Boolean);
         }
         await setConfig('forward:wan_interface', JSON.stringify(wanIfaceToStore));
         await setConfig('forward:max_per_user', String(max_per_user ?? 10));
@@ -264,35 +265,29 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             name: name || '', ip, internal_port, external_port,
             protocol: protocol || 'tcp', sync_status: 'pending'
         });
-        // 同步到 ikuai（支持多外网线路，在所有已配置接口上同时创建）
+        // 同步到 ikuai（一条规则支持多外网接口，interface 字段传逗号分隔值）
         try {
             const wanIfaces = await getWanInterfaces();
             const comment = `${name || '转发'}_VM${vm_id}`;
-            const ikuaiIds = [];
-            let failCount = 0;
-            for (const iface of wanIfaces) {
+            const ifaceStr = wanIfaces.join(',');
+            let ikuaiIds = [];
+            try {
+                await ikuaiApi.addPortForward({ ip, internal_port, external_port, protocol: protocol || 'tcp', comment, enabled: true, interface: ifaceStr });
+                // 爱快 add 接口不返回 ID，从 ikuai 规则列表反查
                 try {
-                    await ikuaiApi.addPortForward({ ip, internal_port, external_port, protocol: protocol || 'tcp', comment, enabled: true, interface: iface });
-                    // 爱快 add 接口不返回 ID，从 ikuai 规则列表反查（按接口区分）
-                    try {
-                        const ikuaiRules = await ikuaiApi.getPortForwards();
-                        const match = ikuaiRules.find(r =>
-                            String(r.wan_port) === String(external_port) &&
-                            String(r.lan_port) === String(internal_port) &&
-                            (r.lan_ip || r.lan_addr) === ip &&
-                            (!iface || r.interface === iface)
-                        );
-                        if (match) ikuaiIds.push({ interface: iface, id: String(match.id) });
-                    } catch (_) {}
-                } catch (e) {
-                    failCount++;
-                    console.error(`[端口转发] 同步到接口 ${iface} 失败:`, e.message);
-                }
+                    const ikuaiRules = await ikuaiApi.getPortForwards();
+                    const match = ikuaiRules.find(r =>
+                        String(r.wan_port) === String(external_port) &&
+                        String(r.lan_port) === String(internal_port) &&
+                        (r.lan_ip || r.lan_addr) === ip
+                    );
+                    if (match) ikuaiIds.push({ interface: ifaceStr, id: String(match.id) });
+                } catch (_) {}
+            } catch (e) {
+                console.error(`[端口转发] 同步到接口 ${ifaceStr} 失败:`, e.message);
             }
-            // 同步状态：全部成功=synced，部分失败=partial，全部失败=failed
-            let syncStatus = 'synced';
-            if (ikuaiIds.length === 0) syncStatus = 'failed';
-            else if (failCount > 0) syncStatus = 'partial';
+            // 同步状态：有 id=synced，无 id=failed
+            const syncStatus = ikuaiIds.length > 0 ? 'synced' : 'failed';
             await db.portForwards.update(rule.id, { sync_status: syncStatus, ikuai_id: stringifyIkuaiIds(ikuaiIds) });
             rule.sync_status = syncStatus;
             rule.ikuai_id = stringifyIkuaiIds(ikuaiIds);
@@ -366,26 +361,24 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                         try { await ikuaiApi.deletePortForward(m.id); } catch (_) {}
                     }
                 }
-                // 在所有已配置外网接口上重新创建
+                // 重新创建一条规则，interface 字段传逗号分隔的多接口值
                 const wanIfaces = await getWanInterfaces();
                 const comment = `${name || existing.name || '转发'}_VM${existing.vm_id}`;
+                const ifaceStr = wanIfaces.join(',');
                 newIkuaiIds = [];
-                for (const iface of wanIfaces) {
+                try {
+                    await ikuaiApi.addPortForward({ ip: ip || existing.ip, internal_port: internal_port || existing.internal_port, external_port: external_port || existing.external_port, protocol: protocol || existing.protocol, comment, enabled: true, interface: ifaceStr });
                     try {
-                        await ikuaiApi.addPortForward({ ip: ip || existing.ip, internal_port: internal_port || existing.internal_port, external_port: external_port || existing.external_port, protocol: protocol || existing.protocol, comment, enabled: true, interface: iface });
-                        try {
-                            const ikuaiRules = await ikuaiApi.getPortForwards();
-                            const match = ikuaiRules.find(r =>
-                                String(r.wan_port) === String(external_port || existing.external_port) &&
-                                String(r.lan_port) === String(internal_port || existing.internal_port) &&
-                                (r.lan_ip || r.lan_addr) === (ip || existing.ip) &&
-                                (!iface || r.interface === iface)
-                            );
-                            if (match) newIkuaiIds.push({ interface: iface, id: String(match.id) });
-                        } catch (_) {}
-                    } catch (e) {
-                        console.error(`[端口转发] 编辑同步到接口 ${iface} 失败:`, e.message);
-                    }
+                        const ikuaiRules = await ikuaiApi.getPortForwards();
+                        const match = ikuaiRules.find(r =>
+                            String(r.wan_port) === String(external_port || existing.external_port) &&
+                            String(r.lan_port) === String(internal_port || existing.internal_port) &&
+                            (r.lan_ip || r.lan_addr) === (ip || existing.ip)
+                        );
+                        if (match) newIkuaiIds.push({ interface: ifaceStr, id: String(match.id) });
+                    } catch (_) {}
+                } catch (e) {
+                    console.error(`[端口转发] 编辑同步到接口 ${ifaceStr} 失败:`, e.message);
                 }
             } catch (e) {
                 await db.portForwards.update(id, { sync_status: 'failed' });

@@ -678,6 +678,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
                     await db.portForwards.update(rule.id, { ip: finalIp });
                     if (rule.ikuai_id) {
                         // 解析 ikuai_id（兼容旧格式纯字符串和新格式 JSON 数组）
+                        // 新格式下数组只有一个元素，interface 字段为逗号分隔的多接口值
                         let ikuaiIds = [];
                         try {
                             const parsed = JSON.parse(rule.ikuai_id);
