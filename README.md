@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.9.1-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.10.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -489,6 +489,35 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v2.10.0</b> (2026-06-22) — 端口转发修复 + 外网接口多选</summary>
+
+修复虚拟机/容器列表"更多"→"网络"弹窗中端口转发添加/编辑表单显示空白问题，同时支持外网接口多选，一条端口转发规则可同时应用到所有选中的外网线路。
+
+**Fixed**
+- 🔧 修复 `admin-template-modals.js` / `dashboard-template.js` 中 `deviceForwardModal` 缺失 `v-else` 添加/编辑表单模板，导致点击"添加端口转发"显示空白
+- 🔧 修复 `</Teleport>` 标签位置错误导致模板结构断裂
+
+**Added**
+- 🚀 外网接口支持多选：系统设置 → 网络管理中 WAN 接口改为多选下拉框，一条端口转发同时在所有选中接口创建规则
+- 🚀 `getWanInterfaces()` 替代 `getWanInterface()`：返回已配置接口数组，兼容新旧存储格式
+- 🚀 `ikuai_id` 存储格式升级为 JSON 数组 `[{interface, id}]`，精确关联每条 ikuai 规则对应的接口
+
+**Changed**
+- 🔄 POST/PUT/DELETE `/port-forwards` 端点：遍历所有选中外网接口同步创建/编辑/删除 ikuai 转发规则
+- 🔄 VM/LXC IP 变更同步：遍历所有接口的 ikuai 规则同步更新
+- 🔄 ikuai-sync 导入：使用新 `ikuai_id` JSON 数组格式
+
+**影响范围**
+- `server/routes/network.js`（核心：多接口同步逻辑）
+- `server/services/dhcp.js`（新增 `getWanInterfaces`）
+- `server/routes/vm.js` / `server/routes/lxc.js`（IP 变更多接口适配）
+- `server/services/ikuai-sync.js`（同步格式升级）
+- `server/api/db-mysql.js` / `server/api/db-sqlite.js`（默认值格式更新）
+- `public/js/admin/` 4 个文件 + `public/js/dashboard/` 1 个文件
+
+</details>
 
 <details>
 <summary><b>v2.9.1</b> (2026-06-18) — 自动更新功能优化</summary>
