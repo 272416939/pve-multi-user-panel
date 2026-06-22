@@ -109,6 +109,16 @@
         } catch (e) { alert('保存失败: ' + e.message); }
     };
 
+    // 外网接口下拉框选择：追加到文本框（逗号分隔，去重）
+    $.addWanInterface = function(ifaceName) {
+        if (!ifaceName) return;
+        var current = ($.networkConfig.wan_interface || '').trim();
+        var ifaces = current ? current.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
+        if (ifaces.indexOf(ifaceName) >= 0) return; // 已存在则跳过
+        ifaces.push(ifaceName);
+        $.networkConfig.wan_interface = ifaces.join(',');
+    };
+
     $.syncDhcpBindings = async function() {
         if (!await window.customConfirm('将从爱快读取所有 DHCP 静态绑定，匹配 VM/CT 并回写到数据库，继续吗？')) return;
         try {
@@ -318,7 +328,7 @@
 
     $.submitDeviceRule = async function() {
         var ip = $.deviceForm.ip || $.deviceModal.device.ip;
-        if (!ip) return alert('无可用 IP');
+        if (!ip) return alert('当前设备无可用 IP，无法创建端口转发');
         if (!$.deviceForm.internal_port) return alert('请填入内网端口');
         if (!$.deviceForm.external_port) return alert('请填入外网端口');
         try {

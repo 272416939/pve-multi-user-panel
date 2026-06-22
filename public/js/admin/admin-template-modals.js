@@ -1385,7 +1385,8 @@
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">目标 IP</label>
-                                        <input type="text" class="form-control" v-model="deviceForm.ip" placeholder="目标 IP">
+                                        <input type="text" class="form-control" v-model="deviceForm.ip" placeholder="自动获取设备 IP" readonly>
+                                        <small class="text-muted">目标 IP 自动从当前设备获取，不可手动修改</small>
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">协议</label>

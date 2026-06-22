@@ -167,11 +167,21 @@
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label">默认外网接口</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.wan_interface" placeholder="如：adsl1,adsl2">
+                                        <div class="input-group">
+                                            <input type="text" class="form-control" v-model="networkConfig.wan_interface" placeholder="点击右侧下拉框选择接口" readonly>
+                                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" :disabled="wanInterfaceList.length === 0">选择</button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <li v-for="iface in wanInterfaceList" :key="iface.name">
+                                                    <a class="dropdown-item" href="#" @click.prevent="addWanInterface(iface.name)">
+                                                        {{ iface.name }} ({{ iface.ip || '拨号获取' }})
+                                                    </a>
+                                                </li>
+                                                <li v-if="wanInterfaceList.length === 0"><span class="dropdown-item text-muted">暂无可用接口，请先刷新</span></li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                <li><a class="dropdown-item text-danger" href="#" @click.prevent="networkConfig.wan_interface = ''">清空</a></li>
+                                            </ul>
+                                        </div>
                                         <small class="text-muted">多个接口用英文逗号分隔，将作为一条规则绑定多接口</small>
-                                        <small class="text-muted d-block mt-1" v-if="wanInterfaceList.length > 0">
-                                            可用接口：{{ wanInterfaceList.map(i => i.name).join(', ') }}
-                                        </small>
                                     </div>
                                     <div class="col-md-4 d-flex align-items-center" style="padding-top: 24px;">
                                         <pv-button style="border-color:rgba(99,102,241,0.2);background:rgba(99,102,241,0.08);color:#A5B4FC;" @click="refreshIfaceList" variant="glass">刷新接口</pv-button>

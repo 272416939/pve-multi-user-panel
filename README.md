@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.11.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.11.1-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-003b57?style=flat-square&labelColor=1a1740&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
@@ -489,6 +489,25 @@ git fetch origin && git reset --hard origin/main && npm install --production
 ---
 
 ## 🔄 更新日志
+
+<details>
+<summary><b>v2.11.1</b> (2026-06-22) — 外网接口 UI 优化 + 设备端口转发 IP 只读</summary>
+
+优化外网接口选择体验，从纯文本框改为"下拉框选择 + 文本框自动填充"组合；设备端口转发弹窗的目标 IP 改为只读，自动从当前设备获取，避免用户随意修改导致同步异常。
+
+**Changed**
+- 🔄 默认外网接口改为下拉框 + 文本框组合：点击下拉框选项自动追加到文本框（逗号分隔、去重），文本框只读，提供"清空"选项
+- 🔄 设备端口转发弹窗（虚拟机/容器列表"更多"→"网络"）的目标 IP 改为 `readonly`，自动从当前设备获取，用户不可修改
+- 🔄 新增 `addWanInterface(ifaceName)` 方法：追加接口到文本框，已存在则跳过
+
+**影响范围**
+- `public/js/admin/admin-template-settings.js`（外网接口 UI 改为下拉框+文本框）
+- `public/js/admin/network.js`（新增 `addWanInterface` 方法）
+- `public/js/admin/admin-template-modals.js`（设备端口转发 IP 改为只读）
+- `public/js/dashboard/dashboard-template.js`（设备端口转发 IP 改为只读）
+- `public/js/dashboard/forward.js`（IP 缺失提示优化）
+
+</details>
 
 <details>
 <summary><b>v2.11.0</b> (2026-06-22) — 端口转发多接口优化</summary>

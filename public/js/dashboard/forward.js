@@ -74,7 +74,7 @@
 
     $.submitDeviceRule = async function() {
         var ip = $.deviceForm.ip;
-        if (!ip) return alert('请选择或输入目标 IP');
+        if (!ip) return alert('当前设备无可用 IP，无法创建端口转发');
         if (!$.deviceForm.internal_port) return alert('请填入内网端口');
         if (!$.deviceForm.external_port) return alert('请填入外网端口');
         try {
