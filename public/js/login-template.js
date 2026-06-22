@@ -10,10 +10,6 @@
                             <h5 class="card-title mb-0">登录</h5>
                         </div>
                         <div class="card-body">
-                            <div v-if="registerEnabled" class="login-tab-switch">
-                                <button type="button" :class="{ active: currentView === 'login' }" @click="switchView('login')">登录</button>
-                                <button type="button" :class="{ active: currentView === 'register' }" @click="switchView('register')">注册</button>
-                            </div>
                             <div v-if="currentView === 'login'">
                             <div v-if="!showTwofaInput">
                                 <form @submit.prevent="login" novalidate>
@@ -28,7 +24,10 @@
                                         <span class="login-field-error" v-if="loginPasswordError">{{ loginPasswordError }}</span>
                                     </div>
                                     <div class="login-form-error" v-if="loginError">{{ loginError }}</div>
-                                    <pv-button type="submit" variant="primary" style="width:100%">登录</pv-button>
+                                    <div class="d-flex gap-2">
+                                        <pv-button type="submit" variant="primary" style="flex:1">登录</pv-button>
+                                        <pv-button v-if="registerEnabled" type="button" variant="outline" @click="switchView('register')" style="flex:1">注册</pv-button>
+                                    </div>
                                 </form>
                                 <div class="mt-3 text-center">
                                     <pv-button type="button" variant="link" @click="showResetPassword = true">忘记密码？</pv-button>

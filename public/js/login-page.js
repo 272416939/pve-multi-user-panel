@@ -320,7 +320,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             registerError.value = res.error || '验证码发送失败';
                         }
                     } catch (e) {
-                        registerError.value = '请求失败，请稍后重试';
+                        registerError.value = e.message || '请求失败，请稍后重试';
                     }
                 };
 
@@ -353,7 +353,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             registerError.value = res.error || '注册失败';
                         }
                     } catch (e) {
-                        registerError.value = '请求失败，请稍后重试';
+                        registerError.value = e.message || '请求失败，请稍后重试';
                     }
                     registerSubmitting.value = false;
                 };
