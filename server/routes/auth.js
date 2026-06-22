@@ -13,6 +13,13 @@ const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const RATELIMIT_PREFIX = 'ratelimit:login:';
 
+// 本地时间格式化：返回 YYYY-MM-DD HH:MM:SS（Asia/Shanghai）
+// 避免使用 toISOString()（UTC）导致 MySQL DATETIME 丢失时区信息
+function formatLocalDateTime(date) {
+    var d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return d.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 async function checkLoginRateLimit(ip, username) {
     const key = `${RATELIMIT_PREFIX}${ip}:${username}`;
     return checkRateLimit(key, 5, 60000);
@@ -289,7 +296,7 @@ router.post('/auth/forgot-password', async (req, res) => {
             userId: user.id,
             token: token,
             type: 'password_reset',
-            expiresAt: expiresAt.toISOString()
+            expiresAt: formatLocalDateTime(expiresAt)
         });
         
         // H-10 修复：检查 SITE_URL 是否已配置
@@ -446,7 +453,7 @@ router.post('/register/send-code', async (req, res) => {
             email,
             token: code,
             type: 'register_code',
-            expiresAt: expiresAt.toISOString()
+            expiresAt: formatLocalDateTime(expiresAt)
         });
 
         // 生成邮件 HTML

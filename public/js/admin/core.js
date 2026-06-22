@@ -874,6 +874,10 @@ $.initDetailCharts = function() {
                 api('/site/config').then(function(res) {
                     $.siteLogoText.value = res.logo_text || 'PVE 面板';
                 }).catch(function() {});
+                // 若刷新后停留在站点设置页，需主动加载配置（watch 不会在初始化时触发）
+                if ($.activeTab.value === 'site') {
+                    $.loadSiteConfig();
+                }
                 if ($.activeTab.value === 'network') {
                     $.loadForwardRules('all');
                 }

@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.13.3] - 2026-06-23
+
+### Fixed
+- fix(register): 修复注册验证码始终提示"已过期"的问题
+  - 根因：expiresAt.toISOString() 生成 UTC 时间字符串，存入 MySQL DATETIME 字段时丢失时区信息
+  - 读取时 new Date() 按本地时间解析，导致时间提前 8 小时，验证码刚保存就被判定过期
+  - 修复：新增 formatLocalDateTime() 函数，返回 YYYY-MM-DD HH:MM:SS 本地时间格式
+  - 涉及注册验证码和密码重置令牌两处
+- fix(site): 修复站点设置刷新页面后配置丢失的问题
+  - 根因：watch(activeTab) 未设置 immediate，页面刷新时 activeTab 已为 'site' 但 watch 不触发
+  - 修复：onMounted 中补充判断，若 activeTab === 'site' 则主动调用 loadSiteConfig()
+
+---
+
 ## [2.13.2] - 2026-06-23
 
 ### Fixed
