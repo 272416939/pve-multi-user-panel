@@ -8,6 +8,11 @@
                             <h5 class="card-title mb-0">登录</h5>
                         </div>
                         <div class="card-body">
+                            <div v-if="registerEnabled" class="login-tab-switch">
+                                <button type="button" :class="{ active: currentView === 'login' }" @click="switchView('login')">登录</button>
+                                <button type="button" :class="{ active: currentView === 'register' }" @click="switchView('register')">注册</button>
+                            </div>
+                            <div v-if="currentView === 'login'">
                             <div v-if="!showTwofaInput">
                                 <form @submit.prevent="login" novalidate>
                                     <div class="mb-3">
@@ -39,6 +44,41 @@
                                 <p class="text-muted small text-center mb-3" style="font-size:0.82rem;line-height:1.5;">请输入身份验证器中的 6 位验证码，或使用恢复码登录</p>
                                 <pv-button type="button" variant="primary" @click="verifyTwofa">验证</pv-button>
                                 <pv-button type="button" variant="secondary" @click="backToLogin">返回</pv-button>
+                            </div>
+                            </div>
+                            <div v-else-if="currentView === 'register'" class="register-form">
+                                <h6 class="register-title">注册新账号</h6>
+                                <div class="mb-3">
+                                    <label class="form-label">用户名</label>
+                                    <input type="text" class="form-control" v-model="registerForm.username" placeholder="3-32 位字符" autocomplete="username">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">密码</label>
+                                    <input type="password" class="form-control" v-model="registerForm.password" autocomplete="new-password">
+                                    <div v-if="passwordStrength.level" class="password-strength">
+                                        <div class="password-strength-bar" :class="'strength-' + passwordStrength.level" :style="{ width: passwordStrength.percent + '%' }"></div>
+                                    </div>
+                                    <div class="password-strength-text" v-if="passwordStrength.text">{{ passwordStrength.text }}</div>
+                                    <div class="register-hint">至少 8 位，包含大小写字母和特殊字符 (@#$%^&*!)</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">邮箱</label>
+                                    <input type="email" class="form-control" v-model="registerForm.email" autocomplete="email">
+                                    <button type="button" class="send-code-btn" @click="sendCode" :disabled="codeCountdown > 0">
+                                        {{ codeCountdown > 0 ? codeCountdown + 's 后重发' : '发送验证码' }}
+                                    </button>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">验证码</label>
+                                    <input type="text" class="form-control" v-model="registerForm.code" maxlength="6" placeholder="6 位数字" autocomplete="one-time-code">
+                                </div>
+                                <div v-if="registerError" class="login-form-error">{{ registerError }}</div>
+                                <button type="button" class="btn btn-primary" style="width:100%" @click="submitRegister" :disabled="registerSubmitting">
+                                    {{ registerSubmitting ? '注册中...' : '注册' }}
+                                </button>
+                                <div class="mt-3 text-center">
+                                    <a href="javascript:void(0)" class="register-back-link" @click="switchView('login')">已有账号？去登录</a>
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -755,6 +755,7 @@ function initDefaultConfig() {
         'pay:wxpay_enabled': '1',
         'pay:min_amount': '0.01',
         'pay:max_amount': '999999.99',
+        'register:enabled': '0',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {
@@ -980,6 +981,7 @@ module.exports = {
         getAll: () => db.prepare('SELECT * FROM users').all(),
         getById: (id) => db.prepare('SELECT * FROM users WHERE id = ?').get(id),
         getByUsername: (username) => db.prepare('SELECT * FROM users WHERE username = ?').get(username),
+        getByEmail: (email) => db.prepare('SELECT * FROM users WHERE email = ?').get(email),
         create: (user) => {
             const { lastInsertRowid } = db.prepare(`
                 INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, created_at)
@@ -1247,7 +1249,9 @@ module.exports = {
         },
         delete: (id) => db.prepare('DELETE FROM password_reset_tokens WHERE id = ?').run(id),
         deleteByUserId: (userId) => db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(userId),
-        deleteByType: (userId, type) => db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ? AND type = ?').run(userId, type)
+        deleteByType: (userId, type) => db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ? AND type = ?').run(userId, type),
+        deleteByEmailAndType: (email, type) => db.prepare('DELETE FROM password_reset_tokens WHERE email = ? AND type = ?').run(email, type),
+        getByEmailAndType: (email, type) => db.prepare('SELECT * FROM password_reset_tokens WHERE email = ? AND type = ? ORDER BY expires_at DESC LIMIT 1').get(email, type)
     },
     
     // 站内消息操作

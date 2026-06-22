@@ -481,4 +481,33 @@ router.get('/admin/storages/all', authMiddleware, adminMiddleware, async (req, r
     }
 });
 
+// ========== 注册配置 ==========
+
+router.get('/admin/register/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var getConfig = db.config.get;
+        var enabled = await getConfig('register:enabled') || '0';
+        res.json({
+            enabled: enabled === '1'
+        });
+    } catch (e) {
+        console.error('[注册配置]', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+router.put('/admin/register/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var setConfig = db.config.set;
+        var { enabled } = req.body;
+        if (enabled !== undefined) {
+            await setConfig('register:enabled', enabled ? '1' : '0');
+        }
+        res.json({ message: '注册配置保存成功' });
+    } catch (e) {
+        console.error('[注册配置]', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
 module.exports = router;

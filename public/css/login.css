@@ -202,3 +202,138 @@
         [data-theme="dark"] .theme-icon-moon { display: none; }
         [data-theme="light"] .theme-icon-sun { display: none; }
         [data-theme="light"] .theme-icon-moon { display: block; }
+
+        /* ===== 注册功能样式 ===== */
+        /* Tab 切换按钮组 */
+        .login-tab-switch {
+            display: flex;
+            background: var(--login-bg-input);
+            border: 1px solid var(--login-border-input);
+            border-radius: 10px;
+            padding: 4px;
+            margin-bottom: 20px;
+            gap: 4px;
+            transition: background-color 0.3s ease, border-color 0.3s ease;
+        }
+        .login-tab-switch button {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 8px;
+            background: transparent;
+            color: var(--login-text-label);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .login-tab-switch button.active {
+            background: var(--login-gradient-primary);
+            color: #fff;
+            font-weight: 600;
+        }
+        .login-tab-switch button:not(.active):hover {
+            color: var(--login-text-input);
+            background: rgba(255, 255, 255, 0.05);
+        }
+        [data-theme="light"] .login-tab-switch button:not(.active):hover {
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        /* 密码强度条 */
+        .password-strength {
+            height: 4px;
+            background: var(--login-border-input);
+            border-radius: 2px;
+            margin-top: 8px;
+            overflow: hidden;
+            transition: background-color 0.3s ease;
+        }
+        .password-strength-bar {
+            height: 100%;
+            border-radius: 2px;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+        .password-strength-bar.strength-weak {
+            background: var(--login-color-error);
+        }
+        .password-strength-bar.strength-medium {
+            background: #f59e0b;
+        }
+        .password-strength-bar.strength-strong {
+            background: var(--login-color-success);
+        }
+        .password-strength-text {
+            font-size: 12px;
+            margin-top: 4px;
+            color: var(--login-text-label);
+            transition: color 0.3s ease;
+        }
+        .password-strength-text:empty { display: none; }
+
+        /* 注册表单标题 */
+        .register-title {
+            color: var(--login-text-input);
+            font-size: 1.1rem;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: color 0.3s ease;
+        }
+
+        /* 密码提示文字 */
+        .register-hint {
+            font-size: 12px;
+            color: var(--login-text-label);
+            margin-top: 6px;
+            line-height: 1.4;
+            transition: color 0.3s ease;
+        }
+
+        /* 发送验证码按钮 */
+        .send-code-btn {
+            width: 100%;
+            margin-top: 8px;
+            padding: 8px 12px;
+            border: 1px solid var(--login-color-primary);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--login-color-primary);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .send-code-btn:hover:not(:disabled) {
+            background: rgba(102, 126, 234, 0.1);
+        }
+        [data-theme="light"] .send-code-btn:hover:not(:disabled) {
+            background: rgba(99, 102, 241, 0.08);
+        }
+        .send-code-btn:disabled {
+            border-color: var(--login-border-input);
+            color: var(--login-text-label);
+            background: var(--login-bg-input);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* 注册按钮禁用态 */
+        .login-card .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* 返回登录链接 */
+        .register-back-link {
+            color: var(--login-color-primary);
+            font-size: 13px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: opacity 0.2s ease, color 0.3s ease;
+        }
+        .register-back-link:hover {
+            opacity: 0.8;
+        }

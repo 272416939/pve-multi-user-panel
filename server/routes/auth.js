@@ -5,9 +5,10 @@ const CryptoJS = require('crypto-js');
 const jwt = require('jsonwebtoken');
 const otplib = require('otplib');
 const db = require('../api/db');
-const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateAccessToken, generateRefreshToken, generatePartialToken } = require('../utils/token');
+const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateAccessToken, generateRefreshToken, generatePartialToken, generateCode } = require('../utils/token');
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const RATELIMIT_PREFIX = 'ratelimit:login:';
@@ -31,7 +32,16 @@ router.post('/login', async (req, res) => {
         });
     }
     
-    const user = await db.users.getByUsername(username);
+    const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username);
+    var user;
+    if (isEmail) {
+        user = await db.users.getByEmail(username);
+        if (user && !user.emailVerified) {
+            return res.status(400).json({ error: '该邮箱尚未验证，请先完成验证' });
+        }
+    } else {
+        user = await db.users.getByUsername(username);
+    }
 
     if (!user) {
         return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
@@ -371,6 +381,171 @@ router.post('/auth/reset-password', async (req, res) => {
         res.json({ message: '密码重置成功，请使用新密码登录' });
     } catch (error) {
         res.status(500).json({ error: '重置失败' });
+    }
+});
+
+// ========== 注册功能 ==========
+
+// PUBLIC: 注册开关状态查询（无需认证）
+router.get('/register/status', async (req, res) => {
+    try {
+        const enabled = await db.config.get('register:enabled');
+        res.json({ enabled: enabled === '1' });
+    } catch (e) {
+        res.json({ enabled: false });
+    }
+});
+
+// PUBLIC: 发送注册验证码
+router.post('/register/send-code', async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ error: '请提供邮箱地址' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: '邮箱格式不正确' });
+        }
+
+        // 校验邮箱未被占用
+        const existingUser = await db.users.getByEmail(email);
+        if (existingUser) {
+            return res.status(400).json({ error: '邮箱已被使用' });
+        }
+
+        // 限速1：同一邮箱 1 次/60 秒
+        const emailLimit = await checkRateLimit(`ratelimit:register-code:${email}`, 1, 60000);
+        if (!emailLimit.allowed) {
+            return res.status(429).json({
+                error: '验证码发送过于频繁，请稍后再试',
+                retryAfter: emailLimit.retryAfter
+            });
+        }
+
+        // 限速2：同一 IP 5 次/小时
+        const ipLimit = await checkRateLimit(`ratelimit:register-code-ip:${req.ip}`, 5, 3600000);
+        if (!ipLimit.allowed) {
+            return res.status(429).json({
+                error: '请求过于频繁，请稍后再试',
+                retryAfter: ipLimit.retryAfter
+            });
+        }
+
+        // 生成 6 位验证码
+        const code = generateCode();
+
+        // 删除该邮箱旧的 register_code token
+        await db.passwordResetTokens.deleteByEmailAndType(email, 'register_code');
+
+        // 存入 password_reset_tokens（userId=0，注册场景用户尚未创建）
+        const expiresAt = new Date(Date.now() + 600000); // 10 分钟
+        await db.passwordResetTokens.create({
+            userId: 0,
+            email,
+            token: code,
+            type: 'register_code',
+            expiresAt: expiresAt.toISOString()
+        });
+
+        // 生成邮件 HTML
+        var html = createEmailTemplate('注册验证码 - PVE管理面板',
+            '<p>您好，您正在进行账号注册，验证码为：</p>' +
+            '<div style="text-align:center;margin:20px 0;">' +
+            '<span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#7c3aed;background:#f5f3ff;padding:12px 24px;border-radius:8px;display:inline-block;">' + code + '</span>' +
+            '</div>' +
+            '<p style="color:#666;">验证码有效期为 10 分钟，请尽快使用。</p>' +
+            '<p style="color:#999;font-size:12px;">如非本人操作，请忽略此邮件。</p>');
+
+        try {
+            await sendEmail(email, '注册验证码 - PVE管理面板', html);
+        } catch (sendErr) {
+            console.error('[register] 邮件发送失败:', sendErr.message);
+            return res.status(500).json({ error: '邮件发送失败，请检查邮箱配置或联系管理员' });
+        }
+
+        res.json({ success: true, message: '验证码已发送' });
+    } catch (error) {
+        console.error('[register/send-code] 错误:', error.message);
+        res.status(500).json({ error: '操作失败，请稍后重试' });
+    }
+});
+
+// PUBLIC: 用户注册
+router.post('/register', async (req, res) => {
+    try {
+        // 校验注册开关
+        const enabled = await db.config.get('register:enabled');
+        if (enabled !== '1') {
+            return res.status(403).json({ error: '注册功能已关闭' });
+        }
+
+        // 限速：同一 IP 3 次/小时
+        const ipLimit = await checkRateLimit(`ratelimit:register:${req.ip}`, 3, 3600000);
+        if (!ipLimit.allowed) {
+            return res.status(429).json({
+                error: '注册请求过于频繁，请稍后再试',
+                retryAfter: ipLimit.retryAfter
+            });
+        }
+
+        const { username, password, email, code } = req.body;
+
+        // 校验用户名
+        if (!username || username.length < 3 || username.length > 32) {
+            return res.status(400).json({ error: '用户名长度必须为 3-32 个字符' });
+        }
+        if (isUsernameBlacklisted(username)) {
+            return res.status(400).json({ error: '该用户名不可用' });
+        }
+        const existingUsername = await db.users.getByUsername(username);
+        if (existingUsername) {
+            return res.status(400).json({ error: '用户名已存在' });
+        }
+
+        // 校验密码强度
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/;
+        if (!passwordRegex.test(password || '')) {
+            return res.status(400).json({ error: '密码必须至少 8 位，包含大小写字母和特殊字符' });
+        }
+
+        // 校验邮箱
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!email || !emailRegex.test(email)) {
+            return res.status(400).json({ error: '邮箱格式不正确' });
+        }
+        const existingEmail = await db.users.getByEmail(email);
+        if (existingEmail) {
+            return res.status(400).json({ error: '邮箱已被使用' });
+        }
+
+        // 校验验证码
+        const codeRecord = await db.passwordResetTokens.getByEmailAndType(email, 'register_code');
+        if (!codeRecord || codeRecord.token !== code || new Date(codeRecord.expires_at) <= new Date()) {
+            return res.status(400).json({ error: '验证码错误或已过期' });
+        }
+
+        // 创建用户
+        const salt = crypto.randomBytes(16).toString('hex');
+        const hashedPassword = CryptoJS.SHA256(salt + password).toString();
+        const newUser = await db.users.create({
+            username,
+            password: hashedPassword,
+            role: 'user',
+            email,
+            emailVerified: true
+        });
+        // 补充 salt（create 不接受 password_salt 字段）
+        await db.users.update(newUser.id, { password_salt: salt });
+
+        // 删除该邮箱的 register_code token
+        await db.passwordResetTokens.deleteByEmailAndType(email, 'register_code');
+
+        res.json({ success: true, message: '注册成功，请登录' });
+    } catch (error) {
+        console.error('[register] 错误:', error.message);
+        res.status(500).json({ error: '注册失败，请稍后重试' });
     }
 });
 

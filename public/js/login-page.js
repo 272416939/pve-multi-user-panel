@@ -1,4 +1,4 @@
-const { createApp, ref, onMounted, nextTick } = Vue;
+const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
 
         function getDeviceName() {
             const ua = navigator.userAgent;
@@ -52,6 +52,15 @@ const { createApp, ref, onMounted, nextTick } = Vue;
                 const forceNewPassword = ref('');
                 const forceConfirmPassword = ref('');
                 const forcePwdError = ref('');
+
+                // 注册功能
+                const currentView = ref('login');
+                const registerEnabled = ref(false);
+                const registerForm = ref({ username: '', password: '', email: '', code: '' });
+                const registerError = ref('');
+                const registerSubmitting = ref(false);
+                const codeCountdown = ref(0);
+                let codeTimer = null;
 
                 setupCustomAlert(customAlertMessage);
                 setupCustomConfirm(customConfirmMessage, customConfirmResolve);
@@ -271,7 +280,84 @@ const { createApp, ref, onMounted, nextTick } = Vue;
                     }
                 };
 
-                onMounted(() => {
+                // 注册功能：切换视图
+                const switchView = (view) => {
+                    currentView.value = view;
+                    registerError.value = '';
+                };
+
+                // 注册功能：密码强度计算
+                const passwordStrength = computed(() => {
+                    const pwd = registerForm.value.password;
+                    if (!pwd) return { level: '', percent: 0, text: '' };
+                    const hasLower = /[a-z]/.test(pwd);
+                    const hasUpper = /[A-Z]/.test(pwd);
+                    const hasSpecial = /[@#$%^&*!]/.test(pwd);
+                    const hasLen = pwd.length >= 8;
+                    const score = [hasLower, hasUpper, hasSpecial, hasLen].filter(Boolean).length;
+                    if (score <= 1) return { level: 'weak', percent: 33, text: '弱' };
+                    if (score <= 3) return { level: 'medium', percent: 66, text: '中' };
+                    return { level: 'strong', percent: 100, text: '强' };
+                });
+
+                // 注册功能：发送验证码
+                const sendCode = async () => {
+                    const email = registerForm.value.email.trim();
+                    if (!email) { registerError.value = '请输入邮箱'; return; }
+                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { registerError.value = '邮箱格式不正确'; return; }
+                    if (codeCountdown.value > 0) return;
+                    try {
+                        registerError.value = '';
+                        const res = await api('/register/send-code', { method: 'POST', body: JSON.stringify({ email }) });
+                        if (res.success) {
+                            codeCountdown.value = 60;
+                            codeTimer = setInterval(() => {
+                                codeCountdown.value--;
+                                if (codeCountdown.value <= 0) { clearInterval(codeTimer); codeTimer = null; }
+                            }, 1000);
+                        } else {
+                            registerError.value = res.error || '验证码发送失败';
+                        }
+                    } catch (e) {
+                        registerError.value = '请求失败，请稍后重试';
+                    }
+                };
+
+                // 注册功能：提交注册
+                const submitRegister = async () => {
+                    const f = registerForm.value;
+                    if (!f.username || f.username.length < 3 || f.username.length > 32) {
+                        registerError.value = '用户名长度需为 3-32 位'; return;
+                    }
+                    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/.test(f.password)) {
+                        registerError.value = '密码必须至少 8 位，包含大小写字母和特殊字符'; return;
+                    }
+                    if (!f.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) {
+                        registerError.value = '邮箱格式不正确'; return;
+                    }
+                    if (!f.code || f.code.length !== 6) {
+                        registerError.value = '请输入 6 位验证码'; return;
+                    }
+                    registerSubmitting.value = true;
+                    registerError.value = '';
+                    try {
+                        const res = await api('/register', { method: 'POST', body: JSON.stringify(f) });
+                        if (res.success) {
+                            switchView('login');
+                            loginForm.value.username = f.username;
+                            alert(res.message || '注册成功，请登录');
+                            registerForm.value = { username: '', password: '', email: '', code: '' };
+                            if (codeTimer) { clearInterval(codeTimer); codeTimer = null; codeCountdown.value = 0; }
+                        } else {
+                            registerError.value = res.error || '注册失败';
+                        }
+                    } catch (e) {
+                        registerError.value = '请求失败，请稍后重试';
+                    }
+                    registerSubmitting.value = false;
+                };
+
+                onMounted(async () => {
                     const urlParams = new URLSearchParams(window.location.search);
                     const resetTokenParam = urlParams.get('resetPassword');
 
@@ -296,6 +382,21 @@ const { createApp, ref, onMounted, nextTick } = Vue;
                     if (token) {
                         window.location.href = 'dashboard.html';
                         return;
+                    }
+
+                    // 获取注册开关
+                    try {
+                        const res = await api('/register/status');
+                        registerEnabled.value = res.enabled === true;
+                    } catch (e) {
+                        registerEnabled.value = false;
+                    }
+                });
+
+                onUnmounted(() => {
+                    if (codeTimer) {
+                        clearInterval(codeTimer);
+                        codeTimer = null;
                     }
                 });
 
@@ -332,6 +433,17 @@ const { createApp, ref, onMounted, nextTick } = Vue;
                     requestPasswordReset,
                     resetPassword,
                     submitForceChangePwd,
+                    // 注册功能
+                    currentView,
+                    registerEnabled,
+                    registerForm,
+                    registerError,
+                    registerSubmitting,
+                    codeCountdown,
+                    passwordStrength,
+                    switchView,
+                    sendCode,
+                    submitRegister,
                     confirmOk,
                     confirmCancel
                 };

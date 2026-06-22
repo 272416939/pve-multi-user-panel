@@ -597,6 +597,7 @@ async function initDefaultConfig() {
         'pay:wxpay_enabled': '1',
         'pay:min_amount': '0.01',
         'pay:max_amount': '999999.99',
+        'register:enabled': '0',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {
@@ -791,6 +792,7 @@ module.exports = {
         getAll: () => queryAll('SELECT * FROM users'),
         getById: (id) => queryOne('SELECT * FROM users WHERE id = ?', [id]),
         getByUsername: (username) => queryOne('SELECT * FROM users WHERE username = ?', [username]),
+        getByEmail: (email) => queryOne('SELECT * FROM users WHERE email = ?', [email]),
         create: async (user) => {
             const [result] = await execute(
                 `INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, created_at)
@@ -1066,6 +1068,14 @@ module.exports = {
         deleteByType: (userId, type) => execute(
             'DELETE FROM password_reset_tokens WHERE user_id = ? AND type = ?',
             [userId, type]
+        ),
+        deleteByEmailAndType: (email, type) => execute(
+            'DELETE FROM password_reset_tokens WHERE email = ? AND type = ?',
+            [email, type]
+        ),
+        getByEmailAndType: (email, type) => queryOne(
+            'SELECT * FROM password_reset_tokens WHERE email = ? AND type = ? ORDER BY expires_at DESC LIMIT 1',
+            [email, type]
         )
     },
 

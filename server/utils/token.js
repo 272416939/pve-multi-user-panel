@@ -63,6 +63,15 @@ function generatePartialToken(user) {
     );
 }
 
+// 生成 6 位随机数字验证码（100000 ~ 999999）
+function generateCode() {
+    if (typeof crypto.randomInt === 'function') {
+        return crypto.randomInt(100000, 1000000).toString();
+    }
+    // 兼容旧版本 Node.js（< 14.10）
+    return (crypto.randomBytes(4).readUInt32BE(0) % 900000 + 100000).toString();
+}
+
 module.exports = {
     JWT_SECRET,
     JWT_EXPIRES_IN,
@@ -70,5 +79,6 @@ module.exports = {
     generateToken,
     generateAccessToken,
     generateRefreshToken,
-    generatePartialToken
+    generatePartialToken,
+    generateCode
 };
