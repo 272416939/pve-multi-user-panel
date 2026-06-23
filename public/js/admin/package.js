@@ -21,7 +21,7 @@
     $.vmProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
     $.lxcProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
 
-    $.dragState = Vue.reactive({ draggingId: null, dragOverId: null, dragType: null });
+    $.dragState = Vue.reactive({ draggingId: null, dragOverId: null, dragType: null, dragFromIndex: -1, avoidDownIds: [], avoidUpIds: [] });
 
     $.loadVmPackages = async function() {
         try { $.vmPackages.value = await api('/admin/vm-packages'); } catch (e) {}
@@ -232,18 +232,52 @@
     };
 
     // ===== 拖拽排序 =====
+    $.getDragList = function(type) {
+        if (type === 'vm') return $.vmPackages.value;
+        if (type === 'lxc') return $.lxcPackages.value;
+        if (type === 'group-vm') return $.vmPackageGroups.value;
+        if (type === 'group-lxc') return $.lxcPackageGroups.value;
+        return [];
+    };
+
     $.handleDragStart = function(e, id, type) {
         $.dragState.draggingId = id;
         $.dragState.dragType = type;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', String(id));
+        // 记录起始索引
+        var list = $.getDragList(type);
+        $.dragState.dragFromIndex = list.findIndex(function(p) { return p.id === id; });
     };
 
     $.handleDragOver = function(e, id) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        if ($.dragState.draggingId !== id) {
-            $.dragState.dragOverId = id;
+        if ($.dragState.draggingId === id) return;
+        $.dragState.dragOverId = id;
+        // 计算目标索引
+        var list = $.getDragList($.dragState.dragType);
+        var toIndex = list.findIndex(function(p) { return p.id === id; });
+        var fromIndex = $.dragState.dragFromIndex;
+        if (fromIndex < 0 || toIndex < 0) return;
+        // 清除所有避让 class（通过响应式数据驱动）
+        $.dragState.avoidDownIds = [];
+        $.dragState.avoidUpIds = [];
+        // 根据拖拽方向应用避让
+        if (fromIndex < toIndex) {
+            // 向下拖拽：fromIndex 和 toIndex 之间的行向上避让
+            var ids = [];
+            for (var i = fromIndex + 1; i <= toIndex; i++) {
+                ids.push(list[i].id);
+            }
+            $.dragState.avoidUpIds = ids;
+        } else if (fromIndex > toIndex) {
+            // 向上拖拽：toIndex 和 fromIndex 之间的行向下避让
+            var ids = [];
+            for (var i = toIndex; i < fromIndex; i++) {
+                ids.push(list[i].id);
+            }
+            $.dragState.avoidDownIds = ids;
         }
     };
 
@@ -251,11 +285,19 @@
         if ($.dragState.dragOverId === id) {
             $.dragState.dragOverId = null;
         }
+        // 不在这里清除避让 class，因为 dragleave 会在 dragover 之间频繁触发
+        // 避让 class 由下一次 dragover 重新计算
+    };
+
+    $.clearAvoidClasses = function() {
+        $.dragState.avoidDownIds = [];
+        $.dragState.avoidUpIds = [];
     };
 
     $.handleDrop = function(e, targetId, type) {
         e.preventDefault();
         e.stopPropagation();
+        $.clearAvoidClasses();  // 先清除避让 class
         var sourceId = $.dragState.draggingId;
         if (!sourceId || sourceId === targetId || $.dragState.dragType !== type) {
             $.handleDragEnd();
@@ -280,6 +322,8 @@
         $.dragState.draggingId = null;
         $.dragState.dragOverId = null;
         $.dragState.dragType = null;
+        $.dragState.dragFromIndex = -1;
+        $.clearAvoidClasses();
     };
 
     $.saveReorder = async function(type, ids) {

@@ -673,26 +673,40 @@
 
     /* ===== 拖拽排序视觉反馈 ===== */
     .row-dragging {
-        opacity: 0.5;
+        opacity: 0.4;
         background: var(--glass-accent, rgba(99,102,241,0.1)) !important;
         cursor: grabbing !important;
     }
-    .row-drag-over {
-        border-top: 3px solid var(--color-primary, #6366F1) !important;
+    /* 表格行基础 transition（避让动效平滑过渡） */
+    .table tbody tr {
+        transition: transform 0.2s ease, opacity 0.2s ease;
     }
+    /* 向下避让：行向下平移（被向上拖拽的行经过时） */
+    .row-avoid-down {
+        transform: translateY(40px);
+    }
+    /* 向上避让：行向上平移（被向下拖拽的行经过时） */
+    .row-avoid-up {
+        transform: translateY(-40px);
+    }
+    /* 分组 badge 拖拽 */
     .group-badge-draggable {
         cursor: grab;
         user-select: none;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .group-badge-draggable:hover {
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(99,102,241,0.3);
     }
     .group-badge-draggable.row-dragging {
-        opacity: 0.5;
+        opacity: 0.4;
         cursor: grabbing !important;
     }
-    .group-badge-draggable.row-drag-over {
-        border-top: 3px solid var(--color-primary, #6366F1) !important;
+    /* badge 横向避让 */
+    .badge-avoid-right {
+        transform: translateX(20px);
+    }
+    .badge-avoid-left {
+        transform: translateX(-20px);
     }
