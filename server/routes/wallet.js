@@ -114,6 +114,12 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         if (numAmount <= 0) {
             return res.status(400).json({ error: '充值金额必须大于0' });
         }
+
+        var minAmount = parseFloat(await db.config.get('pay:min_amount') || '0.01');
+        var maxAmount = parseFloat(await db.config.get('pay:max_amount') || '999999.99');
+        if (numAmount < minAmount || numAmount > maxAmount) {
+            return res.status(400).json({ error: '充值金额必须在 ' + minAmount + ' ~ ' + maxAmount + ' 之间' });
+        }
         
         if (!pay_method || !['alipay', 'wxpay'].includes(pay_method)) {
             return res.status(400).json({ error: '请选择支付方式' });
@@ -154,6 +160,14 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
             notify_url: notifyUrl,
             return_url: returnUrl
         };
+
+        // PAY-1/2/3 修复：创建本地待处理订单记录，回调时从本地记录获取 userId/amount，不信任回调参数
+        await db.pendingOrders.create({
+            order_no: orderNo,
+            user_id: req.user.id,
+            amount: numAmount.toFixed(2),
+            pay_method: pay_method
+        });
 
         // 设备类型检测（用于统一下单接口）
         var userAgent = req.headers['user-agent'] || '';
@@ -255,41 +269,54 @@ router.all('/wallet/notify', async (req, res) => {
             return res.send('fail');
         }
         
-        var existing = await db.transactionRecords.getByOrderNo(params.out_trade_no);
-        if (existing) {
-            return res.send('success');
+        // PAY-1/2/3 修复：从本地 pending_orders 记录获取 userId 和 amount，不信任回调参数
+        var pendingOrder = await db.pendingOrders.getByOrderNo(params.out_trade_no);
+        if (!pendingOrder) {
+            console.error('[钱包] 回调找不到本地订单记录:', params.out_trade_no);
+            return res.send('fail');
         }
         
-        var userId = params.param ? parseInt(params.param) : null;
-        if (!userId) {
-            console.error('[钱包] 回调无法识别用户:', params.out_trade_no);
+        var userId = pendingOrder.user_id;
+        var amount = parseFloat(pendingOrder.amount);
+        if (!userId || isNaN(amount) || amount <= 0) {
+            console.error('[钱包] 回调本地订单记录异常:', params.out_trade_no);
             return res.send('fail');
         }
         
         var user = await db.users.getById(userId);
         if (!user) return res.send('fail');
         
-        var amount = parseFloat(params.money || '0');
         var balanceBefore = parseFloat(user.balance || '0');
         var balanceAfter = balanceBefore + amount;
         
         var tradeNo = params.trade_no || null;
         var apiTradeNo = await queryApiTradeNo(params.out_trade_no);
 
-        await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
+        // PAY-1/2/3 修复：利用 UNIQUE 约束作为幂等 guard，防止 notify/return 双回调双倍入账
+        try {
+            await db.transactionRecords.create({
+                user_id: userId,
+                order_no: params.out_trade_no,
+                pay_time: db.now(),
+                pay_method: pendingOrder.pay_method || params.type || '',
+                trade_type: 'recharge',
+                amount: amount.toFixed(2),
+                balance_before: balanceBefore.toFixed(2),
+                balance_after: balanceAfter.toFixed(2),
+                trade_no: tradeNo,
+                api_trade_no: apiTradeNo
+            });
+        } catch (e) {
+            if (e.code === 'ER_DUP_ENTRY') {
+                dbg('[钱包] 订单已处理，跳过:', params.out_trade_no);
+                return res.send('success');
+            }
+            throw e;
+        }
 
-        await db.transactionRecords.create({
-            user_id: userId,
-            order_no: params.out_trade_no,
-            pay_time: db.now(),
-            pay_method: params.type || '',
-            trade_type: 'recharge',
-            amount: amount.toFixed(2),
-            balance_before: balanceBefore.toFixed(2),
-            balance_after: balanceAfter.toFixed(2),
-            trade_no: tradeNo,
-            api_trade_no: apiTradeNo
-        });
+        // PAY-6 修复：原子余额增量更新，避免 read-modify-write 竞态
+        await db.users.incrementBalance(userId, amount);
+        await db.pendingOrders.markProcessed(params.out_trade_no);
         
         try {
             await db.messages.create({
@@ -360,40 +387,52 @@ router.get('/wallet/return', async (req, res) => {
             return res.json({ success: false, error: '签名验证失败' });
         }
 
-        var existing = await db.transactionRecords.getByOrderNo(params.out_trade_no);
-        if (existing) {
-            return res.json({ success: true, msg: '已处理', order_no: params.out_trade_no, amount: existing.amount });
+        // PAY-1/2/3 修复：从本地 pending_orders 记录获取 userId 和 amount，不信任回调参数
+        var pendingOrder = await db.pendingOrders.getByOrderNo(params.out_trade_no);
+        if (!pendingOrder) {
+            return res.json({ success: false, error: '订单记录不存在' });
         }
 
-        var userId = params.param ? parseInt(params.param) : null;
-        if (!userId) {
-            return res.json({ success: false, error: '无法识别用户' });
+        var userId = pendingOrder.user_id;
+        var amount = parseFloat(pendingOrder.amount);
+        if (!userId || isNaN(amount) || amount <= 0) {
+            return res.json({ success: false, error: '订单记录异常' });
         }
 
         var user = await db.users.getById(userId);
         if (!user) return res.json({ success: false, error: '用户不存在' });
 
-        var amount = parseFloat(params.money || '0');
         var balanceBefore = parseFloat(user.balance || '0');
         var balanceAfter = balanceBefore + amount;
 
         var tradeNo = params.trade_no || null;
         var apiTradeNo = await queryApiTradeNo(params.out_trade_no);
 
-        await db.users.update(userId, { balance: balanceAfter.toFixed(2) });
+        // PAY-1/2/3 修复：利用 UNIQUE 约束作为幂等 guard，防止 notify/return 双回调双倍入账
+        try {
+            await db.transactionRecords.create({
+                user_id: userId,
+                order_no: params.out_trade_no,
+                pay_time: db.now(),
+                pay_method: pendingOrder.pay_method || params.type || '',
+                trade_type: 'recharge',
+                amount: amount.toFixed(2),
+                balance_before: balanceBefore.toFixed(2),
+                balance_after: balanceAfter.toFixed(2),
+                trade_no: tradeNo,
+                api_trade_no: apiTradeNo
+            });
+        } catch (e) {
+            if (e.code === 'ER_DUP_ENTRY') {
+                var existingRec = await db.transactionRecords.getByOrderNo(params.out_trade_no);
+                return res.json({ success: true, msg: '已处理', order_no: params.out_trade_no, amount: existingRec ? existingRec.amount : amount.toFixed(2) });
+            }
+            throw e;
+        }
 
-        await db.transactionRecords.create({
-            user_id: userId,
-            order_no: params.out_trade_no,
-            pay_time: db.now(),
-            pay_method: params.type || '',
-            trade_type: 'recharge',
-            amount: amount.toFixed(2),
-            balance_before: balanceBefore.toFixed(2),
-            balance_after: balanceAfter.toFixed(2),
-            trade_no: tradeNo,
-            api_trade_no: apiTradeNo
-        });
+        // PAY-6 修复：原子余额增量更新，避免 read-modify-write 竞态
+        await db.users.incrementBalance(userId, amount);
+        await db.pendingOrders.markProcessed(params.out_trade_no);
 
         try {
             await db.messages.create({
@@ -449,9 +488,6 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
         var now = Date.now();
         var windowMs = 60000;
         var maxRequests = 60;
-        if (!orderStatusRateLimiter) {
-            var orderStatusRateLimiter = new Map();
-        }
         var record = orderStatusRateLimiter.get(rateKey);
         if (!record || now - record.windowStart > windowMs) {
             orderStatusRateLimiter.set(rateKey, { windowStart: now, count: 1 });
@@ -503,6 +539,9 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
                 return res.status(400).json({ error: '续费数量必须为正整数' });
             }
         }
+        if (!Number.isInteger(qty) || qty < 1) {
+            return res.status(400).json({ error: '续费数量必须为正整数' });
+        }
         
         var resource;
         if (type === 'vm') {
@@ -548,7 +587,8 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         var newExpiration = formatLocalDate(oldExpiration);
         
         var newBalance = (balance - totalPrice).toFixed(2);
-        await db.users.update(userId, { balance: newBalance });
+        // PAY-6 修复：原子余额扣减，避免 read-modify-write 竞态
+        await db.users.incrementBalance(userId, -totalPrice);
         
         if (type === 'vm') {
             await db.vms.update(resource.id, { expiration_date: newExpiration });

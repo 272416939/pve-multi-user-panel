@@ -6,6 +6,9 @@ const fs = require('fs');
 const pkg = require('../package.json');
 const { WebSocket } = require('ws');
 require('dotenv').config();
+const crypto = require('crypto');
+const { authMiddleware } = require('./middleware/auth');
+const { checkRateLimit } = require('./middleware/rate-limiter');
 
 // 统一设置服务器时区为 Asia/Shanghai，确保 new Date() 和数据库时间写入一致
 process.env.TZ = process.env.TZ || 'Asia/Shanghai';
@@ -27,8 +30,10 @@ if (!fs.existsSync(envPath)) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// R3-2 补充: 反向代理环境下 req.ip 需要信任代理头才能获取真实客户端IP
-app.set('trust proxy', true);
+// MISC-1 修复：仅信任一层代理（防止 req.ip 伪造绕过限速）
+app.set('trust proxy', 1);
+// MISC-9 修复：禁用 X-Powered-By 头，不暴露框架信息
+app.disable('x-powered-by');
 
 // EJS 模板引擎配置
 app.set('view engine', 'ejs');
@@ -36,39 +41,32 @@ app.set('views', path.join(__dirname, '..', 'views'));
 
 app.use(cors({
     origin: function (origin, callback) {
+        // MISC-4 修复：精确匹配 protocol+host+port，不再按 hostname 宽松放行
         const allowedOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean);
-        // 自动将 SITE_URL 加入白名单（按 hostname 匹配，忽略端口差异）
-        let siteHost = '';
         if (process.env.SITE_URL) {
-            try {
-                siteHost = new URL(process.env.SITE_URL).hostname;
-                allowedOrigins.push(process.env.SITE_URL.replace(/\/+$/, ''));
-            } catch (_) {}
+            allowedOrigins.push(process.env.SITE_URL.replace(/\/+$/, ''));
         }
         allowedOrigins.push('http://localhost:3002');
         allowedOrigins.push('http://127.0.0.1:3002');
 
         if (!origin) return callback(null, true);
-        // 精确匹配或同 hostname（端口不同也放行）
         if (allowedOrigins.some(o => o.trim() === origin)) {
             return callback(null, true);
         }
-        if (siteHost) {
-            try {
-                if (new URL(origin).hostname === siteHost) {
-                    return callback(null, true);
-                }
-            } catch (_) {}
-        }
-        console.warn('[cors] blocked origin:', origin, 'siteHost:', siteHost);
+        console.warn('[cors] blocked origin:', origin);
         callback(new Error('CORS policy: Origin not allowed'));
     },
     credentials: true
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// MISC-10 修复：body 限制从 10mb 降至 1mb
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
 app.use((req, res, next) => {
+    // XSS-4 修复：生成 per-request CSP nonce，替换 unsafe-inline
+    const cspNonce = crypto.randomBytes(16).toString('base64');
+    res.locals.cspNonce = cspNonce;
+
     const origSetHeader = res.setHeader;
     res.setHeader = function (name, value) {
         if (name.toLowerCase() === 'expires') return;
@@ -76,10 +74,10 @@ app.use((req, res, next) => {
     };
     res.removeHeader('X-Frame-Options');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    // L-4 修复：CSP 策略（允许项目依赖的 CDN 资源）
+    // XSS-4 修复：script-src 使用 nonce 替代 unsafe-inline（保留 unsafe-eval 供 Vue 运行时模板编译）
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://jsd.owoser.cn",
+        "script-src 'self' 'nonce-" + cspNonce + "' 'unsafe-eval' https://jsd.owoser.cn",
         "style-src 'self' 'unsafe-inline' https://jsd.owoser.cn https://fonts.loli.net",
         "font-src 'self' https://gstatic.loli.net",
         "img-src 'self' data: blob: https:",
@@ -124,8 +122,8 @@ app.use('/images', express.static(path.join(__dirname, '../images'), {
     }
 }));
 
-// 版本号接口（无需认证）
-app.get('/api/version', (req, res) => {
+// 版本号接口（需认证）
+app.get('/api/version', authMiddleware, (req, res) => {
     res.json({ version: pkg.version });
 });
 
@@ -151,6 +149,19 @@ app.get('/api/site/config', async (req, res) => {
             register_enabled: false
         });
     }
+});
+
+// MISC-5 修复：全局 API 限速（每 IP 每分钟 300 次请求）
+app.use('/api', async (req, res, next) => {
+    try {
+        var limit = await checkRateLimit('ratelimit:global:' + req.ip, 300, 60000);
+        if (!limit.allowed) {
+            return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
+        }
+    } catch (e) {
+        // 限速器异常不应阻断请求
+    }
+    next();
 });
 
 app.use('/api', require('./routes/auth'));
@@ -275,7 +286,8 @@ app.get('*', (req, res) => {
 app.use((err, req, res, next) => {
     console.error('[error]', err.message || err);
     if (req.path.startsWith('/api/')) {
-        return res.status(err.status || 500).json({ error: err.message || '服务器内部错误' });
+        var errMsg = (process.env.DEBUG === 'true') ? (err.message || '服务器内部错误') : '服务器内部错误';
+        return res.status(err.status || 500).json({ error: errMsg });
     }
     res.status(500).send('服务器内部错误');
 });

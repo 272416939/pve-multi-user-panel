@@ -46,7 +46,7 @@ router.post('/login', async (req, res) => {
     if (isEmail) {
         user = await db.users.getByEmail(username);
         if (user && !user.emailVerified) {
-            return res.status(400).json({ error: '该邮箱尚未验证，请先完成验证' });
+            return res.status(400).json({ error: '用户名或密码不正确，请核对信息后重试' });
         }
     } else {
         user = await db.users.getByUsername(username);
@@ -119,7 +119,16 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/login/2fa', async (req, res) => {
-    const tfaLimit = await checkRateLimit(`ratelimit:2fa:${req.ip}:${req.body?.userId || req.body?.username}`, 3, 60000);
+    // AUTH-6 修复：解析 partial_token 获取 userId 作为限速 key，避免依赖前端传值导致 key 失效
+    let rateLimitUserId = null;
+    try {
+        const decodedForLimit = jwt.verify(req.body.partial_token, JWT_SECRET, { algorithms: ['HS256'] });
+        rateLimitUserId = decodedForLimit.id;
+    } catch (err) {
+        // 令牌无效，后续校验会拦截
+    }
+
+    const tfaLimit = await checkRateLimit(`ratelimit:2fa:${req.ip}:${rateLimitUserId || 'unknown'}`, 3, 60000);
     if (!tfaLimit.allowed) {
         return res.status(429).json({ error: '2FA 验证过于频繁，请 60 秒后重试' });
     }
@@ -343,6 +352,11 @@ router.post('/auth/forgot-password', async (req, res) => {
 
 router.get('/auth/reset-password/:token', async (req, res) => {
     try {
+        const resetLimit = await checkRateLimit(`ratelimit:reset-pwd:${req.ip}`, 5, 60000);
+        if (!resetLimit.allowed) {
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        }
+
         const { token } = req.params;
 
         const userId = await tokenStore.getResetToken(token);
@@ -358,14 +372,20 @@ router.get('/auth/reset-password/:token', async (req, res) => {
 
 router.post('/auth/reset-password', async (req, res) => {
     try {
+        const resetLimit = await checkRateLimit(`ratelimit:reset-pwd:${req.ip}`, 5, 60000);
+        if (!resetLimit.allowed) {
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        }
+
         const { token, newPassword } = req.body;
         
         if (!token || !newPassword) {
             return res.status(400).json({ error: '缺少必要参数' });
         }
         
-        if (newPassword.length < 6) {
-            return res.status(400).json({ error: '密码至少需要 6 个字符' });
+        var passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/;
+        if (!passwordRegex.test(newPassword)) {
+            return res.status(400).json({ error: '密码至少8位，需包含大小写字母和特殊字符' });
         }
         
         const userId = await tokenStore.getResetToken(token);
@@ -424,10 +444,10 @@ router.post('/register/send-code', async (req, res) => {
             return res.status(400).json({ error: '邮箱格式不正确' });
         }
 
-        // 校验邮箱未被占用
+        // AUTH-9 修复：不泄露邮箱是否已注册，统一返回成功响应
         const existingUser = await db.users.getByEmail(email);
         if (existingUser) {
-            return res.status(400).json({ error: '邮箱已被使用' });
+            return res.json({ success: true, message: '验证码已发送' });
         }
 
         // 限速1：同一邮箱 1 次/60 秒
@@ -507,7 +527,7 @@ router.post('/register', async (req, res) => {
         }
         const existingUsername = await db.users.getByUsername(username);
         if (existingUsername) {
-            return res.status(400).json({ error: '用户名已存在' });
+            return res.status(400).json({ error: '注册失败，请检查输入信息' });
         }
 
         // 校验密码强度
@@ -523,7 +543,7 @@ router.post('/register', async (req, res) => {
         }
         const existingEmail = await db.users.getByEmail(email);
         if (existingEmail) {
-            return res.status(400).json({ error: '邮箱已被使用' });
+            return res.status(400).json({ error: '注册失败，请检查输入信息' });
         }
 
         // 校验验证码（通过 token-store，优先 Redis）

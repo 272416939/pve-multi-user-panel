@@ -360,6 +360,22 @@ async function initDb() {
         )
     `);
 
+    // PAY-1/2/3 修复：充值待处理订单表（回调时从本地记录获取 userId/amount，不信任回调参数）
+    await execute(`
+        CREATE TABLE IF NOT EXISTS pending_orders (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            order_no VARCHAR(200) NOT NULL UNIQUE,
+            user_id INT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            pay_method VARCHAR(50) DEFAULT '',
+            status VARCHAR(20) DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            processed_at DATETIME DEFAULT NULL,
+            INDEX idx_po_order_no (order_no),
+            INDEX idx_po_user_id (user_id)
+        )
+    `);
+
     // 创建 orders 表
     await execute(`CREATE TABLE IF NOT EXISTS orders (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -625,7 +641,7 @@ async function createDefaultAdmin() {
         console.log('================================================');
         console.log('  ⚠ 默认管理员账号已创建（此信息仅显示一次）');
         console.log('  用户名: admin');
-        console.log(`  密码:   ${defaultAdminPassword}`);
+        console.log('  密码:   ******（为安全起见不再显示，请通过环境变量 DEFAULT_ADMIN_PASSWORD 设置，或查看数据库）');
         console.log('  ⚠ 请立即登录并修改密码！');
         console.log('================================================');
     }
@@ -691,6 +707,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
+            if (Object.keys(updates).length === 0) return;
             const fields = [];
             const values = [];
 
@@ -709,6 +726,11 @@ module.exports = {
             return queryOne('SELECT * FROM users WHERE id = ?', [id]);
         },
         delete: (id) => execute('DELETE FROM users WHERE id = ?', [id]),
+        // PAY-6 修复：原子余额增量更新，避免 read-modify-write 竞态
+        incrementBalance: async (id, amount) => {
+            await execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [amount, id]);
+            return queryOne('SELECT * FROM users WHERE id = ?', [id]);
+        },
     },
 
     // 虚拟机操作
@@ -733,11 +755,12 @@ module.exports = {
             return queryOne('SELECT * FROM vms WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'vm_id', 'user_id', 'username', 'expiration_date',
-                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
+            const allowedColumns = ['name', 'vm_id', 'user_id', 'expiration_date',
+                'renewal_price', 'renewal_period', 'dhcp_static_ip', 'ikuai_mac_group_id', 'backup_storage', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
+            if (Object.keys(updates).length === 0) return;
             const fields = [];
             const values = [];
 
@@ -902,6 +925,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
+            if (Object.keys(updates).length === 0) return;
             const fields = [];
             const values = [];
 
@@ -974,6 +998,9 @@ module.exports = {
             return queryOne('SELECT * FROM messages WHERE id = ?', [result.insertId]);
         },
         getByUser: async (uid, type, page = 1, pageSize = 20) => {
+            // SQL-2 修复：parseInt + 上限保护
+            page = parseInt(page) || 1;
+            pageSize = Math.min(parseInt(pageSize) || 20, 200);
             const offset = (page - 1) * pageSize;
             let where = '(uid = ? OR uid = 0)';
             const params = [uid];
@@ -1362,11 +1389,12 @@ module.exports = {
             return queryOne('SELECT * FROM lxc_containers WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'ct_id', 'user_id', 'username', 'expiration_date',
-                'renewal_price', 'renewal_period', 'config', 'status', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
+            const allowedColumns = ['name', 'ct_id', 'user_id', 'expiration_date',
+                'renewal_price', 'renewal_period', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
+            if (Object.keys(updates).length === 0) return;
             const fields = [];
             const values = [];
 
@@ -1526,6 +1554,7 @@ module.exports = {
                     delete data[key];
                 }
             }
+            if (Object.keys(data).length === 0) return;
             const fields = [];
             const values = [];
             for (const [key, value] of Object.entries(data)) {
@@ -1590,8 +1619,14 @@ module.exports = {
             if (params.start_time) { sql += ' AND pay_time >= ?'; args.push(params.start_time); }
             if (params.end_time) { sql += ' AND pay_time <= ?'; args.push(params.end_time); }
             sql += ' ORDER BY created_at DESC';
-            if (params.limit) { sql += ' LIMIT ?'; args.push(params.limit); }
-            if (params.offset) { sql += ' OFFSET ?'; args.push(params.offset); }
+            // SQL-2 修复：LIMIT/OFFSET 强制 parseInt + 上限保护
+            var limit = parseInt(params.limit) || 0;
+            var offset = parseInt(params.offset) || 0;
+            if (limit > 0) {
+                limit = Math.min(limit, 200);
+                sql += ' LIMIT ?'; args.push(limit);
+            }
+            if (offset > 0) { sql += ' OFFSET ?'; args.push(offset); }
             return queryAll(sql, args);
         },
         countAll: async (params) => {
@@ -1614,6 +1649,19 @@ module.exports = {
         }
     },
 
+    // PAY-1/2/3 修复：充值待处理订单操作
+    pendingOrders: {
+        create: async (data) => {
+            await execute(
+                `INSERT INTO pending_orders (order_no, user_id, amount, pay_method, status, created_at)
+                 VALUES (?, ?, ?, ?, 'pending', ?)`,
+                [data.order_no, data.user_id, data.amount, data.pay_method || '', mysqlNow()]
+            );
+        },
+        getByOrderNo: (orderNo) => queryOne('SELECT * FROM pending_orders WHERE order_no = ?', [orderNo]),
+        markProcessed: (orderNo) => execute('UPDATE pending_orders SET status = ?, processed_at = ? WHERE order_no = ?', ['processed', mysqlNow(), orderNo]),
+    },
+
     // 订单操作
     orders: {
         create: async (data) => {
@@ -1633,8 +1681,9 @@ module.exports = {
         },
         getByUser: (userId) => queryAll('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', [userId]),
         getAll: async (params) => {
-            var page = params.page || 1;
-            var limit = params.limit || 20;
+            // SQL-2 修复：parseInt + 上限保护
+            var page = parseInt(params.page) || 1;
+            var limit = Math.min(parseInt(params.limit) || 20, 200);
             var offset = (page - 1) * limit;
             var where = [];
             var args = [];
@@ -1690,6 +1739,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
+            if (Object.keys(updates).length === 0) return;
             const fields = [];
             const values = [];
             for (const [key, value] of Object.entries(updates)) {
@@ -1732,6 +1782,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
+            if (Object.keys(updates).length === 0) return;
             const fields = [];
             const values = [];
             for (const [key, value] of Object.entries(updates)) {
@@ -1769,6 +1820,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
+            if (Object.keys(updates).length === 0) return;
             const fields = [];
             const values = [];
             for (const [key, value] of Object.entries(updates)) {
@@ -1806,6 +1858,7 @@ module.exports = {
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
+            if (Object.keys(updates).length === 0) return;
             const fields = [];
             const values = [];
             for (const [key, value] of Object.entries(updates)) {

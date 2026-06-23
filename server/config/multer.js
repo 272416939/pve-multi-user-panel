@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // 确保 images 目录存在（项目根目录下的 images/）
 const imagesDir = path.join(__dirname, '../../images');
@@ -14,7 +15,7 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => {
         const ext = path.extname(file.originalname);
-        const filename = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}${ext}`;
+        const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}${ext}`;
         cb(null, filename);
     }
 });

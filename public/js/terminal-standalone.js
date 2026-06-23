@@ -1,42 +1,3 @@
-<!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
-<head>
-    <script src="js/theme-init.js"></script>
-    <script src="js/app-version.js" defer></script>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LXC 终端</title>
-    <link rel="stylesheet" href="https://jsd.owoser.cn/npm/xterm@5.3.0/css/xterm.min.css" />
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; overflow: hidden; height: 100vh; }
-        #terminal-container {
-            position: fixed; top: 28px; bottom: 0; left: 0; right: 0;
-            padding: 4px;
-        }
-        .status-bar {
-            position: fixed; top: 0; left: 0; right: 0;
-            background: #1a1a2e; color: #888; font-size: 12px;
-            padding: 4px 12px; font-family: monospace;
-            display: flex; justify-content: space-between;
-            z-index: 10;
-            height: 28px;
-        }
-        .status-bar .error { color: #ff4444; }
-        .status-bar .connected { color: #44ff44; }
-    </style>
-</head>
-<body>
-    <div id="terminal-container"></div>
-    <div class="status-bar" id="statusBar">
-        <span id="statusText">正在连接...</span>
-        <span id="connInfo"></span>
-    </div>
-
-    <script src="https://jsd.owoser.cn/npm/xterm@5.3.0/lib/xterm.min.js"></script>
-    <script src="https://jsd.owoser.cn/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
-    <script src="https://jsd.owoser.cn/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
-    <script nonce="<%= cspNonce %>">
 (function() {
     const params = new URLSearchParams(location.search);
     const vmid = params.get('vmid');
@@ -86,6 +47,8 @@
             statusEl.textContent = '已连接';
             statusEl.className = 'connected';
             term.focus();
+
+            // 发送 resize 信息
             sendResize();
         };
 
@@ -113,17 +76,20 @@
         if (ws && ws.readyState === WebSocket.OPEN) {
             const dims = fitAddon.proposeDimensions();
             if (dims) {
+                // PVE xtermjs 通过 resize 消息调整
                 ws.send(JSON.stringify({ resize: { cols: dims.cols, rows: dims.rows } }));
             }
         }
     }
 
+    // 终端输入 → WebSocket
     term.onData(function(data) {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(data);
         }
     });
 
+    // 窗口调整大小
     let resizeTimer;
     window.addEventListener('resize', function() {
         fitAddon.fit();
@@ -133,6 +99,3 @@
 
     connect();
 })();
-    </script>
-</body>
-</html>

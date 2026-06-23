@@ -10,14 +10,15 @@ function calculateAmount(monthlyPrice, period, periodCount) {
 }
 
 async function deductBalance(userId, amount, dbInstance) {
+  if (amount <= 0) throw new Error('扣款金额必须大于0');
   var user = await dbInstance.users.getById(userId);
   var balance = parseFloat(user.balance || '0');
   if (balance < amount) {
     throw new Error('余额不足');
   }
-  var newBalance = balance - amount;
-  await dbInstance.users.update(userId, { balance: newBalance.toFixed(2) });
-  return newBalance;
+  // PAY-6 修复：原子余额扣减，避免 read-modify-write 竞态
+  var updatedUser = await dbInstance.users.incrementBalance(userId, -amount);
+  return parseFloat(updatedUser.balance || '0');
 }
 
 async function setVmAffinity(vmid, affinityValue) {
@@ -29,6 +30,9 @@ async function setVmAffinity(vmid, affinityValue) {
   var password = process.env.PVE_SSH_PASSWORD;
   if (!host || !password) {
     throw new Error('SSH 配置不完整，无法设置 CPU 亲和性（请配置 PVE_SSH_HOST 和 PVE_SSH_PASSWORD）');
+  }
+  if (!affinityValue || !/^[0-9,\-]+$/.test(affinityValue)) {
+    throw new Error('无效的 CPU 亲和性值');
   }
   var cmd = 'qm set ' + parseInt(vmid) + ' --affinity ' + affinityValue;
   var result = await execSSH(host, 'root', password, cmd);

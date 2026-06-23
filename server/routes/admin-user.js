@@ -5,6 +5,7 @@ const CryptoJS = require('crypto-js');
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware, invalidateUserActiveCache } = require('../middleware/auth');
 const cacheStore = require('../utils/cache-store');
+const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 // 用户列表缓存（30s TTL，低频变更场景）
 const userListCache = cacheStore.create('admin_users', 30);
 
@@ -17,7 +18,7 @@ router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const cached = await userListCache.get('list');
         if (cached) return res.json(cached);
-        const users = (await db.users.getAll()).map(({ password, ...rest }) => rest);
+        const users = (await db.users.getAll()).map(({ password, password_salt, totp_secret, ...rest }) => rest);
         await userListCache.set('list', users);
         res.json(users);
     } catch (e) {
@@ -27,6 +28,36 @@ router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     const { username, password, role, email, emailVerified } = req.body;
+
+    if (!password) {
+        return res.status(400).json({ error: '密码不能为空' });
+    }
+
+    if (role && !['admin', 'user'].includes(role)) {
+        return res.status(400).json({ error: '无效的角色' });
+    }
+
+    // AUTH-14 修复：用户名黑名单 + 长度校验
+    if (!username || username.length < 3 || username.length > 32) {
+        return res.status(400).json({ error: '用户名长度必须为 3-32 个字符' });
+    }
+    if (isUsernameBlacklisted(username)) {
+        return res.status(400).json({ error: '该用户名不可用' });
+    }
+
+    // AUTH-14 修复：密码强度校验
+    if (password.length < 8) {
+        return res.status(400).json({ error: '密码至少8位' });
+    }
+
+    // AUTH-14 修复：邮箱格式校验
+    if (email) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: '邮箱格式不正确' });
+        }
+    }
+
     const salt = crypto.randomBytes(16).toString('hex');
     const hashedPassword = CryptoJS.SHA256(salt + password).toString();
     
@@ -50,13 +81,17 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
         emailVerified: !!emailVerified
     });
     
-    const { password: _, ...safeUser } = newUser;
+    const { password: _, password_salt: __, totp_secret: ___, ...safeUser } = newUser;
     await userListCache.del('list');
     res.json(safeUser);
 });
 
 router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     const userId = parseInt(req.params.id);
+
+    if (parseInt(req.params.id) === req.user.id) {
+        return res.status(400).json({ error: '不能删除自己的账号' });
+    }
 
     const userVms = await db.vms.getByUserId(userId);
     for (const vm of userVms) {
@@ -75,6 +110,9 @@ router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) =>
     }
 
     await db.passwordResetTokens.deleteByUserId(userId);
+
+    await db.refreshTokens.revokeByUserId(userId);
+    if (db.recoveryCodes) await db.recoveryCodes.deleteByUserId(userId);
 
     await db.users.delete(userId);
     await userListCache.del('list');
@@ -102,11 +140,21 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     }
     
     if (password) {
+        if (password.length < 8) {
+            return res.status(400).json({ error: '密码至少8位' });
+        }
         const salt = crypto.randomBytes(16).toString('hex');
         updates.password = CryptoJS.SHA256(salt + password).toString();
         updates.password_salt = salt;
+        await db.refreshTokens.revokeByUserId(parseInt(req.params.id));
     }
-    
+
+    if (role && !['admin', 'user'].includes(role)) {
+        return res.status(400).json({ error: '无效的角色' });
+    }
+    if (role && parseInt(req.params.id) === req.user.id) {
+        return res.status(400).json({ error: '不能修改自己的角色' });
+    }
     if (role) {
         updates.role = role;
     }
@@ -150,11 +198,12 @@ router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, 
 
         var oldBalance = parseFloat(user.balance || '0');
         var newBalance = oldBalance + amount;
-        await db.users.update(userId, { balance: newBalance.toFixed(2) });
+        // PAY-6 修复：原子余额增量更新
+        await db.users.incrementBalance(userId, amount);
 
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-        var orderNo = 'ADMIN_RECHARGE_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
+        var orderNo = 'ADMIN_RECHARGE_' + dateStr + '_' + crypto.randomBytes(4).toString('hex');
 
         await db.transactionRecords.create({
             user_id: userId, order_no: orderNo, pay_time: db.now(),

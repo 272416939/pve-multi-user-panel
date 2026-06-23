@@ -74,6 +74,10 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         var packageId = parseInt(req.params.id);
         var period = req.body.period || 'month';
         var period_count = req.body.period_count || 1;
+        period_count = parseInt(period_count);
+        if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
+            return res.status(400).json({ error: '订购数量必须为1-99的正整数' });
+        }
         var macGroupId = req.body.mac_group_id || '';
 
         var pkg = await db.vmPackages.getById(packageId);
@@ -242,6 +246,10 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var packageId = parseInt(req.params.id);
         var period = req.body.period || 'month';
         var period_count = req.body.period_count || 1;
+        period_count = parseInt(period_count);
+        if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
+            return res.status(400).json({ error: '订购数量必须为1-99的正整数' });
+        }
         var macGroupId = req.body.mac_group_id || '';
 
         var pkg = await db.lxcPackages.getById(packageId);
@@ -460,6 +468,10 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         var renewalPeriod = req.body.renewal_period || 'month';
         var period = req.body.period || 'month';
         var period_count = req.body.period_count || 1;
+        period_count = parseInt(period_count);
+        if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
+            return res.status(400).json({ error: '订购数量必须为1-99的正整数' });
+        }
 
         if (!userId) return res.status(400).json({ error: '请选择用户' });
 
@@ -631,6 +643,10 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         var renewalPeriod = req.body.renewal_period || 'month';
         var period = req.body.period || 'month';
         var period_count = req.body.period_count || 1;
+        period_count = parseInt(period_count);
+        if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
+            return res.status(400).json({ error: '订购数量必须为1-99的正整数' });
+        }
 
         if (!userId) return res.status(400).json({ error: '请选择用户' });
 

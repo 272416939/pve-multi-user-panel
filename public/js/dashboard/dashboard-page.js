@@ -48,7 +48,31 @@ function toggleSidebar() {
 // 主题切换 — 统一使用 theme-init.js
 if (window.initThemeToggle) window.initThemeToggle();
 
-// 注意：侧边栏导航点击已由 Vue switchSection() 统一处理（含移动端自动收起），无需重复绑定原生事件
+// XSS-4 修复：侧边栏导航事件绑定（替换内联 onclick，CSP nonce 合规）
+document.querySelectorAll('[data-section]').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (window.__dashboard && window.__dashboard.switchSection) {
+            window.__dashboard.switchSection(el.getAttribute('data-section'));
+        }
+    });
+});
+document.querySelectorAll('[data-submenu]').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (window.__dashboard && window.__dashboard.toggleSubmenu) {
+            window.__dashboard.toggleSubmenu(el.getAttribute('data-submenu'));
+        }
+    });
+});
+document.querySelectorAll('[data-suborder]').forEach(function(el) {
+    el.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (window.__dashboard && window.__dashboard.switchSubOrder) {
+            window.__dashboard.switchSubOrder(el.getAttribute('data-suborder'));
+        }
+    });
+});
 
 // 点击页面空白处关闭下拉菜单
 document.addEventListener('click', function(e) {

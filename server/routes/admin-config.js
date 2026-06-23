@@ -537,6 +537,21 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
     try {
         var setConfig = db.config.set;
         var { name, logo_text, login_title, register_enabled } = req.body;
+        if (name !== undefined) {
+            if (typeof name !== 'string' || name.length > 50 || /[<>]/.test(name)) {
+                return res.status(400).json({ error: '站点名称不能超过50字符且不能包含<>符号' });
+            }
+        }
+        if (logo_text !== undefined) {
+            if (typeof logo_text !== 'string' || logo_text.length > 30 || /[<>]/.test(logo_text)) {
+                return res.status(400).json({ error: 'LOGO文字不能超过30字符且不能包含<>符号' });
+            }
+        }
+        if (login_title !== undefined) {
+            if (typeof login_title !== 'string' || login_title.length > 100 || /[<>]/.test(login_title)) {
+                return res.status(400).json({ error: '登录页标题不能超过100字符且不能包含<>符号' });
+            }
+        }
         if (name !== undefined) await setConfig('site:name', name);
         if (logo_text !== undefined) await setConfig('site:logo_text', logo_text);
         if (login_title !== undefined) await setConfig('site:login_title', login_title);

@@ -165,6 +165,7 @@ router.delete('/lxc/:vmid/backups/:id', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的容器 ID' });
         const backupId = parseInt(req.params.id);
  
         const allCts = await db.lxcContainers.getAll();
@@ -283,7 +284,8 @@ router.get('/vm/:vmid/backups', authMiddleware, async (req, res) => {
 
 router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
     try {
-        const vmid = req.params.vmid;
+        const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const owned = userVms.some(v => v.vm_id == vmid);
@@ -433,7 +435,8 @@ router.delete('/admin/backups/:id', authMiddleware, adminMiddleware, async (req,
 
 router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) => {
     try {
-        const vmid = req.params.vmid;
+        const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
         const backupId = req.params.id;
         const backup = await db.backups.getById(backupId);
         if (!backup) return res.status(404).json({ error: '备份不存在' });
@@ -476,12 +479,14 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
 
 router.get('/vm/:vmid/restore-status', authMiddleware, async (req, res) => {
     try {
+        const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
-            const owned = userVms.some(v => v.vm_id == req.params.vmid);
+            const owned = userVms.some(v => v.vm_id === vmid);
             if (!owned) return res.status(403).json({ error: '无权操作此虚拟机' });
         }
-        const tasks = (await db.restoreTasks.getByVmId(req.params.vmid)).filter(t => t.status === 'running' || t.status === 'pending');
+        const tasks = (await db.restoreTasks.getByVmId(vmid)).filter(t => t.status === 'running' || t.status === 'pending');
         res.json(tasks.length > 0 ? tasks[0] : null);
     } catch (error) {
         res.status(500).json({ error: '获取恢复任务状态失败' });

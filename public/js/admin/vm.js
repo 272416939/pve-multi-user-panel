@@ -518,7 +518,7 @@
     $.restoreBackup = async function(backup) {
         $.bsModalHide('backupModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('即将使用此备份恢复虚拟机 <strong>' + $.backupVmName.value + '</strong>（备份时间：' + formatDate(backup.created_at) + '）。<br><br>恢复将<strong>完全覆盖</strong>当前虚拟机的磁盘数据！<br><span style="color:#ff4444;font-weight:bold">⚠️ 已有的快照将会被清除</span><br><br>请确保虚拟机已关机，否则恢复将失败。<br><br>确认要恢复吗？')) {
+        if (!await window.customConfirm('即将使用此备份恢复虚拟机【' + $.backupVmName.value + '】（备份时间：' + formatDate(backup.created_at) + '）。\n\n恢复将【完全覆盖】当前虚拟机的磁盘数据！\n⚠️ 已有的快照将会被清除\n\n请确保虚拟机已关机，否则恢复将失败。\n\n确认要恢复吗？')) {
             $.bsModalShow('backupModal');
             return;
         }

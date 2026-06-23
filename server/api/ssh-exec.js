@@ -84,6 +84,11 @@ async function restoreLxcBySSH(vmid, volid, storage) {
         throw new Error('无效的存储名称');
     }
 
+    vmid = parseInt(vmid);
+    if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+        throw new Error('无效的容器 ID');
+    }
+
     let cmd = `pct restore ${vmid} ${volid} --force 1`;
     if (storage) {
         cmd += ` --storage ${storage}`;

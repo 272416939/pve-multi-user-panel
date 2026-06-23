@@ -416,6 +416,26 @@ const logout = () => {
     window.location.href = 'login.html';
 };
 
+// XSS-4 修复：替换内联 onclick 为 addEventListener（CSP nonce 合规）
+document.addEventListener('DOMContentLoaded', function() {
+    var sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+    if (sidebarToggleBtn && typeof toggleSidebar === 'function') {
+        sidebarToggleBtn.addEventListener('click', toggleSidebar);
+    }
+    var headerRefreshBtn = document.getElementById('headerRefreshBtn');
+    if (headerRefreshBtn) {
+        headerRefreshBtn.addEventListener('click', function() { location.reload(); });
+    }
+    var headerLogoutBtn = document.getElementById('headerLogoutBtn');
+    if (headerLogoutBtn) {
+        headerLogoutBtn.addEventListener('click', function(e) { e.preventDefault(); logout(); });
+    }
+    var sidebarOverlay = document.getElementById('sidebarOverlay');
+    if (sidebarOverlay && typeof toggleSidebar === 'function') {
+        sidebarOverlay.addEventListener('click', toggleSidebar);
+    }
+});
+
 // ===== ModalZIndexManager: 统一弹窗 z-index 管理器 =====
 // 解决弹窗叠加时 z-index 硬编码导致后弹出的弹窗可能被先弹出的弹窗遮挡的问题
 window.ModalZIndexManager = (function() {

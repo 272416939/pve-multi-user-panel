@@ -272,20 +272,16 @@
     // 一键清除所有缓存（Redis + 内存），带二次确认
     $.clearAllCache = async function() {
         var confirmed = await window.customConfirm(
-            '<div style="text-align:left;">' +
-            '<p style="color:#ff4444;font-weight:bold;font-size:16px;margin-bottom:8px;">⚠️ 危险操作：清除所有缓存</p>' +
-            '<p style="margin-bottom:8px;">此操作将立即清除以下数据：</p>' +
-            '<ul style="margin-bottom:8px;padding-left:20px;">' +
-            '<li>用户列表 / 套餐列表缓存</li>' +
-            '<li>设备状态 / 用户活跃状态缓存</li>' +
-            '<li>JWT 黑名单（已登出的令牌将恢复可用）</li>' +
-            '<li>未读消息数 / 用户资料缓存</li>' +
-            '<li>站点配置缓存</li>' +
-            '<li>验证码 / 找回密码 Token</li>' +
-            '<li>登录限速计数器</li>' +
-            '</ul>' +
-            '<p style="color:#ff4444;font-weight:bold;">确认要继续吗？</p>' +
-            '</div>'
+            '⚠️ 危险操作：清除所有缓存\n' +
+            '此操作将立即清除以下数据：\n' +
+            '· 用户列表 / 套餐列表缓存\n' +
+            '· 设备状态 / 用户活跃状态缓存\n' +
+            '· JWT 黑名单（已登出的令牌将恢复可用）\n' +
+            '· 未读消息数 / 用户资料缓存\n' +
+            '· 站点配置缓存\n' +
+            '· 验证码 / 找回密码 Token\n' +
+            '· 登录限速计数器\n' +
+            '确认要继续吗？'
         );
         if (!confirmed) return;
         $.cacheClearing.value = true;

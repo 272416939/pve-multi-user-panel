@@ -84,6 +84,8 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!/^[a-zA-Z0-9_-]{2,20}$/.test(req.params.snapname)) return res.status(400).json({ error: '无效的快照名称' });
 
         // H-4 修复：统一权限校验模式
         const allCts = await db.lxcContainers.getAll();
@@ -122,6 +124,10 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
 router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        const snapname = req.params.snapname;
+        if (!/^[a-zA-Z0-9_-]{2,20}$/.test(snapname)) {
+            return res.status(400).json({ error: '无效的快照名称' });
+        }
 
         // H-4 修复：统一权限校验模式
         const allCts = await db.lxcContainers.getAll();
@@ -271,6 +277,11 @@ router.delete('/vm/:vmid/snapshots/:snapname', authMiddleware, async (req, res) 
             }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '虚拟机未分配，无权限' });
+        }
+
+        // PVE-3 修复：snapname 白名单校验
+        if (!/^[a-zA-Z0-9_-]{2,20}$/.test(req.params.snapname)) {
+            return res.status(400).json({ error: '无效的快照名称' });
         }
 
         await pveApi.deleteSnapshot(req.params.vmid, req.params.snapname);
