@@ -16,6 +16,18 @@ function safeError(e) {
 
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        var hasQuery = req.query.page || req.query.keyword || req.query.role;
+        if (hasQuery) {
+            var page = parseInt(req.query.page) || 1;
+            var limit = parseInt(req.query.limit) || 20;
+            var keyword = (req.query.keyword || '').trim();
+            var role = req.query.role || '';
+            if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
+            if (role && !['admin', 'user'].includes(role)) return res.status(400).json({ error: '无效的角色' });
+            var result = await db.users.getPaginated({ page: page, limit: limit, keyword: keyword, role: role });
+            result.rows = result.rows.map(({ password, password_salt, totp_secret, ...rest }) => rest);
+            return res.json(result);
+        }
         const cached = await userListCache.get('list');
         if (cached) return res.json(cached);
         const users = (await db.users.getAll()).map(({ password, password_salt, totp_secret, ...rest }) => rest);

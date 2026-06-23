@@ -971,6 +971,9 @@ $.initDetailCharts = function() {
                 if ($.activeTab.value === 'orders') {
                     $.loadOrders(1);
                 }
+                if ($.activeTab.value === 'users') {
+                    $.loadUsers(1);
+                }
                 // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
                 setInterval(function() {
                     var token = localStorage.getItem('token');
@@ -1006,6 +1009,7 @@ $.initDetailCharts = function() {
             if (newTab === 'transactions') {
                 $.loadTransactions(1);
             }
+            if (newTab === 'users') { $.loadUsers(1); }
         });
 
         watch($.activeSection, function(val) {

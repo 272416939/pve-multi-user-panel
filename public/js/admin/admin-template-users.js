@@ -9,6 +9,24 @@
                             <h4 class="module-title">用户管理</h4>
                             <pv-button @click="showCreateUser = true" variant="glass">创建用户</pv-button>
                         </div>
+                        <div class="row g-2 mb-3 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">用户名/邮箱</label>
+                                <input type="text" class="form-control form-control-sm" v-model="userFilter.keyword" placeholder="搜索用户名或邮箱" @keyup.enter="searchUsers">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">角色</label>
+                                <select class="form-select form-select-sm" v-model="userFilter.role">
+                                    <option value="">全部</option>
+                                    <option value="admin">管理员</option>
+                                    <option value="user">普通用户</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex gap-2">
+                                <pv-button @click="searchUsers" size="sm">查询</pv-button>
+                                <pv-button @click="userFilter={keyword:'',role:''};searchUsers()" variant="outline" size="sm">重置</pv-button>
+                            </div>
+                        </div>
                         <div class="card">
                             <div class="table-responsive">
                                 <table class="table table-striped mb-0">
@@ -52,6 +70,14 @@
                                         </tr>
                                     </tbody>
                                 </table>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-3" v-if="userTotal > 0">
+                                <small class="text-muted">共 {{ userTotal }} 条</small>
+                                <div>
+                                    <pv-button :disabled="userPage <= 1" @click="loadUsers(userPage - 1)" variant="outline" size="sm">上一页</pv-button>
+                                    <span class="mx-2 text-muted small">{{ userPage }} / {{ Math.ceil(userTotal / 20) || 1 }}</span>
+                                    <pv-button :disabled="userPage * 20 >= userTotal" @click="loadUsers(userPage + 1)" variant="outline" size="sm">下一页</pv-button>
+                                </div>
                             </div>
                         </div>
                     </div>

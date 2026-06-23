@@ -686,7 +686,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
 router.get('/wallet/transactions', authMiddleware, async (req, res) => {
     try {
         var page = parseInt(req.query.page) || 1;
-        var limit = parseInt(req.query.limit) || 10;
+        var limit = parseInt(req.query.limit) || 20;
         var offset = (page - 1) * limit;
         var trade_type = req.query.trade_type || '';
         var order_no = req.query.order_no || '';
@@ -716,6 +716,30 @@ router.get('/wallet/transactions', authMiddleware, async (req, res) => {
 // ========== 用户订单查询 ==========
 router.get('/orders', authMiddleware, async (req, res) => {
     try {
+        var hasQuery = req.query.page || req.query.order_no || req.query.type || req.query.status;
+        if (hasQuery) {
+            var page = parseInt(req.query.page) || 1;
+            var limit = parseInt(req.query.limit) || 20;
+            var params = { page: page, limit: limit, user_id: req.user.id };
+            var order_no = (req.query.order_no || '').trim();
+            if (order_no.length > 50) return res.status(400).json({ error: '订单号过长' });
+            if (order_no) params.order_no = order_no;
+            if (req.query.type && ['vm', 'lxc'].includes(req.query.type)) params.type = req.query.type;
+            if (req.query.status && ['completed', 'pending'].includes(req.query.status)) params.status = req.query.status;
+            var result = await db.orders.getByUser(req.user.id, params);
+            result.rows = await Promise.all((result.rows || result.data || []).map(async function(order) {
+                var packageName = '';
+                if (order.type === 'vm') {
+                    var pkg = await db.vmPackages.getById(order.package_id);
+                    packageName = pkg ? pkg.name : '';
+                } else if (order.type === 'lxc') {
+                    var pkg = await db.lxcPackages.getById(order.package_id);
+                    packageName = pkg ? pkg.name : '';
+                }
+                return Object.assign({}, order, { package_name: packageName });
+            }));
+            return res.json({ data: result.rows, total: result.total, page: result.page, limit: result.limit });
+        }
         var rows = await db.orders.getByUser(req.user.id);
         rows = await Promise.all(rows.map(async function(order) {
             var packageName = '';

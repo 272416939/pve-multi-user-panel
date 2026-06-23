@@ -42,6 +42,9 @@ const App = {
         const txPage = ref(1);
         const txFilter = ref({ start_time: '', end_time: '', trade_type: '', order_no: '' });
         const myOrders = ref([]);
+        const orderPage = ref(1);
+        const orderTotal = ref(0);
+        const orderFilter = ref({ order_no: '', type: '' });
 
         // 充值轮询相关
         const rechargePendingOrderNo = ref('');

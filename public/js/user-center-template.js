@@ -33,7 +33,7 @@
                 </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'wallet-transactions' }"
                    @click.prevent="switchSubTab('wallet-transactions')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">交易明细</span>
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">交易流水</span>
                 </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'orders' }"
                    @click.prevent="switchSubTab('orders'); loadMyOrders()">
@@ -302,6 +302,14 @@
                                             <tr v-if="!myOrders || myOrders.length === 0"><td colspan="7" class="text-center text-muted py-4">暂无订单记录</td></tr>
                                         </tbody>
                                     </table>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-3" v-if="orderTotal > 0">
+                                    <small class="text-muted">共 {{ orderTotal }} 条</small>
+                                    <div>
+                                        <pv-button variant="outline" size="sm" :disabled="orderPage <= 1" @click="loadMyOrders(orderPage - 1)">上一页</pv-button>
+                                        <span class="mx-2 text-muted small">{{ orderPage }} / {{ Math.ceil(orderTotal / 20) || 1 }}</span>
+                                        <pv-button variant="outline" size="sm" :disabled="orderPage * 20 >= orderTotal" @click="loadMyOrders(orderPage + 1)">下一页</pv-button>
+                                    </div>
                                 </div>
                             </div>
                         </div>

@@ -7,6 +7,9 @@
 
     // ==================== 状态 ====================
     $.users = ref([]);
+    $.userPage = ref(1);
+    $.userTotal = ref(0);
+    $.userFilter = ref({ keyword: '', role: '' });
     $.showCreateUser = ref(false);
     $.createUserForm = ref({ username: '', password: '', role: 'user', email: '', emailVerified: false });
     $.editUserForm = ref({ id: null, username: '', password: '', role: 'user', email: '', emailVerified: false, totp_enabled: false });
@@ -123,6 +126,26 @@
 
     // ==================== 函数 ====================
     // 用户管理
+    $.loadUsers = async function(page) {
+        $.userPage.value = page || 1;
+        try {
+            var params = { page: $.userPage.value, limit: 20 };
+            if ($.userFilter.value.keyword) params.keyword = $.userFilter.value.keyword;
+            if ($.userFilter.value.role) params.role = $.userFilter.value.role;
+            var res = await api('/users?' + new URLSearchParams(params));
+            if (Array.isArray(res)) {
+                $.users.value = res;
+                $.userTotal.value = res.length;
+            } else {
+                $.users.value = res.rows || res.data || [];
+                $.userTotal.value = res.total || 0;
+            }
+        } catch (e) {
+            console.error('加载用户失败', e);
+        }
+    };
+    $.searchUsers = function() { $.loadUsers(1); };
+
     $.createUser = async function() {
         try {
             await api('/users', {
@@ -533,7 +556,7 @@
     $.loadTransactions = async function(page) {
         $.financePage.value = page || 1;
         try {
-            var params = { page: $.financePage.value, limit: 10 };
+            var params = { page: $.financePage.value, limit: 20 };
             var f = $.financeFilter.value;
             if (f.start_time) params.start_time = f.start_time;
             if (f.end_time) params.end_time = f.end_time;

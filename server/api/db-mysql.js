@@ -680,6 +680,25 @@ module.exports = {
     // 用户操作
     users: {
         getAll: () => queryAll('SELECT * FROM users'),
+        getPaginated: async (params) => {
+            var page = parseInt(params.page) || 1;
+            var limit = Math.min(parseInt(params.limit) || 20, 200);
+            var offset = (page - 1) * limit;
+            var where = [];
+            var args = [];
+            if (params.keyword) {
+                where.push('(username LIKE ? OR email LIKE ?)');
+                var kw = '%' + params.keyword + '%';
+                args.push(kw, kw);
+            }
+            if (params.role) { where.push('role = ?'); args.push(params.role); }
+            var whereClause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : '';
+            var countArgs = args.slice();
+            var totalRow = await queryOne('SELECT COUNT(*) as total FROM users' + whereClause, countArgs);
+            args.push(limit, offset);
+            var rows = await queryAll('SELECT * FROM users' + whereClause + ' ORDER BY id DESC LIMIT ? OFFSET ?', args);
+            return { rows: rows, total: totalRow.total, page: page, limit: limit };
+        },
         getById: (id) => queryOne('SELECT * FROM users WHERE id = ?', [id]),
         getByUsername: (username) => queryOne('SELECT * FROM users WHERE username = ?', [username]),
         getByEmail: (email) => queryOne('SELECT * FROM users WHERE email = ?', [email]),
@@ -1679,7 +1698,9 @@ module.exports = {
             );
             return queryOne('SELECT * FROM orders WHERE id = ?', [result.insertId]);
         },
-        getByUser: (userId) => queryAll('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', [userId]),
+        getByUser: (userId, params) => {
+            return module.exports.orders.getAll(Object.assign({}, params, { user_id: userId }));
+        },
         getAll: async (params) => {
             // SQL-2 修复：parseInt + 上限保护
             var page = parseInt(params.page) || 1;
@@ -1688,6 +1709,7 @@ module.exports = {
             var where = [];
             var args = [];
             if (params.order_no) { where.push('o.order_no = ?'); args.push(params.order_no); }
+            if (params.user_id) { where.push('o.user_id = ?'); args.push(params.user_id); }
             if (params.type) { where.push('o.type = ?'); args.push(params.type); }
             if (params.status) { where.push('o.status = ?'); args.push(params.status); }
             if (params.start_time) { where.push('o.created_at >= ?'); args.push(params.start_time); }

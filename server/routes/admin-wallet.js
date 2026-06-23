@@ -12,7 +12,7 @@ function safeError(e) {
 router.get('/admin/transactions', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var page = parseInt(req.query.page) || 1;
-        var limit = parseInt(req.query.limit) || 10;
+        var limit = parseInt(req.query.limit) || 20;
         var offset = (page - 1) * limit;
         var trade_type = req.query.trade_type || '';
         var order_no = req.query.order_no || '';

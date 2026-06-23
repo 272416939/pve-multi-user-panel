@@ -80,8 +80,8 @@
                             <small class="text-muted">共 {{ transactionTotal }} 条</small>
                             <div>
                                 <pv-button :disabled="financePage <= 1" @click="loadTransactions(financePage - 1)" variant="outline" size="sm">上一页</pv-button>
-                                <span class="mx-2 text-muted small">{{ financePage }}</span>
-                                <pv-button :disabled="financePage * 10 >= transactionTotal" @click="loadTransactions(financePage + 1)" variant="outline" size="sm">下一页</pv-button>
+                                <span class="mx-2 text-muted small">{{ financePage }} / {{ Math.ceil(transactionTotal / 20) || 1 }}</span>
+                                <pv-button :disabled="financePage * 20 >= transactionTotal" @click="loadTransactions(financePage + 1)" variant="outline" size="sm">下一页</pv-button>
                             </div>
                         </div>
                     </div>
@@ -154,11 +154,12 @@
                         </div>
                         <!-- 分页（始终显示） -->
                         <div class="d-flex justify-content-between align-items-center mt-3">
-                            <small class="text-muted">共 {{ orderTotal }} 条，第 {{ orderPage }} 页</small>
+                            <small class="text-muted">共 {{ orderTotal }} 条</small>
                             <div class="btn-group" v-if="orderTotal > 20">
                                 <pv-button :disabled="orderPage <= 1" @click="loadOrders(orderPage-1)" variant="outline" size="sm">上一页</pv-button>
                                 <pv-button :disabled="orderPage*20 >= orderTotal" @click="loadOrders(orderPage+1)" variant="outline" size="sm">下一页</pv-button>
                             </div>
+                            <span class="text-muted small" v-if="orderTotal > 0">{{ orderPage }} / {{ Math.ceil(orderTotal / 20) || 1 }}</span>
                         </div>
                     </div>
                 </div>
