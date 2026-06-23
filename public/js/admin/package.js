@@ -5,14 +5,18 @@
 
     $.vmPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
         monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1, sort_order: 0,
-        cpu_model: '', bandwidth: 0 });
+        cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0 });
     $.lxcPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
         monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1, sort_order: 0,
-        cpu_model: '', bandwidth: 0 });
+        cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0 });
     $.vmPackages = Vue.ref([]);
     $.lxcPackages = Vue.ref([]);
     $.vmTemplateOptions = Vue.ref([]);
     $.lxcTemplateOptions = Vue.ref([]);
+    $.vmPackageGroups = Vue.ref([]);
+    $.lxcPackageGroups = Vue.ref([]);
+    $.vmGroupForm = Vue.ref({ id: null, name: '', type: 'vm', sort_order: 0 });
+    $.lxcGroupForm = Vue.ref({ id: null, name: '', type: 'lxc', sort_order: 0 });
 
     $.vmProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
     $.lxcProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
@@ -31,6 +35,13 @@
         try { $.lxcTemplateOptions.value = await api('/admin/lxc-templates'); } catch (e) {}
     };
 
+    $.loadVmPackageGroups = async function() {
+        try { $.vmPackageGroups.value = await api('/admin/package-groups?type=vm'); } catch (e) {}
+    };
+    $.loadLxcPackageGroups = async function() {
+        try { $.lxcPackageGroups.value = await api('/admin/package-groups?type=lxc'); } catch (e) {}
+    };
+
     $.openVmPackageForm = function(p) {
         if (p) {
             $.vmPackageForm.value = Object.assign({}, p);
@@ -40,7 +51,7 @@
         } else {
             $.vmPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
                 monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1,
-                cpu_model: '', bandwidth: 0 };
+                cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0 };
         }
         $.loadVmTemplateOptions().then(function() { admin.bsModalShow('vmPackageModal'); });
     };
@@ -74,7 +85,7 @@
         } else {
             $.lxcPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
                 monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1,
-                cpu_model: '', bandwidth: 0 };
+                cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0 };
         }
         $.loadLxcTemplateOptions().then(function() { admin.bsModalShow('lxcPackageModal'); });
     };
@@ -97,6 +108,55 @@
     $.deleteLxcPackage = async function(id) {
         if (!await window.customConfirm('确定删除此套餐？')) return;
         try { await api('/admin/lxc-packages/' + id, { method: 'DELETE' }); await $.loadLxcPackages(); } catch (e) { alert(e.message); }
+    };
+
+    $.openVmGroupForm = function(g) {
+        if (g) {
+            $.vmGroupForm.value = Object.assign({}, g);
+        } else {
+            $.vmGroupForm.value = { id: null, name: '', type: 'vm', sort_order: 0 };
+        }
+        admin.bsModalShow('vmGroupModal');
+    };
+    $.saveVmGroup = async function() {
+        var f = $.vmGroupForm.value;
+        try {
+            if (f.id) {
+                await api('/admin/package-groups/' + f.id, { method: 'PUT', body: JSON.stringify(f) });
+            } else {
+                await api('/admin/package-groups', { method: 'POST', body: JSON.stringify(f) });
+            }
+            admin.bsModalHide('vmGroupModal');
+            await $.loadVmPackageGroups();
+        } catch (e) { alert(e.message); }
+    };
+    $.deleteVmGroup = async function(id) {
+        if (!await window.customConfirm('确定删除此分组？关联的套餐将变为未分组。')) return;
+        try { await api('/admin/package-groups/' + id, { method: 'DELETE' }); await $.loadVmPackageGroups(); } catch (e) { alert(e.message); }
+    };
+    $.openLxcGroupForm = function(g) {
+        if (g) {
+            $.lxcGroupForm.value = Object.assign({}, g);
+        } else {
+            $.lxcGroupForm.value = { id: null, name: '', type: 'lxc', sort_order: 0 };
+        }
+        admin.bsModalShow('lxcGroupModal');
+    };
+    $.saveLxcGroup = async function() {
+        var f = $.lxcGroupForm.value;
+        try {
+            if (f.id) {
+                await api('/admin/package-groups/' + f.id, { method: 'PUT', body: JSON.stringify(f) });
+            } else {
+                await api('/admin/package-groups', { method: 'POST', body: JSON.stringify(f) });
+            }
+            admin.bsModalHide('lxcGroupModal');
+            await $.loadLxcPackageGroups();
+        } catch (e) { alert(e.message); }
+    };
+    $.deleteLxcGroup = async function(id) {
+        if (!await window.customConfirm('确定删除此分组？关联的套餐将变为未分组。')) return;
+        try { await api('/admin/package-groups/' + id, { method: 'DELETE' }); await $.loadLxcPackageGroups(); } catch (e) { alert(e.message); }
     };
 
     $.restockVmPackage = async function(pkg) {

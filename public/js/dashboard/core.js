@@ -48,16 +48,36 @@
     $.orderPackage = ref({});
     $.orderType = ref('vm');
     $.orderLoading = ref(false);
-    
+    $.pkgSelectedPeriod = ref({});  // { packageId: 'month'/'quarter'/'year' }
+    $.vmGroupedPackages = ref([]);  // [{ group_name, group_id, packages: [] }]
+    $.lxcGroupedPackages = ref([]);
+
     $.orderTotal = computed(function() {
         var p = $.orderPackage.value;
         if (!p || !p.id) return '0.00';
         var monthly = parseFloat(p.monthly_price) || 0;
+        var period = $.orderForm.value.period;
         var months = 1;
-        if ($.orderForm.value.period === 'quarter') months = 3;
-        else if ($.orderForm.value.period === 'year') months = 12;
-        return (monthly * months * (parseInt($.orderForm.value.quantity) || 1)).toFixed(2);
+        var discount = 0;
+        if (period === 'quarter') { months = 3; discount = Math.min(Math.max(parseInt(p.quarterly_discount) || 0, 0), 100); }
+        else if (period === 'year') { months = 12; discount = Math.min(Math.max(parseInt(p.yearly_discount) || 0, 0), 100); }
+        var baseAmount = monthly * months * (parseInt($.orderForm.value.quantity) || 1);
+        return (baseAmount * (1 - discount / 100)).toFixed(2);
     });
+
+    $.getPackageFinalPrice = function(pkg, period) {
+        if (!pkg || !pkg.monthly_price) return '0.00';
+        var monthly = parseFloat(pkg.monthly_price) || 0;
+        var months = 1;
+        var discount = 0;
+        if (period === 'quarter') { months = 3; discount = Math.min(Math.max(parseInt(pkg.quarterly_discount) || 0, 0), 100); }
+        else if (period === 'year') { months = 12; discount = Math.min(Math.max(parseInt(pkg.yearly_discount) || 0, 0), 100); }
+        return (monthly * months * (1 - discount / 100)).toFixed(2);
+    };
+
+    $.selectPackagePeriod = function(pkgId, period) {
+        $.pkgSelectedPeriod.value[pkgId] = period;
+    };
 
     // ===== 详情弹窗状态 =====
     $.showVmDetail = ref(false);
@@ -798,15 +818,46 @@
     // ===== 套餐订购函数 =====
     $.loadPackages = async function() {
         try {
-            $.vmPackages.value = await api('/vm-packages');
-            $.lxcPackages.value = await api('/lxc-packages');
+            var vmRes = await api('/package-groups?type=vm');
+            var lxcRes = await api('/package-groups?type=lxc');
+            $.vmGroupedPackages.value = $.buildGroupedPackages(vmRes.groups, vmRes.packages);
+            $.lxcGroupedPackages.value = $.buildGroupedPackages(lxcRes.groups, lxcRes.packages);
+            // 兼容旧代码：保留 vmPackages/lxcPackages 扁平数组
+            $.vmPackages.value = vmRes.packages || [];
+            $.lxcPackages.value = lxcRes.packages || [];
         } catch(e) { console.error('加载套餐失败', e); }
     };
-    
-    $.openOrderModal = function(pkg, type) {
+
+    // 构建分组套餐数据：无分组的归入"默认"分组，分组按 sort_order DESC 排序，组内套餐按 sort_order DESC 排序
+    $.buildGroupedPackages = function(groups, packages) {
+        var grouped = [];
+        var defaultGroup = { group_id: null, group_name: '默认', packages: [] };
+        var groupMap = {};
+        // groups 已由后端按 sort_order DESC 返回
+        for (var i = 0; i < groups.length; i++) {
+            var g = { group_id: groups[i].id, group_name: groups[i].name, packages: [] };
+            groupMap[groups[i].id] = g;
+            grouped.push(g);
+        }
+        // packages 已由后端按 sort_order DESC 返回
+        for (var j = 0; j < packages.length; j++) {
+            var p = packages[j];
+            if (p.group_id && groupMap[p.group_id]) {
+                groupMap[p.group_id].packages.push(p);
+            } else {
+                defaultGroup.packages.push(p);
+            }
+        }
+        if (defaultGroup.packages.length > 0) {
+            grouped.push(defaultGroup);
+        }
+        return grouped;
+    };
+
+    $.openOrderModal = function(pkg, type, selectedPeriod) {
         $.orderPackage.value = pkg;
         $.orderType.value = type;
-        $.orderForm.value = { period: 'month', quantity: 1 };
+        $.orderForm.value = { period: selectedPeriod || 'month', quantity: 1 };
         // 刷新余额显示
         $.loadWalletBalance();
         // 用 nextTick 确保 Vue 完成 DOM 更新后再显示 Modal

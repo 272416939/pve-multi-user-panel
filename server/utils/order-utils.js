@@ -4,9 +4,16 @@ function getPeriodMonths(period) {
   return 1;
 }
 
-function calculateAmount(monthlyPrice, period, periodCount) {
+function calculateAmount(monthlyPrice, period, periodCount, quarterlyDiscount, yearlyDiscount) {
   var months = getPeriodMonths(period);
-  return (monthlyPrice || 0) * months * Math.max(0, parseInt(periodCount) || 0);
+  var baseAmount = (monthlyPrice || 0) * months * Math.max(0, parseInt(periodCount) || 0);
+  var discount = 0;
+  if (period === 'quarter' && quarterlyDiscount) {
+    discount = Math.min(Math.max(parseInt(quarterlyDiscount) || 0, 0), 100);
+  } else if (period === 'year' && yearlyDiscount) {
+    discount = Math.min(Math.max(parseInt(yearlyDiscount) || 0, 0), 100);
+  }
+  return parseFloat((baseAmount * (1 - discount / 100)).toFixed(2));
 }
 
 async function deductBalance(userId, amount, dbInstance) {

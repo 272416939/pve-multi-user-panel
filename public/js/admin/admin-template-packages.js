@@ -6,17 +6,29 @@
                     <div v-if="activeTabPackages === 'vm'" class="tab-panel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0">VM 套餐管理</h5>
-                            <pv-button @click="packagePage.openVmPackageForm(null)" size="sm">+ 新建套餐</pv-button>
+                            <div>
+                                <pv-button @click="packagePage.openVmGroupForm(null)" size="sm" variant="outline">分组管理</pv-button>
+                                <pv-button @click="packagePage.openVmPackageForm(null)" size="sm">+ 新建套餐</pv-button>
+                            </div>
+                        </div>
+                        <!-- 分组列表 -->
+                        <div v-if="packagePage.vmPackageGroups.value.length > 0" class="mb-3">
+                            <span v-for="g in packagePage.vmPackageGroups.value" :key="g.id" class="badge bg-info me-2">
+                                {{ g.name }} (排序:{{ g.sort_order }})
+                                <pv-button @click="packagePage.openVmGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
+                                <pv-button @click="packagePage.deleteVmGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
+                            </span>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
-                                    <tr><th>ID</th><th>套餐名</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付</th><th>年付</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
+                                    <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="p in packagePage.vmPackages.value" :key="p.id">
                                         <td>{{ p.id }}</td>
                                         <td>{{ p.name }}</td>
+                                        <td>{{ p.group_name || '-' }}</td>
                                         <td>
                                             <span v-if="p.template_name">{{ p.template_name }}</span>
                                             <span v-else class="text-secondary">模板已删除</span>
@@ -25,8 +37,8 @@
                                         <td>{{ p.memory }}MB</td>
                                         <td>{{ p.disk_size }}GB</td>
                                         <td>{{ p.monthly_price }}元</td>
-                                        <td>{{ p.quarterly_price }}元</td>
-                                        <td>{{ p.yearly_price }}元</td>
+                                        <td>{{ p.quarterly_discount || 0 }}%</td>
+                                        <td>{{ p.yearly_discount || 0 }}%</td>
                                         <td>{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</td>
                                         <td>{{ p.sold_count || 0 }}</td>
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
@@ -38,7 +50,7 @@
                         </div>
                                         </td>
                                     </tr>
-                                    <tr v-if="packagePage.vmPackages.value.length === 0"><td colspan="13" class="text-center text-muted">暂无套餐</td></tr>
+                                    <tr v-if="packagePage.vmPackages.value.length === 0"><td colspan="14" class="text-center text-muted">暂无套餐</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -47,18 +59,29 @@
                     <div v-if="activeTabPackages === 'lxc'" class="tab-panel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0">LXC 套餐管理</h5>
-                            <pv-button @click="packagePage.openLxcPackageForm(null)" size="sm">+ 新建套餐</pv-button>
+                            <div>
+                                <pv-button @click="packagePage.openLxcGroupForm(null)" size="sm" variant="outline">分组管理</pv-button>
+                                <pv-button @click="packagePage.openLxcPackageForm(null)" size="sm">+ 新建套餐</pv-button>
+                            </div>
+                        </div>
+                        <!-- 分组列表 -->
+                        <div v-if="packagePage.lxcPackageGroups.value.length > 0" class="mb-3">
+                            <span v-for="g in packagePage.lxcPackageGroups.value" :key="g.id" class="badge bg-info me-2">
+                                {{ g.name }} (排序:{{ g.sort_order }})
+                                <pv-button @click="packagePage.openLxcGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
+                                <pv-button @click="packagePage.deleteLxcGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
+                            </span>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
-                                    <tr><th>ID</th><th>套餐名</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付</th><th>年付</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
+                                    <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="p in packagePage.lxcPackages.value" :key="p.id">
-                                        <td>{{ p.id }}</td><td>{{ p.name }}</td><td><span v-if="p.template_name">{{ p.template_name }}</span><span v-else class="text-secondary">模板已删除</span></td>
+                                        <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ p.group_name || '-' }}</td><td><span v-if="p.template_name">{{ p.template_name }}</span><span v-else class="text-secondary">模板已删除</span></td>
                                         <td>{{ p.cores }}核</td><td>{{ p.memory }}MB</td><td>{{ p.swap }}MB</td><td>{{ p.disk_size }}GB</td>
-                                        <td>{{ p.monthly_price }}元</td><td>{{ p.quarterly_price }}元</td><td>{{ p.yearly_price }}元</td>
+                                        <td>{{ p.monthly_price }}元</td><td>{{ p.quarterly_discount || 0 }}%</td><td>{{ p.yearly_discount || 0 }}%</td>
                                         <td>{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</td>
                                         <td>{{ p.sold_count || 0 }}</td>
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
@@ -70,7 +93,7 @@
                         </div>
                     </td>
                                     </tr>
-                                    <tr v-if="packagePage.lxcPackages.value.length === 0"><td colspan="14" class="text-center text-muted">暂无套餐</td></tr>
+                                    <tr v-if="packagePage.lxcPackages.value.length === 0"><td colspan="15" class="text-center text-muted">暂无套餐</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -104,13 +127,19 @@
                                     <div class="col-md-3"><label class="form-label">库存数量</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.stock" placeholder="-1 不限量，0 售罄"></div>
                                     <!-- 价格 -->
                                     <div class="col-md-4"><label class="form-label">月付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.monthly_price"></div>
-                                    <div class="col-md-4"><label class="form-label">季付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.quarterly_price"></div>
-                                    <div class="col-md-4"><label class="form-label">年付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.yearly_price"></div>
+                                    <div class="col-md-4"><label class="form-label">季付优惠 (%)</label><input class="form-control" type="number" min="0" max="100" step="1" v-model.number="packagePage.vmPackageForm.value.quarterly_discount" placeholder="0-100，0表示无优惠"></div>
+                                    <div class="col-md-4"><label class="form-label">年付优惠 (%)</label><input class="form-control" type="number" min="0" max="100" step="1" v-model.number="packagePage.vmPackageForm.value.yearly_discount" placeholder="0-100，0表示无优惠"></div>
                                     <!-- 扩展信息 -->
                                     <div class="col-md-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="packagePage.vmPackageForm.value.description" placeholder="套餐描述信息"></textarea></div>
                                     <div class="col-md-4"><label class="form-label">CPU 型号</label><input class="form-control" v-model="packagePage.vmPackageForm.value.cpu_model" placeholder="如 Intel Xeon"></div>
                                     <div class="col-md-4"><label class="form-label">带宽 (Mbps)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.bandwidth"></div>
                                     <div class="col-md-4"><label class="form-label">排序权重</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.sort_order" placeholder="数字越大越靠前"></div>
+                                    <div class="col-md-6"><label class="form-label">分组</label>
+                                        <select class="form-select" v-model="packagePage.vmPackageForm.value.group_id">
+                                            <option :value="null">无分组</option>
+                                            <option v-for="g in packagePage.vmPackageGroups.value" :key="g.id" :value="g.id">{{ g.name }}</option>
+                                        </select>
+                                    </div>
                                     <!-- 状态 -->
                                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="packagePage.vmPackageForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
                                 </div>
@@ -149,13 +178,19 @@
                                     <div class="col-md-2"><label class="form-label">库存</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.stock" placeholder="-1 不限量，0 售罄"></div>
                                     <!-- 价格 -->
                                     <div class="col-md-4"><label class="form-label">月付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.monthly_price"></div>
-                                    <div class="col-md-4"><label class="form-label">季付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.quarterly_price"></div>
-                                    <div class="col-md-4"><label class="form-label">年付 (元)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.yearly_price"></div>
+                                    <div class="col-md-4"><label class="form-label">季付优惠 (%)</label><input class="form-control" type="number" min="0" max="100" step="1" v-model.number="packagePage.lxcPackageForm.value.quarterly_discount" placeholder="0-100，0表示无优惠"></div>
+                                    <div class="col-md-4"><label class="form-label">年付优惠 (%)</label><input class="form-control" type="number" min="0" max="100" step="1" v-model.number="packagePage.lxcPackageForm.value.yearly_discount" placeholder="0-100，0表示无优惠"></div>
                                     <!-- 扩展信息 -->
                                     <div class="col-md-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="packagePage.lxcPackageForm.value.description" placeholder="套餐描述信息"></textarea></div>
                                     <div class="col-md-4"><label class="form-label">CPU 型号</label><input class="form-control" v-model="packagePage.lxcPackageForm.value.cpu_model" placeholder="如 Intel Xeon"></div>
                                     <div class="col-md-4"><label class="form-label">带宽 (Mbps)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.bandwidth"></div>
                                     <div class="col-md-4"><label class="form-label">排序权重</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.sort_order" placeholder="数字越大越靠前"></div>
+                                    <div class="col-md-6"><label class="form-label">分组</label>
+                                        <select class="form-select" v-model="packagePage.lxcPackageForm.value.group_id">
+                                            <option :value="null">无分组</option>
+                                            <option v-for="g in packagePage.lxcPackageGroups.value" :key="g.id" :value="g.id">{{ g.name }}</option>
+                                        </select>
+                                    </div>
                                     <!-- 状态 -->
                                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="packagePage.lxcPackageForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
                                 </div>
@@ -163,6 +198,46 @@
                             <div class="modal-footer">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
                                 <pv-button @click="packagePage.saveLxcPackage()" variant="primary">保存</pv-button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- VM 分组弹窗 -->
+                <div class="modal fade" id="vmGroupModal" tabindex="-1" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">{{ packagePage.vmGroupForm.value.id ? '编辑分组' : '新建分组' }}</h5>
+                                <pv-button type="button" variant="close" data-bs-dismiss="modal"></pv-button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3"><label class="form-label">分组名称</label><input class="form-control" v-model="packagePage.vmGroupForm.value.name"></div>
+                                <div class="mb-3"><label class="form-label">排序权重</label><input class="form-control" type="number" v-model.number="packagePage.vmGroupForm.value.sort_order" placeholder="数字越大越靠前"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+                                <pv-button @click="packagePage.saveVmGroup()" variant="primary">保存</pv-button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LXC 分组弹窗 -->
+                <div class="modal fade" id="lxcGroupModal" tabindex="-1" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">{{ packagePage.lxcGroupForm.value.id ? '编辑分组' : '新建分组' }}</h5>
+                                <pv-button type="button" variant="close" data-bs-dismiss="modal"></pv-button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3"><label class="form-label">分组名称</label><input class="form-control" v-model="packagePage.lxcGroupForm.value.name"></div>
+                                <div class="mb-3"><label class="form-label">排序权重</label><input class="form-control" type="number" v-model.number="packagePage.lxcGroupForm.value.sort_order" placeholder="数字越大越靠前"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+                                <pv-button @click="packagePage.saveLxcGroup()" variant="primary">保存</pv-button>
                             </div>
                         </div>
                     </div>

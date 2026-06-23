@@ -67,6 +67,18 @@ router.get('/lxc-packages', authMiddleware, async (req, res) => {
     } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
+// 用户端：获取按分组归类的套餐列表
+router.get('/package-groups', authMiddleware, async (req, res) => {
+    try {
+        var type = req.query.type || 'vm';
+        var groups = await db.packageGroups.getByType(type);
+        var packages = type === 'vm' ? await db.vmPackages.getAll() : await db.lxcPackages.getAll();
+        // 只返回 active 套餐
+        packages = packages.filter(function(p) { return p.status === 'active'; });
+        res.json({ groups: groups, packages: packages });
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+});
+
 // ===== 用户侧：套餐订购（自动取当前用户） =====
 router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
     try {
@@ -93,7 +105,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
-        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
         await deductBalance(userId, totalAmount, db);
 
         var randomName = generateVmName();
@@ -133,7 +145,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         var newVm = await db.vms.create({
             vm_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
-            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1)), renewal_period: period
+            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period
         });
 
         if (finalMacGroupId) {
@@ -265,7 +277,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
-        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
         await deductBalance(userId, totalAmount, db);
 
         var randomName = generateLxcName();
@@ -301,7 +313,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 
         var newCt = await db.lxcContainers.create({
             ct_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
-            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1)), renewal_period: period
+            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period
         });
 
         if (finalMacGroupId) {
@@ -534,7 +546,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
         var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
-        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
         // 写入 orders 表
         await db.orders.create({
             order_no: orderNo, user_id: userId, type: 'vm', package_id: pkg.id,
@@ -718,7 +730,7 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         var now = new Date();
         var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
         var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
-        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count);
+        var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
         // 写入 orders 表
         await db.orders.create({
             order_no: orderNo, user_id: userId, type: 'lxc', package_id: pkg.id,
@@ -808,6 +820,35 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         console.error('[package] LXC 套餐开通失败:', e.message);
         res.status(500).json({ error: safeError(e) });
     }
+});
+
+// ===== 套餐分组管理（管理员） =====
+router.get('/admin/package-groups', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var groups = await db.packageGroups.getAll();
+        res.json(groups);
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+});
+
+router.post('/admin/package-groups', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var r = await db.packageGroups.create(req.body);
+        res.json(r);
+    } catch (e) { console.error('[package] create group error:', e.message); res.status(500).json({ error: safeError(e) }); }
+});
+
+router.put('/admin/package-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var r = await db.packageGroups.update(parseInt(req.params.id), req.body);
+        res.json(r);
+    } catch (e) { console.error('[package] update group error:', e.message); res.status(500).json({ error: safeError(e) }); }
+});
+
+router.delete('/admin/package-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        await db.packageGroups.delete(parseInt(req.params.id));
+        res.json({ message: '已删除' });
+    } catch (e) { console.error('[package] delete group error:', e.message); res.status(500).json({ error: safeError(e) }); }
 });
 
 module.exports = router;

@@ -745,12 +745,12 @@
         <div class="modal-header"><h5 class="modal-title">确认订购</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="mb-3"><strong>{{ orderPackage.name }}</strong></div>
-            <div class="mb-3"><label class="form-label">计费周期</label>
-                <select class="form-select" v-model="orderForm.period">
-                    <option value="month">月付 (30天)</option>
-                    <option value="quarter">季付 (90天)</option>
-                    <option value="year">年付 (365天)</option>
-                </select>
+            <div class="mb-3">
+                <label class="form-label">计费周期</label>
+                <div class="order-period-display">
+                    <span class="badge bg-primary">{{ orderForm.period === 'month' ? '月付' : (orderForm.period === 'quarter' ? '季付' : '年付') }}</span>
+                    <span class="text-muted ms-2" v-if="orderPackage.monthly_price">¥{{ getPackageFinalPrice(orderPackage, orderForm.period) }} / {{ orderForm.period === 'month' ? '月' : (orderForm.period === 'quarter' ? '季' : '年') }}</span>
+                </div>
             </div>
             <div class="mb-3"><label class="form-label">数量</label>
                 <input type="number" class="form-control" v-model="orderForm.quantity" min="1" max="10">

@@ -292,51 +292,87 @@
 <div v-if="activeSection === 'order'">
     <div v-if="activeTabOrder === 'vm'">
         <h4 class="mb-4">VM 虚拟机套餐</h4>
-        <div class="package-cards">
-            <div class="package-card" v-for="p in vmPackages" :key="p.id" v-show="p.status === 'active'">
-                <div class="package-card-header">{{ p.name }}</div>
-                <div class="package-card-body">
-                    <div class="package-spec"><span class="spec-label">CPU 型号</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
-                    <div class="package-spec"><span class="spec-label">vCPU 数量</span><span class="spec-value">{{ p.cores }} 核</span></div>
-                    <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
-                    <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
-                    <div class="package-spec"><span class="spec-label">带宽</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
-                    <div class="package-desc">备注：<span v-html="parseMarkdown(p.description)"></span></div>
-                    <div class="package-stock">库存：{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</div>
-                    <div class="package-prices">
-                        <span class="price-item">月付 {{ p.monthly_price }}元</span>
-                        <span class="price-item">季付 {{ p.quarterly_price }}元</span>
-                        <span class="price-item">年付 {{ p.yearly_price }}元</span>
+        <div v-for="grp in vmGroupedPackages" :key="grp.group_name" class="package-group-section">
+            <h5 class="package-group-title" v-if="grp.group_name !== '默认'">{{ grp.group_name }}</h5>
+            <div class="package-cards">
+                <div class="package-card" v-for="p in grp.packages" :key="p.id" v-show="p.status === 'active'">
+                    <div class="package-card-header">{{ p.name }}</div>
+                    <div class="package-card-body">
+                        <div class="package-spec"><span class="spec-label">CPU 型号</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
+                        <div class="package-spec"><span class="spec-label">vCPU 数量</span><span class="spec-value">{{ p.cores }} 核</span></div>
+                        <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
+                        <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
+                        <div class="package-spec"><span class="spec-label">带宽</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
+                        <div class="package-desc">备注：<span v-html="parseMarkdown(p.description)"></span></div>
+                        <div class="package-stock">库存：{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</div>
+                        <div class="price-tabs">
+                            <div class="price-tab" :class="{ 'price-tab-active': (pkgSelectedPeriod[p.id] || 'month') === 'month' }" @click="selectPackagePeriod(p.id, 'month')">
+                                <span class="price-tab-badge">0%</span>
+                                <span class="price-tab-label">月付</span>
+                                <span class="price-tab-price">¥{{ p.monthly_price }}</span>
+                            </div>
+                            <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'quarter' }" @click="selectPackagePeriod(p.id, 'quarter')">
+                                <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.quarterly_discount > 0 }">-{{ p.quarterly_discount || 0 }}%</span>
+                                <span class="price-tab-label">季付</span>
+                                <span class="price-tab-original" v-if="p.quarterly_discount > 0">¥{{ (p.monthly_price * 3).toFixed(2) }}</span>
+                                <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'quarter') }}</span>
+                            </div>
+                            <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'year' }" @click="selectPackagePeriod(p.id, 'year')">
+                                <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.yearly_discount > 0 }">-{{ p.yearly_discount || 0 }}%</span>
+                                <span class="price-tab-label">年付</span>
+                                <span class="price-tab-original" v-if="p.yearly_discount > 0">¥{{ (p.monthly_price * 12).toFixed(2) }}</span>
+                                <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'year') }}</span>
+                            </div>
+                        </div>
+                        <pv-button :disabled="p.stock !== -1 && p.stock !== null && p.stock <= 0" @click="openOrderModal(p, 'vm', pkgSelectedPeriod[p.id] || 'month')">{{ (p.stock !== -1 && p.stock !== null && p.stock <= 0) ? '已售罄' : '立即开通' }}</pv-button>
                     </div>
-                    <pv-button :disabled="p.stock !== -1 && p.stock !== null && p.stock <= 0" @click="openOrderModal(p, 'vm')">{{ (p.stock !== -1 && p.stock !== null && p.stock <= 0) ? '已售罄' : '立即开通' }}</pv-button>
                 </div>
             </div>
-            <div class="package-empty" v-if="vmPackages.length === 0">暂无可用套餐</div>
+            <div class="package-empty" v-if="grp.packages.length === 0">该分组暂无可用套餐</div>
         </div>
+        <div class="package-empty" v-if="vmGroupedPackages.length === 0">暂无可用套餐</div>
     </div>
     <div v-if="activeTabOrder === 'lxc'">
         <h4 class="mb-4">LXC 容器套餐</h4>
-        <div class="package-cards">
-            <div class="package-card" v-for="p in lxcPackages" :key="p.id" v-show="p.status === 'active'">
-                <div class="package-card-header">{{ p.name }}</div>
-                <div class="package-card-body">
-                    <div class="package-spec"><span class="spec-label">CPU 型号</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
-                    <div class="package-spec"><span class="spec-label">vCPU 数量</span><span class="spec-value">{{ p.cores }} 核</span></div>
-                    <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
-                    <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
-                    <div class="package-spec"><span class="spec-label">带宽</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
-                    <div class="package-desc">备注：<span v-html="parseMarkdown(p.description)"></span></div>
-                    <div class="package-stock">库存：{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</div>
-                    <div class="package-prices">
-                        <span class="price-item">月付 {{ p.monthly_price }}元</span>
-                        <span class="price-item">季付 {{ p.quarterly_price }}元</span>
-                        <span class="price-item">年付 {{ p.yearly_price }}元</span>
+        <div v-for="grp in lxcGroupedPackages" :key="grp.group_name" class="package-group-section">
+            <h5 class="package-group-title" v-if="grp.group_name !== '默认'">{{ grp.group_name }}</h5>
+            <div class="package-cards">
+                <div class="package-card" v-for="p in grp.packages" :key="p.id" v-show="p.status === 'active'">
+                    <div class="package-card-header">{{ p.name }}</div>
+                    <div class="package-card-body">
+                        <div class="package-spec"><span class="spec-label">CPU 型号</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
+                        <div class="package-spec"><span class="spec-label">vCPU 数量</span><span class="spec-value">{{ p.cores }} 核</span></div>
+                        <div class="package-spec"><span class="spec-label">内存</span><span class="spec-value">{{ p.memory }} MB</span></div>
+                        <div class="package-spec"><span class="spec-label">磁盘</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
+                        <div class="package-spec"><span class="spec-label">带宽</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
+                        <div class="package-desc">备注：<span v-html="parseMarkdown(p.description)"></span></div>
+                        <div class="package-stock">库存：{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</div>
+                        <div class="price-tabs">
+                            <div class="price-tab" :class="{ 'price-tab-active': (pkgSelectedPeriod[p.id] || 'month') === 'month' }" @click="selectPackagePeriod(p.id, 'month')">
+                                <span class="price-tab-badge">0%</span>
+                                <span class="price-tab-label">月付</span>
+                                <span class="price-tab-price">¥{{ p.monthly_price }}</span>
+                            </div>
+                            <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'quarter' }" @click="selectPackagePeriod(p.id, 'quarter')">
+                                <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.quarterly_discount > 0 }">-{{ p.quarterly_discount || 0 }}%</span>
+                                <span class="price-tab-label">季付</span>
+                                <span class="price-tab-original" v-if="p.quarterly_discount > 0">¥{{ (p.monthly_price * 3).toFixed(2) }}</span>
+                                <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'quarter') }}</span>
+                            </div>
+                            <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'year' }" @click="selectPackagePeriod(p.id, 'year')">
+                                <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.yearly_discount > 0 }">-{{ p.yearly_discount || 0 }}%</span>
+                                <span class="price-tab-label">年付</span>
+                                <span class="price-tab-original" v-if="p.yearly_discount > 0">¥{{ (p.monthly_price * 12).toFixed(2) }}</span>
+                                <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'year') }}</span>
+                            </div>
+                        </div>
+                        <pv-button :disabled="p.stock !== -1 && p.stock !== null && p.stock <= 0" @click="openOrderModal(p, 'lxc', pkgSelectedPeriod[p.id] || 'month')">{{ (p.stock !== -1 && p.stock !== null && p.stock <= 0) ? '已售罄' : '立即开通' }}</pv-button>
                     </div>
-                    <pv-button :disabled="p.stock !== -1 && p.stock !== null && p.stock <= 0" @click="openOrderModal(p, 'lxc')">{{ (p.stock !== -1 && p.stock !== null && p.stock <= 0) ? '已售罄' : '立即开通' }}</pv-button>
                 </div>
             </div>
-            <div class="package-empty" v-if="lxcPackages.length === 0">暂无可用套餐</div>
+            <div class="package-empty" v-if="grp.packages.length === 0">该分组暂无可用套餐</div>
         </div>
+        <div class="package-empty" v-if="lxcGroupedPackages.length === 0">暂无可用套餐</div>
     </div>
 </div>
 
