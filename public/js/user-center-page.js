@@ -1180,6 +1180,8 @@ const App = {
                     await loadTwofaStatus();
                 } else if (activeSubTab.value === 'wallet-transactions') {
                     await loadTx(1);
+                } else if (activeSubTab.value === 'orders') {
+                    await loadMyOrders(1);
                 } else {
                     await loadMemos();
                 }
@@ -1203,6 +1205,7 @@ const App = {
         watch(activeSubTab, (val) => {
             localStorage.setItem('ucenter_subtab', val);
             if (val === 'wallet-transactions') loadTx(1);
+            if (val === 'orders') loadMyOrders(1);
         });
 
         // 监听 user 变化同步 header
