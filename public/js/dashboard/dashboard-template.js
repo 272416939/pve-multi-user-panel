@@ -309,18 +309,19 @@
                             <div class="price-tab" :class="{ 'price-tab-active': (pkgSelectedPeriod[p.id] || 'month') === 'month' }" @click="selectPackagePeriod(p.id, 'month')">
                                 <span class="price-tab-badge">0%</span>
                                 <span class="price-tab-label">月付</span>
+                                <span class="price-tab-original" style="visibility:hidden">&nbsp;</span>
                                 <span class="price-tab-price">¥{{ p.monthly_price }}</span>
                             </div>
                             <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'quarter' }" @click="selectPackagePeriod(p.id, 'quarter')">
                                 <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.quarterly_discount > 0 }">-{{ p.quarterly_discount || 0 }}%</span>
                                 <span class="price-tab-label">季付</span>
-                                <span class="price-tab-original" v-if="p.quarterly_discount > 0">¥{{ (p.monthly_price * 3).toFixed(2) }}</span>
+                                <span class="price-tab-original" :style="{ visibility: p.quarterly_discount > 0 ? 'visible' : 'hidden' }">¥{{ (p.monthly_price * 3).toFixed(2) }}</span>
                                 <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'quarter') }}</span>
                             </div>
                             <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'year' }" @click="selectPackagePeriod(p.id, 'year')">
                                 <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.yearly_discount > 0 }">-{{ p.yearly_discount || 0 }}%</span>
                                 <span class="price-tab-label">年付</span>
-                                <span class="price-tab-original" v-if="p.yearly_discount > 0">¥{{ (p.monthly_price * 12).toFixed(2) }}</span>
+                                <span class="price-tab-original" :style="{ visibility: p.yearly_discount > 0 ? 'visible' : 'hidden' }">¥{{ (p.monthly_price * 12).toFixed(2) }}</span>
                                 <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'year') }}</span>
                             </div>
                         </div>
@@ -351,18 +352,19 @@
                             <div class="price-tab" :class="{ 'price-tab-active': (pkgSelectedPeriod[p.id] || 'month') === 'month' }" @click="selectPackagePeriod(p.id, 'month')">
                                 <span class="price-tab-badge">0%</span>
                                 <span class="price-tab-label">月付</span>
+                                <span class="price-tab-original" style="visibility:hidden">&nbsp;</span>
                                 <span class="price-tab-price">¥{{ p.monthly_price }}</span>
                             </div>
                             <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'quarter' }" @click="selectPackagePeriod(p.id, 'quarter')">
                                 <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.quarterly_discount > 0 }">-{{ p.quarterly_discount || 0 }}%</span>
                                 <span class="price-tab-label">季付</span>
-                                <span class="price-tab-original" v-if="p.quarterly_discount > 0">¥{{ (p.monthly_price * 3).toFixed(2) }}</span>
+                                <span class="price-tab-original" :style="{ visibility: p.quarterly_discount > 0 ? 'visible' : 'hidden' }">¥{{ (p.monthly_price * 3).toFixed(2) }}</span>
                                 <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'quarter') }}</span>
                             </div>
                             <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'year' }" @click="selectPackagePeriod(p.id, 'year')">
                                 <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.yearly_discount > 0 }">-{{ p.yearly_discount || 0 }}%</span>
                                 <span class="price-tab-label">年付</span>
-                                <span class="price-tab-original" v-if="p.yearly_discount > 0">¥{{ (p.monthly_price * 12).toFixed(2) }}</span>
+                                <span class="price-tab-original" :style="{ visibility: p.yearly_discount > 0 ? 'visible' : 'hidden' }">¥{{ (p.monthly_price * 12).toFixed(2) }}</span>
                                 <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'year') }}</span>
                             </div>
                         </div>
