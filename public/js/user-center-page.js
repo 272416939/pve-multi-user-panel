@@ -1282,7 +1282,7 @@ const App = {
             openDisableTwofa,
             disableTwofa,
             walletBalance, payMethods, rechargeAmount, rechargeMethod, rechargeSubmitting, rechargeError,
-            txList, txTotal, txPage, txFilter, myOrders,
+            txList, txTotal, txPage, txFilter, myOrders, orderPage, orderTotal, orderFilter,
             submitRecharge, loadTx, copyOrderNo, loadMyOrders,
             rechargePendingOrderNo, rechargePendingAmount, rechargeResultType, rechargeResultTitle, rechargeResultAmount,
             rechargeQrLoading, rechargePayUrl, rechargeIsMobile,
