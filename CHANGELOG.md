@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.14.3] - 2026-06-23
+
+### Fixed
+- fix(wallet): 修复安卓支付宝 app 提示"暂未找到此功能，请稍后再试"的问题
+  - 根因：`openMobilePay` 将 z-pay 返回的 https 中转页 URL 包装成 `alipays://platformapi/startapp?saId=10000067&url=...`，让支付宝用内部浏览器容器打开中转页，但安卓支付宝 10.8.76+ 的内部浏览器禁止跨域跳转到 alipays scheme
+  - 鸿蒙支付宝的 H5 容器规则更宽松，所以不受影响
+  - 修复：移除 alipays scheme 包装，scheme URL（alipays://、weixin://）由系统直接唤起，https URL 由浏览器打开后中转页自动唤起支付宝/微信 app（支付宝 H5 支付的标准流程）
+
+---
+
 ## [2.14.2] - 2026-06-23
 
 ### Fixed

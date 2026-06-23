@@ -311,14 +311,13 @@ const App = {
         // 手机端点击跳转到支付宝/微信 app
         const openMobilePay = () => {
             if (!rechargePayUrl.value) return;
-            let url = rechargePayUrl.value;
-            // 支付宝手机端：若返回的是 http/https 网页 URL（中转页），
-            // 包装成 alipays scheme 用内部浏览器容器打开（saId=10000067），
-            // saId=10000007 是扫一扫，会导致打开扫码界面而非支付界面
-            if (rechargeMethod.value === 'alipay' && /^https?:\/\//i.test(url)) {
-                url = 'alipays://platformapi/startapp?saId=10000067&url=' + encodeURIComponent(url);
-            }
-            window.location.href = url;
+            // scheme URL（alipays://、weixin://、alipay://）由系统直接唤起对应 app
+            // https URL（z-pay 中转页）直接让浏览器打开，中转页会自动唤起支付宝/微信 app
+            // 不再用 alipays://platformapi/startapp?saId=10000067&url=... 包装 https URL：
+            //   支付宝内部浏览器容器对中转页跳转有限制，
+            //   安卓 10.8.76+ 会提示"暂未找到此功能，请稍后再试"，
+            //   鸿蒙因 H5 容器规则不同而正常
+            window.location.href = rechargePayUrl.value;
         };
 
         // 手动检查支付状态（用户点击"我已完成支付"按钮）
