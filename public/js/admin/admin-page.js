@@ -62,6 +62,7 @@ var App = {
                 dd.classList.add('open');
             }
         };
+        $.toggleSidebar = toggleSidebar;
         return $;
     }
 };
@@ -342,8 +343,7 @@ app.component('vm-port-forward-list', {
           syncHeaderUser();
       }
 
-      var toggleBtn = document.querySelector('.sidebar-toggle');
-      // 注意：按钮已有 onclick="toggleSidebar()"，不再重复绑定
+      // 侧边栏切换按钮已由 Vue @click.prevent="toggleSidebar()" 绑定（CSP nonce 合规）
 
       // 用户下拉菜单点击切换
       var userDrop = document.getElementById('userInfoDrop');
