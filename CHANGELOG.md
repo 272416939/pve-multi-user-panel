@@ -1,5 +1,41 @@
 # Changelog
 
+## [2.14.21] - 2026-06-24
+
+### Fixed
+- fix(security): 修复 Dashboard parseMarkdown XSS 漏洞（CRITICAL）
+  - 根因：dashboard/core.js 的 parseMarkdown fallback 函数直接返回原文，未经过 DOMPurify 净化，而 dashboard-template.js 中 v-html="parseMarkdown(p.description)" 会将其作为 HTML 渲染
+  - 修复：改为 DOMPurify.sanitize(marked.parse(text))，复用 admin 的安全渲染模式
+- fix(security): 修复 2FA 登录绕过强制改密（HIGH）
+  - 根因：/login/2fa 路由在 TOTP 验证成功和恢复码验证成功后直接返回 token，未检查 must_change_password
+  - 修复：两处路径均添加 must_change_password 检查，与 /login 路由保持一致
+- fix(security): 修复 Admin 用户 CRUD 路由缺少 try-catch（HIGH）
+  - 根因：POST/DELETE/PUT /users 三个路由的 db 操作均无 try-catch，异常时走 Express 默认错误处理器可能泄露堆栈
+  - 修复：三个路由均添加 try-catch + safeError() 错误处理
+- fix(security): 修复 Admin 套餐模板名 XSS（HIGH）
+  - 根因：admin-template-packages.js 中 v-html="packagePage.getTemplateName(p)" 渲染未净化的 template_name
+  - 修复：改为 {{ }} 插值 + v-if/v-else 处理"模板已删除"fallback（VM 和 LXC 两处）
+- fix(security): 修复登录未检查 is_active，禁用用户可登录（MEDIUM）
+  - 根因：/login 路由验证密码后直接签发 token，未检查 is_active 字段
+  - 修复：密码验证通过后添加 is_active 检查，禁用用户返回 403
+- fix(security): 修复 handleAvatarUpload 绕过 api() 函数（MEDIUM）
+  - 根因：user-center-page.js 用 localStorage.getItem('token') 直接调用 fetch，绕过 ensureValidToken() 的 token 自动刷新逻辑
+  - 修复：改用 ensureValidToken() 获取 token
+- fix(security): 修复导出函数绕过 api() 函数（MEDIUM）
+  - 根因：admin.js 的 exportCdkCsv、exportTransactions、exportOrders 三个函数用 localStorage.getItem('token') 直接调用 fetch
+  - 修复：三个函数均改用 ensureValidToken() 获取 token
+- fix(security): 修复 forward.js 使用原生 confirm() 导致 CSP 违规（MEDIUM）
+  - 根因：dashboard/forward.js 使用原生 confirm()，与全项目 customConfirm() 不一致
+  - 修复：改为 await window.customConfirm()
+- fix(security): 修复 EJS JSON.stringify 未转义 </script> 注入（MEDIUM）
+  - 根因：login.ejs 和 admin.ejs 中 JSON.stringify(siteConfig.xxx) 不转义 </script>，可能导致 script 标签闭合注入
+  - 修复：追加 .replace(/</g, '\\u003c').replace(/>/g, '\\u003e') 转义
+- fix(security): 修复 auth.js 空 catch 块静默吞错（LOW）
+  - 根因：TOTP 验证的 catch {} 空捕获会静默吞掉错误，不利于排查
+  - 修复：改为 catch (e) { console.error('[auth] TOTP verify error:', e.message) }
+
+---
+
 ## [2.14.4] - 2026-06-23
 
 ### Fixed
