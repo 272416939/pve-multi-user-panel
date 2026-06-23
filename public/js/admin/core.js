@@ -900,6 +900,20 @@ $.initDetailCharts = function() {
                             var target = document.querySelector('[data-subsection="' + section + '-' + tabVar.value + '"]');
                             if (target) target.classList.add('active');
                         }
+                        if (section === 'templates' && window.templatePage) {
+                            if (tabVar && tabVar.value === 'lxc') {
+                                window.templatePage.loadLxcTemplates();
+                            } else {
+                                window.templatePage.loadVmTemplates();
+                            }
+                        }
+                        if (section === 'packages' && window.packagePage) {
+                            if (tabVar && tabVar.value === 'lxc') {
+                                window.packagePage.loadLxcPackages();
+                            } else {
+                                window.packagePage.loadVmPackages();
+                            }
+                        }
                     }, 100);
                 }
                 await $.loadUserLxcContainers();
