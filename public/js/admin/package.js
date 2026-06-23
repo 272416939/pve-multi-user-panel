@@ -257,27 +257,37 @@
         $.dragState.dragOverId = id;
         // 计算目标索引
         var list = $.getDragList($.dragState.dragType);
-        var toIndex = list.findIndex(function(p) { return p.id === id; });
+        var toIndex = -1;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === id) { toIndex = i; break; }
+        }
         var fromIndex = $.dragState.dragFromIndex;
         if (fromIndex < 0 || toIndex < 0) return;
-        // 清除所有避让 class（通过响应式数据驱动）
-        $.dragState.avoidDownIds = [];
-        $.dragState.avoidUpIds = [];
+        // 直接操作 DOM 设置 transform（绕过 Vue 响应式，避免拖拽期间渲染节流）
+        var container = e.currentTarget.closest('tbody') || e.currentTarget.parentElement;
+        if (!container) return;
+        var rows = container.querySelectorAll('[draggable="true"]');
+        // 判断是表格行（纵向）还是 badge（横向）
+        var isHorizontal = $.dragState.dragType === 'group-vm' || $.dragState.dragType === 'group-lxc';
+        var offset = isHorizontal
+            ? (rows.length > 0 ? rows[0].offsetWidth + 8 : 80)
+            : (rows.length > 0 ? rows[0].offsetHeight : 40);
+        var axis = isHorizontal ? 'X' : 'Y';
+        // 清除所有避让 transform
+        for (var j = 0; j < rows.length; j++) {
+            rows[j].style.transform = '';
+        }
         // 根据拖拽方向应用避让
         if (fromIndex < toIndex) {
-            // 向下拖拽：fromIndex 和 toIndex 之间的行向上避让
-            var ids = [];
-            for (var i = fromIndex + 1; i <= toIndex; i++) {
-                ids.push(list[i].id);
+            // 向后拖拽：fromIndex 和 toIndex 之间的元素向前避让（负方向）
+            for (var k = fromIndex + 1; k <= toIndex && k < rows.length; k++) {
+                rows[k].style.transform = 'translate' + axis + '(-' + offset + 'px)';
             }
-            $.dragState.avoidUpIds = ids;
         } else if (fromIndex > toIndex) {
-            // 向上拖拽：toIndex 和 fromIndex 之间的行向下避让
-            var ids = [];
-            for (var i = toIndex; i < fromIndex; i++) {
-                ids.push(list[i].id);
+            // 向前拖拽：toIndex 和 fromIndex 之间的元素向后避让（正方向）
+            for (var k = toIndex; k < fromIndex && k < rows.length; k++) {
+                rows[k].style.transform = 'translate' + axis + '(' + offset + 'px)';
             }
-            $.dragState.avoidDownIds = ids;
         }
     };
 
@@ -292,6 +302,11 @@
     $.clearAvoidClasses = function() {
         $.dragState.avoidDownIds = [];
         $.dragState.avoidUpIds = [];
+        // 清除所有直接设置的 DOM transform
+        var allDraggables = document.querySelectorAll('[draggable="true"]');
+        for (var i = 0; i < allDraggables.length; i++) {
+            allDraggables[i].style.transform = '';
+        }
     };
 
     $.handleDrop = function(e, targetId, type) {
