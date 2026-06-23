@@ -467,8 +467,21 @@ const App = {
             else { const el = document.createElement('textarea'); el.value = orderNo; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert('订单号已复制'); }
         };
 
-        const loadMyOrders = async () => {
-            try { myOrders.value = await api('/orders'); } catch (e) { console.error('加载订单失败', e); }
+        const loadMyOrders = async (page) => {
+            orderPage.value = page || 1;
+            try {
+                const params = { page: orderPage.value, limit: 20 };
+                if (orderFilter.value.order_no) params.order_no = orderFilter.value.order_no;
+                if (orderFilter.value.type) params.type = orderFilter.value.type;
+                const res = await api('/orders?' + new URLSearchParams(params));
+                if (Array.isArray(res)) {
+                    myOrders.value = res;
+                    orderTotal.value = res.length;
+                } else {
+                    myOrders.value = res.data || res.rows || [];
+                    orderTotal.value = res.total || 0;
+                }
+            } catch (e) { console.error('加载订单失败', e); }
         };
 
         // 初始化加载钱包数据

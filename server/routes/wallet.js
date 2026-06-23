@@ -740,7 +740,8 @@ router.get('/orders', authMiddleware, async (req, res) => {
             }));
             return res.json({ data: result.rows, total: result.total, page: result.page, limit: result.limit });
         }
-        var rows = await db.orders.getByUser(req.user.id);
+        var result = await db.orders.getByUser(req.user.id, { page: 1, limit: 200 });
+        var rows = result.rows || result.data || [];
         rows = await Promise.all(rows.map(async function(order) {
             var packageName = '';
             if (order.type === 'vm') {
