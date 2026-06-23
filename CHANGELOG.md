@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.16.0] - 2026-06-24
+
+### Added
+- feat(package): 套餐与分组支持鼠标拖拽排序
+  - 管理后台 VM/LXC 套餐列表表格行支持长按拖拽调整顺序
+  - VM/LXC 分组 badge 列表支持拖拽排序
+  - 拖拽结束后自动批量更新 sort_order 到后端（从大到小，步长 10）
+  - 新增 3 个批量排序 API：POST /admin/vm-packages/reorder、/admin/lxc-packages/reorder、/admin/package-groups/reorder
+  - 拖拽视觉反馈：被拖拽行半透明、目标位置顶部高亮边框、分组 badge hover 上浮
+
+### Changed
+- 移除套餐编辑弹窗和分组编辑弹窗中的"排序权重"输入框，排序改由列表拖拽驱动
+- 分组 badge 显示中移除排序数字文本
+
 ## [2.15.0] - 2026-06-24
 
 ### Added

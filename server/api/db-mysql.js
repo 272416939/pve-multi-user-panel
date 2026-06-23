@@ -1872,7 +1872,16 @@ module.exports = {
             await execute(`UPDATE vm_packages SET ${fields.join(', ')} WHERE id = ?`, values);
             return queryOne('SELECT * FROM vm_packages WHERE id = ?', [id]);
         },
-        delete: (id) => execute('DELETE FROM vm_packages WHERE id = ?', [id])
+        delete: (id) => execute('DELETE FROM vm_packages WHERE id = ?', [id]),
+        batchUpdateSortOrder: async function(ids) {
+            if (!Array.isArray(ids) || ids.length === 0) return;
+            var total = ids.length;
+            var sql = 'UPDATE vm_packages SET sort_order = ? WHERE id = ?';
+            for (var i = 0; i < ids.length; i++) {
+                var sortOrder = (total - i) * 10;
+                await execute(sql, [sortOrder, parseInt(ids[i])]);
+            }
+        }
     },
 
     // LXC 套餐操作
@@ -1911,7 +1920,16 @@ module.exports = {
             await execute(`UPDATE lxc_packages SET ${fields.join(', ')} WHERE id = ?`, values);
             return queryOne('SELECT * FROM lxc_packages WHERE id = ?', [id]);
         },
-        delete: (id) => execute('DELETE FROM lxc_packages WHERE id = ?', [id])
+        delete: (id) => execute('DELETE FROM lxc_packages WHERE id = ?', [id]),
+        batchUpdateSortOrder: async function(ids) {
+            if (!Array.isArray(ids) || ids.length === 0) return;
+            var total = ids.length;
+            var sql = 'UPDATE lxc_packages SET sort_order = ? WHERE id = ?';
+            for (var i = 0; i < ids.length; i++) {
+                var sortOrder = (total - i) * 10;
+                await execute(sql, [sortOrder, parseInt(ids[i])]);
+            }
+        }
     },
 
     // 套餐分组操作
@@ -1944,6 +1962,15 @@ module.exports = {
             await execute(`UPDATE package_groups SET ${fields.join(', ')} WHERE id = ?`, values);
             return queryOne('SELECT * FROM package_groups WHERE id = ?', [id]);
         },
-        delete: (id) => execute('DELETE FROM package_groups WHERE id = ?', [id])
+        delete: (id) => execute('DELETE FROM package_groups WHERE id = ?', [id]),
+        batchUpdateSortOrder: async function(ids) {
+            if (!Array.isArray(ids) || ids.length === 0) return;
+            var total = ids.length;
+            var sql = 'UPDATE package_groups SET sort_order = ? WHERE id = ?';
+            for (var i = 0; i < ids.length; i++) {
+                var sortOrder = (total - i) * 10;
+                await execute(sql, [sortOrder, parseInt(ids[i])]);
+            }
+        }
     },
 };

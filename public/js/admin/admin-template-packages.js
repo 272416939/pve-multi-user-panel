@@ -13,8 +13,16 @@
                         </div>
                         <!-- 分组列表 -->
                         <div v-if="packagePage.vmPackageGroups.value.length > 0" class="mb-3">
-                            <span v-for="g in packagePage.vmPackageGroups.value" :key="g.id" class="badge bg-info me-2">
-                                {{ g.name }} (排序:{{ g.sort_order }})
+                            <span v-for="g in packagePage.vmPackageGroups.value" :key="g.id"
+                                class="badge bg-info me-2 group-badge-draggable"
+                                draggable="true"
+                                :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id, 'row-drag-over': packagePage.dragState.dragOverId === g.id && packagePage.dragType === 'group-vm' }"
+                                @dragstart="packagePage.handleDragStart($event, g.id, 'group-vm')"
+                                @dragover.prevent="packagePage.handleDragOver($event, g.id)"
+                                @dragleave="packagePage.handleDragLeave($event, g.id)"
+                                @drop="packagePage.handleDrop($event, g.id, 'group-vm')"
+                                @dragend="packagePage.handleDragEnd()">
+                                {{ g.name }}
                                 <pv-button @click="packagePage.openVmGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
                                 <pv-button @click="packagePage.deleteVmGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
                             </span>
@@ -25,7 +33,14 @@
                                     <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="p in packagePage.vmPackages.value" :key="p.id">
+                                    <tr v-for="p in packagePage.vmPackages.value" :key="p.id"
+                                        draggable="true"
+                                        :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id, 'row-drag-over': packagePage.dragState.dragOverId === p.id && packagePage.dragType === 'vm' }"
+                                        @dragstart="packagePage.handleDragStart($event, p.id, 'vm')"
+                                        @dragover.prevent="packagePage.handleDragOver($event, p.id)"
+                                        @dragleave="packagePage.handleDragLeave($event, p.id)"
+                                        @drop="packagePage.handleDrop($event, p.id, 'vm')"
+                                        @dragend="packagePage.handleDragEnd()">
                                         <td>{{ p.id }}</td>
                                         <td>{{ p.name }}</td>
                                         <td>{{ p.group_name || '-' }}</td>
@@ -66,8 +81,16 @@
                         </div>
                         <!-- 分组列表 -->
                         <div v-if="packagePage.lxcPackageGroups.value.length > 0" class="mb-3">
-                            <span v-for="g in packagePage.lxcPackageGroups.value" :key="g.id" class="badge bg-info me-2">
-                                {{ g.name }} (排序:{{ g.sort_order }})
+                            <span v-for="g in packagePage.lxcPackageGroups.value" :key="g.id"
+                                class="badge bg-info me-2 group-badge-draggable"
+                                draggable="true"
+                                :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id, 'row-drag-over': packagePage.dragState.dragOverId === g.id && packagePage.dragType === 'group-lxc' }"
+                                @dragstart="packagePage.handleDragStart($event, g.id, 'group-lxc')"
+                                @dragover.prevent="packagePage.handleDragOver($event, g.id)"
+                                @dragleave="packagePage.handleDragLeave($event, g.id)"
+                                @drop="packagePage.handleDrop($event, g.id, 'group-lxc')"
+                                @dragend="packagePage.handleDragEnd()">
+                                {{ g.name }}
                                 <pv-button @click="packagePage.openLxcGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
                                 <pv-button @click="packagePage.deleteLxcGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
                             </span>
@@ -78,7 +101,14 @@
                                     <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-for="p in packagePage.lxcPackages.value" :key="p.id">
+                                    <tr v-for="p in packagePage.lxcPackages.value" :key="p.id"
+                                        draggable="true"
+                                        :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id, 'row-drag-over': packagePage.dragState.dragOverId === p.id && packagePage.dragType === 'lxc' }"
+                                        @dragstart="packagePage.handleDragStart($event, p.id, 'lxc')"
+                                        @dragover.prevent="packagePage.handleDragOver($event, p.id)"
+                                        @dragleave="packagePage.handleDragLeave($event, p.id)"
+                                        @drop="packagePage.handleDrop($event, p.id, 'lxc')"
+                                        @dragend="packagePage.handleDragEnd()">
                                         <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ p.group_name || '-' }}</td><td><span v-if="p.template_name">{{ p.template_name }}</span><span v-else class="text-secondary">模板已删除</span></td>
                                         <td>{{ p.cores }}核</td><td>{{ p.memory }}MB</td><td>{{ p.swap }}MB</td><td>{{ p.disk_size }}GB</td>
                                         <td>{{ p.monthly_price }}元</td><td>{{ p.quarterly_discount || 0 }}%</td><td>{{ p.yearly_discount || 0 }}%</td>
@@ -133,7 +163,6 @@
                                     <div class="col-md-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="packagePage.vmPackageForm.value.description" placeholder="套餐描述信息"></textarea></div>
                                     <div class="col-md-4"><label class="form-label">CPU 型号</label><input class="form-control" v-model="packagePage.vmPackageForm.value.cpu_model" placeholder="如 Intel Xeon"></div>
                                     <div class="col-md-4"><label class="form-label">带宽 (Mbps)</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.bandwidth"></div>
-                                    <div class="col-md-4"><label class="form-label">排序权重</label><input class="form-control" type="number" v-model.number="packagePage.vmPackageForm.value.sort_order" placeholder="数字越大越靠前"></div>
                                     <div class="col-md-6"><label class="form-label">分组</label>
                                         <select class="form-select" v-model="packagePage.vmPackageForm.value.group_id">
                                             <option :value="null">无分组</option>
@@ -184,7 +213,6 @@
                                     <div class="col-md-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="packagePage.lxcPackageForm.value.description" placeholder="套餐描述信息"></textarea></div>
                                     <div class="col-md-4"><label class="form-label">CPU 型号</label><input class="form-control" v-model="packagePage.lxcPackageForm.value.cpu_model" placeholder="如 Intel Xeon"></div>
                                     <div class="col-md-4"><label class="form-label">带宽 (Mbps)</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.bandwidth"></div>
-                                    <div class="col-md-4"><label class="form-label">排序权重</label><input class="form-control" type="number" v-model.number="packagePage.lxcPackageForm.value.sort_order" placeholder="数字越大越靠前"></div>
                                     <div class="col-md-6"><label class="form-label">分组</label>
                                         <select class="form-select" v-model="packagePage.lxcPackageForm.value.group_id">
                                             <option :value="null">无分组</option>
@@ -213,7 +241,6 @@
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3"><label class="form-label">分组名称</label><input class="form-control" v-model="packagePage.vmGroupForm.value.name"></div>
-                                <div class="mb-3"><label class="form-label">排序权重</label><input class="form-control" type="number" v-model.number="packagePage.vmGroupForm.value.sort_order" placeholder="数字越大越靠前"></div>
                             </div>
                             <div class="modal-footer">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
@@ -233,7 +260,6 @@
                             </div>
                             <div class="modal-body">
                                 <div class="mb-3"><label class="form-label">分组名称</label><input class="form-control" v-model="packagePage.lxcGroupForm.value.name"></div>
-                                <div class="mb-3"><label class="form-label">排序权重</label><input class="form-control" type="number" v-model.number="packagePage.lxcGroupForm.value.sort_order" placeholder="数字越大越靠前"></div>
                             </div>
                             <div class="modal-footer">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>

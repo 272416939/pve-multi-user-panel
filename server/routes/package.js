@@ -469,6 +469,27 @@ router.delete('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (
     try { await db.vmPackages.delete(parseInt(req.params.id)); await vmPackageCache.del('all'); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
+router.post('/admin/vm-packages/reorder', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var ids = req.body.ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ids 参数无效' });
+        }
+        for (var i = 0; i < ids.length; i++) {
+            ids[i] = parseInt(ids[i]);
+            if (!Number.isInteger(ids[i]) || ids[i] <= 0) {
+                return res.status(400).json({ error: 'id 必须为正整数' });
+            }
+        }
+        await db.vmPackages.batchUpdateSortOrder(ids);
+        await vmPackageCache.del('all');
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[package] vm-packages reorder error:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
 // VM 套餐开通（核心）
 router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -642,6 +663,27 @@ router.put('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (re
 
 router.delete('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try { await db.lxcPackages.delete(parseInt(req.params.id)); await lxcPackageCache.del('all'); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+});
+
+router.post('/admin/lxc-packages/reorder', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var ids = req.body.ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ids 参数无效' });
+        }
+        for (var i = 0; i < ids.length; i++) {
+            ids[i] = parseInt(ids[i]);
+            if (!Number.isInteger(ids[i]) || ids[i] <= 0) {
+                return res.status(400).json({ error: 'id 必须为正整数' });
+            }
+        }
+        await db.lxcPackages.batchUpdateSortOrder(ids);
+        await lxcPackageCache.del('all');
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[package] lxc-packages reorder error:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
 });
 
 // LXC 套餐开通（核心）
@@ -849,6 +891,26 @@ router.delete('/admin/package-groups/:id', authMiddleware, adminMiddleware, asyn
         await db.packageGroups.delete(parseInt(req.params.id));
         res.json({ message: '已删除' });
     } catch (e) { console.error('[package] delete group error:', e.message); res.status(500).json({ error: safeError(e) }); }
+});
+
+router.post('/admin/package-groups/reorder', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var ids = req.body.ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ids 参数无效' });
+        }
+        for (var i = 0; i < ids.length; i++) {
+            ids[i] = parseInt(ids[i]);
+            if (!Number.isInteger(ids[i]) || ids[i] <= 0) {
+                return res.status(400).json({ error: 'id 必须为正整数' });
+            }
+        }
+        await db.packageGroups.batchUpdateSortOrder(ids);
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[package] package-groups reorder error:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
 });
 
 module.exports = router;

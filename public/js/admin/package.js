@@ -21,6 +21,8 @@
     $.vmProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
     $.lxcProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
 
+    $.dragState = Vue.reactive({ draggingId: null, dragOverId: null, dragType: null });
+
     $.loadVmPackages = async function() {
         try { $.vmPackages.value = await api('/admin/vm-packages'); } catch (e) {}
     };
@@ -227,6 +229,74 @@
             if (window.lxcPage && window.lxcPage.loadUserLxcContainers) await window.lxcPage.loadUserLxcContainers();
             if (window.lxcPage && window.lxcPage.loadLxcContainers) await window.lxcPage.loadLxcContainers();
         } catch (e) { alert(e.message); }
+    };
+
+    // ===== 拖拽排序 =====
+    $.handleDragStart = function(e, id, type) {
+        $.dragState.draggingId = id;
+        $.dragState.dragType = type;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', String(id));
+    };
+
+    $.handleDragOver = function(e, id) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if ($.dragState.draggingId !== id) {
+            $.dragState.dragOverId = id;
+        }
+    };
+
+    $.handleDragLeave = function(e, id) {
+        if ($.dragState.dragOverId === id) {
+            $.dragState.dragOverId = null;
+        }
+    };
+
+    $.handleDrop = function(e, targetId, type) {
+        e.preventDefault();
+        e.stopPropagation();
+        var sourceId = $.dragState.draggingId;
+        if (!sourceId || sourceId === targetId || $.dragState.dragType !== type) {
+            $.handleDragEnd();
+            return;
+        }
+        var list = [];
+        if (type === 'vm') list = $.vmPackages.value;
+        else if (type === 'lxc') list = $.lxcPackages.value;
+        else if (type === 'group-vm') list = $.vmPackageGroups.value;
+        else if (type === 'group-lxc') list = $.lxcPackageGroups.value;
+        var newOrder = list.map(function(p) { return p.id; });
+        var fromIdx = newOrder.indexOf(sourceId);
+        var toIdx = newOrder.indexOf(targetId);
+        if (fromIdx === -1 || toIdx === -1) { $.handleDragEnd(); return; }
+        newOrder.splice(fromIdx, 1);
+        newOrder.splice(toIdx, 0, sourceId);
+        $.saveReorder(type, newOrder);
+        $.handleDragEnd();
+    };
+
+    $.handleDragEnd = function() {
+        $.dragState.draggingId = null;
+        $.dragState.dragOverId = null;
+        $.dragState.dragType = null;
+    };
+
+    $.saveReorder = async function(type, ids) {
+        try {
+            var endpoint = '';
+            if (type === 'vm') endpoint = '/admin/vm-packages/reorder';
+            else if (type === 'lxc') endpoint = '/admin/lxc-packages/reorder';
+            else if (type === 'group-vm' || type === 'group-lxc') endpoint = '/admin/package-groups/reorder';
+            await api(endpoint, { method: 'POST', body: JSON.stringify({ ids: ids }) });
+            if (type === 'vm') await $.loadVmPackages();
+            else if (type === 'lxc') await $.loadLxcPackages();
+            else if (type === 'group-vm') await $.loadVmPackageGroups();
+            else if (type === 'group-lxc') await $.loadLxcPackageGroups();
+        } catch (e) {
+            console.error('排序保存失败', e);
+            alert('排序保存失败：' + (e.message || '未知错误'));
+        }
     };
 
     $.getTemplateName = function(p) {
