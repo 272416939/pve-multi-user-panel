@@ -173,7 +173,17 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
             payParams.clientip = clientIp;
             payParams.device = isMobile ? 'mobile' : 'pc';
             gatewayRes = await payClient.apiPay(payParams);
-            dbg('[钱包] 网关响应(V1):', JSON.stringify(gatewayRes));
+            dbg('[钱包] 网关响应(V1):', typeof gatewayRes, JSON.stringify(gatewayRes));
+        }
+
+        // 部分网关响应 Content-Type 不规范（text/html），axios 会返回字符串而非对象，这里兜底解析
+        if (typeof gatewayRes === 'string') {
+            var trimmed = gatewayRes.trim();
+            try {
+                gatewayRes = JSON.parse(trimmed);
+            } catch (e) {
+                dbg('[钱包] 网关响应非JSON，原样保留:', trimmed.slice(0, 200));
+            }
         }
 
         var payUrl = null;
@@ -181,7 +191,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         if (gatewayRes && gatewayRes.code === 0 && gatewayRes.pay_info) {
             payUrl = gatewayRes.pay_info;
         }
-        // V1/submit 接口: code=1 成功，优先使用 urlscheme（可能是 alipays:// deep link）
+        // V1/mapi.php 接口: code=1 成功（z-pay 文档规定为 Int 1），优先使用 urlscheme（可能是 alipays:// deep link）
         if (!payUrl && gatewayRes && gatewayRes.code === 1) {
             payUrl = gatewayRes.urlscheme || gatewayRes.payurl || gatewayRes.qrcode || gatewayRes.qr || gatewayRes.url;
         }
@@ -196,10 +206,14 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         if (payUrl) {
             res.json({ success: true, order_no: orderNo, redirect_url: payUrl });
         } else {
-            // 返回网关的具体错误信息
+            // 网关业务错误（签名错误/商户未开通/金额超限等），返回 400 而非 502，避免被反向代理/CDN 替换响应体
             var errMsg = (gatewayRes && gatewayRes.msg) ? gatewayRes.msg : '支付网关响应异常，请稍后重试';
             console.error('[钱包] 网关未返回支付链接:', JSON.stringify(gatewayRes));
-            res.status(502).json({ error: errMsg });
+            var errResp = { error: errMsg };
+            if (process.env.DEBUG === 'true') {
+                errResp.raw = gatewayRes;
+            }
+            res.status(400).json(errResp);
         }
     } catch (e) {
         console.error('[钱包] recharge:', e.message);

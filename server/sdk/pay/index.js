@@ -41,7 +41,7 @@ class PayClientV1 {
             var res = await axios.get(url, { timeout: 15000 });
             return res.data;
         } catch (err) {
-            return { code: -1, msg: '支付网关请求失败' };
+            return { code: -1, msg: '支付网关请求失败: ' + (err.message || err.code || 'unknown') };
         }
     }
 
@@ -56,7 +56,7 @@ class PayClientV1 {
             });
             return res.data;
         } catch (err) {
-            return { code: -1, msg: '支付网关请求失败' };
+            return { code: -1, msg: '支付网关请求失败: ' + (err.message || err.code || 'unknown') };
         }
     }
 
@@ -68,7 +68,7 @@ class PayClientV1 {
             var res = await axios.get(url, { timeout: 15000 });
             return res.data;
         } catch (err) {
-            return { code: -1, msg: '支付网关请求失败' };
+            return { code: -1, msg: '支付网关请求失败: ' + (err.message || err.code || 'unknown') };
         }
     }
 
@@ -82,7 +82,7 @@ class PayClientV1 {
             });
             return res.data;
         } catch (err) {
-            return { code: -1, msg: '支付网关请求失败' };
+            return { code: -1, msg: '支付网关请求失败: ' + (err.message || err.code || 'unknown') };
         }
     }
 

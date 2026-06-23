@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.14.2] - 2026-06-23
+
+### Fixed
+- fix(wallet): 修复 V1 支付（z-pay）下单后前端提示"请求失败，请稍后重试"的问题
+  - 根因1：后端在支付网关返回业务错误时使用 HTTP 502，容易被反向代理/CDN 替换响应体，前端拿不到具体错误
+  - 根因2：部分网关响应 Content-Type 不规范（text/html），axios 返回字符串而非对象，导致 payurl 解析失败
+  - 根因3：前端 user-center-page.js 的 catch 块硬编码"请求失败"文案，丢弃了 shared.js 已传递的 e.message
+  - 修复：502 → 400（业务错误语义）；字符串响应兜底 JSON.parse；catch 块改用 e.message
+  - DEBUG 模式下后端响应附带 raw 字段，便于排查网关返回的原始内容
+- fix(sdk): 支付 SDK _get/_post/_apiGet/_apiPost 网络错误时透传实际 err.message，便于定位网络层问题
+
+---
+
 ## [2.14.1] - 2026-06-23
 
 ### Changed

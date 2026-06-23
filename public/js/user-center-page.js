@@ -215,7 +215,7 @@ const App = {
                     // 启动轮询
                     pollOrderStatus(res.order_no, amount.toFixed(2));
                 } else { rechargeError.value = res.error || '创建订单失败'; }
-            } catch (e) { rechargeError.value = '请求失败，请稍后重试'; }
+            } catch (e) { rechargeError.value = e.message || '请求失败，请稍后重试'; }
             rechargeSubmitting.value = false;
         };
 
