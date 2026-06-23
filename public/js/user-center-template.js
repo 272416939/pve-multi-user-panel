@@ -284,43 +284,45 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">我的订单</h4>
                         </div>
-                        <div class="row g-2 mb-3 align-items-end">
-                            <div class="col-md-3">
-                                <label class="form-label small mb-1">订单号</label>
-                                <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号" @keyup.enter="loadMyOrders(1)">
-                            </div>
-                            <div class="col-md-2">
-                                <label class="form-label small mb-1">类型</label>
-                                <select class="form-select form-select-sm" v-model="orderFilter.type">
-                                    <option value="">全部</option>
-                                    <option value="vm">VM</option>
-                                    <option value="lxc">LXC</option>
-                                </select>
-                            </div>
-                            <div class="col-md-2 d-flex gap-2">
-                                <pv-button variant="primary" size="sm" @click="loadMyOrders(1)">查询</pv-button>
-                                <pv-button variant="outline" size="sm" @click="orderFilter={order_no:'',type:''};loadMyOrders(1)">重置</pv-button>
-                            </div>
-                        </div>
                         <div class="card">
-                            <div class="card-body">
-                                <div class="table-responsive">
-                                    <table class="table table-hover table-sm mb-0">
-                                        <thead><tr><th>订单号</th><th>套餐</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>时间</th></tr></thead>
-                                        <tbody>
-                                            <tr v-for="o in myOrders" :key="o.id">
-                                                <td><code style="font-size:11px;">{{ o.order_no }}</code></td>
-                                                <td>{{ o.package_name }}</td>
-                                                <td><span :class="o.type === 'vm' ? 'badge bg-info' : 'badge bg-success'">{{ o.type === 'vm' ? 'VM' : 'LXC' }}</span></td>
-                                                <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
-                                                <td>{{ o.period_count }}</td>
-                                                <td>¥{{ o.amount }}</td>
-                                                <td>{{ formatDate(o.created_at) }}</td>
-                                            </tr>
-                                            <tr v-if="!myOrders || myOrders.length === 0"><td colspan="7" class="text-center text-muted py-4">暂无订单记录</td></tr>
-                                        </tbody>
-                                    </table>
+                            <div class="card-body pb-0">
+                                <div class="row g-2 mb-3 align-items-end">
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-1">订单号</label>
+                                        <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号" @keyup.enter="loadMyOrders(1)">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-1">类型</label>
+                                        <select class="form-select form-select-sm" v-model="orderFilter.type">
+                                            <option value="">全部</option>
+                                            <option value="vm">VM</option>
+                                            <option value="lxc">LXC</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2 d-flex gap-2">
+                                        <pv-button @click="loadMyOrders(1)" size="sm">查询</pv-button>
+                                        <pv-button @click="orderFilter={order_no:'',type:''};loadMyOrders(1)" variant="outline" size="sm">重置</pv-button>
+                                    </div>
                                 </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm mb-0">
+                                    <thead><tr><th>订单号</th><th>套餐</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>时间</th></tr></thead>
+                                    <tbody>
+                                        <tr v-for="o in myOrders" :key="o.id">
+                                            <td><code style="font-size:11px;">{{ o.order_no }}</code></td>
+                                            <td>{{ o.package_name }}</td>
+                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : 'badge bg-success'">{{ o.type === 'vm' ? 'VM' : 'LXC' }}</span></td>
+                                            <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
+                                            <td>{{ o.period_count }}</td>
+                                            <td>¥{{ o.amount }}</td>
+                                            <td>{{ formatDate(o.created_at) }}</td>
+                                        </tr>
+                                        <tr v-if="!myOrders || myOrders.length === 0"><td colspan="7" class="text-center text-muted py-4">暂无订单记录</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mt-3" v-if="orderTotal > 0">
                                     <small class="text-muted">共 {{ orderTotal }} 条</small>
                                     <div>
