@@ -56,7 +56,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                 // 注册功能
                 const currentView = ref('login');
                 const registerEnabled = ref(false);
-                const siteLoginTitle = ref('PVE Panel');
+                const siteLoginTitle = ref(window.__siteLoginTitle || 'PVE Panel');
                 const registerForm = ref({ username: '', password: '', email: '', code: '' });
                 const registerError = ref('');
                 const registerSubmitting = ref(false);
