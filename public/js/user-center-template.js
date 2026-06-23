@@ -267,8 +267,8 @@
                                     <small class="text-muted">共 {{ txTotal }} 条</small>
                                     <div>
                                         <pv-button variant="outline" size="sm" :disabled="txPage <= 1" @click="loadTx(txPage - 1)">上一页</pv-button>
-                                        <span class="mx-2 text-muted small">{{ txPage }}</span>
-                                        <pv-button variant="outline" size="sm" :disabled="txPage * 10 >= txTotal" @click="loadTx(txPage + 1)">下一页</pv-button>
+                                        <span class="mx-2 text-muted small">{{ txPage }} / {{ Math.ceil(txTotal / 20) || 1 }}</span>
+                                        <pv-button variant="outline" size="sm" :disabled="txPage * 20 >= txTotal" @click="loadTx(txPage + 1)">下一页</pv-button>
                                     </div>
                                 </div>
                             </div>
@@ -283,6 +283,24 @@
                     <div class="col-md-10">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">我的订单</h4>
+                        </div>
+                        <div class="row g-2 mb-3 align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label small mb-1">订单号</label>
+                                <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号" @keyup.enter="loadMyOrders(1)">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label small mb-1">类型</label>
+                                <select class="form-select form-select-sm" v-model="orderFilter.type">
+                                    <option value="">全部</option>
+                                    <option value="vm">VM</option>
+                                    <option value="lxc">LXC</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2 d-flex gap-2">
+                                <pv-button variant="primary" size="sm" @click="loadMyOrders(1)">查询</pv-button>
+                                <pv-button variant="outline" size="sm" @click="orderFilter={order_no:'',type:''};loadMyOrders(1)">重置</pv-button>
+                            </div>
                         </div>
                         <div class="card">
                             <div class="card-body">

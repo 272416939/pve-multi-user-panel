@@ -450,7 +450,7 @@ const App = {
         const loadTx = async (page) => {
             txPage.value = page || 1;
             try {
-                const params = { page: txPage.value, limit: 10 };
+                const params = { page: txPage.value, limit: 20 };
                 const f = txFilter.value;
                 if (f.start_time) params.start_time = f.start_time;
                 if (f.end_time) params.end_time = f.end_time;
