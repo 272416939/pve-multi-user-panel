@@ -4,7 +4,7 @@ const App = {
     template: '#appTemplate',
     setup() {
         const user = ref(null);
-        const activeSubTab = ref(localStorage.getItem('ucenter_subtab') || 'settings');
+        const activeSubTab = ref(window.location.hash ? window.location.hash.slice(1) : 'settings');
         const navItems = ref([]);
         const currentNavId = ref('user-center');
 
@@ -1203,7 +1203,11 @@ const App = {
         });
 
         watch(activeSubTab, (val) => {
-            localStorage.setItem('ucenter_subtab', val);
+            if (val !== 'settings' && window.location.hash !== '#' + val) {
+                history.replaceState(null, '', '#' + val);
+            } else if (val === 'settings' && window.location.hash) {
+                history.replaceState(null, '', window.location.pathname);
+            }
             if (val === 'wallet-transactions') loadTx(1);
             if (val === 'orders') loadMyOrders(1);
         });

@@ -146,7 +146,7 @@ watch($.user, function(u) {
     // ==================== 函数 ====================
     $.switchSection = function(id, options) {
         if (id === 'user-center') {
-            window.location.href = 'user-center.html';
+            window.location.href = 'user-center';
             return;
         }
         $.activeSection.value = id;
