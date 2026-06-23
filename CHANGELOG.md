@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.14.4] - 2026-06-23
+
+### Fixed
+- fix(wallet): 修复手机端支付完成后返回面板看不到成功弹窗、金额不更新的问题
+  - 根因1：支付宝/微信 H5 支付完成后，安卓浏览器会重建页面，Vue 实例的 `rechargePendingOrderNo` 等 ref 重置为空，`visibilitychange` 条件不满足导致不查询
+  - 根因2：z-pay 手机端支付宝跳回的 URL 可能不带 `trade_status=TRADE_SUCCESS`，原 `handleReturnPayment` 直接 return 不处理
+  - 根因3：`visibilitychange` 要求 `rechargePollingTimer && rechargePendingOrderNo` 同时存在，页面重建后两者都空
+  - 修复：用 `localStorage` 持久化 pending order（15 分钟过期），页面加载/onMounted 时恢复轮询
+  - 修复：`handleReturnPayment` 放宽条件，只要有 `out_trade_no` 就查询订单实际状态，并清理 URL 参数防刷新重复触发
+  - 修复：`visibilitychange` 去掉 `rechargePollingTimer` 依赖，从 `localStorage` 恢复 pending order，未支付时自动恢复轮询
+  - 修复：`pollOrderStatus`/`checkPayStatus`/`cancelRecharge` 成功/取消时同步清除 `localStorage` 中的 pending order
+
+---
+
 ## [2.14.3] - 2026-06-23
 
 ### Fixed

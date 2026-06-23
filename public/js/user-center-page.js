@@ -46,6 +46,31 @@ const App = {
         // 充值轮询相关
         const rechargePendingOrderNo = ref('');
         const rechargePendingAmount = ref('');
+
+        // pending order 持久化：手机端支付完成后页面可能被支付宝/浏览器重建，
+        // 通过 localStorage 在页面加载时恢复轮询，确保支付成功后能看到弹窗+余额更新
+        const PENDING_KEY = 'recharge_pending';
+        const savePending = (orderNo, amount, method) => {
+            try {
+                localStorage.setItem(PENDING_KEY, JSON.stringify({ orderNo, amount, method, ts: Date.now() }));
+            } catch (e) {}
+        };
+        const loadPending = () => {
+            try {
+                const raw = localStorage.getItem(PENDING_KEY);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                // 超过 15 分钟视为过期，避免残留
+                if (!data || !data.orderNo || Date.now() - (data.ts || 0) > 15 * 60 * 1000) {
+                    localStorage.removeItem(PENDING_KEY);
+                    return null;
+                }
+                return data;
+            } catch (e) { return null; }
+        };
+        const clearPending = () => {
+            try { localStorage.removeItem(PENDING_KEY); } catch (e) {}
+        };
         const rechargeResultType = ref(''); // success / fail / cancel / timeout
         const rechargeResultTitle = ref('');
         const rechargeResultAmount = ref('');
@@ -167,6 +192,8 @@ const App = {
                     rechargePendingOrderNo.value = res.order_no;
                     rechargePendingAmount.value = amount.toFixed(2);
                     rechargePayUrl.value = payUrl;
+                    // 持久化 pending order，手机端支付完成后页面被重建也能恢复轮询
+                    savePending(res.order_no, amount.toFixed(2), rechargeMethod.value);
                     // 设备检测
                     const ua = navigator.userAgent || '';
                     const mobile = /Android|iPhone|iPad|iPod|Mobile|Windows Phone/i.test(ua);
@@ -230,6 +257,7 @@ const App = {
                 if (Date.now() - startTime > timeout) {
                     stopPolling();
                     closePendingModal();
+                    clearPending();
                     showRechargeResult('timeout', '');
                     return;
                 }
@@ -241,6 +269,7 @@ const App = {
                     if (status.status === 'paid') {
                         stopPolling();
                         closePendingModal();
+                        clearPending();
                         showRechargeResult('success', status.amount || amount);
                         loadWalletBalance();
                         rechargeAmount.value = '';
@@ -301,6 +330,7 @@ const App = {
 
         const cancelRecharge = () => {
             stopPolling();
+            clearPending();
             // 清除二维码容器
             var qrContainer = document.getElementById('rechargeQrContainer');
             if (qrContainer) qrContainer.innerHTML = '';
@@ -328,6 +358,7 @@ const App = {
                 if (status.status === 'paid') {
                     stopPolling();
                     closePendingModal();
+                    clearPending();
                     showRechargeResult('success', status.amount || rechargePendingAmount.value);
                     loadWalletBalance();
                     rechargeAmount.value = '';
@@ -344,20 +375,46 @@ const App = {
         };
 
         // 手机端从支付 app 切回浏览器时，自动检测支付完成
+        // 不依赖 rechargePollingTimer：页面可能被支付宝/浏览器重建，timer 已丢失，
+        // 但只要 localStorage 里有 pending order 就查询
         const handleVisibilityChange = async () => {
-            if (document.visibilityState === 'visible' && rechargePollingTimer && rechargePendingOrderNo.value) {
-                try {
-                    const status = await api('/wallet/order-status/' + rechargePendingOrderNo.value);
-                    if (status.status === 'paid') {
-                        stopPolling();
-                        closePendingModal();
-                        showRechargeResult('success', status.amount || rechargePendingAmount.value);
-                        loadWalletBalance();
-                        rechargeAmount.value = '';
-                        rechargeMethod.value = '';
+            if (document.visibilityState !== 'visible') return;
+            // 优先用内存中的 pending order，其次从 localStorage 恢复
+            let orderNo = rechargePendingOrderNo.value;
+            if (!orderNo) {
+                const p = loadPending();
+                if (p) {
+                    orderNo = p.orderNo;
+                    rechargePendingOrderNo.value = p.orderNo;
+                    rechargePendingAmount.value = p.amount;
+                    rechargeMethod.value = p.method || '';
+                }
+            }
+            if (!orderNo) {
+                // 无 pending order，仅刷新余额（可能支付已完成但 pending 已清）
+                loadWalletBalance();
+                return;
+            }
+            try {
+                const status = await api('/wallet/order-status/' + orderNo);
+                if (status.status === 'paid') {
+                    stopPolling();
+                    closePendingModal();
+                    clearPending();
+                    showRechargeResult('success', status.amount || rechargePendingAmount.value);
+                    loadWalletBalance();
+                    rechargeAmount.value = '';
+                    rechargeMethod.value = '';
+                } else {
+                    // 仍未支付，恢复轮询继续等待
+                    if (!rechargePollingTimer) {
+                        pollOrderStatus(orderNo, rechargePendingAmount.value);
                     }
-                } catch (e) {
-                    // 忽略错误，轮询会继续
+                }
+            } catch (e) {
+                // 忽略错误，恢复轮询兜底
+                if (!rechargePollingTimer) {
+                    pollOrderStatus(orderNo, rechargePendingAmount.value);
                 }
             }
         };
@@ -417,14 +474,48 @@ const App = {
 
         const handleReturnPayment = async () => {
             var qs = window.location.search;
-            if (!qs || qs.indexOf('trade_status=TRADE_SUCCESS') === -1) return;
+            if (!qs) return;
+            // 放宽条件：z-pay 手机端支付宝 H5 跳回时 URL 可能不带 trade_status=TRADE_SUCCESS，
+            // 只要带 out_trade_no 就查询订单实际状态（后端 /wallet/order-status 不泄露订单是否存在）
+            var params = new URLSearchParams(qs);
+            var outTradeNo = params.get('out_trade_no');
+            if (!outTradeNo) return;
             try {
-                var res = await api('/wallet/return' + qs);
-                if (res.success) {
-                    window.history.replaceState({}, '', window.location.pathname + (activeSubTab.value !== 'settings' ? '#' + activeSubTab.value : ''));
+                // 优先用同步回调接口（带验签+入账兜底），失败则降级到订单状态查询
+                var res;
+                try {
+                    res = await api('/wallet/return' + qs);
+                } catch (e) {
+                    // /wallet/return 验签失败或订单已处理时可能报错，降级查询
+                    res = null;
+                }
+                // 清理 URL 参数，防止刷新重复触发
+                window.history.replaceState({}, '', window.location.pathname + (activeSubTab.value !== 'settings' ? '#' + activeSubTab.value : ''));
+                if (res && res.success) {
+                    clearPending();
+                    stopPolling();
+                    closePendingModal();
                     loadWalletBalance();
-                    // 显示充值成功弹窗
                     showRechargeResult('success', res.amount || '');
+                    return;
+                }
+                // 同步回调未成功入账，查询订单实际状态
+                const status = await api('/wallet/order-status/' + outTradeNo);
+                if (status.status === 'paid') {
+                    clearPending();
+                    stopPolling();
+                    closePendingModal();
+                    loadWalletBalance();
+                    showRechargeResult('success', status.amount || '');
+                } else {
+                    // 仍未支付，恢复 pending 状态并启动轮询
+                    rechargePendingOrderNo.value = outTradeNo;
+                    rechargePendingAmount.value = params.get('money') || '';
+                    rechargeMethod.value = params.get('type') || '';
+                    savePending(outTradeNo, rechargePendingAmount.value, rechargeMethod.value);
+                    if (!rechargePollingTimer) {
+                        pollOrderStatus(outTradeNo, rechargePendingAmount.value);
+                    }
                 }
             } catch (e) {
                 console.error('同步回调处理失败', e);
@@ -1051,6 +1142,17 @@ const App = {
                 user.value = userData;
                 syncHeaderUser();
                 await handleReturnPayment();
+                // 兜底：URL 没带回调参数但 localStorage 有 pending order（页面被支付宝/浏览器重建），
+                // 恢复 pending 状态并启动轮询，确保支付成功后能看到弹窗+余额更新
+                if (!rechargePollingTimer && !rechargePendingOrderNo.value) {
+                    const p = loadPending();
+                    if (p) {
+                        rechargePendingOrderNo.value = p.orderNo;
+                        rechargePendingAmount.value = p.amount;
+                        rechargeMethod.value = p.method || '';
+                        pollOrderStatus(p.orderNo, p.amount);
+                    }
+                }
                 await loadNavItems();
                 await loadProfile();
                 handleEmailVerification();
