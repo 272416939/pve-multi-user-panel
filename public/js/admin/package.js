@@ -244,31 +244,57 @@
         $.dragState.draggingId = id;
         $.dragState.dragType = type;
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', String(id));
+        // 使用自定义 MIME 类型避免浏览器触发"搜索文本"
+        try {
+            e.dataTransfer.setData('application/x-pve-drag', String(id));
+        } catch (err) {
+            e.dataTransfer.setData('text/plain', String(id));
+        }
         // 记录起始索引
         var list = $.getDragList(type);
-        $.dragState.dragFromIndex = list.findIndex(function(p) { return p.id === id; });
+        var fromIndex = -1;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === id) { fromIndex = i; break; }
+        }
+        $.dragState.dragFromIndex = fromIndex;
     };
 
     $.handleDragOver = function(e, id) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         if ($.dragState.draggingId === id) return;
-        $.dragState.dragOverId = id;
-        // 计算目标索引
+        // 如果 fromIndex 丢失（可能被意外重置），重新计算
+        if ($.dragState.dragFromIndex < 0 && $.dragState.draggingId != null) {
+            var dragList = $.getDragList($.dragState.dragType);
+            for (var fi = 0; fi < dragList.length; fi++) {
+                if (dragList[fi].id === $.dragState.draggingId) {
+                    $.dragState.dragFromIndex = fi;
+                    break;
+                }
+            }
+        }
+        if ($.dragState.dragFromIndex < 0) return;
+        // 计算目标索引（基于数据列表，不依赖 DOM 顺序）
         var list = $.getDragList($.dragState.dragType);
         var toIndex = -1;
         for (var i = 0; i < list.length; i++) {
             if (list[i].id === id) { toIndex = i; break; }
         }
+        if (toIndex < 0) return;
         var fromIndex = $.dragState.dragFromIndex;
-        if (fromIndex < 0 || toIndex < 0) return;
         // 直接操作 DOM 设置 transform（绕过 Vue 响应式，避免拖拽期间渲染节流）
-        var container = e.currentTarget.closest('tbody') || e.currentTarget.parentElement;
-        if (!container) return;
+        // 找到当前拖拽元素和目标元素的 DOM 节点
+        var dragType = $.dragState.dragType;
+        var containerSelector = (dragType === 'vm' || dragType === 'lxc') ? 'tbody' : '.mb-3';
+        var container = e.currentTarget.closest(containerSelector);
+        if (!container) {
+            container = e.currentTarget.parentElement;
+            if (!container) return;
+        }
+        // 只选择当前容器内的可拖拽元素（避免跨容器污染）
         var rows = container.querySelectorAll('[draggable="true"]');
         // 判断是表格行（纵向）还是 badge（横向）
-        var isHorizontal = $.dragState.dragType === 'group-vm' || $.dragState.dragType === 'group-lxc';
+        var isHorizontal = dragType === 'group-vm' || dragType === 'group-lxc';
         var offset = isHorizontal
             ? (rows.length > 0 ? rows[0].offsetWidth + 8 : 80)
             : (rows.length > 0 ? rows[0].offsetHeight : 40);
@@ -277,14 +303,14 @@
         for (var j = 0; j < rows.length; j++) {
             rows[j].style.transform = '';
         }
-        // 根据拖拽方向应用避让
+        // 根据拖拽方向应用避让（严格限制范围，避免连带）
         if (fromIndex < toIndex) {
-            // 向后拖拽：fromIndex 和 toIndex 之间的元素向前避让（负方向）
+            // 向后拖拽：仅 fromIndex+1 到 toIndex 的元素向前避让（负方向）
             for (var k = fromIndex + 1; k <= toIndex && k < rows.length; k++) {
                 rows[k].style.transform = 'translate' + axis + '(-' + offset + 'px)';
             }
         } else if (fromIndex > toIndex) {
-            // 向前拖拽：toIndex 和 fromIndex 之间的元素向后避让（正方向）
+            // 向前拖拽：仅 toIndex 到 fromIndex-1 的元素向后避让（正方向）
             for (var k = toIndex; k < fromIndex && k < rows.length; k++) {
                 rows[k].style.transform = 'translate' + axis + '(' + offset + 'px)';
             }
@@ -292,17 +318,13 @@
     };
 
     $.handleDragLeave = function(e, id) {
-        if ($.dragState.dragOverId === id) {
-            $.dragState.dragOverId = null;
-        }
-        // 不在这里清除避让 class，因为 dragleave 会在 dragover 之间频繁触发
-        // 避让 class 由下一次 dragover 重新计算
+        // dragleave 在 dragover 之间频繁触发，不做处理
     };
 
     $.clearAvoidClasses = function() {
         $.dragState.avoidDownIds = [];
         $.dragState.avoidUpIds = [];
-        // 清除所有直接设置的 DOM transform
+        // 清除所有直接设置的 DOM transform（全局）
         var allDraggables = document.querySelectorAll('[draggable="true"]');
         for (var i = 0; i < allDraggables.length; i++) {
             allDraggables[i].style.transform = '';
@@ -312,21 +334,22 @@
     $.handleDrop = function(e, targetId, type) {
         e.preventDefault();
         e.stopPropagation();
-        $.clearAvoidClasses();  // 先清除避让 class
         var sourceId = $.dragState.draggingId;
-        if (!sourceId || sourceId === targetId || $.dragState.dragType !== type) {
+        var dragType = $.dragState.dragType;
+        // 先清除避让 transform
+        $.clearAvoidClasses();
+        if (!sourceId || sourceId === targetId || dragType !== type) {
             $.handleDragEnd();
             return;
         }
-        var list = [];
-        if (type === 'vm') list = $.vmPackages.value;
-        else if (type === 'lxc') list = $.lxcPackages.value;
-        else if (type === 'group-vm') list = $.vmPackageGroups.value;
-        else if (type === 'group-lxc') list = $.lxcPackageGroups.value;
+        var list = $.getDragList(type);
         var newOrder = list.map(function(p) { return p.id; });
         var fromIdx = newOrder.indexOf(sourceId);
         var toIdx = newOrder.indexOf(targetId);
-        if (fromIdx === -1 || toIdx === -1) { $.handleDragEnd(); return; }
+        if (fromIdx === -1 || toIdx === -1) {
+            $.handleDragEnd();
+            return;
+        }
         newOrder.splice(fromIdx, 1);
         newOrder.splice(toIdx, 0, sourceId);
         $.saveReorder(type, newOrder);
