@@ -39,6 +39,7 @@ router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
 });
 
 router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
     const { username, password, role, email, emailVerified } = req.body;
 
     if (!password) {
@@ -96,9 +97,14 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     const { password: _, password_salt: __, totp_secret: ___, ...safeUser } = newUser;
     await userListCache.del('list');
     res.json(safeUser);
+  } catch (e) {
+    console.error('[admin] create user error:', e.message);
+    res.status(500).json({ error: safeError(e) });
+  }
 });
 
 router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
     const userId = parseInt(req.params.id);
 
     if (parseInt(req.params.id) === req.user.id) {
@@ -130,9 +136,14 @@ router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) =>
     await userListCache.del('list');
     await invalidateUserActiveCache(userId);
     res.json({ message: '用户删除成功' });
+  } catch (e) {
+    console.error('[admin] delete user error:', e.message);
+    res.status(500).json({ error: safeError(e) });
+  }
 });
 
 router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
     const userId = parseInt(req.params.id);
     const { username, password, role, email, emailVerified } = req.body;
     
@@ -193,6 +204,10 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     await userListCache.del('list');
     await invalidateUserActiveCache(userId);
     res.json({ message: '用户更新成功' });
+  } catch (e) {
+    console.error('[admin] update user error:', e.message);
+    res.status(500).json({ error: safeError(e) });
+  }
 });
 
 // 管理员手动为用户充值

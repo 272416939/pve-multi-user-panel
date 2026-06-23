@@ -119,7 +119,7 @@
                 });
             }
         }
-        var ok = confirm('确定要删除端口转发 "' + (rule.name || rule.external_port) + '" 吗？');
+        var ok = await window.customConfirm('确定要删除端口转发 "' + (rule.name || rule.external_port) + '" 吗？');
         if (!ok) { $.bsModalShow('deviceForwardModal'); return; }
         try {
             await api('/port-forwards/' + rule.id, { method: 'DELETE' });

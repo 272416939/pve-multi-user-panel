@@ -82,6 +82,10 @@ router.post('/login', async (req, res) => {
         return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
     }
 
+    if (!user.is_active) {
+        return res.status(403).json({ error: '账号已被禁用' });
+    }
+
     const refreshToken = generateRefreshToken();
     const ua = req.headers['user-agent'] || '';
     const deviceName = (device_name || ua.substring(0, 100));
@@ -189,6 +193,9 @@ router.post('/login/2fa', async (req, res) => {
 
         const token = generateAccessToken(user, record.id);
         const { password: _, ...safeUser } = user;
+        if (user.must_change_password) {
+            return res.json({ token, refreshToken, user: safeUser, must_change_password: true });
+        }
         return res.json({ token, refreshToken, user: safeUser });
     }
 
@@ -219,6 +226,9 @@ router.post('/login/2fa', async (req, res) => {
             }
             const token = generateAccessToken(user, record.id);
             const { password: _, ...safeUser } = user;
+            if (user.must_change_password) {
+                return res.json({ token, refreshToken, user: safeUser, must_change_password: true });
+            }
             return res.json({ token, refreshToken, user: safeUser });
         }
     }

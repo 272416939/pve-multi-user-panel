@@ -124,7 +124,14 @@
     $.trimContent = trimContent;
     $.getGeekAvatar = getGeekAvatar;
     $.formatDateTimeLocal = formatDateTimeLocal;
-    $.parseMarkdown = window.parseMarkdown || function(t) { return t || ''; };
+    $.parseMarkdown = function(text) {
+        if (!text) return '';
+        try {
+            return DOMPurify.sanitize(marked.parse(text));
+        } catch (e) {
+            return text;
+        }
+    };
 
     // ===== 用户数据变化时同步 Header 头像/用户名 + 管理员链接 =====
     watch($.user, function(u) {

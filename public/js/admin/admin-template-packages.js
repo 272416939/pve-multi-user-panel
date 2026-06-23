@@ -17,7 +17,10 @@
                                     <tr v-for="p in packagePage.vmPackages.value" :key="p.id">
                                         <td>{{ p.id }}</td>
                                         <td>{{ p.name }}</td>
-                                        <td v-html="packagePage.getTemplateName(p)"></td>
+                                        <td>
+                                            <span v-if="p.template_name">{{ p.template_name }}</span>
+                                            <span v-else class="text-secondary">模板已删除</span>
+                                        </td>
                                         <td>{{ p.cores }}核</td>
                                         <td>{{ p.memory }}MB</td>
                                         <td>{{ p.disk_size }}GB</td>
@@ -53,7 +56,7 @@
                                 </thead>
                                 <tbody>
                                     <tr v-for="p in packagePage.lxcPackages.value" :key="p.id">
-                                        <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ packagePage.getTemplateName(p) }}</td>
+                                        <td>{{ p.id }}</td><td>{{ p.name }}</td><td><span v-if="p.template_name">{{ p.template_name }}</span><span v-else class="text-secondary">模板已删除</span></td>
                                         <td>{{ p.cores }}核</td><td>{{ p.memory }}MB</td><td>{{ p.swap }}MB</td><td>{{ p.disk_size }}GB</td>
                                         <td>{{ p.monthly_price }}元</td><td>{{ p.quarterly_price }}元</td><td>{{ p.yearly_price }}元</td>
                                         <td>{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</td>

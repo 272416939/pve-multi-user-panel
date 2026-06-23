@@ -729,11 +729,11 @@ const App = {
                 try {
                     const formData = new FormData();
                     formData.append('avatar', file);
-                    const token = localStorage.getItem('token');
+                    const token = await ensureValidToken();
                     const response = await fetch('/api/user/avatar', {
                         method: 'POST',
                         headers: {
-                            'Authorization': `Bearer ${token}`
+                            'Authorization': `Bearer ${token || ''}`
                         },
                         body: formData
                     });

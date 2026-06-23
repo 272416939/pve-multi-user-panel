@@ -413,11 +413,11 @@
 
     $.exportCdkCsv = async function(batchId) {
         try {
-            var token = localStorage.getItem('token');
+            var token = await ensureValidToken();
             var url = '/api/admin/cdk/export';
             if (batchId) url += '?batch_id=' + batchId;
             var response = await fetch(url, {
-                headers: { 'Authorization': 'Bearer ' + token }
+                headers: { 'Authorization': 'Bearer ' + (token || '') }
             });
             if (!response.ok) {
                 var data = await response.json();
@@ -580,9 +580,9 @@
             if (f.pay_method) params.pay_method = f.pay_method;
             if (f.trade_type) params.trade_type = f.trade_type;
             if (f.order_no) params.order_no = f.order_no;
-            var token = localStorage.getItem('token');
+            var token = await ensureValidToken();
             var resp = await fetch('/api/admin/transactions/export?' + new URLSearchParams(params), {
-                headers: { 'Authorization': 'Bearer ' + token }
+                headers: { 'Authorization': 'Bearer ' + (token || '') }
             });
             if (!resp.ok) {
                 var err = await resp.json().catch(function() { return { error: '导出失败' }; });
@@ -632,9 +632,9 @@
             if ($.orderFilter.status) params.set('status', $.orderFilter.status);
             if ($.orderFilter.start_time) params.set('start_time', $.orderFilter.start_time);
             if ($.orderFilter.end_time) params.set('end_time', $.orderFilter.end_time);
-            var token = localStorage.getItem('token');
+            var token = await ensureValidToken();
             var resp = await fetch('/api/admin/orders/export?' + params.toString(), {
-                headers: { 'Authorization': 'Bearer ' + token }
+                headers: { 'Authorization': 'Bearer ' + (token || '') }
             });
             if (!resp.ok) { alert('导出失败'); return; }
             var blob = await resp.blob();
