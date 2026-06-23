@@ -152,14 +152,14 @@
                                 </table>
                             </div>
                         </div>
-                        <!-- 分页（始终显示） -->
-                        <div class="d-flex justify-content-between align-items-center mt-3">
+                        <!-- 分页 -->
+                        <div class="d-flex justify-content-between align-items-center mt-3" v-if="orderTotal > 0">
                             <small class="text-muted">共 {{ orderTotal }} 条</small>
-                            <div class="btn-group" v-if="orderTotal > 20">
+                            <div>
                                 <pv-button :disabled="orderPage <= 1" @click="loadOrders(orderPage-1)" variant="outline" size="sm">上一页</pv-button>
+                                <span class="mx-2 text-muted small">{{ orderPage }} / {{ Math.ceil(orderTotal / 20) || 1 }}</span>
                                 <pv-button :disabled="orderPage*20 >= orderTotal" @click="loadOrders(orderPage+1)" variant="outline" size="sm">下一页</pv-button>
                             </div>
-                            <span class="text-muted small" v-if="orderTotal > 0">{{ orderPage }} / {{ Math.ceil(orderTotal / 20) || 1 }}</span>
                         </div>
                     </div>
                 </div>
