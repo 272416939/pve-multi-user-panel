@@ -867,7 +867,8 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
 // ===== 套餐分组管理（管理员） =====
 router.get('/admin/package-groups', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        var groups = await db.packageGroups.getAll();
+        var type = req.query.type;
+        var groups = type ? await db.packageGroups.getByType(type) : await db.packageGroups.getAll();
         res.json(groups);
     } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });

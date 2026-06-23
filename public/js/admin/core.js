@@ -190,11 +190,13 @@ watch($.user, function(u) {
             subId = 'packages-vm';
             $.activeTabPackages.value = 'vm';
             window.packagePage.loadVmPackages();
+            window.packagePage.loadVmPackageGroups();
         } else if (page === 'lxc-packages') {
             section = 'packages';
             subId = 'packages-lxc';
             $.activeTabPackages.value = 'lxc';
             window.packagePage.loadLxcPackages();
+            window.packagePage.loadLxcPackageGroups();
         }
         if (!section) return;
         $.switchSection(section);
@@ -910,8 +912,10 @@ $.initDetailCharts = function() {
                         if (section === 'packages' && window.packagePage) {
                             if (tabVar && tabVar.value === 'lxc') {
                                 window.packagePage.loadLxcPackages();
+                                window.packagePage.loadLxcPackageGroups();
                             } else {
                                 window.packagePage.loadVmPackages();
+                                window.packagePage.loadVmPackageGroups();
                             }
                         }
                     }, 100);
