@@ -17,7 +17,7 @@
     $.storageList = ref([]);
     $.backupConfigForm = ref({ default_storage: 'local', max_per_vm: 3, daily_limit: 3 });
     $.testEmail = ref('');
-    $.siteLogoText = ref('PVE 面板');
+    $.siteLogoText = ref($.__siteLogoText || 'PVE 面板');
     $.siteConfigForm = ref({ name: '', logo_text: '', login_title: '', register_enabled: false });
     $.siteConfigSaving = ref(false);
     $.cacheClearing = ref(false);
