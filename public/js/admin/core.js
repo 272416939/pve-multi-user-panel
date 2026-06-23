@@ -888,7 +888,18 @@ $.initDetailCharts = function() {
                 var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance'];
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
-                        $.toggleSubmenu($.activeSection.value);
+                        var section = $.activeSection.value;
+                        $.toggleSubmenu(section);
+                        var tabVar = {
+                            vms: $.activeTabVm, lxc: $.activeTabLxc,
+                            manage: $.activeTab, settings: $.activeTab,
+                            templates: $.activeTabTemplates, packages: $.activeTabPackages,
+                            finance: $.activeTab
+                        }[section];
+                        if (tabVar) {
+                            var target = document.querySelector('[data-subsection="' + section + '-' + tabVar.value + '"]');
+                            if (target) target.classList.add('active');
+                        }
                     }, 100);
                 }
                 await $.loadUserLxcContainers();
