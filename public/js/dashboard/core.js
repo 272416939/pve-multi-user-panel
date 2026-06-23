@@ -910,6 +910,9 @@
                 await $.loadData();
                 await $.loadLxcContainers();
                 await $.loadCnameDomain();
+                if ($.activeSection.value === 'order') {
+                    await $.loadPackages();
+                }
                 $.loadUnreadCount();
                 $.loadWalletBalance();
                 initPushClient(function(msg) {
