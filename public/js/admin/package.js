@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.18.6-no-ghost';
+    window.__PKG_JS_VERSION = 'v2.18.7-avoid-fix';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -276,46 +276,48 @@
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         $.dragState.dragOverId = id;
-        if ($.dragState.draggingId === id) return;
         if ($.dragState.dragFromIndex < 0 && $.dragState.draggingId != null) {
-            var dragList = $.getDragList($.dragState.dragType);
-            for (var fi = 0; fi < dragList.length; fi++) {
-                if (dragList[fi].id === $.dragState.draggingId) {
-                    $.dragState.dragFromIndex = fi;
+            var dragList0 = $.getDragList($.dragState.dragType);
+            for (var fi0 = 0; fi0 < dragList0.length; fi0++) {
+                if (dragList0[fi0].id === $.dragState.draggingId) {
+                    $.dragState.dragFromIndex = fi0;
                     break;
                 }
             }
         }
         if ($.dragState.dragFromIndex < 0) return;
-        var list = $.getDragList($.dragState.dragType);
-        var toIndex = -1;
-        for (var i = 0; i < list.length; i++) {
-            if (list[i].id === id) { toIndex = i; break; }
+        var list0 = $.getDragList($.dragState.dragType);
+        var toIndex0 = -1;
+        for (var i0 = 0; i0 < list0.length; i0++) {
+            if (list0[i0].id === id) { toIndex0 = i0; break; }
         }
-        if (toIndex < 0) return;
-        var fromIndex = $.dragState.dragFromIndex;
-        var containerSelector = (type === 'vm' || type === 'lxc') ? 'tbody' : '.mb-3';
-        var container = e.currentTarget.closest(containerSelector);
-        if (!container) {
-            container = e.currentTarget.parentElement;
-            if (!container) return;
+        if (toIndex0 < 0) return;
+        var fromIndex0 = $.dragState.dragFromIndex;
+        var containerSelector0 = (type === 'vm' || type === 'lxc') ? 'tbody' : '.mb-3';
+        var container0 = e.currentTarget.closest(containerSelector0);
+        if (!container0) {
+            container0 = e.currentTarget.parentElement;
+            if (!container0) return;
         }
-        var rows = container.querySelectorAll('[draggable="true"]');
-        var isHorizontal = type === 'group-vm' || type === 'group-lxc';
-        var offset = isHorizontal
-            ? (rows.length > 0 ? rows[0].offsetWidth + 8 : 80)
-            : (rows.length > 0 ? rows[0].offsetHeight : 40);
-        var axis = isHorizontal ? 'X' : 'Y';
-        for (var j = 0; j < rows.length; j++) {
-            rows[j].style.transform = '';
+        var rows0 = container0.querySelectorAll('[draggable="true"]');
+        var isHorizontal0 = type === 'group-vm' || type === 'group-lxc';
+        var offset0 = isHorizontal0
+            ? (rows0.length > 0 ? rows0[0].offsetWidth + 8 : 80)
+            : (rows0.length > 0 ? rows0[0].offsetHeight : 40);
+        var axis0 = isHorizontal0 ? 'X' : 'Y';
+        // 先清除所有 transform（避免上一轮方向的残留导致重叠）
+        for (var j0 = 0; j0 < rows0.length; j0++) {
+            rows0[j0].style.transform = '';
         }
-        if (fromIndex < toIndex) {
-            for (var k = fromIndex + 1; k <= toIndex && k < rows.length; k++) {
-                rows[k].style.transform = 'translate' + axis + '(-' + offset + 'px)';
+        // hover 到被拖元素自身：fromIndex === toIndex，不施加任何避让
+        if ($.dragState.draggingId === id) return;
+        if (fromIndex0 < toIndex0) {
+            for (var k0 = fromIndex0 + 1; k0 <= toIndex0 && k0 < rows0.length; k0++) {
+                rows0[k0].style.transform = 'translate' + axis0 + '(-' + offset0 + 'px)';
             }
-        } else if (fromIndex > toIndex) {
-            for (var k = toIndex; k < fromIndex && k < rows.length; k++) {
-                rows[k].style.transform = 'translate' + axis + '(' + offset + 'px)';
+        } else if (fromIndex0 > toIndex0) {
+            for (var k1 = toIndex0; k1 < fromIndex0 && k1 < rows0.length; k1++) {
+                rows0[k1].style.transform = 'translate' + axis0 + '(' + offset0 + 'px)';
             }
         }
     };
