@@ -24,10 +24,10 @@
     $.dragState = Vue.reactive({ draggingId: null, dragOverId: null, dragType: null, dragFromIndex: -1, avoidDownIds: [], avoidUpIds: [] });
 
     $.loadVmPackages = async function() {
-        try { $.vmPackages.value = await api('/admin/vm-packages'); } catch (e) {}
+        try { $.vmPackages.value = await api('/admin/vm-packages'); } catch (e) { console.error('loadVmPackages error:', e); }
     };
     $.loadLxcPackages = async function() {
-        try { $.lxcPackages.value = await api('/admin/lxc-packages'); } catch (e) {}
+        try { $.lxcPackages.value = await api('/admin/lxc-packages'); } catch (e) { console.error('loadLxcPackages error:', e); }
     };
 
     $.loadVmTemplateOptions = async function() {
@@ -244,12 +244,8 @@
         $.dragState.draggingId = id;
         $.dragState.dragType = type;
         e.dataTransfer.effectAllowed = 'move';
-        // 使用自定义 MIME 类型避免浏览器触发"搜索文本"
-        try {
-            e.dataTransfer.setData('application/x-pve-drag', String(id));
-        } catch (err) {
-            e.dataTransfer.setData('text/plain', String(id));
-        }
+        // 必须调用 setData 才能触发拖拽，用 text/plain 即可
+        e.dataTransfer.setData('text/plain', String(id));
         // 记录起始索引
         var list = $.getDragList(type);
         var fromIndex = -1;
@@ -262,6 +258,8 @@
     $.handleDragOver = function(e, id) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        // 始终记录最后经过的目标 id（包括拖拽行自身），供容器兜底使用
+        $.dragState.dragOverId = id;
         if ($.dragState.draggingId === id) return;
         // 如果 fromIndex 丢失（可能被意外重置），重新计算
         if ($.dragState.dragFromIndex < 0 && $.dragState.draggingId != null) {
@@ -331,14 +329,13 @@
         }
     };
 
-    $.handleDrop = function(e, targetId, type) {
+    $.handleDrop = async function(e, targetId, type) {
         e.preventDefault();
         e.stopPropagation();
         var sourceId = $.dragState.draggingId;
         var dragType = $.dragState.dragType;
-        // 先清除避让 transform
         $.clearAvoidClasses();
-        if (!sourceId || sourceId === targetId || dragType !== type) {
+        if (sourceId == null || sourceId === targetId || dragType !== type) {
             $.handleDragEnd();
             return;
         }
@@ -352,8 +349,18 @@
         }
         newOrder.splice(fromIdx, 1);
         newOrder.splice(toIdx, 0, sourceId);
-        $.saveReorder(type, newOrder);
+        await $.saveReorder(type, newOrder);
         $.handleDragEnd();
+    };
+
+    // 容器兜底：当 drop 落在行间空隙（非 tr 元素）时，使用最后经过的目标 id
+    $.handleDropOnContainer = async function(e, type) {
+        var targetId = $.dragState.dragOverId;
+        if (targetId == null) {
+            $.handleDragEnd();
+            return;
+        }
+        await $.handleDrop(e, targetId, type);
     };
 
     $.handleDragEnd = function() {
