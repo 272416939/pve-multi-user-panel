@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.18.4-dragend-fallback';
+    window.__PKG_JS_VERSION = 'v2.18.5-stable';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -246,6 +246,7 @@
         $.dragState.draggingId = id;
         $.dragState.dragType = type;
         $.dragState.draggingType = type;
+        $.dragState.dragHandled = false;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/x-pve-drag', String(id));
         var list = $.getDragList(type);
@@ -254,25 +255,19 @@
             if (list[i].id === id) { fromIndex = i; break; }
         }
         $.dragState.dragFromIndex = fromIndex;
-        console.log('[drag] start id=' + id + ' type=' + type + ' fromIdx=' + fromIndex);
-        // 兜底：5 秒后如果还在拖拽状态（dragend 未触发），自动清理防止下次拖拽失效
+        // 兜底：30 秒后如果还在拖拽状态（异常情况），自动清理
         if ($.__dragFallbackTimer) clearTimeout($.__dragFallbackTimer);
         $.__dragFallbackTimer = setTimeout(function() {
             if ($.dragState.draggingId != null) {
-                console.log('[drag] fallback timer triggered, cleaning up');
                 $.handleDragEnd();
             }
-        }, 5000);
+        }, 30000);
     };
 
     $.handleDragOver = function(e, id, type) {
-        // 严格类型守卫：type 必须与当前 dragType 一致才处理
         if ($.dragState.dragType !== type) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        if ($.dragState.dragOverId !== id) {
-            console.log('[drag] over id=' + id + ' type=' + type);
-        }
         $.dragState.dragOverId = id;
         if ($.dragState.draggingId === id) return;
         if ($.dragState.dragFromIndex < 0 && $.dragState.draggingId != null) {
@@ -344,8 +339,8 @@
         e.preventDefault();
         var sourceId = $.dragState.draggingId;
         var dragType = $.dragState.dragType;
-        console.log('[drag] drop targetId=' + targetId + ' type=' + type + ' sourceId=' + sourceId + ' dragType=' + dragType);
-        if (sourceId == null) return;
+        if (sourceId == null || $.dragState.dragHandled) return;
+        $.dragState.dragHandled = true;
         $.clearAvoidClasses();
         if (sourceId === targetId || dragType !== type) {
             $.handleDragEnd();
@@ -373,7 +368,6 @@
 
     // 容器兜底：当 drop 落在行间空隙（非 tr 元素）时，使用最后经过的目标 id
     $.handleDropOnContainer = async function(e, type) {
-        console.log('[drag] dropOnContainer type=' + type + ' dragType=' + $.dragState.dragType + ' dragOverId=' + $.dragState.dragOverId + ' draggingId=' + $.dragState.draggingId);
         if ($.dragState.dragType !== type) return;
         var targetId = $.dragState.dragOverId;
         if (targetId == null) {
@@ -384,15 +378,13 @@
     };
 
     $.handleDragEnd = async function() {
-        console.log('[drag] end draggingId=' + $.dragState.draggingId + ' dragOverId=' + $.dragState.dragOverId);
         if ($.__dragFallbackTimer) { clearTimeout($.__dragFallbackTimer); $.__dragFallbackTimer = null; }
-        // 兜底：如果 draggingId 还在（说明 drop 没成功处理），且 dragOverId 有效，执行 reorder
-        // 这解决了套餐行拖拽时 drop 事件未触发（鼠标移出 tr 范围）导致拖拽失败的问题
+        // 兜底：如果 draggingId 还在（说明 drop 没成功处理），且 dragOverId 有效，且未处理过，执行 reorder
         var sourceId = $.dragState.draggingId;
         var targetId = $.dragState.dragOverId;
         var dragType = $.dragState.dragType;
-        if (sourceId != null && targetId != null && sourceId !== targetId && dragType != null) {
-            console.log('[drag] end fallback reorder: sourceId=' + sourceId + ' targetId=' + targetId + ' type=' + dragType);
+        if (sourceId != null && targetId != null && sourceId !== targetId && dragType != null && !$.dragState.dragHandled) {
+            $.dragState.dragHandled = true;
             var list = $.getDragList(dragType);
             var newOrder = list.map(function(p) { return p.id; });
             var fromIdx = newOrder.indexOf(sourceId);
