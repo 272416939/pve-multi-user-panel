@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.20.0-touch-support';
+    window.__PKG_JS_VERSION = 'v2.20.1-touch-fix';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -270,7 +270,7 @@
             }
             $.dragState.dragFromIndex = fi;
             // 触觉反馈
-            if (navigator.vibrate) navigator.vibrate(30);
+            try { if (navigator.vibrate) navigator.vibrate(30); } catch (err) {}
             document.body.style.userSelect = 'none';
         }, 500);
     };
@@ -278,7 +278,7 @@
     $.handleTouchMove = function(e) {
         if (!$.dragState.__touchLongPress) return;
         if (e.touches.length !== 1) return;
-        e.preventDefault();
+        if (e.cancelable) e.preventDefault(); else return;
         var touch = e.touches[0];
         var type = $.dragState.dragType;
         var underEl = document.elementFromPoint(touch.clientX, touch.clientY);

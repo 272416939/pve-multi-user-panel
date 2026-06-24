@@ -372,11 +372,13 @@ tr:hover td { background: var(--bg-hover); }
     user-select: none;
     -webkit-user-select: none;
     -moz-user-select: none;
+    touch-action: none;
 }
 .group-badge-draggable {
     cursor: grab;
     user-select: none;
     transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
+    touch-action: none;
 }
 .group-badge-draggable:hover {
     transform: translateY(-1px);
@@ -394,17 +396,4 @@ tr:hover td { background: var(--bg-hover); }
 }
 .group-badges-container .group-badge-draggable {
     margin-right: 0 !important;
-    touch-action: none;
-}
-/* 触摸设备：可拖拽行禁用默认触摸手势，允许我们接管 */
-@media (hover: none) and (pointer: coarse) {
-    .table tbody tr[draggable="true"],
-    .group-badge-draggable {
-        touch-action: none;
-    }
-    /* 小屏幕分组 badge 更大触摸目标 */
-    .group-badge-draggable {
-        padding: 0.4em 0.6em;
-        font-size: 0.85rem;
-    }
 }
