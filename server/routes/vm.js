@@ -10,12 +10,7 @@ const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 const vncProxy = require('../websocket/vnc-proxy');
-// H-9 修复：生产环境隐藏详细错误信息
-function safeError(e) {
-    const isDebug = process.env.DEBUG === 'true';
-    if (isDebug) return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
+const { safeError } = require('../utils/safe-error');
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -24,26 +19,29 @@ router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
         // 获取已分配的VMID
         const assignedVms = await db.vms.getAll();
         const assignedVmIds = new Set(assignedVms.map(vm => vm.vm_id));
-        
+
+        // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
+        const allUsers = await db.users.getAll();
+        const userMap = {};
+        allUsers.forEach(u => { userMap[u.id] = u; });
+
         // 将虚拟机分为待分配和已分配，并按VMID降序排序
         const availableVms = vms
             .filter(vm => !assignedVmIds.has(vm.vmid))
             .sort((a, b) => b.vmid - a.vmid);
         
-        const assignedVmsWithUsers = await Promise.all(
-            vms
+        const assignedVmsWithUsers = vms
             .filter(vm => assignedVmIds.has(vm.vmid))
             .sort((a, b) => b.vmid - a.vmid)
-            .map(async vm => {
+            .map(vm => {
                 const assignment = assignedVms.find(a => a.vm_id === vm.vmid);
-                const user = assignment ? await db.users.getById(assignment.user_id) : null;
+                const user = assignment ? userMap[assignment.user_id] : null;
                 return {
                     ...vm,
                     assigned_user: user ? user.username : null,
                     assignment_id: assignment ? assignment.id : null
                 };
-            })
-        );
+            });
         
         res.json({
             available: availableVms,
@@ -59,10 +57,14 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
     try {
         let userVms;
         if (req.user.role === 'admin') {
-            userVms = await Promise.all((await db.vms.getAll()).map(async vm => {
-                const user = await db.users.getById(vm.user_id);
+            // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
+            const allUsers = await db.users.getAll();
+            const userMap = {};
+            allUsers.forEach(u => { userMap[u.id] = u; });
+            userVms = (await db.vms.getAll()).map(vm => {
+                const user = userMap[vm.user_id];
                 return { ...vm, username: user?.username };
-            }));
+            });
         } else {
             userVms = await db.vms.getByUserId(req.user.id);
         }
@@ -81,29 +83,33 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
             };
         });
  
-        // 再尝试获取 PVE 状态，每个 VM 独立处理
-        for (const vmData of vmsWithDetails) {
-            try {
-                var cachedStatus = getStatusCache('vm:' + vmData.vm_id, req.user.id);
-                var rawStatus = cachedStatus || await pveApi.getVmStatus(vmData.vm_id);
-                var config = await pveApi.getVmConfig(vmData.vm_id);
-                vmData.status = cachedStatus || _applyRate('vm:' + vmData.vm_id, rawStatus);
-                vmData.config = config;
-                vmData.error = null;
-            } catch (innerError) {
-                var cachedFallback = getStatusCache('vm:' + vmData.vm_id, req.user.id);
-                if (cachedFallback) {
-                    vmData.status = cachedFallback;
+        // PERF-05: 并行查询 PVE 状态（分批，每批 10 个），替代串行 for 循环
+        const batchSize = 10;
+        for (let i = 0; i < vmsWithDetails.length; i += batchSize) {
+            const batch = vmsWithDetails.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (vmData) => {
+                try {
+                    var cachedStatus = getStatusCache('vm:' + vmData.vm_id, req.user.id);
+                    var rawStatus = cachedStatus || await pveApi.getVmStatus(vmData.vm_id);
+                    var config = await pveApi.getVmConfig(vmData.vm_id);
+                    vmData.status = cachedStatus || _applyRate('vm:' + vmData.vm_id, rawStatus);
+                    vmData.config = config;
                     vmData.error = null;
-                } else {
-                    const errMsg = innerError?.response?.data?.message || innerError?.message || '';
-                    if (innerError.response?.status === 404 || errMsg.includes('does not exist')) {
-                        vmData.destroyed = true;
+                } catch (innerError) {
+                    var cachedFallback = getStatusCache('vm:' + vmData.vm_id, req.user.id);
+                    if (cachedFallback) {
+                        vmData.status = cachedFallback;
+                        vmData.error = null;
                     } else {
-                        vmData.error = '获取虚拟机信息失败';
+                        const errMsg = innerError?.response?.data?.message || innerError?.message || '';
+                        if (innerError.response?.status === 404 || errMsg.includes('does not exist')) {
+                            vmData.destroyed = true;
+                        } else {
+                            vmData.error = '获取虚拟机信息失败';
+                        }
                     }
                 }
-            }
+            }));
         }
  
         res.json(vmsWithDetails);
@@ -136,6 +142,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
     const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id, monthly_price, quarterly_discount, yearly_discount } = req.body;
  
     if (!vm_id || !user_id) {
@@ -221,7 +228,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
             link_url: '',
             link_text: ''
         });
-    } catch (e) {}
+    } catch (e) { console.error('[vm] 站内信发送失败:', e.message); }
 
     const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
@@ -267,9 +274,14 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     }
     
     res.json(newVm);
+    } catch (e) {
+        console.error('[vm] 操作失败:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
 });
 
 router.put('/user/vms/:id', authMiddleware, async (req, res) => {
+    try {
     const vmId = parseInt(req.params.id);
     const { name, expiration_date, renewal_price, renewal_period, user_id, ikuai_mac_group_id } = req.body;
     
@@ -352,9 +364,14 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     }
     
     res.json({ message: '虚拟机信息更新成功' });
+    } catch (e) {
+        console.error('[vm] 操作失败:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
 });
 
 router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
     const vmId = parseInt(req.params.id);
     const vm = await db.vms.getById(vmId);
     let removedVmInfo = null;
@@ -442,6 +459,10 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     }
 
     res.json({ message: '虚拟机移除成功' });
+    } catch (e) {
+        console.error('[vm] 操作失败:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
 });
 
 router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {

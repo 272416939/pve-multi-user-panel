@@ -1,6 +1,28 @@
 const axios = require('axios');
 const https = require('https');
+const http = require('http');
 require('dotenv').config();
+
+// 对幂等 GET 请求进行重试（仅对 502/503/504/超时/连接重置 重试）
+async function withRetry(fn, maxRetries = 2) {
+  let lastErr;
+  for (let i = 0; i <= maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      if (e.code === 'ECONNRESET' || e.code === 'ETIMEDOUT' ||
+          (e.response && [502, 503, 504].includes(e.response.status))) {
+        if (i < maxRetries) {
+          await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+          continue;
+        }
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
+}
 
 class PveApi {
   constructor() {
@@ -8,8 +30,16 @@ class PveApi {
     this.apiToken = process.env.PVE_API_TOKEN;
     this.node = null;
     this.axiosInstance = axios.create({
-      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-      timeout: 10000,
+      httpsAgent: new https.Agent({
+        keepAlive: true,
+        maxSockets: 50,
+        rejectUnauthorized: false
+      }),
+      httpAgent: new http.Agent({
+        keepAlive: true,
+        maxSockets: 50
+      }),
+      timeout: 30000,
       headers: {
         'Authorization': `PVEAPIToken=${this.apiToken}`
       }
@@ -55,8 +85,16 @@ class PveApi {
     if (!this.node) {
       await this.detectNode();
     }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/status/current`);
-    return response.data.data;
+    try {
+      const response = await withRetry(() => this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/status/current`));
+      return response.data.data;
+    } catch (e) {
+      if (e.response && [404, 500].includes(e.response.status)) {
+        this.node = null;
+        await this.detectNode();
+      }
+      throw e;
+    }
   }
 
   async getVmConfig(vmid) {
@@ -267,8 +305,16 @@ class PveApi {
     if (!this.node) {
       await this.detectNode();
     }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/tasks/${encodeURIComponent(upid)}/status`);
-    return response.data.data;
+    try {
+      const response = await withRetry(() => this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/tasks/${encodeURIComponent(upid)}/status`));
+      return response.data.data;
+    } catch (e) {
+      if (e.response && [404, 500].includes(e.response.status)) {
+        this.node = null;
+        await this.detectNode();
+      }
+      throw e;
+    }
   }
 
   async deleteBackupFile(volid) {
@@ -331,8 +377,16 @@ class PveApi {
     if (!this.node) {
       await this.detectNode();
     }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/status/current`);
-    return response.data.data;
+    try {
+      const response = await withRetry(() => this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/status/current`));
+      return response.data.data;
+    } catch (e) {
+      if (e.response && [404, 500].includes(e.response.status)) {
+        this.node = null;
+        await this.detectNode();
+      }
+      throw e;
+    }
   }
 
   async getLxcConfig(vmid) {
@@ -486,16 +540,22 @@ class PveApi {
   }
 
   async getNextAvailableVmid() {
-    if (!this.node) {
-      await this.detectNode();
+    try {
+      const resp = await withRetry(() => this.axiosInstance.get(`${this.host}/api2/json/cluster/nextid`));
+      return parseInt(resp.data.data);
+    } catch (e) {
+      console.warn('[pve-api] /cluster/nextid 失败，回退到手动计算:', e.message);
+      if (!this.node) {
+        await this.detectNode();
+      }
+      const [qemuVms, lxcCts] = await Promise.all([
+        this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/qemu`).then(r => r.data.data || []),
+        this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/lxc`).then(r => r.data.data || [])
+      ]);
+      const allIds = [...qemuVms, ...lxcCts].map(vm => parseInt(vm.vmid)).filter(id => !isNaN(id));
+      const maxId = allIds.length > 0 ? Math.max(...allIds) : 99;
+      return maxId + 1;
     }
-    const [qemuVms, lxcCts] = await Promise.all([
-      this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/qemu`).then(r => r.data.data || []),
-      this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/lxc`).then(r => r.data.data || [])
-    ]);
-    const allIds = [...qemuVms, ...lxcCts].map(vm => parseInt(vm.vmid)).filter(id => !isNaN(id));
-    const maxId = allIds.length > 0 ? Math.max(...allIds) : 99;
-    return maxId + 1;
   }
 
   async restoreLxcBackup(vmid, volid, storage) {

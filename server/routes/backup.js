@@ -5,12 +5,7 @@ const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const dbg = require('../utils/debug');
 const { startLxcBackupPolling, sendLxcRestoreNotification, startBackupPolling, startRestorePolling } = require('../services/backup-polling');
-// H-9 修复：生产环境隐藏详细错误信息
-function safeError(e) {
-    const isDebug = process.env.DEBUG === 'true';
-    if (isDebug) return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
+const { safeError } = require('../utils/safe-error');
 router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);

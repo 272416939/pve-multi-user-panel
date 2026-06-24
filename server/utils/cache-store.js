@@ -65,13 +65,14 @@ function create(namespace, ttlSeconds) {
     var ttlMs = (ttlSeconds || 60) * 1000;
     var memStore = getMemoryStore(namespace, ttlMs);
 
-    return {
+    var cache = {
         /**
          * 读取缓存（自动反序列化 JSON）
          * @param {string} key
+         * @param {function} [loader] - 可选的回源函数，缓存未命中时调用
          * @returns {Promise<any|null>}
          */
-        async get(key) {
+        async get(key, loader) {
             var fullKey = namespace + ':' + key;
             // 1. 内存缓存
             var entry = memStore.map.get(key);
@@ -92,6 +93,19 @@ function create(namespace, ttlSeconds) {
                     // Redis 异常，静默回退
                 }
             }
+
+            // 3. 缓存未命中且有 loader，回源查询（缓存穿透防护）
+            if (typeof loader === 'function') {
+                var value = await loader(key);
+                if (value === null || value === undefined) {
+                    // 缓存空值防止穿透，短 TTL
+                    await cache.set(key, null, Math.floor(ttlSeconds / 4 || 10));
+                    return null;
+                }
+                await cache.set(key, value);
+                return value;
+            }
+
             return null;
         },
 
@@ -104,13 +118,16 @@ function create(namespace, ttlSeconds) {
         async set(key, value, customTtl) {
             var fullKey = namespace + ':' + key;
             var ttl = customTtl || ttlSeconds;
+            // 添加 ±10% 随机偏移防止雪崩
+            var jitter = Math.floor(ttl * 0.1 * (Math.random() - 0.5) * 2);
+            var actualTtl = ttl + jitter;
             // 写内存
             memStore.map.set(key, { value: value, ts: Date.now() });
             // 写 Redis
             if (redisClient) {
                 try {
                     var raw = (typeof value === 'string') ? value : JSON.stringify(value);
-                    await redisClient.set(fullKey, raw, 'EX', ttl);
+                    await redisClient.set(fullKey, raw, 'EX', actualTtl);
                 } catch (e) {
                     // Redis 异常，静默回退
                 }
@@ -143,6 +160,7 @@ function create(namespace, ttlSeconds) {
             memStore.map.clear();
         }
     };
+    return cache;
 }
 
 /**

@@ -4,6 +4,24 @@ const { resumeRunningBackups, resumeRunningLxcBackups } = require('../services/b
 const { syncPortForwardsFromIkuai } = require('../services/ikuai-sync');
 const ikuaiApi = require('../api/ikuai-api');
 const { generateOrderNo } = require('../utils/order-utils');
+const { withTransaction } = require('../utils/with-transaction');
+const redis = require('../api/redis').getRedisClient();
+
+// PERF-25: 分布式锁，防止多实例重复执行到期检查
+async function tryAcquireLock(lockKey, ttl = 300) {
+    if (!redis) return true; // 无 Redis 时跳过锁
+    try {
+        const result = await redis.set(lockKey, '1', 'EX', ttl, 'NX');
+        return result === 'OK';
+    } catch (e) {
+        return true; // Redis 异常时不阻止执行
+    }
+}
+
+async function releaseLock(lockKey) {
+    if (!redis) return;
+    try { await redis.del(lockKey); } catch (e) {}
+}
 
 // SEC-05: 启动时恢复因服务器崩溃导致的开通中孤儿记录
 // 扫描 pve_upid 非空的记录，查询 PVE 真实任务状态并做善后处理
@@ -56,16 +74,22 @@ async function recoverProvisioningTasks() {
                         if (matchedOrder) {
                             var refundAmount = parseFloat(matchedOrder.amount);
                             if (refundAmount > 0) {
-                                var refundUser = await db.users.incrementBalance(record.user_id, refundAmount);
-                                var balanceAfterRefund = parseFloat(refundUser.balance || '0');
                                 var refundOrderNo = generateOrderNo('refund');
-                                await db.transactionRecords.create({
-                                    user_id: record.user_id, order_no: refundOrderNo, pay_time: db.now(),
-                                    pay_method: 'balance_refund', trade_type: 'refund', amount: refundAmount,
-                                    balance_before: balanceAfterRefund - refundAmount, balance_after: balanceAfterRefund,
-                                    trade_no: matchedOrder.order_no, api_trade_no: ''
+                                // ARCH-12: 退款+流水+订单状态三步放入事务，保证原子性
+                                await withTransaction(async (conn) => {
+                                    // 1. 退款（原子增量）
+                                    await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [refundAmount, record.user_id]);
+                                    // 2. 查询退款后余额
+                                    var [userRows] = await conn.execute('SELECT balance FROM users WHERE id = ?', [record.user_id]);
+                                    var balanceAfterRefund = parseFloat((userRows[0] && userRows[0].balance) || '0');
+                                    // 3. 创建退款流水
+                                    await conn.execute(
+                                        'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                                        [record.user_id, refundOrderNo, db.now(), 'balance_refund', 'refund', refundAmount, null, null, balanceAfterRefund - refundAmount, balanceAfterRefund, null, null, matchedOrder.order_no, '', db.now()]
+                                    );
+                                    // 4. 订单标记 refunded（ARCH-03: 不再吞错，失败则事务回滚）
+                                    await conn.execute('UPDATE orders SET `status` = ? WHERE order_no = ?', ['refunded', matchedOrder.order_no]);
                                 });
-                                try { await db.orders.updateStatus(matchedOrder.order_no, 'refunded'); } catch (e) {}
                                 console.warn('[recovery] ' + type + ' ' + record.id + ' 已退款 ¥' + refundAmount + '，订单 ' + matchedOrder.order_no + ' 标记 refunded');
                             }
                         } else {
@@ -101,9 +125,15 @@ async function recoverProvisioningTasks() {
 }
 
 function initScheduledTasks() {
-    schedule.scheduleJob('*/5 * * * *', () => {
-        checkExpiredVms();
-        checkExpiredLxc();
+    schedule.scheduleJob('*/5 * * * *', async () => {
+        if (await tryAcquireLock('lock:expiry-check')) {
+            try {
+                await checkExpiredVms();
+                await checkExpiredLxc();
+            } finally {
+                await releaseLock('lock:expiry-check');
+            }
+        }
     });
 
     setTimeout(async () => {

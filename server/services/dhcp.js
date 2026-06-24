@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const ikuaiApi = require('../api/ikuai-api');
 const db = require('../api/db');
 
@@ -24,7 +25,7 @@ async function pickUnusedStaticIp() {
             console.warn('[DHCP] IP 范围已用尽:', rangeStart + '-' + rangeEnd);
             return '';
         }
-        const picked = candidates[Math.floor(Math.random() * candidates.length)];
+        const picked = candidates[crypto.randomInt(0, candidates.length)];
         return picked;
     } catch (e) {
         console.error('[DHCP] 选取空闲 IP 失败:', e.message);

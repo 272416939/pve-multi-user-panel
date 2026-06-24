@@ -8,22 +8,8 @@ const { createEmailTemplate, sendEmail } = require('../utils/email');
 const dbg = require('../utils/debug');
 const { getPeriodMonths, calculateAmount, generateOrderNo } = require('../utils/order-utils');
 const pveApi = require('../api/pve-api');
-
-function safeError(e) {
-    if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
-
-// 将 Date 对象格式化为本地时间字符串 YYYY-MM-DD HH:MM:SS（避免 toISOString() 转换为 UTC）
-function formatLocalDate(d) {
-    var y = d.getFullYear();
-    var m = String(d.getMonth() + 1).padStart(2, '0');
-    var dd = String(d.getDate()).padStart(2, '0');
-    var h = String(d.getHours()).padStart(2, '0');
-    var mi = String(d.getMinutes()).padStart(2, '0');
-    var s = String(d.getSeconds()).padStart(2, '0');
-    return y + '-' + m + '-' + dd + ' ' + h + ':' + mi + ':' + s;
-}
+const { safeError } = require('../utils/safe-error');
+const { formatLocalDate } = require('../utils/date');
 
 var callbackRateLimiter = new Map();
 function checkCallbackRate(ip) {
@@ -601,16 +587,25 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         var newExpiration = formatLocalDate(oldExpiration);
         
         var newBalance = (balance - totalPrice).toFixed(2);
-        // PAY-6 修复：原子余额扣减，避免 read-modify-write 竞态
-        await db.users.incrementBalance(userId, -totalPrice);
-        
-        if (type === 'vm') {
-            await db.vms.update(resource.id, { expiration_date: newExpiration });
-        } else {
-            await db.lxcContainers.update(resource.id, { expiration_date: newExpiration });
-        }
-        
-        // 续费后自动开机
+        var orderNo = generateOrderId('RENEWAL');
+        // ARCH-10: 扣款+更新到期时间+流水记录三步放入事务，保证原子性
+        await withTransaction(async (conn) => {
+            // 1. 扣款（原子扣减）
+            await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalPrice, userId]);
+            // 2. 更新到期时间
+            if (type === 'vm') {
+                await conn.execute('UPDATE vms SET expiration_date = ? WHERE id = ?', [newExpiration, resource.id]);
+            } else {
+                await conn.execute('UPDATE lxc_containers SET expiration_date = ? WHERE id = ?', [newExpiration, resource.id]);
+            }
+            // 3. 创建流水
+            await conn.execute(
+                'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [userId, orderNo, db.now(), 'balance', 'renewal', totalPrice.toFixed(2), period, qty, balance.toFixed(2), newBalance, type, resource.vm_id || resource.ct_id || resource.id, null, null, db.now()]
+            );
+        });
+
+        // 续费后自动开机（PVE 操作不放入事务，避免长事务）
         try {
             var renewVmid = type === 'vm' ? resource.vm_id : resource.ct_id;
             if (type === 'vm') {
@@ -625,23 +620,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
                 }
             }
         } catch (startErr) { console.error('[wallet] 续费自动开机失败:', startErr.message); }
-        
-        var orderNo = generateOrderId('RENEWAL');
-        await db.transactionRecords.create({
-            user_id: userId,
-            order_no: orderNo,
-            pay_time: db.now(),
-            pay_method: 'balance',
-            trade_type: 'renewal',
-            amount: totalPrice.toFixed(2),
-            period: period,
-            period_count: qty,
-            balance_before: balance.toFixed(2),
-            balance_after: newBalance,
-            resource_type: type,
-            resource_id: resource.vm_id || resource.ct_id || resource.id
-        });
-        
+
         var resourceName = resource.name || (type === 'vm' ? 'VM ' + resource.vm_id : 'CT ' + resource.ct_id);
         var periodStr = period === 'year' ? qty + '年' : period === 'quarter' ? qty + '季' : qty + '个月';
         var expiryDisplay = newExpiration ? new Date(newExpiration).toLocaleString('zh-CN') : '永久有效';

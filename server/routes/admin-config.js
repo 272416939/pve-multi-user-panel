@@ -10,12 +10,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { loadSentRemindersFromDb, checkExpiredVms, checkExpiredLxc } = require('../services/expiry-check');
 const pkg = require('../../package.json');
-// H-9 修复：生产环境隐藏详细错误信息
-function safeError(e) {
-    const isDebug = process.env.DEBUG === 'true';
-    if (isDebug) return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
+const { safeError } = require('../utils/safe-error');
 
 function maskSecret(value) {
     if (!value || value.length < 5) return value || '';

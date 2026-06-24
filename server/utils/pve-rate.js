@@ -46,4 +46,9 @@ function clearExpiredCache() {
     }
 }
 
+// 每小时清理过期的速率限制缓存，防止内存泄漏
+setInterval(() => {
+    clearExpiredCache();
+}, 3600000).unref();
+
 module.exports = { _applyRate, clearExpiredCache };

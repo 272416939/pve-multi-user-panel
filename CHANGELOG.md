@@ -1,5 +1,37 @@
 # Changelog
 
+## [2.28.1] - 2026-06-25
+
+### Fixed
+- fix(security): Math.random 替换为 crypto.randomInt/randomBytes（CDK 生成、随机端口、批次ID、DHCP 分配）
+- fix(security): 抽取 sanitizeUser 公共函数统一剔除 password/totp_secret/recovery_codes/api_key 等敏感字段，消除 14+ 文件重复解构
+- fix(security): 修复 otplib.verifySync → otplib.authenticator.verifySync（auth.js / user.js）
+- fix(security): /auth/refresh 添加 30次/分钟 速率限制
+- fix(security): 前端 pv-table/pv-modal/pv-card 添加 escapeHtml 防 XSS
+- fix(security): VNC 页面 innerHTML 改为 createElement + textContent
+- fix(arch): async 路由添加 try-catch 防止 unhandledRejection（vm.js / lxc.js）
+- fix(arch): 空 catch 块补充 console.error 避免静默吞错
+- fix(perf): 修复 backup-polling 中 async filter 永远返回 truthy 的 bug
+- fix(perf): 修复 WebSocket statusCache key 不一致（存储无 userId，读取有 userId）导致缓存永远 miss
+- fix(perf): 修复 N+1 查询（vm/lxc/network/expiry-check 预加载 userMap）
+
+### Changed
+- refactor(arch): 新增 withTransaction 事务封装用于订购/续费/退款/删除用户级联操作
+- refactor(arch): 新增 safeError/formatLocalDate 公共函数消除重复定义
+- refactor(arch): 添加 process 级 unhandledRejection/uncaughtException 处理
+- refactor(perf): 新增 16 个数据库索引（safeAddIndex 幂等创建）
+- refactor(perf): PVE API 添加 withRetry 重试（ECONNRESET/502/503/504 指数退避）+ axios 连接池
+- refactor(perf): cache-store 添加 null 缓存防穿透 + TTL ±10% 随机偏移防雪崩
+- refactor(perf): WebSocket 连接数上限（MAX_CONNECTIONS=1000, MAX_PER_IP=20）+ statusCacheGlobal 上限 10000
+- refactor(perf): 终端代理添加 30 分钟空闲超时检测
+- refactor(perf): 定时任务添加 Redis 分布式锁（SETNX）确保多实例单实例执行
+- refactor(db): MySQL 连接池配置读取环境变量（MYSQL_CONNECTION_LIMIT/MYSQL_QUEUE_LIMIT 等）
+- refactor(deploy): 静态资源缓存策略优化（HTML no-cache，JS/CSS max-age=3600）
+- refactor(deploy): .env.example 补全 DEFAULT_ADMIN_PASSWORD/ALLOWED_ORIGINS/TZ
+
+### Added
+- feat(ops): 添加 /health 健康检查端点（返回 status/version/timestamp）
+
 ## [2.28.0] - 2026-06-25
 
 ### Added

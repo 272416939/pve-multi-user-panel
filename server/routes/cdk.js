@@ -1,27 +1,13 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { generateUniqueCdkCode } = require('../utils/cdk-generator');
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
-// H-9 修复：生产环境隐藏详细错误信息
-function safeError(e) {
-    const isDebug = process.env.DEBUG === 'true';
-    if (isDebug) return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
-
-// 将 Date 对象格式化为本地时间字符串 YYYY-MM-DD HH:MM:SS（避免 toISOString() 转换为 UTC）
-function formatLocalDate(d) {
-    var y = d.getFullYear();
-    var m = String(d.getMonth() + 1).padStart(2, '0');
-    var dd = String(d.getDate()).padStart(2, '0');
-    var h = String(d.getHours()).padStart(2, '0');
-    var mi = String(d.getMinutes()).padStart(2, '0');
-    var s = String(d.getSeconds()).padStart(2, '0');
-    return y + '-' + m + '-' + dd + ' ' + h + ':' + mi + ':' + s;
-}
+const { safeError } = require('../utils/safe-error');
+const { formatLocalDate } = require('../utils/date');
 
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const pveApi = require('../api/pve-api');
@@ -76,7 +62,7 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
         const targetNum = Math.min(Math.max(parseInt(count) || 1, 1), 1000);
         // 选中用户时，每人自动生成一个 CDK
         const num = targetUsers.length > 0 ? targetUsers.length : targetNum;
-        const batchId = `BATCH-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+        const batchId = `BATCH-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
         const createdCdkCodes = [];
  
         // 生成 CDK，轮询分配给多用户

@@ -7,13 +7,10 @@ const { authMiddleware, adminMiddleware, invalidateUserActiveCache } = require('
 const cacheStore = require('../utils/cache-store');
 const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 const { generateOrderNo } = require('../utils/order-utils');
+const { withTransaction } = require('../utils/with-transaction');
+const { safeError } = require('../utils/safe-error');
 // 用户列表缓存（30s TTL，低频变更场景）
 const userListCache = cacheStore.create('admin_users', 30);
-
-function safeError(e) {
-    if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
 
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -112,28 +109,16 @@ router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) =>
         return res.status(400).json({ error: '不能删除自己的账号' });
     }
 
-    const userVms = await db.vms.getByUserId(userId);
-    for (const vm of userVms) {
-        await db.vms.delete(vm.id);
-    }
-
-    // M-3 修复：删除用户时同步清理 LXC 容器分配记录
-    const userCts = await db.lxcContainers.getByUserId(userId);
-    for (const ct of userCts) {
-        await db.lxcContainers.delete(ct.id);
-    }
-
-    const userMemos = await db.memos.getByUserId(userId);
-    for (const memo of userMemos) {
-        await db.memos.delete(memo.id);
-    }
-
-    await db.passwordResetTokens.deleteByUserId(userId);
-
-    await db.refreshTokens.revokeByUserId(userId);
-    if (db.recoveryCodes) await db.recoveryCodes.deleteByUserId(userId);
-
-    await db.users.delete(userId);
+    // ARCH-11: 级联删除放入事务，保证原子性
+    await withTransaction(async (conn) => {
+        await conn.execute('DELETE FROM vms WHERE user_id = ?', [userId]);
+        await conn.execute('DELETE FROM lxc_containers WHERE user_id = ?', [userId]);
+        await conn.execute('DELETE FROM memos WHERE user_id = ?', [userId]);
+        await conn.execute('DELETE FROM password_reset_tokens WHERE user_id = ?', [userId]);
+        await conn.execute('DELETE FROM refresh_tokens WHERE user_id = ?', [userId]);
+        await conn.execute('DELETE FROM recovery_codes WHERE user_id = ?', [userId]);
+        await conn.execute('DELETE FROM users WHERE id = ?', [userId]);
+    });
     await userListCache.del('list');
     await invalidateUserActiveCache(userId);
     res.json({ message: '用户删除成功' });

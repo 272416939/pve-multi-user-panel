@@ -1,17 +1,30 @@
 /**
+ * HTML 转义，防止 innerHTML 拼接用户数据导致 XSS
+ */
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
  * pv-modal - 模态框组件
- * 
+ *
  * 属性:
  *   title: 模态框标题
  *   size: sm | md | lg (默认 md)
- * 
+ *
  * 方法:
  *   open() - 打开模态框
  *   close() - 关闭模态框
- * 
+ *
  * 事件:
  *   pv-modal-close - 模态框关闭时触发
- * 
+ *
  * 使用方式:
  *   <pv-modal id="myModal" title="编辑" size="lg">
  *     <div>内容</div>
@@ -192,7 +205,7 @@ class PvModal extends HTMLElement {
       <div class="modal-overlay">
         <div class="modal-content">
           <div class="modal-header">
-            <h3 class="modal-title">${title}</h3>
+            <h3 class="modal-title">${escapeHtml(title)}</h3>
             <button class="modal-close" aria-label="关闭">&times;</button>
           </div>
           <div class="modal-body">

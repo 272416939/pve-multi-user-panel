@@ -1,10 +1,23 @@
 /**
+ * HTML 转义，防止 innerHTML 拼接用户数据导致 XSS
+ */
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
  * pv-card - 卡片组件
- * 
+ *
  * 属性:
  *   title: 卡片标题
  *   collapsible: 是否可折叠 (无值属性)
- * 
+ *
  * 使用方式:
  *   <pv-card title="标题">内容</pv-card>
  *   <pv-card title="可折叠" collapsible>内容</pv-card>
@@ -62,7 +75,7 @@ class PvCard extends HTMLElement {
 
     const headerHtml = title ? `
       <div class="card-header">
-        <span class="card-title">${title}</span>
+        <span class="card-title">${escapeHtml(title)}</span>
         ${collapsible ? '<span class="collapse-arrow" style="transition:transform 0.2s;display:inline-block;">▼</span>' : ''}
       </div>
     ` : '';

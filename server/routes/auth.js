@@ -13,6 +13,7 @@ const tokenStore = require('../utils/token-store');
 const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
 
 const { checkRateLimit } = require('../middleware/rate-limiter');
+const { sanitizeUser } = require('../utils/safe-error');
 const RATELIMIT_PREFIX = 'ratelimit:login:';
 
 // 本地时间格式化：返回 YYYY-MM-DD HH:MM:SS（Asia/Shanghai）
@@ -103,7 +104,7 @@ router.post('/login', async (req, res) => {
 
     if (await db.twofa.isEnabled(user.id)) {
         const partialToken = generatePartialToken(user);
-        const { password: _, ...safeUser } = user;
+        const safeUser = sanitizeUser(user);
         return res.json({
             twofa_required: true,
             partial_token: partialToken,
@@ -114,7 +115,7 @@ router.post('/login', async (req, res) => {
     
     const token = generateAccessToken(user, record.id);
 
-    const { password: _, ...safeUser } = user;
+    const safeUser = sanitizeUser(user);
     // P1-C2 修复：如果用户需要强制改密，在响应中标记
     if (user.must_change_password) {
         return res.json({ token, refreshToken, user: safeUser, must_change_password: true });
@@ -162,7 +163,7 @@ router.post('/login/2fa', async (req, res) => {
         const secret = await db.twofa.getSecret(user.id);
         if (secret) {
             try {
-                isValidTotp = otplib.verifySync({ token: code, secret }).valid;
+                isValidTotp = otplib.authenticator.verifySync({ token: code, secret });
             } catch {
             }
         }
@@ -192,7 +193,7 @@ router.post('/login/2fa', async (req, res) => {
         }
 
         const token = generateAccessToken(user, record.id);
-        const { password: _, ...safeUser } = user;
+        const safeUser = sanitizeUser(user);
         if (user.must_change_password) {
             return res.json({ token, refreshToken, user: safeUser, must_change_password: true });
         }
@@ -225,7 +226,7 @@ router.post('/login/2fa', async (req, res) => {
                 });
             }
             const token = generateAccessToken(user, record.id);
-            const { password: _, ...safeUser } = user;
+            const safeUser = sanitizeUser(user);
             if (user.must_change_password) {
                 return res.json({ token, refreshToken, user: safeUser, must_change_password: true });
             }
@@ -238,6 +239,9 @@ router.post('/login/2fa', async (req, res) => {
 
 router.post('/auth/refresh', async (req, res) => {
     try {
+        var rateLimitResult = await checkRateLimit('ratelimit:refresh:' + req.ip, 30, 60000);
+        if (!rateLimitResult.allowed) return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
+
         const { refreshToken } = req.body;
         if (!refreshToken) return res.status(400).json({ error: '缺少 refreshToken' });
 

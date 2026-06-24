@@ -1,15 +1,28 @@
 /**
+ * HTML 转义，防止 innerHTML 拼接用户数据导致 XSS
+ */
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+/**
  * pv-table - 数据表格组件
- * 
+ *
  * 属性:
  *   striped: 斑马纹 (无值属性)
  *   hover: 悬停高亮 (无值属性)
  *   sm: 紧凑模式 (无值属性)
- * 
+ *
  * 方法:
  *   setData(data) - 设置表格数据
  *   setColumns(columns) - 设置列定义 [{label, field, width, align, render}]
- * 
+ *
  * 使用方式:
  *   <pv-table id="myTable" striped hover></pv-table>
  *   const table = document.getElementById('myTable');
@@ -61,7 +74,7 @@ class PvTable extends HTMLElement {
     thead.innerHTML = '<tr>' + this._columns.map(col => {
       const width = col.width ? `style="width:${col.width}"` : '';
       const align = col.align ? `style="text-align:${col.align}"` : '';
-      return `<th ${width} ${align}>${col.label || ''}</th>`;
+      return '<th ' + width + ' ' + align + '>' + escapeHtml(col.label || '') + '</th>';
     }).join('') + '</tr>';
 
     // 渲染表体
@@ -71,13 +84,16 @@ class PvTable extends HTMLElement {
     } else {
       tbody.innerHTML = this._data.map((row, idx) => {
         const rowClass = this.isStriped && idx % 2 === 1 ? ' class="striped"' : '';
-        return `<tr${rowClass}>` + this._columns.map(col => {
+        return '<tr' + rowClass + '>' + this._columns.map(col => {
           let value = col.field ? (row[col.field] !== undefined ? row[col.field] : '') : '';
+          let isRenderedHtml = false;
           if (col.render && typeof col.render === 'function') {
             value = col.render(value, row);
+            isRenderedHtml = true; // render 返回 HTML，不再转义
           }
           const align = col.align ? `style="text-align:${col.align}"` : '';
-          return `<td ${align}>${value}</td>`;
+          // 仅对直接取值的字段转义；render 返回的 HTML 保持原样
+          return '<td ' + align + '>' + (isRenderedHtml ? value : escapeHtml(value)) + '</td>';
         }).join('') + '</tr>';
       }).join('');
     }

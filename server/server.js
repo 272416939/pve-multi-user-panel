@@ -27,6 +27,15 @@ if (!fs.existsSync(envPath)) {
     process.exit(1);
 }
 
+// 注册 process 级错误处理，防止 unhandledRejection/uncaughtException 导致进程无日志退出
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+    console.error('[uncaughtException]', err.stack || err.message || err);
+    process.exit(1);
+});
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -93,8 +102,10 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '../public'), {
     setHeaders: (res, filePath) => {
         res.removeHeader('Expires');
-        if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
-            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+        } else if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
+            res.setHeader('Cache-Control', 'public, max-age=3600');
         } else {
             res.setHeader('Cache-Control', 'public, max-age=3600');
         }
@@ -123,6 +134,11 @@ app.use('/images', express.static(path.join(__dirname, '../images'), {
 // 版本号接口（需认证）
 app.get('/api/version', authMiddleware, (req, res) => {
     res.json({ version: pkg.version });
+});
+
+// 健康检查端点（供负载均衡器/K8s 探测，无需认证）
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', version: pkg.version, timestamp: new Date().toISOString() });
 });
 
 // 公开接口：获取站点配置（供前端和登录页使用）

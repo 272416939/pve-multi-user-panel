@@ -2,11 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-
-function safeError(e) {
-    if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
+const { safeError } = require('../utils/safe-error');
 
 // ========== 全平台交易流水 (admin) ==========
 router.get('/admin/transactions', authMiddleware, adminMiddleware, async (req, res) => {

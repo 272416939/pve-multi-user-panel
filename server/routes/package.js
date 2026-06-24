@@ -12,25 +12,15 @@ var { execSSHWithStdin } = require('../api/ssh-exec');
 var crypto = require('crypto');
 var cacheStore = require('../utils/cache-store');
 var { checkRateLimit } = require('../middleware/rate-limiter');
+var { withTransaction } = require('../utils/with-transaction');
+const { safeError } = require('../utils/safe-error');
+const { formatLocalDate } = require('../utils/date');
 
 var VALID_PERIODS = ['month', 'quarter', 'year'];
 
 // 套餐列表缓存（5 分钟 TTL，低频变更场景）
 var vmPackageCache = cacheStore.create('vm_packages', 300);
 var lxcPackageCache = cacheStore.create('lxc_packages', 300);
-
-function safeError(e) { return process.env.DEBUG === 'true' ? e.message : '服务器错误'; }
-
-// 将 Date 对象格式化为本地时间字符串 YYYY-MM-DD HH:MM:SS（避免 toISOString() 转换为 UTC）
-function formatLocalDate(d) {
-    var y = d.getFullYear();
-    var m = String(d.getMonth() + 1).padStart(2, '0');
-    var dd = String(d.getDate()).padStart(2, '0');
-    var h = String(d.getHours()).padStart(2, '0');
-    var mi = String(d.getMinutes()).padStart(2, '0');
-    var s = String(d.getSeconds()).padStart(2, '0');
-    return y + '-' + m + '-' + dd + ' ' + h + ':' + mi + ':' + s;
-}
 
 function generateRandomPassword() {
     var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -113,26 +103,33 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
         var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
-        var balResult = await deductBalance(userId, totalAmount, db);
 
         var randomName = generateVmName();
         var newVmid = await pveApi.getNextAvailableVmid();
 
         // 下单即生成订单与扣款流水（先扣款后开通，失败退款）
+        // ARCH-09: 扣款+订单创建+流水记录三步放入事务，保证原子性
         var orderNo = generateOrderNo('vm');
-        await db.orders.create({
-            order_no: orderNo, user_id: userId, type: 'vm', package_id: pkg.id,
-            template_id: template.id, period: period, period_count: period_count,
-            amount: totalAmount, cores: template.cores, memory: template.memory,
-            disk_size: template.disk_size, resource_name: randomName, resource_id: String(newVmid),
-            mac_group_id: finalMacGroupId || '', status: 'pending'
-        });
-        await db.transactionRecords.create({
-            user_id: userId, order_no: orderNo, pay_time: db.now(),
-            pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
-            balance_before: balResult.balanceBefore, balance_after: balResult.balanceAfter,
-            period: period, period_count: period_count,
-            trade_no: '', api_trade_no: ''
+        var balanceBefore = 0;
+        var balanceAfter = 0;
+        await withTransaction(async (conn) => {
+            // 1. 查询余额并校验
+            var [userRows] = await conn.execute('SELECT balance FROM users WHERE id = ?', [userId]);
+            balanceBefore = parseFloat((userRows[0] && userRows[0].balance) || '0');
+            if (balanceBefore < totalAmount) throw new Error('余额不足');
+            // 2. 扣款
+            await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, userId]);
+            balanceAfter = balanceBefore - totalAmount;
+            // 3. 创建订单
+            await conn.execute(
+                'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [orderNo, userId, 'vm', pkg.id, template.id, period, period_count, totalAmount, template.cores, template.memory, template.disk_size, randomName, String(newVmid), 'pending']
+            );
+            // 4. 创建流水
+            await conn.execute(
+                'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [userId, orderNo, db.now(), 'balance', 'new_order', totalAmount, period, period_count, balanceBefore, balanceAfter, null, null, '', '', db.now()]
+            );
         });
 
         // 检查模板 VM 状态，full clone 需要模板处于停止状态
@@ -206,7 +203,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             } catch (dhcpErr) { console.error('[package] VM DHCP绑定失败:', dhcpErr.message); }
         } catch (provErr) {
             // 开通失败：清理预创建记录、退款、创建退款流水、订单标记 refunded、发送站内信
-            if (newVm) { try { await db.vms.delete(newVm.id); } catch (e) {} }
+            if (newVm) { try { await db.vms.delete(newVm.id); } catch (e) { console.error('[package] 订单状态更新失败:', e.message); } }
             var refundUser = await db.users.incrementBalance(userId, totalAmount);
             var balanceAfterRefund = parseFloat(refundUser.balance || '0');
             var refundOrderNo = generateOrderNo('refund');
@@ -217,7 +214,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                 period: period, period_count: period_count,
                 trade_no: orderNo, api_trade_no: ''
             });
-            try { await db.orders.updateStatus(orderNo, 'refunded'); } catch (e) {}
+            try { await db.orders.updateStatus(orderNo, 'refunded'); } catch (e) { console.error('[package] 订单状态更新失败:', e.message); }
             try {
                 await db.messages.create({
                     uid: userId, title: '虚拟机开通失败',
@@ -229,7 +226,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         }
 
         // 开通成功，订单标记完成
-        try { await db.orders.updateStatus(orderNo, 'completed'); } catch (e) {}
+        try { await db.orders.updateStatus(orderNo, 'completed'); } catch (e) { console.error('[package] 订单状态更新失败:', e.message); }
 
         // 增加已售数量，并扣减剩余库存（-1 不限量不扣减）
         try {
@@ -326,26 +323,33 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
         var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
-        var balResult = await deductBalance(userId, totalAmount, db);
 
         var randomName = generateLxcName();
         var newVmid = await pveApi.getNextAvailableVmid();
 
         // 下单即生成订单与扣款流水（先扣款后开通，失败退款）
+        // ARCH-09: 扣款+订单创建+流水记录三步放入事务，保证原子性
         var orderNo = generateOrderNo('lxc');
-        await db.orders.create({
-            order_no: orderNo, user_id: userId, type: 'lxc', package_id: pkg.id,
-            template_id: template.id, period: period, period_count: period_count,
-            amount: totalAmount, cores: template.cores, memory: template.memory,
-            disk_size: template.disk_size, resource_name: randomName, resource_id: String(newVmid),
-            mac_group_id: finalMacGroupId || '', status: 'pending'
-        });
-        await db.transactionRecords.create({
-            user_id: userId, order_no: orderNo, pay_time: db.now(),
-            pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
-            balance_before: balResult.balanceBefore, balance_after: balResult.balanceAfter,
-            period: period, period_count: period_count,
-            trade_no: '', api_trade_no: ''
+        var balanceBefore = 0;
+        var balanceAfter = 0;
+        await withTransaction(async (conn) => {
+            // 1. 查询余额并校验
+            var [userRows] = await conn.execute('SELECT balance FROM users WHERE id = ?', [userId]);
+            balanceBefore = parseFloat((userRows[0] && userRows[0].balance) || '0');
+            if (balanceBefore < totalAmount) throw new Error('余额不足');
+            // 2. 扣款
+            await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, userId]);
+            balanceAfter = balanceBefore - totalAmount;
+            // 3. 创建订单
+            await conn.execute(
+                'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [orderNo, userId, 'lxc', pkg.id, template.id, period, period_count, totalAmount, template.cores, template.memory, template.disk_size, randomName, String(newVmid), 'pending']
+            );
+            // 4. 创建流水
+            await conn.execute(
+                'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [userId, orderNo, db.now(), 'balance', 'new_order', totalAmount, period, period_count, balanceBefore, balanceAfter, null, null, '', '', db.now()]
+            );
         });
 
         var newCt = null;
@@ -425,7 +429,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             } catch (dhcpErr) { console.error('[package] LXC DHCP绑定失败:', dhcpErr.message); }
         } catch (provErr) {
             // 开通失败：清理预创建记录、退款、创建退款流水、订单标记 refunded、发送站内信
-            if (newCt) { try { await db.lxcContainers.delete(newCt.id); } catch (e) {} }
+            if (newCt) { try { await db.lxcContainers.delete(newCt.id); } catch (e) { console.error('[package] 订单状态更新失败:', e.message); } }
             var refundUser = await db.users.incrementBalance(userId, totalAmount);
             var balanceAfterRefund = parseFloat(refundUser.balance || '0');
             var refundOrderNo = generateOrderNo('refund');
@@ -436,7 +440,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
                 period: period, period_count: period_count,
                 trade_no: orderNo, api_trade_no: ''
             });
-            try { await db.orders.updateStatus(orderNo, 'refunded'); } catch (e) {}
+            try { await db.orders.updateStatus(orderNo, 'refunded'); } catch (e) { console.error('[package] 订单状态更新失败:', e.message); }
             try {
                 await db.messages.create({
                     uid: userId, title: '容器开通失败',
@@ -448,7 +452,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         }
 
         // 开通成功，订单标记完成
-        try { await db.orders.updateStatus(orderNo, 'completed'); } catch (e) {}
+        try { await db.orders.updateStatus(orderNo, 'completed'); } catch (e) { console.error('[package] 订单状态更新失败:', e.message); }
 
         // 增加已售数量，并扣减剩余库存（-1 不限量不扣减）
         try {

@@ -25,6 +25,7 @@ function getRedis() {
         },
         maxRetriesPerRequest: 3,
         lazyConnect: false,
+        connectionTimeout: 10000,
     });
 
     redis.on('connect', () => {
@@ -32,8 +33,7 @@ function getRedis() {
     });
 
     redis.on('error', (err) => {
-        if (retryCount <= 3) return;
-        console.warn(`[redis] 错误: ${err.message}`);
+        console.error('[redis] 连接错误:', err.message);
     });
 
     return redis;

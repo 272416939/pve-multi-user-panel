@@ -63,8 +63,8 @@ const App = {
                 const raw = localStorage.getItem(PENDING_KEY);
                 if (!raw) return null;
                 const data = JSON.parse(raw);
-                // 超过 15 分钟视为过期，避免残留
-                if (!data || !data.orderNo || Date.now() - (data.ts || 0) > 15 * 60 * 1000) {
+                // 超过 15 分钟视为过期，避免残留；同时校验字段类型，防止 localStorage 被篡改注入非法结构
+                if (!data || typeof data.orderNo !== 'string' || typeof data.ts !== 'number' || Date.now() - (data.ts || 0) > 15 * 60 * 1000) {
                     localStorage.removeItem(PENDING_KEY);
                     return null;
                 }

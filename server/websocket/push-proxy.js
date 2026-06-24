@@ -12,6 +12,8 @@ const UNREAD_INTERVAL = 30000;
 const TICKET_TTL = 5 * 60;
 
 const SUBSCRIPTIONS = new Map();
+const MAX_CONNECTIONS = 1000; // 全局连接上限
+const MAX_PER_IP = 20; // 单 IP 连接上限
 
 function validateTicket(token) {
     try {
@@ -90,6 +92,12 @@ async function pushStatus() {
 
     const statusCache = new Map();
 
+    // 存储前检查全局缓存大小，超过上限时清理最旧的条目，防止内存泄漏
+    if (statusCacheGlobal.size > 10000) {
+        const keysToDelete = Array.from(statusCacheGlobal.keys()).slice(0, 2000);
+        keysToDelete.forEach(k => statusCacheGlobal.delete(k));
+    }
+
     for (const vmid of vms) {
         try {
             const raw = await pveApi.getVmStatus(vmid);
@@ -142,6 +150,18 @@ async function checkResourceOwnership(userId, role, vmid, isLxc) {
 }
 
 pushProxy.on('connection', async (clientWs, request) => {
+    // PERF-30: 连接数上限检查
+    if (SUBSCRIPTIONS.size >= MAX_CONNECTIONS) {
+        clientWs.close(1013, '服务器繁忙，连接数已满');
+        return;
+    }
+    const clientIp = (request.headers['x-forwarded-for'] || '').split(',')[0].trim() || request.socket.remoteAddress;
+    const ipConnections = Array.from(SUBSCRIPTIONS.values()).filter(s => s.ip === clientIp).length;
+    if (ipConnections >= MAX_PER_IP) {
+        clientWs.close(1013, '单IP连接数超限');
+        return;
+    }
+
     const url = new URL(request.url, `http://${request.headers.host}`);
     const ticket = url.searchParams.get('ticket');
 
@@ -161,6 +181,7 @@ pushProxy.on('connection', async (clientWs, request) => {
         userId: decoded.userId,
         username: decoded.username,
         role: decoded.role || 'user',
+        ip: clientIp,
         vms: new Set(),
         lxcs: new Set(),
         detailVms: new Set(),
@@ -273,7 +294,11 @@ module.exports.pushToUser = pushToUser;
 module.exports.getStatusCache = function(key, userId) {
     var cacheKey = userId ? userId + ':' + key : key;
     var e = statusCacheGlobal.get(cacheKey);
+    if (!e && userId) {
+        // 兼容旧数据：pushStatus 存储时未带 userId 前缀，回退到不带 userId 的 key
+        e = statusCacheGlobal.get(key);
+    }
     if (e && Date.now() - e.ts < 5000) return e.s;
-    statusCacheGlobal.delete(cacheKey);
+    if (e) statusCacheGlobal.delete(cacheKey);
     return null;
 };

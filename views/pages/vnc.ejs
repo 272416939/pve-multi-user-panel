@@ -151,7 +151,11 @@
                 rfb.scaleViewport = scaled;
                 rfb.resizeSession = false;
             } catch(e) {
-                connectingEl.innerHTML = '<span id="error-msg">连接失败: ' + e.message + '</span>';
+                var errorSpan = document.createElement('span');
+                errorSpan.id = 'error-msg';
+                errorSpan.textContent = '连接失败: ' + e.message;
+                connectingEl.innerHTML = '';
+                connectingEl.appendChild(errorSpan);
                 statusText.textContent = '连接失败';
             }
         }

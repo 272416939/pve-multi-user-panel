@@ -37,33 +37,49 @@ async function syncPortForwardsFromIkuai() {
             }
             return '';
         }
-        for (const vm of allVms) {
-            let ip = '';
-            let mac = '';
-            try {
-                const config = await pveApi.getVmConfig(vm.vm_id);
-                const net0 = config?.net0 || '';
-                const macMatch = net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
-                if (macMatch) mac = macMatch[0].toLowerCase();
-                ip = findIpByMac(mac);
-            } catch (e) {}
-            if (ip) ipToDevice.set(ip, { type: 'vm', device_id: vm.vm_id, name: vm.name || 'VM ' + vm.vm_id });
-        }
-        for (const ct of allCts) {
-            let ip = '';
-            try {
-                const config = await pveApi.getLxcConfig(ct.ct_id);
-                const net0 = config?.net0 || '';
-                const ipMatch = net0.match(/ip=([0-9.]+)/);
-                if (ipMatch) ip = ipMatch[1];
-                if (!ip) {
-                    const hwaddrMatch = net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
-                    if (hwaddrMatch) {
-                        ip = findIpByMac(hwaddrMatch[0].toLowerCase());
+        // 合并所有设备，分批并行处理，每批 10 个
+        const allDevices = [
+            ...allVms.map(vm => ({ type: 'vm', device: vm })),
+            ...allCts.map(ct => ({ type: 'lxc', device: ct }))
+        ];
+        const batchSize = 10;
+        for (let i = 0; i < allDevices.length; i += batchSize) {
+            const batch = allDevices.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (item) => {
+                try {
+                    if (item.type === 'vm') {
+                        const vm = item.device;
+                        let ip = '';
+                        let mac = '';
+                        try {
+                            const config = await pveApi.getVmConfig(vm.vm_id);
+                            const net0 = config?.net0 || '';
+                            const macMatch = net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+                            if (macMatch) mac = macMatch[0].toLowerCase();
+                            ip = findIpByMac(mac);
+                        } catch (e) {}
+                        if (ip) ipToDevice.set(ip, { type: 'vm', device_id: vm.vm_id, name: vm.name || 'VM ' + vm.vm_id });
+                    } else {
+                        const ct = item.device;
+                        let ip = '';
+                        try {
+                            const config = await pveApi.getLxcConfig(ct.ct_id);
+                            const net0 = config?.net0 || '';
+                            const ipMatch = net0.match(/ip=([0-9.]+)/);
+                            if (ipMatch) ip = ipMatch[1];
+                            if (!ip) {
+                                const hwaddrMatch = net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+                                if (hwaddrMatch) {
+                                    ip = findIpByMac(hwaddrMatch[0].toLowerCase());
+                                }
+                            }
+                        } catch (e) {}
+                        if (ip) ipToDevice.set(ip, { type: 'lxc', device_id: ct.ct_id, name: ct.name || 'CT ' + ct.ct_id });
                     }
+                } catch (e) {
+                    console.error('[ikuai-sync] 设备配置获取失败:', item.device.id || item.device.vm_id || item.device.ct_id, e.message);
                 }
-            } catch (e) {}
-            if (ip) ipToDevice.set(ip, { type: 'lxc', device_id: ct.ct_id, name: ct.name || 'CT ' + ct.ct_id });
+            }));
         }
         let reassociated = 0;
         for (const localRule of localRules) {

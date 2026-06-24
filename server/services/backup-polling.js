@@ -175,11 +175,15 @@ async function resumeRunningLxcBackups() {
     }
 
     try {
-        const runningTasks = (await db.restoreTasks.getRunning()).filter(async t => {
+        const allRunningTasks = await db.restoreTasks.getRunning();
+        const lxcRunningTasks = [];
+        for (const t of allRunningTasks) {
             const backup = await db.backups.getById(t.backup_id);
-            return backup && backup.type === 'lxc';
-        });
-        for (const task of runningTasks) {
+            if (backup && backup.type === 'lxc') {
+                lxcRunningTasks.push(t);
+            }
+        }
+        for (const task of lxcRunningTasks) {
             console.log('[LXC启动恢复] 恢复恢复任务轮询:', task.id);
             startLxcRestorePolling(task.id, task.pve_upid, task.vm_id);
         }

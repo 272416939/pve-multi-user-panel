@@ -5,6 +5,7 @@ const dbg = require('../utils/debug');
 const { getRedisClient } = require('../api/redis');
 
 let isCheckingExpired = false;
+let isCheckingLxcExpired = false;
 const reminderSentTracker = new Map();
 
 async function markReminderSent(vmId, days, date) {
@@ -81,6 +82,8 @@ const checkExpiredVms = async () => {
         const oneDayMs = 24 * 60 * 60 * 1000;
         const allVms = await db.vms.getAll();
         const allUsers = await db.users.getAll();
+        const userMap = {};
+        allUsers.forEach(u => { userMap[u.id] = u; });
         
         for (const vm of allVms) {
             if (!vm.expiration_date) {
@@ -107,7 +110,7 @@ const checkExpiredVms = async () => {
                     continue;
                 }
                 
-                const user = allUsers.find(u => u.id === vm.user_id);
+                const user = userMap[vm.user_id];
                 if (!user || !user.email || !user.emailVerified) {
                     continue;
                 }
@@ -171,7 +174,7 @@ const checkExpiredVms = async () => {
                 const alreadySentToday = await isReminderSent(vm.vm_id, 0, today) || todayExpiredInDb.length > 0;
                 
                 if (!alreadySentToday && expiredDaysCount < 3) {
-                    const user = allUsers.find(u => u.id === vm.user_id);
+                    const user = userMap[vm.user_id];
                     if (user && user.email && user.emailVerified) {
                         try {
                             const dayNum = expiredDaysCount + 1;
@@ -238,8 +241,22 @@ const checkExpiredVms = async () => {
 };
 
 async function checkExpiredLxc() {
+    if (isCheckingLxcExpired) {
+        console.log('[expiry] LXC检查正在进行中，跳过');
+        return;
+    }
+    isCheckingLxcExpired = true;
     try {
         const allCts = await db.lxcContainers.getAll();
+        const allUsers = await db.users.getAll();
+        const userMap = {};
+        allUsers.forEach(u => { userMap[u.id] = u; });
+        const todayReminders = await db.lxcContainers.reminders.getTodayAll();
+        const reminderMap = {};
+        todayReminders.forEach(r => {
+            if (!reminderMap[r.ct_id]) reminderMap[r.ct_id] = [];
+            reminderMap[r.ct_id].push(r);
+        });
         const reminderCfg = await db.config.getReminder();
         const today = new Date();
 
@@ -253,11 +270,11 @@ async function checkExpiredLxc() {
                 const reminderDays = [reminderCfg.days1, reminderCfg.days2, reminderCfg.days3].filter(d => d > 0);
                 for (const days of reminderDays) {
                     if (diffDays === days) {
-                        const existing = (await db.lxcContainers.reminders.getTodayAll()).filter(r => r.ct_id === ct.id && r.days === days);
+                        const existing = (reminderMap[ct.id] || []).filter(r => r.days === days);
                         if (existing.length === 0) {
                             await db.lxcContainers.reminders.add(ct.id, days);
                             try {
-                                const user = await db.users.getById(ct.user_id);
+                                const user = userMap[ct.user_id];
                                 if (user && user.email && user.emailVerified) {
                                     try {
                                         const emailContent = `
@@ -300,7 +317,7 @@ async function checkExpiredLxc() {
                     if (!todaySent) {
                         await db.lxcContainers.reminders.add(ct.id, 0);
                         try {
-                            const user = await db.users.getById(ct.user_id);
+                            const user = userMap[ct.user_id];
                             if (user && user.email && user.emailVerified) {
                                 try {
                                     const dayNum = expiredDays + 1;
@@ -356,6 +373,8 @@ async function checkExpiredLxc() {
         }
     } catch (e) {
         console.error('检查 LXC 容器到期错误:', e.message);
+    } finally {
+        isCheckingLxcExpired = false;
     }
 }
 

@@ -1,17 +1,13 @@
 const express = require('express');
 const router = express.Router();
+const crypto = require('crypto');
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const ikuaiApi = require('../api/ikuai-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, getWanInterface, getWanInterfaces } = require('../services/dhcp');
 const dbg = require('../utils/debug');
-// H-9 修复：生产环境隐藏详细错误信息
-function safeError(e) {
-    const isDebug = process.env.DEBUG === 'true';
-    if (isDebug) return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
+const { safeError } = require('../utils/safe-error');
 
 // 解析 ikuai_id 字段，兼容旧格式（纯字符串）和新格式（JSON 数组）
 // 返回 [{interface, id}] 数组
@@ -138,6 +134,14 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
         const bindings = await ikuaiApi.getDhcpStaticBindings();
         let updated = 0, skipped = 0, errors = 0;
 
+        // PERF-05: 循环外一次性获取所有 VM 和 LXC，构建 Map，避免循环内全表查询（N+1）
+        const allVms = await db.vms.getAll();
+        const vmByVmId = {};
+        allVms.forEach(v => { vmByVmId[v.vm_id] = v; });
+        const allLxc = await db.lxcContainers.getAll();
+        const lxcByCtId = {};
+        allLxc.forEach(l => { lxcByCtId[l.ct_id] = l; });
+
         for (const b of bindings) {
             // comment 格式: VM-{id} 或 CT-{id}
             const vmMatch = b.comment.match(/^VM-(\d+)$/);
@@ -151,7 +155,7 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
             try {
                 if (vmMatch) {
                     const vmId = parseInt(vmMatch[1]);
-                    const vm = (await db.vms.getAll()).find(v => v.vm_id === vmId);
+                    const vm = vmByVmId[vmId];
                     if (vm && vm.dhcp_static_ip !== b.ip) {
                         await db.vms.update(vm.id, { dhcp_static_ip: b.ip });
                         updated++;
@@ -160,9 +164,9 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
                     }
                 } else if (ctMatch) {
                     const ctId = parseInt(ctMatch[1]);
-                    const ct = await db.lxcContainers.getByCtId(ctId);
-                    if (ct && ct.length > 0 && ct[0].dhcp_static_ip !== b.ip) {
-                        await db.lxcContainers.update(ct[0].id, { dhcp_static_ip: b.ip });
+                    const ct = lxcByCtId[ctId];
+                    if (ct && ct.dhcp_static_ip !== b.ip) {
+                        await db.lxcContainers.update(ct.id, { dhcp_static_ip: b.ip });
                         updated++;
                     } else {
                         skipped++;
@@ -503,7 +507,7 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
         if (available.length === 0) {
             return res.status(400).json({ error: '端口范围内无可用端口' });
         }
-        const randomPort = available[Math.floor(Math.random() * available.length)];
+        const randomPort = available[crypto.randomInt(0, available.length)];
         res.json({ port: randomPort });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });

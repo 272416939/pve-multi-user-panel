@@ -13,40 +13,38 @@ const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp } =
 const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
 const dbg = require('../utils/debug');
 const vncProxy = require('../websocket/vnc-proxy');
-// H-9 修复：生产环境隐藏详细错误信息
-function safeError(e) {
-    const isDebug = process.env.DEBUG === 'true';
-    if (isDebug) return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
+const { safeError } = require('../utils/safe-error');
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
 router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const containers = await pveApi.getLxcContainers();
- 
+
         const assignedCts = await db.lxcContainers.getAll();
         const assignedCtIds = new Set(assignedCts.map(ct => ct.ct_id));
- 
+
+        // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
+        const allUsers = await db.users.getAll();
+        const userMap = {};
+        allUsers.forEach(u => { userMap[u.id] = u; });
+
         const available = containers
             .filter(ct => !assignedCtIds.has(ct.vmid))
             .sort((a, b) => b.vmid - a.vmid);
- 
-        const assigned = await Promise.all(
-            containers
+
+        const assigned = containers
             .filter(ct => assignedCtIds.has(ct.vmid))
             .sort((a, b) => b.vmid - a.vmid)
-            .map(async ct => {
+            .map(ct => {
                 const assignment = assignedCts.find(a => a.ct_id === ct.vmid);
-                const user = assignment ? await db.users.getById(assignment.user_id) : null;
+                const user = assignment ? userMap[assignment.user_id] : null;
                 return {
                     ...ct,
                     name: assignment?.name || ct.name,
                     assigned_user: user ? user.username : null,
                     assignment_id: assignment ? assignment.id : null
                 };
-            })
-        );
- 
+            });
+
         res.json({ available, assigned });
     } catch (error) {
         console.error('获取 LXC 容器列表错误:', error);
@@ -58,10 +56,14 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
     try {
         let userCts;
         if (req.user.role === 'admin') {
-            userCts = await Promise.all((await db.lxcContainers.getAll()).map(async ct => {
-                const user = await db.users.getById(ct.user_id);
+            // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
+            const allUsers = await db.users.getAll();
+            const userMap = {};
+            allUsers.forEach(u => { userMap[u.id] = u; });
+            userCts = (await db.lxcContainers.getAll()).map(ct => {
+                const user = userMap[ct.user_id];
                 return { ...ct, username: user?.username };
-            }));
+            });
         } else {
             userCts = await db.lxcContainers.getByUserId(req.user.id);
         }
@@ -79,28 +81,33 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
             };
         });
  
-        for (const ctData of ctsWithDetails) {
-            try {
-                var cachedStatus = getStatusCache('lxc:' + ctData.ct_id, req.user.id);
-                var rawStatus = cachedStatus || await pveApi.getLxcStatus(ctData.ct_id);
-                var config = await pveApi.getLxcConfig(ctData.ct_id);
-                ctData.status = cachedStatus || _applyRate('lxc:' + ctData.ct_id, rawStatus);
-                ctData.config = config;
-                ctData.error = null;
-            } catch (innerError) {
-                var cachedFallback = getStatusCache('lxc:' + ctData.ct_id, req.user.id);
-                if (cachedFallback) {
-                    ctData.status = cachedFallback;
+        // PERF-05: 并行查询 PVE 状态（分批，每批 10 个），替代串行 for 循环
+        const batchSize = 10;
+        for (let i = 0; i < ctsWithDetails.length; i += batchSize) {
+            const batch = ctsWithDetails.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (ctData) => {
+                try {
+                    var cachedStatus = getStatusCache('lxc:' + ctData.ct_id, req.user.id);
+                    var rawStatus = cachedStatus || await pveApi.getLxcStatus(ctData.ct_id);
+                    var config = await pveApi.getLxcConfig(ctData.ct_id);
+                    ctData.status = cachedStatus || _applyRate('lxc:' + ctData.ct_id, rawStatus);
+                    ctData.config = config;
                     ctData.error = null;
-                } else {
-                    const errMsg = innerError?.response?.data?.message || innerError?.message || '';
-                    if (innerError.response?.status === 404 || errMsg.includes('does not exist')) {
-                        ctData.destroyed = true;
+                } catch (innerError) {
+                    var cachedFallback = getStatusCache('lxc:' + ctData.ct_id, req.user.id);
+                    if (cachedFallback) {
+                        ctData.status = cachedFallback;
+                        ctData.error = null;
                     } else {
-                        ctData.error = '获取容器信息失败';
+                        const errMsg = innerError?.response?.data?.message || innerError?.message || '';
+                        if (innerError.response?.status === 404 || errMsg.includes('does not exist')) {
+                            ctData.destroyed = true;
+                        } else {
+                            ctData.error = '获取容器信息失败';
+                        }
                     }
                 }
-            }
+            }));
         }
  
         res.json(ctsWithDetails);
@@ -132,6 +139,7 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
     const { ct_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id, monthly_price, quarterly_discount, yearly_discount } = req.body;
  
     if (!ct_id || !user_id) {
@@ -201,7 +209,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
             link_url: '',
             link_text: ''
         });
-    } catch (e) {}
+    } catch (e) { console.error('[lxc] 通知发送失败:', e.message); }
 
     const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
@@ -264,9 +272,14 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     } catch (e) { console.error(`LXC ${parsedCtId} DHCP 静态绑定失败:`, e.message); }
 
     res.json(newCt);
+    } catch (e) {
+        console.error('[lxc] 操作失败:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
 });
 
 router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
+    try {
     const ctId = parseInt(req.params.id);
     const { name, expiration_date, renewal_price, renewal_period, user_id, ikuai_mac_group_id } = req.body;
  
@@ -320,7 +333,7 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
                     send_type: 1
                 });
             }
-        } catch (e) {}
+        } catch (e) { console.error('[lxc] 通知发送失败:', e.message); }
     }
 
     // MAC 分组变更
@@ -357,9 +370,14 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     }
  
     res.json({ message: '容器信息更新成功' });
+    } catch (e) {
+        console.error('[lxc] 操作失败:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
 });
 
 router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
     const ctId = parseInt(req.params.id);
     const ct = await db.lxcContainers.getById(ctId);
     let removedCtInfo = null;
@@ -412,7 +430,7 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
                 type: 2,
                 send_type: 1
             });
-        } catch (e) {}
+        } catch (e) { console.error('[lxc] 通知发送失败:', e.message); }
     }
 
     if (removedCtInfo) {
@@ -446,6 +464,10 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
     }
 
     res.json({ message: '容器移除成功' });
+    } catch (e) {
+        console.error('[lxc] 操作失败:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
 });
 
 router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {

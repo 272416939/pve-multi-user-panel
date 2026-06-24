@@ -80,6 +80,15 @@ terminalProxy.on('connection', (clientWs, request) => {
         }
     );
 
+    // 空闲超时检测：30 分钟无数据自动断开，防止连接泄漏
+    let lastActivity = Date.now();
+    clientWs.on('message', () => { lastActivity = Date.now(); });
+    const idleCheckInterval = setInterval(() => {
+        if (Date.now() - lastActivity > 30 * 60 * 1000) {
+            clientWs.close(4000, '空闲超时，自动断开');
+        }
+    }, 60000);
+
     clientWs.on('message', (data) => {
         if (Buffer.isBuffer(data)) {
             try {
@@ -94,8 +103,8 @@ terminalProxy.on('connection', (clientWs, request) => {
         session.write(data);
     });
 
-    clientWs.on('close', () => { session.close(); });
-    clientWs.on('error', () => { session.close(); });
+    clientWs.on('close', () => { clearInterval(idleCheckInterval); session.close(); });
+    clientWs.on('error', () => { clearInterval(idleCheckInterval); session.close(); });
 });
 
 module.exports = terminalProxy;

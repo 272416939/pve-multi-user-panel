@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const db = require('../api/db');
 
 const CDK_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
@@ -7,7 +8,7 @@ function generateCdkCode() {
     for (let s = 0; s < 3; s++) {
         let section = '';
         for (let i = 0; i < 4; i++) {
-            section += CDK_CHARS[Math.floor(Math.random() * CDK_CHARS.length)];
+            section += CDK_CHARS[crypto.randomInt(0, CDK_CHARS.length)];
         }
         sections.push(section);
     }

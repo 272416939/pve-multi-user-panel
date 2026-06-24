@@ -2,11 +2,7 @@ var express = require('express');
 var router = express.Router();
 var { authMiddleware, adminMiddleware } = require('../middleware/auth');
 var db = require('../api/db');
-
-function safeError(e) {
-    if (process.env.DEBUG === 'true') return e.response?.data?.message || e.message || String(e);
-    return '操作失败，请稍后重试';
-}
+const { safeError } = require('../utils/safe-error');
 
 // VM 模板列表
 router.get('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, res) => {

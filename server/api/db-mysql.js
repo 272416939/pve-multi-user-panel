@@ -38,10 +38,10 @@ function getPool() {
             password: process.env.MYSQL_PASSWORD || '',
             database: process.env.MYSQL_DATABASE || 'pve_panel',
             charset: 'utf8mb4',
-            connectionLimit: 10,
-            queueLimit: 0,
+            connectionLimit: parseInt(process.env.MYSQL_CONNECTION_LIMIT || '10'),
+            queueLimit: parseInt(process.env.MYSQL_QUEUE_LIMIT || '0'),
             waitForConnections: true,
-            connectTimeout: 10000,
+            connectTimeout: parseInt(process.env.MYSQL_ACQUIRE_TIMEOUT_MS || '10000'),
             dateStrings: true,
             timezone: '+08:00',
         });
@@ -524,6 +524,18 @@ async function migrateSchema() {
         }
     }
 
+    async function safeAddIndex(tableName, indexName, columns) {
+        try {
+            await execute('CREATE INDEX ' + indexName + ' ON ' + tableName + '(' + columns + ')');
+            console.log('[db] 索引创建成功:', indexName);
+        } catch (e) {
+            // 索引已存在则忽略
+            if (e.code !== 'ER_DUP_KEYNAME' && e.errno !== 1061) {
+                console.warn('[db] 创建索引失败:', indexName, e.message);
+            }
+        }
+    }
+
     await safeAlter('vms', 'renewal_price', "TEXT");
     await safeAlter('cdk_codes', 'target_user_id', 'INT');
     await safeAlter('users', 'totp_secret', "TEXT");
@@ -589,6 +601,24 @@ async function migrateSchema() {
     } catch (e) {
         console.error('修复 LXC 备份记录失败:', e.message);
     }
+
+    // PERF-01: 补全数据库索引
+    await safeAddIndex('vm_reminders', 'idx_vm_reminders_vm_id', 'vm_id, days, sent_at');
+    await safeAddIndex('lxc_reminders', 'idx_lxc_reminders_ct_id', 'ct_id, days, sent_at');
+    await safeAddIndex('port_forwards', 'idx_port_forwards_type_vm', 'type, vm_id');
+    await safeAddIndex('port_forwards', 'idx_port_forwards_type_ct', 'type, ct_id');
+    await safeAddIndex('port_forwards', 'idx_port_forwards_ext_port', 'external_port');
+    await safeAddIndex('snapshot_logs', 'idx_snapshot_logs_user', 'user_id, action, created_at');
+    await safeAddIndex('backup_logs', 'idx_backup_logs_user', 'user_id, action, created_at');
+    await safeAddIndex('recovery_codes', 'idx_recovery_codes_user', 'user_id');
+    await safeAddIndex('refresh_tokens', 'idx_refresh_tokens_user', 'user_id, revoked, expires_at');
+    await safeAddIndex('password_reset_tokens', 'idx_prt_email', 'email, type, expires_at');
+    await safeAddIndex('users', 'idx_users_email', 'email');
+    await safeAddIndex('vms', 'idx_vms_vm_id', 'vm_id');
+    await safeAddIndex('lxc_containers', 'idx_lxc_ct_id', 'ct_id');
+    await safeAddIndex('cdk_codes', 'idx_cdk_batch', 'batch_id, is_used, expires_at');
+    await safeAddIndex('orders', 'idx_orders_status', 'status, type, user_id');
+    await safeAddIndex('pending_orders', 'idx_pending_orders_status', 'status');
 }
 
 // 初始化默认配置（异步）
@@ -696,6 +726,9 @@ async function createDefaultAdmin() {
 module.exports = {
     // 数据库连接
     db: { connection: getPool },
+
+    // 暴露连接池获取函数（供 with-transaction.js 等工具使用）
+    getPool: getPool,
 
     // 时间工具函数（统一本地时间 YYYY-MM-DD HH:MM:SS）
     now: mysqlNow,
@@ -1095,16 +1128,23 @@ module.exports = {
 
     // 配置操作
     config: {
-        getSmtp: async () => ({
-            host: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:host']))?.value || '',
-            port: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:port']))?.value || '587'),
-            secure: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:secure']))?.value === '1',
-            user: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:user']))?.value || '',
-            password: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:password']))?.value || '',
-            from: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:from']))?.value || '',
-            from_name: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:from_name']))?.value || '',
-            enabled: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:enabled']))?.value === '1'
-        }),
+        getSmtp: async () => {
+            const keys = ['smtp:host', 'smtp:port', 'smtp:secure', 'smtp:user', 'smtp:password', 'smtp:from', 'smtp:from_name', 'smtp:enabled'];
+            const placeholders = keys.map(() => '?').join(',');
+            const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+            const map = {};
+            rows.forEach(r => { map[r.key] = r.value; });
+            return {
+                host: map['smtp:host'] || '',
+                port: parseInt(map['smtp:port'] || '587'),
+                secure: map['smtp:secure'] === '1',
+                user: map['smtp:user'] || '',
+                password: map['smtp:password'] || '',
+                from: map['smtp:from'] || '',
+                from_name: map['smtp:from_name'] || '',
+                enabled: map['smtp:enabled'] === '1'
+            };
+        },
         setSmtp: async (smtpConfig) => {
             const currentPassword = (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:password']))?.value || '';
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:host', smtpConfig.host ?? '']);
@@ -1116,11 +1156,18 @@ module.exports = {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:from_name', smtpConfig.from_name ?? '']);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:enabled', smtpConfig.enabled ? '1' : '0']);
         },
-        getReminder: async () => ({
-            days1: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['reminder:days1']))?.value) || 7,
-            days2: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['reminder:days2']))?.value) || 3,
-            days3: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['reminder:days3']))?.value) || 1
-        }),
+        getReminder: async () => {
+            const keys = ['reminder:days1', 'reminder:days2', 'reminder:days3'];
+            const placeholders = keys.map(() => '?').join(',');
+            const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+            const map = {};
+            rows.forEach(r => { map[r.key] = r.value; });
+            return {
+                days1: parseInt(map['reminder:days1']) || 7,
+                days2: parseInt(map['reminder:days2']) || 3,
+                days3: parseInt(map['reminder:days3']) || 1
+            };
+        },
         setReminder: async (reminderConfig) => {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days1', String(reminderConfig.days1 ?? 7)]);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days2', String(reminderConfig.days2 ?? 3)]);
@@ -1173,11 +1220,18 @@ module.exports = {
 
     // 快照配置操作
     snapshotConfig: {
-        get: async () => ({
-            max_per_vm: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['snapshot:max_per_vm']))?.value) || 5,
-            daily_create_limit: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['snapshot:daily_create_limit']))?.value) || 20,
-            daily_restore_limit: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['snapshot:daily_restore_limit']))?.value) || 10
-        }),
+        get: async () => {
+            const keys = ['snapshot:max_per_vm', 'snapshot:daily_create_limit', 'snapshot:daily_restore_limit'];
+            const placeholders = keys.map(() => '?').join(',');
+            const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+            const map = {};
+            rows.forEach(r => { map[r.key] = r.value; });
+            return {
+                max_per_vm: parseInt(map['snapshot:max_per_vm']) || 5,
+                daily_create_limit: parseInt(map['snapshot:daily_create_limit']) || 20,
+                daily_restore_limit: parseInt(map['snapshot:daily_restore_limit']) || 10
+            };
+        },
         set: async (cfg) => {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['snapshot:max_per_vm', String(cfg.max_per_vm ?? 5)]);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['snapshot:daily_create_limit', String(cfg.daily_create_limit ?? 20)]);
@@ -1248,11 +1302,18 @@ module.exports = {
 
     // 备份配置操作
     backupConfig: {
-        get: async () => ({
-            default_storage: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['backup:default_storage']))?.value || 'local',
-            max_per_vm: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['backup:max_per_vm']))?.value) || 3,
-            daily_limit: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['backup:daily_limit']))?.value) || 3
-        }),
+        get: async () => {
+            const keys = ['backup:default_storage', 'backup:max_per_vm', 'backup:daily_limit'];
+            const placeholders = keys.map(() => '?').join(',');
+            const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+            const map = {};
+            rows.forEach(r => { map[r.key] = r.value; });
+            return {
+                default_storage: map['backup:default_storage'] || 'local',
+                max_per_vm: parseInt(map['backup:max_per_vm']) || 3,
+                daily_limit: parseInt(map['backup:daily_limit']) || 3
+            };
+        },
         set: async (cfg) => {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:default_storage', cfg.default_storage ?? 'local']);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:max_per_vm', String(cfg.max_per_vm ?? 3)]);
@@ -1395,14 +1456,21 @@ module.exports = {
 
     // LXC 配置操作
     lxcConfig: {
-        get: async () => ({
-            max_per_vm: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:max_per_vm']))?.value) || 3,
-            default_storage: (await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_storage']))?.value || 'local',
-            default_memory: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_memory']))?.value) || 512,
-            default_cores: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_cores']))?.value) || 1,
-            default_disk: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_disk']))?.value) || 8,
-            default_swap: parseInt((await queryOne('SELECT value FROM config WHERE `key` = ?', ['lxc:default_swap']))?.value) || 512
-        }),
+        get: async () => {
+            const keys = ['lxc:max_per_vm', 'lxc:default_storage', 'lxc:default_memory', 'lxc:default_cores', 'lxc:default_disk', 'lxc:default_swap'];
+            const placeholders = keys.map(() => '?').join(',');
+            const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+            const map = {};
+            rows.forEach(r => { map[r.key] = r.value; });
+            return {
+                max_per_vm: parseInt(map['lxc:max_per_vm']) || 3,
+                default_storage: map['lxc:default_storage'] || 'local',
+                default_memory: parseInt(map['lxc:default_memory']) || 512,
+                default_cores: parseInt(map['lxc:default_cores']) || 1,
+                default_disk: parseInt(map['lxc:default_disk']) || 8,
+                default_swap: parseInt(map['lxc:default_swap']) || 512
+            };
+        },
         set: async (cfg) => {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:max_per_vm', String(cfg.max_per_vm ?? 3)]);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['lxc:default_storage', cfg.default_storage ?? 'local']);

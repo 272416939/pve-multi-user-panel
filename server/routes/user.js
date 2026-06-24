@@ -15,6 +15,7 @@ const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const cacheStore = require('../utils/cache-store');
 const { invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
+const { sanitizeUser } = require('../utils/safe-error');
 // profileCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
 const profileCache = cacheStore.create('profile', 60);
 
@@ -49,7 +50,7 @@ router.post('/user/2fa/verify', authMiddleware, async (req, res) => {
         const secret = await db.twofa.getSecret(req.user.id);
         if (!secret) return res.status(400).json({ error: '请先获取 2FA 密钥' });
 
-        const isValid = otplib.verifySync({ token: code, secret }).valid;
+        const isValid = otplib.authenticator.verifySync({ token: code, secret });
         if (!isValid) return res.status(400).json({ error: '验证码错误' });
 
         await db.twofa.enable(req.user.id);
@@ -175,7 +176,7 @@ router.get('/user/profile', authMiddleware, async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: '用户不存在' });
         }
-        const { password, ...safeUser } = user;
+        const safeUser = sanitizeUser(user);
         await profileCache.set(String(req.user.id), safeUser);
         res.json(safeUser);
     } catch (error) {
@@ -238,7 +239,7 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         await db.users.update(req.user.id, updates);
         
         const updatedUser = await db.users.getById(req.user.id);
-        const { password: _, ...safeUser } = updatedUser;
+        const safeUser = sanitizeUser(updatedUser);
         await profileCache.del(String(req.user.id));
         res.json({ message: '资料更新成功', user: safeUser });
     } catch (error) {
@@ -359,7 +360,7 @@ router.post('/user/avatar', authMiddleware, upload.single('avatar'), async (req,
         if (process.env.DEBUG === 'true') console.log('[avatar] 上传成功:', req.file.path, '→', avatarPath);
 
         const updatedUser = await db.users.getById(req.user.id);
-        const { password: _, ...safeUser } = updatedUser;
+        const safeUser = sanitizeUser(updatedUser);
         res.json({ message: '头像上传成功', avatar: avatarPath, user: safeUser });
     } catch (error) {
         console.error('上传头像失败', error);
@@ -435,7 +436,7 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         }
         
         const updatedUser = await db.users.getById(req.user.id);
-        const { password: _, ...safeUser } = updatedUser;
+        const safeUser = sanitizeUser(updatedUser);
         res.json({ message: '邮箱绑定成功！请查收验证邮件', user: safeUser });
     } catch (error) {
         console.error('绑定邮箱失败', error);
