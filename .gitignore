@@ -46,3 +46,5 @@ docs/
 # E2E 测试脚本（本地验证用，含测试mock数据）
 tests/
 test/
+test_*.py
+shot_*.png
