@@ -12,13 +12,13 @@
                             </div>
                         </div>
                         <!-- 分组列表 -->
-                        <div v-if="packagePage.vmPackageGroups.value.length > 0" class="mb-3" @dragover.prevent @drop="packagePage.handleDropOnContainer($event, 'group-vm')">
+                        <div v-if="packagePage.vmPackageGroups.value.length > 0" class="mb-3" @dragover="packagePage.handleContainerDragOver($event, 'group-vm')" @drop="packagePage.handleDropOnContainer($event, 'group-vm')">
                             <span v-for="g in packagePage.vmPackageGroups.value" :key="g.id"
                                 class="badge bg-info me-2 group-badge-draggable"
                                 draggable="true"
                                 :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id }"
                                 @dragstart="packagePage.handleDragStart($event, g.id, 'group-vm')"
-                                @dragover.prevent="packagePage.handleDragOver($event, g.id)"
+                                @dragover="packagePage.handleDragOver($event, g.id)"
                                 @dragleave="packagePage.handleDragLeave($event, g.id)"
                                 @drop="packagePage.handleDrop($event, g.id, 'group-vm')"
                                 @dragend="packagePage.handleDragEnd()">
@@ -32,12 +32,12 @@
                                 <thead class="table-light">
                                     <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
-                                <tbody @dragover.prevent @drop="packagePage.handleDropOnContainer($event, 'vm')">
+                                <tbody @dragover="packagePage.handleContainerDragOver($event, 'vm')" @drop="packagePage.handleDropOnContainer($event, 'vm')">
                                     <tr v-for="p in packagePage.vmPackages.value" :key="p.id"
                                         draggable="true"
                                         :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id }"
                                         @dragstart="packagePage.handleDragStart($event, p.id, 'vm')"
-                                        @dragover.prevent="packagePage.handleDragOver($event, p.id)"
+                                        @dragover="packagePage.handleDragOver($event, p.id)"
                                         @dragleave="packagePage.handleDragLeave($event, p.id)"
                                         @drop="packagePage.handleDrop($event, p.id, 'vm')"
                                         @dragend="packagePage.handleDragEnd()">
@@ -80,13 +80,13 @@
                             </div>
                         </div>
                         <!-- 分组列表 -->
-                        <div v-if="packagePage.lxcPackageGroups.value.length > 0" class="mb-3" @dragover.prevent @drop="packagePage.handleDropOnContainer($event, 'group-lxc')">
+                        <div v-if="packagePage.lxcPackageGroups.value.length > 0" class="mb-3" @dragover="packagePage.handleContainerDragOver($event, 'group-lxc')" @drop="packagePage.handleDropOnContainer($event, 'group-lxc')">
                             <span v-for="g in packagePage.lxcPackageGroups.value" :key="g.id"
                                 class="badge bg-info me-2 group-badge-draggable"
                                 draggable="true"
                                 :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id }"
                                 @dragstart="packagePage.handleDragStart($event, g.id, 'group-lxc')"
-                                @dragover.prevent="packagePage.handleDragOver($event, g.id)"
+                                @dragover="packagePage.handleDragOver($event, g.id)"
                                 @dragleave="packagePage.handleDragLeave($event, g.id)"
                                 @drop="packagePage.handleDrop($event, g.id, 'group-lxc')"
                                 @dragend="packagePage.handleDragEnd()">
@@ -100,12 +100,12 @@
                                 <thead class="table-light">
                                     <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
-                                <tbody @dragover.prevent @drop="packagePage.handleDropOnContainer($event, 'lxc')">
+                                <tbody @dragover="packagePage.handleContainerDragOver($event, 'lxc')" @drop="packagePage.handleDropOnContainer($event, 'lxc')">
                                     <tr v-for="p in packagePage.lxcPackages.value" :key="p.id"
                                         draggable="true"
                                         :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id }"
                                         @dragstart="packagePage.handleDragStart($event, p.id, 'lxc')"
-                                        @dragover.prevent="packagePage.handleDragOver($event, p.id)"
+                                        @dragover="packagePage.handleDragOver($event, p.id)"
                                         @dragleave="packagePage.handleDragLeave($event, p.id)"
                                         @drop="packagePage.handleDrop($event, p.id, 'lxc')"
                                         @dragend="packagePage.handleDragEnd()">

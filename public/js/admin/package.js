@@ -254,24 +254,25 @@
     };
 
     $.handleDragOver = function(e, id) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-        // 类型隔离：id 必须属于当前 dragType 的列表，否则只 preventDefault 不污染状态
+        // 类型隔离：id 必须属于当前 dragType 的列表
         var dragType = $.dragState.dragType;
         var dragList = $.getDragList(dragType);
         var idBelongsToType = false;
         for (var bi = 0; bi < dragList.length; bi++) {
             if (dragList[bi].id === id) { idBelongsToType = true; break; }
         }
+        // 类型不匹配：不 preventDefault，浏览器原生禁止 drop，无视觉污染
         if (!idBelongsToType) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
         // 始终记录最后经过的目标 id（包括拖拽行自身），供容器兜底使用
         $.dragState.dragOverId = id;
         if ($.dragState.draggingId === id) return;
         // 如果 fromIndex 丢失（可能被意外重置），重新计算
         if ($.dragState.dragFromIndex < 0 && $.dragState.draggingId != null) {
-            var dragList = $.getDragList($.dragState.dragType);
-            for (var fi = 0; fi < dragList.length; fi++) {
-                if (dragList[fi].id === $.dragState.draggingId) {
+            var dragList2 = $.getDragList($.dragState.dragType);
+            for (var fi = 0; fi < dragList2.length; fi++) {
+                if (dragList2[fi].id === $.dragState.draggingId) {
                     $.dragState.dragFromIndex = fi;
                     break;
                 }
@@ -286,37 +287,37 @@
         }
         if (toIndex < 0) return;
         var fromIndex = $.dragState.dragFromIndex;
-        // 直接操作 DOM 设置 transform（绕过 Vue 响应式，避免拖拽期间渲染节流）
-        // 找到当前拖拽元素和目标元素的 DOM 节点
         var containerSelector = (dragType === 'vm' || dragType === 'lxc') ? 'tbody' : '.mb-3';
         var container = e.currentTarget.closest(containerSelector);
         if (!container) {
             container = e.currentTarget.parentElement;
             if (!container) return;
         }
-        // 只选择当前容器内的可拖拽元素（避免跨容器污染）
         var rows = container.querySelectorAll('[draggable="true"]');
-        // 判断是表格行（纵向）还是 badge（横向）
         var isHorizontal = dragType === 'group-vm' || dragType === 'group-lxc';
         var offset = isHorizontal
             ? (rows.length > 0 ? rows[0].offsetWidth + 8 : 80)
             : (rows.length > 0 ? rows[0].offsetHeight : 40);
         var axis = isHorizontal ? 'X' : 'Y';
-        // 清除所有避让 transform
         for (var j = 0; j < rows.length; j++) {
             rows[j].style.transform = '';
         }
-        // 根据拖拽方向应用避让（严格限制范围，避免连带）
         if (fromIndex < toIndex) {
-            // 向后拖拽：仅 fromIndex+1 到 toIndex 的元素向前避让（负方向）
             for (var k = fromIndex + 1; k <= toIndex && k < rows.length; k++) {
                 rows[k].style.transform = 'translate' + axis + '(-' + offset + 'px)';
             }
         } else if (fromIndex > toIndex) {
-            // 向前拖拽：仅 toIndex 到 fromIndex-1 的元素向后避让（正方向）
             for (var k = toIndex; k < fromIndex && k < rows.length; k++) {
                 rows[k].style.transform = 'translate' + axis + '(' + offset + 'px)';
             }
+        }
+    };
+
+    // 容器 dragover：仅当拖拽类型匹配时才 preventDefault 允许 drop
+    $.handleContainerDragOver = function(e, type) {
+        if ($.dragState.dragType === type) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
         }
     };
 
@@ -379,14 +380,6 @@
         $.dragState.dragType = null;
         $.dragState.dragFromIndex = -1;
         $.clearAvoidClasses();
-        // 清理活动元素焦点和文本选区，防止残留状态干扰下次拖拽
-        try {
-            if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) {
-                document.activeElement.blur();
-            }
-            var sel = window.getSelection && window.getSelection();
-            if (sel && sel.removeAllRanges) sel.removeAllRanges();
-        } catch (ignore) {}
     };
 
     $.saveReorder = async function(type, ids) {

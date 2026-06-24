@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.17.4] - 2026-06-24
+
+### Fixed
+- fix(packages): 重构拖拽事件策略彻底修复跨类型污染与重复拖拽失效
+  - 模板 @dragover.prevent 改为 @dragover 交函数控制，类型不匹配时不 preventDefault，浏览器原生禁止 drop
+  - 新增 handleContainerDragOver，容器仅当 dragType 匹配时才允许 drop
+  - handleDragEnd 移除 blur/removeAllRanges，避免干扰 Chrome 拖拽状态机导致重复拖拽失效
+
 ## [2.17.3] - 2026-06-24
 
 ### Fixed
