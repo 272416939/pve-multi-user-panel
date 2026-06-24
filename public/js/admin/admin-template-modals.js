@@ -273,7 +273,7 @@
                                     <div class="d-flex gap-2">
                                         <pv-button type="submit" variant="primary" formnovalidate>保存</pv-button>
                                         <pv-button type="button" @click="removeVm" :disabled="editVmForm.status && editVmForm.status.status === 'running'" :title="editVmForm.status && editVmForm.status.status === 'running' ? '请先关机后操作' : '移除分配（仅解绑）'" variant="outline">移除（仅解绑）</pv-button>
-                                        <pv-button type="button" @click="openDestroyVmConfirm" :disabled="editVmForm.status && editVmForm.status.status === 'running'" :title="editVmForm.status && editVmForm.status.status === 'running' ? '请先关机后操作' : '销毁虚拟机（删除 PVE 数据）'" variant="outline">销毁（删除 PVE）</pv-button>
+                                        <pv-button type="button" @click="openDestroyVmConfirm" :disabled="editVmForm.status && editVmForm.status.status === 'running'" :title="editVmForm.status && editVmForm.status.status === 'running' ? '请先关机后操作' : '销毁虚拟机（删除 PVE 数据）'" variant="danger">销毁（删除 PVE）</pv-button>
                                     </div>
                                 </form>
                             </div>
@@ -876,7 +876,7 @@
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                                                         
 </pv-button>
-                                                        <pv-button @click="deleteLxcSnapshot(lxcSnapshotVmId, snap.name)" title="删除快照" variant="outline" size="sm">
+                                                        <pv-button @click="deleteLxcSnapshot(lxcSnapshotVmId, snap.name)" title="删除快照" variant="outline-danger" size="sm">
 
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                                         
@@ -1392,7 +1392,7 @@
                                                     <td><span :class="rule.enabled ? 'text-success' : 'text-muted'">{{ rule.enabled ? '启用' : '禁用' }}</span></td>
                                                     <td>
                                                         <pv-button @click="openDeviceEditModal(rule)" variant="outline" size="sm">编辑</pv-button>
-                                                        <pv-button @click="deleteDeviceRule(rule)" variant="outline" size="sm">删除</pv-button>
+                                                        <pv-button @click="deleteDeviceRule(rule)" variant="outline-danger" size="sm">删除</pv-button>
                                                     </td>
                                                 </tr>
                                             </tbody>

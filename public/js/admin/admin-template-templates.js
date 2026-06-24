@@ -30,7 +30,7 @@
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <pv-button @click="templatePage.openVmTemplateForm(t)" variant="outline">编辑</pv-button>
-                                                <pv-button @click="templatePage.deleteVmTemplate(t.id)" variant="outline">删除</pv-button>
+                                                <pv-button @click="templatePage.deleteVmTemplate(t.id)" variant="outline-danger">删除</pv-button>
                                             </div>
                                         </td>
                                     </tr>
@@ -66,7 +66,7 @@
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <pv-button @click="templatePage.openLxcTemplateForm(t)" variant="outline">编辑</pv-button>
-                                                <pv-button @click="templatePage.deleteLxcTemplate(t.id)" variant="outline">删除</pv-button>
+                                                <pv-button @click="templatePage.deleteLxcTemplate(t.id)" variant="outline-danger">删除</pv-button>
                                             </div>
                                         </td>
                                     </tr>

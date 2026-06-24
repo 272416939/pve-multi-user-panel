@@ -611,7 +611,7 @@
                                 <div class="d-flex gap-2 mt-3">
                                     <pv-button variant="secondary" size="sm" @click="copyRecoveryCodes">复制全部</pv-button>
                                     <pv-button variant="outline" size="sm" @click="downloadRecoveryCodes">下载</pv-button>
-                                    <pv-button variant="danger" size="sm" @click="regenerateRecoveryCodes">重新生成</pv-button>
+                                    <pv-button variant="outline-danger" size="sm" @click="regenerateRecoveryCodes">重新生成</pv-button>
                                 </div>
                             </div>
                         </div>

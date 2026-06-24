@@ -99,7 +99,7 @@
                                 <h5 class="mb-0">CDK 列表（{{ cdkList.length }}）</h5>
                                 <div v-if="selectedCdkIds.length > 0" class="d-flex align-items-center gap-2">
                                     <span class="text-muted small">已选 {{ selectedCdkIds.length }} 个</span>
-                                    <pv-button @click="batchDeleteCdk" variant="outline" size="sm">批量删除</pv-button>
+                                    <pv-button @click="batchDeleteCdk" variant="outline-danger" size="sm">批量删除</pv-button>
                                 </div>
                             </div>
                             <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
@@ -146,7 +146,7 @@
                                             <td><small>{{ cdk.expires_at ? formatDate(cdk.expires_at) : '永久' }}</small></td>
                                             <td><small>{{ cdk.used_at ? formatDate(cdk.used_at) : '-' }}</small></td>
                                             <td>
-                                                <pv-button @click="deleteCdk(cdk.id)" variant="danger">删除</pv-button>
+                                                <pv-button @click="deleteCdk(cdk.id)" variant="outline-danger">删除</pv-button>
                                             </td>
                                         </tr>
                                     </tbody>

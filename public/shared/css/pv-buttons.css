@@ -271,6 +271,42 @@
   box-shadow: 0 2px 10px rgba(99,102,241,0.12) !important;
 }
 
+/* .pv-btn-outline-danger — 危险描边按钮（列表内删除/销毁） */
+.pv-btn-outline-danger {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: rgba(248,113,113,0.95) !important;
+  border-color: rgba(239,68,68,0.4) !important;
+  box-shadow: none !important;
+}
+.pv-btn-outline-danger:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(239,68,68,0.12), rgba(220,38,38,0.08)) !important;
+  border-color: rgba(239,68,68,0.6) !important;
+  box-shadow: 0 2px 10px rgba(239,68,68,0.15) !important;
+}
+
+/* .pv-btn-outline-warning — 警告描边按钮（移除/解绑） */
+.pv-btn-outline-warning {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: rgba(251,191,36,0.95) !important;
+  border-color: rgba(250,204,21,0.4) !important;
+  box-shadow: none !important;
+}
+.pv-btn-outline-warning:hover {
+  transform: translateY(-1px) !important;
+  background: linear-gradient(135deg, rgba(250,204,21,0.12), rgba(245,158,11,0.08)) !important;
+  border-color: rgba(250,204,21,0.6) !important;
+  box-shadow: 0 2px 10px rgba(250,204,21,0.15) !important;
+}
+
 /* .pv-btn-secondary — 次要按钮 */
 .pv-btn-secondary {
   padding: 5px 14px !important;

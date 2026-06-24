@@ -411,7 +411,7 @@
                                     <td><span :class="rule.enabled ? 'text-success' : 'text-muted'">{{ rule.enabled ? '启用' : '禁用' }}</span></td>
                                     <td>
                                         <pv-button variant="outline" size="sm" @click="openDeviceEditModal(rule)" title="编辑">编辑</pv-button>
-                                        <pv-button variant="outline" size="sm" @click="deleteDeviceRule(rule)" title="删除">删除</pv-button>
+                                        <pv-button variant="outline-danger" size="sm" @click="deleteDeviceRule(rule)" title="删除">删除</pv-button>
                                     </td>
                                 </tr>
                             </tbody>

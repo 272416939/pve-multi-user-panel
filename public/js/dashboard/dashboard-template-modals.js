@@ -54,7 +54,7 @@
                     </div>
                     <div class="d-flex gap-2">
                         <pv-button type="submit" variant="primary" formnovalidate>保存</pv-button>
-                        <pv-button type="button" @click="removeVm" variant="outline">移除（仅解绑）</pv-button>
+                        <pv-button type="button" @click="removeVm" variant="outline-warning">移除（仅解绑）</pv-button>
                     </div>
                 </form>
             </div>
@@ -521,7 +521,7 @@
                                         <td class="small">{{ b.storage }}</td>
                                         <td>
                                             <pv-button v-if="b.status === 'completed'" @click="restoreLxcBackup(b)" title="恢复此备份" variant="outline" size="sm">恢复</pv-button>
-                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteLxcBackup(b.id, lxcBackupCtId)" title="删除备份" variant="outline" size="sm">删除</pv-button>
+                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteLxcBackup(b.id, lxcBackupCtId)" title="删除备份" variant="outline-danger" size="sm">删除</pv-button>
                                         </td>
                                     </tr>
                                 </tbody>

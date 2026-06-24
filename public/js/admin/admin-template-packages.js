@@ -93,7 +93,7 @@
                                         <td>
                                             <div class="btn-group btn-group-sm">
                                                 <pv-button @click="packagePage.openVmGroupForm(g)" variant="outline">编辑</pv-button>
-                                                <pv-button @click="packagePage.deleteVmGroup(g.id)" variant="outline">删除</pv-button>
+                                                <pv-button @click="packagePage.deleteVmGroup(g.id)" variant="outline-danger">删除</pv-button>
                                             </div>
                                         </td>
                                     </tr>
