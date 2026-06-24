@@ -1419,10 +1419,11 @@ module.exports = {
         getByUserId: (userId) => queryAll('SELECT * FROM lxc_containers WHERE user_id = ?', [userId]),
         getById: (id) => queryOne('SELECT * FROM lxc_containers WHERE id = ?', [id]),
         getByCtId: (ctId) => queryAll('SELECT * FROM lxc_containers WHERE ct_id = ?', [ctId]),
+        findByUpid: (upid) => queryOne('SELECT * FROM lxc_containers WHERE pve_upid = ? LIMIT 1', [upid]),
         create: async (ct) => {
             const [result] = await execute(
-                `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, pve_upid, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     ct.ct_id,
                     ct.user_id,
@@ -1430,6 +1431,9 @@ module.exports = {
                     ct.expiration_date || null,
                     ct.renewal_price || '',
                     ct.renewal_period || 'month',
+                    ct.monthly_price || '',
+                    ct.quarterly_discount || '',
+                    ct.yearly_discount || '',
                     ct.pve_upid || '',
                     mysqlNow()
                 ]
@@ -1438,7 +1442,7 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'ct_id', 'user_id', 'expiration_date',
-                'renewal_price', 'renewal_period', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

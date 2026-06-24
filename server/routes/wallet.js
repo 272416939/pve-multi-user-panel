@@ -562,6 +562,10 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         if (price <= 0) return res.status(400).json({ error: '该资源未设置续费价格' });
 
         var period = req.body.period || resource.renewal_period || 'month';
+        // SEC-04: period 白名单校验
+        if (!['month', 'quarter', 'year'].includes(period)) {
+            return res.status(400).json({ error: '无效的计费周期' });
+        }
 
         // 如果用户选择了不同的周期，重新计算单价
         var actualPrice = parseFloat(resource.renewal_price || '0');

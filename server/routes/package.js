@@ -11,6 +11,10 @@ var { calculateAmount, deductBalance, setVmAffinity } = require('../utils/order-
 var { execSSHWithStdin } = require('../api/ssh-exec');
 var crypto = require('crypto');
 var cacheStore = require('../utils/cache-store');
+var { checkRateLimit } = require('../middleware/rate-limiter');
+
+var UPID_REGEX = /^UPID:[a-zA-Z0-9_-]+:\d+:[a-f0-9]+:[0-9A-F]+:[a-zA-Z]+:[^:]*:.+$/;
+var VALID_PERIODS = ['month', 'quarter', 'year'];
 
 // 套餐列表缓存（5 分钟 TTL，低频变更场景）
 var vmPackageCache = cacheStore.create('vm_packages', 300);
@@ -85,6 +89,10 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         var userId = req.user.id;
         var packageId = parseInt(req.params.id);
         var period = req.body.period || 'month';
+        // SEC-04: period 白名单校验
+        if (!VALID_PERIODS.includes(period)) {
+            return res.status(400).json({ error: '无效的计费周期' });
+        }
         var period_count = req.body.period_count || 1;
         period_count = parseInt(period_count);
         if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
@@ -272,6 +280,10 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var userId = req.user.id;
         var packageId = parseInt(req.params.id);
         var period = req.body.period || 'month';
+        // SEC-04: period 白名单校验
+        if (!VALID_PERIODS.includes(period)) {
+            return res.status(400).json({ error: '无效的计费周期' });
+        }
         var period_count = req.body.period_count || 1;
         period_count = parseInt(period_count);
         if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
@@ -531,6 +543,10 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         var renewalPrice = req.body.renewal_price || '';
         var renewalPeriod = req.body.renewal_period || 'month';
         var period = req.body.period || 'month';
+        // SEC-04: period 白名单校验
+        if (!VALID_PERIODS.includes(period)) {
+            return res.status(400).json({ error: '无效的计费周期' });
+        }
         var period_count = req.body.period_count || 1;
         period_count = parseInt(period_count);
         if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
@@ -730,6 +746,10 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         var renewalPrice = req.body.renewal_price || '';
         var renewalPeriod = req.body.renewal_period || 'month';
         var period = req.body.period || 'month';
+        // SEC-04: period 白名单校验
+        if (!VALID_PERIODS.includes(period)) {
+            return res.status(400).json({ error: '无效的计费周期' });
+        }
         var period_count = req.body.period_count || 1;
         period_count = parseInt(period_count);
         if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
@@ -956,6 +976,30 @@ router.get('/provision-status', authMiddleware, async (req, res) => {
     try {
         var upid = req.query.pve_upid;
         if (!upid) return res.status(400).json({ error: '缺少 pve_upid' });
+
+        // SEC-06: UPID 格式校验，防止畸形值触发 PVE API 错误信息泄露
+        if (!UPID_REGEX.test(upid)) {
+            return res.status(400).json({ error: '无效的任务ID格式' });
+        }
+
+        // SEC-02: 速率限制（每用户每分钟 30 次，略高于前端 3 秒轮询频率）
+        var rateLimitKey = 'ratelimit:provision-status:' + req.user.id;
+        var rateLimitResult = await checkRateLimit(rateLimitKey, 30, 60 * 1000);
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        }
+
+        // SEC-01: 归属校验 — 确认该 upid 属于当前用户名下的开通中资源，防止 IDOR 越权查询
+        var vmRecord = await db.vms.findByUpid(upid);
+        var ctRecord = vmRecord ? null : await db.lxcContainers.findByUpid(upid);
+        var ownerRecord = vmRecord || ctRecord;
+        if (!ownerRecord) {
+            return res.status(404).json({ error: '任务不存在' });
+        }
+        var isAdmin = req.user.role === 'admin';
+        if (ownerRecord.user_id !== req.user.id && !isAdmin) {
+            return res.status(403).json({ error: '无权限查询此任务' });
+        }
 
         var taskStatus = await pveApi.getTaskStatus(upid);
         res.json({

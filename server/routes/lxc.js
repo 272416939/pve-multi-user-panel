@@ -136,6 +136,22 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     if (isNaN(parsedCtId) || isNaN(parsedUserId)) {
         return res.status(400).json({ error: '无效的容器或用户ID' });
     }
+
+    // SEC-03: 价格/折扣参数服务端校验
+    var parsedMonthlyPrice = parseFloat(monthly_price);
+    if (isNaN(parsedMonthlyPrice) || parsedMonthlyPrice < 0) parsedMonthlyPrice = 0;
+    var parsedQDiscount = parseInt(quarterly_discount);
+    if (isNaN(parsedQDiscount)) parsedQDiscount = 0;
+    parsedQDiscount = Math.min(Math.max(parsedQDiscount, 0), 100);
+    var parsedYDiscount = parseInt(yearly_discount);
+    if (isNaN(parsedYDiscount)) parsedYDiscount = 0;
+    parsedYDiscount = Math.min(Math.max(parsedYDiscount, 0), 100);
+
+    // SEC-04: period 白名单校验
+    var validPeriod = renewal_period || 'month';
+    if (!['month', 'quarter', 'year'].includes(validPeriod)) {
+        return res.status(400).json({ error: '无效的计费周期' });
+    }
  
     const existingCts = await db.lxcContainers.getAll();
     if (existingCts.find(ct => ct.ct_id === parsedCtId && ct.user_id === parsedUserId)) {
@@ -148,10 +164,10 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         name,
         expiration_date,
         renewal_price: renewal_price || '',
-        renewal_period: renewal_period || 'month',
-        monthly_price: monthly_price || '',
-        quarterly_discount: quarterly_discount || '',
-        yearly_discount: yearly_discount || ''
+        renewal_period: validPeriod,
+        monthly_price: String(parsedMonthlyPrice),
+        quarterly_discount: String(parsedQDiscount),
+        yearly_discount: String(parsedYDiscount)
     });
  
     // MAC 分组同步

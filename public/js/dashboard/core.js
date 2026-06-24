@@ -986,6 +986,11 @@
                 var raw = localStorage.getItem('provisioning_' + t);
                 if (!raw) continue;
                 var data = JSON.parse(raw);
+                // SEC-07: 字段类型断言，防止 localStorage 被污染后注入异常值
+                if (!data || typeof data.id !== 'string' || typeof data.startTime !== 'number') {
+                    localStorage.removeItem('provisioning_' + t);
+                    continue;
+                }
                 // 若已有 pve_upid 轮询在跑，说明新方案已接管，清除旧 localStorage
                 var hasUpidPoll = (t === 'vm' && provisioningVm) || (t === 'lxc' && provisioningLxc);
                 if (hasUpidPoll) {
