@@ -116,6 +116,7 @@ async function initDb() {
     try { await execute('ALTER TABLE vms ADD COLUMN monthly_price VARCHAR(50) DEFAULT \'\''); } catch (_) {}
     try { await execute('ALTER TABLE vms ADD COLUMN quarterly_discount VARCHAR(10) DEFAULT \'\''); } catch (_) {}
     try { await execute('ALTER TABLE vms ADD COLUMN yearly_discount VARCHAR(10) DEFAULT \'\''); } catch (_) {}
+    try { await execute('ALTER TABLE vms ADD COLUMN pve_upid VARCHAR(200) DEFAULT \'\''); } catch (_) {}
 
     // 创建虚拟机提醒记录表
     await execute(`
@@ -309,6 +310,7 @@ async function initDb() {
     try { await execute('ALTER TABLE lxc_containers ADD COLUMN monthly_price VARCHAR(50) DEFAULT \'\''); } catch (_) {}
     try { await execute('ALTER TABLE lxc_containers ADD COLUMN quarterly_discount VARCHAR(10) DEFAULT \'\''); } catch (_) {}
     try { await execute('ALTER TABLE lxc_containers ADD COLUMN yearly_discount VARCHAR(10) DEFAULT \'\''); } catch (_) {}
+    try { await execute('ALTER TABLE lxc_containers ADD COLUMN pve_upid VARCHAR(200) DEFAULT \'\''); } catch (_) {}
 
     // 创建 LXC 提醒记录表
     await execute(`
@@ -781,8 +783,8 @@ module.exports = {
         getById: (id) => queryOne('SELECT * FROM vms WHERE id = ?', [id]),
         create: async (vm) => {
             const [result] = await execute(
-                `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     vm.vm_id,
                     vm.user_id,
@@ -793,6 +795,7 @@ module.exports = {
                     vm.monthly_price || '',
                     vm.quarterly_discount || '',
                     vm.yearly_discount || '',
+                    vm.pve_upid || '',
                     mysqlNow()
                 ]
             );
@@ -800,7 +803,7 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'vm_id', 'user_id', 'expiration_date',
-                'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'dhcp_static_ip', 'ikuai_mac_group_id', 'backup_storage', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'backup_storage', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1418,8 +1421,8 @@ module.exports = {
         getByCtId: (ctId) => queryAll('SELECT * FROM lxc_containers WHERE ct_id = ?', [ctId]),
         create: async (ct) => {
             const [result] = await execute(
-                `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, pve_upid, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     ct.ct_id,
                     ct.user_id,
@@ -1427,6 +1430,7 @@ module.exports = {
                     ct.expiration_date || null,
                     ct.renewal_price || '',
                     ct.renewal_period || 'month',
+                    ct.pve_upid || '',
                     mysqlNow()
                 ]
             );
@@ -1434,7 +1438,7 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'ct_id', 'user_id', 'expiration_date',
-                'renewal_price', 'renewal_period', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

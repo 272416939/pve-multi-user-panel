@@ -127,7 +127,30 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             storage: template.target_storage || undefined,
             clone_mode: template.clone_mode || 'full'
         });
-        await pveApi.waitForTask(upid);
+
+        // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪
+        var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
+        var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
+        var newVm = await db.vms.create({
+            vm_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
+            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
+            monthly_price: String(pkg.monthly_price || ''),
+            quarterly_discount: String(pkg.quarterly_discount || ''),
+            yearly_discount: String(pkg.yearly_discount || ''),
+            pve_upid: upid
+        });
+
+        // 等待 clone 任务完成；失败则清理预创建记录并退款（订单/库存尚未创建，无需回滚）
+        try {
+            await pveApi.waitForTask(upid);
+        } catch (taskErr) {
+            try { await db.vms.delete(newVm.id); } catch (e) {}
+            try { await db.users.incrementBalance(userId, totalAmount); } catch (e) {}
+            throw taskErr;
+        }
+
+        // 开通完成，清空 pve_upid（表示开通完成）
+        newVm = await db.vms.update(newVm.id, { pve_upid: '' });
 
         var vmUpdateCfg = { cores: template.cores, memory: template.memory };
         if (template.ciuser) {
@@ -139,17 +162,6 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         if (template.cpu_affinity) {
             await setVmAffinity(newVmid, template.cpu_affinity);
         }
-
-        var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
-        var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
-
-        var newVm = await db.vms.create({
-            vm_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
-            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
-            monthly_price: String(pkg.monthly_price || ''),
-            quarterly_discount: String(pkg.quarterly_discount || ''),
-            yearly_discount: String(pkg.yearly_discount || '')
-        });
 
         if (finalMacGroupId) {
             try {
@@ -247,7 +259,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             await pveApi.startVm(newVmid);
         } catch (startErr) { console.error('[package] VM 自动开机失败:', startErr.message); }
 
-        res.json({ message: 'VM 开通成功', vm: newVm, name: randomName, vmid: newVmid, order_no: orderNo });
+        res.json({ message: 'VM 开通成功', vm: newVm, id: newVm.id, pve_upid: newVm.pve_upid || '', name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
         console.error('[package] 用户订购 VM 失败:', e.message);
         logPveError(e);
@@ -286,7 +298,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var randomName = generateLxcName();
         var newVmid = await pveApi.getNextAvailableVmid();
 
-        await pveApi.createLxc({
+        var lxcResp = await pveApi.createLxc({
             vmid: String(newVmid), ostemplate: template.ostemplate,
             storage: template.storage || 'local', hostname: randomName,
             cores: template.cores, memory: template.memory, swap: template.swap,
@@ -310,14 +322,30 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             unprivileged: template.unprivileged !== undefined ? template.unprivileged : 1,
             features: template.features || '', start: 0
         });
+        // createLxc 返回 response.data，PVE 创建接口返回 { data: upid }
+        var lxcUpid = (lxcResp && lxcResp.data) ? lxcResp.data : lxcResp;
 
         var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
         var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
 
+        // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪
         var newCt = await db.lxcContainers.create({
             ct_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
-            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period
+            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
+            pve_upid: lxcUpid
         });
+
+        // 等待 LXC 创建任务完成；失败则清理预创建记录并退款（订单/库存尚未创建，无需回滚）
+        try {
+            await pveApi.waitForTask(lxcUpid);
+        } catch (taskErr) {
+            try { await db.lxcContainers.delete(newCt.id); } catch (e) {}
+            try { await db.users.incrementBalance(userId, totalAmount); } catch (e) {}
+            throw taskErr;
+        }
+
+        // 开通完成，清空 pve_upid（表示开通完成）
+        newCt = await db.lxcContainers.update(newCt.id, { pve_upid: '' });
 
         if (finalMacGroupId) {
             try {
@@ -441,7 +469,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
         }
 
-        res.json({ message: 'LXC 开通成功', ct: newCt, name: randomName, vmid: newVmid, order_no: orderNo });
+        res.json({ message: 'LXC 开通成功', ct: newCt, id: newCt.id, pve_upid: newCt.pve_upid || '', name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
         console.error('[package] 用户订购 LXC 失败:', e.message);
         logPveError(e);
@@ -919,6 +947,25 @@ router.post('/admin/package-groups/reorder', authMiddleware, adminMiddleware, as
         res.json({ success: true });
     } catch (e) {
         console.error('[package] package-groups reorder error:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+// ===== 开通状态查询：通过 PVE upid 查询真实任务状态 =====
+router.get('/provision-status', authMiddleware, async (req, res) => {
+    try {
+        var upid = req.query.pve_upid;
+        if (!upid) return res.status(400).json({ error: '缺少 pve_upid' });
+
+        var taskStatus = await pveApi.getTaskStatus(upid);
+        res.json({
+            status: taskStatus.status,
+            exitstatus: taskStatus.exitstatus,
+            isCompleted: taskStatus.status === 'stopped',
+            isSuccess: taskStatus.status === 'stopped' && taskStatus.exitstatus === 'OK'
+        });
+    } catch (e) {
+        console.error('[package] 查询开通状态失败:', e.message);
         res.status(500).json({ error: safeError(e) });
     }
 });

@@ -96,8 +96,18 @@
         }
         try {
             var fresh = await api('/user/lxc');
-            // 保留正在开通中的占位记录（_provisioning 标记），避免 WebSocket tick 推送刷新时丢失
-            var provisioning = $.userLxcContainers.value.filter(function(c) { return c._provisioning; });
+            // pve_upid 非空表示该容器仍在 PVE 开通任务中，标记为开通中状态
+            var freshIds = {};
+            fresh.forEach(function(c) {
+                freshIds[c.id] = true;
+                if (c.pve_upid && c.pve_upid !== '') {
+                    c._provisioning = true;
+                    if (!c.status) c.status = {};
+                    c.status.status = 'provisioning';
+                }
+            });
+            // 保留开通中占位记录，但去除 fresh 中已存在的（避免 DB 记录与占位记录重复）
+            var provisioning = $.userLxcContainers.value.filter(function(c) { return c._provisioning && !freshIds[c.id]; });
             $.userLxcContainers.value = provisioning.concat(fresh);
         } catch (e) {
             console.error('加载LXC容器失败', e);
