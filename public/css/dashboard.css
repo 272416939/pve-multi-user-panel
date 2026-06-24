@@ -673,11 +673,13 @@
 
     /* ===== 拖拽排序视觉反馈 ===== */
     .row-dragging {
-        opacity: 0 !important;
+        opacity: 0.4;
+        background: var(--glass-accent, rgba(99,102,241,0.1)) !important;
+        cursor: grabbing !important;
     }
     /* 表格行基础 transition（避让动效平滑过渡，直接操作 DOM style.transform） */
     .table tbody tr {
-        transition: transform 0.2s ease, opacity 0.1s ease;
+        transition: transform 0.2s ease, opacity 0.2s ease;
     }
     /* 可拖拽表格行禁用文本选择，防止拖拽时触发浏览器文本拖拽/搜索弹窗 */
     .table tbody tr[draggable="true"] {
@@ -689,12 +691,13 @@
     .group-badge-draggable {
         cursor: grab;
         user-select: none;
-        transition: transform 0.2s ease, opacity 0.1s ease, box-shadow 0.2s ease;
+        transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
     }
     .group-badge-draggable:hover {
         transform: translateY(-1px);
         box-shadow: 0 2px 8px rgba(99,102,241,0.3);
     }
     .group-badge-draggable.row-dragging {
-        opacity: 0 !important;
+        opacity: 0.4;
+        cursor: grabbing !important;
     }
