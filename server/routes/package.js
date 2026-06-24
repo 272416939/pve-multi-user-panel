@@ -13,7 +13,7 @@ var crypto = require('crypto');
 var cacheStore = require('../utils/cache-store');
 var { checkRateLimit } = require('../middleware/rate-limiter');
 
-var UPID_REGEX = /^UPID:[a-zA-Z0-9_-]+:\d+:[a-f0-9]+:[0-9A-F]+:[a-zA-Z]+:[^:]*:.+$/;
+var UPID_REGEX = /^UPID:[a-zA-Z0-9_-]+:\d+:[0-9a-fA-F]+:[0-9a-fA-F]+:[a-zA-Z]+:[^:]*:.+$/;
 var VALID_PERIODS = ['month', 'quarter', 'year'];
 
 // 套餐列表缓存（5 分钟 TTL，低频变更场景）
