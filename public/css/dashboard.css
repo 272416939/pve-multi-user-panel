@@ -701,3 +701,25 @@
         opacity: 0.4;
         cursor: grabbing !important;
     }
+    /* 分组 badge 容器：小屏幕自动换行 */
+    .group-badges-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.375rem;
+    }
+    .group-badges-container .group-badge-draggable {
+        margin-right: 0 !important;
+        touch-action: none;
+    }
+    /* 触摸设备：可拖拽行禁用默认触摸手势，允许我们接管 */
+    @media (hover: none) and (pointer: coarse) {
+        .table tbody tr[draggable="true"],
+        .group-badge-draggable {
+            touch-action: none;
+        }
+        /* 小屏幕分组 badge 更大触摸目标 */
+        .group-badge-draggable {
+            padding: 0.4em 0.6em;
+            font-size: 0.85rem;
+        }
+    }

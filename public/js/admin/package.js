@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.19.0-native-drag';
+    window.__PKG_JS_VERSION = 'v2.20.0-touch-support';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -240,6 +240,146 @@
         if (type === 'group-vm') return $.vmPackageGroups.value;
         if (type === 'group-lxc') return $.lxcPackageGroups.value;
         return [];
+    };
+
+    // ===== 触摸事件拖拽（移动端）=====
+    $.handleTouchStart = function(e, id, type) {
+        if (e.touches.length !== 1) return;
+        var tgt = e.target;
+        if (tgt && tgt.closest && tgt.closest('button, a, input, select, .btn-group')) return;
+        var touch = e.touches[0];
+        $.dragState.__touchId = touch.identifier;
+        $.dragState.__touchStartX = touch.clientX;
+        $.dragState.__touchStartY = touch.clientY;
+        $.dragState.__touchPendingId = id;
+        $.dragState.__touchPendingType = type;
+        $.dragState.__touchLongPress = false;
+        // 长按 500ms 后启动拖拽
+        if ($.__touchLongPressTimer) clearTimeout($.__touchLongPressTimer);
+        $.__touchLongPressTimer = setTimeout(function() {
+            if ($.dragState.__touchPendingId == null) return;
+            $.dragState.__touchLongPress = true;
+            $.dragState.draggingId = $.dragState.__touchPendingId;
+            $.dragState.dragType = $.dragState.__touchPendingType;
+            $.dragState.draggingType = $.dragState.__touchPendingType;
+            $.dragState.dragHandled = false;
+            var list = $.getDragList($.dragState.dragType);
+            var fi = -1;
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].id === $.dragState.draggingId) { fi = i; break; }
+            }
+            $.dragState.dragFromIndex = fi;
+            // 触觉反馈
+            if (navigator.vibrate) navigator.vibrate(30);
+            document.body.style.userSelect = 'none';
+        }, 500);
+    };
+
+    $.handleTouchMove = function(e) {
+        if (!$.dragState.__touchLongPress) return;
+        if (e.touches.length !== 1) return;
+        e.preventDefault();
+        var touch = e.touches[0];
+        var type = $.dragState.dragType;
+        var underEl = document.elementFromPoint(touch.clientX, touch.clientY);
+        var targetRow = null;
+        if (underEl) {
+            targetRow = underEl.closest('[draggable="true"]');
+            if (targetRow) {
+                var rowType = targetRow.getAttribute('data-drag-type');
+                if (rowType !== type) targetRow = null;
+            }
+        }
+        if (targetRow) {
+            var overId = Number(targetRow.getAttribute('data-drag-id'));
+            $.dragState.dragOverId = overId;
+            if (overId !== $.dragState.draggingId) {
+                $.__applyAvoidTransform(type, overId);
+            } else {
+                $.__clearAllTransform(type);
+            }
+        }
+    };
+
+    $.handleTouchEnd = async function(e) {
+        if ($.__touchLongPressTimer) { clearTimeout($.__touchLongPressTimer); $.__touchLongPressTimer = null; }
+        if (!$.dragState.__touchLongPress) {
+            $.dragState.__touchPendingId = null;
+            $.dragState.__touchPendingType = null;
+            return;
+        }
+        var sourceId = $.dragState.draggingId;
+        var targetId = $.dragState.dragOverId;
+        var dragType = $.dragState.dragType;
+        document.body.style.userSelect = '';
+        if (sourceId != null && targetId != null && sourceId !== targetId && dragType != null && !$.dragState.dragHandled) {
+            $.dragState.dragHandled = true;
+            var list = $.getDragList(dragType);
+            var newOrder = list.map(function(p) { return p.id; });
+            var fromIdx = newOrder.indexOf(sourceId);
+            var toIdx = newOrder.indexOf(targetId);
+            if (fromIdx !== -1 && toIdx !== -1) {
+                newOrder.splice(fromIdx, 1);
+                newOrder.splice(toIdx, 0, sourceId);
+                $.dragState.draggingId = null;
+                $.dragState.dragOverId = null;
+                $.dragState.dragType = null;
+                $.dragState.draggingType = null;
+                $.dragState.dragFromIndex = -1;
+                $.dragState.__touchLongPress = false;
+                $.dragState.__touchPendingId = null;
+                $.dragState.__touchPendingType = null;
+                $.__clearAllTransform(dragType);
+                await $.saveReorder(dragType, newOrder);
+                return;
+            }
+        }
+        $.dragState.draggingId = null;
+        $.dragState.dragOverId = null;
+        $.dragState.dragType = null;
+        $.dragState.draggingType = null;
+        $.dragState.dragFromIndex = -1;
+        $.dragState.__touchLongPress = false;
+        $.dragState.__touchPendingId = null;
+        $.dragState.__touchPendingType = null;
+        if (dragType) $.__clearAllTransform(dragType);
+    };
+
+    $.__applyAvoidTransform = function(type, overId) {
+        var list = $.getDragList(type);
+        var fromIndex = $.dragState.dragFromIndex;
+        var toIndex = -1;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === overId) { toIndex = i; break; }
+        }
+        if (fromIndex < 0 || toIndex < 0) return;
+        var containerSelector = (type === 'vm' || type === 'lxc') ? 'tbody' : '.mb-3';
+        var containers = document.querySelectorAll(containerSelector);
+        var rows = null;
+        for (var c = 0; c < containers.length; c++) {
+            var testRows = containers[c].querySelectorAll('[draggable="true"][data-drag-type="' + type + '"]');
+            if (testRows.length > 0) { rows = testRows; break; }
+        }
+        if (!rows || rows.length === 0) return;
+        var isHorizontal = type === 'group-vm' || type === 'group-lxc';
+        var offset = isHorizontal ? (rows[0].offsetWidth + 8) : rows[0].offsetHeight;
+        var axis = isHorizontal ? 'X' : 'Y';
+        for (var j = 0; j < rows.length; j++) rows[j].style.transform = '';
+        if (fromIndex < toIndex) {
+            for (var k = fromIndex + 1; k <= toIndex && k < rows.length; k++) {
+                rows[k].style.transform = 'translate' + axis + '(-' + offset + 'px)';
+            }
+        } else if (fromIndex > toIndex) {
+            for (var k = toIndex; k < fromIndex && k < rows.length; k++) {
+                rows[k].style.transform = 'translate' + axis + '(' + offset + 'px)';
+            }
+        }
+    };
+
+    $.__clearAllTransform = function(type) {
+        var selector = type ? '[draggable="true"][data-drag-type="' + type + '"]' : '[draggable="true"]';
+        var rows = document.querySelectorAll(selector);
+        for (var i = 0; i < rows.length; i++) rows[i].style.transform = '';
     };
 
     $.handleDragStart = function(e, id, type) {
