@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.18.7-avoid-fix';
+    window.__PKG_JS_VERSION = 'v2.18.8-visible-drag';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -249,13 +249,6 @@
         $.dragState.dragHandled = false;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/x-pve-drag', String(id));
-        // 立即设置拖拽镜像：用当前元素（此时 opacity 还是 1），确保镜像完整
-        // Vue 会在下一微任务添加 row-dragging class 使原元素 opacity:0 消除残影
-        try {
-            var el = e.currentTarget;
-            var rect = el.getBoundingClientRect();
-            e.dataTransfer.setDragImage(el, e.clientX - rect.left, e.clientY - rect.top);
-        } catch (err) {}
         var list = $.getDragList(type);
         var fromIndex = -1;
         for (var i = 0; i < list.length; i++) {
