@@ -91,7 +91,7 @@
                                         <td>{{ g.name }}</td>
                                         <td>{{ packagePage.vmPackages.value.filter(p => p.group_id === g.id).length }}</td>
                                         <td>
-                                            <pv-button @click="packagePage.openVmGroupForm(g)" size="sm" variant="outline" class="me-1">编辑</pv-button>
+                                            <pv-button @click="packagePage.openVmGroupForm(g)" size="sm" variant="outline">编辑</pv-button>
                                             <pv-button @click="packagePage.deleteVmGroup(g.id)" size="sm" variant="outline-danger">删除</pv-button>
                                         </td>
                                     </tr>
@@ -178,7 +178,7 @@
                                         <td>{{ g.name }}</td>
                                         <td>{{ packagePage.lxcPackages.value.filter(p => p.group_id === g.id).length }}</td>
                                         <td>
-                                            <pv-button @click="packagePage.openLxcGroupForm(g)" size="sm" variant="outline" class="me-1">编辑</pv-button>
+                                            <pv-button @click="packagePage.openLxcGroupForm(g)" size="sm" variant="outline">编辑</pv-button>
                                             <pv-button @click="packagePage.deleteLxcGroup(g.id)" size="sm" variant="outline-danger">删除</pv-button>
                                         </td>
                                     </tr>

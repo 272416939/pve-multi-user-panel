@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.22.1-fix-avoid';
+    window.__PKG_JS_VERSION = 'v2.22.2-touch-lock';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -259,14 +259,22 @@
             if (list[i].id === id) { fi = i; break; }
         }
         $.dragState.dragFromIndex = fi;
+        // 触觉反馈（静默失败，不报错到控制台）
         try { if (navigator.vibrate) navigator.vibrate(20); } catch (err) {}
         document.body.style.userSelect = 'none';
+        // 锁定整个容器的 touch-action，防止手指移出手柄后浏览器接管滚动
+        var handleEl = e.currentTarget;
+        var container = handleEl.closest('tbody') || handleEl.closest('.mb-3') || handleEl.parentElement;
+        if (container) {
+            container.style.touchAction = 'none';
+            $.__touchLockedContainer = container;
+        }
     };
 
     $.handleTouchMove = function(e) {
         if ($.dragState.draggingId == null) return;
         if (e.touches.length !== 1) return;
-        if (e.cancelable) e.preventDefault(); else return;
+        if (e.cancelable) e.preventDefault();
         var touch = e.touches[0];
         var type = $.dragState.dragType;
         var underEl = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -290,11 +298,15 @@
     };
 
     $.handleTouchEnd = async function(e) {
-        if ($.dragState.draggingId == null) return;
+        if ($.dragState.draggingId == null) {
+            if ($.__touchLockedContainer) { $.__touchLockedContainer.style.touchAction = ''; $.__touchLockedContainer = null; }
+            return;
+        }
         var sourceId = $.dragState.draggingId;
         var targetId = $.dragState.dragOverId;
         var dragType = $.dragState.dragType;
         document.body.style.userSelect = '';
+        if ($.__touchLockedContainer) { $.__touchLockedContainer.style.touchAction = ''; $.__touchLockedContainer = null; }
         if (sourceId != null && targetId != null && sourceId !== targetId && dragType != null && !$.dragState.dragHandled) {
             $.dragState.dragHandled = true;
             var list = $.getDragList(dragType);
