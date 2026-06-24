@@ -482,12 +482,11 @@
         }
         try {
             var fresh = await api('/user/vms');
-            // pve_upid 非空表示该 VM 仍在 PVE 开通任务中，标记为开通中状态
+            // _provisioning 为 true 表示该 VM 仍在 PVE 开通任务中（后端已剔除 pve_upid 敏感字段）
             var freshIds = {};
             fresh.forEach(function(v) {
                 freshIds[v.id] = true;
-                if (v.pve_upid && v.pve_upid !== '') {
-                    v._provisioning = true;
+                if (v._provisioning) {
                     if (!v.status) v.status = {};
                     v.status.status = 'provisioning';
                 }
@@ -926,12 +925,12 @@
         var endpoint = type === 'vm' ? '/vm-packages/' + pkg.id + '/order' : '/lxc-packages/' + pkg.id + '/order';
         try {
             var result = await api(endpoint, { method: 'POST', body: JSON.stringify(orderForm) });
-            // 后端同步开通完成时 pve_upid 已清空；若返回 pve_upid 非空（异步场景），改用 PVE 任务状态轮询
-            if (result && result.pve_upid) {
+            // 后端同步开通完成时 _provisioning 为 false；若为 true（异步场景），改用 resourceId 轮询 PVE 任务状态
+            if (result && result._provisioning && result.id) {
                 try {
-                    localStorage.setItem('provisioning_' + type, JSON.stringify({ id: placeholderId, type: type, startTime: Date.now(), pve_upid: result.pve_upid, resourceId: result.id || '' }));
+                    localStorage.setItem('provisioning_' + type, JSON.stringify({ id: placeholderId, type: type, startTime: Date.now(), resourceId: result.id }));
                 } catch (e2) {}
-                // 移除占位记录，加载 DB 预创建记录（pve_upid 非空会被 loadData 标记为开通中），再启动 PVE 状态轮询
+                // 移除占位记录，加载 DB 预创建记录（_provisioning 为 true 会被 loadData 标记为开通中），再启动 PVE 状态轮询
                 if (type === 'vm') {
                     $.userVms.value = $.userVms.value.filter(function(v) { return v.id !== placeholderId; });
                     await $.loadData();
@@ -939,7 +938,7 @@
                     $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
                     await $.loadLxcContainers();
                 }
-                $.__startProvisioningPoll(type, result.pve_upid, result.id || placeholderId);
+                $.__startProvisioningPoll(type, result.id);
             } else {
                 // API 成功，移除占位记录并重新加载列表
                 if (type === 'vm') {
@@ -968,17 +967,17 @@
     };
     
     $.restoreProvisioningState = function() {
-        // 新方案：检测 DB 中 pve_upid 非空的记录（PVE 开通任务进行中），通过 PVE 真实任务状态轮询
-        var provisioningVm = $.userVms.value.find(function(v) { return v.pve_upid && v.pve_upid !== ''; });
+        // 检测 DB 中 _provisioning 为 true 的记录（PVE 开通任务进行中），通过 resourceId 轮询 PVE 真实任务状态
+        var provisioningVm = $.userVms.value.find(function(v) { return v._provisioning; });
         if (provisioningVm) {
-            $.__startProvisioningPoll('vm', provisioningVm.pve_upid, provisioningVm.id);
+            $.__startProvisioningPoll('vm', provisioningVm.id);
         }
-        var provisioningLxc = $.userLxcContainers.value.find(function(c) { return c.pve_upid && c.pve_upid !== ''; });
+        var provisioningLxc = $.userLxcContainers.value.find(function(c) { return c._provisioning; });
         if (provisioningLxc) {
-            $.__startProvisioningPoll('lxc', provisioningLxc.pve_upid, provisioningLxc.id);
+            $.__startProvisioningPoll('lxc', provisioningLxc.id);
         }
 
-        // 兼容旧的 localStorage 占位记录方案（无 pve_upid 时作为 fallback）
+        // 兼容旧的 localStorage 占位记录方案（无 resourceId 时作为 fallback）
         var types = ['vm', 'lxc'];
         for (var i = 0; i < types.length; i++) {
             var t = types[i];
@@ -991,9 +990,9 @@
                     localStorage.removeItem('provisioning_' + t);
                     continue;
                 }
-                // 若已有 pve_upid 轮询在跑，说明新方案已接管，清除旧 localStorage
-                var hasUpidPoll = (t === 'vm' && provisioningVm) || (t === 'lxc' && provisioningLxc);
-                if (hasUpidPoll) {
+                // 若已有 _provisioning 轮询在跑，说明新方案已接管，清除旧 localStorage
+                var hasProvisioningPoll = (t === 'vm' && provisioningVm) || (t === 'lxc' && provisioningLxc);
+                if (hasProvisioningPoll) {
                     localStorage.removeItem('provisioning_' + t);
                     continue;
                 }
@@ -1024,17 +1023,17 @@
         }
     };
 
-    // 新轮询：用 pve_upid 调用后端 /provision-status 查询 PVE 真实任务状态
-    $.__startProvisioningPoll = function(type, upid, resourceId) {
+    // 轮询：用 resourceId 调用后端 /provision-status 查询 PVE 真实任务状态（不暴露 pve_upid 给前端）
+    $.__startProvisioningPoll = function(type, resourceId) {
         var pollKey = '__provPoll_' + type;
         if ($[pollKey]) clearInterval($[pollKey]);
         $[pollKey] = setInterval(async function() {
             try {
-                var result = await api('/provision-status?type=' + type + '&pve_upid=' + encodeURIComponent(upid));
+                var result = await api('/provision-status?type=' + type + '&resourceId=' + resourceId);
                 if (result && result.isCompleted) {
                     clearInterval($[pollKey]);
                     $[pollKey] = null;
-                    // 重新加载列表（后端已清空 pve_upid）
+                    // 重新加载列表（后端已清空 pve_upid，_provisioning 变为 false）
                     if (type === 'vm') {
                         await $.loadData();
                     } else {

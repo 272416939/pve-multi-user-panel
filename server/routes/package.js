@@ -13,7 +13,6 @@ var crypto = require('crypto');
 var cacheStore = require('../utils/cache-store');
 var { checkRateLimit } = require('../middleware/rate-limiter');
 
-var UPID_REGEX = /^UPID:[a-zA-Z0-9_-]+:[0-9a-fA-F]+:[0-9a-fA-F]+:[0-9a-fA-F]+:[a-zA-Z]+:[^:]*:[^:]*(?::.*)?$/;
 var VALID_PERIODS = ['month', 'quarter', 'year'];
 
 // 套餐列表缓存（5 分钟 TTL，低频变更场景）
@@ -267,7 +266,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             await pveApi.startVm(newVmid);
         } catch (startErr) { console.error('[package] VM 自动开机失败:', startErr.message); }
 
-        res.json({ message: 'VM 开通成功', vm: newVm, id: newVm.id, pve_upid: newVm.pve_upid || '', name: randomName, vmid: newVmid, order_no: orderNo });
+        res.json({ message: 'VM 开通成功', id: newVm.id, _provisioning: !!(newVm.pve_upid && newVm.pve_upid !== ''), name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
         console.error('[package] 用户订购 VM 失败:', e.message);
         logPveError(e);
@@ -481,7 +480,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
         }
 
-        res.json({ message: 'LXC 开通成功', ct: newCt, id: newCt.id, pve_upid: newCt.pve_upid || '', name: randomName, vmid: newVmid, order_no: orderNo });
+        res.json({ message: 'LXC 开通成功', id: newCt.id, _provisioning: !!(newCt.pve_upid && newCt.pve_upid !== ''), name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
         console.error('[package] 用户订购 LXC 失败:', e.message);
         logPveError(e);
@@ -971,16 +970,13 @@ router.post('/admin/package-groups/reorder', authMiddleware, adminMiddleware, as
     }
 });
 
-// ===== 开通状态查询：通过 PVE upid 查询真实任务状态 =====
+// ===== 开通状态查询：前端只传 resourceId（DB 主键，无敏感信息），后端内部用 pve_upid 查 PVE =====
 router.get('/provision-status', authMiddleware, async (req, res) => {
     try {
-        var upid = req.query.pve_upid;
-        if (!upid) return res.status(400).json({ error: '缺少 pve_upid' });
-
-        // SEC-06: UPID 格式校验，防止畸形值触发 PVE API 错误信息泄露
-        if (!UPID_REGEX.test(upid)) {
-            return res.status(400).json({ error: '无效的任务ID格式' });
-        }
+        var resourceId = parseInt(req.query.resourceId);
+        var type = req.query.type;
+        if (!resourceId || resourceId <= 0) return res.status(400).json({ error: '缺少 resourceId' });
+        if (type !== 'vm' && type !== 'lxc') return res.status(400).json({ error: '无效的资源类型' });
 
         // SEC-02: 速率限制（每用户每分钟 30 次，略高于前端 3 秒轮询频率）
         var rateLimitKey = 'ratelimit:provision-status:' + req.user.id;
@@ -989,16 +985,22 @@ router.get('/provision-status', authMiddleware, async (req, res) => {
             return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
         }
 
-        // SEC-01: 归属校验 — 确认该 upid 属于当前用户名下的开通中资源，防止 IDOR 越权查询
-        var vmRecord = await db.vms.findByUpid(upid);
-        var ctRecord = vmRecord ? null : await db.lxcContainers.findByUpid(upid);
-        var ownerRecord = vmRecord || ctRecord;
+        // SEC-01: 归属校验 — 按 resourceId 查 DB 记录，确认属于当前用户，防止 IDOR 越权查询
+        var ownerRecord = type === 'vm'
+            ? await db.vms.getById(resourceId)
+            : await db.lxcContainers.getById(resourceId);
         if (!ownerRecord) {
             return res.status(404).json({ error: '任务不存在' });
         }
         var isAdmin = req.user.role === 'admin';
         if (ownerRecord.user_id !== req.user.id && !isAdmin) {
             return res.status(403).json({ error: '无权限查询此任务' });
+        }
+
+        // pve_upid 为空表示开通已完成，无需再查 PVE
+        var upid = ownerRecord.pve_upid;
+        if (!upid || upid === '') {
+            return res.json({ status: 'stopped', exitstatus: 'OK', isCompleted: true, isSuccess: true });
         }
 
         var taskStatus = await pveApi.getTaskStatus(upid);

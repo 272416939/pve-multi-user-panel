@@ -96,12 +96,11 @@
         }
         try {
             var fresh = await api('/user/lxc');
-            // pve_upid 非空表示该容器仍在 PVE 开通任务中，标记为开通中状态
+            // _provisioning 为 true 表示该容器仍在 PVE 开通任务中（后端已剔除 pve_upid 敏感字段）
             var freshIds = {};
             fresh.forEach(function(c) {
                 freshIds[c.id] = true;
-                if (c.pve_upid && c.pve_upid !== '') {
-                    c._provisioning = true;
+                if (c._provisioning) {
                     if (!c.status) c.status = {};
                     c.status.status = 'provisioning';
                 }

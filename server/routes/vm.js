@@ -67,15 +67,19 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
             userVms = await db.vms.getByUserId(req.user.id);
         }
  
-        // 先构建基础数据（不依赖 PVE 状态查询）
-        const vmsWithDetails = userVms.map(vm => ({
-            ...vm,
-            status: null,
-            config: null,
-            isExpired: vm.expiration_date ? new Date(vm.expiration_date) < new Date() : false,
-            destroyed: false,
-            error: null
-        }));
+        // 先构建基础数据（不依赖 PVE 状态查询）；剔除 pve_upid 敏感字段，仅返回 _provisioning 布尔标记
+        const vmsWithDetails = userVms.map(vm => {
+            const { pve_upid, ...rest } = vm;
+            return {
+                ...rest,
+                _provisioning: !!(pve_upid && pve_upid !== ''),
+                status: null,
+                config: null,
+                isExpired: vm.expiration_date ? new Date(vm.expiration_date) < new Date() : false,
+                destroyed: false,
+                error: null
+            };
+        });
  
         // 再尝试获取 PVE 状态，每个 VM 独立处理
         for (const vmData of vmsWithDetails) {
@@ -113,13 +117,17 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
             } else {
                 userVms = await db.vms.getByUserId(req.user.id);
             }
-            return res.json(userVms.map(vm => ({
-                ...vm,
-                status: null,
-                config: null,
-                isExpired: vm.expiration_date ? new Date(vm.expiration_date) < new Date() : false,
-                destroyed: false
-            })));
+            return res.json(userVms.map(vm => {
+                const { pve_upid, ...rest } = vm;
+                return {
+                    ...rest,
+                    _provisioning: !!(pve_upid && pve_upid !== ''),
+                    status: null,
+                    config: null,
+                    isExpired: vm.expiration_date ? new Date(vm.expiration_date) < new Date() : false,
+                    destroyed: false
+                };
+            }));
         } catch (e2) {
             console.error('兜底返回也失败:', e2);
             res.json([]);

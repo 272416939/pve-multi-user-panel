@@ -66,14 +66,18 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
             userCts = await db.lxcContainers.getByUserId(req.user.id);
         }
  
-        const ctsWithDetails = userCts.map(ct => ({
-            ...ct,
-            status: null,
-            config: null,
-            isExpired: ct.expiration_date ? new Date(ct.expiration_date) < new Date() : false,
-            destroyed: false,
-            error: null
-        }));
+        const ctsWithDetails = userCts.map(ct => {
+            const { pve_upid, ...rest } = ct;
+            return {
+                ...rest,
+                _provisioning: !!(pve_upid && pve_upid !== ''),
+                status: null,
+                config: null,
+                isExpired: ct.expiration_date ? new Date(ct.expiration_date) < new Date() : false,
+                destroyed: false,
+                error: null
+            };
+        });
  
         for (const ctData of ctsWithDetails) {
             try {
@@ -109,13 +113,17 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
             } else {
                 userCts = await db.lxcContainers.getByUserId(req.user.id);
             }
-            return res.json(userCts.map(ct => ({
-                ...ct,
-                status: null,
-                config: null,
-                isExpired: ct.expiration_date ? new Date(ct.expiration_date) < new Date() : false,
-                destroyed: false
-            })));
+            return res.json(userCts.map(ct => {
+                const { pve_upid, ...rest } = ct;
+                return {
+                    ...rest,
+                    _provisioning: !!(pve_upid && pve_upid !== ''),
+                    status: null,
+                    config: null,
+                    isExpired: ct.expiration_date ? new Date(ct.expiration_date) < new Date() : false,
+                    destroyed: false
+                };
+            }));
         } catch (e2) {
             console.error('兜底返回也失败:', e2);
             res.json([]);
