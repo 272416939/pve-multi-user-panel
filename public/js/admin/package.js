@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.24.3-debug';
+    window.__PKG_JS_VERSION = 'v2.24.4-fix-self-drop';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -318,8 +318,8 @@
         }
         if (targetRow) {
             var overId = Number(targetRow.getAttribute('data-drag-id'));
-            $.dragState.dragOverId = overId;
             if (overId !== $.dragState.draggingId) {
+                $.dragState.dragOverId = overId;
                 $.__applyAvoidTransform(type, overId);
             }
         }
@@ -398,7 +398,6 @@
     };
 
     $.handleDragStart = function(e, id, type) {
-        console.log('[drag] dragStart', { id: id, type: type, currentTarget: e.currentTarget });
         $.dragState.draggingId = id;
         $.dragState.dragType = type;
         $.dragState.draggingType = type;
@@ -430,10 +429,9 @@
     };
 
     $.handleDragOver = function(e, id, type) {
-        if ($.dragState.dragType !== type) { console.log('[drag] dragOver type mismatch', { dragType: $.dragState.dragType, type: type }); return; }
+        if ($.dragState.dragType !== type) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        $.dragState.dragOverId = id;
         if ($.dragState.dragFromIndex < 0 && $.dragState.draggingId != null) {
             var dragList0 = $.getDragList($.dragState.dragType);
             for (var fi0 = 0; fi0 < dragList0.length; fi0++) {
@@ -444,14 +442,9 @@
             }
         }
         if ($.dragState.dragFromIndex < 0) return;
-        var list0 = $.getDragList($.dragState.dragType);
-        var toIndex0 = -1;
-        for (var i0 = 0; i0 < list0.length; i0++) {
-            if (list0[i0].id === id) { toIndex0 = i0; break; }
-        }
-        if (toIndex0 < 0) return;
-        // hover 到被拖元素自身：保持当前避让状态，不做任何操作（避免高频来回切换导致抽动）
+        // hover 到被拖元素自身：保持上一次有效目标，不更新 dragOverId，不做任何操作（避免抽动+避免 drop 落在自身）
         if ($.dragState.draggingId === id) return;
+        $.dragState.dragOverId = id;
         // 统一调用避让逻辑
         $.__applyAvoidTransform(type, id);
     };
@@ -479,11 +472,10 @@
     };
 
     $.handleDrop = async function(e, targetId, type) {
-        console.log('[drag] drop', { targetId: targetId, type: type, sourceId: $.dragState.draggingId, dragType: $.dragState.dragType, dragHandled: $.dragState.dragHandled });
         e.preventDefault();
         var sourceId = $.dragState.draggingId;
         var dragType = $.dragState.dragType;
-        if (sourceId == null || $.dragState.dragHandled) { console.log('[drag] drop early return', { sourceId: sourceId, dragHandled: $.dragState.dragHandled }); return; }
+        if (sourceId == null || $.dragState.dragHandled) return;
         $.dragState.dragHandled = true;
         $.clearAvoidClasses();
         if (sourceId === targetId || dragType !== type) {
@@ -522,7 +514,6 @@
     };
 
     $.handleDragEnd = async function() {
-        console.log('[drag] dragEnd', { sourceId: $.dragState.draggingId, targetId: $.dragState.dragOverId, dragType: $.dragState.dragType, dragHandled: $.dragState.dragHandled });
         if ($.__dragFallbackTimer) { clearTimeout($.__dragFallbackTimer); $.__dragFallbackTimer = null; }
         // 兜底：如果 draggingId 还在（说明 drop 没成功处理），且 dragOverId 有效，且未处理过，执行 reorder
         var sourceId = $.dragState.draggingId;
@@ -556,7 +547,6 @@
     };
 
     $.saveReorder = async function(type, ids) {
-        console.log('[drag] saveReorder', { type: type, ids: ids });
         try {
             var endpoint = '';
             if (type === 'vm') endpoint = '/admin/vm-packages/reorder';
