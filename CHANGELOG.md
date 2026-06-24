@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.17.1] - 2026-06-24
+
+### Fixed
+- fix(packages): 修复拖拽排序后位置不变的问题
+  - 为容器元素（tbody/分组 div）添加 @dragover.prevent @drop 处理器
+  - 新增 handleDropOnContainer 兜底函数，当 drop 落在行间空隙时使用最后经过的目标 id
+  - handleDragOver 始终更新 dragOverId（包括拖拽行自身），确保容器兜底能拿到有效目标
+  - 更新 package.js 和 admin-template-packages.js 的浏览器缓存参数，避免加载旧版本
+  - 清理拖拽调试日志
+
 ## [2.17.0] - 2026-06-24
 
 ### Added
