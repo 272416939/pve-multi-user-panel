@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.26.2] - 2026-06-24
+
+### Fixed
+- fix(security): 修复 UPID 正则表达式无法匹配大写十六进制字符
+  - pstart/starttime 字段使用 `[a-f0-9]` 只匹配小写 hex，导致含大写字母的真实 PVE UPID 被拒（400 Bad Request）
+  - 改为 `[0-9a-fA-F]` 同时接受大小写十六进制字符
+
 ## [2.26.1] - 2026-06-24
 
 ### Fixed
