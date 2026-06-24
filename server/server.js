@@ -93,10 +93,8 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, '../public'), {
     setHeaders: (res, filePath) => {
         res.removeHeader('Expires');
-        if (filePath.endsWith('.html')) {
+        if (filePath.endsWith('.html') || filePath.endsWith('.js') || filePath.endsWith('.css')) {
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
-        } else if (filePath.endsWith('.js')) {
-            res.setHeader('Cache-Control', 'no-cache');
         } else {
             res.setHeader('Cache-Control', 'public, max-age=3600');
         }
