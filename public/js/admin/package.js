@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.24.4-fix-self-drop';
+    window.__PKG_JS_VERSION = 'v2.24.5-fix-slow-drop';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -476,12 +476,13 @@
         var sourceId = $.dragState.draggingId;
         var dragType = $.dragState.dragType;
         if (sourceId == null || $.dragState.dragHandled) return;
-        $.dragState.dragHandled = true;
-        $.clearAvoidClasses();
+        // drop 落在自身或类型不匹配：不标记 dragHandled，交给 handleDragEnd 用 dragOverId 兜底
         if (sourceId === targetId || dragType !== type) {
             $.handleDragEnd();
             return;
         }
+        $.dragState.dragHandled = true;
+        $.clearAvoidClasses();
         var list = $.getDragList(type);
         var newOrder = list.map(function(p) { return p.id; });
         var fromIdx = newOrder.indexOf(sourceId);
