@@ -12,7 +12,7 @@
     $.userLxcContainers = ref([]);
     $.lxcLoading = ref(false);
     $.lxcForm = ref({ ostemplate: '', hostname: '', password: '', confirmPassword: '', storage: '', cores: 1, memory: 512, swap: 512, disk: 8, features: '', net0Bridge: 'vmbr0', net0Ip: '', net0Mac: '', net0Ip6: '', unprivileged: true, start: true });
-    $.lxcAssignForm = ref({ ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', mac_group_id: '' });
+    $.lxcAssignForm = ref({ ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' });
     $.lxcPasswordForm = ref({ password: '', confirmPassword: '' });
     $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
     $.lxcIpError = Vue.ref('');
@@ -153,7 +153,7 @@
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.lxcAssignForm.value, { expiration_date: expDate }))
             });
-            $.lxcAssignForm.value = { ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', mac_group_id: '' };
+            $.lxcAssignForm.value = { ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' };
             await $.loadLxcContainers();
             await $.loadUserLxcContainers();
         } catch (e) {

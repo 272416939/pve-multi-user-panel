@@ -358,11 +358,24 @@
         if (period === storedPeriod) {
             return storedPrice * qty;
         }
-        var monthsMap = { month: 1, quarter: 3, year: 12 };
-        var storedMonths = monthsMap[storedPeriod] || 1;
+        var monthlyPrice = parseFloat(resource.monthly_price || '0');
+        if (monthlyPrice > 0) {
+            var monthsMap = { month: 1, quarter: 3, year: 12 };
+            var newMonths = monthsMap[period] || 1;
+            var discount = 0;
+            if (period === 'quarter') {
+                discount = Math.min(Math.max(parseInt(resource.quarterly_discount) || 0, 0), 100);
+            } else if (period === 'year') {
+                discount = Math.min(Math.max(parseInt(resource.yearly_discount) || 0, 0), 100);
+            }
+            var baseAmount = monthlyPrice * newMonths * qty;
+            return parseFloat((baseAmount * (1 - discount / 100)).toFixed(2));
+        }
+        var monthsMap2 = { month: 1, quarter: 3, year: 12 };
+        var storedMonths = monthsMap2[storedPeriod] || 1;
         var monthlyBase = storedPrice / storedMonths;
-        var newMonths = monthsMap[period] || 1;
-        return monthlyBase * newMonths * qty;
+        var newMonths2 = monthsMap2[period] || 1;
+        return monthlyBase * newMonths2 * qty;
     };
 
     $.openRenewModal = function(resource) {

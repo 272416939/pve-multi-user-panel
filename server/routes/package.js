@@ -145,7 +145,10 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         var newVm = await db.vms.create({
             vm_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
-            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period
+            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
+            monthly_price: String(pkg.monthly_price || ''),
+            quarterly_discount: String(pkg.quarterly_discount || ''),
+            yearly_discount: String(pkg.yearly_discount || '')
         });
 
         if (finalMacGroupId) {
@@ -548,7 +551,10 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
             name: randomName,
             expiration_date: expDate,
             renewal_price: renewalPrice || String(pkg.monthly_price),
-            renewal_period: renewalPeriod
+            renewal_period: renewalPeriod,
+            monthly_price: String(pkg.monthly_price || ''),
+            quarterly_discount: String(pkg.quarterly_discount || ''),
+            yearly_discount: String(pkg.yearly_discount || '')
         });
 
         // MAC 分组同步
@@ -753,7 +759,10 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
             name: randomName,
             expiration_date: expDate,
             renewal_price: renewalPrice || String(pkg.monthly_price),
-            renewal_period: renewalPeriod
+            renewal_period: renewalPeriod,
+            monthly_price: String(pkg.monthly_price || ''),
+            quarterly_discount: String(pkg.quarterly_discount || ''),
+            yearly_discount: String(pkg.yearly_discount || '')
         });
 
         // MAC 分组同步

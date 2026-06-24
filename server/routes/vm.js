@@ -128,7 +128,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
-    const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id } = req.body;
+    const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id, monthly_price, quarterly_discount, yearly_discount } = req.body;
  
     if (!vm_id || !user_id) {
         return res.status(400).json({ error: '请选择虚拟机和用户' });
@@ -152,7 +152,10 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         name,
         expiration_date,
         renewal_price: renewal_price || '',
-        renewal_period: renewal_period || 'month'
+        renewal_period: renewal_period || 'month',
+        monthly_price: monthly_price || '',
+        quarterly_discount: quarterly_discount || '',
+        yearly_discount: yearly_discount || ''
     });
     
     // MAC 分组同步

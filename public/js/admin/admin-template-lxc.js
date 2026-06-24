@@ -155,9 +155,21 @@
                                             <label class="form-label">周期</label>
                                             <select class="form-select" v-model="lxcAssignForm.renewal_period">
                                                 <option value="month">月（30天计）</option>
-                                                <option value="quarter">季（180天计）</option>
+                                                <option value="quarter">季（90天计）</option>
                                                 <option value="year">年（365天计）</option>
                                             </select>
+                                        </div>
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">月付原价</label>
+                                            <input type="number" step="0.01" min="0" class="form-control" v-model="lxcAssignForm.monthly_price" placeholder="如 20">
+                                        </div>
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">季付折扣(%)</label>
+                                            <input type="number" step="1" min="0" max="100" class="form-control" v-model="lxcAssignForm.quarterly_discount" placeholder="如 5（表示5%）">
+                                        </div>
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">年付折扣(%)</label>
+                                            <input type="number" step="1" min="0" max="100" class="form-control" v-model="lxcAssignForm.yearly_discount" placeholder="如 10（表示10%）">
                                         </div>
                                         <div class="col-md-2 mb-3">
                                             <label class="form-label">MAC分组</label>

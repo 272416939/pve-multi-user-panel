@@ -242,7 +242,7 @@
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.assignForm.value, { expiration_date: expDate }))
             });
-            $.assignForm.value = { vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', mac_group_id: '' };
+            $.assignForm.value = { vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' };
             $.loadData();
             $.loadAssignData();
         } catch (e) {

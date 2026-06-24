@@ -6,7 +6,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createPayClient, generateOrderId } = require('../sdk/pay');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const dbg = require('../utils/debug');
-const { getPeriodMonths } = require('../utils/order-utils');
+const { getPeriodMonths, calculateAmount } = require('../utils/order-utils');
 const pveApi = require('../api/pve-api');
 
 function safeError(e) {
@@ -565,11 +565,21 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
 
         // 如果用户选择了不同的周期，重新计算单价
         var actualPrice = parseFloat(resource.renewal_price || '0');
-        if (period !== (resource.renewal_period || 'month')) {
-            var originalMonths = getPeriodMonths(resource.renewal_period || 'month');
-            var monthlyBase = actualPrice / originalMonths;
-            var newMonths = getPeriodMonths(period);
-            actualPrice = monthlyBase * newMonths;
+        var storedPeriod = resource.renewal_period || 'month';
+        if (period !== storedPeriod) {
+            // 优先用资源存储的 monthly_price + 折扣按周期独立计价
+            var monthlyPrice = parseFloat(resource.monthly_price || '0');
+            if (monthlyPrice > 0) {
+                var qDiscount = parseInt(resource.quarterly_discount) || 0;
+                var yDiscount = parseInt(resource.yearly_discount) || 0;
+                actualPrice = calculateAmount(monthlyPrice, period, 1, qDiscount, yDiscount);
+            } else {
+                // 历史数据无 monthly_price，回退到原逻辑
+                var originalMonths = getPeriodMonths(storedPeriod);
+                var monthlyBase = actualPrice / originalMonths;
+                var newMonths = getPeriodMonths(period);
+                actualPrice = monthlyBase * newMonths;
+            }
         }
         var totalPrice = actualPrice * qty;
 
