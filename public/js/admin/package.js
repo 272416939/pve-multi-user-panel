@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.18.3-debug-logs';
+    window.__PKG_JS_VERSION = 'v2.18.4-dragend-fallback';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -267,10 +267,12 @@
 
     $.handleDragOver = function(e, id, type) {
         // 严格类型守卫：type 必须与当前 dragType 一致才处理
-        // （套餐与分组 id 可能重复，不能靠 id 查列表判断）
         if ($.dragState.dragType !== type) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        if ($.dragState.dragOverId !== id) {
+            console.log('[drag] over id=' + id + ' type=' + type);
+        }
         $.dragState.dragOverId = id;
         if ($.dragState.draggingId === id) return;
         if ($.dragState.dragFromIndex < 0 && $.dragState.draggingId != null) {
@@ -381,9 +383,33 @@
         await $.handleDrop(e, targetId, type);
     };
 
-    $.handleDragEnd = function() {
-        console.log('[drag] end draggingId=' + $.dragState.draggingId);
+    $.handleDragEnd = async function() {
+        console.log('[drag] end draggingId=' + $.dragState.draggingId + ' dragOverId=' + $.dragState.dragOverId);
         if ($.__dragFallbackTimer) { clearTimeout($.__dragFallbackTimer); $.__dragFallbackTimer = null; }
+        // 兜底：如果 draggingId 还在（说明 drop 没成功处理），且 dragOverId 有效，执行 reorder
+        // 这解决了套餐行拖拽时 drop 事件未触发（鼠标移出 tr 范围）导致拖拽失败的问题
+        var sourceId = $.dragState.draggingId;
+        var targetId = $.dragState.dragOverId;
+        var dragType = $.dragState.dragType;
+        if (sourceId != null && targetId != null && sourceId !== targetId && dragType != null) {
+            console.log('[drag] end fallback reorder: sourceId=' + sourceId + ' targetId=' + targetId + ' type=' + dragType);
+            var list = $.getDragList(dragType);
+            var newOrder = list.map(function(p) { return p.id; });
+            var fromIdx = newOrder.indexOf(sourceId);
+            var toIdx = newOrder.indexOf(targetId);
+            if (fromIdx !== -1 && toIdx !== -1) {
+                newOrder.splice(fromIdx, 1);
+                newOrder.splice(toIdx, 0, sourceId);
+                $.dragState.draggingId = null;
+                $.dragState.dragOverId = null;
+                $.dragState.dragType = null;
+                $.dragState.draggingType = null;
+                $.dragState.dragFromIndex = -1;
+                $.clearAvoidClasses();
+                await $.saveReorder(dragType, newOrder);
+                return;
+            }
+        }
         $.dragState.draggingId = null;
         $.dragState.dragOverId = null;
         $.dragState.dragType = null;
