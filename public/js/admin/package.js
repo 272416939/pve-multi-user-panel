@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = '20260624-v6-typed-guard';
+    window.__PKG_JS_VERSION = 'v2.17.5-revert-dnd';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -22,6 +22,8 @@
 
     $.vmProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
     $.lxcProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
+
+    $.dragState = Vue.reactive({ draggingId: null, dragOverId: null, dragType: null, dragFromIndex: -1, avoidDownIds: [], avoidUpIds: [] });
 
     $.loadVmPackages = async function() {
         try { $.vmPackages.value = await api('/admin/vm-packages'); } catch (e) { console.error('loadVmPackages error:', e); }
@@ -231,7 +233,7 @@
         } catch (e) { alert(e.message); }
     };
 
-    // ===== 拖拽排序（纯鼠标事件实现，绕过 HTML5 DnD 协议坑）=====
+    // ===== 拖拽排序 =====
     $.getDragList = function(type) {
         if (type === 'vm') return $.vmPackages.value;
         if (type === 'lxc') return $.lxcPackages.value;
@@ -240,88 +242,55 @@
         return [];
     };
 
-    $.dragState = Vue.reactive({
-        draggingId: null, dragType: null, dragFromIndex: -1, dragOverId: null,
-        isMouseDown: false, mouseDownId: null, mouseDownType: null,
-        started: false, ghostEl: null
-    });
-
-    // 鼠标按下：记录候选拖拽，不立即启动（需移动一定距离才认为是拖拽）
-    $.handleMouseDown = function(e, id, type) {
-        if (e.button !== 0) return; // 仅左键
-        // 点击按钮/链接不触发拖拽
-        var tgt = e.target;
-        if (tgt && tgt.closest && tgt.closest('button, a, input, select, .btn-group')) return;
-        $.dragState.isMouseDown = true;
-        $.dragState.mouseDownId = id;
-        $.dragState.mouseDownType = type;
-        $.dragState.mouseDownX = e.clientX;
-        $.dragState.mouseDownY = e.clientY;
-        document.addEventListener('mousemove', $.__onMouseMove);
-        document.addEventListener('mouseup', $.__onMouseUp);
-    };
-
-    $.__onMouseMove = function(e) {
-        if (!$.dragState.isMouseDown) return;
-        // 首次移动：判断是否超过阈值才启动拖拽
-        if (!$.dragState.started) {
-            var dx = e.clientX - $.dragState.mouseDownX;
-            var dy = e.clientY - $.dragState.mouseDownY;
-            if (dx * dx + dy * dy < 25) return; // 5px 阈值
-            // 启动拖拽
-            $.dragState.started = true;
-            $.dragState.draggingId = $.dragState.mouseDownId;
-            $.dragState.dragType = $.dragState.mouseDownType;
-            var list = $.getDragList($.dragState.dragType);
-            var fi = -1;
-            for (var i = 0; i < list.length; i++) {
-                if (list[i].id === $.dragState.draggingId) { fi = i; break; }
-            }
-            $.dragState.dragFromIndex = fi;
-            document.body.style.userSelect = 'none';
-            document.body.style.cursor = 'grabbing';
-        }
-        // 检测当前鼠标下方的可拖拽行
-        var type = $.dragState.dragType;
-        var containerSelector = (type === 'vm' || type === 'lxc') ? 'tbody' : '.mb-3';
-        var underEl = document.elementFromPoint(e.clientX, e.clientY);
-        var targetRow = null;
-        if (underEl) {
-            targetRow = underEl.closest('[data-drag-id]');
-            // 类型隔离：必须属于当前拖拽类型的容器
-            if (targetRow) {
-                var rowType = targetRow.getAttribute('data-drag-type');
-                if (rowType !== type) targetRow = null;
-            }
-        }
-        var overId = targetRow ? Number(targetRow.getAttribute('data-drag-id')) : null;
-        $.dragState.dragOverId = overId;
-        // 更新避让 transform
-        if (overId != null && overId !== $.dragState.draggingId) {
-            $.__applyAvoid(type, overId);
-        }
-    };
-
-    $.__applyAvoid = function(type, overId) {
+    $.handleDragStart = function(e, id, type) {
+        $.dragState.draggingId = id;
+        $.dragState.dragType = type;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/x-pve-drag', String(id));
         var list = $.getDragList(type);
-        var fromIndex = $.dragState.dragFromIndex;
+        var fromIndex = -1;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === id) { fromIndex = i; break; }
+        }
+        $.dragState.dragFromIndex = fromIndex;
+    };
+
+    $.handleDragOver = function(e, id, type) {
+        // 严格类型守卫：type 必须与当前 dragType 一致才处理
+        // （套餐与分组 id 可能重复，不能靠 id 查列表判断）
+        if ($.dragState.dragType !== type) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        $.dragState.dragOverId = id;
+        if ($.dragState.draggingId === id) return;
+        if ($.dragState.dragFromIndex < 0 && $.dragState.draggingId != null) {
+            var dragList = $.getDragList($.dragState.dragType);
+            for (var fi = 0; fi < dragList.length; fi++) {
+                if (dragList[fi].id === $.dragState.draggingId) {
+                    $.dragState.dragFromIndex = fi;
+                    break;
+                }
+            }
+        }
+        if ($.dragState.dragFromIndex < 0) return;
+        var list = $.getDragList($.dragState.dragType);
         var toIndex = -1;
         for (var i = 0; i < list.length; i++) {
-            if (list[i].id === overId) { toIndex = i; break; }
+            if (list[i].id === id) { toIndex = i; break; }
         }
-        if (fromIndex < 0 || toIndex < 0) return;
+        if (toIndex < 0) return;
+        var fromIndex = $.dragState.dragFromIndex;
         var containerSelector = (type === 'vm' || type === 'lxc') ? 'tbody' : '.mb-3';
-        var containers = document.querySelectorAll(containerSelector);
-        var rows = null;
-        for (var c = 0; c < containers.length; c++) {
-            var testRows = containers[c].querySelectorAll('[data-drag-id][data-drag-type="' + type + '"]');
-            if (testRows.length > 0) { rows = testRows; break; }
+        var container = e.currentTarget.closest(containerSelector);
+        if (!container) {
+            container = e.currentTarget.parentElement;
+            if (!container) return;
         }
-        if (!rows || rows.length === 0) return;
+        var rows = container.querySelectorAll('[draggable="true"]');
         var isHorizontal = type === 'group-vm' || type === 'group-lxc';
         var offset = isHorizontal
-            ? (rows[0].offsetWidth + 8)
-            : (rows[0].offsetHeight);
+            ? (rows.length > 0 ? rows[0].offsetWidth + 8 : 80)
+            : (rows.length > 0 ? rows[0].offsetHeight : 40);
         var axis = isHorizontal ? 'X' : 'Y';
         for (var j = 0; j < rows.length; j++) {
             rows[j].style.transform = '';
@@ -337,52 +306,75 @@
         }
     };
 
-    $.__onMouseUp = async function(e) {
-        document.removeEventListener('mousemove', $.__onMouseMove);
-        document.removeEventListener('mouseup', $.__onMouseUp);
-        var wasStarted = $.dragState.started;
-        var type = $.dragState.dragType;
-        var sourceId = $.dragState.draggingId;
-        var targetId = $.dragState.dragOverId;
-        // 重置状态
-        $.dragState.isMouseDown = false;
-        $.dragState.started = false;
-        $.dragState.mouseDownId = null;
-        $.dragState.mouseDownType = null;
-        $.dragState.draggingId = null;
-        $.dragState.dragOverId = null;
-        $.dragState.dragType = null;
-        $.dragState.dragFromIndex = -1;
-        document.body.style.userSelect = '';
-        document.body.style.cursor = '';
-        $.clearAvoidClasses();
-        if (!wasStarted || sourceId == null) return;
-        if (targetId == null || targetId === sourceId) return;
-        var list = $.getDragList(type);
-        var newOrder = list.map(function(p) { return p.id; });
-        var fromIdx = newOrder.indexOf(sourceId);
-        var toIdx = newOrder.indexOf(targetId);
-        if (fromIdx === -1 || toIdx === -1) return;
-        newOrder.splice(fromIdx, 1);
-        newOrder.splice(toIdx, 0, sourceId);
-        await $.saveReorder(type, newOrder);
+    // 容器 dragover：仅当拖拽类型匹配时才 preventDefault 允许 drop
+    $.handleContainerDragOver = function(e, type) {
+        if ($.dragState.dragType === type) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+    };
+
+    $.handleDragLeave = function(e, id) {
+        // dragleave 在 dragover 之间频繁触发，不做处理
     };
 
     $.clearAvoidClasses = function() {
-        var allDraggables = document.querySelectorAll('[data-drag-id]');
+        $.dragState.avoidDownIds = [];
+        $.dragState.avoidUpIds = [];
+        // 清除所有直接设置的 DOM transform（全局）
+        var allDraggables = document.querySelectorAll('[draggable="true"]');
         for (var i = 0; i < allDraggables.length; i++) {
             allDraggables[i].style.transform = '';
         }
     };
 
-    // 兼容旧调用（模板可能仍引用，做无操作）
-    $.handleDragStart = function() {};
-    $.handleDragOver = function() {};
-    $.handleDragLeave = function() {};
-    $.handleDrop = function() {};
-    $.handleDropOnContainer = function() {};
-    $.handleDragEnd = function() {};
-    $.handleContainerDragOver = function() {};
+    $.handleDrop = async function(e, targetId, type) {
+        e.preventDefault();
+        var sourceId = $.dragState.draggingId;
+        var dragType = $.dragState.dragType;
+        if (sourceId == null) return;
+        $.clearAvoidClasses();
+        if (sourceId === targetId || dragType !== type) {
+            $.handleDragEnd();
+            return;
+        }
+        var list = $.getDragList(type);
+        var newOrder = list.map(function(p) { return p.id; });
+        var fromIdx = newOrder.indexOf(sourceId);
+        var toIdx = newOrder.indexOf(targetId);
+        if (fromIdx === -1 || toIdx === -1) {
+            $.handleDragEnd();
+            return;
+        }
+        newOrder.splice(fromIdx, 1);
+        newOrder.splice(toIdx, 0, sourceId);
+        // 异步操作前立即清空拖拽状态，防止容器冒泡 drop 重复处理，并避免 dragend 竞态
+        $.dragState.draggingId = null;
+        $.dragState.dragOverId = null;
+        $.dragState.dragType = null;
+        $.dragState.dragFromIndex = -1;
+        await $.saveReorder(type, newOrder);
+        $.clearAvoidClasses();
+    };
+
+    // 容器兜底：当 drop 落在行间空隙（非 tr 元素）时，使用最后经过的目标 id
+    $.handleDropOnContainer = async function(e, type) {
+        if ($.dragState.dragType !== type) return;
+        var targetId = $.dragState.dragOverId;
+        if (targetId == null) {
+            $.handleDragEnd();
+            return;
+        }
+        await $.handleDrop(e, targetId, type);
+    };
+
+    $.handleDragEnd = function() {
+        $.dragState.draggingId = null;
+        $.dragState.dragOverId = null;
+        $.dragState.dragType = null;
+        $.dragState.dragFromIndex = -1;
+        $.clearAvoidClasses();
+    };
 
     $.saveReorder = async function(type, ids) {
         try {
