@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.26.1] - 2026-06-24
+
+### Fixed
+- fix(security): 修复安全审查发现的7项漏洞(SEC-01~07)
+  - SEC-01: `/provision-status` 接口新增 upid 归属校验，防止 IDOR 越权查询任意用户 PVE 任务状态
+  - SEC-02: `/provision-status` 接口新增速率限制(30次/分钟/用户)，防止滥用对 PVE API 发起 DoS
+  - SEC-03: VM/LXC 手动分配接口价格/折扣参数新增服务端 parseFloat + clamp[0,100] 校验，前端 min/max 可绕过
+  - SEC-04: 所有计费接口 period 参数新增白名单校验['month','quarter','year']，防止异常值导致到期日计算不一致
+  - SEC-05: 新增 `recoverProvisioningTasks` 启动恢复机制，扫描 pve_upid 非空记录查 PVE 真实任务状态做善后，防止服务器崩溃产生孤儿记录
+  - SEC-06: `/provision-status` 接口新增 UPID 格式正则校验，防止畸形值触发 PVE API 错误信息泄露
+  - SEC-07: 前端 `restoreProvisioningState` 新增 localStorage 解析字段类型断言，防止被污染数据导致逻辑异常
+  - 附带修复: `lxcContainers.create` INSERT 语句补全 monthly_price/quarterly_discount/yearly_discount 列(原遗漏导致LXC手动分配价格参数未入库)
+  - 附带修复: `lxcContainers.update` allowedColumns 白名单同步补全新字段
+
 ## [2.18.0] - 2026-06-24
 
 ### Changed
