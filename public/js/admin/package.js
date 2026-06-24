@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.22.0-subtabs';
+    window.__PKG_JS_VERSION = 'v2.22.1-fix-avoid';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -338,9 +338,8 @@
             if (testRows.length > 0) { rows = testRows; break; }
         }
         if (!rows || rows.length === 0) return;
-        var isHorizontal = type === 'group-vm' || type === 'group-lxc';
-        var offset = isHorizontal ? (rows[0].offsetWidth + 8) : rows[0].offsetHeight;
-        var axis = isHorizontal ? 'X' : 'Y';
+        var offset = rows[0].offsetHeight;
+        var axis = 'Y';
         for (var j = 0; j < rows.length; j++) rows[j].style.transform = '';
         if (fromIndex < toIndex) {
             for (var k = fromIndex + 1; k <= toIndex && k < rows.length; k++) {
@@ -366,6 +365,15 @@
         $.dragState.dragHandled = false;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/x-pve-drag', String(id));
+        // 手柄是 draggable，浏览器默认镜像只有手柄图标；设置整行/整 badge 为拖拽镜像
+        // dragstart 触发时 Vue 尚未添加 row-dragging class，此时 opacity 仍为 1，镜像完整
+        try {
+            var rowEl = e.currentTarget.closest('[data-drag-id]');
+            if (rowEl) {
+                var rect = rowEl.getBoundingClientRect();
+                e.dataTransfer.setDragImage(rowEl, e.clientX - rect.left, e.clientY - rect.top);
+            }
+        } catch (err) {}
         var list = $.getDragList(type);
         var fromIndex = -1;
         for (var i = 0; i < list.length; i++) {
@@ -410,11 +418,8 @@
             if (!container0) return;
         }
         var rows0 = container0.querySelectorAll('[data-drag-id]');
-        var isHorizontal0 = type === 'group-vm' || type === 'group-lxc';
-        var offset0 = isHorizontal0
-            ? (rows0.length > 0 ? rows0[0].offsetWidth + 8 : 80)
-            : (rows0.length > 0 ? rows0[0].offsetHeight : 40);
-        var axis0 = isHorizontal0 ? 'X' : 'Y';
+        var offset0 = rows0[0].offsetHeight;
+        var axis0 = 'Y';
         // 先清除所有 transform（避免上一轮方向的残留导致重叠）
         for (var j0 = 0; j0 < rows0.length; j0++) {
             rows0[j0].style.transform = '';
