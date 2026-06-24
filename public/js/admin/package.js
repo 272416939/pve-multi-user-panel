@@ -253,33 +253,24 @@
         $.dragState.dragFromIndex = fromIndex;
     };
 
-    $.handleDragOver = function(e, id) {
-        // 类型隔离：id 必须属于当前 dragType 的列表
-        var dragType = $.dragState.dragType;
-        var dragList = $.getDragList(dragType);
-        var idBelongsToType = false;
-        for (var bi = 0; bi < dragList.length; bi++) {
-            if (dragList[bi].id === id) { idBelongsToType = true; break; }
-        }
-        // 类型不匹配：不 preventDefault，浏览器原生禁止 drop，无视觉污染
-        if (!idBelongsToType) return;
+    $.handleDragOver = function(e, id, type) {
+        // 严格类型守卫：type 必须与当前 dragType 一致才处理
+        // （套餐与分组 id 可能重复，不能靠 id 查列表判断）
+        if ($.dragState.dragType !== type) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        // 始终记录最后经过的目标 id（包括拖拽行自身），供容器兜底使用
         $.dragState.dragOverId = id;
         if ($.dragState.draggingId === id) return;
-        // 如果 fromIndex 丢失（可能被意外重置），重新计算
         if ($.dragState.dragFromIndex < 0 && $.dragState.draggingId != null) {
-            var dragList2 = $.getDragList($.dragState.dragType);
-            for (var fi = 0; fi < dragList2.length; fi++) {
-                if (dragList2[fi].id === $.dragState.draggingId) {
+            var dragList = $.getDragList($.dragState.dragType);
+            for (var fi = 0; fi < dragList.length; fi++) {
+                if (dragList[fi].id === $.dragState.draggingId) {
                     $.dragState.dragFromIndex = fi;
                     break;
                 }
             }
         }
         if ($.dragState.dragFromIndex < 0) return;
-        // 计算目标索引（基于数据列表，不依赖 DOM 顺序）
         var list = $.getDragList($.dragState.dragType);
         var toIndex = -1;
         for (var i = 0; i < list.length; i++) {
@@ -287,14 +278,14 @@
         }
         if (toIndex < 0) return;
         var fromIndex = $.dragState.dragFromIndex;
-        var containerSelector = (dragType === 'vm' || dragType === 'lxc') ? 'tbody' : '.mb-3';
+        var containerSelector = (type === 'vm' || type === 'lxc') ? 'tbody' : '.mb-3';
         var container = e.currentTarget.closest(containerSelector);
         if (!container) {
             container = e.currentTarget.parentElement;
             if (!container) return;
         }
         var rows = container.querySelectorAll('[draggable="true"]');
-        var isHorizontal = dragType === 'group-vm' || dragType === 'group-lxc';
+        var isHorizontal = type === 'group-vm' || type === 'group-lxc';
         var offset = isHorizontal
             ? (rows.length > 0 ? rows[0].offsetWidth + 8 : 80)
             : (rows.length > 0 ? rows[0].offsetHeight : 40);
@@ -366,6 +357,7 @@
 
     // 容器兜底：当 drop 落在行间空隙（非 tr 元素）时，使用最后经过的目标 id
     $.handleDropOnContainer = async function(e, type) {
+        if ($.dragState.dragType !== type) return;
         var targetId = $.dragState.dragOverId;
         if (targetId == null) {
             $.handleDragEnd();

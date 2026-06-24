@@ -18,7 +18,7 @@
                                 draggable="true"
                                 :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id }"
                                 @dragstart="packagePage.handleDragStart($event, g.id, 'group-vm')"
-                                @dragover="packagePage.handleDragOver($event, g.id)"
+                                @dragover="packagePage.handleDragOver($event, g.id, 'group-vm')"
                                 @dragleave="packagePage.handleDragLeave($event, g.id)"
                                 @drop="packagePage.handleDrop($event, g.id, 'group-vm')"
                                 @dragend="packagePage.handleDragEnd()">
@@ -37,7 +37,7 @@
                                         draggable="true"
                                         :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id }"
                                         @dragstart="packagePage.handleDragStart($event, p.id, 'vm')"
-                                        @dragover="packagePage.handleDragOver($event, p.id)"
+                                        @dragover="packagePage.handleDragOver($event, p.id, 'vm')"
                                         @dragleave="packagePage.handleDragLeave($event, p.id)"
                                         @drop="packagePage.handleDrop($event, p.id, 'vm')"
                                         @dragend="packagePage.handleDragEnd()">
@@ -86,7 +86,7 @@
                                 draggable="true"
                                 :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id }"
                                 @dragstart="packagePage.handleDragStart($event, g.id, 'group-lxc')"
-                                @dragover="packagePage.handleDragOver($event, g.id)"
+                                @dragover="packagePage.handleDragOver($event, g.id, 'group-lxc')"
                                 @dragleave="packagePage.handleDragLeave($event, g.id)"
                                 @drop="packagePage.handleDrop($event, g.id, 'group-lxc')"
                                 @dragend="packagePage.handleDragEnd()">
@@ -105,7 +105,7 @@
                                         draggable="true"
                                         :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id }"
                                         @dragstart="packagePage.handleDragStart($event, p.id, 'lxc')"
-                                        @dragover="packagePage.handleDragOver($event, p.id)"
+                                        @dragover="packagePage.handleDragOver($event, p.id, 'lxc')"
                                         @dragleave="packagePage.handleDragLeave($event, p.id)"
                                         @drop="packagePage.handleDrop($event, p.id, 'lxc')"
                                         @dragend="packagePage.handleDragEnd()">

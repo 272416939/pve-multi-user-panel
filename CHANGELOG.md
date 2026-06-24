@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.17.5] - 2026-06-24
+
+### Fixed
+- fix(packages): 修复套餐与分组 id 重复导致类型隔离失效
+  - handleDragOver 改为接收 type 参数，第一行严格比对 dragType !== type 直接返回
+  - 不再依赖 id 查列表判断类型（套餐表和分组表 id 各自自增会重复）
+  - handleDropOnContainer 增加 dragType 类型守卫
+  - 模板 4 处 @dragover 传入对应 type 参数
+
 ## [2.17.4] - 2026-06-24
 
 ### Fixed
