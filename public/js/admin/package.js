@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.22.3-touch-css';
+    window.__PKG_JS_VERSION = 'v2.23.0-unified-drag';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -242,13 +242,19 @@
         return [];
     };
 
-    // ===== 触摸事件拖拽（移动端，通过拖拽手柄触发）=====
+    // ===== 统一拖拽引擎（桌面+移动端，套餐+分组共用）=====
+    $.__findRows = function(type) {
+        return document.querySelectorAll('[data-drag-id][data-drag-type="' + type + '"]');
+    };
+    $.__findContainer = function(type) {
+        var rows = $.__findRows(type);
+        if (rows.length === 0) return null;
+        return rows[0].closest('tbody') || rows[0].parentElement;
+    };
+
     $.handleTouchStart = function(e, id, type) {
         if (e.touches.length !== 1) return;
         var touch = e.touches[0];
-        $.dragState.__touchStartX = touch.clientX;
-        $.dragState.__touchStartY = touch.clientY;
-        // 手柄触发，立即启动拖拽（无需长按）
         $.dragState.draggingId = id;
         $.dragState.dragType = type;
         $.dragState.draggingType = type;
@@ -260,13 +266,38 @@
         }
         $.dragState.dragFromIndex = fi;
         document.body.style.userSelect = 'none';
-        // 锁定整个容器的 touch-action，防止手指移出手柄后浏览器接管滚动
-        var handleEl = e.currentTarget;
-        var container = handleEl.closest('tbody') || handleEl.closest('.mb-3') || handleEl.parentElement;
-        if (container) {
-            container.style.touchAction = 'none';
-            $.__touchLockedContainer = container;
+        // 创建跟随手指的克隆镜像
+        var srcRow = e.currentTarget.closest('[data-drag-id]');
+        if (srcRow) {
+            var clone = srcRow.cloneNode(true);
+            clone.style.position = 'fixed';
+            clone.style.zIndex = '99999';
+            clone.style.pointerEvents = 'none';
+            clone.style.opacity = '0.9';
+            clone.style.width = srcRow.offsetWidth + 'px';
+            clone.style.boxShadow = '0 8px 24px rgba(0,0,0,0.3)';
+            clone.style.background = 'var(--glass-bg, #fff)';
+            document.body.appendChild(clone);
+            $.__touchClone = clone;
+            $.__touchCloneW = srcRow.offsetWidth;
+            $.__touchCloneH = srcRow.offsetHeight;
+            $.__touchOffsetX = touch.clientX - srcRow.getBoundingClientRect().left;
+            $.__touchOffsetY = touch.clientY - srcRow.getBoundingClientRect().top;
+            $.__updateClonePos(touch.clientX, touch.clientY);
         }
+    };
+
+    $.__updateClonePos = function(x, y) {
+        if (!$.__touchClone) return;
+        $.__touchClone.style.left = (x - $.__touchOffsetX) + 'px';
+        $.__touchClone.style.top = (y - $.__touchOffsetY) + 'px';
+    };
+
+    $.__removeTouchClone = function() {
+        if ($.__touchClone && $.__touchClone.parentNode) {
+            $.__touchClone.parentNode.removeChild($.__touchClone);
+        }
+        $.__touchClone = null;
     };
 
     $.handleTouchMove = function(e) {
@@ -274,6 +305,7 @@
         if (e.touches.length !== 1) return;
         if (e.cancelable) e.preventDefault();
         var touch = e.touches[0];
+        $.__updateClonePos(touch.clientX, touch.clientY);
         var type = $.dragState.dragType;
         var underEl = document.elementFromPoint(touch.clientX, touch.clientY);
         var targetRow = null;
@@ -297,14 +329,14 @@
 
     $.handleTouchEnd = async function(e) {
         if ($.dragState.draggingId == null) {
-            if ($.__touchLockedContainer) { $.__touchLockedContainer.style.touchAction = ''; $.__touchLockedContainer = null; }
+            $.__removeTouchClone();
             return;
         }
         var sourceId = $.dragState.draggingId;
         var targetId = $.dragState.dragOverId;
         var dragType = $.dragState.dragType;
         document.body.style.userSelect = '';
-        if ($.__touchLockedContainer) { $.__touchLockedContainer.style.touchAction = ''; $.__touchLockedContainer = null; }
+        $.__removeTouchClone();
         if (sourceId != null && targetId != null && sourceId !== targetId && dragType != null && !$.dragState.dragHandled) {
             $.dragState.dragHandled = true;
             var list = $.getDragList(dragType);
@@ -332,6 +364,7 @@
         if (dragType) $.__clearAllTransform(dragType);
     };
 
+    // 统一避让：所有类型都用 [data-drag-id] 查找，transform 应用到行
     $.__applyAvoidTransform = function(type, overId) {
         var list = $.getDragList(type);
         var fromIndex = $.dragState.dragFromIndex;
@@ -340,31 +373,23 @@
             if (list[i].id === overId) { toIndex = i; break; }
         }
         if (fromIndex < 0 || toIndex < 0) return;
-        var containerSelector = (type === 'vm' || type === 'lxc') ? 'tbody' : '.mb-3';
-        var containers = document.querySelectorAll(containerSelector);
-        var rows = null;
-        for (var c = 0; c < containers.length; c++) {
-            var testRows = containers[c].querySelectorAll('[data-drag-id][data-drag-type="' + type + '"]');
-            if (testRows.length > 0) { rows = testRows; break; }
-        }
+        var rows = $.__findRows(type);
         if (!rows || rows.length === 0) return;
         var offset = rows[0].offsetHeight;
-        var axis = 'Y';
         for (var j = 0; j < rows.length; j++) rows[j].style.transform = '';
         if (fromIndex < toIndex) {
             for (var k = fromIndex + 1; k <= toIndex && k < rows.length; k++) {
-                rows[k].style.transform = 'translate' + axis + '(-' + offset + 'px)';
+                rows[k].style.transform = 'translateY(-' + offset + 'px)';
             }
         } else if (fromIndex > toIndex) {
             for (var k = toIndex; k < fromIndex && k < rows.length; k++) {
-                rows[k].style.transform = 'translate' + axis + '(' + offset + 'px)';
+                rows[k].style.transform = 'translateY(' + offset + 'px)';
             }
         }
     };
 
     $.__clearAllTransform = function(type) {
-        var selector = type ? '[data-drag-id][data-drag-type="' + type + '"]' : '[data-drag-id]';
-        var rows = document.querySelectorAll(selector);
+        var rows = $.__findRows(type);
         for (var i = 0; i < rows.length; i++) rows[i].style.transform = '';
     };
 
@@ -420,31 +445,13 @@
             if (list0[i0].id === id) { toIndex0 = i0; break; }
         }
         if (toIndex0 < 0) return;
-        var fromIndex0 = $.dragState.dragFromIndex;
-        var containerSelector0 = (type === 'vm' || type === 'lxc') ? 'tbody' : '.mb-3';
-        var container0 = e.currentTarget.closest(containerSelector0);
-        if (!container0) {
-            container0 = e.currentTarget.parentElement;
-            if (!container0) return;
+        // hover 到被拖元素自身：清除所有 transform 后返回
+        if ($.dragState.draggingId === id) {
+            $.__clearAllTransform(type);
+            return;
         }
-        var rows0 = container0.querySelectorAll('[data-drag-id]');
-        var offset0 = rows0[0].offsetHeight;
-        var axis0 = 'Y';
-        // 先清除所有 transform（避免上一轮方向的残留导致重叠）
-        for (var j0 = 0; j0 < rows0.length; j0++) {
-            rows0[j0].style.transform = '';
-        }
-        // hover 到被拖元素自身：fromIndex === toIndex，不施加任何避让
-        if ($.dragState.draggingId === id) return;
-        if (fromIndex0 < toIndex0) {
-            for (var k0 = fromIndex0 + 1; k0 <= toIndex0 && k0 < rows0.length; k0++) {
-                rows0[k0].style.transform = 'translate' + axis0 + '(-' + offset0 + 'px)';
-            }
-        } else if (fromIndex0 > toIndex0) {
-            for (var k1 = toIndex0; k1 < fromIndex0 && k1 < rows0.length; k1++) {
-                rows0[k1].style.transform = 'translate' + axis0 + '(' + offset0 + 'px)';
-            }
-        }
+        // 统一调用避让逻辑
+        $.__applyAvoidTransform(type, id);
     };
 
     // 容器 dragover：仅当拖拽类型匹配时才 preventDefault 允许 drop
