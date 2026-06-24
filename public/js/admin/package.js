@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.24.2-fix-jitter';
+    window.__PKG_JS_VERSION = 'v2.24.3-debug';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -398,6 +398,7 @@
     };
 
     $.handleDragStart = function(e, id, type) {
+        console.log('[drag] dragStart', { id: id, type: type, currentTarget: e.currentTarget });
         $.dragState.draggingId = id;
         $.dragState.dragType = type;
         $.dragState.draggingType = type;
@@ -429,7 +430,7 @@
     };
 
     $.handleDragOver = function(e, id, type) {
-        if ($.dragState.dragType !== type) return;
+        if ($.dragState.dragType !== type) { console.log('[drag] dragOver type mismatch', { dragType: $.dragState.dragType, type: type }); return; }
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         $.dragState.dragOverId = id;
@@ -478,10 +479,11 @@
     };
 
     $.handleDrop = async function(e, targetId, type) {
+        console.log('[drag] drop', { targetId: targetId, type: type, sourceId: $.dragState.draggingId, dragType: $.dragState.dragType, dragHandled: $.dragState.dragHandled });
         e.preventDefault();
         var sourceId = $.dragState.draggingId;
         var dragType = $.dragState.dragType;
-        if (sourceId == null || $.dragState.dragHandled) return;
+        if (sourceId == null || $.dragState.dragHandled) { console.log('[drag] drop early return', { sourceId: sourceId, dragHandled: $.dragState.dragHandled }); return; }
         $.dragState.dragHandled = true;
         $.clearAvoidClasses();
         if (sourceId === targetId || dragType !== type) {
@@ -520,6 +522,7 @@
     };
 
     $.handleDragEnd = async function() {
+        console.log('[drag] dragEnd', { sourceId: $.dragState.draggingId, targetId: $.dragState.dragOverId, dragType: $.dragState.dragType, dragHandled: $.dragState.dragHandled });
         if ($.__dragFallbackTimer) { clearTimeout($.__dragFallbackTimer); $.__dragFallbackTimer = null; }
         // 兜底：如果 draggingId 还在（说明 drop 没成功处理），且 dragOverId 有效，且未处理过，执行 reorder
         var sourceId = $.dragState.draggingId;
@@ -553,6 +556,7 @@
     };
 
     $.saveReorder = async function(type, ids) {
+        console.log('[drag] saveReorder', { type: type, ids: ids });
         try {
             var endpoint = '';
             if (type === 'vm') endpoint = '/admin/vm-packages/reorder';
