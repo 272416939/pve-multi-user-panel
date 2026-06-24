@@ -143,7 +143,7 @@
                                         <span v-else class="text-muted">-</span>
                                     </td>
                                     <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm._provisioning ? '' : (vm.config || vm.status ? '/ ' + formatDiskSize(vm) : '') }}</td>
-                                    <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
+                                    <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                     <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                     <td>
                                         <template v-if="vm._provisioning">
@@ -238,7 +238,7 @@
                                         <span v-else class="text-muted">-</span>
                                     </td>
                                     <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct._provisioning ? '' : (ct.config || ct.status ? '/ ' + formatDiskSize(ct) : '') }}</td>
-                                    <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : '月') : '-' }}</td>
+                                    <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : ct.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                     <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                     <td>
                                         <template v-if="ct._provisioning">
@@ -494,7 +494,7 @@
                     <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '容器ID' : '虚拟机ID' }}</span><span class="info-value">{{ detailVm.vm_id || '-' }}</span></div>
                     <div class="info-item"><span class="info-label">内网IP</span><span class="info-value">{{ detailVm.ip || '-' }}</span></div>
                     <div class="info-item"><span class="info-label">硬件配置</span><span class="info-value">{{ detailVmConfigStr }}</span></div>
-                    <div class="info-item"><span class="info-label">续费价格</span><span class="info-value">{{ detailVm.renewal_price ? detailVm.renewal_price + '元/' + (detailVm.renewal_period === 'year' ? '年' : '月') : '-' }}</span></div>
+                    <div class="info-item"><span class="info-label">续费价格</span><span class="info-value">{{ detailVm.renewal_price ? detailVm.renewal_price + '元/' + (detailVm.renewal_period === 'year' ? '年' : detailVm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
                     <div class="info-item">
                         <span class="info-label">到期时间</span>
                         <span class="info-value" :class="detailVm.expiration_date && new Date(detailVm.expiration_date) < new Date() ? 'text-danger' : ''">{{ detailVm.expiration_date ? formatDate(detailVm.expiration_date) : '未设置' }}</span>

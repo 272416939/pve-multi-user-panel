@@ -898,6 +898,12 @@
             placeholder.ct_id = '-';
             $.userLxcContainers.value.unshift(placeholder);
         }
+        // 持久化开通中状态到 localStorage，支持页面刷新恢复
+        try {
+            var taskKey = 'provisioning_' + type;
+            var taskData = { id: placeholderId, type: type, startTime: Date.now(), pkgName: pkg.name || '' };
+            localStorage.setItem(taskKey, JSON.stringify(taskData));
+        } catch (e2) {}
 
         // 关闭弹窗，用户无需等待
         $.bsModalHide('orderModal');
@@ -918,6 +924,8 @@
                 $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
                 await $.loadLxcContainers();
             }
+            // 清除开通中状态
+            try { localStorage.removeItem('provisioning_' + type); } catch (e2) {}
             // 刷新余额
             $.loadWalletBalance();
         } catch(e) {
@@ -927,10 +935,70 @@
             } else {
                 $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
             }
+            // 清除开通中状态
+            try { localStorage.removeItem('provisioning_' + type); } catch (e2) {}
             alert('开通失败：' + (e.message || '未知错误'));
         }
     };
     
+    $.restoreProvisioningState = function() {
+        var types = ['vm', 'lxc'];
+        for (var i = 0; i < types.length; i++) {
+            var t = types[i];
+            try {
+                var raw = localStorage.getItem('provisioning_' + t);
+                if (!raw) continue;
+                var data = JSON.parse(raw);
+                // 超过 10 分钟视为超时，清除不恢复
+                if (Date.now() - (data.startTime || 0) > 10 * 60 * 1000) {
+                    localStorage.removeItem('provisioning_' + t);
+                    continue;
+                }
+                var placeholder = {
+                    id: data.id,
+                    name: '开通中...',
+                    status: { status: 'provisioning' },
+                    config: null,
+                    _provisioning: true
+                };
+                if (t === 'vm') {
+                    placeholder.vm_id = '-';
+                    var existVm = $.userVms.value.find(function(v) { return v.id === data.id; });
+                    if (!existVm) $.userVms.value.unshift(placeholder);
+                } else {
+                    placeholder.ct_id = '-';
+                    var existCt = $.userLxcContainers.value.find(function(c) { return c.id === data.id; });
+                    if (!existCt) $.userLxcContainers.value.unshift(placeholder);
+                }
+                // 启动轮询：定期检查 localStorage 是否还在，并刷新数据
+                $.__startProvisioningPoll(t, data.id);
+            } catch (e) {}
+        }
+    };
+
+    $.__startProvisioningPoll = function(type, placeholderId) {
+        var pollKey = '__provPoll_' + type;
+        if ($[pollKey]) clearInterval($[pollKey]);
+        $[pollKey] = setInterval(async function() {
+            try {
+                var raw = localStorage.getItem('provisioning_' + type);
+                if (!raw) {
+                    // 开通完成或失败，localStorage 已清除，移除占位记录并刷新
+                    clearInterval($[pollKey]);
+                    $[pollKey] = null;
+                    if (type === 'vm') {
+                        $.userVms.value = $.userVms.value.filter(function(v) { return v.id !== placeholderId; });
+                        await $.loadData();
+                    } else {
+                        $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
+                        await $.loadLxcContainers();
+                    }
+                    $.loadWalletBalance();
+                }
+            } catch (e) {}
+        }, 3000);
+    };
+
     $.switchSubOrder = function(tab) {
         $.switchSection('order');
         $.activeTabOrder.value = tab;
@@ -980,6 +1048,8 @@
                 await $.loadNavItems();
                 await $.loadData();
                 await $.loadLxcContainers();
+                // 恢复开通中状态（页面刷新后从 localStorage 恢复占位记录）
+                $.restoreProvisioningState();
                 await $.loadCnameDomain();
                 if ($.activeSection.value === 'order') {
                     await $.loadPackages();
