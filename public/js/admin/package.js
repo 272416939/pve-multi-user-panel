@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.18.2-type-guard';
+    window.__PKG_JS_VERSION = 'v2.18.3-debug-logs';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -254,10 +254,12 @@
             if (list[i].id === id) { fromIndex = i; break; }
         }
         $.dragState.dragFromIndex = fromIndex;
+        console.log('[drag] start id=' + id + ' type=' + type + ' fromIdx=' + fromIndex);
         // 兜底：5 秒后如果还在拖拽状态（dragend 未触发），自动清理防止下次拖拽失效
         if ($.__dragFallbackTimer) clearTimeout($.__dragFallbackTimer);
         $.__dragFallbackTimer = setTimeout(function() {
             if ($.dragState.draggingId != null) {
+                console.log('[drag] fallback timer triggered, cleaning up');
                 $.handleDragEnd();
             }
         }, 5000);
@@ -340,6 +342,7 @@
         e.preventDefault();
         var sourceId = $.dragState.draggingId;
         var dragType = $.dragState.dragType;
+        console.log('[drag] drop targetId=' + targetId + ' type=' + type + ' sourceId=' + sourceId + ' dragType=' + dragType);
         if (sourceId == null) return;
         $.clearAvoidClasses();
         if (sourceId === targetId || dragType !== type) {
@@ -368,6 +371,7 @@
 
     // 容器兜底：当 drop 落在行间空隙（非 tr 元素）时，使用最后经过的目标 id
     $.handleDropOnContainer = async function(e, type) {
+        console.log('[drag] dropOnContainer type=' + type + ' dragType=' + $.dragState.dragType + ' dragOverId=' + $.dragState.dragOverId + ' draggingId=' + $.dragState.draggingId);
         if ($.dragState.dragType !== type) return;
         var targetId = $.dragState.dragOverId;
         if (targetId == null) {
@@ -378,6 +382,7 @@
     };
 
     $.handleDragEnd = function() {
+        console.log('[drag] end draggingId=' + $.dragState.draggingId);
         if ($.__dragFallbackTimer) { clearTimeout($.__dragFallbackTimer); $.__dragFallbackTimer = null; }
         $.dragState.draggingId = null;
         $.dragState.dragOverId = null;
