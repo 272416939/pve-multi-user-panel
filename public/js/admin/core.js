@@ -197,6 +197,14 @@ watch($.user, function(u) {
             $.activeTabPackages.value = 'lxc';
             window.packagePage.loadLxcPackages();
             window.packagePage.loadLxcPackageGroups();
+        } else if (page === 'vm-package-groups') {
+            section = 'packages'; subId = 'packages-vm-groups';
+            $.activeTabPackages.value = 'vm-groups';
+            window.packagePage.loadVmPackageGroups();
+        } else if (page === 'lxc-package-groups') {
+            section = 'packages'; subId = 'packages-lxc-groups';
+            $.activeTabPackages.value = 'lxc-groups';
+            window.packagePage.loadLxcPackageGroups();
         }
         if (!section) return;
         $.switchSection(section);
@@ -910,9 +918,14 @@ $.initDetailCharts = function() {
                             }
                         }
                         if (section === 'packages' && window.packagePage) {
-                            if (tabVar && tabVar.value === 'lxc') {
+                            var pkgTab = tabVar ? tabVar.value : 'vm';
+                            if (pkgTab === 'lxc') {
                                 window.packagePage.loadLxcPackages();
                                 window.packagePage.loadLxcPackageGroups();
+                            } else if (pkgTab === 'lxc-groups') {
+                                window.packagePage.loadLxcPackageGroups();
+                            } else if (pkgTab === 'vm-groups') {
+                                window.packagePage.loadVmPackageGroups();
                             } else {
                                 window.packagePage.loadVmPackages();
                                 window.packagePage.loadVmPackageGroups();

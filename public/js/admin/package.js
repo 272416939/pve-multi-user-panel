@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.21.0-drag-handle';
+    window.__PKG_JS_VERSION = 'v2.22.0-subtabs';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -334,7 +334,7 @@
         var containers = document.querySelectorAll(containerSelector);
         var rows = null;
         for (var c = 0; c < containers.length; c++) {
-            var testRows = containers[c].querySelectorAll('[draggable="true"][data-drag-type="' + type + '"]');
+            var testRows = containers[c].querySelectorAll('[data-drag-id][data-drag-type="' + type + '"]');
             if (testRows.length > 0) { rows = testRows; break; }
         }
         if (!rows || rows.length === 0) return;
@@ -354,7 +354,7 @@
     };
 
     $.__clearAllTransform = function(type) {
-        var selector = type ? '[draggable="true"][data-drag-type="' + type + '"]' : '[draggable="true"]';
+        var selector = type ? '[data-drag-id][data-drag-type="' + type + '"]' : '[data-drag-id]';
         var rows = document.querySelectorAll(selector);
         for (var i = 0; i < rows.length; i++) rows[i].style.transform = '';
     };
@@ -409,7 +409,7 @@
             container0 = e.currentTarget.parentElement;
             if (!container0) return;
         }
-        var rows0 = container0.querySelectorAll('[draggable="true"]');
+        var rows0 = container0.querySelectorAll('[data-drag-id]');
         var isHorizontal0 = type === 'group-vm' || type === 'group-lxc';
         var offset0 = isHorizontal0
             ? (rows0.length > 0 ? rows0[0].offsetWidth + 8 : 80)
@@ -448,7 +448,7 @@
         $.dragState.avoidDownIds = [];
         $.dragState.avoidUpIds = [];
         // 清除所有直接设置的 DOM transform（全局）
-        var allDraggables = document.querySelectorAll('[draggable="true"]');
+        var allDraggables = document.querySelectorAll('[data-drag-id]');
         for (var i = 0; i < allDraggables.length; i++) {
             allDraggables[i].style.transform = '';
         }

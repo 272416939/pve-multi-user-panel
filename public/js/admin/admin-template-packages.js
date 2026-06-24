@@ -6,32 +6,7 @@
                     <div v-if="activeTabPackages === 'vm'" class="tab-panel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0">VM 套餐管理</h5>
-                            <div>
-                                <pv-button @click="packagePage.openVmGroupForm(null)" size="sm" variant="outline">分组管理</pv-button>
-                                <pv-button @click="packagePage.openVmPackageForm(null)" size="sm">+ 新建套餐</pv-button>
-                            </div>
-                        </div>
-                        <!-- 分组列表 -->
-                        <div v-if="packagePage.vmPackageGroups.value.length > 0" class="mb-3 group-badges-container" @dragover="packagePage.handleContainerDragOver($event, 'group-vm')" @drop="packagePage.handleDropOnContainer($event, 'group-vm')">
-                            <span v-for="g in packagePage.vmPackageGroups.value" :key="g.id"
-                                class="badge bg-info me-2 mb-1 group-badge-draggable"
-                                :data-drag-id="g.id" data-drag-type="group-vm"
-                                :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id && packagePage.dragState.draggingType === 'group-vm' }"
-                                @dragover="packagePage.handleDragOver($event, g.id, 'group-vm')"
-                                @dragleave="packagePage.handleDragLeave($event, g.id)"
-                                @drop="packagePage.handleDrop($event, g.id, 'group-vm')">
-                                <span class="drag-handle"
-                                    draggable="true"
-                                    @dragstart="packagePage.handleDragStart($event, g.id, 'group-vm')"
-                                    @dragend="packagePage.handleDragEnd()"
-                                    @touchstart="packagePage.handleTouchStart($event, g.id, 'group-vm')"
-                                    @touchmove="packagePage.handleTouchMove($event)"
-                                    @touchend="packagePage.handleTouchEnd($event)"
-                                    @touchcancel="packagePage.handleTouchEnd($event)">⠿</span>
-                                {{ g.name }}
-                                <pv-button @click="packagePage.openVmGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
-                                <pv-button @click="packagePage.deleteVmGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
-                            </span>
+                            <pv-button @click="packagePage.openVmPackageForm(null)" size="sm">+ 新建套餐</pv-button>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
@@ -85,35 +60,50 @@
                         </div>
                     </div>
 
+                    <div v-if="activeTabPackages === 'vm-groups'" class="tab-panel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">VM 套餐分组管理</h5>
+                            <pv-button @click="packagePage.openVmGroupForm(null)" size="sm">+ 新建分组</pv-button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr><th class="drag-handle-th"></th><th>ID</th><th>分组名</th><th>套餐数量</th><th>操作</th></tr>
+                                </thead>
+                                <tbody @dragover="packagePage.handleContainerDragOver($event, 'group-vm')" @drop="packagePage.handleDropOnContainer($event, 'group-vm')">
+                                    <tr v-for="g in packagePage.vmPackageGroups.value" :key="g.id"
+                                        :data-drag-id="g.id" data-drag-type="group-vm"
+                                        :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id && packagePage.dragState.draggingType === 'group-vm' }"
+                                        @dragover="packagePage.handleDragOver($event, g.id, 'group-vm')"
+                                        @dragleave="packagePage.handleDragLeave($event, g.id)"
+                                        @drop="packagePage.handleDrop($event, g.id, 'group-vm')">
+                                        <td class="drag-handle-cell">
+                                            <span class="drag-handle"
+                                                draggable="true"
+                                                @dragstart="packagePage.handleDragStart($event, g.id, 'group-vm')"
+                                                @dragend="packagePage.handleDragEnd()"
+                                                @touchstart="packagePage.handleTouchStart($event, g.id, 'group-vm')"
+                                                @touchmove="packagePage.handleTouchMove($event)"
+                                                @touchend="packagePage.handleTouchEnd($event)"
+                                                @touchcancel="packagePage.handleTouchEnd($event)">⠿</span>
+                                        </td>
+                                        <td>{{ g.id }}</td>
+                                        <td>{{ g.name }}</td>
+                                        <td>{{ packagePage.vmPackages.value.filter(p => p.group_id === g.id).length }}</td>
+                                        <td>
+                                            <pv-button @click="packagePage.openVmGroupForm(g)" size="sm" variant="outline" class="me-1">编辑</pv-button>
+                                            <pv-button @click="packagePage.deleteVmGroup(g.id)" size="sm" variant="outline-danger">删除</pv-button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     <div v-if="activeTabPackages === 'lxc'" class="tab-panel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0">LXC 套餐管理</h5>
-                            <div>
-                                <pv-button @click="packagePage.openLxcGroupForm(null)" size="sm" variant="outline">分组管理</pv-button>
-                                <pv-button @click="packagePage.openLxcPackageForm(null)" size="sm">+ 新建套餐</pv-button>
-                            </div>
-                        </div>
-                        <!-- 分组列表 -->
-                        <div v-if="packagePage.lxcPackageGroups.value.length > 0" class="mb-3 group-badges-container" @dragover="packagePage.handleContainerDragOver($event, 'group-lxc')" @drop="packagePage.handleDropOnContainer($event, 'group-lxc')">
-                            <span v-for="g in packagePage.lxcPackageGroups.value" :key="g.id"
-                                class="badge bg-info me-2 mb-1 group-badge-draggable"
-                                :data-drag-id="g.id" data-drag-type="group-lxc"
-                                :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id && packagePage.dragState.draggingType === 'group-lxc' }"
-                                @dragover="packagePage.handleDragOver($event, g.id, 'group-lxc')"
-                                @dragleave="packagePage.handleDragLeave($event, g.id)"
-                                @drop="packagePage.handleDrop($event, g.id, 'group-lxc')">
-                                <span class="drag-handle"
-                                    draggable="true"
-                                    @dragstart="packagePage.handleDragStart($event, g.id, 'group-lxc')"
-                                    @dragend="packagePage.handleDragEnd()"
-                                    @touchstart="packagePage.handleTouchStart($event, g.id, 'group-lxc')"
-                                    @touchmove="packagePage.handleTouchMove($event)"
-                                    @touchend="packagePage.handleTouchEnd($event)"
-                                    @touchcancel="packagePage.handleTouchEnd($event)">⠿</span>
-                                {{ g.name }}
-                                <pv-button @click="packagePage.openLxcGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
-                                <pv-button @click="packagePage.deleteLxcGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
-                            </span>
+                            <pv-button @click="packagePage.openLxcPackageForm(null)" size="sm">+ 新建套餐</pv-button>
                         </div>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
@@ -152,6 +142,46 @@
                     </td>
                                     </tr>
                                     <tr v-if="packagePage.lxcPackages.value.length === 0"><td colspan="15" class="text-center text-muted">暂无套餐</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div v-if="activeTabPackages === 'lxc-groups'" class="tab-panel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="mb-0">LXC 套餐分组管理</h5>
+                            <pv-button @click="packagePage.openLxcGroupForm(null)" size="sm">+ 新建分组</pv-button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle">
+                                <thead class="table-light">
+                                    <tr><th class="drag-handle-th"></th><th>ID</th><th>分组名</th><th>套餐数量</th><th>操作</th></tr>
+                                </thead>
+                                <tbody @dragover="packagePage.handleContainerDragOver($event, 'group-lxc')" @drop="packagePage.handleDropOnContainer($event, 'group-lxc')">
+                                    <tr v-for="g in packagePage.lxcPackageGroups.value" :key="g.id"
+                                        :data-drag-id="g.id" data-drag-type="group-lxc"
+                                        :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id && packagePage.dragState.draggingType === 'group-lxc' }"
+                                        @dragover="packagePage.handleDragOver($event, g.id, 'group-lxc')"
+                                        @dragleave="packagePage.handleDragLeave($event, g.id)"
+                                        @drop="packagePage.handleDrop($event, g.id, 'group-lxc')">
+                                        <td class="drag-handle-cell">
+                                            <span class="drag-handle"
+                                                draggable="true"
+                                                @dragstart="packagePage.handleDragStart($event, g.id, 'group-lxc')"
+                                                @dragend="packagePage.handleDragEnd()"
+                                                @touchstart="packagePage.handleTouchStart($event, g.id, 'group-lxc')"
+                                                @touchmove="packagePage.handleTouchMove($event)"
+                                                @touchend="packagePage.handleTouchEnd($event)"
+                                                @touchcancel="packagePage.handleTouchEnd($event)">⠿</span>
+                                        </td>
+                                        <td>{{ g.id }}</td>
+                                        <td>{{ g.name }}</td>
+                                        <td>{{ packagePage.lxcPackages.value.filter(p => p.group_id === g.id).length }}</td>
+                                        <td>
+                                            <pv-button @click="packagePage.openLxcGroupForm(g)" size="sm" variant="outline" class="me-1">编辑</pv-button>
+                                            <pv-button @click="packagePage.deleteLxcGroup(g.id)" size="sm" variant="outline-danger">删除</pv-button>
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>

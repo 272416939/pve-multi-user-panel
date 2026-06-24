@@ -86,7 +86,9 @@
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-packages">
                     <a class="nav-item" data-subsection="packages-vm" href="#" @click.prevent="switchPage('vm-packages')"><span class="nav-text">VM 套餐</span></a>
+                    <a class="nav-item" data-subsection="packages-vm-groups" href="#" @click.prevent="switchPage('vm-package-groups')"><span class="nav-text">VM 套餐分组</span></a>
                     <a class="nav-item" data-subsection="packages-lxc" href="#" @click.prevent="switchPage('lxc-packages')"><span class="nav-text">LXC 套餐</span></a>
+                    <a class="nav-item" data-subsection="packages-lxc-groups" href="#" @click.prevent="switchPage('lxc-package-groups')"><span class="nav-text">LXC 套餐分组</span></a>
                 </div>
 
                 <!-- 财务管理（父菜单，仅admin） -->
