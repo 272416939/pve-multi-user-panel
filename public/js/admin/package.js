@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.18.8-visible-drag';
+    window.__PKG_JS_VERSION = 'v2.18.9-clone-drag';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -249,6 +249,33 @@
         $.dragState.dragHandled = false;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/x-pve-drag', String(id));
+        // 克隆元素做拖拽镜像（原元素将被 opacity:0 隐藏，克隆保持完整可见跟随鼠标）
+        var srcEl = e.currentTarget;
+        try {
+            var clone = srcEl.cloneNode(true);
+            clone.style.position = 'fixed';
+            clone.style.top = '-9999px';
+            clone.style.left = '-9999px';
+            clone.style.opacity = '1';
+            clone.style.pointerEvents = 'none';
+            clone.style.width = srcEl.offsetWidth + 'px';
+            var wrap = document.createElement('div');
+            wrap.style.position = 'fixed';
+            wrap.style.top = '-9999px';
+            wrap.style.left = '-9999px';
+            wrap.style.opacity = '1';
+            wrap.appendChild(clone);
+            document.body.appendChild(wrap);
+            var rect = srcEl.getBoundingClientRect();
+            e.dataTransfer.setDragImage(wrap, e.clientX - rect.left, e.clientY - rect.top);
+            $.__dragClone = wrap;
+            setTimeout(function() {
+                if ($.__dragClone && $.__dragClone.parentNode) {
+                    $.__dragClone.parentNode.removeChild($.__dragClone);
+                }
+                $.__dragClone = null;
+            }, 0);
+        } catch (err) {}
         var list = $.getDragList(type);
         var fromIndex = -1;
         for (var i = 0; i < list.length; i++) {

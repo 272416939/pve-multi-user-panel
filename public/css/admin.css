@@ -361,14 +361,10 @@ tr:hover td { background: var(--bg-hover); }
 
 /* ===== 拖拽排序视觉反馈 ===== */
 .row-dragging {
-    opacity: 0.35;
-    background: var(--glass-accent, rgba(99,102,241,0.08)) !important;
-    outline: 2px dashed rgba(99,102,241,0.5);
-    outline-offset: -2px;
-    cursor: grabbing !important;
+    opacity: 0 !important;
 }
 .table tbody tr {
-    transition: transform 0.2s ease, opacity 0.15s ease;
+    transition: transform 0.2s ease, opacity 0.1s ease;
 }
 .table tbody tr[draggable="true"] {
     user-select: none;
@@ -378,15 +374,12 @@ tr:hover td { background: var(--bg-hover); }
 .group-badge-draggable {
     cursor: grab;
     user-select: none;
-    transition: transform 0.2s ease, opacity 0.15s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease, opacity 0.1s ease, box-shadow 0.2s ease;
 }
 .group-badge-draggable:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(99,102,241,0.3);
 }
 .group-badge-draggable.row-dragging {
-    opacity: 0.35;
-    outline: 2px dashed rgba(99,102,241,0.5);
-    outline-offset: -2px;
-    cursor: grabbing !important;
+    opacity: 0 !important;
 }
