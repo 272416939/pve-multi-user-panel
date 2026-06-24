@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.17.5-revert-dnd';
+    window.__PKG_JS_VERSION = 'v2.18.2-type-guard';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -23,7 +23,7 @@
     $.vmProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
     $.lxcProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
 
-    $.dragState = Vue.reactive({ draggingId: null, dragOverId: null, dragType: null, dragFromIndex: -1, avoidDownIds: [], avoidUpIds: [] });
+    $.dragState = Vue.reactive({ draggingId: null, dragOverId: null, dragType: null, draggingType: null, dragFromIndex: -1, avoidDownIds: [], avoidUpIds: [] });
 
     $.loadVmPackages = async function() {
         try { $.vmPackages.value = await api('/admin/vm-packages'); } catch (e) { console.error('loadVmPackages error:', e); }
@@ -245,6 +245,7 @@
     $.handleDragStart = function(e, id, type) {
         $.dragState.draggingId = id;
         $.dragState.dragType = type;
+        $.dragState.draggingType = type;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('application/x-pve-drag', String(id));
         var list = $.getDragList(type);
@@ -253,6 +254,13 @@
             if (list[i].id === id) { fromIndex = i; break; }
         }
         $.dragState.dragFromIndex = fromIndex;
+        // 兜底：5 秒后如果还在拖拽状态（dragend 未触发），自动清理防止下次拖拽失效
+        if ($.__dragFallbackTimer) clearTimeout($.__dragFallbackTimer);
+        $.__dragFallbackTimer = setTimeout(function() {
+            if ($.dragState.draggingId != null) {
+                $.handleDragEnd();
+            }
+        }, 5000);
     };
 
     $.handleDragOver = function(e, id, type) {
@@ -352,6 +360,7 @@
         $.dragState.draggingId = null;
         $.dragState.dragOverId = null;
         $.dragState.dragType = null;
+        $.dragState.draggingType = null;
         $.dragState.dragFromIndex = -1;
         await $.saveReorder(type, newOrder);
         $.clearAvoidClasses();
@@ -369,9 +378,11 @@
     };
 
     $.handleDragEnd = function() {
+        if ($.__dragFallbackTimer) { clearTimeout($.__dragFallbackTimer); $.__dragFallbackTimer = null; }
         $.dragState.draggingId = null;
         $.dragState.dragOverId = null;
         $.dragState.dragType = null;
+        $.dragState.draggingType = null;
         $.dragState.dragFromIndex = -1;
         $.clearAvoidClasses();
     };
