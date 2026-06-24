@@ -387,6 +387,7 @@ tr:hover td { background: var(--bg-hover); }
     width: 32px;
     text-align: center;
     padding: 0 !important;
+    touch-action: none;
 }
 .drag-handle-th {
     width: 32px;

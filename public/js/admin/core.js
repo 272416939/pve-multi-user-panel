@@ -34,7 +34,7 @@ $.detailVmChartData = null;
 
     // ==================== 模板/套餐页面状态 ====================
     $.activeTabTemplates = ref('vm');
-    $.activeTabPackages = ref('vm');
+    $.activeTabPackages = ref(localStorage.getItem('admin_activeTabPackages') || 'vm');
 
     // ==================== 工具函数注册到$ ====================
     $.formatMemory = formatMemory;
@@ -1041,6 +1041,10 @@ $.initDetailCharts = function() {
                 $.loadTransactions(1);
             }
             if (newTab === 'users') { $.loadUsers(1); }
+        });
+
+        watch($.activeTabPackages, function(newTab) {
+            localStorage.setItem('admin_activeTabPackages', newTab);
         });
 
         watch($.activeSection, function(val) {

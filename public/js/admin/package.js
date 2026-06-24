@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.22.2-touch-lock';
+    window.__PKG_JS_VERSION = 'v2.22.3-touch-css';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -259,8 +259,6 @@
             if (list[i].id === id) { fi = i; break; }
         }
         $.dragState.dragFromIndex = fi;
-        // 触觉反馈（静默失败，不报错到控制台）
-        try { if (navigator.vibrate) navigator.vibrate(20); } catch (err) {}
         document.body.style.userSelect = 'none';
         // 锁定整个容器的 touch-action，防止手指移出手柄后浏览器接管滚动
         var handleEl = e.currentTarget;
