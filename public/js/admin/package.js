@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.23.0-unified-drag';
+    window.__PKG_JS_VERSION = 'v2.24.1-fluid-drag';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -381,9 +381,15 @@
             for (var k = fromIndex + 1; k <= toIndex && k < rows.length; k++) {
                 rows[k].style.transform = 'translateY(-' + offset + 'px)';
             }
+            if (fromIndex < rows.length) {
+                rows[fromIndex].style.transform = 'translateY(' + ((toIndex - fromIndex) * offset) + 'px)';
+            }
         } else if (fromIndex > toIndex) {
             for (var k = toIndex; k < fromIndex && k < rows.length; k++) {
                 rows[k].style.transform = 'translateY(' + offset + 'px)';
+            }
+            if (fromIndex < rows.length) {
+                rows[fromIndex].style.transform = 'translateY(-' + ((fromIndex - toIndex) * offset) + 'px)';
             }
         }
     };

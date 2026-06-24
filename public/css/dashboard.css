@@ -706,8 +706,8 @@
         padding: 0.5rem 0 !important;
     }
     .row-dragging {
-        opacity: 0.4;
-        background: var(--glass-accent, rgba(99,102,241,0.1)) !important;
+        opacity: 0.25;
+        background: var(--glass-accent, rgba(99,102,241,0.06)) !important;
     }
     /* 表格行基础 transition（避让动效平滑过渡，直接操作 DOM style.transform） */
     .table tbody tr {

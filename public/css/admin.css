@@ -394,8 +394,8 @@ tr:hover td { background: var(--bg-hover); }
     padding: 0.5rem 0 !important;
 }
 .row-dragging {
-    opacity: 0.4;
-    background: var(--glass-accent, rgba(99,102,241,0.1)) !important;
+    opacity: 0.25;
+    background: var(--glass-accent, rgba(99,102,241,0.06)) !important;
 }
 .table tbody tr {
     transition: transform 0.2s ease, opacity 0.2s ease;
