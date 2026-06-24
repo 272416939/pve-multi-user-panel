@@ -358,3 +358,31 @@ tr:hover td { background: var(--bg-hover); }
     0%, 100% { box-shadow: 0 0 6px rgba(239,68,68,0.5), 0 2px 8px rgba(0,0,0,0.3); }
     50% { box-shadow: 0 0 16px rgba(239,68,68,0.75), 0 3px 12px rgba(0,0,0,0.35); }
 }
+
+/* ===== 拖拽排序视觉反馈 ===== */
+.row-dragging {
+    opacity: 0.4;
+    background: var(--glass-accent, rgba(99,102,241,0.1)) !important;
+    cursor: grabbing !important;
+}
+.table tbody tr {
+    transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.table tbody tr[draggable="true"] {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+}
+.group-badge-draggable {
+    cursor: grab;
+    user-select: none;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.group-badge-draggable:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+}
+.group-badge-draggable.row-dragging {
+    opacity: 0.4;
+    cursor: grabbing !important;
+}

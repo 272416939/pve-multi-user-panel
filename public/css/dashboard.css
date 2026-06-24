@@ -681,6 +681,12 @@
     .table tbody tr {
         transition: transform 0.2s ease, opacity 0.2s ease;
     }
+    /* 可拖拽表格行禁用文本选择，防止拖拽时触发浏览器文本拖拽/搜索弹窗 */
+    .table tbody tr[draggable="true"] {
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+    }
     /* 分组 badge 拖拽 */
     .group-badge-draggable {
         cursor: grab;

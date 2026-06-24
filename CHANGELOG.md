@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.17.2] - 2026-06-24
+
+### Fixed
+- fix(packages): 修复套餐行拖拽失效与浏览器搜索文本弹窗问题
+  - admin.css 追加完整拖拽样式（含 user-select: none），因 admin 页面未加载 dashboard.css
+  - dashboard.css 为 tr[draggable] 补充 user-select: none
+  - handleDragStart 的 setData 改用 application/x-pve-drag 自定义 MIME 类型，避免 Chrome 触发文本搜索弹窗
+  - 更新 admin.css / package.js / dashboard.css 的浏览器缓存参数
+
 ## [2.17.1] - 2026-06-24
 
 ### Fixed

@@ -244,9 +244,7 @@
         $.dragState.draggingId = id;
         $.dragState.dragType = type;
         e.dataTransfer.effectAllowed = 'move';
-        // 必须调用 setData 才能触发拖拽，用 text/plain 即可
-        e.dataTransfer.setData('text/plain', String(id));
-        // 记录起始索引
+        e.dataTransfer.setData('application/x-pve-drag', String(id));
         var list = $.getDragList(type);
         var fromIndex = -1;
         for (var i = 0; i < list.length; i++) {

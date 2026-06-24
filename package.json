@@ -1,42 +1,42 @@
-{
-    "name": "pve-multi-user-panel",
-    "version": "2.17.1",
-    "description": "Proxmox Virtual Environment 多用户控制面板",
-    "main": "server/server.js",
-    "scripts": {
-        "start": "node server/server.js",
-        "dev": "nodemon server/server.js",
-        "test": "mocha --recursive test/**/*.test.js --timeout 10000"
-    },
-    "keywords": [
-        "proxmox",
-        "pve",
-        "management",
-        "multi-tenant"
-    ],
-    "author": "",
-    "license": "MIT",
-    "dependencies": {
-        "axios": "^1.17.0",
-        "cors": "^2.8.5",
-        "crypto-js": "^4.2.0",
-        "dotenv": "^16.3.1",
-        "ejs": "^6.0.1",
-        "express": "^4.22.2",
-        "ioredis": "^5.6.1",
-        "jsonwebtoken": "^9.0.3",
-        "multer": "^2.0.0",
-        "mysql2": "^3.14.4",
-        "node-schedule": "^2.1.1",
-        "nodemailer": "^6.9.8",
-        "otplib": "^13.4.1",
-        "qrcode": "^1.5.4",
-        "ssh2": "^1.17.0",
-        "ws": "^8.20.1"
-    },
-    "devDependencies": {
-        "chai": "^6.2.2",
-        "mocha": "^11.7.6",
-        "nodemon": "^3.0.2"
-    }
+﻿{
+    "name":  "pve-multi-user-panel",
+    "version":  "2.17.2",
+    "description":  "Proxmox Virtual Environment 多用户控制面板",
+    "main":  "server/server.js",
+    "scripts":  {
+                    "start":  "node server/server.js",
+                    "dev":  "nodemon server/server.js",
+                    "test":  "mocha --recursive test/**/*.test.js --timeout 10000"
+                },
+    "keywords":  [
+                     "proxmox",
+                     "pve",
+                     "management",
+                     "multi-tenant"
+                 ],
+    "author":  "",
+    "license":  "MIT",
+    "dependencies":  {
+                         "axios":  "^1.17.0",
+                         "cors":  "^2.8.5",
+                         "crypto-js":  "^4.2.0",
+                         "dotenv":  "^16.3.1",
+                         "ejs":  "^6.0.1",
+                         "express":  "^4.22.2",
+                         "ioredis":  "^5.6.1",
+                         "jsonwebtoken":  "^9.0.3",
+                         "multer":  "^2.0.0",
+                         "mysql2":  "^3.14.4",
+                         "node-schedule":  "^2.1.1",
+                         "nodemailer":  "^6.9.8",
+                         "otplib":  "^13.4.1",
+                         "qrcode":  "^1.5.4",
+                         "ssh2":  "^1.17.0",
+                         "ws":  "^8.20.1"
+                     },
+    "devDependencies":  {
+                            "chai":  "^6.2.2",
+                            "mocha":  "^11.7.6",
+                            "nodemon":  "^3.0.2"
+                        }
 }
