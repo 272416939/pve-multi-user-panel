@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.24.1-fluid-drag';
+    window.__PKG_JS_VERSION = 'v2.24.2-fix-jitter';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -321,8 +321,6 @@
             $.dragState.dragOverId = overId;
             if (overId !== $.dragState.draggingId) {
                 $.__applyAvoidTransform(type, overId);
-            } else {
-                $.__clearAllTransform(type);
             }
         }
     };
@@ -451,11 +449,8 @@
             if (list0[i0].id === id) { toIndex0 = i0; break; }
         }
         if (toIndex0 < 0) return;
-        // hover 到被拖元素自身：清除所有 transform 后返回
-        if ($.dragState.draggingId === id) {
-            $.__clearAllTransform(type);
-            return;
-        }
+        // hover 到被拖元素自身：保持当前避让状态，不做任何操作（避免高频来回切换导致抽动）
+        if ($.dragState.draggingId === id) return;
         // 统一调用避让逻辑
         $.__applyAvoidTransform(type, id);
     };
