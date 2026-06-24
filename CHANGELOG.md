@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.28.0] - 2026-06-25
+
+### Added
+- feat(package): 开通失败退款通知与订单号统一
+  - 下单即生成订单(pending)与扣款流水（含 balance_before/after），开通成功标记 completed，失败退款+退款流水+站内信
+  - 新增 `generateOrderNo` 统一订单号生成：VM(KTVM)/LXC(KTLXC)/退款(TK)/支付宝(ZFB)/微信(WX)/系统充值(SYSPAY) 前缀+时间+8位随机数字（使用 crypto.randomBytes）
+  - 开通失败站内信通知（标题"虚拟机/容器开通失败"，告知退款金额与订单号）
+  - 崩溃恢复任务补充退款流水与开通失败站内信
+- feat(finance): 前端交易记录新增"订单退款"徽标(bg-warning)与退款支付方式展示（余额退款/支付宝退款/微信退款）
+
+### Changed
+- refactor(order): 充值订单号统一改用 ZFB/WX/SYSPAY 前缀，订单状态查询正则同步适配
+- refactor(order): 管理员订购订单号改用 generateOrderNo('vm'/'lxc')
+- refactor(utils): deductBalance 返回 balanceBefore/balanceAfter 供流水记录
+
+## [2.27.0] - 2026-06-24
+
+### Fixed
+- fix(security): 移除前端 pve_upid 暴露，改用 resourceId 查询开通状态
+  - PVE UPID 含宿主机节点名、PVE 认证用户等敏感信息，此前通过 API 响应和 URL 查询参数暴露给前端
+  - `/provision-status` 改为接受 resourceId+type 参数，后端内部用 pve_upid 查 PVE
+  - `/user/vms` 和 `/user/lxc` 剔除 pve_upid 字段，返回 _provisioning 布尔标记
+  - 前端轮询改用 resourceId，移除 UPID_REGEX
+
 ## [2.26.3] - 2026-06-24
 
 ### Fixed
