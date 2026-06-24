@@ -672,10 +672,41 @@
     @media (min-width: 769px) and (max-width: 1024px) { .package-cards { grid-template-columns: repeat(2, 1fr); } }
 
     /* ===== 拖拽排序视觉反馈 ===== */
+    .drag-handle {
+        cursor: grab;
+        user-select: none;
+        -webkit-user-select: none;
+        touch-action: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--text-muted, #6c757d);
+        font-size: 1.1rem;
+        line-height: 1;
+        padding: 0.25rem 0.15rem;
+        opacity: 0.5;
+        transition: opacity 0.15s ease, color 0.15s ease;
+    }
+    .drag-handle:hover {
+        opacity: 1;
+        color: var(--bs-primary, #6366f1);
+    }
+    .drag-handle:active {
+        cursor: grabbing;
+        opacity: 1;
+    }
+    .drag-handle-cell {
+        width: 32px;
+        text-align: center;
+        padding: 0 !important;
+    }
+    .drag-handle-th {
+        width: 32px;
+        padding: 0.5rem 0 !important;
+    }
     .row-dragging {
         opacity: 0.4;
         background: var(--glass-accent, rgba(99,102,241,0.1)) !important;
-        cursor: grabbing !important;
     }
     /* 表格行基础 transition（避让动效平滑过渡，直接操作 DOM style.transform） */
     .table tbody tr {
@@ -686,14 +717,11 @@
         user-select: none;
         -webkit-user-select: none;
         -moz-user-select: none;
-        touch-action: none;
     }
     /* 分组 badge 拖拽 */
     .group-badge-draggable {
-        cursor: grab;
+        cursor: default;
         user-select: none;
-        transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
-        touch-action: none;
     }
     .group-badge-draggable:hover {
         transform: translateY(-1px);
@@ -701,7 +729,6 @@
     }
     .group-badge-draggable.row-dragging {
         opacity: 0.4;
-        cursor: grabbing !important;
     }
     /* 分组 badge 容器：小屏幕自动换行 */
     .group-badges-container {

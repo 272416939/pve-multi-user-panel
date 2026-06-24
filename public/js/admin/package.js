@@ -1,5 +1,5 @@
 (function() {
-    window.__PKG_JS_VERSION = 'v2.20.1-touch-fix';
+    window.__PKG_JS_VERSION = 'v2.21.0-drag-handle';
     console.log('[package.js] loaded version:', window.__PKG_JS_VERSION);
     var Vue = window.Vue;
     var admin = window.__admin;
@@ -242,41 +242,29 @@
         return [];
     };
 
-    // ===== 触摸事件拖拽（移动端）=====
+    // ===== 触摸事件拖拽（移动端，通过拖拽手柄触发）=====
     $.handleTouchStart = function(e, id, type) {
         if (e.touches.length !== 1) return;
-        var tgt = e.target;
-        if (tgt && tgt.closest && tgt.closest('button, a, input, select, .btn-group')) return;
         var touch = e.touches[0];
-        $.dragState.__touchId = touch.identifier;
         $.dragState.__touchStartX = touch.clientX;
         $.dragState.__touchStartY = touch.clientY;
-        $.dragState.__touchPendingId = id;
-        $.dragState.__touchPendingType = type;
-        $.dragState.__touchLongPress = false;
-        // 长按 500ms 后启动拖拽
-        if ($.__touchLongPressTimer) clearTimeout($.__touchLongPressTimer);
-        $.__touchLongPressTimer = setTimeout(function() {
-            if ($.dragState.__touchPendingId == null) return;
-            $.dragState.__touchLongPress = true;
-            $.dragState.draggingId = $.dragState.__touchPendingId;
-            $.dragState.dragType = $.dragState.__touchPendingType;
-            $.dragState.draggingType = $.dragState.__touchPendingType;
-            $.dragState.dragHandled = false;
-            var list = $.getDragList($.dragState.dragType);
-            var fi = -1;
-            for (var i = 0; i < list.length; i++) {
-                if (list[i].id === $.dragState.draggingId) { fi = i; break; }
-            }
-            $.dragState.dragFromIndex = fi;
-            // 触觉反馈
-            try { if (navigator.vibrate) navigator.vibrate(30); } catch (err) {}
-            document.body.style.userSelect = 'none';
-        }, 500);
+        // 手柄触发，立即启动拖拽（无需长按）
+        $.dragState.draggingId = id;
+        $.dragState.dragType = type;
+        $.dragState.draggingType = type;
+        $.dragState.dragHandled = false;
+        var list = $.getDragList(type);
+        var fi = -1;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].id === id) { fi = i; break; }
+        }
+        $.dragState.dragFromIndex = fi;
+        try { if (navigator.vibrate) navigator.vibrate(20); } catch (err) {}
+        document.body.style.userSelect = 'none';
     };
 
     $.handleTouchMove = function(e) {
-        if (!$.dragState.__touchLongPress) return;
+        if ($.dragState.draggingId == null) return;
         if (e.touches.length !== 1) return;
         if (e.cancelable) e.preventDefault(); else return;
         var touch = e.touches[0];
@@ -284,7 +272,7 @@
         var underEl = document.elementFromPoint(touch.clientX, touch.clientY);
         var targetRow = null;
         if (underEl) {
-            targetRow = underEl.closest('[draggable="true"]');
+            targetRow = underEl.closest('[data-drag-id]');
             if (targetRow) {
                 var rowType = targetRow.getAttribute('data-drag-type');
                 if (rowType !== type) targetRow = null;
@@ -302,12 +290,7 @@
     };
 
     $.handleTouchEnd = async function(e) {
-        if ($.__touchLongPressTimer) { clearTimeout($.__touchLongPressTimer); $.__touchLongPressTimer = null; }
-        if (!$.dragState.__touchLongPress) {
-            $.dragState.__touchPendingId = null;
-            $.dragState.__touchPendingType = null;
-            return;
-        }
+        if ($.dragState.draggingId == null) return;
         var sourceId = $.dragState.draggingId;
         var targetId = $.dragState.dragOverId;
         var dragType = $.dragState.dragType;
@@ -326,9 +309,6 @@
                 $.dragState.dragType = null;
                 $.dragState.draggingType = null;
                 $.dragState.dragFromIndex = -1;
-                $.dragState.__touchLongPress = false;
-                $.dragState.__touchPendingId = null;
-                $.dragState.__touchPendingType = null;
                 $.__clearAllTransform(dragType);
                 await $.saveReorder(dragType, newOrder);
                 return;
@@ -339,9 +319,6 @@
         $.dragState.dragType = null;
         $.dragState.draggingType = null;
         $.dragState.dragFromIndex = -1;
-        $.dragState.__touchLongPress = false;
-        $.dragState.__touchPendingId = null;
-        $.dragState.__touchPendingType = null;
         if (dragType) $.__clearAllTransform(dragType);
     };
 

@@ -15,18 +15,19 @@
                         <div v-if="packagePage.vmPackageGroups.value.length > 0" class="mb-3 group-badges-container" @dragover="packagePage.handleContainerDragOver($event, 'group-vm')" @drop="packagePage.handleDropOnContainer($event, 'group-vm')">
                             <span v-for="g in packagePage.vmPackageGroups.value" :key="g.id"
                                 class="badge bg-info me-2 mb-1 group-badge-draggable"
-                                draggable="true"
                                 :data-drag-id="g.id" data-drag-type="group-vm"
                                 :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id && packagePage.dragState.draggingType === 'group-vm' }"
-                                @dragstart="packagePage.handleDragStart($event, g.id, 'group-vm')"
                                 @dragover="packagePage.handleDragOver($event, g.id, 'group-vm')"
                                 @dragleave="packagePage.handleDragLeave($event, g.id)"
-                                @drop="packagePage.handleDrop($event, g.id, 'group-vm')"
-                                @dragend="packagePage.handleDragEnd()"
-                                @touchstart="packagePage.handleTouchStart($event, g.id, 'group-vm')"
-                                @touchmove="packagePage.handleTouchMove($event)"
-                                @touchend="packagePage.handleTouchEnd($event)"
-                                @touchcancel="packagePage.handleTouchEnd($event)">
+                                @drop="packagePage.handleDrop($event, g.id, 'group-vm')">
+                                <span class="drag-handle"
+                                    draggable="true"
+                                    @dragstart="packagePage.handleDragStart($event, g.id, 'group-vm')"
+                                    @dragend="packagePage.handleDragEnd()"
+                                    @touchstart="packagePage.handleTouchStart($event, g.id, 'group-vm')"
+                                    @touchmove="packagePage.handleTouchMove($event)"
+                                    @touchend="packagePage.handleTouchEnd($event)"
+                                    @touchcancel="packagePage.handleTouchEnd($event)">⠿</span>
                                 {{ g.name }}
                                 <pv-button @click="packagePage.openVmGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
                                 <pv-button @click="packagePage.deleteVmGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
@@ -35,22 +36,25 @@
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
-                                    <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
+                                    <tr><th class="drag-handle-th"></th><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody @dragover="packagePage.handleContainerDragOver($event, 'vm')" @drop="packagePage.handleDropOnContainer($event, 'vm')">
                                     <tr v-for="p in packagePage.vmPackages.value" :key="p.id"
-                                        draggable="true"
                                         :data-drag-id="p.id" data-drag-type="vm"
                                         :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id && packagePage.dragState.draggingType === 'vm' }"
-                                        @dragstart="packagePage.handleDragStart($event, p.id, 'vm')"
                                         @dragover="packagePage.handleDragOver($event, p.id, 'vm')"
                                         @dragleave="packagePage.handleDragLeave($event, p.id)"
-                                        @drop="packagePage.handleDrop($event, p.id, 'vm')"
-                                        @dragend="packagePage.handleDragEnd()"
-                                        @touchstart="packagePage.handleTouchStart($event, p.id, 'vm')"
-                                        @touchmove="packagePage.handleTouchMove($event)"
-                                        @touchend="packagePage.handleTouchEnd($event)"
-                                        @touchcancel="packagePage.handleTouchEnd($event)">
+                                        @drop="packagePage.handleDrop($event, p.id, 'vm')">
+                                        <td class="drag-handle-cell">
+                                            <span class="drag-handle"
+                                                draggable="true"
+                                                @dragstart="packagePage.handleDragStart($event, p.id, 'vm')"
+                                                @dragend="packagePage.handleDragEnd()"
+                                                @touchstart="packagePage.handleTouchStart($event, p.id, 'vm')"
+                                                @touchmove="packagePage.handleTouchMove($event)"
+                                                @touchend="packagePage.handleTouchEnd($event)"
+                                                @touchcancel="packagePage.handleTouchEnd($event)">⠿</span>
+                                        </td>
                                         <td>{{ p.id }}</td>
                                         <td>{{ p.name }}</td>
                                         <td>{{ p.group_name || '-' }}</td>
@@ -93,18 +97,19 @@
                         <div v-if="packagePage.lxcPackageGroups.value.length > 0" class="mb-3 group-badges-container" @dragover="packagePage.handleContainerDragOver($event, 'group-lxc')" @drop="packagePage.handleDropOnContainer($event, 'group-lxc')">
                             <span v-for="g in packagePage.lxcPackageGroups.value" :key="g.id"
                                 class="badge bg-info me-2 mb-1 group-badge-draggable"
-                                draggable="true"
                                 :data-drag-id="g.id" data-drag-type="group-lxc"
                                 :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id && packagePage.dragState.draggingType === 'group-lxc' }"
-                                @dragstart="packagePage.handleDragStart($event, g.id, 'group-lxc')"
                                 @dragover="packagePage.handleDragOver($event, g.id, 'group-lxc')"
                                 @dragleave="packagePage.handleDragLeave($event, g.id)"
-                                @drop="packagePage.handleDrop($event, g.id, 'group-lxc')"
-                                @dragend="packagePage.handleDragEnd()"
-                                @touchstart="packagePage.handleTouchStart($event, g.id, 'group-lxc')"
-                                @touchmove="packagePage.handleTouchMove($event)"
-                                @touchend="packagePage.handleTouchEnd($event)"
-                                @touchcancel="packagePage.handleTouchEnd($event)">
+                                @drop="packagePage.handleDrop($event, g.id, 'group-lxc')">
+                                <span class="drag-handle"
+                                    draggable="true"
+                                    @dragstart="packagePage.handleDragStart($event, g.id, 'group-lxc')"
+                                    @dragend="packagePage.handleDragEnd()"
+                                    @touchstart="packagePage.handleTouchStart($event, g.id, 'group-lxc')"
+                                    @touchmove="packagePage.handleTouchMove($event)"
+                                    @touchend="packagePage.handleTouchEnd($event)"
+                                    @touchcancel="packagePage.handleTouchEnd($event)">⠿</span>
                                 {{ g.name }}
                                 <pv-button @click="packagePage.openLxcGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
                                 <pv-button @click="packagePage.deleteLxcGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
@@ -113,22 +118,25 @@
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
-                                    <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
+                                    <tr><th class="drag-handle-th"></th><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
                                 <tbody @dragover="packagePage.handleContainerDragOver($event, 'lxc')" @drop="packagePage.handleDropOnContainer($event, 'lxc')">
                                     <tr v-for="p in packagePage.lxcPackages.value" :key="p.id"
-                                        draggable="true"
                                         :data-drag-id="p.id" data-drag-type="lxc"
                                         :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id && packagePage.dragState.draggingType === 'lxc' }"
-                                        @dragstart="packagePage.handleDragStart($event, p.id, 'lxc')"
                                         @dragover="packagePage.handleDragOver($event, p.id, 'lxc')"
                                         @dragleave="packagePage.handleDragLeave($event, p.id)"
-                                        @drop="packagePage.handleDrop($event, p.id, 'lxc')"
-                                        @dragend="packagePage.handleDragEnd()"
-                                        @touchstart="packagePage.handleTouchStart($event, p.id, 'lxc')"
-                                        @touchmove="packagePage.handleTouchMove($event)"
-                                        @touchend="packagePage.handleTouchEnd($event)"
-                                        @touchcancel="packagePage.handleTouchEnd($event)">
+                                        @drop="packagePage.handleDrop($event, p.id, 'lxc')">
+                                        <td class="drag-handle-cell">
+                                            <span class="drag-handle"
+                                                draggable="true"
+                                                @dragstart="packagePage.handleDragStart($event, p.id, 'lxc')"
+                                                @dragend="packagePage.handleDragEnd()"
+                                                @touchstart="packagePage.handleTouchStart($event, p.id, 'lxc')"
+                                                @touchmove="packagePage.handleTouchMove($event)"
+                                                @touchend="packagePage.handleTouchEnd($event)"
+                                                @touchcancel="packagePage.handleTouchEnd($event)">⠿</span>
+                                        </td>
                                         <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ p.group_name || '-' }}</td><td><span v-if="p.template_name">{{ p.template_name }}</span><span v-else class="text-secondary">模板已删除</span></td>
                                         <td>{{ p.cores }}核</td><td>{{ p.memory }}MB</td><td>{{ p.swap }}MB</td><td>{{ p.disk_size }}GB</td>
                                         <td>{{ p.monthly_price }}元</td><td>{{ p.quarterly_discount || 0 }}%</td><td>{{ p.yearly_discount || 0 }}%</td>
