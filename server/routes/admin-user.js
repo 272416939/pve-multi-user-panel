@@ -6,6 +6,7 @@ const db = require('../api/db');
 const { authMiddleware, adminMiddleware, invalidateUserActiveCache } = require('../middleware/auth');
 const cacheStore = require('../utils/cache-store');
 const { isUsernameBlacklisted } = require('../utils/username-blacklist');
+const { generateOrderNo } = require('../utils/order-utils');
 // 用户列表缓存（30s TTL，低频变更场景）
 const userListCache = cacheStore.create('admin_users', 30);
 
@@ -228,9 +229,7 @@ router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, 
         // PAY-6 修复：原子余额增量更新
         await db.users.incrementBalance(userId, amount);
 
-        var now = new Date();
-        var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-        var orderNo = 'ADMIN_RECHARGE_' + dateStr + '_' + crypto.randomBytes(4).toString('hex');
+        var orderNo = generateOrderNo('syspay');
 
         await db.transactionRecords.create({
             user_id: userId, order_no: orderNo, pay_time: db.now(),

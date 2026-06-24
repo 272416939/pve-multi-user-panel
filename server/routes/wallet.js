@@ -6,7 +6,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createPayClient, generateOrderId } = require('../sdk/pay');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const dbg = require('../utils/debug');
-const { getPeriodMonths, calculateAmount } = require('../utils/order-utils');
+const { getPeriodMonths, calculateAmount, generateOrderNo } = require('../utils/order-utils');
 const pveApi = require('../api/pve-api');
 
 function safeError(e) {
@@ -139,7 +139,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         
         if (!pid) return res.status(400).json({ error: '支付接口未配置，请联系管理员' });
         
-        var orderNo = generateOrderId('RECHARGE');
+        var orderNo = generateOrderNo(pay_method);
         var siteUrl = process.env.SITE_URL || baseUrl;
         var notifyUrl = siteUrl.replace(/\/+$/, '') + '/api/wallet/notify';
         var returnUrl = siteUrl.replace(/\/+$/, '') + '/user-center';
@@ -478,8 +478,8 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
     try {
         var orderNo = req.params.order_no;
 
-        // 订单号格式校验：RECHARGE_<base36时间戳>_<12位hex随机>
-        if (!/^RECHARGE_[a-z0-9]+_[a-f0-9]{12}$/.test(orderNo)) {
+        // 订单号格式校验：ZFB/WX 前缀 + 12位时间 + 8位随机数字
+        if (!/^(ZFB|WX)[0-9]{20}$/.test(orderNo)) {
             return res.status(400).json({ error: '无效的订单号格式' });
         }
 

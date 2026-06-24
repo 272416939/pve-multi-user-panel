@@ -7,7 +7,7 @@ var ikuaiApi = require('../api/ikuai-api');
 var { generateVmName, generateLxcName } = require('../utils/random-name');
 var { createDhcpStaticBinding, removeDhcpStaticBinding } = require('../services/dhcp');
 var { createEmailTemplate, sendEmail } = require('../utils/email');
-var { calculateAmount, deductBalance, setVmAffinity } = require('../utils/order-utils');
+var { calculateAmount, deductBalance, setVmAffinity, generateOrderNo } = require('../utils/order-utils');
 var { execSSHWithStdin } = require('../api/ssh-exec');
 var crypto = require('crypto');
 var cacheStore = require('../utils/cache-store');
@@ -113,10 +113,27 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
         var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
-        await deductBalance(userId, totalAmount, db);
+        var balResult = await deductBalance(userId, totalAmount, db);
 
         var randomName = generateVmName();
         var newVmid = await pveApi.getNextAvailableVmid();
+
+        // 下单即生成订单与扣款流水（先扣款后开通，失败退款）
+        var orderNo = generateOrderNo('vm');
+        await db.orders.create({
+            order_no: orderNo, user_id: userId, type: 'vm', package_id: pkg.id,
+            template_id: template.id, period: period, period_count: period_count,
+            amount: totalAmount, cores: template.cores, memory: template.memory,
+            disk_size: template.disk_size, resource_name: randomName, resource_id: String(newVmid),
+            mac_group_id: finalMacGroupId || '', status: 'pending'
+        });
+        await db.transactionRecords.create({
+            user_id: userId, order_no: orderNo, pay_time: db.now(),
+            pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
+            balance_before: balResult.balanceBefore, balance_after: balResult.balanceAfter,
+            period: period, period_count: period_count,
+            trade_no: '', api_trade_no: ''
+        });
 
         // 检查模板 VM 状态，full clone 需要模板处于停止状态
         try {
@@ -129,85 +146,90 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             console.error('[package] 检查模板 VM 状态失败:', statusErr.message);
         }
 
-        var upid = await pveApi.cloneVm(template.template_vmid, newVmid, {
-            name: randomName,
-            storage: template.target_storage || undefined,
-            clone_mode: template.clone_mode || 'full'
-        });
-
-        // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪
-        var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
-        var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
-        var newVm = await db.vms.create({
-            vm_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
-            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
-            monthly_price: String(pkg.monthly_price || ''),
-            quarterly_discount: String(pkg.quarterly_discount || ''),
-            yearly_discount: String(pkg.yearly_discount || ''),
-            pve_upid: upid
-        });
-
-        // 等待 clone 任务完成；失败则清理预创建记录并退款（订单/库存尚未创建，无需回滚）
+        var newVm = null;
         try {
+            var upid = await pveApi.cloneVm(template.template_vmid, newVmid, {
+                name: randomName,
+                storage: template.target_storage || undefined,
+                clone_mode: template.clone_mode || 'full'
+            });
+
+            // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪
+            var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
+            var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
+            newVm = await db.vms.create({
+                vm_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
+                renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
+                monthly_price: String(pkg.monthly_price || ''),
+                quarterly_discount: String(pkg.quarterly_discount || ''),
+                yearly_discount: String(pkg.yearly_discount || ''),
+                pve_upid: upid
+            });
+
+            // 等待 clone 任务完成
             await pveApi.waitForTask(upid);
-        } catch (taskErr) {
-            try { await db.vms.delete(newVm.id); } catch (e) {}
-            try { await db.users.incrementBalance(userId, totalAmount); } catch (e) {}
-            throw taskErr;
-        }
 
-        // 开通完成，清空 pve_upid（表示开通完成）
-        newVm = await db.vms.update(newVm.id, { pve_upid: '' });
+            // 开通完成，清空 pve_upid（表示开通完成）
+            newVm = await db.vms.update(newVm.id, { pve_upid: '' });
 
-        var vmUpdateCfg = { cores: template.cores, memory: template.memory };
-        if (template.ciuser) {
-            vmUpdateCfg.ciuser = template.ciuser;
-            vmUpdateCfg.cipassword = generateRandomPassword();
-        }
-        await pveApi.updateVmConfig(newVmid, vmUpdateCfg);
-
-        if (template.cpu_affinity) {
-            await setVmAffinity(newVmid, template.cpu_affinity);
-        }
-
-        if (finalMacGroupId) {
-            try {
-                var macCfg = await pveApi.getVmConfig(newVmid);
-                var vmac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
-                if (vmac) {
-                    await ikuaiApi.addMacToGroup(finalMacGroupId, vmac[0], randomName);
-                    await db.vms.update(newVm.id, { ikuai_mac_group_id: finalMacGroupId });
-                }
-            } catch (macErr) { console.error('[package] VM MAC sync failed:', macErr.message); }
-        }
-
-        // DHCP 静态绑定
-        try {
-            var dhcpMac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
-            if (dhcpMac) {
-                var dhcpIp = await createDhcpStaticBinding('vm', newVmid, dhcpMac[0], '');
-                if (dhcpIp) {
-                    await db.vms.update(newVm.id, { dhcp_static_ip: dhcpIp });
-                }
+            var vmUpdateCfg = { cores: template.cores, memory: template.memory };
+            if (template.ciuser) {
+                vmUpdateCfg.ciuser = template.ciuser;
+                vmUpdateCfg.cipassword = generateRandomPassword();
             }
-        } catch (dhcpErr) { console.error('[package] VM DHCP绑定失败:', dhcpErr.message); }
+            await pveApi.updateVmConfig(newVmid, vmUpdateCfg);
 
-        var now = new Date();
-        var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-        var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
-        await db.orders.create({
-            order_no: orderNo, user_id: userId, type: 'vm', package_id: pkg.id,
-            template_id: template.id, period: period, period_count: period_count,
-            amount: totalAmount, cores: template.cores, memory: template.memory,
-            disk_size: template.disk_size, resource_name: randomName, resource_id: String(newVmid),
-            mac_group_id: finalMacGroupId || ''
-        });
-        await db.transactionRecords.create({
-            user_id: userId, order_no: orderNo, pay_time: db.now(),
-            pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
-            period: period, period_count: period_count,
-            trade_no: '', api_trade_no: ''
-        });
+            if (template.cpu_affinity) {
+                await setVmAffinity(newVmid, template.cpu_affinity);
+            }
+
+            if (finalMacGroupId) {
+                try {
+                    var macCfg = await pveApi.getVmConfig(newVmid);
+                    var vmac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
+                    if (vmac) {
+                        await ikuaiApi.addMacToGroup(finalMacGroupId, vmac[0], randomName);
+                        await db.vms.update(newVm.id, { ikuai_mac_group_id: finalMacGroupId });
+                    }
+                } catch (macErr) { console.error('[package] VM MAC sync failed:', macErr.message); }
+            }
+
+            // DHCP 静态绑定
+            try {
+                var dhcpMac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
+                if (dhcpMac) {
+                    var dhcpIp = await createDhcpStaticBinding('vm', newVmid, dhcpMac[0], '');
+                    if (dhcpIp) {
+                        await db.vms.update(newVm.id, { dhcp_static_ip: dhcpIp });
+                    }
+                }
+            } catch (dhcpErr) { console.error('[package] VM DHCP绑定失败:', dhcpErr.message); }
+        } catch (provErr) {
+            // 开通失败：清理预创建记录、退款、创建退款流水、订单标记 refunded、发送站内信
+            if (newVm) { try { await db.vms.delete(newVm.id); } catch (e) {} }
+            var refundUser = await db.users.incrementBalance(userId, totalAmount);
+            var balanceAfterRefund = parseFloat(refundUser.balance || '0');
+            var refundOrderNo = generateOrderNo('refund');
+            await db.transactionRecords.create({
+                user_id: userId, order_no: refundOrderNo, pay_time: db.now(),
+                pay_method: 'balance_refund', trade_type: 'refund', amount: totalAmount,
+                balance_before: balanceAfterRefund - totalAmount, balance_after: balanceAfterRefund,
+                period: period, period_count: period_count,
+                trade_no: orderNo, api_trade_no: ''
+            });
+            try { await db.orders.updateStatus(orderNo, 'refunded'); } catch (e) {}
+            try {
+                await db.messages.create({
+                    uid: userId, title: '虚拟机开通失败',
+                    content: '非常抱歉，您订购的虚拟机 ' + randomName + ' 开通失败，钱款已原路返回。\n订单号：' + orderNo + '\n退款金额：¥' + totalAmount + '\n如有疑问请联系客服。',
+                    type: 1, is_read: 0, send_type: 1
+                });
+            } catch (e) { console.error('[package] VM 开通失败通知发送失败', e); }
+            throw provErr;
+        }
+
+        // 开通成功，订单标记完成
+        try { await db.orders.updateStatus(orderNo, 'completed'); } catch (e) {}
 
         // 增加已售数量，并扣减剩余库存（-1 不限量不扣减）
         try {
@@ -304,107 +326,129 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
         var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
-        await deductBalance(userId, totalAmount, db);
+        var balResult = await deductBalance(userId, totalAmount, db);
 
         var randomName = generateLxcName();
         var newVmid = await pveApi.getNextAvailableVmid();
 
-        var lxcResp = await pveApi.createLxc({
-            vmid: String(newVmid), ostemplate: template.ostemplate,
-            storage: template.storage || 'local', hostname: randomName,
-            cores: template.cores, memory: template.memory, swap: template.swap,
-            rootfs: (template.rootfs_storage || template.storage || 'local-lvm') + ':' + (template.disk_size),
-            net0: (function(){
-                var n = 'name=eth0,bridge=' + (template.network_bridge || 'vmbr0');
-                if (template.network_mode === 'dhcp') {
-                    n += ',ip=dhcp';
-                } else if (template.ip4_addr) {
-                    n += ',ip=' + template.ip4_addr;
-                }
-                if (template.ipv6_enabled != 0) {
-                    if (template.ip6_mode === 'dhcp') {
-                        n += ',ip6=dhcp';
-                    } else if (template.ip6_mode === 'static' && template.ip6_addr) {
-                        n += ',ip6=' + template.ip6_addr;
-                    }
-                }
-                return n;
-            })(),
-            unprivileged: template.unprivileged !== undefined ? template.unprivileged : 1,
-            features: template.features || '', start: 0
-        });
-        // createLxc 返回 response.data，PVE 创建接口返回 { data: upid }
-        var lxcUpid = (lxcResp && lxcResp.data) ? lxcResp.data : lxcResp;
-
-        var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
-        var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
-
-        // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪
-        var newCt = await db.lxcContainers.create({
-            ct_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
-            renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
-            pve_upid: lxcUpid
-        });
-
-        // 等待 LXC 创建任务完成；失败则清理预创建记录并退款（订单/库存尚未创建，无需回滚）
-        try {
-            await pveApi.waitForTask(lxcUpid);
-        } catch (taskErr) {
-            try { await db.lxcContainers.delete(newCt.id); } catch (e) {}
-            try { await db.users.incrementBalance(userId, totalAmount); } catch (e) {}
-            throw taskErr;
-        }
-
-        // 开通完成，清空 pve_upid（表示开通完成）
-        newCt = await db.lxcContainers.update(newCt.id, { pve_upid: '' });
-
-        if (finalMacGroupId) {
-            try {
-                // LXC 刚创建时 config.net0 可能不含 MAC，先启动再获取
-                var lxcStatus = await pveApi.getLxcStatus(newVmid);
-                var needStart = lxcStatus && lxcStatus.status === 'stopped';
-                if (needStart) {
-                    await pveApi.startLxc(newVmid);
-                    // 等待 PVE 分配 MAC
-                    await new Promise(function(r) { setTimeout(r, 3000); });
-                }
-                var lxcCfg = await pveApi.getLxcConfig(newVmid);
-                var lmac = lxcCfg && lxcCfg.net0 ? lxcCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
-                if (lmac) {
-                    await ikuaiApi.addMacToGroup(finalMacGroupId, lmac[0], randomName);
-                    await db.lxcContainers.update(newCt.id, { ikuai_mac_group_id: finalMacGroupId });
-                }
-            } catch (macErr) { console.error('[package] LXC MAC sync failed:', macErr.message); }
-        }
-
-        // DHCP 静态绑定
-        try {
-            var lxcDhcpCfg = await pveApi.getLxcConfig(newVmid);
-            var dhcpLxcMac = lxcDhcpCfg && lxcDhcpCfg.net0 ? lxcDhcpCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
-            if (dhcpLxcMac) {
-                var dhcpLxcIp = await createDhcpStaticBinding('lxc', newVmid, dhcpLxcMac[0], '');
-                if (dhcpLxcIp) {
-                    await db.lxcContainers.update(newCt.id, { dhcp_static_ip: dhcpLxcIp });
-                }
-            }
-        } catch (dhcpErr) { console.error('[package] LXC DHCP绑定失败:', dhcpErr.message); }
-
-        var now = new Date();
-        var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-        var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
+        // 下单即生成订单与扣款流水（先扣款后开通，失败退款）
+        var orderNo = generateOrderNo('lxc');
         await db.orders.create({
             order_no: orderNo, user_id: userId, type: 'lxc', package_id: pkg.id,
             template_id: template.id, period: period, period_count: period_count,
             amount: totalAmount, cores: template.cores, memory: template.memory,
             disk_size: template.disk_size, resource_name: randomName, resource_id: String(newVmid),
-            mac_group_id: finalMacGroupId || ''
+            mac_group_id: finalMacGroupId || '', status: 'pending'
         });
         await db.transactionRecords.create({
             user_id: userId, order_no: orderNo, pay_time: db.now(),
             pay_method: 'balance', trade_type: 'new_order', amount: totalAmount,
+            balance_before: balResult.balanceBefore, balance_after: balResult.balanceAfter,
             period: period, period_count: period_count,
             trade_no: '', api_trade_no: ''
         });
+
+        var newCt = null;
+        try {
+            var lxcResp = await pveApi.createLxc({
+                vmid: String(newVmid), ostemplate: template.ostemplate,
+                storage: template.storage || 'local', hostname: randomName,
+                cores: template.cores, memory: template.memory, swap: template.swap,
+                rootfs: (template.rootfs_storage || template.storage || 'local-lvm') + ':' + (template.disk_size),
+                net0: (function(){
+                    var n = 'name=eth0,bridge=' + (template.network_bridge || 'vmbr0');
+                    if (template.network_mode === 'dhcp') {
+                        n += ',ip=dhcp';
+                    } else if (template.ip4_addr) {
+                        n += ',ip=' + template.ip4_addr;
+                    }
+                    if (template.ipv6_enabled != 0) {
+                        if (template.ip6_mode === 'dhcp') {
+                            n += ',ip6=dhcp';
+                        } else if (template.ip6_mode === 'static' && template.ip6_addr) {
+                            n += ',ip6=' + template.ip6_addr;
+                        }
+                    }
+                    return n;
+                })(),
+                unprivileged: template.unprivileged !== undefined ? template.unprivileged : 1,
+                features: template.features || '', start: 0
+            });
+            // createLxc 返回 response.data，PVE 创建接口返回 { data: upid }
+            var lxcUpid = (lxcResp && lxcResp.data) ? lxcResp.data : lxcResp;
+
+            var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
+            var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
+
+            // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪
+            newCt = await db.lxcContainers.create({
+                ct_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
+                renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
+                pve_upid: lxcUpid
+            });
+
+            // 等待 LXC 创建任务完成
+            await pveApi.waitForTask(lxcUpid);
+
+            // 开通完成，清空 pve_upid（表示开通完成）
+            newCt = await db.lxcContainers.update(newCt.id, { pve_upid: '' });
+
+            if (finalMacGroupId) {
+                try {
+                    // LXC 刚创建时 config.net0 可能不含 MAC，先启动再获取
+                    var lxcStatus = await pveApi.getLxcStatus(newVmid);
+                    var needStart = lxcStatus && lxcStatus.status === 'stopped';
+                    if (needStart) {
+                        await pveApi.startLxc(newVmid);
+                        // 等待 PVE 分配 MAC
+                        await new Promise(function(r) { setTimeout(r, 3000); });
+                    }
+                    var lxcCfg = await pveApi.getLxcConfig(newVmid);
+                    var lmac = lxcCfg && lxcCfg.net0 ? lxcCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
+                    if (lmac) {
+                        await ikuaiApi.addMacToGroup(finalMacGroupId, lmac[0], randomName);
+                        await db.lxcContainers.update(newCt.id, { ikuai_mac_group_id: finalMacGroupId });
+                    }
+                } catch (macErr) { console.error('[package] LXC MAC sync failed:', macErr.message); }
+            }
+
+            // DHCP 静态绑定
+            try {
+                var lxcDhcpCfg = await pveApi.getLxcConfig(newVmid);
+                var dhcpLxcMac = lxcDhcpCfg && lxcDhcpCfg.net0 ? lxcDhcpCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
+                if (dhcpLxcMac) {
+                    var dhcpLxcIp = await createDhcpStaticBinding('lxc', newVmid, dhcpLxcMac[0], '');
+                    if (dhcpLxcIp) {
+                        await db.lxcContainers.update(newCt.id, { dhcp_static_ip: dhcpLxcIp });
+                    }
+                }
+            } catch (dhcpErr) { console.error('[package] LXC DHCP绑定失败:', dhcpErr.message); }
+        } catch (provErr) {
+            // 开通失败：清理预创建记录、退款、创建退款流水、订单标记 refunded、发送站内信
+            if (newCt) { try { await db.lxcContainers.delete(newCt.id); } catch (e) {} }
+            var refundUser = await db.users.incrementBalance(userId, totalAmount);
+            var balanceAfterRefund = parseFloat(refundUser.balance || '0');
+            var refundOrderNo = generateOrderNo('refund');
+            await db.transactionRecords.create({
+                user_id: userId, order_no: refundOrderNo, pay_time: db.now(),
+                pay_method: 'balance_refund', trade_type: 'refund', amount: totalAmount,
+                balance_before: balanceAfterRefund - totalAmount, balance_after: balanceAfterRefund,
+                period: period, period_count: period_count,
+                trade_no: orderNo, api_trade_no: ''
+            });
+            try { await db.orders.updateStatus(orderNo, 'refunded'); } catch (e) {}
+            try {
+                await db.messages.create({
+                    uid: userId, title: '容器开通失败',
+                    content: '非常抱歉，您订购的容器 ' + randomName + ' 开通失败，钱款已原路返回。\n订单号：' + orderNo + '\n退款金额：¥' + totalAmount + '\n如有疑问请联系客服。',
+                    type: 1, is_read: 0, send_type: 1
+                });
+            } catch (e) { console.error('[package] LXC 开通失败通知发送失败', e); }
+            throw provErr;
+        }
+
+        // 开通成功，订单标记完成
+        try { await db.orders.updateStatus(orderNo, 'completed'); } catch (e) {}
 
         // 增加已售数量，并扣减剩余库存（-1 不限量不扣减）
         try {
@@ -613,9 +657,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         }
 
         // 生成订单号
-        var now = new Date();
-        var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-        var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
+        var orderNo = generateOrderNo('vm');
         var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
         // 写入 orders 表
         await db.orders.create({
@@ -825,9 +867,7 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         }
 
         // 生成订单号
-        var now = new Date();
-        var dateStr = now.getFullYear() + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0');
-        var orderNo = 'ORDER_' + dateStr + '_' + String(Math.floor(Math.random() * 900000 + 100000));
+        var orderNo = generateOrderNo('lxc');
         var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
         // 写入 orders 表
         await db.orders.create({

@@ -3,6 +3,7 @@ const { checkExpiredVms, checkExpiredLxc, loadSentRemindersFromDb } = require('.
 const { resumeRunningBackups, resumeRunningLxcBackups } = require('../services/backup-polling');
 const { syncPortForwardsFromIkuai } = require('../services/ikuai-sync');
 const ikuaiApi = require('../api/ikuai-api');
+const { generateOrderNo } = require('../utils/order-utils');
 
 // SEC-05: 启动时恢复因服务器崩溃导致的开通中孤儿记录
 // 扫描 pve_upid 非空的记录，查询 PVE 真实任务状态并做善后处理
@@ -39,13 +40,47 @@ async function recoverProvisioningTasks() {
                 } else {
                     // 任务失败：PVE 中资源未创建成功，删除 DB 预创建记录
                     console.warn('[recovery] ' + type + ' ' + record.id + ' (upid=' + record.pve_upid + ') 开通任务失败(exitstatus=' + status.exitstatus + ')，删除预创建记录');
+                    var resourceId = type === 'vm' ? record.vm_id : record.ct_id;
                     if (type === 'vm') {
                         await db.vms.delete(record.id);
                     } else {
                         await db.lxcContainers.delete(record.id);
                     }
-                    // 退款（从 renewal_price 推算月价再按周期还原，仅作为兜底）
-                    console.warn('[recovery] ' + type + ' ' + record.id + ' 用户 ' + record.user_id + ' 需手动核实退款');
+                    // 退款：查找关联的 pending 订单获取退款金额，创建退款流水并退还余额
+                    try {
+                        var pendingOrders = await db.orders.getByUser(record.user_id, { type: type, status: 'pending', limit: 50 });
+                        var matchedOrder = null;
+                        if (pendingOrders && pendingOrders.rows) {
+                            matchedOrder = pendingOrders.rows.find(function(o) { return o.resource_id === String(resourceId); });
+                        }
+                        if (matchedOrder) {
+                            var refundAmount = parseFloat(matchedOrder.amount);
+                            if (refundAmount > 0) {
+                                var refundUser = await db.users.incrementBalance(record.user_id, refundAmount);
+                                var balanceAfterRefund = parseFloat(refundUser.balance || '0');
+                                var refundOrderNo = generateOrderNo('refund');
+                                await db.transactionRecords.create({
+                                    user_id: record.user_id, order_no: refundOrderNo, pay_time: db.now(),
+                                    pay_method: 'balance_refund', trade_type: 'refund', amount: refundAmount,
+                                    balance_before: balanceAfterRefund - refundAmount, balance_after: balanceAfterRefund,
+                                    trade_no: matchedOrder.order_no, api_trade_no: ''
+                                });
+                                try { await db.orders.updateStatus(matchedOrder.order_no, 'refunded'); } catch (e) {}
+                                console.warn('[recovery] ' + type + ' ' + record.id + ' 已退款 ¥' + refundAmount + '，订单 ' + matchedOrder.order_no + ' 标记 refunded');
+                            }
+                        } else {
+                            console.warn('[recovery] ' + type + ' ' + record.id + ' 未找到关联 pending 订单，需手动核实退款');
+                        }
+                        // 发送开通失败站内信
+                        try {
+                            await db.messages.create({
+                                uid: record.user_id,
+                                title: type === 'vm' ? '虚拟机开通失败' : '容器开通失败',
+                                content: '非常抱歉，您订购的' + (type === 'vm' ? '虚拟机' : '容器') + ' ' + (record.name || '') + ' 开通失败，钱款已原路返回。如有疑问请联系客服。',
+                                type: 1, is_read: 0, send_type: 1
+                            });
+                        } catch (e) { console.error('[recovery] 失败通知发送失败', e); }
+                    } catch (e) { console.error('[recovery] ' + type + ' ' + record.id + ' 退款处理失败:', e.message); }
                 }
             } else {
                 console.log('[recovery] ' + type + ' ' + record.id + ' (upid=' + record.pve_upid + ') 任务仍在运行，前端将继续轮询');

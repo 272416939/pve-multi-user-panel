@@ -1,3 +1,5 @@
+var crypto = require('crypto');
+
 function getPeriodMonths(period) {
   if (period === 'quarter') return 3;
   if (period === 'year') return 12;
@@ -19,13 +21,13 @@ function calculateAmount(monthlyPrice, period, periodCount, quarterlyDiscount, y
 async function deductBalance(userId, amount, dbInstance) {
   if (amount <= 0) throw new Error('扣款金额必须大于0');
   var user = await dbInstance.users.getById(userId);
-  var balance = parseFloat(user.balance || '0');
-  if (balance < amount) {
+  var balanceBefore = parseFloat(user.balance || '0');
+  if (balanceBefore < amount) {
     throw new Error('余额不足');
   }
-  // PAY-6 修复：原子余额扣减，避免 read-modify-write 竞态
   var updatedUser = await dbInstance.users.incrementBalance(userId, -amount);
-  return parseFloat(updatedUser.balance || '0');
+  var balanceAfter = parseFloat(updatedUser.balance || '0');
+  return { balanceBefore: balanceBefore, balanceAfter: balanceAfter };
 }
 
 async function setVmAffinity(vmid, affinityValue) {
@@ -49,4 +51,23 @@ async function setVmAffinity(vmid, affinityValue) {
   return result;
 }
 
-module.exports = { getPeriodMonths, calculateAmount, deductBalance, setVmAffinity };
+/**
+ * 统一订单号生成：{前缀}{YYYYMMDDHHmm}{8位随机数字}
+ * @param {string} category - vm(KTVM)/lxc(KTLXC)/refund(TK)/alipay(ZFB)/wxpay(WX)/syspay(SYSPAY)
+ * @returns {string} 订单号
+ */
+function generateOrderNo(category) {
+    var prefixes = { vm: 'KTVM', lxc: 'KTLXC', refund: 'TK', alipay: 'ZFB', wxpay: 'WX', syspay: 'SYSPAY' };
+    var prefix = prefixes[category];
+    if (!prefix) throw new Error('未知的订单类别: ' + category);
+    var now = new Date();
+    var ts = String(now.getFullYear()) +
+        String(now.getMonth() + 1).padStart(2, '0') +
+        String(now.getDate()).padStart(2, '0') +
+        String(now.getHours()).padStart(2, '0') +
+        String(now.getMinutes()).padStart(2, '0');
+    var rand = String(crypto.randomBytes(4).readUInt32BE(0) % 100000000).padStart(8, '0');
+    return prefix + ts + rand;
+}
+
+module.exports = { getPeriodMonths, calculateAmount, deductBalance, setVmAffinity, generateOrderNo };

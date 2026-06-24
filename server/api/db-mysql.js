@@ -1764,6 +1764,7 @@ module.exports = {
             return { rows, total: totalRow.total, page, limit };
         },
         getByOrderNo: (orderNo) => queryOne('SELECT * FROM orders WHERE order_no = ?', [orderNo]),
+        updateStatus: (orderNo, status) => execute('UPDATE orders SET `status` = ? WHERE order_no = ?', [status, orderNo]),
     },
 
     // VM 模板操作

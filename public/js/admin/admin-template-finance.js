@@ -24,6 +24,9 @@
                                     <option value="alipay">支付宝</option>
                                     <option value="wxpay">微信支付</option>
                                     <option value="balance">余额抵扣</option>
+                                    <option value="balance_refund">余额退款</option>
+                                    <option value="alipay_refund">支付宝退款</option>
+                                    <option value="wxpay_refund">微信退款</option>
                                 </select>
                             </div>
                             <div class="col-md-2">
@@ -66,7 +69,7 @@
                                     <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method === 'manual' ? '系统' : tx.pay_method }}</td>
                                     <td><code style="font-size:11px;">{{ tx.order_no }}</code></td>
                                     <td><code style="font-size:11px;">{{ tx.trade_no || '-' }}</code></td>
-                                    <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : 'badge badge-renewal'" :style="tx.trade_type !== 'recharge' && tx.trade_type !== 'admin_recharge' && tx.trade_type !== 'new_order' ? 'background:#0d9488;color:#fff' : ''">{{ tx.trade_type === 'recharge' ? '余额充值' : tx.trade_type === 'admin_recharge' ? '后台充值' : tx.trade_type === 'new_order' ? '新购服务器' : '服务器续费' }}</span></td>
+                                    <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'refund' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : 'badge badge-renewal'" :style="tx.trade_type !== 'recharge' && tx.trade_type !== 'admin_recharge' && tx.trade_type !== 'refund' && tx.trade_type !== 'new_order' ? 'background:#0d9488;color:#fff' : ''">{{ tx.trade_type === 'recharge' ? '余额充值' : tx.trade_type === 'admin_recharge' ? '后台充值' : tx.trade_type === 'refund' ? '订单退款' : tx.trade_type === 'new_order' ? '新购服务器' : '服务器续费' }}</span></td>
                                     <td>¥{{ tx.amount }}</td>
                                 </tr>
                                 <tr v-if="!transactionList || transactionList.length === 0">
