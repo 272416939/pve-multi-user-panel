@@ -91,8 +91,10 @@
                                         <td>{{ g.name }}</td>
                                         <td>{{ packagePage.vmPackages.value.filter(p => p.group_id === g.id).length }}</td>
                                         <td>
-                                            <pv-button @click="packagePage.openVmGroupForm(g)" size="sm" variant="outline">编辑</pv-button>
-                                            <pv-button @click="packagePage.deleteVmGroup(g.id)" size="sm" variant="outline-danger">删除</pv-button>
+                                            <div class="btn-group btn-group-sm">
+                                                <pv-button @click="packagePage.openVmGroupForm(g)" variant="outline">编辑</pv-button>
+                                                <pv-button @click="packagePage.deleteVmGroup(g.id)" variant="outline">删除</pv-button>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -178,8 +180,10 @@
                                         <td>{{ g.name }}</td>
                                         <td>{{ packagePage.lxcPackages.value.filter(p => p.group_id === g.id).length }}</td>
                                         <td>
-                                            <pv-button @click="packagePage.openLxcGroupForm(g)" size="sm" variant="outline">编辑</pv-button>
-                                            <pv-button @click="packagePage.deleteLxcGroup(g.id)" size="sm" variant="outline-danger">删除</pv-button>
+                                            <div class="btn-group btn-group-sm">
+                                                <pv-button @click="packagePage.openLxcGroupForm(g)" variant="outline">编辑</pv-button>
+                                                <pv-button @click="packagePage.deleteLxcGroup(g.id)" variant="outline">删除</pv-button>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
