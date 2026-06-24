@@ -256,6 +256,14 @@
     $.handleDragOver = function(e, id) {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        // 类型隔离：id 必须属于当前 dragType 的列表，否则只 preventDefault 不污染状态
+        var dragType = $.dragState.dragType;
+        var dragList = $.getDragList(dragType);
+        var idBelongsToType = false;
+        for (var bi = 0; bi < dragList.length; bi++) {
+            if (dragList[bi].id === id) { idBelongsToType = true; break; }
+        }
+        if (!idBelongsToType) return;
         // 始终记录最后经过的目标 id（包括拖拽行自身），供容器兜底使用
         $.dragState.dragOverId = id;
         if ($.dragState.draggingId === id) return;
@@ -280,7 +288,6 @@
         var fromIndex = $.dragState.dragFromIndex;
         // 直接操作 DOM 设置 transform（绕过 Vue 响应式，避免拖拽期间渲染节流）
         // 找到当前拖拽元素和目标元素的 DOM 节点
-        var dragType = $.dragState.dragType;
         var containerSelector = (dragType === 'vm' || dragType === 'lxc') ? 'tbody' : '.mb-3';
         var container = e.currentTarget.closest(containerSelector);
         if (!container) {
@@ -329,11 +336,11 @@
 
     $.handleDrop = async function(e, targetId, type) {
         e.preventDefault();
-        e.stopPropagation();
         var sourceId = $.dragState.draggingId;
         var dragType = $.dragState.dragType;
+        if (sourceId == null) return;
         $.clearAvoidClasses();
-        if (sourceId == null || sourceId === targetId || dragType !== type) {
+        if (sourceId === targetId || dragType !== type) {
             $.handleDragEnd();
             return;
         }
@@ -347,8 +354,13 @@
         }
         newOrder.splice(fromIdx, 1);
         newOrder.splice(toIdx, 0, sourceId);
+        // 异步操作前立即清空拖拽状态，防止容器冒泡 drop 重复处理，并避免 dragend 竞态
+        $.dragState.draggingId = null;
+        $.dragState.dragOverId = null;
+        $.dragState.dragType = null;
+        $.dragState.dragFromIndex = -1;
         await $.saveReorder(type, newOrder);
-        $.handleDragEnd();
+        $.clearAvoidClasses();
     };
 
     // 容器兜底：当 drop 落在行间空隙（非 tr 元素）时，使用最后经过的目标 id
@@ -367,6 +379,14 @@
         $.dragState.dragType = null;
         $.dragState.dragFromIndex = -1;
         $.clearAvoidClasses();
+        // 清理活动元素焦点和文本选区，防止残留状态干扰下次拖拽
+        try {
+            if (document.activeElement && document.activeElement !== document.body && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+            var sel = window.getSelection && window.getSelection();
+            if (sel && sel.removeAllRanges) sel.removeAllRanges();
+        } catch (ignore) {}
     };
 
     $.saveReorder = async function(type, ids) {

@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.17.3] - 2026-06-24
+
+### Fixed
+- fix(packages): 修复套餐行重复拖拽失效与分组拖拽污染套餐列表的问题
+  - handleDragOver 增加类型隔离校验，拖拽分组经过套餐行时不再污染 dragOverId
+  - handleDrop 移除 stopPropagation，异步操作前立即清空拖拽状态，避免 dragend 竞态导致重复拖拽失效
+  - handleDragEnd 清理活动元素焦点和文本选区，防止残留状态干扰下次 dragstart
+
 ## [2.17.2] - 2026-06-24
 
 ### Fixed
