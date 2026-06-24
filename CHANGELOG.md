@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.18.0] - 2026-06-24
+
+### Changed
+- refactor(packages): 拖拽排序改为纯鼠标事件实现，彻底绕过 HTML5 DnD 协议
+  - 移除 draggable/dragstart/dragover/drop/dragend，改用 mousedown/mousemove/mouseup
+  - 通过 document.elementFromPoint 检测悬停目标，data-drag-id/data-drag-type 标识
+  - 解决 HTML5 DnD 的 dragend 竞态、浏览器搜索文本弹窗、状态机卡死等问题
+  - 5px 移动阈值区分点击与拖拽，点击按钮/链接不触发拖拽
+
 ## [2.17.5] - 2026-06-24
 
 ### Fixed

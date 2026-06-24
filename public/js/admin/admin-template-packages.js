@@ -12,16 +12,12 @@
                             </div>
                         </div>
                         <!-- 分组列表 -->
-                        <div v-if="packagePage.vmPackageGroups.value.length > 0" class="mb-3" @dragover="packagePage.handleContainerDragOver($event, 'group-vm')" @drop="packagePage.handleDropOnContainer($event, 'group-vm')">
+                        <div v-if="packagePage.vmPackageGroups.value.length > 0" class="mb-3">
                             <span v-for="g in packagePage.vmPackageGroups.value" :key="g.id"
                                 class="badge bg-info me-2 group-badge-draggable"
-                                draggable="true"
+                                :data-drag-id="g.id" data-drag-type="group-vm"
                                 :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id }"
-                                @dragstart="packagePage.handleDragStart($event, g.id, 'group-vm')"
-                                @dragover="packagePage.handleDragOver($event, g.id, 'group-vm')"
-                                @dragleave="packagePage.handleDragLeave($event, g.id)"
-                                @drop="packagePage.handleDrop($event, g.id, 'group-vm')"
-                                @dragend="packagePage.handleDragEnd()">
+                                @mousedown="packagePage.handleMouseDown($event, g.id, 'group-vm')">
                                 {{ g.name }}
                                 <pv-button @click="packagePage.openVmGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
                                 <pv-button @click="packagePage.deleteVmGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
@@ -32,15 +28,11 @@
                                 <thead class="table-light">
                                     <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
-                                <tbody @dragover="packagePage.handleContainerDragOver($event, 'vm')" @drop="packagePage.handleDropOnContainer($event, 'vm')">
+                                <tbody>
                                     <tr v-for="p in packagePage.vmPackages.value" :key="p.id"
-                                        draggable="true"
+                                        :data-drag-id="p.id" data-drag-type="vm"
                                         :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id }"
-                                        @dragstart="packagePage.handleDragStart($event, p.id, 'vm')"
-                                        @dragover="packagePage.handleDragOver($event, p.id, 'vm')"
-                                        @dragleave="packagePage.handleDragLeave($event, p.id)"
-                                        @drop="packagePage.handleDrop($event, p.id, 'vm')"
-                                        @dragend="packagePage.handleDragEnd()">
+                                        @mousedown="packagePage.handleMouseDown($event, p.id, 'vm')">
                                         <td>{{ p.id }}</td>
                                         <td>{{ p.name }}</td>
                                         <td>{{ p.group_name || '-' }}</td>
@@ -80,16 +72,12 @@
                             </div>
                         </div>
                         <!-- 分组列表 -->
-                        <div v-if="packagePage.lxcPackageGroups.value.length > 0" class="mb-3" @dragover="packagePage.handleContainerDragOver($event, 'group-lxc')" @drop="packagePage.handleDropOnContainer($event, 'group-lxc')">
+                        <div v-if="packagePage.lxcPackageGroups.value.length > 0" class="mb-3">
                             <span v-for="g in packagePage.lxcPackageGroups.value" :key="g.id"
                                 class="badge bg-info me-2 group-badge-draggable"
-                                draggable="true"
+                                :data-drag-id="g.id" data-drag-type="group-lxc"
                                 :class="{ 'row-dragging': packagePage.dragState.draggingId === g.id }"
-                                @dragstart="packagePage.handleDragStart($event, g.id, 'group-lxc')"
-                                @dragover="packagePage.handleDragOver($event, g.id, 'group-lxc')"
-                                @dragleave="packagePage.handleDragLeave($event, g.id)"
-                                @drop="packagePage.handleDrop($event, g.id, 'group-lxc')"
-                                @dragend="packagePage.handleDragEnd()">
+                                @mousedown="packagePage.handleMouseDown($event, g.id, 'group-lxc')">
                                 {{ g.name }}
                                 <pv-button @click="packagePage.openLxcGroupForm(g)" size="sm" variant="link" class="text-white p-0 ms-1">编辑</pv-button>
                                 <pv-button @click="packagePage.deleteLxcGroup(g.id)" size="sm" variant="link" class="text-white p-0 ms-1">删除</pv-button>
@@ -100,15 +88,11 @@
                                 <thead class="table-light">
                                     <tr><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
-                                <tbody @dragover="packagePage.handleContainerDragOver($event, 'lxc')" @drop="packagePage.handleDropOnContainer($event, 'lxc')">
+                                <tbody>
                                     <tr v-for="p in packagePage.lxcPackages.value" :key="p.id"
-                                        draggable="true"
+                                        :data-drag-id="p.id" data-drag-type="lxc"
                                         :class="{ 'row-dragging': packagePage.dragState.draggingId === p.id }"
-                                        @dragstart="packagePage.handleDragStart($event, p.id, 'lxc')"
-                                        @dragover="packagePage.handleDragOver($event, p.id, 'lxc')"
-                                        @dragleave="packagePage.handleDragLeave($event, p.id)"
-                                        @drop="packagePage.handleDrop($event, p.id, 'lxc')"
-                                        @dragend="packagePage.handleDragEnd()">
+                                        @mousedown="packagePage.handleMouseDown($event, p.id, 'lxc')">
                                         <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ p.group_name || '-' }}</td><td><span v-if="p.template_name">{{ p.template_name }}</span><span v-else class="text-secondary">模板已删除</span></td>
                                         <td>{{ p.cores }}核</td><td>{{ p.memory }}MB</td><td>{{ p.swap }}MB</td><td>{{ p.disk_size }}GB</td>
                                         <td>{{ p.monthly_price }}元</td><td>{{ p.quarterly_discount || 0 }}%</td><td>{{ p.yearly_discount || 0 }}%</td>
