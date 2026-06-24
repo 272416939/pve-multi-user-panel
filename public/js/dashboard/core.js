@@ -979,11 +979,19 @@
     $.__startProvisioningPoll = function(type, placeholderId) {
         var pollKey = '__provPoll_' + type;
         if ($[pollKey]) clearInterval($[pollKey]);
+        // 记录初始真实资源数量（排除占位记录），用于检测新资源出现
+        var getRealCount = function() {
+            if (type === 'vm') {
+                return $.userVms.value.filter(function(v) { return !v._provisioning; }).length;
+            }
+            return $.userLxcContainers.value.filter(function(c) { return !c._provisioning; }).length;
+        };
+        var initialCount = getRealCount();
         $[pollKey] = setInterval(async function() {
             try {
+                // 情况1：localStorage 已被清除（其他标签页或原 await 完成）→ 移除占位记录
                 var raw = localStorage.getItem('provisioning_' + type);
                 if (!raw) {
-                    // 开通完成或失败，localStorage 已清除，移除占位记录并刷新
                     clearInterval($[pollKey]);
                     $[pollKey] = null;
                     if (type === 'vm') {
@@ -993,6 +1001,26 @@
                         $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
                         await $.loadLxcContainers();
                     }
+                    $.loadWalletBalance();
+                    return;
+                }
+                // 情况2：刷新数据检测新资源是否已出现
+                if (type === 'vm') {
+                    await $.loadData();
+                } else {
+                    await $.loadLxcContainers();
+                }
+                var currentCount = getRealCount();
+                if (currentCount > initialCount) {
+                    // 新资源已出现，开通完成，清除占位记录和 localStorage
+                    clearInterval($[pollKey]);
+                    $[pollKey] = null;
+                    if (type === 'vm') {
+                        $.userVms.value = $.userVms.value.filter(function(v) { return v.id !== placeholderId; });
+                    } else {
+                        $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
+                    }
+                    try { localStorage.removeItem('provisioning_' + type); } catch (e2) {}
                     $.loadWalletBalance();
                 }
             } catch (e) {}
