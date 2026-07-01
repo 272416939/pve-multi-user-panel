@@ -332,6 +332,8 @@ const setupCustomAlert = (customAlertMessage) => {
                     document.activeElement.blur();
                 }
             }, { once: true });
+            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
+            window.applyModalZIndex(el);
             bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
         }
     };
@@ -355,6 +357,8 @@ const setupCustomConfirm = (customConfirmMessage, customConfirmResolve) => {
                     document.activeElement.blur();
                 }
             }, { once: true });
+            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
+            window.applyModalZIndex(el);
             bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
         });
     };
@@ -475,3 +479,32 @@ window.ModalZIndexManager = (function() {
         }
     };
 })();
+
+// ===== applyModalZIndex / releaseModalZIndex 公共 helper =====
+// 供 alert/confirm/showAlertAndWait/rechargeResultModal 等不走 bsModalShow 的弹窗复用
+// 保证后弹出的弹窗 z-index 永远高于先弹出的弹窗
+window.applyModalZIndex = function(el) {
+    if (!el || !window.ModalZIndexManager) return null;
+    var zIndex = window.ModalZIndexManager.acquire();
+    el._modalZIndex = zIndex;
+    el.style.zIndex = zIndex;
+    // shown 后设置 backdrop z-index
+    el.addEventListener('shown.bs.modal', function onShown() {
+        el.removeEventListener('shown.bs.modal', onShown);
+        var backdrop = document.querySelector('.modal-backdrop');
+        if (backdrop) {
+            backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
+        }
+    }, { once: true });
+    // hidden 时 release z-index
+    el.addEventListener('hidden.bs.modal', function onHidden() {
+        el.removeEventListener('hidden.bs.modal', onHidden);
+        if (el._modalZIndex != null) {
+            window.ModalZIndexManager.release(el._modalZIndex);
+            el._modalZIndex = null;
+            el.style.zIndex = '';
+        }
+    }, { once: true });
+    return zIndex;
+};
+

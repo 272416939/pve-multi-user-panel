@@ -112,6 +112,8 @@ const App = {
                 }, { once: true });
                 var oldModal = bootstrap.Modal.getInstance(el);
                 if (oldModal) oldModal.dispose();
+                // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
+                window.applyModalZIndex(el);
                 new bootstrap.Modal(el, { focus: false }).show();
             }
         };
@@ -216,6 +218,8 @@ const App = {
                     // 显示扫码支付弹窗
                     const modalEl = document.getElementById('rechargePendingModal');
                     if (modalEl) {
+                        // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
+                        window.applyModalZIndex(modalEl);
                         const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
                         modal.show();
                     }
@@ -326,6 +330,8 @@ const App = {
             }
             const el = document.getElementById('rechargeResultModal');
             if (el) {
+                // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
+                window.applyModalZIndex(el);
                 const modal = bootstrap.Modal.getOrCreateInstance(el);
                 modal.show();
             }

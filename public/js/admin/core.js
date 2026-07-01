@@ -553,6 +553,8 @@ watch($.user, function(u) {
                 el.removeEventListener('hidden.bs.modal', onHidden);
                 resolve();
             }, { once: true });
+            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
+            window.applyModalZIndex(el);
             var modal = bootstrap.Modal.getOrCreateInstance(el);
             modal.show();
         });

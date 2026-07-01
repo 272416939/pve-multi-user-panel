@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.28.6] - 2026-07-02
+
+### Fixed
+- fix(modal): 统一所有弹窗走动态 z-index 管理，确保后弹出的弹窗始终在之前弹窗之上
+  - 问题：8 处弹窗未走 `ModalZIndexManager`，直接 `bootstrap.Modal.show()` 使用浏览器默认 z-index，叠加时后弹出的弹窗可能被先弹出的弹窗遮挡
+  - 影响范围：
+    - `shared.js` setupCustomAlert（window.alert）/ setupCustomConfirm（window.customConfirm）
+    - `dashboard/core.js` window.alert / $.showAlertAndWait
+    - `admin/core.js` $.showAlertAndWait
+    - `user-center-page.js` window.alert / rechargeResultModal / rechargePendingModal
+  - 修复：新增 `window.applyModalZIndex(el)` 公共 helper 封装 acquire + backdrop + release 完整逻辑，8 处弹窗统一复用
+  - 新增 TDD 测试：`test/modal-z-index-dynamic.test.js`（17 个用例，覆盖存在性、8 处弹窗调用点、3 处 bsModalShow 一致性、硬编码 z-index 禁止规则）
+
 ## [2.28.5] - 2026-07-02
 
 ### Fixed
