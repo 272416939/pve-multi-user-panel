@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.28.2] - 2026-07-02
+
+### Fixed
+- fix(ikuai): 修复会话长时间未使用过期后 API 调用失败不自动恢复的问题
+  - SDK `login()` 开头清空旧 cookie 和 loggedIn 状态，防止过期会话干扰新登录
+  - `#fetch` 同名 cookie 替换为新值（原逻辑跳过导致新 session 无法覆盖旧 session）
+  - 新增 `logout()` 方法清空会话状态
+  - `_call` 重试前先 `logout()` 再 `login()`，确保干净重连
+  - `_call` 检测 `Result=10014` 主动触发重登重试
+  - `getMacGroups/addMacToGroup/removeMacFromGroup` 改走 `_call` 统一重试逻辑
+- fix(auth): 修复 otplib.verifySync 调用方式错误导致 2FA 启用/验证崩溃
+  - 新版 otplib 无 `authenticator` 子对象，`verifySync` 直接在顶层导出
+  - 审计时误改为 `otplib.authenticator.verifySync` 导致 `undefined` 报错
+  - 改回 `otplib.verifySync({ token, secret }).valid` 正确调用
+
 ## [2.28.1] - 2026-06-25
 
 ### Fixed
