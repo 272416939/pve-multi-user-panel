@@ -330,10 +330,6 @@
                             暂无 LXC 容器
                         </div>
                     </div>
-                    <!-- LXC 端口转发 -->
-                    <div v-if="activeTabLxc === 'network'">
-                        <lxc-port-forward-list></lxc-port-forward-list>
-                    </div>
                 </div>
 
                 <!-- 后台管理区域 -->

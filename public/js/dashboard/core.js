@@ -20,7 +20,6 @@
     $.activeSection = ref(new URLSearchParams(window.location.search).get('section') || 'overview');
     $.navItems = ref([]);
     $.users = ref([]);
-    $.storageList = ref([]);
     $.macGroups = ref([]);
     $.openDropdownId = ref(null); // 当前打开的下拉菜单ID，格式 'vm-123' 或 'lxc-456'
     $.dropdownItems = ref([]); // 当前下拉菜单的 [{label, action, cls}]

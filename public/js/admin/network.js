@@ -30,6 +30,7 @@
     $.userForwardCount = ref(0);
     $.maxForwardPerUser = ref(10);
     $.checkResult = ref(null);
+    $.forwardFilterType = ref('all');
 
     // 设备端口转发弹窗
     $.deviceModal = reactive({ device: { deviceId: null, type: 'vm', name: '', ip: '' } });

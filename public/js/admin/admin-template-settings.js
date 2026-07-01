@@ -261,69 +261,6 @@
                                 </div>
                             </div>
                         </div>
-
-                        <!-- 全局端口转发列表（分页） -->
-                        <div class="card mt-3">
-                            <div class="card-header d-flex justify-content-between align-items-center">
-                                <h5 class="mb-0">所有端口转发</h5>
-                                <small class="text-muted">共 {{ forwardRules.length }} 条</small>
-                            </div>
-                            <div class="card-body">
-                                <div v-if="forwardRulesLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>
-                                <div v-else-if="forwardRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>
-                                <div v-else class="table-responsive">
-                                    <table class="table table-striped table-hover">
-                                        <thead>
-                                            <tr>
-                                                <th>#</th>
-                                                <th>名称</th>
-                                                <th>类型</th>
-                                                <th>设备</th>
-                                                <th>目标 IP</th>
-                                                <th>内网端口</th>
-                                                <th>外网端口</th>
-                                                <th>协议</th>
-                                                <th>状态</th>
-                                                <th>同步状态</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="(rule, idx) in paginatedForwardRules" :key="rule.id" :class="{ 'text-muted': rule.sync_status === 'orphan' }">
-                                                <td>{{ (forwardPage - 1) * forwardPageSize + idx + 1 }}</td>
-                                                <td>{{ rule.name || '-' }}</td>
-                                                <td><span class="type-badge" :class="rule.type === 'vm' ? 'type-badge-vm' : 'type-badge-ct'">{{ rule.type === 'vm' ? 'VM' : 'CT' }}</span></td>
-                                                <td>{{ rule.vm_id || rule.ct_id }}</td>
-                                                <td>{{ rule.ip }}</td>
-                                                <td>{{ rule.internal_port }}</td>
-                                                <td>{{ rule.external_port }}</td>
-                                                <td>{{ (rule.protocol || '').toUpperCase() }}</td>
-                                                <td><span :class="rule.enabled ? 'text-success' : 'text-muted'">{{ rule.enabled ? '启用' : '禁用' }}</span></td>
-                                                <td>
-                                                    <span v-if="rule.sync_status === 'synced'" class="badge bg-success">已同步</span>
-                                                    <span v-else-if="rule.sync_status === 'orphan'" class="badge bg-secondary">孤立</span>
-                                                    <span v-else-if="rule.sync_status === 'failed'" class="badge bg-danger">失败</span>
-                                                    <span v-else class="badge bg-warning text-dark">待同步</span>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <!-- 分页 -->
-                                <nav v-if="forwardRules.length > forwardPageSize" class="mt-2">
-                                    <ul class="pagination pagination-sm justify-content-center mb-0">
-                                        <li class="page-item" :class="{ disabled: forwardPage <= 1 }">
-                                            <pv-button @click="forwardPage--">上一页</pv-button>
-                                        </li>
-                                        <li class="page-item disabled">
-                                            <span class="page-link">{{ forwardPage }} / {{ Math.ceil(forwardRules.length / forwardPageSize) }}</span>
-                                        </li>
-                                        <li class="page-item" :class="{ disabled: forwardPage >= Math.ceil(forwardRules.length / forwardPageSize) }">
-                                            <pv-button @click="forwardPage++">下一页</pv-button>
-                                        </li>
-                                    </ul>
-                                </nav>
-                            </div>
-                        </div>
                     </div>
 
                 <!-- 支付配置 -->

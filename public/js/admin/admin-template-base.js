@@ -42,7 +42,6 @@
                 <div class="nav-submenu" id="submenu-vms">
                     <a class="nav-item" data-subsection="vms-manage" href="#" @click.prevent="switchSubsection('vms','manage')"><span class="nav-text">虚拟机列表</span></a>
                     <a class="nav-item" data-subsection="vms-assign" href="#" @click.prevent="switchSubsection('vms','assign')"><span class="nav-text">分配虚拟机</span></a>
-                    <a class="nav-item" data-subsection="vms-network" href="#" @click.prevent="switchSubsection('vms','network')"><span class="nav-text">VM 端口转发管理</span></a>
                 </div>
                 <a class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('lxc')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
@@ -53,8 +52,11 @@
                     <a class="nav-item" data-subsection="lxc-create" href="#" @click.prevent="switchSubsection('lxc','create')"><span class="nav-text">新建 LXC 容器</span></a>
                     <a class="nav-item" data-subsection="lxc-assign" href="#" @click.prevent="switchSubsection('lxc','assign')"><span class="nav-text">分配 LXC 容器</span></a>
                     <a class="nav-item" data-subsection="lxc-manage" href="#" @click.prevent="switchSubsection('lxc','manage')"><span class="nav-text">容器管理</span></a>
-                    <a class="nav-item" data-subsection="lxc-network" href="#" @click.prevent="switchSubsection('lxc','network')"><span class="nav-text">CT 端口转发管理</span></a>
                 </div>
+                <a class="nav-item" :class="{ active: activeSection === 'port-forward' }" href="#" @click.prevent="switchSection('port-forward')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+                    <span class="nav-text">端口转发管理</span>
+                </a>
                 <!-- 后台管理 -->
                 <a class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('manage')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>

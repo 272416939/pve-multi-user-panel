@@ -676,10 +676,6 @@ watch($.user, function(u) {
         } else if (section === 'lxc') {
             $.activeTabLxc.value = tab;
         }
-        // 切换到端口转发子标签时加载数据（watch 在值未变化时不触发，需显式调用）
-        if (tab === 'network') {
-            $.loadForwardRules('all');
-        }
         $.expandedSections.value[section] = true;
         var el = document.getElementById('submenu-' + section);
         if (el) el.classList.add('open');
@@ -1009,11 +1005,8 @@ $.initDetailCharts = function() {
                 if ($.activeTab.value === 'users') {
                     $.loadUsers(1);
                 }
-                // 刷新后停留在 VM/LXC 端口转发子标签时主动加载数据
-                if ($.activeSection.value === 'vms' && $.activeTabVm.value === 'network') {
-                    $.loadForwardRules('all');
-                }
-                if ($.activeSection.value === 'lxc' && $.activeTabLxc.value === 'network') {
+                // 刷新后停留在端口转发管理时主动加载数据
+                if ($.activeSection.value === 'port-forward') {
                     $.loadForwardRules('all');
                 }
                 // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
@@ -1060,16 +1053,10 @@ $.initDetailCharts = function() {
 
         watch($.activeTabVm, function(newTab) {
             localStorage.setItem('admin_activeTabVm', newTab);
-            if (newTab === 'network') {
-                $.loadForwardRules('all');
-            }
         });
 
         watch($.activeTabLxc, function(newTab) {
             localStorage.setItem('admin_activeTabLxc', newTab);
-            if (newTab === 'network') {
-                $.loadForwardRules('all');
-            }
         });
 
         watch($.activeTabTemplates, function(newTab) {
@@ -1080,6 +1067,9 @@ $.initDetailCharts = function() {
             var url = new URL(window.location);
             url.searchParams.set('section', val);
             history.replaceState({}, '', url);
+            if (val === 'port-forward') {
+                $.loadForwardRules('all');
+            }
         });
 
         watch(function() { return $.showCreateUser.value; }, function(val) {

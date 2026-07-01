@@ -90,16 +90,19 @@ app.config.errorHandler = function(err, instance, info) {
     setTimeout(function() { el.remove(); }, 15000);
 };
 
-// ==================== 端口转发列表组件（VM） ====================
-app.component('vm-port-forward-list', {
+// ==================== 端口转发列表组件 ====================
+app.component('port-forward-list', {
     template: '\
         <div>\
             <div class="d-flex justify-content-between align-items-center mb-3">\
                 <h4 class="mb-0">端口转发管理</h4>\
-                <div>\
-                    <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">\
-                        添加端口转发\
-                    </pv-button>\
+                <div class="d-flex align-items-center gap-2">\
+                    <select class="form-select form-select-sm" style="width:auto" v-model="forwardFilterType" @change="filterForward">\
+                        <option value="all">全部</option>\
+                        <option value="vm">VM</option>\
+                        <option value="lxc">LXC</option>\
+                    </select>\
+                    <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">添加端口转发</pv-button>\
                     <pv-button variant="danger" size="sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</pv-button>\
                 </div>\
             </div>\
@@ -112,6 +115,7 @@ app.component('vm-port-forward-list', {
                             <th v-if="userRole === \'admin\'"><input type="checkbox" @change="toggleAll"></th>\
                             <th>序号</th>\
                             <th>名称</th>\
+                            <th>类型</th>\
                             <th>目标 IP</th>\
                             <th>内网端口</th>\
                             <th>外网端口</th>\
@@ -122,10 +126,11 @@ app.component('vm-port-forward-list', {
                         </tr>\
                     </thead>\
                     <tbody>\
-                        <tr v-for="(rule, idx) in paginatedVmForwardRules" :key="rule.id" :class="{ \'text-muted text-decoration-line-through\': rule.sync_status === \'orphan\' }">\
+                        <tr v-for="(rule, idx) in paginatedForwardRules" :key="rule.id" :class="{ \'text-muted text-decoration-line-through\': rule.sync_status === \'orphan\' }">\
                             <td v-if="userRole === \'admin\'"><input type="checkbox" :value="rule.id" v-model="selectedForwardIds"></td>\
-                            <td>{{ (forwardVmPage - 1) * forwardPageSize + idx + 1 }}</td>\
+                            <td>{{ (forwardPage - 1) * forwardPageSize + idx + 1 }}</td>\
                             <td>{{ rule.name || \'-\' }}</td>\
+                            <td><span class="badge" :class="rule.type === \'vm\' ? \'bg-primary\' : \'bg-info\'">{{ rule.type === \'vm\' ? \'VM\' : \'LXC\' }}</span></td>\
                             <td>{{ rule.ip }}</td>\
                             <td>{{ rule.internal_port }}</td>\
                             <td>{{ rule.external_port }}</td>\
@@ -145,16 +150,16 @@ app.component('vm-port-forward-list', {
                     </tbody>\
                 </table>\
             </div>\
-            <nav v-if="vmForwardTotal > forwardPageSize" class="mt-2">\
+            <nav v-if="forwardTotal > forwardPageSize" class="mt-2">\
                 <ul class="pagination pagination-sm justify-content-center mb-0">\
-                    <li class="page-item" :class="{ disabled: forwardVmPage <= 1 }">\
-                        <button class="page-link" @click="prevVmPage">上一页</button>\
+                    <li class="page-item" :class="{ disabled: forwardPage <= 1 }">\
+                        <button class="page-link" @click="prevPage">上一页</button>\
                     </li>\
                     <li class="page-item disabled">\
-                        <span class="page-link">{{ forwardVmPage }} / {{ Math.ceil(vmForwardTotal / forwardPageSize) }}</span>\
+                        <span class="page-link">{{ forwardPage }} / {{ Math.ceil(forwardTotal / forwardPageSize) }}</span>\
                     </li>\
-                    <li class="page-item" :class="{ disabled: forwardVmPage >= Math.ceil(vmForwardTotal / forwardPageSize) }">\
-                        <button class="page-link" @click="nextVmPage">下一页</button>\
+                    <li class="page-item" :class="{ disabled: forwardPage >= Math.ceil(forwardTotal / forwardPageSize) }">\
+                        <button class="page-link" @click="nextPage">下一页</button>\
                     </li>\
                 </ul>\
             </nav>\
@@ -173,152 +178,41 @@ app.component('vm-port-forward-list', {
         },
         forwardRulesLoading() { return $.forwardRulesLoading.value; },
         forwardRules() { return $.forwardRules.value; },
-        paginatedVmForwardRules() { return $.paginatedVmForwardRules.value; },
-        forwardVmPage() { return $.forwardVmPage.value; },
+        paginatedForwardRules() { return $.paginatedForwardRules.value; },
+        forwardPage() { return $.forwardPage.value; },
         forwardPageSize() { return $.forwardPageSize; },
-        vmForwardTotal() { return $.vmForwardTotal.value; }
+        forwardTotal() { return $.forwardRules.value.length; },
+        forwardFilterType: {
+            get() { return $.forwardFilterType ? $.forwardFilterType.value : 'all'; },
+            set(val) { if ($.forwardFilterType) $.forwardFilterType.value = val; }
+        }
     },
     methods: {
-         openAddForward() { $.openAddForward('vm'); },
-         batchDelete() { $.batchDeleteForwards(); },
-         toggleAll(e) { $.toggleSelectAllForwards(e); },
-         prevVmPage() { if ($.forwardVmPage.value > 1) $.forwardVmPage.value--; },
-         nextVmPage() { $.forwardVmPage.value++; },
-         editForward(rule) {
-             $.isEditingForward.value = true;
-             Object.assign($.forwardForm, {
-                 id: rule.id, type: rule.type,
-                 vm_id: rule.vm_id, ct_id: rule.ct_id,
-                 name: rule.name, ip: rule.ip,
-                 internal_port: rule.internal_port,
-                 external_port: rule.external_port,
-                 protocol: rule.protocol
-             });
-             // 加载设备列表供下拉选择
-             api('/port-forwards/extract-ips').then(function(devices) {
-                 $.availableDevices.value = (devices || []).filter(function(d) { return d.type === rule.type; });
-             }).catch(function(e) { console.error('加载设备列表失败:', e); });
-             $.showForwardModal.value = true;
-             $.bsModalShow('forwardModal');
-         },
-         deleteForward(id) { $.deleteForward(id); }
-     }
- });
-
- // ==================== 端口转发列表组件（LXC） ====================
-  app.component('lxc-port-forward-list', {
-      template: '\
-          <div>\
-              <div class="d-flex justify-content-between align-items-center mb-3">\
-                  <h4 class="mb-0">端口转发管理</h4>\
-                  <div>\
-                      <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">\
-                          添加端口转发\
-                      </pv-button>\
-                      <pv-button variant="danger" size="sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</pv-button>\
-                  </div>\
-              </div>\
-            <div v-if="forwardRulesLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>\
-            <div v-else-if="forwardRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>\
-            <div v-else class="table-responsive">\
-                <table class="table table-striped table-hover">\
-                    <thead>\
-                        <tr>\
-                            <th v-if="userRole === \'admin\'"><input type="checkbox" @change="toggleAll"></th>\
-                            <th>序号</th>\
-                            <th>名称</th>\
-                            <th>目标 IP</th>\
-                            <th>内网端口</th>\
-                            <th>外网端口</th>\
-                            <th>协议</th>\
-                            <th>状态</th>\
-                            <th>同步状态</th>\
-                            <th>操作</th>\
-                        </tr>\
-                    </thead>\
-                    <tbody>\
-                        <tr v-for="(rule, idx) in paginatedLxcForwardRules" :key="rule.id" :class="{ \'text-muted text-decoration-line-through\': rule.sync_status === \'orphan\' }">\
-                            <td v-if="userRole === \'admin\'"><input type="checkbox" :value="rule.id" v-model="selectedForwardIds"></td>\
-                            <td>{{ (forwardLxcPage - 1) * forwardPageSize + idx + 1 }}</td>\
-                            <td>{{ rule.name || \'-\' }}</td>\
-                            <td>{{ rule.ip }}</td>\
-                            <td>{{ rule.internal_port }}</td>\
-                            <td>{{ rule.external_port }}</td>\
-                            <td>{{ rule.protocol?.toUpperCase() }}</td>\
-                            <td><span :class="rule.enabled ? \'text-success\' : \'text-muted\'">{{ rule.enabled ? \'启用\' : \'禁用\' }}</span></td>\
-                            <td>\
-                                <span v-if="rule.sync_status === \'synced\'" class="badge bg-success">已同步</span>\
-                                <span v-else-if="rule.sync_status === \'orphan\'" class="badge bg-secondary">孤立</span>\
-                                <span v-else-if="rule.sync_status === \'failed\'" class="badge bg-danger">失败</span>\
-                                <span v-else class="badge bg-warning text-dark">待同步</span>\
-                            </td>\
-                            <td>\
-                                <pv-button variant="outline" size="sm" class="me-1" @click="editForward(rule)">编辑</pv-button>\
-                                <pv-button variant="outline-danger" size="sm" @click="deleteForward(rule.id)">删除</pv-button>\
-                            </td>\
-                        </tr>\
-                    </tbody>\
-                </table>\
-            </div>\
-            <nav v-if="lxcForwardTotal > forwardPageSize" class="mt-2">\
-                <ul class="pagination pagination-sm justify-content-center mb-0">\
-                    <li class="page-item" :class="{ disabled: forwardLxcPage <= 1 }">\
-                        <button class="page-link" @click="prevLxcPage">上一页</button>\
-                    </li>\
-                    <li class="page-item disabled">\
-                        <span class="page-link">{{ forwardLxcPage }} / {{ Math.ceil(lxcForwardTotal / forwardPageSize) }}</span>\
-                    </li>\
-                    <li class="page-item" :class="{ disabled: forwardLxcPage >= Math.ceil(lxcForwardTotal / forwardPageSize) }">\
-                        <button class="page-link" @click="nextLxcPage">下一页</button>\
-                    </li>\
-                </ul>\
-            </nav>\
-            <div class="text-muted small" v-if="userRole !== \'admin\'">\
-                已使用 {{ userForwardCount }} / {{ maxForwardPerUser }} 条\
-            </div>\
-        </div>\
-    ',
-    computed: {
-         userRole() { return $.user.value ? $.user.value.role : 'user'; },
-         userForwardCount() { return $.userForwardCount.value || 0; },
-         maxForwardPerUser() { return $.maxForwardPerUser.value || 10; },
-         selectedForwardIds: {
-             get() { return $.selectedForwardIds.value || []; },
-             set(val) { $.selectedForwardIds.value = val; }
-         },
-         forwardRulesLoading() { return $.forwardRulesLoading.value; },
-         forwardRules() { return $.forwardRules.value; },
-         paginatedLxcForwardRules() { return $.paginatedLxcForwardRules.value; },
-         forwardLxcPage() { return $.forwardLxcPage.value; },
-         forwardPageSize() { return $.forwardPageSize; },
-         lxcForwardTotal() { return $.lxcForwardTotal.value; }
-     },
-     methods: {
-          openAddForward() { $.openAddForward('lxc'); },
-          batchDelete() { $.batchDeleteForwards(); },
-          toggleAll(e) { $.toggleSelectAllForwards(e); },
-          prevLxcPage() { if ($.forwardLxcPage.value > 1) $.forwardLxcPage.value--; },
-          nextLxcPage() { $.forwardLxcPage.value++; },
-          editForward(rule) {
-              $.isEditingForward.value = true;
-              Object.assign($.forwardForm, {
-                  id: rule.id, type: rule.type,
-                  vm_id: rule.vm_id, ct_id: rule.ct_id,
-                  name: rule.name, ip: rule.ip,
-                  internal_port: rule.internal_port,
-                  external_port: rule.external_port,
-                  protocol: rule.protocol
-              });
-              // 加载设备列表供下拉选择
-              api('/port-forwards/extract-ips').then(function(devices) {
-                  $.availableDevices.value = (devices || []).filter(function(d) { return d.type === rule.type; });
-              }).catch(function(e) { console.error('加载设备列表失败:', e); });
-              $.showForwardModal.value = true;
-              $.bsModalShow('forwardModal');
-          },
-          deleteForward(id) { $.deleteForward(id); }
-      }
-  });
+        openAddForward() { $.openAddForward('vm'); },
+        batchDelete() { $.batchDeleteForwards(); },
+        toggleAll(e) { $.toggleSelectAllForwards(e); },
+        filterForward() { $.loadForwardRules($.forwardFilterType.value); },
+        prevPage() { if ($.forwardPage.value > 1) $.forwardPage.value--; },
+        nextPage() { $.forwardPage.value++; },
+        editForward(rule) {
+            $.isEditingForward.value = true;
+            Object.assign($.forwardForm, {
+                id: rule.id, type: rule.type,
+                vm_id: rule.vm_id, ct_id: rule.ct_id,
+                name: rule.name, ip: rule.ip,
+                internal_port: rule.internal_port,
+                external_port: rule.external_port,
+                protocol: rule.protocol
+            });
+            api('/port-forwards/extract-ips').then(function(devices) {
+                $.availableDevices.value = (devices || []).filter(function(d) { return d.type === rule.type; });
+            }).catch(function(e) { console.error('加载设备列表失败:', e); });
+            $.showForwardModal.value = true;
+            $.bsModalShow('forwardModal');
+        },
+        deleteForward(id) { $.deleteForward(id); }
+    }
+});
 
   app.mount('#app');
 

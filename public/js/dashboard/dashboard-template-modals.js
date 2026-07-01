@@ -38,14 +38,6 @@
                         </select>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">备份存储位置</label>
-                        <select class="form-select" v-model="editVmForm.backup_storage">
-                            <option value="">全局默认</option>
-                            <option v-for="s in storageList" :key="s.id" :value="s.id">{{ s.id }} ({{ s.type }})</option>
-                        </select>
-                        <small class="text-muted">为该虚拟机指定专用备份存储位置，留空则使用全局默认</small>
-                    </div>
-                    <div class="mb-3">
                         <label class="form-label">MAC分组</label>
                         <select class="form-select" v-model="editVmForm.mac_group_id">
                             <option value="">不加入分组</option>
@@ -181,14 +173,33 @@
             </div>
             <div class="modal-body">
                 <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">备份限制信息</h6>
+                    </div>
+                    <div class="card-body">
+                        <div v-if="backupLimits.current >= backupLimits.max_per_vm || backupLimits.today_creates >= backupLimits.daily_limit" class="alert alert-warning py-2 mb-2 small">
+                            <span v-if="backupLimits.current >= backupLimits.max_per_vm">已达到最大备份数上限，请先删除旧备份后再创建</span>
+                            <span v-else>今日备份创建次数已达上限，请明日再试</span>
+                        </div>
+                        <div class="row text-center g-2">
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="small text-muted">当前备份数</div>
+                                    <div class="fw-bold" :class="backupLimits.current >= backupLimits.max_per_vm ? 'text-danger' : ''">{{ backupLimits.current }} / {{ backupLimits.max_per_vm }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="small text-muted">今日创建</div>
+                                    <div class="fw-bold" :class="backupLimits.today_creates >= backupLimits.daily_limit ? 'text-danger' : ''">{{ backupLimits.today_creates }} / {{ backupLimits.daily_limit }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card mb-3">
                     <div class="card-header"><h6 class="mb-0">创建备份</h6></div>
                     <div class="card-body">
-                        <div class="mb-2">
-                            <label class="form-label small">存储位置</label>
-                            <select class="form-select form-select-sm" v-model="backupForm.storage">
-                                <option v-for="s in storageList" :key="s.id" :value="s.id">{{ s.id }} ({{ s.type }})</option>
-                            </select>
-                        </div>
                         <div class="mb-2">
                             <textarea class="form-control form-control-sm" v-model="backupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
                             <small class="text-muted">{{ (backupForm.notes || '').length }}/50</small>
@@ -454,14 +465,33 @@
             </div>
             <div class="modal-body">
                 <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">备份限制信息</h6>
+                    </div>
+                    <div class="card-body">
+                        <div v-if="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm || lxcBackupLimits.today_creates >= lxcBackupLimits.daily_limit" class="alert alert-warning py-2 mb-2 small">
+                            <span v-if="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm">已达到最大备份数上限，请先删除旧备份后再创建</span>
+                            <span v-else>今日备份创建次数已达上限，请明日再试</span>
+                        </div>
+                        <div class="row text-center g-2">
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="small text-muted">当前备份数</div>
+                                    <div class="fw-bold" :class="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm ? 'text-danger' : ''">{{ lxcBackupLimits.current }} / {{ lxcBackupLimits.max_per_vm }}</div>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="small text-muted">今日创建</div>
+                                    <div class="fw-bold" :class="lxcBackupLimits.today_creates >= lxcBackupLimits.daily_limit ? 'text-danger' : ''">{{ lxcBackupLimits.today_creates }} / {{ lxcBackupLimits.daily_limit }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card mb-3">
                     <div class="card-header"><h6 class="mb-0">创建备份</h6></div>
                     <div class="card-body">
-                        <div class="mb-2">
-                            <label class="form-label small">存储位置</label>
-                            <select class="form-select form-select-sm" v-model="lxcBackupForm.storage">
-                                <option v-for="s in storageList" :key="s.id" :value="s.id">{{ s.id }} ({{ s.type }})</option>
-                            </select>
-                        </div>
                         <div class="mb-2">
                             <textarea class="form-control form-control-sm" v-model="lxcBackupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
                             <small class="text-muted">{{ (lxcBackupForm.notes || '').length }}/50</small>

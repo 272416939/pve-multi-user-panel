@@ -1,5 +1,31 @@
 # Changelog
 
+## [2.28.4] - 2026-07-02
+
+### Changed
+- refactor(admin): 统一端口转发入口到侧边栏一级标签
+  - 移除 VM 管理 → 端口转发子标签（`vms-network` 菜单项）
+  - 移除 LXC 容器管理 → 端口转发子标签（`lxc-network` 菜单项）
+  - 移除系统设置 → 网络管理内的「所有端口转发」列表卡片
+  - 新增侧边栏一级标签「端口转发管理」（位于 LXC 容器管理 与 后台管理 之间）
+  - 新增 `public/js/admin/admin-template-port-forward.js` 模板片段（IIFE push 模式）
+  - 合并 `vm-port-forward-list` / `lxc-port-forward-list` 为单一 `port-forward-list` 组件，新增类型筛选下拉（全部/VM/LXC）、类型列（VM/LXC 徽章）、统一分页和用户配额提示
+  - `core.js` 调整：onMounted/watch(activeSection) 切换到 port-forward 时加载规则；移除 watch(activeTabVm/activeTabLxc) 的 network 分支；switchSubsection 移除 network 分支
+  - `network.js` 新增 `$.forwardFilterType = ref('all')` 状态
+  - 所有按钮（添加/批量删除/编辑/删除）统一使用 `pv-button` 组件
+  - 新增 TDD 测试：`test/unify-port-forward-and-backup-modal.test.js`（30 个用例）
+
+### Fixed
+- fix(dashboard): 备份弹窗显示备份限制信息
+  - `backupModal` / `lxcBackupModal` 顶部新增「备份限制信息」卡片，展示当前备份数 / 上限、今日创建数 / 日上限
+  - 达到上限时显示 `alert-warning` 警告条，数值标红（`text-danger`）
+  - 数据源：`$.backupLimits` / `$.lxcBackupLimits`（API 已返回，原未展示）
+- fix(dashboard): 移除备份弹窗中暴露给用户的存储位置选项
+  - 移除 `backupModal` 的存储位置下拉（`v-model="backupForm.storage"`）
+  - 移除 `lxcBackupModal` 的存储位置下拉（`v-model="lxcBackupForm.storage"`）
+  - 移除 `editVmModal` 中无效的 `backup_storage` 下拉
+  - 移除 `dashboard/core.js` 中未使用的 `$.storageList = ref([])` 定义（原定义后从未赋值，导致下拉永远为空）
+
 ## [2.28.3] - 2026-07-02
 
 ### Fixed

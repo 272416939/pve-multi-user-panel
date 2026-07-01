@@ -225,10 +225,6 @@
                         </div>
 
                     </div>
-                    <!-- VM 端口转发 -->
-                    <div v-if="activeTabVm === 'network'">
-                        <vm-port-forward-list></vm-port-forward-list>
-                    </div>
                 </div>
 
                 <!-- LXC 容器管理区域 -->
