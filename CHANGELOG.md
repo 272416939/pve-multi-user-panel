@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.28.5] - 2026-07-02
+
+### Fixed
+- fix(admin): 修复端口转发筛选下拉切换报错 `Cannot read properties of undefined (reading 'value')`
+  - 根因：`admin.ejs` 中 `network.js` 引用未带缓存参数 `?_b=`，浏览器使用旧版缓存，旧版 `network.js` 中未定义 `$.forwardFilterType = ref('all')`，导致 `filterForward` 方法访问 `$.forwardFilterType.value` 时 `undefined`
+  - 修复：给 `network.js` 引用添加 `?_b=202607020700`，并更新 `admin-page.js` 缓存参数到 `?_b=202607020800`
+  - 增强：`port-forward-list` 组件的 `filterForward` 方法增加防御性兜底（`$.forwardFilterType` 不存在时回退为 `'all'`），避免类似缓存问题再次发生时直接崩溃
+
 ## [2.28.4] - 2026-07-02
 
 ### Changed

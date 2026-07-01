@@ -191,7 +191,10 @@ app.component('port-forward-list', {
         openAddForward() { $.openAddForward('vm'); },
         batchDelete() { $.batchDeleteForwards(); },
         toggleAll(e) { $.toggleSelectAllForwards(e); },
-        filterForward() { $.loadForwardRules($.forwardFilterType.value); },
+        filterForward() {
+            var t = $.forwardFilterType ? $.forwardFilterType.value : 'all';
+            $.loadForwardRules(t);
+        },
         prevPage() { if ($.forwardPage.value > 1) $.forwardPage.value--; },
         nextPage() { $.forwardPage.value++; },
         editForward(rule) {
