@@ -50,7 +50,7 @@ router.post('/user/2fa/verify', authMiddleware, async (req, res) => {
         const secret = await db.twofa.getSecret(req.user.id);
         if (!secret) return res.status(400).json({ error: '请先获取 2FA 密钥' });
 
-        const isValid = otplib.authenticator.verifySync({ token: code, secret });
+        const isValid = otplib.verifySync({ token: code, secret }).valid;
         if (!isValid) return res.status(400).json({ error: '验证码错误' });
 
         await db.twofa.enable(req.user.id);

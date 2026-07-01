@@ -163,7 +163,7 @@ router.post('/login/2fa', async (req, res) => {
         const secret = await db.twofa.getSecret(user.id);
         if (secret) {
             try {
-                isValidTotp = otplib.authenticator.verifySync({ token: code, secret });
+                isValidTotp = otplib.verifySync({ token: code, secret }).valid;
             } catch {
             }
         }
