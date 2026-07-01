@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.28.3] - 2026-07-02
+
+### Fixed
+- fix(admin): 修复子标签切换不加载内容和刷新丢失子标签的问题
+  - CT 端口转发切换到 VM 端口转发时内容不加载：`switchSubsection` 切换到 network tab 时显式调用 `loadForwardRules`，补充 `watch(activeTabVm/activeTabLxc)` 的 network 触发逻辑，`onMounted` 中补充刷新后停留在 VM/LXC 端口转发页面的数据加载
+  - 刷新丢失子标签：`activeTabVm`/`activeTabLxc`/`activeTabTemplates` 添加 localStorage 持久化（读取恢复 + watch 写入），与 `activeTab`/`activeTabPackages` 保持一致
+  - 检查其他子标签：dashboard 的 `activeTabVm`/`activeTabLxc` 未被模板使用（遗留代码），无需修复；user-center 使用 hash 路由已正确恢复
+  - 新增 TDD 测试：`test/admin-tab-persistence.test.js`（7 个用例）
+- fix(admin): 修复端口转发编辑按钮无效并统一按钮样式为 pv-button
+  - `editForward` 缺少 `bsModalShow('forwardModal')` 调用导致编辑弹窗不显示
+  - `editForward` 缺少设备列表加载导致下拉框为空，补充 `extract-ips` 加载并按 `rule.type` 过滤
+  - 所有按钮（添加/批量删除/编辑/删除）统一使用 `pv-button` 组件替代原生 `button`，与全站样式保持一致
+  - 新增 TDD 测试：`test/admin-port-forward-edit.test.js`（14 个用例）
+
 ## [2.28.2] - 2026-07-02
 
 ### Fixed
