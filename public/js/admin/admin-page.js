@@ -97,10 +97,10 @@ app.component('vm-port-forward-list', {
             <div class="d-flex justify-content-between align-items-center mb-3">\
                 <h4 class="mb-0">端口转发管理</h4>\
                 <div>\
-                    <button class="btn btn-primary btn-sm me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">\
+                    <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">\
                         添加端口转发\
-                    </button>\
-                    <button class="btn btn-danger btn-sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</button>\
+                    </pv-button>\
+                    <pv-button variant="danger" size="sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</pv-button>\
                 </div>\
             </div>\
             <div v-if="forwardRulesLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>\
@@ -138,8 +138,8 @@ app.component('vm-port-forward-list', {
                                 <span v-else class="badge bg-warning text-dark">待同步</span>\
                             </td>\
                             <td>\
-                                <button class="btn btn-sm btn-outline-primary me-1" @click="editForward(rule)">编辑</button>\
-                                <button class="btn btn-sm btn-outline-danger" @click="deleteForward(rule.id)">删除</button>\
+                                <pv-button variant="outline" size="sm" class="me-1" @click="editForward(rule)">编辑</pv-button>\
+                                <pv-button variant="outline-danger" size="sm" @click="deleteForward(rule.id)">删除</pv-button>\
                             </td>\
                         </tr>\
                     </tbody>\
@@ -194,7 +194,12 @@ app.component('vm-port-forward-list', {
                  external_port: rule.external_port,
                  protocol: rule.protocol
              });
+             // 加载设备列表供下拉选择
+             api('/port-forwards/extract-ips').then(function(devices) {
+                 $.availableDevices.value = (devices || []).filter(function(d) { return d.type === rule.type; });
+             }).catch(function(e) { console.error('加载设备列表失败:', e); });
              $.showForwardModal.value = true;
+             $.bsModalShow('forwardModal');
          },
          deleteForward(id) { $.deleteForward(id); }
      }
@@ -207,10 +212,10 @@ app.component('vm-port-forward-list', {
               <div class="d-flex justify-content-between align-items-center mb-3">\
                   <h4 class="mb-0">端口转发管理</h4>\
                   <div>\
-                      <button class="btn btn-primary btn-sm me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">\
+                      <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">\
                           添加端口转发\
-                      </button>\
-                      <button class="btn btn-danger btn-sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</button>\
+                      </pv-button>\
+                      <pv-button variant="danger" size="sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</pv-button>\
                   </div>\
               </div>\
             <div v-if="forwardRulesLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>\
@@ -248,8 +253,8 @@ app.component('vm-port-forward-list', {
                                 <span v-else class="badge bg-warning text-dark">待同步</span>\
                             </td>\
                             <td>\
-                                <button class="btn btn-sm btn-outline-primary me-1" @click="editForward(rule)">编辑</button>\
-                                <button class="btn btn-sm btn-outline-danger" @click="deleteForward(rule.id)">删除</button>\
+                                <pv-button variant="outline" size="sm" class="me-1" @click="editForward(rule)">编辑</pv-button>\
+                                <pv-button variant="outline-danger" size="sm" @click="deleteForward(rule.id)">删除</pv-button>\
                             </td>\
                         </tr>\
                     </tbody>\
@@ -304,7 +309,12 @@ app.component('vm-port-forward-list', {
                   external_port: rule.external_port,
                   protocol: rule.protocol
               });
+              // 加载设备列表供下拉选择
+              api('/port-forwards/extract-ips').then(function(devices) {
+                  $.availableDevices.value = (devices || []).filter(function(d) { return d.type === rule.type; });
+              }).catch(function(e) { console.error('加载设备列表失败:', e); });
               $.showForwardModal.value = true;
+              $.bsModalShow('forwardModal');
           },
           deleteForward(id) { $.deleteForward(id); }
       }
