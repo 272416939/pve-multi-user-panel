@@ -129,7 +129,7 @@ async function syncPortForwardsFromIkuai() {
             }
             try {
                 await db.portForwards.create({
-                    type: deviceType || 'vm',
+                    type: deviceType || 'general',
                     vm_id: deviceType === 'vm' ? deviceId : null,
                     ct_id: deviceType === 'lxc' ? deviceId : null,
                     name: deviceName || comment || `ikuai_${rule.id || ''}`,

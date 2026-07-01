@@ -101,6 +101,7 @@ app.component('port-forward-list', {
                         <option value="all">全部</option>\
                         <option value="vm">VM</option>\
                         <option value="lxc">LXC</option>\
+                        <option value="general">通用</option>\
                     </select>\
                     <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">添加端口转发</pv-button>\
                     <pv-button variant="danger" size="sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</pv-button>\
@@ -130,7 +131,11 @@ app.component('port-forward-list', {
                             <td v-if="userRole === \'admin\'"><input type="checkbox" :value="rule.id" v-model="selectedForwardIds"></td>\
                             <td>{{ (forwardPage - 1) * forwardPageSize + idx + 1 }}</td>\
                             <td>{{ rule.name || \'-\' }}</td>\
-                            <td><span class="badge" :class="rule.type === \'vm\' ? \'bg-primary\' : \'bg-info\'">{{ rule.type === \'vm\' ? \'VM\' : \'LXC\' }}</span></td>\
+                            <td>\
+                                <span v-if="rule.type === \'vm\'" class="badge bg-primary">VM</span>\
+                                <span v-else-if="rule.type === \'lxc\'" class="badge bg-info">LXC</span>\
+                                <span v-else class="badge bg-secondary">通用</span>\
+                            </td>\
                             <td>{{ rule.ip }}</td>\
                             <td>{{ rule.internal_port }}</td>\
                             <td>{{ rule.external_port }}</td>\
@@ -188,7 +193,10 @@ app.component('port-forward-list', {
         }
     },
     methods: {
-        openAddForward() { $.openAddForward('vm'); },
+        openAddForward() {
+            var defaultType = ($.user.value && $.user.value.role === 'admin') ? 'general' : 'vm';
+            $.openAddForward(defaultType);
+        },
         batchDelete() { $.batchDeleteForwards(); },
         toggleAll(e) { $.toggleSelectAllForwards(e); },
         filterForward() {
@@ -207,9 +215,14 @@ app.component('port-forward-list', {
                 external_port: rule.external_port,
                 protocol: rule.protocol
             });
-            api('/port-forwards/extract-ips').then(function(devices) {
-                $.availableDevices.value = (devices || []).filter(function(d) { return d.type === rule.type; });
-            }).catch(function(e) { console.error('加载设备列表失败:', e); });
+            // general 类型无需加载设备列表
+            if (rule.type !== 'general') {
+                api('/port-forwards/extract-ips').then(function(devices) {
+                    $.availableDevices.value = (devices || []).filter(function(d) { return d.type === rule.type; });
+                }).catch(function(e) { console.error('加载设备列表失败:', e); });
+            } else {
+                $.availableDevices.value = [];
+            }
             $.showForwardModal.value = true;
             $.bsModalShow('forwardModal');
         },

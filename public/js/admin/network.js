@@ -176,7 +176,7 @@
     $.openAddForward = async function(type) {
         $.isEditingForward.value = false;
         $.forwardForm.id = null;
-        $.forwardForm.type = type;
+        $.forwardForm.type = type || 'vm';
         $.forwardForm.vm_id = null;
         $.forwardForm.ct_id = null;
         $.forwardForm.name = '';
@@ -186,11 +186,15 @@
         $.forwardForm.protocol = 'tcp';
         $.checkResult.value = null;
         $.selectedForwardIds.value = [];
-        // 加载设备列表
-        try {
-            var devices = await api('/port-forwards/extract-ips');
-            $.availableDevices.value = (devices || []).filter(function(d) { return d.type === type; });
-        } catch (e) { console.error('加载设备列表失败:', e); }
+        // general 类型无需加载设备列表
+        if ($.forwardForm.type !== 'general') {
+            try {
+                var devices = await api('/port-forwards/extract-ips');
+                $.availableDevices.value = (devices || []).filter(function(d) { return d.type === $.forwardForm.type; });
+            } catch (e) { console.error('加载设备列表失败:', e); }
+        } else {
+            $.availableDevices.value = [];
+        }
         $.showForwardModal.value = true;
         $.bsModalShow('forwardModal');
     };

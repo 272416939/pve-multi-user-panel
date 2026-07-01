@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.28.7] - 2026-07-02
+
+### Added
+- feat(port-forward): 端口转发新增「通用」类型，管理员无需绑定 VM/LXC 即可创建转发规则
+  - 新增 `type='general'` 类型白名单，vm_id/ct_id 强制为 null
+  - 前端筛选下拉新增「通用」选项，类型徽章新增「通用」灰色徽标（bg-secondary）
+  - forwardModal 新增「类型」单选按钮组（VM/LXC/通用，仅管理员可见）
+  - 通用类型隐藏设备下拉，显示提示「通用类型无需绑定 VM/LXC」
+
+### Fixed
+- fix(port-forward): 修复 LXC 规则 ikuai comment 错写 `_VM${vm_id}` 的旧 bug（vm_id 为 null 时 comment 变成 `_VMnull` 导致同步反查失败）
+  - 改为根据 type 区分：`_GENERAL` / `_CT${ct_id}` / `_VM${vm_id}`
+
+### Changed
+- refactor(port-forward): 历史孤立规则自动迁移为 general 类型
+  - 启动时执行 `UPDATE port_forwards SET type='general' WHERE type IN ('vm','lxc') AND vm_id IS NULL AND ct_id IS NULL`（幂等）
+  - ikuai 同步导入孤立规则时 `type` 从 `'vm'` 改为 `'general'`
+  - openAddForward 管理员默认类型改为 general，普通用户仍为 vm
+
 ## [2.28.6] - 2026-07-02
 
 ### Fixed

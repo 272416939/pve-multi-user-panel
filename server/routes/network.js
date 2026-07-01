@@ -209,6 +209,14 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         if (!type || !ip || !internal_port || !external_port) {
             return res.status(400).json({ error: '缺少必要参数' });
         }
+        // type 白名单校验
+        const allowedTypes = ['vm', 'lxc', 'general'];
+        if (!allowedTypes.includes(type)) {
+            return res.status(400).json({ error: '无效的转发类型' });
+        }
+        // general 类型强制 vm_id/ct_id 为 null
+        const finalVmId = type === 'vm' ? (vm_id || null) : null;
+        const finalCtId = type === 'lxc' ? (ct_id || null) : null;
         if (internal_port < 1 || internal_port > 65535 || external_port < 1 || external_port > 65535) {
             return res.status(400).json({ error: '端口必须在 1-65535 之间' });
         }
@@ -233,17 +241,17 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
                 return res.status(400).json({ error: `转发规则数量已达上限（${config.max_per_user} 条），如需新增请联系管理员` });
             }
         }
-        // 新增：校验目标资源归属
-        if (vm_id && !isAdmin) {
+        // 新增：校验目标资源归属（general 类型 vm_id/ct_id 均为 null，天然跳过）
+        if (finalVmId && !isAdmin) {
             const userVms = await db.vms.getByUserId(req.user.id);
-            const ownedVm = userVms.some(v => v.vm_id == vm_id);
+            const ownedVm = userVms.some(v => v.vm_id == finalVmId);
             if (!ownedVm) {
                 return res.status(403).json({ error: '无权为此虚拟机创建转发规则' });
             }
         }
-        if (ct_id && !isAdmin) {
+        if (finalCtId && !isAdmin) {
             const userCts = await db.lxcContainers.getByUserId(req.user.id);
-            const ownedCt = userCts.some(c => c.ct_id == ct_id);
+            const ownedCt = userCts.some(c => c.ct_id == finalCtId);
             if (!ownedCt) {
                 return res.status(403).json({ error: '无权为此容器创建转发规则' });
             }
@@ -265,14 +273,19 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         }
         // 先写入本地
         const rule = await db.portForwards.create({
-            type, vm_id: vm_id || null, ct_id: ct_id || null,
+            type, vm_id: finalVmId, ct_id: finalCtId,
             name: name || '', ip, internal_port, external_port,
             protocol: protocol || 'tcp', sync_status: 'pending'
         });
         // 同步到 ikuai（一条规则支持多外网接口，interface 字段传逗号分隔值）
         try {
             const wanIfaces = await getWanInterfaces();
-            const comment = `${name || '转发'}_VM${vm_id}`;
+            // comment 根据 type 区分：general → _GENERAL，lxc → _CT${ct_id}，vm → _VM${vm_id}
+            const comment = type === 'general'
+                ? `${name || '转发'}_GENERAL`
+                : type === 'lxc'
+                    ? `${name || '转发'}_CT${finalCtId}`
+                    : `${name || '转发'}_VM${finalVmId}`;
             const ifaceStr = wanIfaces.join(',');
             let ikuaiIds = [];
             try {
@@ -367,7 +380,12 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                 }
                 // 重新创建一条规则，interface 字段传逗号分隔的多接口值
                 const wanIfaces = await getWanInterfaces();
-                const comment = `${name || existing.name || '转发'}_VM${existing.vm_id}`;
+                // comment 根据 existing.type 区分：general → _GENERAL，lxc → _CT${ct_id}，vm → _VM${vm_id}
+                const comment = existing.type === 'general'
+                    ? `${name || existing.name || '转发'}_GENERAL`
+                    : existing.type === 'lxc'
+                        ? `${name || existing.name || '转发'}_CT${existing.ct_id}`
+                        : `${name || existing.name || '转发'}_VM${existing.vm_id}`;
                 const ifaceStr = wanIfaces.join(',');
                 newIkuaiIds = [];
                 try {

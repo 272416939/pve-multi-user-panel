@@ -1301,7 +1301,15 @@
                                 <div class="text-muted small mb-3" v-if="userRole !== 'admin'">
                                     📊 已使用 {{ userForwardCount }} / {{ maxForwardPerUser }} 条
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3" v-if="userRole === 'admin'">
+                                    <label class="form-label">类型</label>
+                                    <div>
+                                        <label class="me-3"><input type="radio" v-model="forwardForm.type" value="vm"> VM</label>
+                                        <label class="me-3"><input type="radio" v-model="forwardForm.type" value="lxc"> LXC</label>
+                                        <label class="me-3"><input type="radio" v-model="forwardForm.type" value="general"> 通用</label>
+                                    </div>
+                                </div>
+                                <div class="mb-3" v-if="forwardForm.type !== 'general'">
                                     <label class="form-label">选择设备</label>
                                     <select class="form-select" v-model="forwardForm.vm_id" v-if="forwardForm.type === 'vm'" @change="selectDevice">
                                         <option :value="null">-- 请选择虚拟机 --</option>
@@ -1315,6 +1323,9 @@
                                             {{ d.name }} - {{ d.ip || 'IP 未知' }}
                                         </option>
                                     </select>
+                                </div>
+                                <div class="mb-3" v-if="forwardForm.type === 'general'">
+                                    <div class="alert alert-info small">通用类型无需绑定 VM/LXC，请直接填写目标 IP</div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">目标 IP</label>
