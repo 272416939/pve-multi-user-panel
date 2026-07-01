@@ -13,8 +13,8 @@
     $.navItems = ref([]);
     var savedTab = localStorage.getItem('admin_activeTab');
     $.activeTab = ref((savedTab === 'assign' ? 'users' : savedTab) || 'users');
-    $.activeTabLxc = ref('create');
-    $.activeTabVm = ref('manage');
+    $.activeTabLxc = ref(localStorage.getItem('admin_activeTabLxc') || 'create');
+    $.activeTabVm = ref(localStorage.getItem('admin_activeTabVm') || 'manage');
     $.loading = ref(false);
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
@@ -33,7 +33,7 @@ $.detailVmTimer = null;
 $.detailVmChartData = null;
 
     // ==================== 模板/套餐页面状态 ====================
-    $.activeTabTemplates = ref('vm');
+    $.activeTabTemplates = ref(localStorage.getItem('admin_activeTabTemplates') || 'vm');
     $.activeTabPackages = ref(localStorage.getItem('admin_activeTabPackages') || 'vm');
 
     // ==================== 工具函数注册到$ ====================
@@ -676,6 +676,10 @@ watch($.user, function(u) {
         } else if (section === 'lxc') {
             $.activeTabLxc.value = tab;
         }
+        // 切换到端口转发子标签时加载数据（watch 在值未变化时不触发，需显式调用）
+        if (tab === 'network') {
+            $.loadForwardRules('all');
+        }
         $.expandedSections.value[section] = true;
         var el = document.getElementById('submenu-' + section);
         if (el) el.classList.add('open');
@@ -1005,6 +1009,13 @@ $.initDetailCharts = function() {
                 if ($.activeTab.value === 'users') {
                     $.loadUsers(1);
                 }
+                // 刷新后停留在 VM/LXC 端口转发子标签时主动加载数据
+                if ($.activeSection.value === 'vms' && $.activeTabVm.value === 'network') {
+                    $.loadForwardRules('all');
+                }
+                if ($.activeSection.value === 'lxc' && $.activeTabLxc.value === 'network') {
+                    $.loadForwardRules('all');
+                }
                 // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
                 setInterval(function() {
                     var token = localStorage.getItem('token');
@@ -1045,6 +1056,24 @@ $.initDetailCharts = function() {
 
         watch($.activeTabPackages, function(newTab) {
             localStorage.setItem('admin_activeTabPackages', newTab);
+        });
+
+        watch($.activeTabVm, function(newTab) {
+            localStorage.setItem('admin_activeTabVm', newTab);
+            if (newTab === 'network') {
+                $.loadForwardRules('all');
+            }
+        });
+
+        watch($.activeTabLxc, function(newTab) {
+            localStorage.setItem('admin_activeTabLxc', newTab);
+            if (newTab === 'network') {
+                $.loadForwardRules('all');
+            }
+        });
+
+        watch($.activeTabTemplates, function(newTab) {
+            localStorage.setItem('admin_activeTabTemplates', newTab);
         });
 
         watch($.activeSection, function(val) {
