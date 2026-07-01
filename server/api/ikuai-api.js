@@ -38,10 +38,15 @@ class IkuaiApi {
         try {
             const result = await this.client.call(funcName, action, param);
             if (result?.Result === 30000) return result.Data;
+            // 会话过期（10014）：主动重登后重试一次
+            if (result?.Result === 10014) {
+                throw new Error('no login authentication');
+            }
             throw new Error(result?.ErrMsg || `Result=${result?.Result}`);
         } catch (e) {
-            // 尝试重新登录后重试一次
+            // 重新登录前先清空旧会话状态，防止过期 cookie 干扰
             try {
+                this.client.logout();
                 await this.client.login(this.username, this.password);
                 const retryResult = await this.client.call(funcName, action, param);
                 if (retryResult?.Result === 30000) return retryResult.Data;
@@ -300,18 +305,13 @@ class IkuaiApi {
     // func_name: macgroup, action: show
     async getMacGroups() {
         try {
-            await this._ensureLogin();
-            const result = await this.client.call('macgroup', 'show', {
+            const data = await this._call('macgroup', 'show', {
                 TYPE: 'total,data',
                 limit: '0,500',
                 ORDER_BY: '',
                 ORDER: ''
             });
-            if (result?.Result !== 30000) {
-                console.error('[ikuai] macgroup show 失败: Result=' + result?.Result + ' ErrMsg=' + (result?.ErrMsg || ''));
-                return [];
-            }
-            const list = result.Data?.data || result.Data || [];
+            const list = data?.data || data || [];
             if (!Array.isArray(list)) {
                 console.log('[ikuai] macgroup show Data 不是数组，类型:', typeof list);
                 return [];
@@ -334,7 +334,6 @@ class IkuaiApi {
 
     // MAC 分组：添加 MAC 到分组（addr_pool 空格分隔 → 追加 → edit）
     async addMacToGroup(groupId, mac, comment) {
-        await this._ensureLogin();
         var current = await this._getMacGroupById(groupId);
         if (!current) throw new Error('MAC 分组 ID=' + groupId + ' 不存在');
         var pool = (current.addr_pool || '').trim();
@@ -345,19 +344,17 @@ class IkuaiApi {
             return;
         }
         macs.push(normalized);
-        var result = await this.client.call('macgroup', 'edit', {
+        await this._call('macgroup', 'edit', {
             id: groupId,
             group_name: current.group_name,
             addr_pool: macs.join(','),
             comment: current.comment || ''
         });
-        if (result?.Result !== 30000) throw new Error(result?.ErrMsg || 'Result=' + result?.Result);
         console.log('[ikuai] MAC 分组新增: groupId=' + groupId + ', mac=' + normalized);
     }
 
     // MAC 分组：从分组删除 MAC（addr_pool → 过滤 → edit）
     async removeMacFromGroup(groupId, mac) {
-        await this._ensureLogin();
         var current = await this._getMacGroupById(groupId);
         if (!current) throw new Error('MAC 分组 ID=' + groupId + ' 不存在');
         var pool = (current.addr_pool || '').trim();
@@ -369,13 +366,12 @@ class IkuaiApi {
             return;
         }
         macs.splice(idx, 1);
-        var result = await this.client.call('macgroup', 'edit', {
+        await this._call('macgroup', 'edit', {
             id: groupId,
             group_name: current.group_name,
             addr_pool: macs.join(','),
             comment: current.comment || ''
         });
-        if (result?.Result !== 30000) throw new Error(result?.ErrMsg || 'Result=' + result?.Result);
         console.log('[ikuai] MAC 分组删除: groupId=' + groupId + ', mac=' + normalized);
     }
 

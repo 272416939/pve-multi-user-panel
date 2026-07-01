@@ -58,14 +58,19 @@ export class IKuaiClient {
         headers,
         timeout: 8000,
       }, (res) => {
-        // 保存 cookie
+        // 保存 cookie（同名 cookie 替换，避免旧过期 session 干扰新登录）
         const setCookie = res.headers['set-cookie'];
         if (setCookie) {
           const cookies = Array.isArray(setCookie) ? setCookie : [setCookie];
           for (const c of cookies) {
             const name = c.split('=')[0];
-            if (!this.#cookie.includes(name + '=')) {
-              this.#cookie += (this.#cookie ? '; ' : '') + c.split(';')[0];
+            const value = c.split(';')[0];
+            const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            if (this.#cookie.includes(name + '=')) {
+              // 同名 cookie 替换为新值
+              this.#cookie = this.#cookie.replace(new RegExp(escaped + '=[^;]*'), value);
+            } else {
+              this.#cookie += (this.#cookie ? '; ' : '') + value;
             }
           }
         }
@@ -100,6 +105,10 @@ export class IKuaiClient {
    * @param {string} password  明文密码
    */
   async login(username, password) {
+    // 清空旧会话状态，防止过期 cookie 干扰新登录
+    this.#cookie = '';
+    this.#loggedIn = false;
+
     const passwd = IKuaiClient.#md5(password);
     const body = {
       username,
@@ -127,6 +136,14 @@ export class IKuaiClient {
     }
 
     throw new Error(`登录失败: ${JSON.stringify(result)}`);
+  }
+
+  /**
+   * 登出并清空会话状态（用于会话过期后重新登录前调用）
+   */
+  logout() {
+    this.#cookie = '';
+    this.#loggedIn = false;
   }
 
   /**
