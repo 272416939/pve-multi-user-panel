@@ -324,9 +324,10 @@ const setupCustomAlert = (customAlertMessage) => {
             if (document.activeElement && document.activeElement !== document.body) {
                 document.activeElement.blur();
             }
-            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
+            // 注意：不得删除所有 .modal-backdrop（会破坏其他仍开着弹窗的遮罩）
+            // 仅 dispose 当前弹窗的旧实例，让 Bootstrap 自然清理其 backdrop
+            const old = bootstrap.Modal.getInstance(el);
+            if (old) old.dispose();
             el.addEventListener('hide.bs.modal', function onHide() {
                 if (document.activeElement && document.activeElement !== document.body) {
                     document.activeElement.blur();
@@ -349,9 +350,9 @@ const setupCustomConfirm = (customConfirmMessage, customConfirmResolve) => {
             if (document.activeElement && document.activeElement !== document.body) {
                 document.activeElement.blur();
             }
-            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
+            // 注意：不得删除所有 .modal-backdrop（会破坏其他仍开着弹窗的遮罩）
+            const old = bootstrap.Modal.getInstance(el);
+            if (old) old.dispose();
             el.addEventListener('hide.bs.modal', function onHide() {
                 if (document.activeElement && document.activeElement !== document.body) {
                     document.activeElement.blur();
@@ -489,9 +490,11 @@ window.applyModalZIndex = function(el) {
     el._modalZIndex = zIndex;
     el.style.zIndex = zIndex;
     // shown 后设置 backdrop z-index
+    // 注意：多弹窗叠加时，querySelectorAll 取最后一个（最新弹窗的 backdrop），而非第一个
     el.addEventListener('shown.bs.modal', function onShown() {
         el.removeEventListener('shown.bs.modal', onShown);
-        var backdrop = document.querySelector('.modal-backdrop');
+        var backdrops = document.querySelectorAll('.modal-backdrop');
+        var backdrop = backdrops.length > 0 ? backdrops[backdrops.length - 1] : null;
         if (backdrop) {
             backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
         }

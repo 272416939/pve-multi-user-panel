@@ -233,8 +233,11 @@
         if (!$.forwardForm.ip) return alert('请填入目标 IP');
         if (!$.forwardForm.internal_port) return alert('请填入内网端口');
         if (!$.forwardForm.external_port) return alert('请填入外网端口');
-        if ($.forwardForm.external_port < $.networkConfig.port_range_start || $.forwardForm.external_port > $.networkConfig.port_range_end) {
-            return alert('外网端口必须在 ' + $.networkConfig.port_range_start + '-' + $.networkConfig.port_range_end + ' 范围内');
+        // 管理员不受系统配置的端口范围限制
+        if ($.userRole.value !== 'admin') {
+            if ($.forwardForm.external_port < $.networkConfig.port_range_start || $.forwardForm.external_port > $.networkConfig.port_range_end) {
+                return alert('外网端口必须在 ' + $.networkConfig.port_range_start + '-' + $.networkConfig.port_range_end + ' 范围内');
+            }
         }
         try {
             var body = {

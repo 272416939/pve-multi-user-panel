@@ -8,6 +8,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, getWanInterface, getWanInterfaces } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 const { safeError } = require('../utils/safe-error');
+const { checkRateLimit } = require('../middleware/rate-limiter');
 
 // 解析 ikuai_id 字段，兼容旧格式（纯字符串）和新格式（JSON 数组）
 // 返回 [{interface, id}] 数组
@@ -217,6 +218,7 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         // general 类型强制 vm_id/ct_id 为 null
         const finalVmId = type === 'vm' ? (vm_id || null) : null;
         const finalCtId = type === 'lxc' ? (ct_id || null) : null;
+        // 基础合法性校验：端口物理范围（TCP/UDP 端口为 16 位无符号整数），对所有用户（含管理员）生效
         if (internal_port < 1 || internal_port > 65535 || external_port < 1 || external_port > 65535) {
             return res.status(400).json({ error: '端口必须在 1-65535 之间' });
         }
@@ -231,11 +233,11 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             port_range_end: parseInt(await db.config.get('forward:port_range_end')) || 60000,
             max_per_user: parseInt(await db.config.get('forward:max_per_user')) || 10,
         };
-        if (external_port < config.port_range_start || external_port > config.port_range_end) {
-            return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内` });
-        }
-        // 普通用户检查数量限制
+        // 普通用户检查端口范围和数量限制；管理员不受此限制
         if (req.user.role !== 'admin') {
+            if (external_port < config.port_range_start || external_port > config.port_range_end) {
+                return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内` });
+            }
             const count = await db.portForwards.getCountByUserId(req.user.id);
             if (count >= config.max_per_user) {
                 return res.status(400).json({ error: `转发规则数量已达上限（${config.max_per_user} 条），如需新增请联系管理员` });
@@ -342,8 +344,11 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                 port_range_start: parseInt(await db.config.get('forward:port_range_start')) || 50000,
                 port_range_end: parseInt(await db.config.get('forward:port_range_end')) || 60000,
             };
-            if (external_port < config.port_range_start || external_port > config.port_range_end) {
-                return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内` });
+            // 普通用户检查端口范围；管理员不受此限制
+            if (req.user.role !== 'admin') {
+                if (external_port < config.port_range_start || external_port > config.port_range_end) {
+                    return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内` });
+                }
             }
             const conflict = (await db.portForwards.getByExternalPort(external_port)).filter(r => r.id !== id);
             if (conflict.length > 0) return res.status(400).json({ error: '外网端口已被占用，请更换' });
@@ -506,6 +511,12 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
 
 router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
     try {
+        // SEC-02: 代理外部 API（ikuai）端点加速率限制，防止滥用导致外部系统 DoS
+        const rateLimitKey = 'ratelimit:random-port:' + req.user.id;
+        const rateLimitResult = await checkRateLimit(rateLimitKey, 30, 60 * 1000);
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        }
         const portRangeStart = parseInt(await db.config.get('forward:port_range_start')) || 50000;
         const portRangeEnd = parseInt(await db.config.get('forward:port_range_end')) || 60000;
         const usedPorts = new Set((await db.portForwards.getUsedPorts()).map(r => r.external_port));
@@ -518,8 +529,12 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
                 });
             } catch (e) {}
         }
+        // 管理员不受系统配置的端口范围限制，使用 1-65535 全范围；普通用户使用配置范围
+        const isAdmin = req.user.role === 'admin';
+        const start = isAdmin ? 1 : portRangeStart;
+        const end = isAdmin ? 65535 : portRangeEnd;
         const available = [];
-        for (let p = portRangeStart; p <= portRangeEnd; p++) {
+        for (let p = start; p <= end; p++) {
             if (!usedPorts.has(p)) available.push(p);
         }
         if (available.length === 0) {

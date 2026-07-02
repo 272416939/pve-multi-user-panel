@@ -102,9 +102,7 @@ const App = {
                 if (document.activeElement && document.activeElement !== document.body) {
                     document.activeElement.blur();
                 }
-                document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('padding-right');
+                // 注意：不得删除所有 .modal-backdrop（会破坏其他仍开着弹窗的遮罩）
                 el.addEventListener('hide.bs.modal', function onHide() {
                     if (document.activeElement && document.activeElement !== document.body) {
                         document.activeElement.blur();
@@ -127,9 +125,7 @@ const App = {
                 if (document.activeElement && document.activeElement !== document.body) {
                     document.activeElement.blur();
                 }
-                document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('padding-right');
+                // 注意：不得删除所有 .modal-backdrop（会破坏其他仍开着弹窗的遮罩）
                 el.addEventListener('hide.bs.modal', function onHide() {
                     if (document.activeElement && document.activeElement !== document.body) {
                         document.activeElement.blur();
@@ -577,9 +573,7 @@ const App = {
         };
 
         const bsModalShow = (id) => {
-            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
+            // 注意：不得删除所有 .modal-backdrop，否则会破坏其他仍开着弹窗的遮罩层
             if (document.activeElement && document.activeElement !== document.body) {
                 document.activeElement.blur();
             }
@@ -595,9 +589,11 @@ const App = {
                 const modal = new bootstrap.Modal(el, { focus: false });
                 modal.show();
                 // shown 后设置 backdrop z-index
+                // 多弹窗叠加时，querySelectorAll 取最后一个（当前弹窗的 backdrop）
                 el.addEventListener('shown.bs.modal', function onShown() {
                     el.removeEventListener('shown.bs.modal', onShown);
-                    const backdrop = document.querySelector('.modal-backdrop');
+                    const backdrops = document.querySelectorAll('.modal-backdrop');
+                    const backdrop = backdrops.length > 0 ? backdrops[backdrops.length - 1] : null;
                     if (backdrop) {
                         backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
                     }
@@ -1027,11 +1023,9 @@ const App = {
                 }, { once: true });
             }
             customAlertMessage.value = '未使用的恢复码已复制到剪贴板';
-            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
             var oldModal = bootstrap.Modal.getInstance(el);
             if (oldModal) oldModal.dispose();
+            window.applyModalZIndex(el);
             new bootstrap.Modal(el, { focus: false }).show();
         };
 
@@ -1056,11 +1050,9 @@ const App = {
                 }, { once: true });
             }
             customAlertMessage.value = '恢复码已复制';
-            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
             var oldModal = bootstrap.Modal.getInstance(el);
             if (oldModal) oldModal.dispose();
+            window.applyModalZIndex(el);
             new bootstrap.Modal(el, { focus: false }).show();
         };
 
@@ -1094,11 +1086,9 @@ const App = {
                     }, { once: true });
                 }
                 customAlertMessage.value = '恢复码已重新生成';
-                document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('padding-right');
                 var oldModal = bootstrap.Modal.getInstance(el);
                 if (oldModal) oldModal.dispose();
+                window.applyModalZIndex(el);
                 new bootstrap.Modal(el, { focus: false }).show();
             } catch (e) {
                 bsModalShow('twofaRecoveryModal');

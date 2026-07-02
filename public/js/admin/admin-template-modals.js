@@ -1355,7 +1355,7 @@
                                             <pv-button type="button" @click="randomPort" variant="outline">🎲</pv-button>
                                             <pv-button type="button" @click="checkPortConflict" variant="outline">🔍</pv-button>
                                         </div>
-                                        <small class="text-muted">可用范围: {{ networkConfig.port_range_start }}-{{ networkConfig.port_range_end }}</small>
+                                        <small class="text-muted">可用范围: <span v-if="userRole === 'admin'">1-65535（管理员不限）</span><span v-else>{{ networkConfig.port_range_start }}-{{ networkConfig.port_range_end }}</span></small>
                                         <div v-if="checkResult === true" class="text-success small">✅ 端口可用</div>
                                         <div v-else-if="checkResult === false" class="text-danger small">❌ 端口已被占用，请更换</div>
                                     </div>

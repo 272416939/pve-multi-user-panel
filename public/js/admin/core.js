@@ -375,9 +375,8 @@ watch($.user, function(u) {
     };
 
     $.bsModalShow = function(id) {
-        document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
-        document.body.classList.remove('modal-open');
-        document.body.style.removeProperty('padding-right');
+        // 注意：不得删除所有 .modal-backdrop，否则会破坏其他仍开着弹窗的遮罩层
+        // 仅 dispose 目标弹窗的旧实例，让 Bootstrap 自然清理其 backdrop
         if (document.activeElement && document.activeElement !== document.body) {
             document.activeElement.blur();
         }
@@ -394,9 +393,11 @@ watch($.user, function(u) {
             if (freshEl) {
                 new bootstrap.Modal(freshEl, { focus: false }).show();
                 // shown 后设置 backdrop z-index
+                // 多弹窗叠加时，querySelectorAll 取最后一个（当前弹窗的 backdrop）
                 freshEl.addEventListener('shown.bs.modal', function onShown() {
                     freshEl.removeEventListener('shown.bs.modal', onShown);
-                    var backdrop = document.querySelector('.modal-backdrop');
+                    var backdrops = document.querySelectorAll('.modal-backdrop');
+                    var backdrop = backdrops.length > 0 ? backdrops[backdrops.length - 1] : null;
                     if (backdrop) {
                         backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
                     }
@@ -421,9 +422,12 @@ watch($.user, function(u) {
                     el._modalZIndex = null;
                     el.style.zIndex = '';
                 }
-                document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('padding-right');
+                // 不删除所有 backdrop；Bootstrap 会自动清理当前弹窗的 backdrop
+                // 仅当没有任何活跃弹窗时，清理 body 状态
+                if (window.ModalZIndexManager.getActiveCount() === 0) {
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                }
             }, { once: true });
             modal.hide();
         } else {
@@ -432,9 +436,10 @@ watch($.user, function(u) {
                 el._modalZIndex = null;
                 el.style.zIndex = '';
             }
-            document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
+            if (window.ModalZIndexManager.getActiveCount() === 0) {
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+            }
         }
     };
 
@@ -588,8 +593,12 @@ watch($.user, function(u) {
         $.customAlertMessage.value = message;
         var el = document.getElementById('customAlertModal');
         if (el) {
-            var modal = bootstrap.Modal.getOrCreateInstance(el);
-            modal.show();
+            var old = bootstrap.Modal.getInstance(el);
+            if (old) old.dispose();
+            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
+            // 注意：必须调用 applyModalZIndex 设置 z-index，否则叠加时会被遮挡
+            window.applyModalZIndex(el);
+            new bootstrap.Modal(el, { focus: false }).show();
         }
     };
 
@@ -600,29 +609,11 @@ watch($.user, function(u) {
             $.customConfirmResolve.value = resolve;
             var el = document.getElementById('customConfirmModal');
             if (!el) { resolve(false); return; }
-            // 获取动态 z-index（customConfirmModal 不走 bsModalShow，需单独管理）
-            var zIndex = window.ModalZIndexManager.acquire();
-            el._modalZIndex = zIndex;
-            el.style.zIndex = zIndex;
-            // hidden 时释放 z-index（confirmOk/confirmCancel 均通过 modal.hide() 关闭）
-            el.addEventListener('hidden.bs.modal', function onHidden() {
-                el.removeEventListener('hidden.bs.modal', onHidden);
-                if (el._modalZIndex != null) {
-                    window.ModalZIndexManager.release(el._modalZIndex);
-                    el._modalZIndex = null;
-                    el.style.zIndex = '';
-                }
-            }, { once: true });
-            var modal = bootstrap.Modal.getOrCreateInstance(el);
-            modal.show();
-            // shown 后设置 backdrop z-index
-            el.addEventListener('shown.bs.modal', function onShown() {
-                el.removeEventListener('shown.bs.modal', onShown);
-                var backdrop = document.querySelector('.modal-backdrop');
-                if (backdrop) {
-                    backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
-                }
-            }, { once: true });
+            var old = bootstrap.Modal.getInstance(el);
+            if (old) old.dispose();
+            // 动态 z-index + backdrop z-index + hidden release（统一走 applyModalZIndex）
+            window.applyModalZIndex(el);
+            new bootstrap.Modal(el, { focus: false }).show();
         });
     };
 
@@ -634,26 +625,15 @@ watch($.user, function(u) {
             $.customPromptResolve.value = resolve;
             var el = document.getElementById('customPromptModal');
             if (!el) { resolve(null); return; }
-            var zIndex = window.ModalZIndexManager.acquire();
-            el._modalZIndex = zIndex;
-            el.style.zIndex = zIndex;
-            el.addEventListener('hidden.bs.modal', function onHidden() {
-                el.removeEventListener('hidden.bs.modal', onHidden);
-                if (el._modalZIndex != null) {
-                    window.ModalZIndexManager.release(el._modalZIndex);
-                    el._modalZIndex = null;
-                    el.style.zIndex = '';
-                }
-            }, { once: true });
-            var modal = bootstrap.Modal.getOrCreateInstance(el);
+            var old = bootstrap.Modal.getInstance(el);
+            if (old) old.dispose();
+            // 动态 z-index + backdrop z-index + hidden release（统一走 applyModalZIndex）
+            window.applyModalZIndex(el);
+            var modal = new bootstrap.Modal(el, { focus: false });
             modal.show();
+            // shown 后聚焦输入框（applyModalZIndex 已处理 backdrop z-index）
             el.addEventListener('shown.bs.modal', function onShown() {
                 el.removeEventListener('shown.bs.modal', onShown);
-                var backdrop = document.querySelector('.modal-backdrop');
-                if (backdrop) {
-                    backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
-                }
-                // 自动聚焦输入框并选中文本
                 var input = el.querySelector('#customPromptInput');
                 if (input) { input.focus(); input.select(); }
             }, { once: true });

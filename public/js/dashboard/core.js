@@ -593,9 +593,7 @@
 
     // ===== 辅助函数 =====
     $.bsModalShow = function(id) {
-        document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
-        document.body.classList.remove('modal-open');
-        document.body.style.removeProperty('padding-right');
+        // 注意：不得删除所有 .modal-backdrop，否则会破坏其他仍开着弹窗的遮罩层
         if (document.activeElement && document.activeElement !== document.body) {
             document.activeElement.blur();
         }
@@ -612,9 +610,11 @@
             var modal = new bootstrap.Modal(el, { focus: false });
             modal.show();
             // shown 后设置 backdrop z-index
+            // 多弹窗叠加时，querySelectorAll 取最后一个（当前弹窗的 backdrop）
             el.addEventListener('shown.bs.modal', function onShown() {
                 el.removeEventListener('shown.bs.modal', onShown);
-                var backdrop = document.querySelector('.modal-backdrop');
+                var backdrops = document.querySelectorAll('.modal-backdrop');
+                var backdrop = backdrops.length > 0 ? backdrops[backdrops.length - 1] : null;
                 if (backdrop) {
                     backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
                 }
@@ -635,9 +635,11 @@
                     el._modalZIndex = null;
                     el.style.zIndex = '';
                 }
-                document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
-                document.body.classList.remove('modal-open');
-                document.body.style.removeProperty('padding-right');
+                // 不删除所有 backdrop；Bootstrap 会自动清理当前弹窗的 backdrop
+                if (window.ModalZIndexManager.getActiveCount() === 0) {
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                }
             }, { once: true });
             modal.hide();
         } else {
@@ -646,9 +648,10 @@
                 el._modalZIndex = null;
                 el.style.zIndex = '';
             }
-            document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('padding-right');
+            if (window.ModalZIndexManager.getActiveCount() === 0) {
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+            }
         }
     };
 

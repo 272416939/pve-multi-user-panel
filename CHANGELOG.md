@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.28.8] - 2026-07-02
+
+### Fixed
+- fix(modal): 修复弹窗叠加时后弹出的仍被遮挡的真正根因
+  - 问题：`admin/core.js` 的 `window.alert` 覆盖了 `shared.js` 的 `setupCustomAlert`，但未调用 `window.applyModalZIndex(el)`，直接 `bootstrap.Modal.getOrCreateInstance(el).show()` 导致 alert 弹窗 z-index 为空，叠加时被前一个弹窗遮挡
+  - 同步修复 `window.customConfirm`（缺少 backdrop z-index 设置）和 `window.customPrompt`（backdrop 用 `querySelector` 取第一个，多弹窗时会错）
+  - 统一改用 `window.applyModalZIndex(el)` 封装 acquire + backdrop + release 完整生命周期
+  - 移除 `bsModalShow`/`bsModalHide`/`setupCustomAlert`/`setupCustomConfirm` 中"删除所有 .modal-backdrop"的逻辑（会误删其他仍开着弹窗的遮罩层）
+  - `shown.bs.modal` 事件改用 `querySelectorAll('.modal-backdrop')` 取最后一个（当前弹窗的 backdrop），而非 `querySelector` 取第一个
+  - `bsModalHide` 仅当 `ModalZIndexManager.getActiveCount() === 0` 时才清理 body 状态
+  - 影响：shared.js、admin/core.js、dashboard/core.js、user-center-page.js 共 12 处修改
+  - 实测验证：forwardModal(1060) + alert(1070) + customConfirm(1080) 叠加正确，backdrop 各自保留
+
+### Changed
+- refactor(port-forward): 管理员不再受系统配置的端口范围限制
+  - POST `/port-forwards`：端口范围校验和数量限制包裹在 `if (req.user.role !== 'admin')` 内
+  - PUT `/port-forwards/:id`：端口范围校验包裹在 `if (req.user.role !== 'admin')` 内
+  - GET `/port-forwards/random-port`：管理员使用 1-65535 全范围随机，普通用户使用配置范围
+  - 前端 `submitForward`：管理员跳过端口范围校验
+  - forwardModal 提示文案：管理员显示"1-65535（管理员不限）"，普通用户显示配置范围
+  - 注释明确区分两层校验：1-65535 为端口物理范围（全员生效），port_range_start-end 为业务范围（仅普通用户）
+
+### Security
+- security(port-forward): GET `/port-forwards/random-port` 补速率限制（SEC-02）
+  - 该端点调用 ikuaiApi.getPortForwards() 获取已用端口，属代理外部 API 端点
+  - 新增 `checkRateLimit('ratelimit:random-port:' + req.user.id, 30, 60*1000)`，每用户 30 次/分钟
+  - 超限返回 429 "查询过于频繁，请稍后再试"
+
 ## [2.28.7] - 2026-07-02
 
 ### Added
