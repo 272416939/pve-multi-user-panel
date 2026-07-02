@@ -155,9 +155,7 @@
     // 端口转发
     $.loadForwardRules = async function(type) {
         $.forwardRulesLoading.value = true;
-        $.forwardPage.value = 1;
-        $.forwardVmPage.value = 1;
-        $.forwardLxcPage.value = 1;
+        // 不再强制重置页码：编辑/删除后应保持当前页（避免跳转第一页）
         try {
             if (type === 'all') {
                 var rules = await api('/port-forwards');
@@ -169,6 +167,10 @@
             // 获取当前用户数量
             var userRules = await api('/port-forwards');
             $.userForwardCount.value = (userRules || []).length;
+            // 页码修正：如果当前页超过新的总页数，回到最后一页（避免删除后停留在空页）
+            var total = $.forwardRules.value.length;
+            var totalPages = Math.ceil(total / $.forwardPageSize);
+            if ($.forwardPage.value > totalPages) $.forwardPage.value = Math.max(1, totalPages);
         } catch (e) { console.error('加载转发规则失败:', e); }
         finally { $.forwardRulesLoading.value = false; }
     };

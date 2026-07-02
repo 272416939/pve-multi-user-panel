@@ -83,6 +83,9 @@ thead th, .table thead th, .table-striped thead th { padding: 14px 18px !importa
     background: linear-gradient(180deg, rgba(99,102,241,0.10) 0%, rgba(139,92,246,0.05) 100%) !important;
     border-bottom: 2px solid rgba(99,102,241,0.18) !important;
     white-space: nowrap; transition: all 0.3s ease; }
+/* 修复表头与单元格 checkbox 对齐问题：th padding 14px 18px vs td padding 11px 16px 导致 2px 偏差 */
+.checkbox-col { text-align: center !important; padding-left: 12px !important; padding-right: 12px !important; width: 44px; }
+.checkbox-col input[type="checkbox"] { margin: 0; vertical-align: middle; }
 thead tr:first-child th:first-child, .table thead tr:first-child th:first-child, .table-striped thead tr:first-child th:first-child { border-radius: 12px 0 0 0 !important; }
 thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .table-striped thead tr:last-child th:last-child { border-radius: 0 12px 0 0 !important; }
 /* Reset Bootstrap table background variables and thead bg */

@@ -113,7 +113,7 @@ app.component('port-forward-list', {
                 <table class="table table-striped table-hover">\
                     <thead>\
                         <tr>\
-                            <th v-if="userRole === \'admin\'"><input type="checkbox" @change="toggleAll"></th>\
+                            <th v-if="userRole === \'admin\'" class="checkbox-col"><input type="checkbox" @change="toggleAll"></th>\
                             <th>序号</th>\
                             <th>名称</th>\
                             <th>类型</th>\
@@ -128,7 +128,7 @@ app.component('port-forward-list', {
                     </thead>\
                     <tbody>\
                         <tr v-for="(rule, idx) in paginatedForwardRules" :key="rule.id" :class="{ \'text-muted text-decoration-line-through\': rule.sync_status === \'orphan\' }">\
-                            <td v-if="userRole === \'admin\'"><input type="checkbox" :value="rule.id" v-model="selectedForwardIds"></td>\
+                            <td v-if="userRole === \'admin\'" class="checkbox-col"><input type="checkbox" :value="rule.id" v-model="selectedForwardIds"></td>\
                             <td>{{ (forwardPage - 1) * forwardPageSize + idx + 1 }}</td>\
                             <td>{{ rule.name || \'-\' }}</td>\
                             <td>\

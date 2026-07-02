@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.28.10] - 2026-07-02
+
+### Fixed
+- fix(port-forward): 修复编辑/删除端口后列表页码跳转第一页的问题
+  - 问题：`loadForwardRules` 函数中 `$.forwardPage.value = 1` 强制重置页码，导致编辑/删除后无论当前在第几页都跳回第一页
+  - 修复：移除强制重置页码逻辑，改为在数据加载后修正页码（当前页超过新的总页数时回到最后一页，避免删除后停留在空页）
+
+- fix(ui): 修复多选框与表头未对齐的问题（影响所有含多选的列表）
+  - 根因：`components.css` 中 `thead th` 的 padding 为 `14px 18px !important`，而 `td` 的 padding 为 `11px 16px`，左右各差 2px，导致表头的 checkbox 比单元格的 checkbox 偏右 2px
+  - 修复：新增 `.checkbox-col` CSS 类，统一 th/td 的 padding 为 `12px`，设置 `text-align: center` 让 checkbox 居中对齐
+  - 应用到端口转发列表（port-forward-list）的 th/td 和 CDK 列表的 th/td
+
+### Tests
+- test: 新增 `test/port-forward-page-checkbox-align.test.js`，7 个测试覆盖 2 个 bug 的修复
+
 ## [2.28.9] - 2026-07-02
 
 ### Fixed

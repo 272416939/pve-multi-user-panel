@@ -106,7 +106,7 @@
                                 <table class="table table-striped mb-0 table-sm">
                                     <thead style="position: sticky; top: 0;">
                                         <tr>
-                                            <th style="width: 40px;">
+                                            <th class="checkbox-col">
                                                 <input type="checkbox" :checked="selectedCdkIds.length === cdkList.length && cdkList.length > 0" @change="toggleSelectAllCdk">
                                             </th>
                                             <th>ID</th>
@@ -125,7 +125,7 @@
                                     </thead>
                                     <tbody>
                                         <tr v-for="cdk in cdkList" :key="cdk.id">
-                                            <td>
+                                            <td class="checkbox-col">
                                                 <input type="checkbox" :value="cdk.id" v-model="selectedCdkIds">
                                             </td>
                                             <td>{{ cdk.id }}</td>
