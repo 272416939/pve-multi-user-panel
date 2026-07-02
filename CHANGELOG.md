@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.28.9] - 2026-07-02
+
+### Fixed
+- fix(port-forward): 修复编辑/删除端口后列表消失 + 编辑未保存的 bug
+  - **Bug 1**：`submitForward` 使用 `$.forwardForm.type`（表单类型）作为 `loadForwardRules` 的刷新参数，导致筛选为"全部"或"LXC"时编辑 VM 规则后列表只显示 VM 规则，其他规则"消失"
+    - 修复：改用 `$.forwardFilterType.value`（当前筛选器类型）刷新列表
+  - **Bug 2**：`deleteForward` 使用 `$.activeTabVm.value === 'network' ? 'vm' : 'lxc'`（与端口转发无关的 VM 标签页变量）推断刷新类型，导致删除后列表显示错误类型
+    - 修复：改用 `$.forwardFilterType.value` 刷新列表
+  - **Bug 3**：`batchDeleteForwards` 同样使用 `activeTabVm` 推断类型，批量删除后列表消失
+    - 修复：改用 `$.forwardFilterType.value` 刷新列表
+  - **Bug 4**：PUT `/port-forwards/:id` 端点解构只提取 `name/ip/internal_port/external_port/protocol` 5 个字段，完全忽略 `type/vm_id/ct_id`，导致管理员在编辑弹窗切换类型（如 VM→LXC）后保存，数据库 type 字段保持原值，编辑"未保存"
+    - 修复：解构增加 `type/vm_id/ct_id`，新增类型变更校验（type 必须为 vm/lxc/general 之一，VM 类型必须有 vm_id，LXC 类型必须有 ct_id）
+    - 类型切换时互斥清空设备 ID（vm→lxc 时 vm_id 置 null，ct_id 设为新值；反之亦然）
+    - ikuai 同步 comment 改用 `effectiveType`（新类型）而非 `existing.type`（旧类型），确保类型切换后 comment 正确
+    - 类型/设备 ID 变更也触发 ikuai 重新同步（comment 变化需重建规则）
+
+### Tests
+- test(port-forward): 新增 `test/port-forward-edit-delete-list.test.js`，8 个测试覆盖 4 个 bug 的修复
+- test(port-forward): 更新 `test/port-forward-general-type.test.js`，PUT 端点 comment 测试改用 `effectiveType` 匹配
+
 ## [2.28.8] - 2026-07-02
 
 ### Fixed

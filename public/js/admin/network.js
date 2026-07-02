@@ -257,7 +257,7 @@
             }
             $.showForwardModal.value = false;
             $.bsModalHide('forwardModal');
-            $.loadForwardRules($.forwardForm.type);
+            $.loadForwardRules($.forwardFilterType.value);
         } catch (e) { alert(e.error || e.message); }
     };
 
@@ -265,7 +265,7 @@
         if (!await window.customConfirm('确定删除此转发规则？')) return;
         try {
             await api('/port-forwards/' + id, { method: 'DELETE' });
-            $.loadForwardRules($.activeTabVm.value === 'network' ? 'vm' : 'lxc');
+            $.loadForwardRules($.forwardFilterType.value);
         } catch (e) { alert('删除失败: ' + e.message); }
     };
 
@@ -275,7 +275,7 @@
         try {
             await api('/port-forwards/batch-delete', { method: 'POST', body: { ids: $.selectedForwardIds.value } });
             $.selectedForwardIds.value = [];
-            $.loadForwardRules($.activeTabVm.value === 'network' ? 'vm' : 'lxc');
+            $.loadForwardRules($.forwardFilterType.value);
         } catch (e) { alert('批量删除失败: ' + e.message); }
     };
 

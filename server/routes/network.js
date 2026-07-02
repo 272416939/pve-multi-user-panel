@@ -330,7 +330,7 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             const userRules = await db.portForwards.getByUserId(req.user.id);
             if (!userRules.find(r => r.id === id)) return res.status(403).json({ error: '无权限' });
         }
-        const { name, ip, internal_port, external_port, protocol } = req.body;
+        const { name, ip, internal_port, external_port, protocol, type, vm_id, ct_id } = req.body;
 
         // L-2🔶 修复：修改 IP 时同步格式校验（与 POST 端点一致）
         if (ip !== undefined && ip !== null) {
@@ -338,6 +338,18 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                 return res.status(400).json({ error: '无效的 IP 地址格式' });
             }
         }
+
+        // 类型变更校验：type 必须是 vm/lxc/general 之一
+        if (type !== undefined && type !== null && !['vm', 'lxc', 'general'].includes(type)) {
+            return res.status(400).json({ error: '无效的类型，必须为 vm/lxc/general' });
+        }
+        // 计算生效的 type/vm_id/ct_id（未传则用 existing 的值）
+        const effectiveType = type || existing.type;
+        const effectiveVmId = effectiveType === 'vm' ? (vm_id !== undefined ? vm_id : existing.vm_id) : null;
+        const effectiveCtId = effectiveType === 'lxc' ? (ct_id !== undefined ? ct_id : existing.ct_id) : null;
+        // 类型为 vm/lxc 时必须有对应设备 ID
+        if (effectiveType === 'vm' && !effectiveVmId) return res.status(400).json({ error: 'VM 类型必须指定虚拟机' });
+        if (effectiveType === 'lxc' && !effectiveCtId) return res.status(400).json({ error: 'LXC 类型必须指定容器' });
 
         if (external_port) {
             const config = {
@@ -353,11 +365,14 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             const conflict = (await db.portForwards.getByExternalPort(external_port)).filter(r => r.id !== id);
             if (conflict.length > 0) return res.status(400).json({ error: '外网端口已被占用，请更换' });
         }
-        // 检测端口或 IP 变更，需要同步爱快
+        // 检测端口/IP/类型/设备 ID 变更，需要同步爱快（类型或设备 ID 变化会导致 ikuai comment 变化）
         const portChanged = external_port && Number(external_port) !== Number(existing.external_port);
         const ipChanged = ip && ip !== existing.ip;
         const internalChanged = internal_port && Number(internal_port) !== Number(existing.internal_port);
-        const needIkuaiSync = ipChanged || portChanged || internalChanged;
+        const typeChanged = type && type !== existing.type;
+        const vmIdChanged = effectiveType === 'vm' && String(effectiveVmId) !== String(existing.vm_id || '');
+        const ctIdChanged = effectiveType === 'lxc' && String(effectiveCtId) !== String(existing.ct_id || '');
+        const needIkuaiSync = ipChanged || portChanged || internalChanged || typeChanged || vmIdChanged || ctIdChanged;
         let newIkuaiIds = parseIkuaiIds(existing.ikuai_id);
         if (needIkuaiSync) {
             await db.portForwards.update(id, { sync_status: 'pending' });
@@ -385,12 +400,12 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                 }
                 // 重新创建一条规则，interface 字段传逗号分隔的多接口值
                 const wanIfaces = await getWanInterfaces();
-                // comment 根据 existing.type 区分：general → _GENERAL，lxc → _CT${ct_id}，vm → _VM${vm_id}
-                const comment = existing.type === 'general'
+                // comment 根据生效类型区分：general → _GENERAL，lxc → _CT${ct_id}，vm → _VM${vm_id}
+                const comment = effectiveType === 'general'
                     ? `${name || existing.name || '转发'}_GENERAL`
-                    : existing.type === 'lxc'
-                        ? `${name || existing.name || '转发'}_CT${existing.ct_id}`
-                        : `${name || existing.name || '转发'}_VM${existing.vm_id}`;
+                    : effectiveType === 'lxc'
+                        ? `${name || existing.name || '转发'}_CT${effectiveCtId}`
+                        : `${name || existing.name || '转发'}_VM${effectiveVmId}`;
                 const ifaceStr = wanIfaces.join(',');
                 newIkuaiIds = [];
                 try {
@@ -418,6 +433,16 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         if (internal_port !== undefined) updates.internal_port = internal_port;
         if (external_port !== undefined) updates.external_port = external_port;
         if (protocol !== undefined) updates.protocol = protocol;
+        // 支持 type/vm_id/ct_id 更新：切换类型时按新类型互斥设置设备 ID（vm→lxc 时 vm_id 置 null，反之亦然）
+        if (type !== undefined && type !== null) {
+            updates.type = type;
+            updates.vm_id = type === 'vm' ? (vm_id !== undefined ? vm_id : existing.vm_id) : null;
+            updates.ct_id = type === 'lxc' ? (ct_id !== undefined ? ct_id : existing.ct_id) : null;
+        } else {
+            // 未改类型但显式传了设备 ID
+            if (vm_id !== undefined) updates.vm_id = existing.type === 'vm' ? vm_id : null;
+            if (ct_id !== undefined) updates.ct_id = existing.type === 'lxc' ? ct_id : null;
+        }
         if (!needIkuaiSync) updates.sync_status = existing.sync_status;
         else {
             updates.sync_status = newIkuaiIds.length > 0 ? 'synced' : 'failed';
