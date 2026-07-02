@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.28.11] - 2026-07-02
+
+### Fixed
+- fix(db): 移除端口转发 general 自动迁移代码，修复启动报错 "query is not defined"
+  - 该迁移代码引用了未定义的 `query` 函数（应为 `execute` 或 `pool.query`），导致每次启动都报错
+  - 不再自动迁移孤立端口转发规则（vm_id 和 ct_id 均为 NULL 的 vm/lxc 类型规则）
+  - 管理员可在端口转发管理界面手动修改类型（v2.28.9 已支持编辑 type 字段）
+
 ## [2.28.10] - 2026-07-02
 
 ### Fixed

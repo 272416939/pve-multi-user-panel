@@ -620,17 +620,8 @@ async function migrateSchema() {
     await safeAddIndex('orders', 'idx_orders_status', 'status, type, user_id');
     await safeAddIndex('pending_orders', 'idx_pending_orders_status', 'status');
 
-    // 历史数据迁移：孤立端口转发规则（vm_id 和 ct_id 均为 NULL）统一为 general 类型
-    // 幂等：迁移后 type='general' 不再匹配 type IN ('vm','lxc') 条件
-    try {
-        const [rows] = await query(`SELECT COUNT(*) AS cnt FROM port_forwards WHERE type IN ('vm','lxc') AND vm_id IS NULL AND ct_id IS NULL`);
-        if (rows[0].cnt > 0) {
-            await execute(`UPDATE port_forwards SET type='general' WHERE type IN ('vm','lxc') AND vm_id IS NULL AND ct_id IS NULL`);
-            console.log(`[db-migration] 已将 ${rows[0].cnt} 条孤立端口转发规则迁移为 general 类型`);
-        }
-    } catch (e) {
-        console.error('[db-migration] 端口转发 general 迁移失败:', e.message);
-    }
+    // 注：孤立端口转发规则（vm_id 和 ct_id 均为 NULL）不再自动迁移为 general 类型
+    // 如需修改类型，请管理员在端口转发管理界面手动编辑
 }
 
 // 初始化默认配置（异步）
