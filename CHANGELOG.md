@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.28.18] - 2026-07-06
+
+### Added
+- feat(vnc): 为 VNC 控制台启用双向剪贴板复制粘贴功能
+  - 新增 `public/js/vnc-clipboard.js` UMD 模块（TDD：15/15 测试通过）
+  - VM → 浏览器：监听 noVNC `clipboard` 事件被动缓存 VM 剪贴板文本，用户按 `Ctrl+Shift+C` / `Ctrl+Insert` 时写入 `navigator.clipboard`
+  - 浏览器 → VM：用户按 `Ctrl+Shift+V` / `Shift+Insert` 时从 `navigator.clipboard` 读取并调用 `rfb.clipboardPasteFrom(text)`
+  - 快捷键与终端模块保持一致（Ctrl+Shift+C/Ctrl+Insert 复制，Ctrl+Shift+V/Shift+Insert 粘贴）
+  - 添加"剪贴板 ?"提示按钮，点击显示快捷键说明 modal（支持 ESC/遮罩点击关闭）
+  - 仅支持 HTTPS 环境（与终端模块一致），HTTP 环境下按键无操作不报错
+  - 不支持文件复制粘贴，仅支持纯文本
+
 ## [2.28.17] - 2026-07-06
 
 ### Fixed
