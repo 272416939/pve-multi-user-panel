@@ -26,6 +26,11 @@
     term.open(document.getElementById('terminal-container'));
     fitAddon.fit();
 
+    // 自定义快捷键：Ctrl+Shift+C/Insert 复制、Ctrl+Shift+V/Shift+Insert 粘贴、其他透传
+    term.attachCustomKeyEventHandler(function(e) {
+        return handleTerminalKeydown(e, term, navigator.clipboard);
+    });
+
     window.addEventListener('resize', () => fitAddon.fit());
 
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';

@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.28.13] - 2026-07-06
+
+### Added
+- feat(terminal): 网页终端快捷键捕获（复制/粘贴/透传）
+  - `Ctrl+Insert` / `Ctrl+Shift+C` 复制选中文本到剪贴板（`Ctrl+Shift+C` 无选中时透传 `\x03` SIGINT，保留中断命令能力）
+  - `Shift+Insert` / `Ctrl+Shift+V` 从剪贴板粘贴到终端
+  - `Ctrl+A` / `Ctrl+C` / `Ctrl+E` 等其他快捷键透传给 shell（xterm 默认行为）
+  - 新增 `public/js/terminal-keyboard.js` UMD 纯函数模块（导出 `handleTerminalKeydown(e, term, clipboard)`，便于 Node 环境 require 测试）
+  - 非 HTTPS 环境下 `navigator.clipboard` 为 undefined 时静默降级，终端仍可正常使用
+
+### Changed
+- refactor(terminal): 移除 `views/pages/terminal.ejs` 内联脚本，统一引用外部 JS
+  - 消除 `terminal.ejs` 与 `terminal-standalone.js` 的冗余内联脚本（符合"CSS/JS 必须拆分到外部文件"原则）
+  - 移除未使用的 `xterm-addon-web-links` 依赖
+  - 添加缓存参数 `?_b=202607061700` 确保浏览器加载最新版本
+
+### Tests
+- test: 新增 `test/terminal-shortcuts.test.js`，10 个测试用例（12 个断言）覆盖所有快捷键场景
+
 ## [2.28.12] - 2026-07-02
 
 ### Fixed
