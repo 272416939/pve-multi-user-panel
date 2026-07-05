@@ -41,6 +41,7 @@
                 if (clipboard && clipboard.writeText) {
                     clipboard.writeText(sel).catch(function() {});
                 }
+                e.preventDefault(); // 阻止浏览器原生复制（避免覆盖剪贴板）
                 return false; // 阻止 xterm 默认，避免发送 \x03
             }
             return true; // 无选中，透传 SIGINT
@@ -52,6 +53,7 @@
             if (sel2 && clipboard && clipboard.writeText) {
                 clipboard.writeText(sel2).catch(function() {});
             }
+            e.preventDefault(); // 阻止浏览器原生复制
             return false; // Insert 不需要透传给 shell
         }
 
@@ -62,6 +64,7 @@
                     if (text) term.paste(text);
                 }).catch(function() {});
             }
+            e.preventDefault(); // 阻止浏览器原生粘贴（避免双重粘贴：test → testtest）
             return false;
         }
 
@@ -72,6 +75,7 @@
                     if (text) term.paste(text);
                 }).catch(function() {});
             }
+            e.preventDefault(); // 阻止浏览器原生粘贴（避免双重粘贴）
             return false;
         }
 

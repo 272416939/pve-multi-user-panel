@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.28.14] - 2026-07-06
+
+### Fixed
+- fix(terminal): 修复 Ctrl+Shift+V / Shift+Insert 粘贴时双重粘贴的问题
+  - 问题：`attachCustomKeyEventHandler` 返回 `false` 只阻止 xterm 默认处理，不阻止浏览器原生粘贴。浏览器原生粘贴会写入 xterm 隐藏 textarea（触发 onData → ws.send），同时我们又调用 `term.paste(text)`，导致 "test" 变成 "testtest"
+  - 修复：在所有自定义处理的分支（复制和粘贴）中调用 `e.preventDefault()` 阻止浏览器默认行为，确保只执行我们的 `clipboard.readText/writeText` 逻辑
+
+### Tests
+- test: 新增 8 个测试用例覆盖 preventDefault 调用（5 个应调用 + 3 个不应调用）
+
 ## [2.28.13] - 2026-07-06
 
 ### Added
