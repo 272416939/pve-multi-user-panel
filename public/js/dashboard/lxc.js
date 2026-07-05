@@ -252,11 +252,11 @@
 
     $.submitLxcPasswordReset = async function() {
         if ($.lxcPasswordForm.value.password !== $.lxcPasswordForm.value.confirm) {
-            $.lxcPasswordError.value = '两次输入的密码不一致';
+            alert('两次输入的密码不一致');
             return;
         }
         if ($.lxcPasswordForm.value.password.length < 6) {
-            $.lxcPasswordError.value = '密码长度不能少于6位';
+            alert('密码长度不能少于6位');
             return;
         }
         $.lxcPasswordError.value = '';

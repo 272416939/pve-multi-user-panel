@@ -742,7 +742,7 @@
                 <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customAlertMessage }}</p>
             </div>
             <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                <button type="button" class="btn btn-primary px-4" @mousedown="(e) => e.target.blur()" data-bs-dismiss="modal">确定</button>
+                <pv-button type="button" variant="primary" @mousedown="(e) => e.target.blur()" data-bs-dismiss="modal">确定</pv-button>
             </div>
         </div>
     </div>
@@ -761,8 +761,8 @@
                 <p class="custom-confirm-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;white-space:pre-line;">{{ customConfirmMessage }}</p>
             </div>
             <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
-                <button type="button" class="btn btn-outline-light px-3" @click="confirmCancel">取消</button>
-                <button type="button" class="btn btn-primary px-3" @click="confirmOk">确定</button>
+                <pv-button type="button" variant="outline" @click="confirmCancel">取消</pv-button>
+                <pv-button type="button" variant="primary" @click="confirmOk">确定</pv-button>
             </div>
         </div>
     </div>

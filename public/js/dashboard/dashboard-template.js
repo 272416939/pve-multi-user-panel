@@ -382,8 +382,8 @@
 
 <div class="modal fade" id="deviceForwardModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-centered">
-        <div class="modal-content" style="background:#1a1a2e;color:#e0e0e0;">
-            <div class="modal-header" style="border-bottom:1px solid rgba(255,255,255,0.1);">
+        <div class="modal-content" style="background:var(--bg-modal);color:var(--text-primary);">
+            <div class="modal-header" style="border-bottom:1px solid var(--border-color);">
                 <h5 class="modal-title">{{ currentDevice.name || (currentDevice.type === 'vm' ? 'VM ' + currentDevice.deviceId : 'CT ' + currentDevice.deviceId) }} - 端口转发管理</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
@@ -397,7 +397,7 @@
                     </div>
                     <div v-if="deviceRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>
                     <div v-else class="table-responsive mb-0">
-                        <table class="table table-dark table-striped table-hover mb-0">
+                        <table class="table table-striped table-hover mb-0">
                             <thead><tr>
                                 <th>名称</th><th>目标 IP</th><th>内网端口</th><th>外网端口</th><th>协议</th><th>状态</th><th>操作</th>
                             </tr></thead>
@@ -468,13 +468,13 @@
     <div class="modal-content" style="max-width:440px">
         <div class="modal-header">
             <h2 class="modal-title">操作确认</h2>
-            <button class="modal-close" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">✕</button>
+            <pv-button variant="close" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()"></pv-button>
         </div>
         <div class="modal-body" style="padding:24px 28px;text-align:center">
             <p style="font-size:15px;color:var(--text-primary);line-height:1.6;margin:0 0 20px">{{ confirmState?.vmId !== null ? confirmActionText : confirmLxcActionText }}</p>
             <div style="display:flex;gap:10px;justify-content:center">
-                <button class="table-btn btn-danger" style="padding:8px 28px;font-size:14px" @click="confirmState?.vmId !== null ? confirmAction(userVms.find(function(v){return v.id===confirmState.vmId})||userVms[0]) : confirmLxcAction(userLxcContainers.find(function(c){return c.ct_id===lxcConfirmState.ctId})||userLxcContainers[0])">确认执行</button>
-                <button class="table-btn" style="padding:8px 28px;font-size:14px" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">取消</button>
+                <pv-button variant="danger" @click="confirmState?.vmId !== null ? confirmAction(userVms.find(function(v){return v.id===confirmState.vmId})||userVms[0]) : confirmLxcAction(userLxcContainers.find(function(c){return c.ct_id===lxcConfirmState.ctId})||userLxcContainers[0])">确认执行</pv-button>
+                <pv-button variant="outline" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">取消</pv-button>
             </div>
         </div>
     </div>
@@ -485,7 +485,7 @@
     <div class="modal-content" style="max-width:720px">
         <div class="modal-header">
             <h2 class="modal-title">{{ detailVm._isLxc ? (detailVm.name || ('CT ' + detailVm.vm_id)) : (detailVm.name || ('VM ' + detailVm.vm_id)) }} 详情</h2>
-            <button class="modal-close" @click="closeVmDetail()">✕</button>
+            <pv-button variant="close" @click="closeVmDetail()"></pv-button>
         </div>
         <div class="modal-body">
             <!-- 基本信息区域 -->

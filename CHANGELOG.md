@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.28.12] - 2026-07-02
+
+### Fixed
+- fix(dashboard): 修复重置密码长度错误提示没有弹窗的问题
+  - VM 重置密码：密码长度不足 6 位时改用 `alert()` 弹窗提示（支持动态层级），而非只设置内联错误（按钮 disabled 导致用户无法触发提交）
+  - LXC 重置密码：密码长度不足 6 位和两次密码不一致时改用 `alert()` 弹窗提示（模板中缺少 `lxcPasswordError` 显示位置导致错误不可见）
+
+- fix(dashboard): 修复多处按钮、表单未适配明暗模式的问题
+  - deviceForwardModal 移除硬编码深色背景 `#1a1a2e` 和文字颜色 `#e0e0e0`，改用 CSS 变量 `var(--bg-modal)` 和 `var(--text-primary)`
+  - deviceForwardModal header 边框移除硬编码 `rgba(255,255,255,0.1)`，改用 `var(--border-color)`
+  - deviceForwardModal 表格移除 `table-dark` 类（亮色模式下不适配）
+  - customAlertModal 确定按钮从原生 `<button class="btn btn-primary">` 改为 `<pv-button variant="primary">`
+  - customConfirmModal 取消/确定按钮从原生 `<button class="btn btn-outline-light/btn-primary">` 改为 `<pv-button variant="outline/primary">`
+  - VM/LXC 操作确认弹窗按钮从原生 `<button class="table-btn/modal-close">` 改为 `<pv-button variant="danger/outline/close">`
+  - VM/CT 详情监控弹窗关闭按钮从原生 `<button class="modal-close">` 改为 `<pv-button variant="close">`
+
+### Tests
+- test: 新增 `test/dashboard-password-alert-theme.test.js`，10 个测试覆盖 3 个 bug 的修复
+
 ## [2.28.11] - 2026-07-02
 
 ### Fixed
