@@ -102,5 +102,41 @@
         resizeTimer = setTimeout(sendResize, 200);
     });
 
+    // 快捷键说明 modal：点击按钮显示，点击关闭/遮罩/ESC 隐藏
+    (function initShortcutsModal() {
+        var btn = document.getElementById('shortcutsBtn');
+        var modal = document.getElementById('shortcutsModal');
+        var closeBtn = document.getElementById('shortcutsCloseBtn');
+        var content = document.getElementById('shortcutsContent');
+        if (!btn || !modal || !closeBtn || !content) return;
+
+        // 注入快捷键说明 HTML（来自 terminal-shortcuts-help.js）
+        if (typeof getShortcutsHelpHTML === 'function') {
+            content.innerHTML = getShortcutsHelpHTML();
+        }
+
+        function openModal() {
+            modal.classList.add('show');
+            closeBtn.focus();
+        }
+        function closeModal() {
+            modal.classList.remove('show');
+            term.focus();
+        }
+
+        btn.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+        // 点击遮罩区域关闭
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) closeModal();
+        });
+        // ESC 关闭
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && modal.classList.contains('show')) {
+                closeModal();
+            }
+        });
+    })();
+
     connect();
 })();

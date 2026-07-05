@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.28.15] - 2026-07-06
+
+### Added
+- feat(terminal): 网页终端新增快捷键提示和使用说明
+  - 状态栏右侧新增"快捷键 ?"按钮，点击弹出说明 modal
+  - 说明 modal 列出所有快捷键：复制（Ctrl+Insert / Ctrl+Shift+C）、粘贴（Shift+Insert / Ctrl+Shift+V）、透传（Ctrl+A / Ctrl+C / Ctrl+E）
+  - 说明 Ctrl+Shift+C 无选中时透传 SIGINT 中断当前命令
+  - 提示复制需先选中文本、粘贴需 HTTPS 环境支持剪贴板 API
+  - 新增 `public/js/terminal-shortcuts-help.js` UMD 模块（导出 `getShortcutsHelpHTML()` 便于测试）
+
+### UX
+- modal 支持点击关闭按钮、点击遮罩区域、按 ESC 三种方式关闭
+- 关闭后自动聚焦回终端，不影响后续输入
+
+### Tests
+- test: 新增 `test/terminal-shortcuts-help.test.js`，8 个测试用例覆盖说明内容完整性、HTML 结构、安全性（无 script 标签）
+
 ## [2.28.14] - 2026-07-06
 
 ### Fixed
