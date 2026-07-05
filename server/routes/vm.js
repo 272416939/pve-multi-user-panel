@@ -11,6 +11,8 @@ const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindin
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
+const { checkRateLimit } = require('../middleware/rate-limiter');
+const { buildSetClipboardCommand, buildGetClipboardCommand, parseClipboardOutput } = require('../utils/vm-clipboard');
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -869,6 +871,132 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
         res.json({ message: '虚拟机已销毁' });
     } catch (error) {
         console.error('销毁虚拟机失败:', error);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
+// ==================== VM 剪贴板中转 API ====================
+// 通过 PVE QEMU Guest Agent (QMP guest-exec) 在 Windows guest 内读写剪贴板
+// 绕过 QEMU VNC 不支持剪贴板同步的限制
+
+// 共用：校验 vmid + 资源归属 + 运行状态
+async function checkClipboardAccess(req, vmid) {
+    if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+        return { error: '无效的 VM ID', status: 400 };
+    }
+    const allVms = await db.vms.getAll();
+    const vm = allVms.find(v => v.vm_id === vmid);
+    const isAdmin = req.user.role === 'admin';
+
+    // 参考第 583-597 行 VNC 路由的统一权限模式
+    if (!vm) {
+        if (!isAdmin) {
+            return { error: '虚拟机未分配，无权限', status: 403 };
+        }
+        // 管理员允许继续（用于运维未分配的 VM）
+    } else {
+        const isOwner = req.user.id === vm.user_id;
+        if (!isOwner && !isAdmin) {
+            return { error: '无权操作此虚拟机', status: 403 };
+        }
+    }
+
+    // 运行状态检查
+    let vmStatus;
+    try {
+        vmStatus = await pveApi.getVmStatus(vmid);
+    } catch (e) {
+        return { error: '无法获取虚拟机状态', status: 500 };
+    }
+    if (!vmStatus || vmStatus.status !== 'running') {
+        return { error: '虚拟机未运行，请先开机', status: 400 };
+    }
+    return { ok: true };
+}
+
+// 读取 VM 剪贴板（VM → 浏览器）
+router.get('/vm/:vmid/clipboard', authMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+
+        // 限速：每用户 10 次/分钟
+        const rateLimitResult = await checkRateLimit(
+            'ratelimit:vm-clipboard-get:' + req.user.id, 10, 60 * 1000
+        );
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        }
+
+        const access = await checkClipboardAccess(req, vmid);
+        if (access.error) {
+            return res.status(access.status).json({ error: access.error });
+        }
+
+        const cmd = buildGetClipboardCommand();
+        const status = await pveApi.guestExecAndWait(vmid, cmd.command, null, 15000);
+
+        // exitcode 非 0 表示命令执行失败（如 guest 未安装 virtio-ga）
+        if (!status.exited || status.exitcode !== 0) {
+            const errData = status['err-data']
+                ? Buffer.from(status['err-data'], 'base64').toString('utf8')
+                : '';
+            console.error('VM 剪贴板读取失败:', status.exitcode, errData);
+            return res.status(500).json({
+                error: '读取 VM 剪贴板失败，请确认已安装 QEMU Guest Agent 并启用剪贴板支持'
+            });
+        }
+
+        const text = parseClipboardOutput(status['out-data']);
+        res.json({ text });
+    } catch (error) {
+        console.error('读取 VM 剪贴板错误:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
+// 写入 VM 剪贴板（浏览器 → VM）
+router.post('/vm/:vmid/clipboard', authMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+
+        // 限速：每用户 10 次/分钟
+        const rateLimitResult = await checkRateLimit(
+            'ratelimit:vm-clipboard-set:' + req.user.id, 10, 60 * 1000
+        );
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        }
+
+        const access = await checkClipboardAccess(req, vmid);
+        if (access.error) {
+            return res.status(access.status).json({ error: access.error });
+        }
+
+        // 文本校验：必须是字符串，且不超过 64KB
+        const text = req.body && typeof req.body.text === 'string' ? req.body.text : null;
+        if (text === null) {
+            return res.status(400).json({ error: '缺少 text 字段或类型错误' });
+        }
+        if (Buffer.byteLength(text, 'utf8') > 64 * 1024) {
+            return res.status(400).json({ error: '剪贴板内容过大（上限 64KB）' });
+        }
+
+        const cmd = buildSetClipboardCommand(text);
+        const status = await pveApi.guestExecAndWait(vmid, cmd.command, cmd.inputData, 15000);
+
+        if (!status.exited || status.exitcode !== 0) {
+            const errData = status['err-data']
+                ? Buffer.from(status['err-data'], 'base64').toString('utf8')
+                : '';
+            console.error('VM 剪贴板写入失败:', status.exitcode, errData);
+            return res.status(500).json({
+                error: '写入 VM 剪贴板失败，请确认已安装 QEMU Guest Agent 并启用剪贴板支持'
+            });
+        }
+
+        res.json({ success: true });
+    } catch (error) {
+        console.error('写入 VM 剪贴板错误:', error.message);
         res.status(500).json({ error: safeError(error) });
     }
 });

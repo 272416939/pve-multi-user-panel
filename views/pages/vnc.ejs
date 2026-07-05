@@ -147,7 +147,8 @@
                 • 在 VM 内 Ctrl+C 复制后，按 Ctrl+Shift+C 同步到浏览器剪贴板<br>
                 • 浏览器复制后，按 Ctrl+Shift+V 粘贴到 VM<br>
                 • 需 HTTPS 环境（navigator.clipboard API）<br>
-                • 仅支持纯文本，不支持文件
+                • 需 VM 已安装 QEMU Guest Agent 并启用剪贴板支持<br>
+                • 仅支持 Windows VM，仅支持纯文本（上限 64KB）
             </p>
             <div class="modal-close">
                 <button type="button" id="clipboardCloseBtn">关闭</button>
@@ -155,7 +156,7 @@
         </div>
     </div>
 
-    <script src="js/vnc-clipboard.js?_b=202607062300"></script>
+    <script src="js/vnc-clipboard.js?_b=202607070400"></script>
     <script type="module" nonce="<%= cspNonce %>">
         import RFB from '/novnc/core/rfb.js';
 
@@ -187,7 +188,6 @@
 
         let rfb = null;
         let scaled = true;
-        const clipboardState = VncClipboard.createClipboardState();
 
         function onConnected() {
             statusText.innerHTML = '已连接';
@@ -210,9 +210,6 @@
                 });
                 rfb.addEventListener('connect', onConnected);
                 rfb.addEventListener('disconnect', onDisconnected);
-                rfb.addEventListener('clipboard', function(e) {
-                    VncClipboard.handleVncClipboardEvent(clipboardState, e.detail);
-                });
                 rfb.scaleViewport = scaled;
                 rfb.resizeSession = false;
             } catch(e) {
@@ -266,7 +263,7 @@
         // 剪贴板快捷键：全局监听 keydown，仅当 rfb 已连接时处理
         document.addEventListener('keydown', function(e) {
             if (rfb) {
-                VncClipboard.handleVncClipboardKeydown(e, rfb, clipboardState, navigator.clipboard);
+                VncClipboard.handleVncClipboardKeydown(e, vmid, navigator.clipboard);
             }
         });
 

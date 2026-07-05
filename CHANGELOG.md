@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.28.19] - 2026-07-06
+
+### Changed
+- refactor(vnc): 重写 VNC 剪贴板功能改用后端中转 API
+  - 问题：v2.28.18 监听 noVNC `clipboard` 事件被动接收 VM 剪贴板文本，但 QEMU VNC 默认不监听 guest 剪贴板变化，也不主动推送 ServerCutText 事件，导致 VM → 浏览器方向不生效
+  - 方案：通过 PVE QEMU Guest Agent (QMP `guest-exec`) 在 Windows guest 内执行 PowerShell `Get-Clipboard` / `Set-Clipboard` 读写剪贴板，绕过 QEMU VNC 限制
+  - 新增 `server/utils/vm-clipboard.js` 纯函数模块（命令注入防护：文本经 stdin 传递，base64 编码，不拼入命令行参数）
+  - 在 `server/api/pve-api.js` 新增 `guestExec` / `guestExecStatus` / `guestExecAndWait` 三个 QMP 方法
+  - 在 `server/routes/vm.js` 新增 `GET /api/vm/:vmid/clipboard`（VM→浏览器）和 `POST /api/vm/:vmid/clipboard`（浏览器→VM）端点
+  - 端点包含：vmid 范围校验、资源归属校验（参考 VNC 路由权限模式）、运行状态检查、限速（10 次/分钟/用户）、文本 64KB 上限
+  - 前端 `public/js/vnc-clipboard.js` 改为通过 `fetch` 调用后端 API，移除 `createClipboardState` 和 `handleVncClipboardEvent`
+  - `views/pages/vnc.ejs` 移除 noVNC `clipboard` 事件监听和 `clipboardState`，全局 keydown 改传 `vmid`
+  - 仅支持 Windows VM，需 guest 已安装 QEMU Guest Agent 并启用剪贴板支持
+  - TDD：16/16 vnc-clipboard 测试通过 + 18/18 vm-clipboard-api 测试通过
+
 ## [2.28.18] - 2026-07-06
 
 ### Added
