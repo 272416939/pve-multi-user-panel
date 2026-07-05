@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.28.16] - 2026-07-06
+
+### Security
+- security(console): 修复 VNC/终端连接 URL 信息泄露问题
+  - 问题：VNC URL 暴露 `node`、`port`、`ticket`、`vmid`、`userId`，终端 URL 暴露 `vmid`、JWT `token`，敏感凭证会出现在浏览器历史、服务器日志、Referer 头中
+  - 修复：用不透明的 64 字符 hex session ID 替代所有 URL 中的敏感参数，session 数据存服务端（Redis + 内存回退，5分钟 TTL，单次性消费）
+  - 新增 `server/utils/console-session.js` 模块（createSession/getSession/consumeSession/deleteSession）
+  - QEMU VNC ticket 通过 EJS locals 注入（noVNC RFB 认证需要），不再出现在 URL 中
+  - WebSocket 代理（vnc-proxy/terminal-proxy）改用 `consumeSession` 获取连接参数，移除旧 `registerTicket`/`validateTicket` 和 `jwt.verify` 逻辑
+  - Session 单次性：WebSocket 连接后立即删除 session，防止重放攻击
+
+### Removed
+- 删除 legacy 静态文件 `public/vnc.html` 和 `public/terminal.html`（已被 EJS 模板替代，无法接收服务端注入的 session 数据）
+
+### Tests
+- test: `test/console-session.test.js` 7 个测试用例覆盖 session 创建、获取、消费、删除、单次性
+
 ## [2.28.15] - 2026-07-06
 
 ### Added

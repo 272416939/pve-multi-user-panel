@@ -9,7 +9,7 @@ const { getStatusCache } = require('../websocket/push-proxy');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
-const vncProxy = require('../websocket/vnc-proxy');
+const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
@@ -611,11 +611,16 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         // 获取 VNC proxy ticket
         const result = await pveApi.getVncConsole(vmid);
 
-        // 安全修复：注册 ticket 到校验存储，WebSocket 代理连接时会校验
-        await vncProxy.registerTicket(result.ticket, vmid, req.user.id);
+        // 安全修复：用不透明的 session ID 替代 URL 中的敏感参数
+        // session 数据存服务端（Redis+内存回退），避免 ticket/node/port 在浏览器历史/日志/Referer 中泄露
+        const sessionId = await consoleSession.createSession({
+            type: 'vnc', subtype: 'qemu',
+            vmid, userId: req.user.id,
+            node: result.node, port: result.port, ticket: result.ticket
+        });
 
-        // 返回代理页面，通过我们的服务器转发 VNC 流量
-        const proxyUrl = `/vnc?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&userId=${req.user.id}`;
+        // 返回代理页面 URL（只暴露 session ID，不含敏感参数）
+        const proxyUrl = `/vnc?session=${sessionId}`;
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 VNC 控制台失败:', error.message);

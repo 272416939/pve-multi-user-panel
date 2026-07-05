@@ -289,8 +289,34 @@ app.get('/admin', (req, res) => res.render('pages/admin', { title: '管理后台
 app.get('/dashboard', (req, res) => res.render('pages/dashboard', { title: '仪表盘', page: 'dashboard' }));
 app.get('/user-center', (req, res) => res.render('pages/user-center', { title: '用户中心', page: 'user-center' }));
 app.get('/login', (req, res) => res.render('pages/login', { title: '登录', page: 'login' }));
-app.get('/vnc', (req, res) => res.render('pages/vnc'));
-app.get('/terminal', (req, res) => res.render('pages/terminal'));
+app.get('/vnc', async (req, res) => {
+    const sessionId = req.query.session;
+    if (!sessionId) {
+        return res.render('pages/vnc', { error: '缺少会话参数' });
+    }
+    const consoleSession = require('./utils/console-session');
+    const sessionData = await consoleSession.getSession(sessionId);
+    if (!sessionData) {
+        return res.render('pages/vnc', { error: '会话已失效，请重新打开控制台' });
+    }
+    res.render('pages/vnc', {
+        ticket: sessionData.ticket,
+        vmid: String(sessionData.vmid),
+        type: sessionData.subtype || sessionData.type || 'qemu'
+    });
+});
+app.get('/terminal', async (req, res) => {
+    const sessionId = req.query.session;
+    if (!sessionId) {
+        return res.render('pages/terminal', { vmid: '', error: '缺少会话参数' });
+    }
+    const consoleSession = require('./utils/console-session');
+    const sessionData = await consoleSession.getSession(sessionId);
+    if (!sessionData) {
+        return res.render('pages/terminal', { vmid: '', error: '会话已失效，请重新打开终端' });
+    }
+    res.render('pages/terminal', { vmid: String(sessionData.vmid) });
+});
 
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../public', 'index.html'));

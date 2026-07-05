@@ -5,102 +5,34 @@ const tls = require('tls');
 const crypto = require('crypto');
 const pveApi = require('../api/pve-api');
 const dbg = require('../utils/debug');
-const { getRedisClient } = require('../api/redis');
-
-// VNC Ticket 安全校验：防止任意用户通过伪造ticket连接他人机器的控制台
-// ticket → { vmid, userId, createdAt }
-const TICKET_TTL_MS = 5 * 60 * 1000; // 5分钟有效期（PVE自身ticket也是短期的）
-const TICKET_TTL_SEC = 300;
-const ticketRegistry = new Map(); // 仅 Redis 不可用时回退使用
-
-/**
- * 注册一个 VNC ticket（由 API 路程在获取 PVE ticket 后调用）
- * @param {string} ticket - PVE 返回的 vncticket
- * @param {string|number} vmid - 虚拟机/容器 ID
- * @param {string|number} userId - 请求用户的 ID
- */
-async function registerTicket(ticket, vmid, userId) {
-    const redis = getRedisClient();
-    const data = JSON.stringify({ vmid: String(vmid), userId: String(userId) });
-
-    if (redis) {
-        try {
-            await redis.setex(`vncticket:${ticket}`, 300, data);
-            return;
-        } catch (e) {
-            console.warn('[vnc-ticket] Redis 不可用，使用内存回退:', e.message);
-        }
-    }
-
-    const now = Date.now();
-    for (const [t, info] of ticketRegistry) {
-        if (now - info.createdAt > TICKET_TTL_MS) ticketRegistry.delete(t);
-    }
-    ticketRegistry.set(ticket, { vmid: String(vmid), userId: String(userId), createdAt: now });
-}
-
-/**
- * 校验 ticket 是否合法且未过期
- * @param {string} ticket
- * @param {string} vmid - 请求连接的 vmid
- * @param {string} userId - 请求用户的 ID（P1-C5 修复：防止跨用户复用）
- * @returns {{ valid: boolean, reason?: string }}
- */
-async function validateTicket(ticket, vmid, userId) {
-    if (!ticket || !vmid) return { valid: false, reason: '缺少参数' };
-
-    const redis = getRedisClient();
-    if (redis) {
-        try {
-            const data = await redis.get(`vncticket:${ticket}`);
-            if (!data) return { valid: false, reason: 'ticket不存在或已过期' };
-            const info = JSON.parse(data);
-            if (info.vmid !== String(vmid)) return { valid: false, reason: 'ticket与目标VM不匹配' };
-            if (userId && info.userId !== String(userId)) return { valid: false, reason: 'ticket不属于当前用户' };
-            return { valid: true };
-        } catch (e) {
-            console.warn('[vnc-ticket] Redis 不可用，使用内存回退:', e.message);
-        }
-    }
-
-    const info = ticketRegistry.get(ticket);
-    if (!info) return { valid: false, reason: 'ticket不存在或已过期' };
-    if (Date.now() - info.createdAt > TICKET_TTL_MS) {
-        ticketRegistry.delete(ticket);
-        return { valid: false, reason: 'ticket已过期' };
-    }
-    if (info.vmid !== String(vmid)) {
-        return { valid: false, reason: 'ticket与目标VM不匹配' };
-    }
-    if (userId && info.userId !== String(userId)) {
-        return { valid: false, reason: 'ticket不属于当前用户' };
-    }
-    return { valid: true };
-}
+const consoleSession = require('../utils/console-session');
 
 const vncProxy = new WebSocketServer({ noServer: true });
 
 vncProxy.on('connection', async (clientWs, request) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
-    const node = url.searchParams.get('node');
-    const vmid = url.searchParams.get('vmid');
-    const port = url.searchParams.get('port');
-    const ticket = url.searchParams.get('ticket');
-    const userId = url.searchParams.get('userId'); // P1-C5 修复：从 URL 获取用户 ID
-    const type = url.searchParams.get('type') || 'qemu';
+    const sessionId = url.searchParams.get('session');
 
+    if (!sessionId) {
+        clientWs.close(4000, '缺少会话参数');
+        return;
+    }
+
+    // 单次性消费 session（获取后立即删除，防止重放）
+    const sessionData = await consoleSession.consumeSession(sessionId);
+    if (!sessionData) {
+        console.warn('[VNC Proxy] 拒绝无效或已过期的 session');
+        clientWs.close(4001, '会话已失效或已过期');
+        return;
+    }
+
+    const { node, vmid, port, ticket, type } = sessionData;
     if (!node || !vmid || !port || !ticket) {
-        clientWs.close(4000, '缺少参数');
+        clientWs.close(4000, '会话数据不完整');
         return;
     }
 
-    // 安全修复：校验 ticket 合法性 + userId（P1-C5 防跨用户复用）
-    const ticketCheck = await validateTicket(ticket, vmid, userId);
-    if (!ticketCheck.valid) {
-        console.warn('[VNC Proxy] 拒绝非法连接:', ticketCheck.reason, '| vmid:', vmid, '| userId:', userId);
-        clientWs.close(4001, '无效的VNC票据: ' + ticketCheck.reason);
-        return;
-    }
+    dbg(`[VNC Proxy] 连接建立: type=${type || 'qemu'}, vmid=${vmid}, node=${node}`);
 
     if (type === 'lxc') {
         const pveHost = new URL(pveApi.host).hostname;
@@ -443,4 +375,3 @@ function handleLxcVncTcpProxy(clientWs, pveHost, port, ticket) {
 }
 
 module.exports = vncProxy;
-module.exports.registerTicket = registerTicket;

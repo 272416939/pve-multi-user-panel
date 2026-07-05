@@ -1,15 +1,12 @@
 (function() {
     const params = new URLSearchParams(location.search);
-    const vmid = params.get('vmid');
-    const token = params.get('token');
+    const session = params.get('session');
 
-    if (!vmid || !token) {
-        document.getElementById('statusText').textContent = '参数缺失：vmid 或认证 token';
+    if (!session) {
+        document.getElementById('statusText').textContent = '参数缺失：会话 ID';
         document.getElementById('statusText').className = 'error';
         return;
     }
-
-    document.getElementById('connInfo').textContent = 'CT ' + vmid;
 
     const term = new Terminal({
         cursorBlink: true,
@@ -34,7 +31,7 @@
     window.addEventListener('resize', () => fitAddon.fit());
 
     const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = wsProto + '//' + location.host + '/term-proxy?vmid=' + encodeURIComponent(vmid) + '&token=' + encodeURIComponent(token);
+    const wsUrl = wsProto + '//' + location.host + '/term-proxy?session=' + encodeURIComponent(session);
 
     let ws;
     let wsConnected = false;

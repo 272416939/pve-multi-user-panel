@@ -1,10 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const jwt = require('jsonwebtoken');
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-const { JWT_SECRET } = require('../utils/token');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 const { getStatusCache } = require('../websocket/push-proxy');
@@ -12,7 +10,7 @@ const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp } = require('../services/dhcp');
 const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
 const dbg = require('../utils/debug');
-const vncProxy = require('../websocket/vnc-proxy');
+const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
 router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
@@ -614,10 +612,14 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
  
         const result = await pveApi.getLxcVncConsole(vmid);
 
-        // 安全修复：注册 ticket 到校验存储，WebSocket 代理连接时会校验
-        await vncProxy.registerTicket(result.ticket, vmid, req.user.id);
+        // 安全修复：用不透明的 session ID 替代 URL 中的敏感参数
+        const sessionId = await consoleSession.createSession({
+            type: 'vnc', subtype: 'lxc',
+            vmid, userId: req.user.id,
+            node: result.node, port: result.port, ticket: result.ticket
+        });
 
-        const proxyUrl = `/vnc?node=${result.node}&vmid=${vmid}&port=${result.port}&ticket=${encodeURIComponent(result.ticket)}&type=lxc&userId=${req.user.id}`;
+        const proxyUrl = `/vnc?session=${sessionId}`;
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC VNC 控制台失败:', error.message);
@@ -655,19 +657,14 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '容器未运行，请先开机' });
         }
 
-        // 生成一次性 terminal ticket（5分钟有效期，绑定 vmid + userId）
-        const terminalTicket = jwt.sign(
-            {
-                type: 'terminal',
-                vmid: vmid,
-                userId: req.user.id,
-                username: req.user.username
-            },
-            JWT_SECRET,
-            { expiresIn: '5m' }
-        );
+        // 安全修复：用不透明的 session ID 替代 URL 中的 JWT token
+        // session 数据存服务端（5分钟 TTL，单次性），避免 token 在浏览器历史/日志/Referer 中泄露
+        const sessionId = await consoleSession.createSession({
+            type: 'terminal',
+            vmid, userId: req.user.id, username: req.user.username
+        });
 
-        const proxyUrl = `/terminal?vmid=${vmid}&token=${encodeURIComponent(terminalTicket)}`;
+        const proxyUrl = `/terminal?session=${sessionId}`;
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC 终端失败:', error.message);

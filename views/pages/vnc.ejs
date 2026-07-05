@@ -102,27 +102,31 @@
     <script type="module" nonce="<%= cspNonce %>">
         import RFB from '/novnc/core/rfb.js';
 
-        const params = new URLSearchParams(location.search);
-        const node = params.get('node');
-        const vmid = params.get('vmid');
-        const port = params.get('port');
-        const ticket = params.get('ticket');
-        const type = params.get('type') || 'qemu';
+        const error = <%- JSON.stringify(typeof error !== 'undefined' ? error : null) %>;
+        if (error) {
+            document.getElementById('statusText').textContent = error;
+            document.getElementById('connecting').innerHTML = '<span id="error-msg">' + error + '</span>';
+            throw new Error(error);
+        }
+
+        const ticket = <%- JSON.stringify(ticket) %>;
+        const vmid = <%- JSON.stringify(vmid) %>;
+        const type = <%- JSON.stringify(type) %>;
+        const session = new URLSearchParams(location.search).get('session');
 
         const statusText = document.getElementById('statusText');
         const connectingEl = document.getElementById('connecting');
         const screenEl = document.getElementById('screen');
-        document.getElementById('vmLabel').textContent =  (type === 'lxc' ? 'CT ' : 'VM ') + vmid + ' - VNC 控制台';
+        document.getElementById('vmLabel').textContent = (type === 'lxc' ? 'CT ' : 'VM ') + vmid + ' - VNC 控制台';
 
-        if (!node || !vmid || !port || !ticket) {
+        if (!session) {
             statusText.textContent = '参数缺失';
-            connectingEl.innerHTML = '<span id="error-msg">缺少连接参数，请重新打开</span>';
-            throw new Error('missing params');
+            connectingEl.innerHTML = '<span id="error-msg">缺少会话参数，请重新打开</span>';
+            throw new Error('missing session');
         }
 
         const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const userId = params.get('userId') || '';
-        const wsUrl = `${wsProto}//${location.host}/vnc-proxy?node=${node}&vmid=${vmid}&port=${port}&ticket=${encodeURIComponent(ticket)}&type=${encodeURIComponent(type || 'qemu')}&userId=${encodeURIComponent(userId)}`;
+        const wsUrl = `${wsProto}//${location.host}/vnc-proxy?session=${encodeURIComponent(session)}`;
 
         let rfb = null;
         let scaled = true;
