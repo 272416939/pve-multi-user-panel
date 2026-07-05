@@ -24,7 +24,7 @@
             '<thead><tr><th>快捷键</th><th>功能</th></tr></thead>',
             '<tbody>',
             '<tr><td><kbd>Ctrl+Insert</kbd></td><td>复制选中文本到剪贴板</td></tr>',
-            '<tr><td><kbd>Ctrl+Shift+C</kbd></td><td>复制选中文本（无选中时透传 SIGINT 中断当前命令）</td></tr>',
+            '<tr><td><kbd>Ctrl+Shift+C</kbd></td><td>复制选中文本（无选中时无操作）</td></tr>',
             '<tr><td><kbd>Shift+Insert</kbd></td><td>从剪贴板粘贴到终端</td></tr>',
             '<tr><td><kbd>Ctrl+Shift+V</kbd></td><td>从剪贴板粘贴到终端</td></tr>',
             '<tr><td><kbd>Ctrl+A</kbd></td><td>透传：光标移到行首</td></tr>',

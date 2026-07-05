@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.28.17] - 2026-07-06
+
+### Fixed
+- fix(terminal): 修复 Ctrl+Shift+C 无选中时意外发送 SIGINT 的问题
+  - 问题：Ctrl+Shift+C 是复制快捷键，不应等于 Ctrl+C。原实现无选中时返回 `true` 透传给 xterm 默认处理，xterm 会将 Ctrl+Shift+C 当作 Ctrl+C 发送 `\x03` SIGINT，导致意外中断当前命令
+  - 修复：无选中时返回 `false` 并调用 `e.preventDefault()`，阻止 xterm 默认行为。用户如需中断命令应使用 Ctrl+C
+  - 同步更新快捷键说明文案："复制选中文本（无选中时无操作）"
+
+### Tests
+- test: 更新 3 个测试用例（2 个 keyboard + 1 个 help）匹配新行为
+
 ## [2.28.16] - 2026-07-06
 
 ### Security

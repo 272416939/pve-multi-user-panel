@@ -1,6 +1,6 @@
 {
     "name":  "pve-multi-user-panel",
-    "version":  "2.28.16",
+    "version":  "2.28.17",
     "description":  "Proxmox Virtual Environment 多用户控制面板",
     "main":  "server/server.js",
     "scripts":  {

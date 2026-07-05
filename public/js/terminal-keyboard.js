@@ -2,8 +2,7 @@
  * terminal-keyboard.js - 网页终端快捷键处理（复制/粘贴/透传）
  *
  * 快捷键定义：
- *   Ctrl+Insert / Ctrl+Shift+C → 复制选中文本到剪贴板
- *     （Ctrl+Shift+C 无选中时透传 \x03 SIGINT）
+ *   Ctrl+Insert / Ctrl+Shift+C → 复制选中文本到剪贴板（无选中时无操作）
  *   Shift+Insert / Ctrl+Shift+V → 从剪贴板粘贴到终端
  *   Ctrl+A / Ctrl+C / Ctrl+E 等 → 透传给 shell（xterm 默认行为）
  *
@@ -33,18 +32,17 @@
         var shift = e.shiftKey;
         var key = e.key;
 
-        // Ctrl+Shift+C → 复制选中（无选中透传 \x03）
+        // Ctrl+Shift+C → 复制选中（无选中时无操作，不发送 SIGINT）
+        // 注意：Ctrl+Shift+C 不等于 Ctrl+C，不应发送 \x03。
+        // 用户如需中断当前命令，应使用 Ctrl+C（下方透传逻辑）。
         // Shift 按下时 e.key 可能为 'C' 或 'c'（依赖浏览器/键盘布局），两者都匹配
         if (ctrl && shift && (key === 'C' || key === 'c')) {
             var sel = term.getSelection();
-            if (sel) {
-                if (clipboard && clipboard.writeText) {
-                    clipboard.writeText(sel).catch(function() {});
-                }
-                e.preventDefault(); // 阻止浏览器原生复制（避免覆盖剪贴板）
-                return false; // 阻止 xterm 默认，避免发送 \x03
+            if (sel && clipboard && clipboard.writeText) {
+                clipboard.writeText(sel).catch(function() {});
             }
-            return true; // 无选中，透传 SIGINT
+            e.preventDefault(); // 阻止浏览器原生复制 + 阻止 xterm 默认（避免意外发送 \x03）
+            return false;
         }
 
         // Ctrl+Insert → 复制选中
