@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.28.20] - 2026-07-06
+
+### Reverted
+- revert(vnc): 回滚 VNC 剪贴板功能（v2.28.18 + v2.28.19）
+  - 撤销 v2.28.18 引入的 noVNC `clipboard` 事件监听方案（QEMU VNC 默认不推送 ServerCutText，VM→浏览器方向不生效）
+  - 撤销 v2.28.19 引入的后端中转 API 方案（QEMU Guest Agent guest-exec + PowerShell 读写剪贴板）
+  - 删除新增文件：`public/js/vnc-clipboard.js`、`server/utils/vm-clipboard.js`、对应测试文件
+  - 恢复 `views/pages/vnc.ejs`、`server/api/pve-api.js`、`server/routes/vm.js` 到 v2.28.17 状态
+  - VNC 控制台回到无剪贴板快捷键的原始状态（终端模块的复制粘贴功能不受影响）
+
 ## [2.28.19] - 2026-07-06
 
 ### Changed

@@ -68,34 +68,6 @@
         }
         .ctrl-bar button.primary:hover { background: #d63851; }
         #error-msg { color: #e94560; }
-        /* 剪贴板说明 modal */
-        #clipboardModal {
-            display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.6); z-index: 100;
-            justify-content: center; align-items: center;
-        }
-        #clipboardModal.show { display: flex; }
-        #clipboardModal .modal-content {
-            background: #1a1a2e; color: #d4d4d4; border: 1px solid #444;
-            border-radius: 6px; padding: 20px 24px; max-width: 480px;
-            font-family: Menlo, Monaco, "Courier New", monospace;
-        }
-        #clipboardModal h3 { margin-bottom: 12px; color: #fff; font-size: 15px; }
-        #clipboardModal .clipboard-table { border-collapse: collapse; width: 100%; font-size: 12px; }
-        #clipboardModal .clipboard-table th,
-        #clipboardModal .clipboard-table td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #333; }
-        #clipboardModal .clipboard-table th { color: #888; font-weight: normal; }
-        #clipboardModal kbd {
-            background: #2a2a3e; border: 1px solid #555; border-radius: 3px;
-            padding: 1px 6px; font-family: monospace; font-size: 11px; color: #fff;
-        }
-        #clipboardModal .clipboard-tip { margin-top: 12px; font-size: 11px; color: #888; line-height: 1.6; }
-        #clipboardModal .modal-close { margin-top: 16px; text-align: right; }
-        #clipboardModal .modal-close button {
-            background: #444; color: #d4d4d4; border: none; padding: 6px 14px;
-            border-radius: 3px; cursor: pointer; font-family: monospace; font-size: 12px;
-        }
-        #clipboardModal .modal-close button:hover { background: #555; }
     </style>
 </head>
 <body>
@@ -125,38 +97,8 @@
         <span class="group-label">显示</span>
         <button id="fullscreenBtn" aria-label="切换全屏">全屏</button>
         <button id="scaleBtn" aria-label="切换缩放">适应窗口</button>
-
-        <span class="group-label">剪贴板</span>
-        <button id="clipboardHintBtn" aria-label="剪贴板使用说明">剪贴板 ?</button>
     </div>
 
-    <div id="clipboardModal" role="dialog" aria-modal="true" aria-labelledby="clipboardTitle">
-        <div class="modal-content">
-            <h3 id="clipboardTitle">VNC 剪贴板使用说明</h3>
-            <table class="clipboard-table">
-                <thead><tr><th>快捷键</th><th>功能</th></tr></thead>
-                <tbody>
-                    <tr><td><kbd>Ctrl+Shift+C</kbd></td><td>复制 VM 剪贴板到浏览器</td></tr>
-                    <tr><td><kbd>Ctrl+Insert</kbd></td><td>同上（兼容快捷键）</td></tr>
-                    <tr><td><kbd>Ctrl+Shift+V</kbd></td><td>粘贴浏览器剪贴板到 VM</td></tr>
-                    <tr><td><kbd>Shift+Insert</kbd></td><td>同上（兼容快捷键）</td></tr>
-                </tbody>
-            </table>
-            <p class="clipboard-tip">
-                提示：<br>
-                • 在 VM 内 Ctrl+C 复制后，按 Ctrl+Shift+C 同步到浏览器剪贴板<br>
-                • 浏览器复制后，按 Ctrl+Shift+V 粘贴到 VM<br>
-                • 需 HTTPS 环境（navigator.clipboard API）<br>
-                • 需 VM 已安装 QEMU Guest Agent 并启用剪贴板支持<br>
-                • 仅支持 Windows VM，仅支持纯文本（上限 64KB）
-            </p>
-            <div class="modal-close">
-                <button type="button" id="clipboardCloseBtn">关闭</button>
-            </div>
-        </div>
-    </div>
-
-    <script src="js/vnc-clipboard.js?_b=202607070400"></script>
     <script type="module" nonce="<%= cspNonce %>">
         import RFB from '/novnc/core/rfb.js';
 
@@ -258,30 +200,6 @@
             scaled = !scaled;
             if (rfb) rfb.scaleViewport = scaled;
             this.textContent = scaled ? '原始大小' : '适应窗口';
-        });
-
-        // 剪贴板快捷键：全局监听 keydown，仅当 rfb 已连接时处理
-        document.addEventListener('keydown', function(e) {
-            if (rfb) {
-                VncClipboard.handleVncClipboardKeydown(e, vmid, navigator.clipboard);
-            }
-        });
-
-        // 剪贴板说明 modal
-        var clipboardModal = document.getElementById('clipboardModal');
-        document.getElementById('clipboardHintBtn').addEventListener('click', function() {
-            clipboardModal.classList.add('show');
-        });
-        document.getElementById('clipboardCloseBtn').addEventListener('click', function() {
-            clipboardModal.classList.remove('show');
-        });
-        clipboardModal.addEventListener('click', function(e) {
-            if (e.target === clipboardModal) clipboardModal.classList.remove('show');
-        });
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && clipboardModal.classList.contains('show')) {
-                clipboardModal.classList.remove('show');
-            }
         });
 
         connectVnc();

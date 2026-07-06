@@ -574,51 +574,6 @@ class PveApi {
     );
     return response.data;
   }
-
-  // ===== QEMU Guest Agent (QMP guest-exec) =====
-  // 用于在 guest 内执行命令（如读写剪贴板），需 guest 安装 virtio-ga
-
-  async guestExec(vmid, command, inputData) {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const params = new URLSearchParams();
-    for (let i = 0; i < command.length; i++) {
-      params.append('arg[]', command[i]);
-    }
-    if (inputData) params.append('input-data', inputData);
-    const response = await this.axiosInstance.post(
-      `${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/agent/exec`,
-      params.toString(),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 15000 }
-    );
-    return response.data.data; // { pid: 1234 }
-  }
-
-  async guestExecStatus(vmid, pid) {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const response = await this.axiosInstance.get(
-      `${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/agent/exec/status?pid=${pid}`,
-      { timeout: 15000 }
-    );
-    return response.data.data; // { exited, exitcode, 'out-data', 'err-data' }
-  }
-
-  async guestExecAndWait(vmid, command, inputData, timeoutMs) {
-    var timeout = timeoutMs || 15000;
-    var result = await this.guestExec(vmid, command, inputData);
-    var pid = result.pid;
-    if (!pid) throw new Error('guest-exec 未返回 pid');
-    var start = Date.now();
-    while (Date.now() - start < timeout) {
-      var status = await this.guestExecStatus(vmid, pid);
-      if (status.exited) return status;
-      await new Promise(function(r) { setTimeout(r, 200); });
-    }
-    throw new Error('guest-exec 超时');
-  }
 }
 
 module.exports = new PveApi();
