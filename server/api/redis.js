@@ -26,6 +26,15 @@ function getRedis() {
         maxRetriesPerRequest: 3,
         lazyConnect: false,
         connectionTimeout: 10000,
+        // 连接保活：每 30s 发送 PING，防止长连接被中间设备断开
+        keepAlive: 30000,
+        // 启用 NO_DELAY 算法，降低小包延迟
+        noDelay: true,
+        // 单连接多路复用（ioredis 默认模式，无需连接池）
+        // enableOfflineQueue: true（默认）— 离线时排队请求，连接恢复后批量执行
+        enableOfflineQueue: true,
+        // 离线队列上限（防止积压过多请求）
+        offlineQueueMaxItems: 1000
     });
 
     redis.on('connect', () => {

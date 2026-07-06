@@ -1,5 +1,18 @@
 # Changelog
 
+## [2.28.21] - 2026-07-07
+
+### Changed
+- perf(redis): Redis 缓存层性能优化 + 修复 F-1 安全规则违规
+  - **修复 F-1 违规**：`cache-store.js` TTL jitter 从 `Math.random()` 改为 `crypto.randomBytes(2)`（项目规范要求所有随机值使用 crypto.randomBytes）
+  - **限速器原子化**：`rate-limiter.js` 将 INCR + EXPIRE 两个命令合并为 Lua 脚本原子执行，修复竞态条件下 TTL 可能丢失导致限速失效的问题
+  - **SCAN+DEL 优化**：`cache-store.js` 的 `scanDel` 从单次 DEL 改为 pipeline 批量 DEL，减少 N 次 RTT 到 1 次
+  - **JSON 序列化优化**：提取 `shouldSerialize`/`serialize`/`deserialize` 纯函数，字符串值跳过 JSON.parse/stringify，数字/对象才走 JSON 路径
+  - **连接保活**：`redis.js` 新增 `keepAlive: 30000`（30s PING）、`noDelay: true`（禁用 Nagle 算法降低延迟）、`offlineQueueMaxItems: 1000`（离线队列上限）
+  - **纯函数提取**：将 `computeJitteredTtl`/`shouldSerialize`/`serialize`/`deserialize`/`stripPrefix` 导出为可测试纯函数
+  - **SCAN COUNT 提升**：从 100 提升到 200，减少大key 清理时的迭代次数
+  - TDD：17/17 redis-optimization 测试通过，无回归
+
 ## [2.28.20] - 2026-07-06
 
 ### Reverted

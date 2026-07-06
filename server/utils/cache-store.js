@@ -2,7 +2,82 @@
  * 通用缓存工具 — Redis 优先，内存回退
  * 提供统一的 get/set/del/clear 接口，自动处理 Redis 不可用场景
  */
+const crypto = require('crypto');
 const redisClient = require('../api/redis').getRedisClient();
+
+// ==================== 可测试的纯函数 ====================
+
+/**
+ * 计算 ±10% jitter 的 TTL（防雪崩）
+ * 使用 crypto.randomBytes 替代 Math.random（符合 F-1 规则）
+ * @param {number} ttl - 原始 TTL（秒）
+ * @returns {number} 抖动后的 TTL（秒）
+ */
+function computeJitteredTtl(ttl) {
+    if (!ttl || ttl <= 0) return Math.max(ttl || 0, 0);
+    // ±10% 范围的随机偏移
+    var jitterRange = Math.floor(ttl * 0.1);
+    if (jitterRange === 0) {
+        // TTL 太小（<10），用 ±1 抖动
+        jitterRange = 1;
+    }
+    // crypto.randomBytes(2) → 0~65535，归一化到 [-jitterRange, +jitterRange]
+    var randBytes = crypto.randomBytes(2);
+    var randVal = (randBytes[0] * 256 + randBytes[1]) / 65535;  // 0 ~ 1
+    var jitter = Math.floor((randVal - 0.5) * 2 * jitterRange);  // -jitterRange ~ +jitterRange
+    var result = ttl + jitter;
+    return Math.max(result, 1);  // 至少 1 秒
+}
+
+/**
+ * 判断值是否需要 JSON 序列化
+ * 字符串类型直接存储，其他类型需要 JSON.stringify
+ */
+function shouldSerialize(value) {
+    return typeof value !== 'string';
+}
+
+/**
+ * 序列化值（字符串直接返回，其他类型 JSON.stringify）
+ */
+function serialize(value) {
+    if (typeof value === 'string') return value;
+    return JSON.stringify(value);
+}
+
+/**
+ * 反序列化值（尝试 JSON.parse，失败则返回原值）
+ */
+function deserialize(raw) {
+    if (raw === null || raw === undefined) return null;
+    // 简单字符串（非 JSON 格式）直接返回
+    if (typeof raw !== 'string') return raw;
+    // 快速判断：JSON 一定以 { [ " 数字 true false null 开头
+    var firstChar = raw.charAt(0);
+    if (firstChar !== '{' && firstChar !== '[' && firstChar !== '"' &&
+        firstChar !== 't' && firstChar !== 'f' && firstChar !== 'n' &&
+        !(firstChar >= '0' && firstChar <= '9') && firstChar !== '-') {
+        return raw;  // 非 JSON 字符串
+    }
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        return raw;
+    }
+}
+
+/**
+ * 去除 key 的前缀（ioredis keyPrefix 处理）
+ * SCAN 返回的 key 带前缀，DEL 会自动加前缀，所以需要去掉
+ */
+function stripPrefix(key, prefix) {
+    if (prefix && prefix.length > 0 && key.startsWith(prefix)) {
+        return key.slice(prefix.length);
+    }
+    return key;
+}
+
+// ==================== Redis 操作工具 ====================
 
 // 获取 Redis keyPrefix（ioredis 自动给 set/get/del 加前缀，但 SCAN 不加）
 function getRedisPrefix() {
@@ -12,23 +87,32 @@ function getRedisPrefix() {
     return '';
 }
 
-// SCAN + DEL：修复 ioredis keyPrefix 双前缀问题
-// SCAN 返回的 key 带前缀，DEL 会自动加前缀，所以需要去掉前缀后再传给 DEL
+// SCAN + 批量 DEL：修复 ioredis keyPrefix 双前缀问题
+// 优化：使用 pipeline 批量 DEL，减少 RTT
 async function scanDel(pattern) {
     if (!redisClient) return;
     var prefix = getRedisPrefix();
     var fullPattern = prefix + pattern;
     var cursor = '0';
     do {
-        var reply = await redisClient.scan(cursor, 'MATCH', fullPattern, 'COUNT', 100);
+        var reply = await redisClient.scan(cursor, 'MATCH', fullPattern, 'COUNT', 200);
         cursor = reply[0];
         var keys = reply[1];
         if (keys.length > 0) {
             // 去掉前缀，因为 ioredis 的 del 会自动加前缀
             var strippedKeys = keys.map(function(k) {
-                return prefix.length > 0 && k.startsWith(prefix) ? k.slice(prefix.length) : k;
+                return stripPrefix(k, prefix);
             });
-            await redisClient.del(strippedKeys);
+            // 使用 pipeline 批量 DEL，减少 RTT
+            if (strippedKeys.length > 1) {
+                var pipeline = redisClient.pipeline();
+                for (var i = 0; i < strippedKeys.length; i++) {
+                    pipeline.del(strippedKeys[i]);
+                }
+                await pipeline.exec();
+            } else {
+                await redisClient.del(strippedKeys);
+            }
         }
     } while (cursor !== '0');
 }
@@ -86,8 +170,7 @@ function create(namespace, ttlSeconds) {
                 try {
                     var raw = await redisClient.get(fullKey);
                     if (raw !== null) {
-                        try { return JSON.parse(raw); }
-                        catch (e) { return raw; }
+                        return deserialize(raw);
                     }
                 } catch (e) {
                     // Redis 异常，静默回退
@@ -118,15 +201,13 @@ function create(namespace, ttlSeconds) {
         async set(key, value, customTtl) {
             var fullKey = namespace + ':' + key;
             var ttl = customTtl || ttlSeconds;
-            // 添加 ±10% 随机偏移防止雪崩
-            var jitter = Math.floor(ttl * 0.1 * (Math.random() - 0.5) * 2);
-            var actualTtl = ttl + jitter;
+            var actualTtl = computeJitteredTtl(ttl);
             // 写内存
             memStore.map.set(key, { value: value, ts: Date.now() });
             // 写 Redis
             if (redisClient) {
                 try {
-                    var raw = (typeof value === 'string') ? value : JSON.stringify(value);
+                    var raw = serialize(value);
                     await redisClient.set(fullKey, raw, 'EX', actualTtl);
                 } catch (e) {
                     // Redis 异常，静默回退
@@ -177,4 +258,12 @@ async function clearAll() {
     await scanDel('*');
 }
 
-module.exports = { create, clearAll };
+module.exports = {
+    create, clearAll,
+    // 导出纯函数供测试
+    computeJitteredTtl,
+    shouldSerialize,
+    serialize,
+    deserialize,
+    stripPrefix
+};

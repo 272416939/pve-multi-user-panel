@@ -2,6 +2,42 @@ const { getRedisClient } = require('../api/redis');
 
 const memoryStore = new Map();
 
+/**
+ * 限速器 Lua 脚本（原子操作）
+ * INCR + EXPIRE 在一个 Lua 脚本中执行，避免竞态条件导致 TTL 丢失
+ *
+ * KEYS[1] = 限速 key
+ * ARGV[1] = 窗口大小（秒）
+ * ARGV[2] = 最大允许次数
+ *
+ * 返回 {count, ttl}：
+ *   count = 当前累计次数
+ *   ttl = 剩余 TTL（秒）
+ */
+const RATE_LIMIT_LUA = [
+    'local count = redis.call("INCR", KEYS[1])',
+    'local ttl = 0',
+    'if count == 1 then',
+    '    redis.call("EXPIRE", KEYS[1], ARGV[1])',
+    '    ttl = tonumber(ARGV[1])',
+    'else',
+    '    ttl = redis.call("TTL", KEYS[1])',
+    '    if ttl < 0 then',
+    '        -- 兜底：如果 EXPIRE 丢失（理论上不会，但防御性处理），重新设置',
+    '        redis.call("EXPIRE", KEYS[1], ARGV[1])',
+    '        ttl = tonumber(ARGV[1])',
+    '    end',
+    'end',
+    'return {count, ttl}'
+].join('\n');
+
+/**
+ * 获取限速器 Lua 脚本（供测试验证）
+ */
+function getRateLimitScript() {
+    return RATE_LIMIT_LUA;
+}
+
 async function checkRateLimit(key, maxAttempts, windowMs) {
     const redis = getRedisClient();
     if (redis) {
@@ -12,12 +48,14 @@ async function checkRateLimit(key, maxAttempts, windowMs) {
 
 async function redisRateLimit(redis, key, maxAttempts, windowMs) {
     try {
-        const count = await redis.incr(key);
-        if (count === 1) {
-            await redis.expire(key, Math.ceil(windowMs / 1000));
-        }
+        const windowSec = Math.ceil(windowMs / 1000);
+        // 使用 Lua 脚本保证 INCR + EXPIRE 原子性
+        const result = await redis.eval(
+            RATE_LIMIT_LUA, 1, key, windowSec, maxAttempts
+        );
+        const count = parseInt(result[0]);
+        const ttl = parseInt(result[1]);
         if (count > maxAttempts) {
-            const ttl = await redis.ttl(key);
             return { allowed: false, retryAfter: ttl > 0 ? ttl : 60 };
         }
         return { allowed: true };
@@ -43,4 +81,4 @@ function memoryRateLimit(key, maxAttempts, windowMs) {
     return { allowed: true };
 }
 
-module.exports = { checkRateLimit };
+module.exports = { checkRateLimit, getRateLimitScript };
