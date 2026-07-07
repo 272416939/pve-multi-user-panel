@@ -55,7 +55,7 @@ var App = {
         $.toggleAdminDropdown = function(target) {
             var dd = target.parentElement;
             var isOpen = dd.classList.contains('open');
-            // 关闭所有已打开的下拉，释放 z-index 并移除 table-container 的 overflow 释放标记
+            // 关闭所有已打开的下拉，释放 z-index
             document.querySelectorAll('.dropdown-table.open').forEach(function(el) {
                 el.classList.remove('open');
                 var menu = el.querySelector('.dropdown-menu-table');
@@ -65,21 +65,18 @@ var App = {
                     menu.style.zIndex = '';
                 }
             });
-            document.querySelectorAll('.table-container.dropdown-active').forEach(function(el) {
-                el.classList.remove('dropdown-active');
-            });
             if (!isOpen) {
                 dd.classList.add('open');
-                // 动态 z-index：后打开的下拉始终在顶层
                 var menu = dd.querySelector('.dropdown-menu-table');
-                if (menu && window.ModalZIndexManager) {
+                if (menu && window.positionFixedDropdown) {
+                    // position:fixed 下拉，用 JS 定位到按钮下方
+                    window.positionFixedDropdown(target, menu);
+                } else if (menu && window.ModalZIndexManager) {
+                    // 兜底：仅设 z-index
                     var z = window.ModalZIndexManager.acquire();
                     menu._dropdownZIndex = z;
                     menu.style.zIndex = z;
                 }
-                // 给最近的 table-container 加标记，CSS 将 overflow 改为 visible，防止下拉菜单被裁剪
-                var container = dd.closest('.table-container');
-                if (container) container.classList.add('dropdown-active');
             }
         };
         $.toggleSidebar = toggleSidebar;
@@ -313,11 +310,5 @@ app.component('port-forward-list', {
                   }
               }
           });
-          // 所有下拉都关闭后，移除 table-container 的 overflow 释放标记
-          if (document.querySelectorAll('.dropdown-table.open').length === 0) {
-              document.querySelectorAll('.table-container.dropdown-active').forEach(function(el) {
-                  el.classList.remove('dropdown-active');
-              });
-          }
       });
   });

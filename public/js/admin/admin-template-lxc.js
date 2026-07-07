@@ -306,6 +306,11 @@
                                                         <div class="dropdown-table">
                                                             <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                             <ul class="dropdown-menu-table">
+                                                                <li class="d-md-none" v-if="ct.status && ct.status.status === 'running'"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'reboot')">重启</a></li>
+                                                                <li class="d-md-none" v-if="ct.status && ct.status.status === 'running'"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</a></li>
+                                                                <li class="d-md-none" v-if="ct.status && ct.status.status === 'running'"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'stop')" class="text-danger">停止</a></li>
+                                                                <li class="d-md-none" v-if="!ct.status || ct.status.status !== 'running'"><a href="#" @click.prevent="startLxc(ct.ct_id)" class="text-success">启动</a></li>
+                                                                <li class="d-md-none" v-if="!ct.status || ct.status.status !== 'running'"><a href="#" @click.prevent="openDestroyLxcModalFromList(ct)" class="text-danger">销毁</a></li>
                                                                 <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
                                                                 <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
                                                                 <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>

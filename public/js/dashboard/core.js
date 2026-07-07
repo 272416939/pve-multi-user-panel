@@ -336,19 +336,16 @@
                 menu.style.zIndex = '';
             }
         });
-        document.querySelectorAll('.table-container.dropdown-active').forEach(function(el) {
-            el.classList.remove('dropdown-active');
-        });
         if (!isOpen) {
             dd.classList.add('open');
             var menu = dd.querySelector('.dropdown-menu-table');
-            if (menu && window.ModalZIndexManager) {
+            if (menu && window.positionFixedDropdown) {
+                window.positionFixedDropdown(target, menu);
+            } else if (menu && window.ModalZIndexManager) {
                 var z = window.ModalZIndexManager.acquire();
                 menu._dropdownZIndex = z;
                 menu.style.zIndex = z;
             }
-            var container = dd.closest('.table-container');
-            if (container) container.classList.add('dropdown-active');
         }
     };
 

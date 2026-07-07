@@ -170,6 +170,10 @@
                                             <div class="dropdown-table">
                                                 <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                 <ul class="dropdown-menu-table">
+                                                    <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'reboot')">重启</a></li>
+                                                    <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'shutdown')">关机</a></li>
+                                                    <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'stop')" class="text-danger">停止</a></li>
+                                                    <li class="d-md-none" v-if="!vm.status || vm.status.status !== 'running'"><a href="#" @click.prevent="startVm(vm.vm_id)" class="text-success">开机</a></li>
                                                     <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
                                                     <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
                                                     <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
@@ -265,6 +269,10 @@
                                             <div class="dropdown-table">
                                                 <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                 <ul class="dropdown-menu-table">
+                                                    <li class="d-md-none" v-if="ct.status && ct.status.status === 'running'"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'reboot')">重启</a></li>
+                                                    <li class="d-md-none" v-if="ct.status && ct.status.status === 'running'"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</a></li>
+                                                    <li class="d-md-none" v-if="ct.status && ct.status.status === 'running'"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'stop')" class="text-danger">停止</a></li>
+                                                    <li class="d-md-none" v-if="!ct.status || ct.status.status !== 'running'"><a href="#" @click.prevent="startLxc(ct.ct_id)" class="text-success">启动</a></li>
                                                     <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
                                                     <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
                                                     <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>

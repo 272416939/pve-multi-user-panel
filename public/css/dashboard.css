@@ -77,7 +77,10 @@
 
     @media (max-width: 768px) {
         .table-container { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
-        .table-container.dropdown-active { overflow: visible !important; overflow-x: visible !important; overflow-y: visible !important; }
+        /* 移动端隐藏直接操作按钮，统一收入"更多"下拉菜单 */
+        .btn-group-table { display: none !important; }
+        /* 大弹窗移动端适配 */
+        .modal-dialog.modal-lg { max-width: 95vw; margin: 0.5rem auto; }
         table { min-width: 600px; font-size: 12px; }
         th, td { padding: 8px 10px !important; white-space: nowrap; }
         .table-btn { padding: 3px 8px !important; font-size: 11px !important; }
@@ -318,11 +321,11 @@
     .dropdown-table { display: inline-block; position: relative; margin-left: 2px; }
     .dropdown-table .dropdown-toggle::after { display: none; }
     .dropdown-menu-table {
-        display: none; position: absolute; right: 0; top: 100%;
+        display: none; position: fixed;
         min-width: 120px; padding: 6px 0;
         background: var(--bg-modal); backdrop-filter: blur(16px);
         border: 1px solid var(--border-color); border-radius: 8px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.4); list-style: none; margin-top: 4px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4); list-style: none;
     }
     .dropdown-table.open .dropdown-menu-table { display: block; }
     .table-scroll { overflow: visible !important; }

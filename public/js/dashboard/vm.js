@@ -524,29 +524,26 @@
         }
     };
 
-    // ===== CDK 下拉定位（position:fixed + 动态 z-index）=====
+    // ===== CDK 下拉定位（Teleport 到 body + position:fixed + 动态 z-index）=====
     $.toggleCdkDropdown = function(type, open) {
         // 关闭另一个下拉（如果开着）
         var otherOpen = type === 'vm' ? $.cdkLxcDropdownOpen : $.cdkVmDropdownOpen;
         if (otherOpen.value) {
-            document.querySelectorAll('#cdkRedeemModal .custom-select-dropdown').forEach(function(el) {
-                window.releaseFixedDropdown(el);
-            });
+            var otherDropdown = document.querySelector('[data-cdk-dropdown="' + (type === 'vm' ? 'lxc' : 'vm') + '"]');
+            if (otherDropdown) window.releaseFixedDropdown(otherDropdown);
             otherOpen.value = false;
         }
 
         var openRef = type === 'vm' ? $.cdkVmDropdownOpen : $.cdkLxcDropdownOpen;
         if (!open) {
-            document.querySelectorAll('#cdkRedeemModal .custom-select-dropdown').forEach(function(el) {
-                window.releaseFixedDropdown(el);
-            });
+            var dropdown = document.querySelector('[data-cdk-dropdown="' + type + '"]');
+            if (dropdown) window.releaseFixedDropdown(dropdown);
             openRef.value = false;
         } else {
             openRef.value = true;
             Vue.nextTick(function() {
-                var trigger = document.querySelector('#cdkRedeemModal [data-cdk-select="' + type + '"]');
-                var select = trigger ? trigger.closest('.custom-select') : null;
-                var dropdown = select ? select.querySelector('.custom-select-dropdown') : null;
+                var trigger = document.querySelector('[data-cdk-select="' + type + '"]');
+                var dropdown = document.querySelector('[data-cdk-dropdown="' + type + '"]');
                 if (trigger && dropdown && window.positionFixedDropdown) {
                     window.positionFixedDropdown(trigger, dropdown);
                 }

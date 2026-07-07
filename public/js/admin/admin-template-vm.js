@@ -65,6 +65,11 @@
                                                     <div class="dropdown-table">
                                                         <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                         <ul class="dropdown-menu-table">
+                                                            <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'reboot')">重启</a></li>
+                                                            <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'shutdown')">关机</a></li>
+                                                            <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'stop')" class="text-danger">停止</a></li>
+                                                            <li class="d-md-none" v-if="!vm.status || vm.status.status !== 'running'"><a href="#" @click.prevent="startVm(vm.vm_id)" class="text-success">开机</a></li>
+                                                            <li class="d-md-none" v-if="!vm.status || vm.status.status !== 'running'"><a href="#" @click.prevent="openDestroyVmModal(vm)" class="text-danger">销毁</a></li>
                                                             <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
                                                             <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
                                                             <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
