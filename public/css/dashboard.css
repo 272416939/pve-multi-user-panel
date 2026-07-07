@@ -442,13 +442,8 @@
         border: 1px solid var(--border-color) !important;
         border-radius: 12px !important;
     }
-    .list-group-item {
-        background: transparent !important;
-        border-color: var(--border-color) !important;
-        color: var(--text-primary) !important;
-    }
-    .list-group-item:hover { background: var(--glass-accent) !important; }
-    .list-group-item-primary { background: var(--glass-accent) !important; }
+
+    /* list-group 明暗适配已移至 shared/css/components.css */
 
     /* Alert styling */
     .alert-danger {

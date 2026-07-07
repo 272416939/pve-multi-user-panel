@@ -548,7 +548,7 @@
                                             <table class="table table-striped mb-0 table-sm">
                                                 <thead style="position:sticky;top:0;">
                                                     <tr>
-                                                        <th style="width:40px;"><input type="checkbox" class="form-check-input" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer"></th>
+                                                        <th class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer"></th>
                                                         <th style="width:40px;">#</th>
                                                         <th>备份时间</th>
                                                         <th>大小</th>
@@ -560,7 +560,7 @@
                                                 </thead>
                                                 <tbody>
                                                     <tr v-for="(b, idx) in backups" :key="b.id" :style="backupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
-                                                        <td><input type="checkbox" class="form-check-input" :checked="backupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleBackupSelect(b.id)" style="cursor:pointer"></td>
+                                                        <td class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="backupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleBackupSelect(b.id)" style="cursor:pointer"></td>
                                                         <td class="text-muted small">{{ idx + 1 }}</td>
                                                         <td class="small">{{ formatDate(b.created_at) }}</td>
                                                         <td class="small">{{ b.size ? formatBytes(b.size) : '-' }}</td>
@@ -966,7 +966,7 @@
                                             <table class="table table-striped mb-0 table-sm">
                                                 <thead style="position:sticky;top:0;">
                                                     <tr>
-                                                        <th style="width:40px;"><input type="checkbox" class="form-check-input" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer"></th>
+                                                        <th class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer"></th>
                                                         <th style="width:40px;">#</th>
                                                         <th>备份时间</th>
                                                         <th>大小</th>
@@ -978,7 +978,7 @@
                                                 </thead>
                                                 <tbody>
                                                     <tr v-for="(b, idx) in lxcBackups" :key="b.id" :style="lxcBackupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
-                                                        <td><input type="checkbox" class="form-check-input" :checked="lxcBackupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleLxcBackupSelect(b.id)" style="cursor:pointer"></td>
+                                                        <td class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="lxcBackupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleLxcBackupSelect(b.id)" style="cursor:pointer"></td>
                                                         <td class="text-muted small">{{ idx + 1 }}</td>
                                                         <td class="small">{{ formatDate(b.created_at) }}</td>
                                                         <td class="small">{{ b.size ? formatBytes(b.size) : '-' }}</td>

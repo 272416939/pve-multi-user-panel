@@ -17,6 +17,31 @@
 .modal-content .card-body { background: transparent !important; }
 .modal-content .text-muted { color: var(--text-secondary) !important; }
 
+/* ========== list-group 明暗模式适配（快照列表等） ========== */
+.list-group-item {
+    background: transparent !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
+    transition: background-color 0.2s ease;
+}
+.list-group-item:hover { background: var(--glass-accent) !important; }
+.list-group-item-primary { background: var(--glass-accent) !important; }
+
+/* ========== form-check-input 明暗模式适配（checkbox/radio） ========== */
+.form-check-input {
+    background-color: var(--bg-input, var(--bg-card));
+    border-color: var(--border-color);
+    cursor: pointer;
+}
+.form-check-input:checked {
+    background-color: var(--color-primary, #6366f1);
+    border-color: var(--color-primary, #6366f1);
+}
+.form-check-input:focus {
+    border-color: var(--color-primary, #6366f1);
+    box-shadow: 0 0 0 0.25rem rgba(99, 102, 241, 0.25);
+}
+
 /* ========== Overview 总览样式 ========== */
 .stat-card { padding: 20px 24px; border-radius: 14px;
     background: var(--bg-card); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -100,6 +125,8 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
 .table > thead, .table-striped > thead, .table-sm > thead, .table-hover > thead, .table-dark > thead {
     background: transparent !important;
 }
+/* sticky thead 需要不透明背景遮住滚动内容，按明暗模式适配 */
+.modal-content .table-responsive thead { background: var(--bg-card) !important; }
 
 /* Update banner - theme adaptive */
 .update-banner { border: 1px solid rgba(99,102,241,0.25) !important; border-radius: 12px;
