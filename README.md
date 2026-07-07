@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.11.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.28.21-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -23,7 +23,6 @@
 - [🏗️ 项目结构](#️-项目结构)
 - [📡 VNC / 终端架构](#-vnc--终端架构)
 - [📖 使用说明](#-使用说明)
-- [🔄 更新日志](#-更新日志)
 - [📄 许可证](#-许可证)
 
 ---
@@ -231,11 +230,19 @@ npm run dev
 │   │   ├── debug.js
 │   │   ├── pve-rate.js
 │   │   ├── cache.js           # TTL Map 进程内缓存
+│   │   ├── cache-store.js     # Redis/内存双模式缓存存储
+│   │   ├── console-session.js # VNC/终端一次性 session 管理
 │   │   ├── email.js           # 邮件发送（createEmailTemplate 统一模板）
 │   │   ├── token.js
+│   │   ├── token-store.js     # refresh token 持久化
 │   │   ├── site-url.js
 │   │   ├── cdk-generator.js
-│   │   └── order-utils.js     # 订购工具（扣余额/计算金额/affinity）
+│   │   ├── order-utils.js     # 订购工具（扣余额/计算金额/affinity）
+│   │   ├── date.js            # 时区/格式化工具
+│   │   ├── random-name.js     # VM/LXC 随机名称
+│   │   ├── safe-error.js      # 统一错误脱敏（safeError）
+│   │   ├── username-blacklist.js
+│   │   └── with-transaction.js # MySQL 事务封装
 │   ├── routes/                # 路由模块（16 个）
 │   │   ├── auth.js            # 认证 + 2FA + 忘记密码
 │   │   ├── user.js            # 用户中心 + 2FA + 设备 + Push ticket
@@ -272,6 +279,7 @@ npm run dev
 │   │   ├── ikuai-api.js       # ikuai API 封装
 │   │   └── ssh-exec.js        # SSH 执行工具（vmid 白名单 + stdin 传密码）
 │   └── sdk/
+│       ├── ikuai-sdk/         # ikuai SDK（ikuai-sdk.js + ikuai-sdk.mjs）
 │       └── pay/               # 支付网关 SDK（V1 MD5 + V2 RSA）
 ├── views/                     # EJS 模板（服务端渲染）
 │   ├── partials/
@@ -299,8 +307,9 @@ npm run dev
 │   │   ├── components.css     # 通用组件（btn-glass/table/modal/card/badge）
 │   │   ├── pv-buttons.css     # Web Component 按钮样式补充
 │   │   └── theme.css          # 主题适配（[data-theme="dark/light"] 覆盖）
-│   ├── components/            # Web Components（7 个 pv-* 自定义元素）
+│   ├── components/            # Web Components（8 个 pv-* 自定义元素）
 │   │   ├── pv-button.js       # 按钮（variant/size/disabled）
+│   │   ├── pv-button-v2.js    # 按钮 v2（增强变体）
 │   │   ├── pv-badge.js        # 徽标
 │   │   ├── pv-card.js         # 卡片
 │   │   ├── pv-modal.js        # 模态框
@@ -311,13 +320,18 @@ npm run dev
 │   │   ├── shared.js          # 公共函数 + PushClient WebSocket
 │   │   ├── theme-init.js      # 主题初始化（所有页面共用）
 │   │   ├── app-version.js     # 版本号获取
+│   │   ├── index-redirect.js  # 首页重定向
 │   │   ├── login-page.js      # 登录页 Vue 应用
+│   │   ├── login-template.js  # 登录页模板
 │   │   ├── user-center-page.js# 用户中心 Vue 应用
+│   │   ├── user-center-template.js # 用户中心模板
+│   │   ├── terminal-standalone.js # xterm.js 终端独立逻辑
+│   │   ├── terminal-keyboard.js    # 终端快捷键捕获（复制/粘贴/透传）
+│   │   ├── terminal-shortcuts-help.js # 终端快捷键说明 modal
+│   │   ├── lib/               # 第三方库（DOMPurify）
 │   │   ├── admin/             # 管理后台模块（core/admin/vm/lxc/network/update/package/template + admin-template-* 拆分模块）
 │   │   └── dashboard/         # 用户面板模块（core/vm/lxc/forward/message + dashboard-template-*）
-│   ├── novnc/                 # noVNC 库
-│   ├── vnc.html               # VNC 独立全屏页面
-│   └── terminal.html          # xterm.js 独立全屏页面
+│   └── novnc/                 # noVNC 库
 ├── test/                      # Mocha + Chai 测试
 ├── .env.example               # 配置模板
 └── package.json
@@ -477,250 +491,6 @@ git fetch origin && git reset --hard origin/main && npm install --production
 然后重启服务（PM2 / systemd / 手动重启均可）。
 
 > 如需回滚：`git reflog` 查找旧 commit hash，`git reset --hard <hash>` 回滚。
-
----
-
-## 🔄 更新日志
-
-<details>
-<summary><b>v2.11.2</b> (2026-06-22) — 外网接口下拉框交互优化 + SMTP 发件人名称支持</summary>
-
-修复外网接口下拉框交互体验，支持高亮已选接口和点击取消选择；修复下拉框被 CNAME 区块遮挡问题；修复设备端口转发弹窗关闭后再次打开仍显示表单界面的问题；新增 SMTP 发件人名称字段，支持自定义发件人显示名（如 OWO CLOUD）。
-
-**Fixed**
-- 🐛 外网接口下拉框：已选接口高亮显示（active 样式 + 勾选图标），点击已选接口可取消选择
-- 🐛 外网接口下拉框被 CNAME 域名设置区块遮挡：容器添加 `position: relative; z-index: 10`，下拉菜单 `z-index: 1080`
-- 🐛 设备端口转发弹窗关闭后再次打开仍显示表单界面：`openDeviceForward` 时重置 `showDeviceForm = false` 和 `editingDeviceRuleId = null`
-
-**Added**
-- ✨ SMTP 配置新增"发件人名称"字段，发送邮件时使用 `"名称 <邮箱>"` 格式（如 `OWO CLOUD <system-noreply@xlun.top>`）
-- ✨ 数据库新增 `smtp:from_name` 配置项，兼容旧数据（无 from_name 时使用纯邮箱地址）
-
-**影响范围**
-- `public/js/admin/admin-template-settings.js`（外网接口下拉框交互 + SMTP 表单新增 from_name 字段）
-- `public/js/admin/network.js`（新增 `isWanInterfaceSelected`/`toggleWanInterface` 方法，替换 `addWanInterface`）
-- `public/js/admin/admin.js`（smtpConfig 初始化新增 from_name 字段）
-- `public/js/dashboard/forward.js`（`openDeviceForward` 重置 showDeviceForm）
-- `server/routes/admin-config.js`（PUT `/admin/smtp` 处理 from_name 字段）
-- `server/api/db-sqlite.js` / `server/api/db-mysql.js`（`getSmtp`/`setSmtp` 增加 from_name 字段）
-- `server/utils/email.js`（`sendEmail` 构造 `"名称 <邮箱>"` 格式的 from 字段）
-
-</details>
-
-<details>
-<summary><b>v2.11.1</b> (2026-06-22) — 外网接口 UI 优化 + 设备端口转发 IP 只读</summary>
-
-优化外网接口选择体验，从纯文本框改为"下拉框选择 + 文本框自动填充"组合；设备端口转发弹窗的目标 IP 改为只读，自动从当前设备获取，避免用户随意修改导致同步异常。
-
-**Changed**
-- 🔄 默认外网接口改为下拉框 + 文本框组合：点击下拉框选项自动追加到文本框（逗号分隔、去重），文本框只读，提供"清空"选项
-- 🔄 设备端口转发弹窗（虚拟机/容器列表"更多"→"网络"）的目标 IP 改为 `readonly`，自动从当前设备获取，用户不可修改
-- 🔄 新增 `addWanInterface(ifaceName)` 方法：追加接口到文本框，已存在则跳过
-
-**影响范围**
-- `public/js/admin/admin-template-settings.js`（外网接口 UI 改为下拉框+文本框）
-- `public/js/admin/network.js`（新增 `addWanInterface` 方法）
-- `public/js/admin/admin-template-modals.js`（设备端口转发 IP 改为只读）
-- `public/js/dashboard/dashboard-template.js`（设备端口转发 IP 改为只读）
-- `public/js/dashboard/forward.js`（IP 缺失提示优化）
-
-</details>
-
-<details>
-<summary><b>v2.11.0</b> (2026-06-22) — 端口转发多接口优化</summary>
-
-优化端口转发多外网接口实现方式，从"每接口创建独立规则"改为"一条规则绑定多接口"，同时将外网接口选择 UI 从多选下拉框改为文本输入框，避免漏选错选。
-
-**Changed**
-- 🔄 ikuai `addPortForward` 改为单次调用，`interface` 字段传逗号分隔值（如 `adsl1,adsl2`），ikuai 上只创建 1 条规则
-- 🔄 `ikuai_id` 存储格式保持 JSON 数组，但只有一个元素 `[{interface: "adsl1,adsl2", id: "123"}]`
-- 🔄 GET/PUT `/admin/network/config`：`wan_interface` 返回/接收逗号分隔字符串
-- 🔄 前端默认外网接口多选下拉框改为文本输入框，格式 `adsl1,adsl2`，下方显示可用接口列表提示
-
-**影响范围**
-- `server/routes/network.js`（核心：单规则多接口逻辑）
-- `server/routes/vm.js` / `server/routes/lxc.js`（注释更新，逻辑兼容）
-- `public/js/admin/admin-template-settings.js`（UI 改为文本框）
-- `public/js/admin/network.js`（`wan_interface` 适配字符串格式）
-
-</details>
-
-<details>
-<summary><b>v2.10.0</b> (2026-06-22) — 端口转发修复 + 外网接口多选</summary>
-
-修复虚拟机/容器列表"更多"→"网络"弹窗中端口转发添加/编辑表单显示空白问题，同时支持外网接口多选，一条端口转发规则可同时应用到所有选中的外网线路。
-
-**Fixed**
-- 🔧 修复 `admin-template-modals.js` / `dashboard-template.js` 中 `deviceForwardModal` 缺失 `v-else` 添加/编辑表单模板，导致点击"添加端口转发"显示空白
-- 🔧 修复 `</Teleport>` 标签位置错误导致模板结构断裂
-
-**Added**
-- 🚀 外网接口支持多选：系统设置 → 网络管理中 WAN 接口改为多选下拉框，一条端口转发同时在所有选中接口创建规则
-- 🚀 `getWanInterfaces()` 替代 `getWanInterface()`：返回已配置接口数组，兼容新旧存储格式
-- 🚀 `ikuai_id` 存储格式升级为 JSON 数组 `[{interface, id}]`，精确关联每条 ikuai 规则对应的接口
-
-**Changed**
-- 🔄 POST/PUT/DELETE `/port-forwards` 端点：遍历所有选中外网接口同步创建/编辑/删除 ikuai 转发规则
-- 🔄 VM/LXC IP 变更同步：遍历所有接口的 ikuai 规则同步更新
-- 🔄 ikuai-sync 导入：使用新 `ikuai_id` JSON 数组格式
-
-**影响范围**
-- `server/routes/network.js`（核心：多接口同步逻辑）
-- `server/services/dhcp.js`（新增 `getWanInterfaces`）
-- `server/routes/vm.js` / `server/routes/lxc.js`（IP 变更多接口适配）
-- `server/services/ikuai-sync.js`（同步格式升级）
-- `server/api/db-mysql.js` / `server/api/db-sqlite.js`（默认值格式更新）
-- `public/js/admin/` 4 个文件 + `public/js/dashboard/` 1 个文件
-
-</details>
-
-<details>
-<summary><b>v2.9.1</b> (2026-06-18) — 自动更新功能优化</summary>
-
-修复自动更新功能在多种生产环境配置下的兼容性问题，确保公共仓库可免认证拉取。
-
-**Fixed**
-- 🔧 修复更新源选择逻辑：原代码假设 `origin=github`，当生产环境 `origin` 指向 gitee 时，选 github 源仍 fetch gitee
-- 🔧 改用完整 URL 免认证拉取公共仓库：不再依赖 remote 配置，避免 URL 被污染（如反引号）、缺少 remote、认证提示卡住等问题
-- 🔧 添加 `GIT_TERMINAL_PROMPT=0` 环境变量：禁止交互式认证提示，避免请求超时
-- 🔧 fetch 超时从 60s 提升到 90s：适应 GitHub 国内访问慢的情况
-- 🔧 reset 目标改为 `FETCH_HEAD`：配合 `git fetch <url> main` 使用，不再依赖 remote 名称
-- 🔧 主源失败时自动回退到另一个平台，成功响应包含回退提示
-
-**影响范围**
-- 仅修改 `server/routes/admin-config.js` 的 `POST /admin/system/update/execute` 端点
-- 不影响"检查更新"功能（仍通过 Release API 查询）
-- 不需要修改 `.env` 配置（`GITHUB_REPO` / `GITEE_REPO` 默认值已正确）
-
-</details>
-
-<details>
-<summary><b>v2.9.0</b> (2026-06-18) — 安全审计修复 + 充值支付 UX 优化</summary>
-
-基于 `pve-security-guard` Skill 对 v2.8.1 全量代码进行安全审计，对比 v2.1.25 基线（65 个漏洞已 100% 修复）识别新增漏洞并修复。修复后进行全局复查，发现并修复 3 项安全审计遗漏。同时优化充值支付流程 UX，新增等待弹窗、轮询检测和结果提示。
-
-**严重 (CRITICAL)**
-- 🔧 修复 `terminal-proxy.js` JWT 算法未固定漏洞：`jwt.verify` 添加 `{ algorithms: ['HS256'] }` 参数，防止 token 伪造攻击未授权连接 LXC 终端
-
-**高危 (HIGH)**
-- 🔧 修复 `cdk.js` 引用未导入的 `pveApi` 和 `dbg` 导致 CDK 续费流程 ReferenceError 完全不可用
-- 🔧 修复 8 个路由文件共 26 处错误信息泄露：统一使用 `safeError(e)` 函数，生产环境返回通用错误信息，仅 `DEBUG=true` 时返回详细错误
-  - 涉及文件：`admin-user.js`、`admin-wallet.js`、`wallet.js`、`template.js`、`package.js`、`admin-config.js`、`network.js`、`vm.js`、`cdk.js`
-
-**中危 (MEDIUM)**
-- 🔧 修复 `message.js` `deleteAll` 异步操作缺少 `await` 导致响应先于删除完成的竞态问题
-- 🔧 修复 `wallet.js` 3 处支付回跳 URL 使用已废弃的 `/user-center.html`（EJS 迁移后应为 `/user-center`），导致支付完成回跳 404
-
-**低危 (LOW)**
-- 🔧 修复 `vm.js` 单处错误信息泄露
-
-**复查阶段额外修复（安全审计遗漏）**
-- 🔧 修复 `cdk.js` line 42 字符串拼接错误泄露（`'生成 CDK 失败: ' + error.message` → `safeError(error)`）
-- 🔧 修复 `user.js` 10 处旧路由引用：`/user/nav` API 导航菜单 href（admin.html/dashboard.html/user-center.html）+ 邮箱验证回调 redirect（/user-center.html）
-- 🔧 修复 `vm.js`/`lxc.js` 3 处 VNC/terminal 代理 URL 使用旧 `.html` 路径（/vnc.html → /vnc，/terminal.html → /terminal）
-
-**充值支付 UX 优化**
-- ✨ 新增"等待充值中"弹窗：显示订单号、金额、旋转图标、"等待支付完成..."提示、取消支付按钮
-- ✨ 新增订单状态轮询机制：每 2 秒查询 `GET /api/wallet/order-status/:order_no`，超时 10 分钟自动停止
-- ✨ 新增"充值结果"弹窗：成功显示"恭喜您充值成功：xx.xx元"，失败/取消/超时显示对应提示
-- ✨ 新增支付窗口关闭检测：用户关闭支付窗口时最后查询一次订单状态，已支付显示成功，未支付显示取消
-- ✨ 新增弹窗拦截检测：`window.open` 返回 null 时提示"支付窗口被浏览器拦截"
-- ✨ 新增重复提交防护：轮询进行中再次点击充值按钮被拦截
-- ✨ 新增页面卸载清理：`beforeUnmount` 钩子清除 `setInterval` 定时器，避免内存泄漏
-
-**充值支付安全防护**
-- 🔒 新增 IDOR 防护：订单状态查询端点校验 `transaction_records.user_id === req.user.id`，非本人返回 403
-- 🔒 新增用户级限速：订单状态查询端点限制 30 次/分钟（基于 `req.user.id`），超限返回 429
-- 🔒 新增订单号格式校验：正则 `^RECHARGE\d{14}\d{4,6}$`，非法格式返回 400
-- 🔒 信息泄露防护：未支付/不存在订单仅返回 `{ status: 'pending' }`，不泄露订单是否存在
-- 🔒 XSS 防护：弹窗中所有动态数据使用 Vue `{{ }}` 插值（自动转义），禁止 `innerHTML`
-- 🔒 金额格式校验：显示前校验正则 `^\d+\.\d{2}$`，不合法显示 `--`
-
-**已确认安全项（17 条）**：JWT 算法固定（auth/push-proxy）、VNC ticket + Redis 校验 + userId 防跨用户、SQLite/MySQL 列名白名单防 SQL 注入、SSH stdin 传密码防注入、vmid 白名单校验、VM/LXC 权限校验 + 到期检查、CDK CAS 防并发、钱包回调限速 + 签名验证、头像魔数校验、默认密码 `crypto.randomBytes` 生成、密码加盐 SHA256、refresh token DB 查询、CSP 头配置、trust proxy 启用等。
-
-</details>
-
-<details>
-<summary><b>v2.7.0</b> (2026-06-16) — 套餐管理系统 + Cloud-init 密码</summary>
-
-- ✅ VM Cloud-init 密码自动配置：订购/开通时生成 12 位随机密码，站内信+邮件通知
-- ✅ VM 列表显示默认账号（ciuser），未安装 Cloud-init 驱动显示提示
-- ✅ VM 重置密码：需关机状态，校验 Cloud-init 驱动存在
-- ✅ 套餐库存管理：stock/sold_count 字段，订购检查库存，售罄自动禁用
-- ✅ 补货功能：表格操作列一键补货，try/catch 错误提示
-- ✅ 套餐排序自定义（sort_order 数字越小排越前）
-- ✅ 套餐卡片新增 CPU 型号 + 带宽 (Mbps) 字段
-- ✅ 套餐卡片布局优化：备注/库存占位符固定高度，避免卡片高矮不一
-- ✅ 套餐备注支持 Markdown 渲染（marked + DOMPurify）
-
-</details>
-
-<details>
-<summary><b>v2.1.11</b> (2026-06-14) — 支付流水号修复</summary>
-
-- ✅ 支付回调读取 `transaction_id` 替代不存在的 `api_trade_no`
-- ✅ admin CSV 导出同步适配流水号
-- ✅ MySQL/SQLite 双驱 `api_trade_no` 列同步
-
-</details>
-
-<details>
-<summary><b>v2.1.0 ~ v2.1.9</b> (2026-06-14) — 支付系统 + UI 优化</summary>
-
-- ✅ 在线充值：支付宝/微信支付，V1 MD5 + V2 RSA 双模式
-- ✅ 余额续费：VM/LXC 月/年付
-- ✅ 交易流水：用户中心 + admin 查询/CSV 导出
-- ✅ admin 操作栏更多菜单（网络/控制台/终端）
-- ✅ 充值按钮美化 + 明暗模式适配
-- ✅ 侧边栏高亮修复（父级 + 子菜单）
-- ✅ 财务管理与系统设置位置互换
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta23</b> (2026-06-12) — 四项性能优化</summary>
-
-**① 详情监控 WS 推送：**
-- ✅ 详情弹窗 3s HTTP 轮询 → subscribe-detail WS 推送，feedDetailCharts 原地更新 4 组图表
-- ✅ 消灭 GET /vm/:vmid/status + GET /lxc/:vmid/status 两个高频端点
-
-**② 进程内 TTL 缓存：**
-- ✅ 新增 server/utils/cache.js TTL Map 缓存工具（60s 自动清理过期条目）
-- ✅ GET /user/profile 缓存 60s（修改资料时主动失效）
-- ✅ GET /messages/unread-count 缓存 10s（已读/删除/发消息时主动失效）
-
-**③ 备份进度 WS 推送：**
-- ✅ backup-polling.js 完成/失败时 pushToUser 推 backup-done / restore-done
-- ✅ 消灭前端 10s backup/lxcBackup 弹窗轮询
-
-**④ PVE 状态缓存复用：**
-- ✅ pushStatus 结果存入 statusCacheGlobal (5s TTL)
-- ✅ GET /user/vms + /user/lxc 优先命中缓存，PVE API 调用减半
-
-</details>
-
-<details>
-<summary><b>v1.8.0-beta1~22</b> (2026-06) — MySQL + Redis + WS 重构</summary>
-
-- ✅ MySQL 支持（可选远程 5.7+，自动迁移 SQLite）
-- ✅ Redis 缓存（速率限制/VNC ticket/提醒追踪持久化）
-- ✅ WebSocket 统一推送：未读角标/实时监控/备份进度
-- ✅ 异步连接池 mysql2/promise（替换 sync-mysql）
-- ✅ LXC 管理 + XtermJS 终端 + 快照/备份
-- ✅ 自动更新系统（GitHub + Gitee 双源）
-
-</details>
-
-<details>
-<summary><b>v1.0.0 ~ v1.7.x</b> (2026-05~06) — 核心功能</summary>
-
-- ✅ 多租户系统、虚拟机管理、VNC 控制台
-- ✅ JWT 认证 + Refresh Token + 2FA
-- ✅ CDK 兑换码、站内消息、SMTP 邮件
-- ✅ 快照管理、备份恢复、DHCP 静态绑定、端口转发
-- ✅ 系统自动更新、模块化重构
-
-</details>
 
 ---
 
