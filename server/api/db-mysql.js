@@ -698,8 +698,8 @@ async function createDefaultAdmin() {
         console.log('================================================');
         console.log('  ⚠ 默认管理员账号已创建（此信息仅显示一次）');
         console.log('  用户名: admin');
-        console.log('  密码:   ******（为安全起见不再显示，请通过环境变量 DEFAULT_ADMIN_PASSWORD 设置，或查看数据库）');
-        console.log('  ⚠ 请立即登录并修改密码！');
+        console.log('  密码:   ' + defaultAdminPassword);
+        console.log('  ⚠ 请立即登录并修改密码！（首登已强制改密）');
         console.log('================================================');
     }
 
