@@ -94,7 +94,7 @@
                                 <h6 class="mb-0">现有快照</h6>
                             </div>
                             <div class="d-flex align-items-center gap-2">
-                                <pv-button v-if="isAnySnapshotSelected" @click="batchDeleteSnapshots(snapshotVmId)" :disabled="snapshotDeleting" size="sm">
+                                <pv-button v-if="isAnySnapshotSelected" @click="batchDeleteSnapshots(snapshotVmId)" :disabled="snapshotDeleting" variant="outline-danger" size="sm">
                                     <span v-if="snapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                     批量删除 ({{ snapshotSelected.size }})
                                 </pv-button>
@@ -119,7 +119,7 @@
                                     </div>
                                     <div class="d-flex gap-1 flex-shrink-0">
                                         <pv-button @click="rollbackSnapshot(snapshotVmId, snap.name)" title="回滚到此快照" variant="outline" size="sm">回滚</pv-button>
-                                        <pv-button @click="deleteSnapshot(snapshotVmId, snap.name)" title="删除快照" variant="outline" size="sm">删除</pv-button>
+                                        <pv-button @click="deleteSnapshot(snapshotVmId, snap.name)" title="删除快照" variant="outline-danger" size="sm">删除</pv-button>
                                     </div>
                                 </div>
                             </div>
@@ -216,7 +216,7 @@
                             <h6 class="mb-0">备份历史</h6>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <pv-button v-if="isAnyBackupSelected" @click="batchDeleteBackups(backupVmId)" :disabled="backupDeleting" size="sm">
+                            <pv-button v-if="isAnyBackupSelected" @click="batchDeleteBackups(backupVmId)" :disabled="backupDeleting" variant="outline-danger" size="sm">
                                 <span v-if="backupDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                 批量删除 ({{ backupSelected.size }})
                             </pv-button>
@@ -255,7 +255,7 @@
                                         <td class="small">{{ b.storage }}</td>
                                         <td>
                                             <pv-button v-if="b.status === 'completed'" @click="restoreBackup(b)" title="恢复此备份" variant="outline" size="sm">恢复</pv-button>
-                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline" size="sm">删除</pv-button>
+                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline-danger" size="sm">删除</pv-button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -386,7 +386,7 @@
                                 <h6 class="mb-0">现有快照</h6>
                             </div>
                             <div class="d-flex align-items-center gap-2">
-                                <pv-button v-if="isAnyLxcSnapshotSelected" @click="batchDeleteLxcSnapshots()" :disabled="lxcSnapshotDeleting" size="sm">
+                                <pv-button v-if="isAnyLxcSnapshotSelected" @click="batchDeleteLxcSnapshots()" :disabled="lxcSnapshotDeleting" variant="outline-danger" size="sm">
                                     <span v-if="lxcSnapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                     批量删除 ({{ lxcSnapshotSelected.size }})
                                 </pv-button>
@@ -409,7 +409,7 @@
                                     </div>
                                     <div class="d-flex gap-1 flex-shrink-0">
                                         <pv-button @click="rollbackLxcSnapshot(snap.name)" title="回滚到此快照" variant="outline" size="sm">回滚</pv-button>
-                                        <pv-button @click="deleteLxcSnapshot(snap.name)" title="删除快照" variant="outline" size="sm">删除</pv-button>
+                                        <pv-button @click="deleteLxcSnapshot(snap.name)" title="删除快照" variant="outline-danger" size="sm">删除</pv-button>
                                     </div>
                                 </div>
                             </div>
@@ -504,7 +504,7 @@
                             <h6 class="mb-0">备份历史</h6>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <pv-button v-if="isAnyLxcBackupSelected" @click="batchDeleteLxcBackups()" :disabled="lxcBackupDeleting" size="sm">
+                            <pv-button v-if="isAnyLxcBackupSelected" @click="batchDeleteLxcBackups()" :disabled="lxcBackupDeleting" variant="outline-danger" size="sm">
                                 <span v-if="lxcBackupDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                 批量删除 ({{ lxcBackupSelected.size }})
                             </pv-button>

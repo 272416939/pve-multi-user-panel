@@ -272,7 +272,7 @@
                                     </div>
                                     <div class="d-flex gap-2">
                                         <pv-button type="submit" variant="primary" formnovalidate>保存</pv-button>
-                                        <pv-button type="button" @click="removeVm" :disabled="editVmForm.status && editVmForm.status.status === 'running'" :title="editVmForm.status && editVmForm.status.status === 'running' ? '请先关机后操作' : '移除分配（仅解绑）'" variant="outline">移除（仅解绑）</pv-button>
+                                        <pv-button type="button" @click="removeVm" :disabled="editVmForm.status && editVmForm.status.status === 'running'" :title="editVmForm.status && editVmForm.status.status === 'running' ? '请先关机后操作' : '移除分配（仅解绑）'" variant="outline-warning">移除（仅解绑）</pv-button>
                                         <pv-button type="button" @click="openDestroyVmConfirm" :disabled="editVmForm.status && editVmForm.status.status === 'running'" :title="editVmForm.status && editVmForm.status.status === 'running' ? '请先关机后操作' : '销毁虚拟机（删除 PVE 数据）'" variant="danger">销毁（删除 PVE）</pv-button>
                                     </div>
                                 </form>
@@ -405,7 +405,7 @@
                                                 <h6 class="mb-0">现有快照</h6>
                                             </div>
                                             <div class="d-flex align-items-center gap-2">
-                                                <pv-button v-if="isAnySnapshotSelected" @click="batchDeleteSnapshots(snapshotVmId)" :disabled="snapshotDeleting" size="sm">
+                                                <pv-button v-if="isAnySnapshotSelected" @click="batchDeleteSnapshots(snapshotVmId)" :disabled="snapshotDeleting" variant="outline-danger" size="sm">
 
                                                     <span v-if="snapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                                     批量删除 ({{ snapshotSelected.size }})
@@ -438,7 +438,7 @@
                                                             </svg>
                                                         
 </pv-button>
-                                                        <pv-button @click="deleteSnapshot(snapshotVmId, snap.name)" title="删除快照" variant="outline" size="sm">
+                                                        <pv-button @click="deleteSnapshot(snapshotVmId, snap.name)" title="删除快照" variant="outline-danger" size="sm">
 
                                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                                                 <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -533,7 +533,7 @@
                                             <h6 class="mb-0">备份历史</h6>
                                         </div>
                                         <div class="d-flex align-items-center gap-2">
-                                            <pv-button v-if="isAnyBackupSelected" @click="batchDeleteBackups(backupVmId)" :disabled="backupDeleting" size="sm">
+                                            <pv-button v-if="isAnyBackupSelected" @click="batchDeleteBackups(backupVmId)" :disabled="backupDeleting" variant="outline-danger" size="sm">
 
                                                 <span v-if="backupDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                                 批量删除 ({{ backupSelected.size }})
@@ -579,7 +579,7 @@
                                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                                                                 
 </pv-button>
-                                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline" size="sm">
+                                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline-danger" size="sm">
 
                                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                                                 
@@ -789,8 +789,8 @@
                                     </div>
                                     <div class="d-flex gap-2">
                                         <pv-button type="submit" variant="primary" formnovalidate>保存</pv-button>
-                                        <pv-button type="button" @click="removeLxc" :disabled="editLxcForm.status && editLxcForm.status.status === 'running'" :title="editLxcForm.status && editLxcForm.status.status === 'running' ? '请先关机后操作' : '移除分配（仅解绑）'" variant="warning">移除（仅解绑）</pv-button>
-                                        <pv-button type="button" @click="bsModalShow('destroyLxcModal')" :disabled="editLxcForm.status && editLxcForm.status.status === 'running'" :title="editLxcForm.status && editLxcForm.status.status === 'running' ? '请先关机后操作' : '销毁容器（删除 PVE 数据）'" variant="outline">销毁（删除 PVE）</pv-button>
+                                        <pv-button type="button" @click="removeLxc" :disabled="editLxcForm.status && editLxcForm.status.status === 'running'" :title="editLxcForm.status && editLxcForm.status.status === 'running' ? '请先关机后操作' : '移除分配（仅解绑）'" variant="outline-warning">移除（仅解绑）</pv-button>
+                                        <pv-button type="button" @click="bsModalShow('destroyLxcModal')" :disabled="editLxcForm.status && editLxcForm.status.status === 'running'" :title="editLxcForm.status && editLxcForm.status.status === 'running' ? '请先关机后操作' : '销毁容器（删除 PVE 数据）'" variant="outline-danger">销毁（删除 PVE）</pv-button>
                                     </div>
                                 </form>
                             </div>
@@ -839,7 +839,7 @@
                                                 <h6 class="mb-0">现有快照</h6>
                                             </div>
                                             <div class="d-flex align-items-center gap-2">
-                                                <pv-button v-if="isAnyLxcSnapshotSelected" @click="batchDeleteLxcSnapshots(lxcSnapshotVmId)" :disabled="lxcSnapshotDeleting" size="sm">
+                                                <pv-button v-if="isAnyLxcSnapshotSelected" @click="batchDeleteLxcSnapshots(lxcSnapshotVmId)" :disabled="lxcSnapshotDeleting" variant="outline-danger" size="sm">
 
                                                     <span v-if="lxcSnapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                                     批量删除 ({{ lxcSnapshotSelected.size }})
@@ -951,7 +951,7 @@
                                             <h6 class="mb-0">备份历史</h6>
                                         </div>
                                         <div class="d-flex align-items-center gap-2">
-                                            <pv-button v-if="isAnyLxcBackupSelected" @click="batchDeleteLxcBackups(lxcBackupVmId)" :disabled="lxcBackupDeleting" size="sm">
+                                            <pv-button v-if="isAnyLxcBackupSelected" @click="batchDeleteLxcBackups(lxcBackupVmId)" :disabled="lxcBackupDeleting" variant="outline-danger" size="sm">
 
                                                 <span v-if="lxcBackupDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                                 批量删除 ({{ lxcBackupSelected.size }})
@@ -997,7 +997,7 @@
                                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                                                                 
 </pv-button>
-                                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteLxcBackup(b.id, lxcBackupVmId)" title="删除备份" variant="outline" size="sm">
+                                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteLxcBackup(b.id, lxcBackupVmId)" title="删除备份" variant="outline-danger" size="sm">
 
                                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                                                 
@@ -1038,7 +1038,7 @@
                                     <input type="text" class="form-control form-control-sm text-center" v-model="destroyLxcConfirmText" placeholder="输入 yes">
                                 </div>
                                 <div class="d-flex gap-2 justify-content-center">
-                                    <pv-button type="button" :disabled="destroyLxcConfirmText !== 'yes'" @click="confirmDestroyLxc">确认销毁</pv-button>
+                                    <pv-button type="button" :disabled="destroyLxcConfirmText !== 'yes'" @click="confirmDestroyLxc" variant="danger">确认销毁</pv-button>
                                     <pv-button type="button" @click="bsModalHide('destroyLxcModal'); destroyLxcConfirmText = ''" variant="outline">取消</pv-button>
                                 </div>
                             </div>
@@ -1069,7 +1069,7 @@
                                     <input type="text" class="form-control form-control-sm text-center" v-model="destroyVmConfirmText" placeholder="输入 yes">
                                 </div>
                                 <div class="d-flex gap-2 justify-content-center">
-                                    <pv-button type="button" :disabled="destroyVmConfirmText !== 'yes'" @click="confirmDestroyVm">确认销毁</pv-button>
+                                    <pv-button type="button" :disabled="destroyVmConfirmText !== 'yes'" @click="confirmDestroyVm" variant="danger">确认销毁</pv-button>
                                     <pv-button type="button" @click="bsModalHide('destroyVmModal'); destroyVmConfirmText = ''" variant="outline">取消</pv-button>
                                 </div>
                             </div>
