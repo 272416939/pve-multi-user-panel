@@ -330,8 +330,13 @@
         document.querySelectorAll('.dropdown-table.open').forEach(function(el) {
             el.classList.remove('open');
         });
+        document.querySelectorAll('.table-container.dropdown-active').forEach(function(el) {
+            el.classList.remove('dropdown-active');
+        });
         if (!isOpen) {
             dd.classList.add('open');
+            var container = dd.closest('.table-container');
+            if (container) container.classList.add('dropdown-active');
         }
     };
 

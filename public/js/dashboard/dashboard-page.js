@@ -83,6 +83,12 @@ document.addEventListener('click', function(e) {
             dd.classList.remove('open');
         }
     });
+    // 所有下拉都关闭后，移除 table-container 的 overflow 释放标记
+    if (document.querySelectorAll('.dropdown-table.open').length === 0) {
+        document.querySelectorAll('.table-container.dropdown-active').forEach(function(el) {
+            el.classList.remove('dropdown-active');
+        });
+    }
     // 关闭 Teleport 浮动下拉菜单
     if (window.__dashboard && window.__dashboard.closeDropdown) {
         window.__dashboard.closeDropdown();

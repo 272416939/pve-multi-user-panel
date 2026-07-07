@@ -344,12 +344,14 @@ tr:hover td { background: var(--bg-hover); }
 .btn-group-table { display: inline-flex; gap: 2px; vertical-align: middle; }
 .dropdown-table { display: inline-block; position: relative; vertical-align: middle; margin-left: 4px; }
 .dropdown-table .dropdown-toggle::after { display: none; }
-.dropdown-menu-table { display: none; position: absolute; right: 0; top: 100%; z-index: 1000;
+.dropdown-menu-table { display: none; position: absolute; right: 0; top: 100%; z-index: 9999;
     min-width: 120px; padding: 6px 0; background: var(--bg-modal); backdrop-filter: blur(16px);
     border: 1px solid var(--border-color); border-radius: 8px;
     box-shadow: var(--shadow-md); list-style: none; margin-top: 4px;
     transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
 .dropdown-table.open .dropdown-menu-table { display: block; }
+/* 下拉打开时禁用表格容器 overflow，防止下拉菜单被裁剪（移动端关键修复） */
+.table-container.dropdown-active { overflow: visible !important; -webkit-overflow-scrolling: auto; }
 .dropdown-menu-table li a { display: block; padding: 6px 14px; font-size: 13px; color: var(--text-primary);
     text-decoration: none; transition: background 0.15s; white-space: nowrap; }
 .dropdown-menu-table li a:hover { background: rgba(99,102,241,0.15); color: #fff; }

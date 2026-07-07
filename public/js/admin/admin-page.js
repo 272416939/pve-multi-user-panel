@@ -55,11 +55,18 @@ var App = {
         $.toggleAdminDropdown = function(target) {
             var dd = target.parentElement;
             var isOpen = dd.classList.contains('open');
+            // 关闭所有已打开的下拉，并移除 table-container 的 overflow 释放标记
             document.querySelectorAll('.dropdown-table.open').forEach(function(el) {
                 el.classList.remove('open');
             });
+            document.querySelectorAll('.table-container.dropdown-active').forEach(function(el) {
+                el.classList.remove('dropdown-active');
+            });
             if (!isOpen) {
                 dd.classList.add('open');
+                // 给最近的 table-container 加标记，CSS 将 overflow 改为 visible，防止下拉菜单被裁剪
+                var container = dd.closest('.table-container');
+                if (container) container.classList.add('dropdown-active');
             }
         };
         $.toggleSidebar = toggleSidebar;
@@ -287,5 +294,11 @@ app.component('port-forward-list', {
                   dd.classList.remove('open');
               }
           });
+          // 所有下拉都关闭后，移除 table-container 的 overflow 释放标记
+          if (document.querySelectorAll('.dropdown-table.open').length === 0) {
+              document.querySelectorAll('.table-container.dropdown-active').forEach(function(el) {
+                  el.classList.remove('dropdown-active');
+              });
+          }
       });
   });
