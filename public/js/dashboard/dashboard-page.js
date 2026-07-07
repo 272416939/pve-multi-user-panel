@@ -81,6 +81,12 @@ document.addEventListener('click', function(e) {
     allOpen.forEach(function(dd) {
         if (!dd.contains(e.target)) {
             dd.classList.remove('open');
+            var menu = dd.querySelector('.dropdown-menu-table');
+            if (menu && menu._dropdownZIndex != null) {
+                window.ModalZIndexManager.release(menu._dropdownZIndex);
+                menu._dropdownZIndex = null;
+                menu.style.zIndex = '';
+            }
         }
     });
     // 所有下拉都关闭后，移除 table-container 的 overflow 释放标记

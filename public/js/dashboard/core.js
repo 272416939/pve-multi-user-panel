@@ -329,12 +329,24 @@
         var isOpen = dd.classList.contains('open');
         document.querySelectorAll('.dropdown-table.open').forEach(function(el) {
             el.classList.remove('open');
+            var menu = el.querySelector('.dropdown-menu-table');
+            if (menu && menu._dropdownZIndex != null) {
+                window.ModalZIndexManager.release(menu._dropdownZIndex);
+                menu._dropdownZIndex = null;
+                menu.style.zIndex = '';
+            }
         });
         document.querySelectorAll('.table-container.dropdown-active').forEach(function(el) {
             el.classList.remove('dropdown-active');
         });
         if (!isOpen) {
             dd.classList.add('open');
+            var menu = dd.querySelector('.dropdown-menu-table');
+            if (menu && window.ModalZIndexManager) {
+                var z = window.ModalZIndexManager.acquire();
+                menu._dropdownZIndex = z;
+                menu.style.zIndex = z;
+            }
             var container = dd.closest('.table-container');
             if (container) container.classList.add('dropdown-active');
         }

@@ -335,7 +335,8 @@ const setupCustomAlert = (customAlertMessage) => {
             }, { once: true });
             // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
             window.applyModalZIndex(el);
-            bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+            // 用 new Modal 而非 getOrCreateInstance，确保 focus:false 配置每次生效（陷阱 #3）
+            new bootstrap.Modal(el, { focus: false }).show();
         }
     };
 };
@@ -353,14 +354,27 @@ const setupCustomConfirm = (customConfirmMessage, customConfirmResolve) => {
             // 注意：不得删除所有 .modal-backdrop（会破坏其他仍开着弹窗的遮罩）
             const old = bootstrap.Modal.getInstance(el);
             if (old) old.dispose();
+            // hide 前彻底 blur 焦点，防止 Bootstrap 恢复焦点到底层 modal 触发 focus trap 冲突
             el.addEventListener('hide.bs.modal', function onHide() {
                 if (document.activeElement && document.activeElement !== document.body) {
                     document.activeElement.blur();
                 }
             }, { once: true });
+            // hidden 后清理 body 状态（与 bsModalHide 一致），防止残留 modal-open 导致底层 modal 卡死
+            el.addEventListener('hidden.bs.modal', function onHidden() {
+                el.removeEventListener('hidden.bs.modal', onHidden);
+                // z-index 由 applyModalZIndex 的 hidden 监听器负责 release，这里只处理 body 状态
+                // 仅当没有其他活跃弹窗时才清理，避免影响仍开着的底层 modal
+                if (window.ModalZIndexManager && window.ModalZIndexManager.getActiveCount() === 0) {
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('padding-right');
+                    document.body.style.removeProperty('overflow');
+                }
+            }, { once: true });
             // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
             window.applyModalZIndex(el);
-            bootstrap.Modal.getOrCreateInstance(el, { focus: false }).show();
+            // 用 new Modal 而非 getOrCreateInstance，确保 focus:false 配置每次生效（陷阱 #3）
+            new bootstrap.Modal(el, { focus: false }).show();
         });
     };
 };
@@ -509,5 +523,31 @@ window.applyModalZIndex = function(el) {
         }
     }, { once: true });
     return zIndex;
+};
+
+// ===== positionFixedDropdown: fixed 定位下拉菜单的定位 + z-index 管理 =====
+// 用于 custom-select-dropdown（CDK 下拉等），脱离父容器 overflow 限制
+// triggerEl: 触发器元素，dropdownEl: 下拉菜单元素
+window.positionFixedDropdown = function(triggerEl, dropdownEl) {
+    if (!triggerEl || !dropdownEl) return;
+    var rect = triggerEl.getBoundingClientRect();
+    // 动态 z-index：后打开的下拉始终在顶层
+    var z = window.ModalZIndexManager ? window.ModalZIndexManager.acquire() : 9999;
+    dropdownEl._dropdownZIndex = z;
+    dropdownEl.style.zIndex = z;
+    // 定位到触发器正下方，宽度与触发器一致
+    dropdownEl.style.left = rect.left + 'px';
+    dropdownEl.style.top = (rect.bottom + 4) + 'px';
+    dropdownEl.style.width = rect.width + 'px';
+};
+
+// 释放下拉菜单的 z-index（关闭时调用）
+window.releaseFixedDropdown = function(dropdownEl) {
+    if (!dropdownEl) return;
+    if (dropdownEl._dropdownZIndex != null) {
+        if (window.ModalZIndexManager) window.ModalZIndexManager.release(dropdownEl._dropdownZIndex);
+        dropdownEl._dropdownZIndex = null;
+        dropdownEl.style.zIndex = '';
+    }
 };
 

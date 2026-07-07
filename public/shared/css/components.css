@@ -344,7 +344,7 @@ tr:hover td { background: var(--bg-hover); }
 .btn-group-table { display: inline-flex; gap: 2px; vertical-align: middle; }
 .dropdown-table { display: inline-block; position: relative; vertical-align: middle; margin-left: 4px; }
 .dropdown-table .dropdown-toggle::after { display: none; }
-.dropdown-menu-table { display: none; position: absolute; right: 0; top: 100%; z-index: 9999;
+.dropdown-menu-table { display: none; position: absolute; right: 0; top: 100%;
     min-width: 120px; padding: 6px 0; background: var(--bg-modal); backdrop-filter: blur(16px);
     border: 1px solid var(--border-color); border-radius: 8px;
     box-shadow: var(--shadow-md); list-style: none; margin-top: 4px;

@@ -524,6 +524,36 @@
         }
     };
 
+    // ===== CDK 下拉定位（position:fixed + 动态 z-index）=====
+    $.toggleCdkDropdown = function(type, open) {
+        // 关闭另一个下拉（如果开着）
+        var otherOpen = type === 'vm' ? $.cdkLxcDropdownOpen : $.cdkVmDropdownOpen;
+        if (otherOpen.value) {
+            document.querySelectorAll('#cdkRedeemModal .custom-select-dropdown').forEach(function(el) {
+                window.releaseFixedDropdown(el);
+            });
+            otherOpen.value = false;
+        }
+
+        var openRef = type === 'vm' ? $.cdkVmDropdownOpen : $.cdkLxcDropdownOpen;
+        if (!open) {
+            document.querySelectorAll('#cdkRedeemModal .custom-select-dropdown').forEach(function(el) {
+                window.releaseFixedDropdown(el);
+            });
+            openRef.value = false;
+        } else {
+            openRef.value = true;
+            Vue.nextTick(function() {
+                var trigger = document.querySelector('#cdkRedeemModal [data-cdk-select="' + type + '"]');
+                var select = trigger ? trigger.closest('.custom-select') : null;
+                var dropdown = select ? select.querySelector('.custom-select-dropdown') : null;
+                if (trigger && dropdown && window.positionFixedDropdown) {
+                    window.positionFixedDropdown(trigger, dropdown);
+                }
+            });
+        }
+    };
+
     // ===== initVm =====
     $.initVm = function() {
         // 无额外 watch 或生命周期逻辑

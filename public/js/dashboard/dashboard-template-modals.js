@@ -566,7 +566,7 @@
                 <h5 class="modal-title">CDK 兑换</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
-            <div class="modal-body" @click="cdkVmDropdownOpen = false; cdkLxcDropdownOpen = false">
+            <div class="modal-body" @click="toggleCdkDropdown('vm', false); toggleCdkDropdown('lxc', false)">
                 <div v-if="cdkRedeemStep === 'input'">
                     <div class="mb-3">
                         <label class="form-label">CDK 兑换码</label>
@@ -589,19 +589,20 @@
                         <label class="form-label" id="cdk-vm-label">选择要续费的虚拟机</label>
                         <div class="custom-select" :class="{ open: cdkVmDropdownOpen }" @click.stop>
                             <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-vm-label"
-                                 @click="cdkVmDropdownOpen = !cdkVmDropdownOpen"
-                                 @keydown.enter.prevent="cdkVmDropdownOpen = !cdkVmDropdownOpen"
-                                 @keydown.space.prevent="cdkVmDropdownOpen = !cdkVmDropdownOpen"
-                                 @keydown.esc="cdkVmDropdownOpen = false">
+                                 data-cdk-select="vm"
+                                 @click="toggleCdkDropdown('vm', !cdkVmDropdownOpen)"
+                                 @keydown.enter.prevent="toggleCdkDropdown('vm', !cdkVmDropdownOpen)"
+                                 @keydown.space.prevent="toggleCdkDropdown('vm', !cdkVmDropdownOpen)"
+                                 @keydown.esc="toggleCdkDropdown('vm', false)">
                                 <span v-if="cdkRedeemForm.vm_id">
                                     {{ getRedeemableVmName(cdkRedeemForm.vm_id) }}
                                 </span>
                                 <span v-else class="custom-select-placeholder">请选择要续费的虚拟机</span>
                             </div>
-                            <div class="custom-select-dropdown" role="listbox">
+                            <div class="custom-select-dropdown" role="listbox" ref="cdkVmSelectDropdown">
                                 <div v-for="vm in userVms" :key="vm.id" class="option" role="option"
                                      :class="{ selected: cdkRedeemForm.vm_id == vm.id }"
-                                     @click="cdkRedeemForm.vm_id = vm.id; cdkVmDropdownOpen = false;">
+                                     @click="cdkRedeemForm.vm_id = vm.id; toggleCdkDropdown('vm', false);">
                                     {{ vm.name || 'VM ' + vm.vm_id }}（到期: {{ vm.expiration_date ? formatDate(vm.expiration_date) : '未设置' }}）
                                 </div>
                             </div>
@@ -611,19 +612,20 @@
                         <label class="form-label" id="cdk-lxc-label">选择要续费的LXC容器</label>
                         <div class="custom-select" :class="{ open: cdkLxcDropdownOpen }" @click.stop>
                             <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-lxc-label"
-                                 @click="cdkLxcDropdownOpen = !cdkLxcDropdownOpen"
-                                 @keydown.enter.prevent="cdkLxcDropdownOpen = !cdkLxcDropdownOpen"
-                                 @keydown.space.prevent="cdkLxcDropdownOpen = !cdkLxcDropdownOpen"
-                                 @keydown.esc="cdkLxcDropdownOpen = false">
+                                 data-cdk-select="lxc"
+                                 @click="toggleCdkDropdown('lxc', !cdkLxcDropdownOpen)"
+                                 @keydown.enter.prevent="toggleCdkDropdown('lxc', !cdkLxcDropdownOpen)"
+                                 @keydown.space.prevent="toggleCdkDropdown('lxc', !cdkLxcDropdownOpen)"
+                                 @keydown.esc="toggleCdkDropdown('lxc', false)">
                                 <span v-if="cdkRedeemForm.container_id">
                                     {{ getRedeemableLxcName(cdkRedeemForm.container_id) }}
                                 </span>
                                 <span v-else class="custom-select-placeholder">请选择要续费的LXC容器</span>
                             </div>
-                            <div class="custom-select-dropdown" role="listbox">
+                            <div class="custom-select-dropdown" role="listbox" ref="cdkLxcSelectDropdown">
                                 <div v-for="ct in userLxcContainers" :key="ct.id" class="option" role="option"
                                      :class="{ selected: cdkRedeemForm.container_id == ct.id }"
-                                     @click="cdkRedeemForm.container_id = ct.id; cdkLxcDropdownOpen = false;">
+                                     @click="cdkRedeemForm.container_id = ct.id; toggleCdkDropdown('lxc', false);">
                                     {{ ct.name || 'CT ' + ct.ct_id }}（到期: {{ ct.expiration_date ? formatDate(ct.expiration_date) : '未设置' }}）
                                 </div>
                             </div>
