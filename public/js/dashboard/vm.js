@@ -544,9 +544,16 @@
             Vue.nextTick(function() {
                 var trigger = document.querySelector('[data-cdk-select="' + type + '"]');
                 var dropdown = document.querySelector('[data-cdk-dropdown="' + type + '"]');
-                if (trigger && dropdown && window.positionFixedDropdown) {
-                    window.positionFixedDropdown(trigger, dropdown);
+                if (dropdown && window.ModalZIndexManager) {
+                    var z = window.ModalZIndexManager.acquire();
+                    dropdown._dropdownZIndex = z;
+                    dropdown.style.zIndex = z;
                 }
+                requestAnimationFrame(function() {
+                    if (trigger && dropdown && window.positionFixedDropdown) {
+                        window.positionFixedDropdown(trigger, dropdown);
+                    }
+                });
             });
         }
     };

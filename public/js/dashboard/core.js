@@ -340,11 +340,14 @@
             dd.classList.add('open');
             var menu = dd.querySelector('.dropdown-menu-table');
             if (menu && window.positionFixedDropdown) {
-                window.positionFixedDropdown(target, menu);
-            } else if (menu && window.ModalZIndexManager) {
-                var z = window.ModalZIndexManager.acquire();
-                menu._dropdownZIndex = z;
-                menu.style.zIndex = z;
+                if (window.ModalZIndexManager) {
+                    var z0 = window.ModalZIndexManager.acquire();
+                    menu._dropdownZIndex = z0;
+                    menu.style.zIndex = z0;
+                }
+                requestAnimationFrame(function() {
+                    window.positionFixedDropdown(target, menu);
+                });
             }
         }
     };

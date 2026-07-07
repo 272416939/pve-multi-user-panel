@@ -69,13 +69,15 @@ var App = {
                 dd.classList.add('open');
                 var menu = dd.querySelector('.dropdown-menu-table');
                 if (menu && window.positionFixedDropdown) {
-                    // position:fixed 下拉，用 JS 定位到按钮下方
-                    window.positionFixedDropdown(target, menu);
-                } else if (menu && window.ModalZIndexManager) {
-                    // 兜底：仅设 z-index
-                    var z = window.ModalZIndexManager.acquire();
-                    menu._dropdownZIndex = z;
-                    menu.style.zIndex = z;
+                    // 先设 z-index（立即可见），下一帧再定位（等 display:block 布局完成）
+                    if (window.ModalZIndexManager) {
+                        var z0 = window.ModalZIndexManager.acquire();
+                        menu._dropdownZIndex = z0;
+                        menu.style.zIndex = z0;
+                    }
+                    requestAnimationFrame(function() {
+                        window.positionFixedDropdown(target, menu);
+                    });
                 }
             }
         };

@@ -531,14 +531,13 @@ window.applyModalZIndex = function(el) {
 window.positionFixedDropdown = function(triggerEl, dropdownEl) {
     if (!triggerEl || !dropdownEl) return;
     var rect = triggerEl.getBoundingClientRect();
-    // 动态 z-index：后打开的下拉始终在顶层
-    var z = window.ModalZIndexManager ? window.ModalZIndexManager.acquire() : 9999;
-    dropdownEl._dropdownZIndex = z;
-    dropdownEl.style.zIndex = z;
-    // 定位到触发器正下方，宽度与触发器一致
-    dropdownEl.style.left = rect.left + 'px';
+    // 定位到触发器正下方，右对齐触发器（下拉菜单向左展开，避免超出屏幕右边）
+    var menuWidth = dropdownEl.offsetWidth || 160;
+    var left = rect.right - menuWidth;
+    if (left < 8) left = 8; // 防止超出左边
+    dropdownEl.style.left = left + 'px';
     dropdownEl.style.top = (rect.bottom + 4) + 'px';
-    dropdownEl.style.width = rect.width + 'px';
+    dropdownEl.style.minWidth = '160px';
 };
 
 // 释放下拉菜单的 z-index（关闭时调用）
