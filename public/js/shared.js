@@ -531,9 +531,13 @@ window.applyModalZIndex = function(el) {
 window.positionFixedDropdown = function(triggerEl, dropdownEl) {
     if (!triggerEl || !dropdownEl) return;
     var rect = triggerEl.getBoundingClientRect();
-    // 定位到触发器正下方，右对齐触发器（下拉菜单向左展开，避免超出屏幕右边）
     var menuWidth = dropdownEl.offsetWidth || 160;
-    var left = rect.right - menuWidth;
+    // 默认左对齐触发器，下拉菜单在按钮正下方
+    var left = rect.left;
+    // 如果超出屏幕右边，则右对齐触发器（向左展开）
+    if (left + menuWidth > window.innerWidth - 8) {
+        left = rect.right - menuWidth;
+    }
     if (left < 8) left = 8; // 防止超出左边
     dropdownEl.style.left = left + 'px';
     dropdownEl.style.top = (rect.bottom + 4) + 'px';
