@@ -77,14 +77,10 @@
                         </div>
                         <div class="card-body">
                             <div class="mb-2">
-                                <input type="text" class="form-control form-control-sm" v-model="snapshotForm.name" placeholder="快照名称（英文、数字、-、_，最少2字符）" @input="filterSnapshotName">
+                                <textarea class="form-control form-control-sm" v-model="snapshotForm.description" rows="2" placeholder="备注（可选）"></textarea>
                             </div>
-                            <div class="mb-2">
-                                <textarea class="form-control form-control-sm" v-model="snapshotForm.description" rows="2" placeholder="描述（可选）"></textarea>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <small :class="snapshotForm.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ snapshotForm.name.length }}/20</small>
-                                <pv-button @click="createSnapshot(snapshotVmId)" :disabled="!isSnapshotNameValid || snapshotCreating" size="sm">
+                            <div class="d-flex justify-content-end align-items-center">
+                                <pv-button @click="createSnapshot(snapshotVmId)" :disabled="snapshotCreating" size="sm">
                                     <span v-if="snapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
                                     创建快照
                                 </pv-button>
@@ -373,14 +369,10 @@
                         <div class="card-header"><h6 class="mb-0">创建快照</h6></div>
                         <div class="card-body">
                             <div class="mb-2">
-                                <input type="text" class="form-control form-control-sm" v-model="lxcSnapshotForm.name" placeholder="快照名称（英文、数字、-、_，最少2字符）" @input="filterLxcSnapshotName">
+                                <textarea class="form-control form-control-sm" v-model="lxcSnapshotForm.description" rows="2" placeholder="备注（可选）"></textarea>
                             </div>
-                            <div class="mb-2">
-                                <textarea class="form-control form-control-sm" v-model="lxcSnapshotForm.description" rows="2" placeholder="描述（可选）"></textarea>
-                            </div>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <small :class="lxcSnapshotForm.name.length >= 20 ? 'text-danger' : 'text-muted'">{{ lxcSnapshotForm.name.length }}/20</small>
-                                <pv-button @click="createLxcSnapshot()" :disabled="!isLxcSnapshotNameValid || lxcSnapshotCreating" size="sm">
+                            <div class="d-flex justify-content-end align-items-center">
+                                <pv-button @click="createLxcSnapshot()" :disabled="lxcSnapshotCreating" size="sm">
                                     <span v-if="lxcSnapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
                                     创建快照
                                 </pv-button>

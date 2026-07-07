@@ -56,11 +56,6 @@
         return msgs[$.lxcConfirmState.value.action] || '';
     });
 
-    $.isLxcSnapshotNameValid = computed(function() {
-        var n = $.lxcSnapshotForm.value.name;
-        return n.length >= 2 && n.length <= 20 && /^[a-zA-Z0-9\-_]+$/.test(n);
-    });
-
     $.isAllLxcSnapshotsSelected = computed(function() {
         return $.lxcSnapshots.value.length > 0 && $.lxcSnapshots.value.every(function(s) { return $.lxcSnapshotSelected.value.has(s.name); });
     });
@@ -398,12 +393,6 @@
     };
 
     // ==================== LXC 快照管理 ====================
-    $.filterLxcSnapshotName = function() {
-        var name = $.lxcSnapshotForm.value.name.replace(/[^a-zA-Z0-9\-_]/g, '');
-        if (name.length > 20) name = name.slice(0, 20);
-        $.lxcSnapshotForm.value.name = name;
-    };
-
     $.loadLxcSnapshots = async function(vmid) {
         $.lxcSnapshotLoading.value = true;
         try {
@@ -479,12 +468,11 @@
     };
 
     $.createLxcSnapshot = async function(vmid) {
-        if (!$.isLxcSnapshotNameValid.value) return;
         $.lxcSnapshotCreating.value = true;
         try {
             await api('/lxc/' + vmid + '/snapshots', {
                 method: 'POST',
-                body: JSON.stringify({ name: $.lxcSnapshotForm.value.name, description: $.lxcSnapshotForm.value.description || '' })
+                body: JSON.stringify({ description: $.lxcSnapshotForm.value.description || '' })
             });
             $.lxcSnapshotForm.value = { name: '', description: '' };
             $.bsModalHide('lxcSnapshotModal');

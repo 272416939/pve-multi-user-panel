@@ -1,9 +1,16 @@
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { safeError } = require('../utils/safe-error');
+
+// 快照名称格式：kz- 固定前缀 + 17 位随机 base62，总长 20 字符（符合 C-4 {2,20} 规则）
+// 服务端生成，避免用户自定义名称重复导致 PVE 创建快照失败
+function generateSnapshotName() {
+    return 'kz-' + crypto.randomBytes(13).toString('base64').replace(/[+/=]/g, '').slice(0, 17);
+}
 router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
@@ -33,11 +40,8 @@ router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
 
 router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
     try {
-        const { name, description } = req.body;
+        const { description } = req.body;
         const vmid = parseInt(req.params.vmid);
-        if (!name || !/^[a-zA-Z0-9_-]{2,20}$/.test(name)) {
-            return res.status(400).json({ error: '快照名称必须为2~20位英文、数字或 - _ 组合' });
-        }
 
         // H-4 修复：统一权限校验模式（资源存在性 + 归属 + 管理员豁免）
         const allCts = await db.lxcContainers.getAll();
@@ -65,6 +69,7 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
             }
         }
 
+        const name = generateSnapshotName();
         await pveApi.createLxcSnapshot(req.params.vmid, name, description || '');
         db.snapshotLogs.add(req.user.id, req.params.vmid, 'create');
         res.json({ message: '快照创建成功' });
@@ -176,11 +181,8 @@ router.get('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
 
 router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
     try {
-        const { name, description } = req.body;
+        const { description } = req.body;
         const vmid = parseInt(req.params.vmid);
-        if (!name || !/^[a-zA-Z0-9_-]{2,20}$/.test(name)) {
-            return res.status(400).json({ error: '快照名称必须为2~20位英文、数字或 - _ 组合' });
-        }
 
         // H-4 修复：统一权限校验模式
         const allVms = await db.vms.getAll();
@@ -208,6 +210,7 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
             }
         }
 
+        const name = generateSnapshotName();
         await pveApi.createSnapshot(req.params.vmid, name, description || '');
         db.snapshotLogs.add(req.user.id, req.params.vmid, 'create');
         res.json({ message: '快照创建成功' });

@@ -42,11 +42,6 @@
     $.lxcBackupCtName = ref('');
 
     // ===== Computed =====
-    $.isLxcSnapshotNameValid = computed(function() {
-        var name = $.lxcSnapshotForm.value.name;
-        return name.length >= 2 && name.length <= 20 && /^[a-zA-Z0-9\-_]+$/.test(name);
-    });
-
     $.isAllLxcSnapshotsSelected = computed(function() {
         return $.lxcSnapshots.value.length > 0 && $.lxcSnapshots.value.every(function(s) { return $.lxcSnapshotSelected.value.has(s.name); });
     });
@@ -363,12 +358,6 @@
         await $.loadLxcSnapshots(ct.ct_id);
     };
 
-    $.filterLxcSnapshotName = function() {
-        var name = $.lxcSnapshotForm.value.name.replace(/[^a-zA-Z0-9\-_]/g, '');
-        if (name.length > 20) name = name.slice(0, 20);
-        $.lxcSnapshotForm.value.name = name;
-    };
-
     $.toggleLxcSnapshotSelect = function(name) {
         var s = new Set($.lxcSnapshotSelected.value);
         if (s.has(name)) s.delete(name); else s.add(name);
@@ -413,13 +402,11 @@
     };
 
     $.createLxcSnapshot = async function() {
-        if (!$.isLxcSnapshotNameValid.value) return;
         $.lxcSnapshotCreating.value = true;
         try {
             await api('/lxc/' + $.lxcSnapshotCtId.value + '/snapshots', {
                 method: 'POST',
                 body: JSON.stringify({
-                    name: $.lxcSnapshotForm.value.name,
                     description: $.lxcSnapshotForm.value.description || ''
                 })
             });

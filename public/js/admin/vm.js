@@ -46,11 +46,6 @@
         return msgs[$.confirmState.value.action] || '';
     });
 
-    $.isSnapshotNameValid = computed(function() {
-        var name = $.snapshotForm.value.name;
-        return name.length >= 2 && name.length <= 20 && /^[a-zA-Z0-9\-_]+$/.test(name);
-    });
-
     $.isAllSnapshotsSelected = computed(function() {
         return $.snapshots.value.length > 0 && $.snapshots.value.every(function(s) { return $.snapshotSelected.value.has(s.name); });
     });
@@ -261,12 +256,6 @@
     };
 
     // ==================== 快照管理 ====================
-    $.filterSnapshotName = function() {
-        var name = $.snapshotForm.value.name.replace(/[^a-zA-Z0-9\-_]/g, '');
-        if (name.length > 20) name = name.slice(0, 20);
-        $.snapshotForm.value.name = name;
-    };
-
     $.formatSnapshotDate = function(dateStr) {
         if (!dateStr) return '-';
         if (typeof dateStr === 'number' || /^\d{10}$/.test(dateStr)) {
@@ -366,13 +355,11 @@
     };
 
     $.createSnapshot = async function(vmid) {
-        if (!$.isSnapshotNameValid.value) return;
         $.snapshotCreating.value = true;
         try {
             await api('/vm/' + vmid + '/snapshots', {
                 method: 'POST',
                 body: JSON.stringify({
-                    name: $.snapshotForm.value.name,
                     description: $.snapshotForm.value.description || ''
                 })
             });
