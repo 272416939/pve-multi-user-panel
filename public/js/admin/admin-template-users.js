@@ -63,9 +63,11 @@
                                             <td><span class="badge" :class="u.role === 'admin' ? 'bg-primary' : 'bg-secondary'">{{ u.role }}</span></td>
                                             <td>{{ formatDate(u.created_at) }}</td>
                                             <td>
-                                                <pv-button @click="rechargeUser = u; rechargeShow = true" size="sm">充值</pv-button>
-                                                <pv-button @click="editUser(u)" variant="primary">编辑</pv-button>
-                                                <pv-button variant="outline-danger" size="sm" @pv-click="deleteUser(u.id)" :disabled="u.username === 'admin'">删除</pv-button>
+                                                <div class="d-flex gap-2">
+                                                    <pv-button @click="rechargeUser = u; rechargeShow = true" size="sm">充值</pv-button>
+                                                    <pv-button @click="editUser(u)" variant="primary" size="sm">编辑</pv-button>
+                                                    <pv-button variant="outline-danger" size="sm" @pv-click="deleteUser(u.id)" :disabled="u.username === 'admin'">删除</pv-button>
+                                                </div>
                                             </td>
                                         </tr>
                                     </tbody>
