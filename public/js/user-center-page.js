@@ -125,7 +125,10 @@ const App = {
                 if (document.activeElement && document.activeElement !== document.body) {
                     document.activeElement.blur();
                 }
-                // 注意：不得删除所有 .modal-backdrop（会破坏其他仍开着弹窗的遮罩）
+                // 先 dispose 旧实例，再注册事件（dispose 会清除旧监听器）
+                var oldModal = bootstrap.Modal.getInstance(el);
+                if (oldModal) oldModal.dispose();
+                // hide 前彻底 blur 焦点，防止 Bootstrap 恢复焦点到底层 modal 触发 focus trap 冲突
                 el.addEventListener('hide.bs.modal', function onHide() {
                     if (document.activeElement && document.activeElement !== document.body) {
                         document.activeElement.blur();
@@ -135,7 +138,7 @@ const App = {
                 const zIndex = window.ModalZIndexManager.acquire();
                 el._modalZIndex = zIndex;
                 el.style.zIndex = zIndex;
-                // hidden 时释放 z-index（confirmOk/confirmCancel 均通过 modal.hide() 关闭）
+                // hidden 时释放 z-index + 清理 body 状态，防止残留 modal-open 导致底层 modal 卡死
                 el.addEventListener('hidden.bs.modal', function onHidden() {
                     el.removeEventListener('hidden.bs.modal', onHidden);
                     if (el._modalZIndex != null) {
@@ -143,14 +146,18 @@ const App = {
                         el._modalZIndex = null;
                         el.style.zIndex = '';
                     }
+                    if (window.ModalZIndexManager && window.ModalZIndexManager.getActiveCount() === 0) {
+                        document.body.classList.remove('modal-open');
+                        document.body.style.removeProperty('padding-right');
+                        document.body.style.removeProperty('overflow');
+                    }
                 }, { once: true });
-                var oldModal = bootstrap.Modal.getInstance(el);
-                if (oldModal) oldModal.dispose();
                 new bootstrap.Modal(el, { focus: false }).show();
                 // shown 后设置 backdrop z-index
                 el.addEventListener('shown.bs.modal', function onShown() {
                     el.removeEventListener('shown.bs.modal', onShown);
-                    var backdrop = document.querySelector('.modal-backdrop');
+                    var backdrops = document.querySelectorAll('.modal-backdrop');
+                    var backdrop = backdrops.length > 0 ? backdrops[backdrops.length - 1] : null;
                     if (backdrop) {
                         backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
                     }
