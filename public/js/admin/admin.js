@@ -368,7 +368,7 @@
     $.testRedisConfig = async function() {
         $.redisTesting.value = true;
         try {
-            var result = await api('/admin/redis/test', { method: 'POST' });
+            var result = await api('/admin/redis/test', { method: 'POST', body: $.redisConfig.value });
             if (result.success) {
                 alert('✅ ' + result.message);
             } else {

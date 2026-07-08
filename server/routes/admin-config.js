@@ -671,17 +671,22 @@ router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
 
 router.post('/admin/redis/test', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        var config = await db.config.getRedis();
-        if (!config || !config.host) {
-            return res.json({ success: false, message: 'Redis 地址未配置' });
+        var { host, port, password, db } = req.body;
+        if (!host) {
+            return res.json({ success: false, message: '请填写 Redis 地址再测试' });
+        }
+        // 如果密码是打码值，从数据库获取真实密码
+        if (isMasked(password || '')) {
+            var savedConfig = await db.config.getRedis();
+            password = savedConfig.password;
         }
         // 创建临时测试连接
         const Redis = require('ioredis');
         var testClient = new Redis({
-            host: config.host,
-            port: config.port || 6379,
-            password: config.password || undefined,
-            db: config.db || 0,
+            host: host,
+            port: parseInt(port) || 6379,
+            password: password || undefined,
+            db: parseInt(db) || 0,
             retryStrategy: null,    // 不重试
             maxRetriesPerRequest: 1,
             connectionTimeout: 5000,
