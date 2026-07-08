@@ -239,7 +239,8 @@
             var config = await api('/admin/pve/config');
             $.pveConfig.value = config;
         } catch (e) {
-            console.error('加载 PVE 配置失败', e);
+            // 端点不存在（旧版本服务）或服务未重启，静默处理不阻塞加载
+            console.warn('PVE 配置加载失败（服务可能需要重启）:', e.message || e);
         }
     };
 
