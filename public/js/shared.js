@@ -453,6 +453,19 @@ document.addEventListener('DOMContentLoaded', function() {
     if (sidebarOverlay && typeof toggleSidebar === 'function') {
         sidebarOverlay.addEventListener('click', toggleSidebar);
     }
+    // 加载钱包余额到头像下拉菜单（三端共用）
+    window.loadHeaderBalance = async function() {
+        var el = document.getElementById('headerWalletBalance');
+        if (!el) return;
+        try {
+            var res = await api('/wallet/balance');
+            var bal = parseFloat(res.balance || '0.00');
+            el.textContent = '余额：' + bal.toFixed(2) + ' 元';
+        } catch (e) {
+            el.textContent = '余额：--';
+        }
+    };
+    window.loadHeaderBalance();
 });
 
 // ===== ModalZIndexManager: 统一弹窗 z-index 管理器 =====
