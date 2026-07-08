@@ -120,7 +120,7 @@
                         </div>
                         <div v-if="!vm._provisioning" class="vm-mobile-card-body">
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">内网IP</span><span class="vm-mobile-card-value">{{ vm.ip || vm.dhcp_static_ip || '-' }}</span></div>
-                            <div v-if="cnameDomain" class="vm-mobile-card-row"><span class="vm-mobile-card-label">CNAME</span><span class="vm-mobile-card-value text-primary" style="line-height:1.5;"><div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname">{{ cname }}</div></span></div>
+                            <div v-if="cnameDomain" class="vm-mobile-card-fullrow"><span class="vm-mobile-card-label">CNAME域名</span><div class="vm-mobile-card-value text-primary" style="line-height:1.5;"><span v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname" style="display:block;">{{ cname }}</span></div></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
                             <div class="vm-mobile-card-row" v-if="vm.config?.ciuser"><span class="vm-mobile-card-label">账号</span><span class="vm-mobile-card-value">{{ vm.config.ciuser }}</span></div>
@@ -264,7 +264,7 @@
                         </div>
                         <div v-if="!ct._provisioning" class="vm-mobile-card-body">
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">内网IP</span><span class="vm-mobile-card-value">{{ ct.ip || ct.dhcp_static_ip || '-' }}</span></div>
-                            <div v-if="cnameDomain" class="vm-mobile-card-row"><span class="vm-mobile-card-label">CNAME</span><span class="vm-mobile-card-value text-primary" style="line-height:1.5;"><div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname">{{ cname }}</div></span></div>
+                            <div v-if="cnameDomain" class="vm-mobile-card-fullrow"><span class="vm-mobile-card-label">CNAME域名</span><div class="vm-mobile-card-value text-primary" style="line-height:1.5;"><span v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname" style="display:block;">{{ cname }}</span></div></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ ct.config ? (ct.config.cores || 1) + '核 ' + formatMemory(ct.config.memory) : '-' }} / {{ formatDiskSize(ct) }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : ct.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
                             <div class="vm-mobile-card-row" v-if="ct.template_name"><span class="vm-mobile-card-label">镜像</span><span class="vm-mobile-card-value">{{ ct.template_name }}</span></div>
