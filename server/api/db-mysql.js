@@ -1200,7 +1200,7 @@ module.exports = {
         },
         setPve: async (pveConfig) => {
             const { encrypt, isMasked } = require('../utils/crypto-utils');
-            const current = await db.config.getPve();
+            const current = await module.exports.config.getPve();
             // 加密敏感字段，脱敏值跳过
             var apiToken = pveConfig.api_token;
             if (apiToken !== undefined && !isMasked(apiToken)) {
