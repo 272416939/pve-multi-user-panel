@@ -33,9 +33,9 @@
                                             <svg :style="{ transform: vm._cnameOpen ? 'rotate(90deg)' : '' }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                                         </div>
                                         <div v-if="vm._cnameOpen" class="vm-mobile-card-cname-list">
-                                            <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname" class="vm-mobile-card-cname-item">
-                                                <span class="text-primary" style="word-break:break-all;">{{ cname }}</span>
-                                                <button class="cname-copy-btn" @click="copyText(cname)" title="复制">
+                                            <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
+                                                <span class="text-primary" style="word-break:break-all;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</span>
+                                                <button class="cname-copy-btn" @click="copyText(cname.domain)" title="复制">
                                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                                 </button>
                                             </div>
@@ -93,7 +93,7 @@
                                             <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                             <td>
                                                 <template v-if="networkConfig.cname_domain">
-                                                    <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname" class="text-primary" style="line-height:1.5;">{{ cname }}</div>
+                                                    <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname.domain" class="text-primary" style="line-height:1.5;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</div>
                                                 </template>
                                                 <span v-else class="text-muted">-</span>
                                             </td>

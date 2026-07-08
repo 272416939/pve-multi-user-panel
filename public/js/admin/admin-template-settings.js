@@ -200,16 +200,21 @@
                         <div class="card mt-3" style="position: relative; z-index: 1;">
                             <div class="card-header"><h5 class="mb-0">CNAME 域名设置</h5></div>
                             <div class="card-body">
-                                <p class="text-muted small mb-3">配置统一公网域名，所有虚拟机/容器通过此域名访问（需在 DNS 服务商处将 CNAME 指向主机公网 IP）。支持多线路，多个域名用英文逗号分隔。</p>
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <label class="form-label">CNAME 域名</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.cname_domain" placeholder="如: 电信pve.example.com,联通pve.example.com">
-                                        <small class="text-muted">格式: 线路名+域名，多个用英文逗号分隔。如 电信pve.example.com,联通pve.example.com</small>
+                                <p class="text-muted small mb-3">配置统一公网域名，所有虚拟机/容器通过此域名访问。每行一个线路，填写线路名称和域名，域名前会自动加上 VMID。</p>
+                                <div v-for="(entry, idx) in cnameEntries" :key="idx" class="row g-2 mb-2 align-items-center">
+                                    <div class="col-md-3">
+                                        <input type="text" class="form-control form-control-sm" v-model="entry.label" placeholder="节点名称（如 电信）">
                                     </div>
-                                    <div class="col-md-6 d-flex align-items-end">
-                                        <pv-button @click="saveNetworkConfig" variant="primary">💾 保存 CNAME</pv-button>
+                                    <div class="col-md-7">
+                                        <input type="text" class="form-control form-control-sm" v-model="entry.domain" placeholder="域名（如 .example.com）">
                                     </div>
+                                    <div class="col-md-2">
+                                        <pv-button @click="removeCnameEntry(idx)" variant="outline-danger" size="sm">删除</pv-button>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-2">
+                                    <pv-button @click="addCnameEntry" variant="outline" size="sm">+ 新增节点</pv-button>
+                                    <pv-button @click="saveNetworkConfig" variant="primary" size="sm">💾 保存 CNAME</pv-button>
                                 </div>
                             </div>
                         </div>

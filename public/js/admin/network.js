@@ -14,6 +14,7 @@
         max_per_user: 10,
         cname_domain: ''
     });
+    $.cnameEntries = ref([]);
     $.ifaceList = ref([]);
     $.ifaceUpdateTime = ref('');
     $.forwardRules = ref([]);
@@ -100,13 +101,42 @@
                 $.ifaceList.value = res.iface_list;
                 $.ifaceUpdateTime.value = '已缓存';
             }
+            // 解析 cname_domain 为 cnameEntries 数组
+            $.parseCnameEntries();
         } catch (e) { console.error('加载网络配置失败:', e); }
+    };
+
+    // 将 cname_domain 逗号分隔字符串解析为 {label, domain} 数组
+    $.parseCnameEntries = function() {
+        var raw = $.networkConfig.cname_domain || '';
+        var items = raw.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+        $.cnameEntries.value = items.map(function(item) {
+            var match = item.match(/^([\u4e00-\u9fa5]+)(.*)$/);
+            if (match) return { label: match[1], domain: match[2] || '' };
+            return { label: '', domain: item };
+        });
+        if ($.cnameEntries.value.length === 0) $.cnameEntries.value.push({ label: '', domain: '' });
+    };
+
+    $.addCnameEntry = function() {
+        $.cnameEntries.value.push({ label: '', domain: '' });
+    };
+
+    $.removeCnameEntry = function(idx) {
+        $.cnameEntries.value.splice(idx, 1);
+        if ($.cnameEntries.value.length === 0) $.cnameEntries.value.push({ label: '', domain: '' });
     };
 
     $.saveNetworkConfig = async function() {
         try {
+            // 将 cnameEntries 拼接回 cname_domain 逗号分隔字符串
+            $.networkConfig.cname_domain = $.cnameEntries.value
+                .map(function(e) { return (e.label || '') + (e.domain || ''); })
+                .filter(function(s) { return s.trim(); })
+                .join(',');
             await api('/admin/network/config', { method: 'PUT', body: $.networkConfig });
             alert('配置已保存');
+            $.parseCnameEntries();
         } catch (e) { alert('保存失败: ' + e.message); }
     };
 
