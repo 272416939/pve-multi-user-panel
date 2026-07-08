@@ -632,13 +632,13 @@ router.get('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
 
 router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        var { host, port, password, db, prefix } = req.body;
+        var { host, port, password, db: redisDb, prefix } = req.body;
         // 脱敏值跳过，不覆盖原值
         var configToSave = {
             host: host || '',
             port: parseInt(port) || 6379,
             password: (password !== undefined && !isMasked(password)) ? password : undefined,
-            db: parseInt(db) || 0,
+            db: parseInt(redisDb) || 0,
             prefix: prefix || 'pve:'
         };
         await db.config.setRedis(configToSave);
