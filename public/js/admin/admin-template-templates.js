@@ -28,7 +28,7 @@
                                         <td>{{ t.network_bridge }}</td>
                                         <td><span :class="t.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ t.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
+                                            <div class="d-flex gap-2">
                                                 <pv-button @click="templatePage.openVmTemplateForm(t)" variant="outline">编辑</pv-button>
                                                 <pv-button @click="templatePage.deleteVmTemplate(t.id)" variant="outline-danger">删除</pv-button>
                                             </div>
@@ -64,7 +64,7 @@
                                         <td>{{ t.disk_size }}GB</td>
                                         <td><span :class="t.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ t.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
+                                            <div class="d-flex gap-2">
                                                 <pv-button @click="templatePage.openLxcTemplateForm(t)" variant="outline">编辑</pv-button>
                                                 <pv-button @click="templatePage.deleteLxcTemplate(t.id)" variant="outline-danger">删除</pv-button>
                                             </div>

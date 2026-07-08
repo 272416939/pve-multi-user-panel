@@ -47,7 +47,7 @@
                                         <td>{{ p.sold_count || 0 }}</td>
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
+                                            <div class="d-flex gap-2">
                             <pv-button @click="packagePage.openVmPackageForm(p)" variant="outline">编辑</pv-button>
                             <pv-button @click="packagePage.restockVmPackage(p)" variant="outline">补货</pv-button>
                             <pv-button @click="packagePage.deleteVmPackage(p.id)" variant="outline">删除</pv-button>
@@ -91,7 +91,7 @@
                                         <td>{{ g.name }}</td>
                                         <td>{{ packagePage.vmPackages.value.filter(p => p.group_id === g.id).length }}</td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
+                                            <div class="d-flex gap-2">
                                                 <pv-button @click="packagePage.openVmGroupForm(g)" variant="outline">编辑</pv-button>
                                                 <pv-button @click="packagePage.deleteVmGroup(g.id)" variant="outline-danger">删除</pv-button>
                                             </div>
@@ -136,7 +136,7 @@
                                         <td>{{ p.sold_count || 0 }}</td>
                                         <td><span :class="p.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ p.status === 'active' ? '启用' : '停用' }}</span></td>
                                         <td>
-                        <div class="btn-group btn-group-sm">
+                        <div class="d-flex gap-2">
                             <pv-button @click="packagePage.openLxcPackageForm(p)" variant="outline">编辑</pv-button>
                             <pv-button @click="packagePage.restockLxcPackage(p)" variant="outline">补货</pv-button>
                             <pv-button @click="packagePage.deleteLxcPackage(p.id)" variant="outline">删除</pv-button>
@@ -180,7 +180,7 @@
                                         <td>{{ g.name }}</td>
                                         <td>{{ packagePage.lxcPackages.value.filter(p => p.group_id === g.id).length }}</td>
                                         <td>
-                                            <div class="btn-group btn-group-sm">
+                                            <div class="d-flex gap-2">
                                                 <pv-button @click="packagePage.openLxcGroupForm(g)" variant="outline">编辑</pv-button>
                                                 <pv-button @click="packagePage.deleteLxcGroup(g.id)" variant="outline">删除</pv-button>
                                             </div>

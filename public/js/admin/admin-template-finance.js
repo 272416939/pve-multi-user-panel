@@ -43,7 +43,7 @@
                                 <label class="form-label small mb-1">订单号搜索</label>
                                 <input type="text" class="form-control form-control-sm" v-model="financeFilter.order_no" placeholder="精确搜索" @keyup.enter="loadTransactions(1)">
                             </div>
-                            <div class="col-md-2">
+                            <div class="col-md-2 d-flex gap-2 align-items-center">
                                 <pv-button @click="loadTransactions(1)" size="sm">查询</pv-button>
                                 <pv-button @click="exportTransactions" variant="outline" size="sm">导出Excel</pv-button>
                             </div>
