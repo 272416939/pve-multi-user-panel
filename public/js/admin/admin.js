@@ -26,6 +26,7 @@
     $.siteConfigSaving = ref(false);
     $.redisConfig = ref({ host: '', port: 6379, password: '', db: 0, prefix: 'pve:' });
     $.redisConfigSaving = ref(false);
+    $.redisTesting = ref(false);
     $.cacheClearing = ref(false);
     $.cdkList = ref([]);
     $.cdkForm = ref({ duration_days: 30, count: 1, expires_at: '' });
@@ -361,6 +362,22 @@
             alert('保存失败: ' + (e.message || '未知错误'));
         }
         $.redisConfigSaving.value = false;
+    };
+
+    // Redis 测试连接
+    $.testRedisConfig = async function() {
+        $.redisTesting.value = true;
+        try {
+            var result = await api('/admin/redis/test', { method: 'POST' });
+            if (result.success) {
+                alert('✅ ' + result.message);
+            } else {
+                alert('❌ ' + result.message);
+            }
+        } catch (e) {
+            alert('❌ 测试失败: ' + (e.message || '未知错误'));
+        }
+        $.redisTesting.value = false;
     };
 
     // 快照配置

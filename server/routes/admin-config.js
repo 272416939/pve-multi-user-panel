@@ -667,4 +667,43 @@ router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
     }
 });
 
+// ==================== Redis 测试连接 ====================
+
+router.post('/admin/redis/test', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var config = await db.config.getRedis();
+        if (!config || !config.host) {
+            return res.json({ success: false, message: 'Redis 地址未配置' });
+        }
+        // 创建临时测试连接
+        const Redis = require('ioredis');
+        var testClient = new Redis({
+            host: config.host,
+            port: config.port || 6379,
+            password: config.password || undefined,
+            db: config.db || 0,
+            retryStrategy: null,    // 不重试
+            maxRetriesPerRequest: 1,
+            connectionTimeout: 5000,
+            lazyConnect: true
+        });
+        try {
+            await testClient.connect();
+            var pong = await testClient.ping();
+            if (pong === 'PONG') {
+                res.json({ success: true, message: 'Redis 连接成功 (PONG)' });
+            } else {
+                res.json({ success: true, message: 'Redis 连接成功（响应: ' + pong + '）' });
+            }
+        } catch (e) {
+            res.json({ success: false, message: '连接失败: ' + safeError(e) });
+        } finally {
+            try { testClient.disconnect(); } catch (e) {}
+        }
+    } catch (error) {
+        console.error('测试 Redis 连接失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
 module.exports = router;

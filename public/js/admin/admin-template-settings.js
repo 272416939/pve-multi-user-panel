@@ -457,9 +457,14 @@
                                             <small class="text-muted">所有缓存 key 的前缀，多实例共用 Redis 时防止冲突</small>
                                         </div>
                                     </div>
-                                    <pv-button type="submit" variant="glass" :disabled="redisConfigSaving">
-                                        {{ redisConfigSaving ? '保存中...' : '保存配置' }}
-                                    </pv-button>
+                                    <div class="d-flex gap-2">
+                                        <pv-button type="button" variant="outline" @click="testRedisConfig" :disabled="redisTesting">
+                                            {{ redisTesting ? '测试中...' : '测试连接' }}
+                                        </pv-button>
+                                        <pv-button type="submit" variant="glass" :disabled="redisConfigSaving">
+                                            {{ redisConfigSaving ? '保存中...' : '保存配置' }}
+                                        </pv-button>
+                                    </div>
                                 </form>
                             </div>
                         </div>
