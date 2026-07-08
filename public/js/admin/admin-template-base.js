@@ -117,6 +117,7 @@
                 </a>
                 <div class="nav-submenu" id="submenu-settings">
                     <a class="nav-item" data-subsection="settings-smtp" href="#" @click.prevent="switchAdminTab('smtp')"><span class="nav-text">SMTP 配置</span></a>
+                    <a class="nav-item" data-subsection="settings-pve" href="#" @click.prevent="switchAdminTab('pve')"><span class="nav-text">PVE节点设置</span></a>
                     <a class="nav-item" data-subsection="settings-snapshot-backup" href="#" @click.prevent="switchAdminTab('snapshot-backup')"><span class="nav-text">快照&备份配置</span></a>
                     <a class="nav-item" data-subsection="settings-network" href="#" @click.prevent="switchAdminTab('network')"><span class="nav-text">网络管理</span></a>
                     <a class="nav-item" data-subsection="settings-pay" href="#" @click.prevent="switchAdminTab('pay')"><span class="nav-text">支付配置</span></a>

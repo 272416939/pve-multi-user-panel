@@ -671,6 +671,12 @@ async function initDefaultConfig() {
         'site:name': 'PVE 多用户控制面板',
         'site:logo_text': 'PVE 面板',
         'site:login_title': 'PVE Panel',
+        'pve:host': '',
+        'pve:api_token': '',
+        'pve:ssh_host': '',
+        'pve:ssh_port': '22',
+        'pve:ssh_user': 'root',
+        'pve:ssh_password': '',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {
@@ -1175,6 +1181,45 @@ module.exports = {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days1', String(reminderConfig.days1 ?? 7)]);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days2', String(reminderConfig.days2 ?? 3)]);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days3', String(reminderConfig.days3 ?? 1)]);
+        },
+        getPve: async () => {
+            const keys = ['pve:host', 'pve:api_token', 'pve:ssh_host', 'pve:ssh_port', 'pve:ssh_user', 'pve:ssh_password'];
+            const placeholders = keys.map(() => '?').join(',');
+            const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+            const map = {};
+            rows.forEach(r => { map[r.key] = r.value; });
+            const { decrypt } = require('../utils/crypto-utils');
+            return {
+                host: map['pve:host'] || '',
+                api_token: decrypt(map['pve:api_token'] || ''),
+                ssh_host: map['pve:ssh_host'] || '',
+                ssh_port: parseInt(map['pve:ssh_port'] || '22'),
+                ssh_user: map['pve:ssh_user'] || 'root',
+                ssh_password: decrypt(map['pve:ssh_password'] || '')
+            };
+        },
+        setPve: async (pveConfig) => {
+            const { encrypt, isMasked } = require('../utils/crypto-utils');
+            const current = await db.config.getPve();
+            // 加密敏感字段，脱敏值跳过
+            var apiToken = pveConfig.api_token;
+            if (apiToken !== undefined && !isMasked(apiToken)) {
+                apiToken = encrypt(apiToken);
+            } else {
+                apiToken = encrypt(current.api_token); // 保留旧值（重新加密）
+            }
+            var sshPassword = pveConfig.ssh_password;
+            if (sshPassword !== undefined && !isMasked(sshPassword)) {
+                sshPassword = encrypt(sshPassword);
+            } else {
+                sshPassword = encrypt(current.ssh_password);
+            }
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:host', pveConfig.host ?? '']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:api_token', apiToken]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_host', pveConfig.ssh_host ?? '']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_port', String(pveConfig.ssh_port ?? 22)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_user', pveConfig.ssh_user ?? 'root']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_password', sshPassword]);
         },
         get: async (key) => (await queryOne('SELECT value FROM config WHERE `key` = ?', [key]))?.value,
         set: (key, value) => execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', [key, value])

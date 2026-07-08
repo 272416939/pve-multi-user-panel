@@ -266,6 +266,7 @@ watch($.user, function(u) {
             $.cdkList.value = await api('/admin/cdk/list');
             var smtpData = await api('/admin/smtp');
             $.smtpConfig.value = smtpData;
+            await $.loadPveConfig();
             await $.loadSnapshotConfig();
             await $.loadStorageList();
             await $.loadBackupConfig();
@@ -674,7 +675,7 @@ watch($.user, function(u) {
     $.switchAdminTab = function(tab) {
         // Determine which group this tab belongs to
         var manageTabs = ['users', 'cdk', 'messages'];
-        var settingsTabs = ['smtp', 'snapshot-backup', 'network', 'pay', 'site'];
+        var settingsTabs = ['smtp', 'pve', 'snapshot-backup', 'network', 'pay', 'site'];
         var section;
         var submenuId;
 
@@ -706,6 +707,7 @@ watch($.user, function(u) {
             'cdk': 'manage-cdk',
             'messages': 'manage-messages',
             'smtp': 'settings-smtp',
+            'pve': 'settings-pve',
             'snapshot-backup': 'settings-snapshot-backup',
             'network': 'settings-network',
             'pay': 'settings-pay',

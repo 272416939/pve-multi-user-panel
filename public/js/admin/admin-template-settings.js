@@ -84,6 +84,55 @@
 
                 </div>
                 <!-- end settings(smtp) -->
+
+                <!-- PVE 节点设置 -->
+                <div v-if="activeTab === 'pve'">
+                    <h4 class="module-title">PVE 节点设置</h4>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">配置 Proxmox VE 服务器的连接信息。API Token 和 SSH 密码将加密存储，保存后显示为打码值。</p>
+                            <form @submit.prevent="savePveConfig">
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">PVE API 地址</label>
+                                        <input type="text" class="form-control" v-model="pveConfig.host" placeholder="https://192.168.1.100:8006">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">API Token</label>
+                                        <input type="password" class="form-control" v-model="pveConfig.api_token" placeholder="留空则不修改" autocomplete="off">
+                                        <small class="text-muted">格式: root@pam!panel=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</small>
+                                    </div>
+                                </div>
+                                <hr class="my-4">
+                                <h6 class="mb-3">SSH 连接（用于终端、密码重置、备份恢复等）</h6>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">SSH 地址</label>
+                                        <input type="text" class="form-control" v-model="pveConfig.ssh_host" placeholder="192.168.1.100">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">SSH 端口</label>
+                                        <input type="number" class="form-control" v-model="pveConfig.ssh_port" placeholder="22">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">SSH 用户名</label>
+                                        <input type="text" class="form-control" v-model="pveConfig.ssh_user" placeholder="root">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">SSH 密码</label>
+                                        <input type="password" class="form-control" v-model="pveConfig.ssh_password" placeholder="留空则不修改" autocomplete="off">
+                                    </div>
+                                </div>
+                                <pv-button type="submit" variant="glass">保存配置</pv-button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <!-- end settings(pve) -->
 <div v-if="activeSection === 'settings'">
 
                     <!-- 快照 & 备份配置（合并） -->

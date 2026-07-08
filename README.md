@@ -158,14 +158,11 @@ npm run dev
 
 | 变量 | 说明 | 示例 |
 |------|------|------|
-| `PVE_HOST` | PVE 服务器地址 | `https://192.168.1.100:8006` |
-| `PVE_API_TOKEN` | PVE API 令牌，请使用`root@pam`用户创建，格式`用户@认证域!令牌ID=UUID` | `root@pam!panel=xxxxxxxx-...` |
 | `PORT` | 面板服务端口 | `3002` |
 | `SITE_URL` | 外部访问域名（反向代理必填） | `https://your-domain.com` |
 | `JWT_SECRET` | JWT 签名密钥（生产环境请修改） | — |
 | `DEBUG` | 调试日志开关 | `false` |
-| `PVE_SSH_HOST` | PVE 宿主机 SSH 地址 | `10.0.0.2` |
-| `PVE_SSH_PASSWORD` | PVE root 密码 | — |
+> **PVE 节点配置**（API 地址、Token、SSH 连接）已迁移到面板内管理，首次部署后在 **管理后台 > 系统设置 > PVE节点设置** 中配置。Token 和 SSH 密码使用 AES-256-GCM 加密存储。
 
 ### 数据库配置（必填）
 

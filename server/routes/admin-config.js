@@ -11,19 +11,7 @@ const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { loadSentRemindersFromDb, checkExpiredVms, checkExpiredLxc } = require('../services/expiry-check');
 const pkg = require('../../package.json');
 const { safeError } = require('../utils/safe-error');
-
-function maskSecret(value) {
-    if (!value || value.length < 5) return value || '';
-    if (value.includes('****')) return value;
-    if (value.length <= 6) return value[0] + '****' + value[value.length - 1];
-    var prefix = value.substring(0, 4);
-    var suffix = value.substring(value.length - 4);
-    return prefix + '****' + suffix;
-}
-
-function isMasked(value) {
-    return value && value.includes('****');
-}
+const { maskSecret, isMasked } = require('../utils/crypto-utils');
 
 router.get('/admin/storage', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -580,6 +568,47 @@ router.post('/admin/cache/clear', authMiddleware, adminMiddleware, async (req, r
     } catch (e) {
         console.error('[admin] cache clear:', e.message);
         res.status(500).json({ error: '清除缓存失败' });
+    }
+});
+
+// ==================== PVE 节点配置 ====================
+
+router.get('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var config = await db.config.getPve();
+        res.json({
+            host: config.host || '',
+            api_token: maskSecret(config.api_token),
+            ssh_host: config.ssh_host || '',
+            ssh_port: config.ssh_port || 22,
+            ssh_user: config.ssh_user || 'root',
+            ssh_password: maskSecret(config.ssh_password)
+        });
+    } catch (error) {
+        console.error('获取 PVE 配置失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
+router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var { host, api_token, ssh_host, ssh_port, ssh_user, ssh_password } = req.body;
+        // 脱敏值跳过，不覆盖原值
+        var configToSave = {
+            host: host || '',
+            api_token: (api_token !== undefined && !isMasked(api_token)) ? api_token : undefined,
+            ssh_host: ssh_host || '',
+            ssh_port: parseInt(ssh_port) || 22,
+            ssh_user: ssh_user || 'root',
+            ssh_password: (ssh_password !== undefined && !isMasked(ssh_password)) ? ssh_password : undefined
+        };
+        await db.config.setPve(configToSave);
+        // 刷新 PVE API 实例的配置缓存
+        await pveApi.reloadConfig();
+        res.json({ message: 'PVE 配置保存成功' });
+    } catch (error) {
+        console.error('更新 PVE 配置失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
     }
 });
 

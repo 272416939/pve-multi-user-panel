@@ -493,10 +493,10 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var lxcPassword = '';
         try {
             lxcPassword = generateRandomPassword();
-            var sshHost = process.env.PVE_SSH_HOST;
-            var sshPass = process.env.PVE_SSH_PASSWORD;
-            if (sshHost && sshPass) {
-                await execSSHWithStdin(sshHost, 'root', sshPass,
+            var { getPveSshConfig } = require('../api/ssh-exec');
+            var sshConfig = await getPveSshConfig();
+            if (sshConfig.host && sshConfig.password) {
+                await execSSHWithStdin(sshConfig.host, sshConfig.username, sshConfig.password,
                     'lxc-attach -n ' + newVmid + ' -- chpasswd',
                     'root:' + lxcPassword + '\n', 30000
                 );
@@ -922,10 +922,10 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         var adminLxcPwd = '';
         try {
             adminLxcPwd = generateRandomPassword();
-            var sshHost = process.env.PVE_SSH_HOST;
-            var sshPass = process.env.PVE_SSH_PASSWORD;
-            if (sshHost && sshPass) {
-                await execSSHWithStdin(sshHost, 'root', sshPass,
+            var { getPveSshConfig } = require('../api/ssh-exec');
+            var sshConfig = await getPveSshConfig();
+            if (sshConfig.host && sshConfig.password) {
+                await execSSHWithStdin(sshConfig.host, sshConfig.username, sshConfig.password,
                     'lxc-attach -n ' + newVmid + ' -- chpasswd',
                     'root:' + adminLxcPwd + '\n', 30000
                 );

@@ -30,10 +30,10 @@ terminalProxy.on('connection', async (clientWs, request) => {
 
     dbg(`[Terminal] 认证通过: user=${username}(${userId}) → LXC ${vmid}`);
 
-    const sshHost = process.env.PVE_SSH_HOST;
-    const sshPassword = process.env.PVE_SSH_PASSWORD;
-    if (!sshHost || !sshPassword) {
-        clientWs.close(1011, 'SSH 配置不完整');
+    const { getPveSshConfig } = require('../api/ssh-exec');
+    const sshConfig = await getPveSshConfig();
+    if (!sshConfig.host || !sshConfig.password) {
+        clientWs.close(1011, 'SSH 配置不完整：请在面板设置 PVE SSH 连接信息');
         return;
     }
 
@@ -42,7 +42,7 @@ terminalProxy.on('connection', async (clientWs, request) => {
     let pendingResize = { rows: 24, cols: 80 };
 
     const session = createTerminalPty(
-        sshHost, 'root', sshPassword, parseInt(vmid),
+        sshConfig.host, sshConfig.username, sshConfig.password, parseInt(vmid),
         pendingResize,
         (data) => {
             if (clientWs.readyState === WebSocket.OPEN) {

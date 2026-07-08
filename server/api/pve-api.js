@@ -26,9 +26,13 @@ async function withRetry(fn, maxRetries = 2) {
 
 class PveApi {
   constructor() {
-    this.host = process.env.PVE_HOST;
-    this.apiToken = process.env.PVE_API_TOKEN;
     this.node = null;
+    // 内部缓存（从 DB 读取，60s TTL）
+    this._configCache = null;
+    this._configCacheTime = 0;
+    this._configTTL = 60000; // 60 秒
+    var self = this;
+    // axios 实例 + 请求拦截器（每次请求自动注入 host 和 token）
     this.axiosInstance = axios.create({
       httpsAgent: new https.Agent({
         keepAlive: true,
@@ -39,11 +43,58 @@ class PveApi {
         keepAlive: true,
         maxSockets: 50
       }),
-      timeout: 30000,
-      headers: {
-        'Authorization': `PVEAPIToken=${this.apiToken}`
-      }
+      timeout: 30000
     });
+    // 拦截器：确保配置已加载 + 注入完整 URL 和认证头
+    this.axiosInstance.interceptors.request.use(async function(config) {
+      var cfg = await self.ensureConfig();
+      config.baseURL = cfg.host;
+      config.headers['Authorization'] = 'PVEAPIToken=' + cfg.api_token;
+      return config;
+    });
+  }
+
+  // 从 DB 读取 PVE 配置（带缓存）
+  async _getConfig() {
+    var now = Date.now();
+    if (this._configCache && now - this._configCacheTime < this._configTTL) {
+      return this._configCache;
+    }
+    try {
+      const db = require('./db');
+      const config = await db.config.getPve();
+      this._configCache = config;
+      this._configCacheTime = now;
+      return config;
+    } catch (e) {
+      console.error('[pve-api] 读取 PVE 配置失败:', e.message);
+      return { host: '', api_token: '', ssh_host: '', ssh_port: 22, ssh_user: 'root', ssh_password: '' };
+    }
+  }
+
+  // 保存配置后刷新缓存
+  async reloadConfig() {
+    this._configCache = null;
+    this._configCacheTime = 0;
+    await this._getConfig();
+  }
+
+  // 获取 host（getter，兼容旧代码 this.host 访问）
+  get host() {
+    return this._configCache ? this._configCache.host : '';
+  }
+
+  // 获取 apiToken（getter）
+  get apiToken() {
+    return this._configCache ? this._configCache.api_token : '';
+  }
+
+  // 确保配置已加载（异步调用方需要 await）
+  async ensureConfig() {
+    if (!this._configCache || Date.now() - this._configCacheTime >= this._configTTL) {
+      await this._getConfig();
+    }
+    return this._configCache;
   }
 
   async detectNode() {
@@ -54,9 +105,6 @@ class PveApi {
       }
     } catch (error) {
       console.error('检测节点失败:', error.message);
-      if (error.response) {
-        console.error('节点检测错误响应:', error.response.data);
-      }
     }
   }
 

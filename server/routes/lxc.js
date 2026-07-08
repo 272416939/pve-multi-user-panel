@@ -806,14 +806,14 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
         }
  
         // C-3 最终修复：使用 stdin 管道传密码，彻底消除 shell 注入
-        const host = process.env.PVE_SSH_HOST;
-        if (!host) { return res.status(500).json({ error: 'SSH 配置不完整：未设置 PVE_SSH_HOST' }); }
-        const sshPassword = process.env.PVE_SSH_PASSWORD;
-        if (!sshPassword) { return res.status(500).json({ error: 'SSH 配置不完整：未设置 PVE_SSH_PASSWORD' }); }
+        const { getPveSshConfig } = require('../api/ssh-exec');
+        const sshConfig = await getPveSshConfig();
+        if (!sshConfig.host) { return res.status(500).json({ error: 'SSH 配置不完整：请在面板设置 PVE SSH 连接信息' }); }
+        if (!sshConfig.password) { return res.status(500).json({ error: 'SSH 配置不完整：请在面板设置 PVE SSH 密码' }); }
 
         // 密码通过 stdin 传入 chpasswd，完全不接触 shell 解释器
         const { code, stderr } = await execSSHWithStdin(
-            host, 'root', sshPassword,
+            sshConfig.host, sshConfig.username, sshConfig.password,
             `lxc-attach -n ${vmid} -- chpasswd`,
             `root:${password}\n`,
             30000

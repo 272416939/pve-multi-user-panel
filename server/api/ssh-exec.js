@@ -59,21 +59,31 @@ function execSSH(host, username, password, command, timeout = 600000) {
 }
 
 /**
+ * 从数据库获取 PVE SSH 配置（解密密码）
+ * @returns {Promise<{host: string, username: string, password: string, port: number}>}
+ */
+async function getPveSshConfig() {
+    const db = require('./db');
+    const config = await db.config.getPve();
+    return {
+        host: config.ssh_host || '',
+        username: config.ssh_user || 'root',
+        password: config.ssh_password || '',
+        port: config.ssh_port || 22
+    };
+}
+
+/**
  * 通过 SSH 在 PVE 节点上执行 pct restore 命令（强制覆盖恢复 LXC 容器）
- * @param {object} pveHost - PVE SSH 主机地址（从环境变量读取）
- * @param {object} params
- * @param {number} params.vmid - 容器 ID
- * @param {string} params.volid - 备份文件路径 (storage:backup/filename)
- * @param {string} params.storage - 目标存储（可选，不传则用备份中原存储）
- * @returns {Promise<{stdout: string, stderr: string, code: number}>}
  */
 async function restoreLxcBySSH(vmid, volid, storage) {
-    const host = process.env.PVE_SSH_HOST;
-    const username = 'root';
-    const password = process.env.PVE_SSH_PASSWORD;
+    const sshConfig = await getPveSshConfig();
+    const host = sshConfig.host;
+    const username = sshConfig.username;
+    const password = sshConfig.password;
 
     if (!host || !password) {
-        throw new Error('SSH 配置不完整：请设置 PVE_SSH_HOST 和 PVE_SSH_PASSWORD');
+        throw new Error('SSH 配置不完整：请在面板管理后台 > 系统设置 > PVE节点设置 中配置 SSH 连接信息');
     }
 
     // R3-4 修复：白名单校验防止命令注入
@@ -243,4 +253,4 @@ function execSSHWithStdin(host, username, password, command, stdinData, timeout 
     });
 }
 
-module.exports = { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty };
+module.exports = { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty, getPveSshConfig };
