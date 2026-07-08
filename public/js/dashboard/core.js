@@ -667,6 +667,7 @@
                 if (window.ModalZIndexManager.getActiveCount() === 0) {
                     document.body.classList.remove('modal-open');
                     document.body.style.removeProperty('padding-right');
+                    document.body.style.removeProperty('overflow');
                 }
             }, { once: true });
             modal.hide();

@@ -616,6 +616,12 @@ const App = {
                             el._modalZIndex = null;
                             el.style.zIndex = '';
                         }
+                        // 仅当没有其他活跃弹窗时才清理 body 状态，防止残留 modal-open 导致底层 modal 卡死
+                        if (window.ModalZIndexManager && window.ModalZIndexManager.getActiveCount() === 0) {
+                            document.body.classList.remove('modal-open');
+                            document.body.style.removeProperty('padding-right');
+                            document.body.style.removeProperty('overflow');
+                        }
                     }, { once: true });
                     modal.hide();
                 } else if (zIndex != null) {
