@@ -76,16 +76,23 @@ document.querySelectorAll('[data-suborder]').forEach(function(el) {
 
 // 点击页面空白处关闭下拉菜单
 document.addEventListener('click', function(e) {
-    // 关闭内联下拉菜单（与 admin 端一致）
     var allOpen = document.querySelectorAll('.dropdown-table.open');
     allOpen.forEach(function(dd) {
         if (!dd.contains(e.target)) {
             dd.classList.remove('open');
-            var menu = dd.querySelector('.dropdown-menu-table');
-            if (menu && menu._dropdownZIndex != null) {
-                window.ModalZIndexManager.release(menu._dropdownZIndex);
-                menu._dropdownZIndex = null;
-                menu.style.zIndex = '';
+            var menu = dd._movedMenu;
+            if (menu) {
+                menu.style.display = 'none';
+                if (menu._dropdownZIndex != null) {
+                    window.ModalZIndexManager.release(menu._dropdownZIndex);
+                    menu._dropdownZIndex = null;
+                    menu.style.zIndex = '';
+                }
+                if (menu._originalParent) {
+                    menu._originalParent.appendChild(menu);
+                    menu._originalParent = null;
+                }
+                dd._movedMenu = null;
             }
         }
     });

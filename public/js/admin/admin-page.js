@@ -55,29 +55,44 @@ var App = {
         $.toggleAdminDropdown = function(target) {
             var dd = target.parentElement;
             var isOpen = dd.classList.contains('open');
-            // 关闭所有已打开的下拉，释放 z-index
+            // 关闭所有已打开的下拉，释放 z-index，移回原位
             document.querySelectorAll('.dropdown-table.open').forEach(function(el) {
                 el.classList.remove('open');
                 var menu = el.querySelector('.dropdown-menu-table');
-                if (menu && menu._dropdownZIndex != null) {
-                    window.ModalZIndexManager.release(menu._dropdownZIndex);
-                    menu._dropdownZIndex = null;
-                    menu.style.zIndex = '';
+                // menu 可能已移到 body，也检查 body 下属于该 dropdown 的 menu
+                if (!menu) menu = el._movedMenu;
+                if (menu) {
+                    menu.style.display = 'none';
+                    if (menu._dropdownZIndex != null) {
+                        window.ModalZIndexManager.release(menu._dropdownZIndex);
+                        menu._dropdownZIndex = null;
+                        menu.style.zIndex = '';
+                    }
+                    // 移回原 DOM 位置
+                    if (menu._originalParent) {
+                        menu._originalParent.appendChild(menu);
+                        menu._originalParent = null;
+                    }
                 }
             });
             if (!isOpen) {
                 dd.classList.add('open');
                 var menu = dd.querySelector('.dropdown-menu-table');
-                if (menu && window.positionFixedDropdown) {
-                    // 先设 z-index（立即可见），下一帧再定位（等 display:block 布局完成）
+                if (menu) {
+                    // 移到 body 下，绕过 table-container 的 backdrop-filter 导致 fixed 降级
+                    menu._originalParent = dd;
+                    dd._movedMenu = menu; // 记录引用，关闭时能找到
+                    document.body.appendChild(menu);
+                    menu.style.display = 'block'; // 移到 body 后 CSS 后代选择器失效，手动控制 display
                     if (window.ModalZIndexManager) {
                         var z0 = window.ModalZIndexManager.acquire();
                         menu._dropdownZIndex = z0;
                         menu.style.zIndex = z0;
                     }
-                    requestAnimationFrame(function() {
+                    if (window.positionFixedDropdown) {
+                        void menu.offsetWidth;
                         window.positionFixedDropdown(target, menu);
-                    });
+                    }
                 }
             }
         };
@@ -304,11 +319,19 @@ app.component('port-forward-list', {
           allOpen.forEach(function(dd) {
               if (!dd.contains(e.target)) {
                   dd.classList.remove('open');
-                  var menu = dd.querySelector('.dropdown-menu-table');
-                  if (menu && menu._dropdownZIndex != null) {
-                      window.ModalZIndexManager.release(menu._dropdownZIndex);
-                      menu._dropdownZIndex = null;
-                      menu.style.zIndex = '';
+                  var menu = dd._movedMenu;
+                  if (menu) {
+                      menu.style.display = 'none';
+                      if (menu._dropdownZIndex != null) {
+                          window.ModalZIndexManager.release(menu._dropdownZIndex);
+                          menu._dropdownZIndex = null;
+                          menu.style.zIndex = '';
+                      }
+                      if (menu._originalParent) {
+                          menu._originalParent.appendChild(menu);
+                          menu._originalParent = null;
+                      }
+                      dd._movedMenu = null;
                   }
               }
           });
