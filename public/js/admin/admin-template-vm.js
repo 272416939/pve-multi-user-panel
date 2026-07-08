@@ -14,7 +14,46 @@
                         <p class="mt-2 text-muted">加载中...</p>
                     </div>
                     <div v-else class="vm-table-wrap">
-                        <div class="table-container">
+                        <!-- 移动端卡片视图 -->
+                        <div class="d-block d-md-none">
+                            <div v-if="userVms.length === 0" class="text-center text-muted py-4">暂无虚拟机</div>
+                            <div v-for="vm in userVms" :key="vm.id" class="vm-mobile-card">
+                                <div class="vm-mobile-card-header">
+                                    <div class="vm-mobile-card-title">
+                                        {{ vm.name || ('VM ' + vm.vm_id) }}
+                                        <span class="vm-mobile-card-id">#{{ vm.vm_id }}</span>
+                                    </div>
+                                    <span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span>
+                                </div>
+                                <div class="vm-mobile-card-body">
+                                    <div class="vm-mobile-card-row" v-if="vm.username"><span class="vm-mobile-card-label">用户</span><span class="vm-mobile-card-value">{{ vm.username }}</span></div>
+                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">内网IP</span><span class="vm-mobile-card-value">{{ vm.ip || vm.dhcp_static_ip || '-' }}</span></div>
+                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
+                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
+                                </div>
+                                <div class="vm-mobile-card-actions">
+                                    <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
+                                    <button v-if="vm.status && vm.status.status === 'running'" class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
+                                    <button v-if="vm.status && vm.status.status === 'running'" class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
+                                    <button v-if="vm.status && vm.status.status === 'running'" class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
+                                    <button v-if="!vm.status || vm.status.status !== 'running'" class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
+                                    <button v-if="!vm.status || vm.status.status !== 'running'" class="table-btn btn-danger" @click="openDestroyVmModal(vm)">销毁</button>
+                                    <div class="dropdown-table">
+                                        <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                        <ul class="dropdown-menu-table">
+                                            <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
+                                            <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
+                                            <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
+                                            <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
+                                            <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
+                                            <li><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- 桌面端表格视图 -->
+                        <div class="table-container d-none d-md-block">
                             <div class="table-scroll">
                                 <table>
                                     <thead>

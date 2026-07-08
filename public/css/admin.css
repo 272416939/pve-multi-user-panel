@@ -75,6 +75,31 @@
     color: #4caf50;
 }
 
+/* ===== 移动端卡片布局（与 dashboard.css 一致）===== */
+.vm-mobile-card {
+    background: var(--glass-surface);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    box-shadow: var(--shadow-md);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    transition: all 0.3s ease;
+}
+.vm-mobile-card:hover { border-color: rgba(99,102,241,0.3); }
+.vm-mobile-card-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px; padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+.vm-mobile-card-title { font-size: 15px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 8px; }
+.vm-mobile-card-id { font-size: 12px; color: var(--text-muted); }
+.vm-mobile-card-body { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.vm-mobile-card-row { display: flex; justify-content: space-between; font-size: 13px; }
+.vm-mobile-card-label { color: var(--text-muted); flex-shrink: 0; }
+.vm-mobile-card-value { color: var(--text-primary); text-align: right; word-break: break-all; }
+.vm-mobile-card-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
 @media (max-width: 768px) {
     /* Mobile table optimization */
     .table-container { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }

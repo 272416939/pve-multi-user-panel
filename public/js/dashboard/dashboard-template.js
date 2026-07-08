@@ -105,7 +105,49 @@
                 <p class="mt-2 text-muted">加载中...</p>
             </div>
             <div v-else class="vm-table-wrap">
-                <div class="table-container">
+                <!-- 移动端卡片视图 -->
+                <div class="d-block d-md-none">
+                    <div v-if="userVms.length === 0" class="text-center text-muted py-4">暂无虚拟机</div>
+                    <div v-for="vm in userVms" :key="vm.id" class="vm-mobile-card">
+                        <div class="vm-mobile-card-header">
+                            <div class="vm-mobile-card-title">
+                                <span v-if="vm._provisioning" class="spinner-border spinner-border-sm text-primary"></span>
+                                {{ vm.name || ('VM ' + vm.vm_id) }}
+                                <span class="vm-mobile-card-id">#{{ vm.vm_id }}</span>
+                            </div>
+                            <span v-if="vm._provisioning" class="tag-pending">开通中</span>
+                            <span v-else :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span>
+                        </div>
+                        <div v-if="!vm._provisioning" class="vm-mobile-card-body">
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">内网IP</span><span class="vm-mobile-card-value">{{ vm.ip || vm.dhcp_static_ip || '-' }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
+                            <div class="vm-mobile-card-row" v-if="vm.config?.ciuser"><span class="vm-mobile-card-label">账号</span><span class="vm-mobile-card-value">{{ vm.config.ciuser }}</span></div>
+                        </div>
+                        <div v-if="vm._provisioning" class="text-center text-muted py-2"><small>正在开通中，请稍后刷新</small></div>
+                        <div v-else class="vm-mobile-card-actions">
+                            <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
+                            <button v-if="vm.status && vm.status.status === 'running'" class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
+                            <button v-if="vm.status && vm.status.status === 'running'" class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
+                            <button v-if="vm.status && vm.status.status === 'running'" class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
+                            <button v-if="!vm.status || vm.status.status !== 'running'" class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
+                            <div class="dropdown-table">
+                                <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                <ul class="dropdown-menu-table">
+                                    <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
+                                    <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
+                                    <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
+                                    <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
+                                    <li><a href="#" @click.prevent="renewResource = vm; renewShow = true">续费</a></li>
+                                    <li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
+                                    <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 桌面端表格视图 -->
+                <div class="table-container d-none d-md-block">
                     <div class="table-scroll">
                         <table>
                             <thead>
@@ -206,7 +248,49 @@
                 <p class="mt-2 text-muted">加载中...</p>
             </div>
             <div v-else class="vm-table-wrap">
-                <div class="table-container">
+                <!-- 移动端卡片视图 -->
+                <div class="d-block d-md-none">
+                    <div v-if="userLxcContainers.length === 0" class="text-center text-muted py-4">暂无容器</div>
+                    <div v-for="ct in userLxcContainers" :key="ct.id" class="vm-mobile-card">
+                        <div class="vm-mobile-card-header">
+                            <div class="vm-mobile-card-title">
+                                <span v-if="ct._provisioning" class="spinner-border spinner-border-sm text-primary"></span>
+                                {{ ct.name || ('CT ' + ct.ct_id) }}
+                                <span class="vm-mobile-card-id">#{{ ct.ct_id }}</span>
+                            </div>
+                            <span v-if="ct._provisioning" class="tag-pending">开通中</span>
+                            <span v-else :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span>
+                        </div>
+                        <div v-if="!ct._provisioning" class="vm-mobile-card-body">
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">内网IP</span><span class="vm-mobile-card-value">{{ ct.ip || ct.dhcp_static_ip || '-' }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ ct.config ? (ct.config.cores || 1) + '核 ' + formatMemory(ct.config.memory) : '-' }} / {{ formatDiskSize(ct) }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : ct.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
+                            <div class="vm-mobile-card-row" v-if="ct.template_name"><span class="vm-mobile-card-label">镜像</span><span class="vm-mobile-card-value">{{ ct.template_name }}</span></div>
+                        </div>
+                        <div v-if="ct._provisioning" class="text-center text-muted py-2"><small>正在开通中，请稍后刷新</small></div>
+                        <div v-else class="vm-mobile-card-actions">
+                            <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
+                            <button v-if="ct.status && ct.status.status === 'running'" class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
+                            <button v-if="ct.status && ct.status.status === 'running'" class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
+                            <button v-if="ct.status && ct.status.status === 'running'" class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
+                            <button v-if="!ct.status || ct.status.status !== 'running'" class="table-btn btn-primary" @click="startLxc(ct.ct_id)">启动</button>
+                            <div class="dropdown-table">
+                                <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                <ul class="dropdown-menu-table">
+                                    <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
+                                    <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
+                                    <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
+                                    <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
+                                    <li><a href="#" @click.prevent="renewResource = ct; renewShow = true">续费</a></li>
+                                    <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
+                                    <li><a href="#" @click.prevent="openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 桌面端表格视图 -->
+                <div class="table-container d-none d-md-block">
                     <div class="table-scroll">
                         <table>
                             <thead>
