@@ -1242,14 +1242,16 @@ module.exports = {
             };
         },
         setRedis: async (redisConfig) => {
-            const { encrypt, isMasked } = require('../utils/crypto-utils');
-            const current = await module.exports.config.getRedis();
+            const { encrypt, decrypt, isMasked } = require('../utils/crypto-utils');
+            var currentPasswordRow = await queryOne('SELECT value FROM config WHERE `key` = ?', ['redis:password']);
+            var currentPassword = currentPasswordRow ? currentPasswordRow.value : '';
+            var decryptedCurrent = currentPassword && currentPassword.includes(':') ? decrypt(currentPassword) : '';
             // 加密密码，脱敏值跳过
             var password = redisConfig.password;
             if (password !== undefined && !isMasked(password)) {
                 password = encrypt(password);
             } else {
-                password = encrypt(current.password); // 保留旧值（重新加密）
+                password = encrypt(decryptedCurrent); // 保留旧值（重新加密）
             }
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['redis:host', redisConfig.host ?? '']);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['redis:port', String(redisConfig.port ?? 6379)]);
