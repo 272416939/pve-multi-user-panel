@@ -45,6 +45,8 @@ var App = {
         if (!$.lxcForwardTotal) $.lxcForwardTotal = Vue.ref(0);
         if (!$.isEditingForward) $.isEditingForward = Vue.ref(false);
         if (!$.showForwardModal) $.showForwardModal = Vue.ref(false);
+        if (!$.redisConfig) $.redisConfig = Vue.ref({ host: '', port: 6379, password: '', db: 0, prefix: 'pve:' });
+        if (!$.redisConfigSaving) $.redisConfigSaving = Vue.ref(false);
         $.initCore();
         $.initVm();
         $.initLxc();
