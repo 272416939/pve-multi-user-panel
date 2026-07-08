@@ -177,17 +177,11 @@ npm run dev
 
 > **注意:** 系统仅支持 MySQL 5.7+，启动时自动建表和迁移字段。字符集统一为 utf8mb4，完美支持 emoji。
 
-### Redis 缓存配置（可选）
+### Redis 缓存配置
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `REDIS_HOST` | Redis 服务器地址（留空=禁用） | — |
-| `REDIS_PORT` | Redis 端口 | `6379` |
-| `REDIS_PASSWORD` | Redis 密码（无密码留空） | — |
-| `REDIS_DB` | Redis 数据库编号 | `0` |
-| `REDIS_PREFIX` | key 前缀（防与其他应用冲突） | `pve:` |
+Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 > Redis 缓存配置** 中配置。密码使用 AES-256-GCM 加密存储。
 
-> **注意:** 不配置 `REDIS_HOST` 时，所有缓存回退到进程内存方案，行为不变。配置后速率限制、VNC ticket、到期提醒追踪将持久化到 Redis。
+> **注意:** 留空 Redis 地址时禁用 Redis，所有缓存回退到进程内存，行为不变。配置后速率限制、VNC ticket、到期提醒追踪将持久化到 Redis。
 
 ### ikuai 软路由配置
 
@@ -448,11 +442,13 @@ MYSQL_DATABASE=pve_panel
 
 ```bash
 # .env 中设置
-REDIS_HOST=127.0.0.1
-REDIS_PORT=6379
-# REDIS_PASSWORD=  # 无密码则留空
-REDIS_DB=0
-REDIS_PREFIX=pve:
+# Redis 配置已迁移到面板管理后台，在 系统设置 > 站点设置 > Redis 缓存配置 中配置。
+# 密码使用 AES-256-GCM 加密存储。以下为默认值参考：
+# REDIS_HOST=
+# REDIS_PORT=6379
+# REDIS_PASSWORD=
+# REDIS_DB=0
+# REDIS_PREFIX=pve:
 ```
 
 配置后生效的数据类别：

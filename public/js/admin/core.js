@@ -267,6 +267,7 @@ watch($.user, function(u) {
             var smtpData = await api('/admin/smtp');
             $.smtpConfig.value = smtpData;
             await $.loadPveConfig();
+            await $.loadRedisConfig();
             await $.loadSnapshotConfig();
             await $.loadStorageList();
             await $.loadBackupConfig();
@@ -1022,6 +1023,7 @@ $.initDetailCharts = function() {
             }
             if (newTab === 'site') {
                 $.loadSiteConfig();
+                $.loadRedisConfig();
             }
             if (newTab === 'orders') {
                 $.loadOrders(1);

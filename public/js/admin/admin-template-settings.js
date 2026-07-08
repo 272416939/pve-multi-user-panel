@@ -425,6 +425,45 @@
                             </div>
                         </div>
 
+                        <!-- Redis 缓存配置 -->
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title mb-3">Redis 缓存配置</h5>
+                                <p class="text-muted small mb-3">配置 Redis 缓存服务。密码将加密存储，留空地址则禁用 Redis，所有缓存回退到进程内存。</p>
+                                <form @submit.prevent="saveRedisConfig">
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Redis 地址</label>
+                                            <input type="text" class="form-control" v-model="redisConfig.host" placeholder="留空则禁用 Redis">
+                                            <small class="text-muted">Redis 服务器主机名或 IP 地址</small>
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">端口</label>
+                                            <input type="number" class="form-control" v-model.number="redisConfig.port" placeholder="6379">
+                                        </div>
+                                        <div class="col-md-3">
+                                            <label class="form-label">数据库</label>
+                                            <input type="number" class="form-control" v-model.number="redisConfig.db" placeholder="0">
+                                        </div>
+                                    </div>
+                                    <div class="row mb-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">密码</label>
+                                            <input type="password" class="form-control" v-model="redisConfig.password" placeholder="无密码留空">
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Key 前缀</label>
+                                            <input type="text" class="form-control" v-model="redisConfig.prefix" placeholder="pve:">
+                                            <small class="text-muted">所有缓存 key 的前缀，多实例共用 Redis 时防止冲突</small>
+                                        </div>
+                                    </div>
+                                    <pv-button type="submit" variant="glass" :disabled="redisConfigSaving">
+                                        {{ redisConfigSaving ? '保存中...' : '保存配置' }}
+                                    </pv-button>
+                                </form>
+                            </div>
+                        </div>
+
                         <!-- 危险操作：清除缓存 -->
                         <div class="card mt-3" style="border-color: rgba(239, 68, 68, 0.3);">
                             <div class="card-header" style="background: rgba(239, 68, 68, 0.05);">

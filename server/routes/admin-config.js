@@ -612,4 +612,59 @@ router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
     }
 });
 
+// ==================== Redis 缓存配置 ====================
+
+router.get('/admin/redis/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var config = await db.config.getRedis();
+        res.json({
+            host: config.host || '',
+            port: config.port || 6379,
+            password: maskSecret(config.password),
+            db: config.db || 0,
+            prefix: config.prefix || 'pve:'
+        });
+    } catch (error) {
+        console.error('获取 Redis 配置失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
+router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var { host, port, password, db, prefix } = req.body;
+        // 脱敏值跳过，不覆盖原值
+        var configToSave = {
+            host: host || '',
+            port: parseInt(port) || 6379,
+            password: (password !== undefined && !isMasked(password)) ? password : undefined,
+            db: parseInt(db) || 0,
+            prefix: prefix || 'pve:'
+        };
+        await db.config.setRedis(configToSave);
+
+        // 热更新 Redis 连接
+        try {
+            var newCfg = await db.config.getRedis();
+            if (newCfg.host) {
+                process.env.REDIS_HOST = newCfg.host;
+                process.env.REDIS_PORT = String(newCfg.port || 6379);
+                process.env.REDIS_PASSWORD = newCfg.password || '';
+                process.env.REDIS_DB = String(newCfg.db || 0);
+                process.env.REDIS_PREFIX = newCfg.prefix || 'pve:';
+            } else {
+                delete process.env.REDIS_HOST;
+            }
+            require('../api/redis').resetClient();
+        } catch (e) {
+            console.error('热更新 Redis 连接失败:', e.message);
+        }
+
+        res.json({ message: 'Redis 配置保存成功' });
+    } catch (error) {
+        console.error('更新 Redis 配置失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
 module.exports = router;

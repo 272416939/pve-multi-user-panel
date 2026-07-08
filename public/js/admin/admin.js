@@ -24,6 +24,8 @@
     $.siteLogoText = ref($.__siteLogoText || 'PVE 面板');
     $.siteConfigForm = ref({ name: '', logo_text: '', login_title: '', register_enabled: false });
     $.siteConfigSaving = ref(false);
+    $.redisConfig = ref({ host: '', port: 6379, password: '', db: 0, prefix: 'pve:' });
+    $.redisConfigSaving = ref(false);
     $.cacheClearing = ref(false);
     $.cdkList = ref([]);
     $.cdkForm = ref({ duration_days: 30, count: 1, expires_at: '' });
@@ -337,6 +339,28 @@
             alert('清除失败: ' + (e.message || '未知错误'));
         }
         $.cacheClearing.value = false;
+    };
+
+    // Redis 配置
+    $.loadRedisConfig = async function() {
+        try {
+            var config = await api('/admin/redis/config');
+            $.redisConfig.value = config;
+        } catch (e) {
+            console.warn('Redis 配置加载失败（服务可能需要重启）:', e.message || e);
+        }
+    };
+
+    $.saveRedisConfig = async function() {
+        $.redisConfigSaving.value = true;
+        try {
+            await api('/admin/redis/config', { method: 'PUT', body: $.redisConfig.value });
+            alert('Redis 配置保存成功');
+            await $.loadRedisConfig();
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        }
+        $.redisConfigSaving.value = false;
     };
 
     // 快照配置

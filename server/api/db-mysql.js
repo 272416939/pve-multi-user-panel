@@ -677,6 +677,11 @@ async function initDefaultConfig() {
         'pve:ssh_port': '22',
         'pve:ssh_user': 'root',
         'pve:ssh_password': '',
+        'redis:host': '',
+        'redis:port': '6379',
+        'redis:password': '',
+        'redis:db': '0',
+        'redis:prefix': 'pve:',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {
@@ -1220,6 +1225,37 @@ module.exports = {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_port', String(pveConfig.ssh_port ?? 22)]);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_user', pveConfig.ssh_user ?? 'root']);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_password', sshPassword]);
+        },
+        getRedis: async () => {
+            const keys = ['redis:host', 'redis:port', 'redis:password', 'redis:db', 'redis:prefix'];
+            const placeholders = keys.map(() => '?').join(',');
+            const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+            const map = {};
+            rows.forEach(r => { map[r.key] = r.value; });
+            const { decrypt } = require('../utils/crypto-utils');
+            return {
+                host: map['redis:host'] || '',
+                port: parseInt(map['redis:port'] || '6379'),
+                password: decrypt(map['redis:password'] || ''),
+                db: parseInt(map['redis:db'] || '0'),
+                prefix: map['redis:prefix'] || 'pve:'
+            };
+        },
+        setRedis: async (redisConfig) => {
+            const { encrypt, isMasked } = require('../utils/crypto-utils');
+            const current = await module.exports.config.getRedis();
+            // 加密密码，脱敏值跳过
+            var password = redisConfig.password;
+            if (password !== undefined && !isMasked(password)) {
+                password = encrypt(password);
+            } else {
+                password = encrypt(current.password); // 保留旧值（重新加密）
+            }
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['redis:host', redisConfig.host ?? '']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['redis:port', String(redisConfig.port ?? 6379)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['redis:password', password]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['redis:db', String(redisConfig.db ?? 0)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['redis:prefix', redisConfig.prefix ?? 'pve:']);
         },
         get: async (key) => (await queryOne('SELECT value FROM config WHERE `key` = ?', [key]))?.value,
         set: (key, value) => execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', [key, value])

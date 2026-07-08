@@ -54,4 +54,19 @@ function getRedisClient() {
     return _redis;
 }
 
-module.exports = { getRedis, getRedisClient };
+/**
+ * 重置 Redis 客户端连接
+ * 用于配置变更后热更新 Redis 连接（从 DB 读取配置后调用）
+ */
+function resetClient() {
+    if (_redis) {
+        try {
+            _redis.disconnect();
+        } catch (e) {
+            // 忽略断开异常
+        }
+    }
+    _redis = null;
+}
+
+module.exports = { getRedis, getRedisClient, resetClient };

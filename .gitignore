@@ -26,6 +26,7 @@ node_modules/
 .vscode/
 .idea/
 .trae/
+.zcode/
 
 # 操作系统
 Thumbs.db

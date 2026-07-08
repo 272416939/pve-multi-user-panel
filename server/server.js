@@ -223,7 +223,8 @@ httpServer.on('upgrade', (request, socket, head) => {
 // EJS 渲染中间件：注入站点配置到 res.locals.siteConfig
 // 优先 Redis 缓存（多实例一致），回退到进程内存缓存
 app.locals.siteConfigCache = { data: null, expires: 0 };
-var redisClient = require('./api/redis').getRedisClient();
+// 惰性 getter：Redis 初始化在 DB 就绪后（listen 回调中）才完成
+function getRedisClient() { return require('./api/redis').getRedisClient(); }
 var SITE_CONFIG_REDIS_KEY = 'site_config';
 var SITE_CONFIG_TTL = 60; // 秒
 
@@ -235,9 +236,10 @@ async function getSiteConfigCached() {
         return cache.data;
     }
     // 2. Redis 缓存（多实例一致）
-    if (redisClient) {
+    var redis = getRedisClient();
+    if (redis) {
         try {
-            var cached = await redisClient.get(SITE_CONFIG_REDIS_KEY);
+            var cached = await redis.get(SITE_CONFIG_REDIS_KEY);
             if (cached) {
                 var parsed = JSON.parse(cached);
                 cache.data = parsed;
@@ -258,8 +260,8 @@ async function getSiteConfigCached() {
         cache.data = data;
         cache.expires = now + SITE_CONFIG_TTL * 1000;
         // 写入 Redis
-        if (redisClient) {
-            try { await redisClient.set(SITE_CONFIG_REDIS_KEY, JSON.stringify(data), 'EX', SITE_CONFIG_TTL); } catch (e) {}
+        if (redis) {
+            try { await redis.set(SITE_CONFIG_REDIS_KEY, JSON.stringify(data), 'EX', SITE_CONFIG_TTL); } catch (e) {}
         }
         return data;
     } catch (e) {
@@ -335,18 +337,6 @@ app.use((err, req, res, next) => {
 httpServer.listen(PORT, async () => {
     console.log(`服务器运行在 http://localhost:${PORT}`);
 
-    try {
-        const { getRedisClient } = require('./api/redis');
-        const redis = getRedisClient();
-        app.locals.redis = redis;
-        if (!redis) {
-            console.log('[redis] 未配置 REDIS_HOST，使用进程内存模式');
-        }
-    } catch (e) {
-        console.warn('[redis] 初始化异常:', e.message);
-        app.locals.redis = null;
-    }
-
     console.log(`[system] 当前系统版本：v${pkg.version}`);
 
     // 初始化数据库（建表+迁移，MySQL 唯一驱动）
@@ -356,6 +346,31 @@ httpServer.listen(PORT, async () => {
     } catch (error) {
         console.error('[数据库] MySQL 初始化失败:', error.message);
         process.exit(1);
+    }
+
+    // 从 DB 加载 Redis 配置，写入 process.env 后初始化连接
+    try {
+        var redisConfig = await db.config.getRedis();
+        if (redisConfig && redisConfig.host) {
+            process.env.REDIS_HOST = redisConfig.host;
+            process.env.REDIS_PORT = String(redisConfig.port || 6379);
+            process.env.REDIS_PASSWORD = redisConfig.password || '';
+            process.env.REDIS_DB = String(redisConfig.db || 0);
+            process.env.REDIS_PREFIX = redisConfig.prefix || 'pve:';
+        } else {
+            // 未配置 Redis 地址，确保 REDIS_HOST 不存在（disable Redis）
+            delete process.env.REDIS_HOST;
+        }
+        const redisModule = require('./api/redis');
+        redisModule.resetClient(); // 断开旧连接（如有），强制下次 getRedisClient 重新连接
+        const redisClient = redisModule.getRedisClient();
+        app.locals.redis = redisClient;
+        if (!redisClient) {
+            console.log('[redis] 未配置 Redis，使用进程内存模式');
+        }
+    } catch (e) {
+        console.warn('[redis] 初始化异常:', e.message);
+        app.locals.redis = null;
     }
 
     try {
