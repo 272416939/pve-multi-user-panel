@@ -350,8 +350,8 @@ tr:hover td { background: var(--bg-hover); }
     to { opacity: 0; transform: translateY(-4px); }
 }
 /* ========== 表格内操作按钮组 ========== */
-.btn-group-table { display: inline-flex; gap: 2px; vertical-align: middle; }
-.dropdown-table { display: inline-block; position: relative; vertical-align: middle; margin-left: 4px; }
+.btn-group-table { display: inline-flex; gap: 4px; vertical-align: middle; }
+.dropdown-table { display: inline-block; position: relative; vertical-align: middle; margin-left: 6px; }
 .dropdown-table .dropdown-toggle::after { display: none; }
 .dropdown-menu-table { display: none; position: fixed;
     min-width: 120px; padding: 6px 0; background: var(--bg-modal); backdrop-filter: blur(16px);
