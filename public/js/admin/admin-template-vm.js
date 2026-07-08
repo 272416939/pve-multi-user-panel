@@ -27,7 +27,20 @@
                                 <div class="vm-mobile-card-body">
                                     <div class="vm-mobile-card-row" v-if="vm.username"><span class="vm-mobile-card-label">用户</span><span class="vm-mobile-card-value">{{ vm.username }}</span></div>
                                     <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">内网IP</span><span class="vm-mobile-card-value">{{ vm.ip || vm.dhcp_static_ip || '-' }}</span></div>
-                                    <div v-if="networkConfig.cname_domain" class="vm-mobile-card-fullrow"><span class="vm-mobile-card-label">CNAME域名</span><div class="vm-mobile-card-value text-primary" style="line-height:1.5;"><span v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname" style="display:block;">{{ cname }}</span></div></div>
+                                    <div v-if="networkConfig.cname_domain" class="vm-mobile-card-cname">
+                                        <div class="vm-mobile-card-cname-toggle" @click="vm._cnameOpen = !vm._cnameOpen">
+                                            <span class="vm-mobile-card-label">CNAME域名</span>
+                                            <svg :style="{ transform: vm._cnameOpen ? 'rotate(90deg)' : '' }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+                                        </div>
+                                        <div v-if="vm._cnameOpen" class="vm-mobile-card-cname-list">
+                                            <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname" class="vm-mobile-card-cname-item">
+                                                <span class="text-primary" style="word-break:break-all;">{{ cname }}</span>
+                                                <button class="cname-copy-btn" @click="copyText(cname)" title="复制">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
                                     <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
                                 </div>

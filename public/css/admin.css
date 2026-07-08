@@ -97,6 +97,13 @@
 .vm-mobile-card-body { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
 .vm-mobile-card-row { display: flex; justify-content: space-between; font-size: 13px; }
 .vm-mobile-card-fullrow { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.vm-mobile-card-cname { font-size: 13px; }
+.vm-mobile-card-cname-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; padding: 2px 0; }
+.vm-mobile-card-cname-toggle svg { transition: transform 0.2s ease; color: var(--text-muted); }
+.vm-mobile-card-cname-list { margin-top: 4px; display: flex; flex-direction: column; gap: 4px; }
+.vm-mobile-card-cname-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(99,102,241,0.06); padding: 4px 8px; border-radius: 6px; }
+.cname-copy-btn { flex-shrink: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+.cname-copy-btn:hover { color: var(--color-primary, #818cf8); background: rgba(99,102,241,0.1); }
 .vm-mobile-card-label { color: var(--text-muted); flex-shrink: 0; }
 .vm-mobile-card-value { color: var(--text-primary); text-align: right; word-break: break-all; }
 .vm-mobile-card-fullrow .vm-mobile-card-value { text-align: left; }

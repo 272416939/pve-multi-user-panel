@@ -421,6 +421,30 @@ const authGuard = async () => {
     }
 };
 
+// 通用文本复制函数（三端共用）
+window.copyText = function(text) {
+    if (!text) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            if (window.alert) window.alert('已复制：' + text);
+        }).catch(function() {
+            fallbackCopy(text);
+        });
+    } else {
+        fallbackCopy(text);
+    }
+};
+function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); if (window.alert) window.alert('已复制：' + text); } catch(e) {}
+    document.body.removeChild(ta);
+}
+
 const logout = () => {
     const refreshToken = localStorage.getItem('refreshToken');
     if (refreshToken) {
