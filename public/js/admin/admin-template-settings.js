@@ -84,6 +84,7 @@
 
                 </div>
                 <!-- end settings(smtp) -->
+<div v-if="activeSection === 'settings'">
 
                 <!-- PVE 节点设置 -->
                 <div v-if="activeTab === 'pve'">
@@ -133,7 +134,6 @@
                     </div>
                 </div>
                 <!-- end settings(pve) -->
-<div v-if="activeSection === 'settings'">
 
                     <!-- 快照 & 备份配置（合并） -->
                     <div v-if="activeTab === 'snapshot-backup'">
