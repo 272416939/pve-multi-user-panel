@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.28.22] - 2026-07-09
+
+### Added
+- feat(settings): Redis 配置从 .env 迁移至面板站点设置
+  - Redis 缓存配置现在在管理后台 > 系统设置 > 站点设置 中直接管理
+  - 密码使用 AES-256-GCM 加密存储（复用 PVE 配置的加密体系，密钥从 JWT_SECRET 派生）
+  - 保存后自动热重载 Redis 连接，无需重启服务
+  - 支持"测试连接"功能：填完表单即可验证连通性，PING 通过后保存
+  - 移除 .env.example 中的 REDIS_HOST/REDIS_PORT/REDIS_PASSWORD/REDIS_DB/REDIS_PREFIX 参数
+
+### Changed
+- server.js: 调整启动时序，Redis 初始化移至数据库就绪之后
+- redis.js: 导出 resetClient() 支持配置热更新
+
 ## [2.28.21] - 2026-07-07
 
 ### Changed
