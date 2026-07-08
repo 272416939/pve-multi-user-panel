@@ -634,6 +634,7 @@ async function initDefaultConfig() {
         'smtp:password': '',
         'smtp:from': '',
         'smtp:enabled': '0',
+        'smtp:strict_tls': '0',
         'reminder:days1': '7',
         'reminder:days2': '3',
         'reminder:days3': '1',
@@ -677,6 +678,7 @@ async function initDefaultConfig() {
         'pve:ssh_port': '22',
         'pve:ssh_user': 'root',
         'pve:ssh_password': '',
+        'pve:strict_tls': '0',
         'redis:host': '',
         'redis:port': '6379',
         'redis:password': '',
@@ -697,13 +699,13 @@ async function createDefaultAdmin() {
     const adminExists = await queryOne('SELECT id FROM users WHERE username = ?', ['admin']);
     if (!adminExists) {
         const defaultAdminPassword = process.env.DEFAULT_ADMIN_PASSWORD || generateRandomPassword(16);
-        const adminSalt = crypto.randomBytes(16).toString('hex');
-        const hashedPassword = CryptoJS.SHA256(adminSalt + defaultAdminPassword).toString();
+        const { hashPassword } = require('../utils/password-hash');
+        const hashedPassword = await hashPassword(defaultAdminPassword);
 
         await execute(
             `INSERT INTO users (username, password, role, avatar, bio, email, emailVerified, must_change_password, password_salt, is_active, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-            ['admin', hashedPassword, 'admin', '', '', '', 0, 1, adminSalt, mysqlNow()]
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 1, ?)`,
+            ['admin', hashedPassword, 'admin', '', '', '', 0, 1, mysqlNow()]
         );
 
         console.log('================================================');
@@ -1188,7 +1190,7 @@ module.exports = {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['reminder:days3', String(reminderConfig.days3 ?? 1)]);
         },
         getPve: async () => {
-            const keys = ['pve:host', 'pve:api_token', 'pve:ssh_host', 'pve:ssh_port', 'pve:ssh_user', 'pve:ssh_password'];
+            const keys = ['pve:host', 'pve:api_token', 'pve:ssh_host', 'pve:ssh_port', 'pve:ssh_user', 'pve:ssh_password', 'pve:strict_tls'];
             const placeholders = keys.map(() => '?').join(',');
             const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
             const map = {};
@@ -1200,7 +1202,8 @@ module.exports = {
                 ssh_host: map['pve:ssh_host'] || '',
                 ssh_port: parseInt(map['pve:ssh_port'] || '22'),
                 ssh_user: map['pve:ssh_user'] || 'root',
-                ssh_password: decrypt(map['pve:ssh_password'] || '')
+                ssh_password: decrypt(map['pve:ssh_password'] || ''),
+                strict_tls: map['pve:strict_tls'] === '1'
             };
         },
         setPve: async (pveConfig) => {
@@ -1225,6 +1228,7 @@ module.exports = {
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_port', String(pveConfig.ssh_port ?? 22)]);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_user', pveConfig.ssh_user ?? 'root']);
             await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_password', sshPassword]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:strict_tls', pveConfig.strict_tls ? '1' : '0']);
         },
         getRedis: async () => {
             const keys = ['redis:host', 'redis:port', 'redis:password', 'redis:db', 'redis:prefix'];

@@ -83,6 +83,14 @@ app.use((req, res, next) => {
     };
     res.removeHeader('X-Frame-Options');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    // 安全响应头补充
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+    // HSTS：仅在 HTTPS 请求时设置（避免 HTTP 开发环境冲突）
+    if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    }
     // XSS-4 修复：script-src 使用 nonce 替代 unsafe-inline（保留 unsafe-eval 供 Vue 运行时模板编译）
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",

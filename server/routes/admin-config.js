@@ -582,7 +582,8 @@ router.get('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
             ssh_host: config.ssh_host || '',
             ssh_port: config.ssh_port || 22,
             ssh_user: config.ssh_user || 'root',
-            ssh_password: maskSecret(config.ssh_password)
+            ssh_password: maskSecret(config.ssh_password),
+            strict_tls: config.strict_tls || false
         });
     } catch (error) {
         console.error('获取 PVE 配置失败:', error.message);
@@ -592,7 +593,7 @@ router.get('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
 
 router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        var { host, api_token, ssh_host, ssh_port, ssh_user, ssh_password } = req.body;
+        var { host, api_token, ssh_host, ssh_port, ssh_user, ssh_password, strict_tls } = req.body;
         // 脱敏值跳过，不覆盖原值
         var configToSave = {
             host: host || '',
@@ -600,7 +601,8 @@ router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
             ssh_host: ssh_host || '',
             ssh_port: parseInt(ssh_port) || 22,
             ssh_user: ssh_user || 'root',
-            ssh_password: (ssh_password !== undefined && !isMasked(ssh_password)) ? ssh_password : undefined
+            ssh_password: (ssh_password !== undefined && !isMasked(ssh_password)) ? ssh_password : undefined,
+            strict_tls: !!strict_tls
         };
         await db.config.setPve(configToSave);
         // 刷新 PVE API 实例的配置缓存

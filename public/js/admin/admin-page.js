@@ -8,6 +8,7 @@ var App = {
         if (!$.confirmState) $.confirmState = Vue.ref({ vmId: null, action: null });
         if (!$.lxcConfirmState) $.lxcConfirmState = Vue.ref({ ctId: null, action: null });
         if (!$.snapshotForm) $.snapshotForm = Vue.ref({ name: '', description: '' });
+        if (!$.pveConfig) $.pveConfig = Vue.ref({ host: '', api_token: '', ssh_host: '', ssh_port: 22, ssh_user: 'root', ssh_password: '', strict_tls: false });
         if (!$.lxcSnapshotForm) $.lxcSnapshotForm = Vue.ref({ name: '', description: '' });
         if (!$.userVms) $.userVms = Vue.ref([]);
         if (!$.userLxcContainers) $.userLxcContainers = Vue.ref([]);

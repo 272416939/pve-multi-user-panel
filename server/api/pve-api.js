@@ -31,25 +31,37 @@ class PveApi {
     this._configCache = null;
     this._configCacheTime = 0;
     this._configTTL = 60000; // 60 秒
+    this._httpsAgent = null;
     var self = this;
-    // axios 实例 + 请求拦截器（每次请求自动注入 host 和 token）
+    // axios 实例（httpsAgent 在拦截器中动态设置，依赖 DB 配置的 strict_tls）
     this.axiosInstance = axios.create({
-      httpsAgent: new https.Agent({
-        keepAlive: true,
-        maxSockets: 50,
-        rejectUnauthorized: false
-      }),
       httpAgent: new http.Agent({
         keepAlive: true,
         maxSockets: 50
       }),
       timeout: 30000
     });
-    // 拦截器：确保配置已加载 + 注入完整 URL 和认证头
+    // 拦截器：确保配置已加载 + 注入完整 URL、认证头、TLS 策略
     this.axiosInstance.interceptors.request.use(async function(config) {
       var cfg = await self.ensureConfig();
       config.baseURL = cfg.host;
       config.headers['Authorization'] = 'PVEAPIToken=' + cfg.api_token;
+      // 根据 DB 配置动态创建/复用 httpsAgent
+      var strictTls = !!cfg.strict_tls;
+      if (!self._httpsAgent || self._httpsAgentStrictTls !== strictTls) {
+        self._httpsAgent = new https.Agent({
+          keepAlive: true,
+          maxSockets: 50,
+          rejectUnauthorized: strictTls
+        });
+        self._httpsAgentStrictTls = strictTls;
+        if (strictTls) {
+          console.log('[pve-api] TLS 严格证书验证已启用');
+        } else {
+          console.warn('[pve-api] ⚠️ TLS 证书验证已禁用（自签证书模式），生产环境建议启用');
+        }
+      }
+      config.httpsAgent = self._httpsAgent;
       return config;
     });
   }

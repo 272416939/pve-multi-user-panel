@@ -133,6 +133,13 @@ async function sendEmail(to, subject, html) {
     }
     
     try {
+        // SMTP TLS 验证：默认关闭（兼容自签证书），可在 SMTP 配置中开启
+        var strictTls = false;
+        try {
+            var tlsVal = await db.config.get('smtp:strict_tls');
+            strictTls = tlsVal === '1';
+        } catch (e) {}
+
         const transporter = nodemailer.createTransport({
             host: config.host,
             port: config.port,
@@ -142,7 +149,7 @@ async function sendEmail(to, subject, html) {
                 pass: config.password
             },
             tls: {
-                rejectUnauthorized: false
+                rejectUnauthorized: strictTls
             }
         });
         

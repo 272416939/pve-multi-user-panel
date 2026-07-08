@@ -14,6 +14,7 @@ const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache } = req
 
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const { sanitizeUser } = require('../utils/safe-error');
+const { hashPassword, verifyPassword, needsUpgrade } = require('../utils/password-hash');
 const RATELIMIT_PREFIX = 'ratelimit:login:';
 
 // 本地时间格式化：返回 YYYY-MM-DD HH:MM:SS（Asia/Shanghai）
@@ -57,27 +58,16 @@ router.post('/login', async (req, res) => {
         return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
     }
 
-    let passwordMatch = false;
+    let passwordMatch = await verifyPassword(password, user.password, user.password_salt);
 
-    if (user.password_salt && user.password_salt.length > 0) {
-        // 有盐模式：SHA256(salt + password)
-        const saltedHash = CryptoJS.SHA256(user.password_salt + password).toString();
-        passwordMatch = (user.password === saltedHash);
-    } else {
-        // 兼容无盐旧模式：SHA256(password)
-        const legacyHash = CryptoJS.SHA256(password).toString();
-        passwordMatch = (user.password === legacyHash);
-
-        // Lazy migration: 旧密码首次登录成功后自动 re-hash
-        if (passwordMatch) {
-            const newSalt = crypto.randomBytes(16).toString('hex');
-            const newHash = CryptoJS.SHA256(newSalt + password).toString();
-            await db.users.update(user.id, {
-                password: newHash,
-                password_salt: newSalt
-            });
-        }
-    }
+// Lazy migration: 旧格式密码验证成功后自动升级到 bcrypt
+if (passwordMatch && needsUpgrade(user.password)) {
+    const newHash = await hashPassword(password);
+    await db.users.update(user.id, {
+        password: newHash,
+        password_salt: null  // bcrypt 自带盐，清除旧 salt
+    });
+}
 
     if (!passwordMatch) {
         return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
@@ -413,10 +403,10 @@ router.post('/auth/reset-password', async (req, res) => {
             return res.status(404).json({ error: '用户不存在' });
         }
 
-        const salt = crypto.randomBytes(16).toString('hex');
+        const hashedPassword = await hashPassword(newPassword);
         await db.users.update(userId, {
-            password: CryptoJS.SHA256(salt + newPassword).toString(),
-            password_salt: salt
+            password: hashedPassword,
+            password_salt: null
         });
 
         // H-8 修复：密码重置后撤销该用户所有 refresh token
@@ -567,8 +557,7 @@ router.post('/register', async (req, res) => {
         }
 
         // 创建用户
-        const salt = crypto.randomBytes(16).toString('hex');
-        const hashedPassword = CryptoJS.SHA256(salt + password).toString();
+        const hashedPassword = await hashPassword(password);
         const newUser = await db.users.create({
             username,
             password: hashedPassword,
@@ -576,8 +565,6 @@ router.post('/register', async (req, res) => {
             email,
             emailVerified: true
         });
-        // 补充 salt（create 不接受 password_salt 字段）
-        await db.users.update(newUser.id, { password_salt: salt });
 
         // 删除已使用的验证码
         await tokenStore.delRegisterCode(email);

@@ -227,8 +227,8 @@ router.all('/wallet/notify', async (req, res) => {
         return res.status(429).send('Too Many Requests');
     }
     try {
-        // V1 文档回调为 GET，部分网关可能用 POST，合并 query + body
-        var params = Object.assign({}, req.query, req.body);
+        // 按请求方法取单一来源，避免 query/body 参数覆盖污染
+        var params = req.method === 'POST' ? req.body : req.query;
         dbg('[钱包] 支付回调:', params.out_trade_no, params.trade_status, req.method);
         
         if (params.trade_status !== 'TRADE_SUCCESS') {

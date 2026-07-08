@@ -9,6 +9,7 @@ const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
 const { safeError } = require('../utils/safe-error');
+const { hashPassword, verifyPassword } = require('../utils/password-hash');
 // 用户列表缓存（30s TTL，低频变更场景）
 const userListCache = cacheStore.create('admin_users', 30);
 
@@ -69,13 +70,12 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
         }
     }
 
-    const salt = crypto.randomBytes(16).toString('hex');
-    const hashedPassword = CryptoJS.SHA256(salt + password).toString();
-    
+    const hashedPassword = await hashPassword(password);
+
     if (await db.users.getByUsername(username)) {
         return res.status(400).json({ error: '用户名已存在' });
     }
-    
+
     if (email) {
         const allUsers = await db.users.getAll();
         if (allUsers.find(u => u.email === email)) {
@@ -86,7 +86,6 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     const newUser = await db.users.create({
         username,
         password: hashedPassword,
-        password_salt: salt,
         role: role || 'user',
         email: email || '',
         emailVerified: !!emailVerified
@@ -152,9 +151,8 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
         if (password.length < 8) {
             return res.status(400).json({ error: '密码至少8位' });
         }
-        const salt = crypto.randomBytes(16).toString('hex');
-        updates.password = CryptoJS.SHA256(salt + password).toString();
-        updates.password_salt = salt;
+        updates.password = await hashPassword(password);
+        updates.password_salt = null;
         await db.refreshTokens.revokeByUserId(parseInt(req.params.id));
     }
 

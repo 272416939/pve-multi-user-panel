@@ -13,6 +13,7 @@ const upload = require('../config/multer');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { hashPassword, verifyPassword } = require('../utils/password-hash');
 const cacheStore = require('../utils/cache-store');
 const { invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/safe-error');
@@ -75,14 +76,7 @@ router.post('/user/2fa/disable', authMiddleware, async (req, res) => {
         if (!password) return res.status(400).json({ error: '需要验证密码' });
 
         const user = await db.users.getById(req.user.id);
-        let passwordMatch = false;
-        if (user.password_salt && user.password_salt.length > 0) {
-            const saltedHash = CryptoJS.SHA256(user.password_salt + password).toString();
-            passwordMatch = (user.password === saltedHash);
-        } else {
-            const legacyHash = CryptoJS.SHA256(password).toString();
-            passwordMatch = (user.password === legacyHash);
-        }
+        let passwordMatch = await verifyPassword(password, user.password, user.password_salt);
         if (!passwordMatch) {
             return res.status(401).json({ error: '密码错误' });
         }
@@ -221,9 +215,8 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         }
         
         if (password) {
-            const salt = crypto.randomBytes(16).toString('hex');
-            updates.password = CryptoJS.SHA256(salt + password).toString();
-            updates.password_salt = salt;
+            updates.password = await hashPassword(password);
+            updates.password_salt = null;
             // C-2 修复：用户主动改密后清除强制改密标记
             updates.must_change_password = 0;
             // H-8 修复：密码变更后撤销该用户所有 refresh token

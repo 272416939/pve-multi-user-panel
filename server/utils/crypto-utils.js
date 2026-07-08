@@ -6,8 +6,12 @@
 const crypto = require('crypto');
 require('dotenv').config();
 
-// 从 JWT_SECRET 派生固定密钥（PBKDF2），无需额外配置
-const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-this';
+// 从 token.js 获取 JWT_SECRET（统一密钥源，确保与 JWT 签名使用同一密钥）
+const { JWT_SECRET } = require('./token');
+if (!JWT_SECRET) {
+    console.error('🚨 [crypto-utils] JWT_SECRET 为空，敏感配置加密将不可用！');
+}
+// 从 JWT_SECRET 派生固定密钥（PBKDF2 100k 轮），与 JWT 签名同源但经 PBKDF2 隔离
 const ENCRYPTION_KEY = crypto.pbkdf2Sync(JWT_SECRET, 'pve-panel-encryption-salt', 100000, 32, 'sha256');
 const ALGORITHM = 'aes-256-gcm';
 

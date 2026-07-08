@@ -128,6 +128,15 @@
                                         <input type="password" class="form-control" v-model="pveConfig.ssh_password" placeholder="留空则不修改" autocomplete="off">
                                     </div>
                                 </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="pveStrictTls" v-model="pveConfig.strict_tls">
+                                            <label class="form-check-label" for="pveStrictTls">TLS 严格证书验证</label>
+                                        </div>
+                                        <small class="text-muted">PVE 使用自签证书时请关闭。开启后将验证 PVE API 和 VNC 连接的 TLS 证书。</small>
+                                    </div>
+                                </div>
                                 <pv-button type="submit" variant="glass">保存配置</pv-button>
                             </form>
                         </div>

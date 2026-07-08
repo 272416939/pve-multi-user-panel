@@ -34,13 +34,17 @@ vncProxy.on('connection', async (clientWs, request) => {
 
     dbg(`[VNC Proxy] 连接建立: type=${type || 'qemu'}, vmid=${vmid}, node=${node}`);
 
+    // 从 DB 读取 TLS 配置
+    const pveConfig = await require('../api/db').config.getPve();
+    const strictTls = !!pveConfig.strict_tls;
+
     if (type === 'lxc') {
         const pveHost = new URL(pveApi.host).hostname;
-        handleLxcVncTcpProxy(clientWs, pveHost, parseInt(port), ticket);
+        handleLxcVncTcpProxy(clientWs, pveHost, parseInt(port), ticket, strictTls);
         return;
     }
 
-    const agent = new https.Agent({ rejectUnauthorized: false });
+    const agent = new https.Agent({ rejectUnauthorized: strictTls });
     const vmType = 'qemu';
     const pveWsUrl = `${pveApi.host.replace(/^http/, 'ws')}/api2/json/nodes/${node}/${vmType}/${vmid}/vncwebsocket?port=${port}&vncticket=${encodeURIComponent(ticket)}`;
 
@@ -52,7 +56,7 @@ vncProxy.on('connection', async (clientWs, request) => {
         agent: agent,
         perMessageDeflate: false,
         followRedirects: false,
-        rejectUnauthorized: false
+        rejectUnauthorized: strictTls
     });
 
     pveWs.on('open', () => {
@@ -101,7 +105,7 @@ vncProxy.on('connection', async (clientWs, request) => {
  *   4. 对浏览器呈现标准 VNC Auth（type 2），noVNC 原生支持
  *   5. 认证后桥接浏览器 WS ↔ TLS socket
  */
-function handleLxcVncTcpProxy(clientWs, pveHost, port, ticket) {
+function handleLxcVncTcpProxy(clientWs, pveHost, port, ticket, strictTls) {
     console.log(`[LXC VNC] TCP connecting ${pveHost}:${port}`);
     const rawSocket = net.createConnection({ host: pveHost, port }, () => {
         console.log('[LXC VNC] TCP connected');
@@ -251,11 +255,11 @@ function handleLxcVncTcpProxy(clientWs, pveHost, port, ticket) {
 
                 var tlsSocket = tls.connect({
                     socket: socket,
-                    rejectUnauthorized: false,
+                    rejectUnauthorized: strictTls,
                     requestCert: false,
-                    minVersion: 'TLSv1',
+                    minVersion: strictTls ? 'TLSv1.2' : 'TLSv1',
                     maxVersion: 'TLSv1.2',
-                    ciphers: 'ALL:@SECLEVEL=0',
+                    ciphers: strictTls ? 'HIGH:!aNULL:!eNULL:!EXPORT:!DES:!MD5:!PSK:!RC4' : 'ALL:@SECLEVEL=0',
                     secureOptions: crypto.constants.SSL_OP_ALL | crypto.constants.SSL_OP_NO_TICKET,
                     session: false
                 });
