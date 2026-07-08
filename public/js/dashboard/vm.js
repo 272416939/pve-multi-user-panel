@@ -203,6 +203,15 @@
         $.cdkRedeemError.value = '';
         $.cdkRedeemMessage.value = '';
         $.bsModalShow('cdkRedeemModal');
+        // modal 关闭时清理 CDK 下拉状态（Teleport 到 body 的下拉不会随 modal 一起隐藏）
+        var modalEl = document.getElementById('cdkRedeemModal');
+        if (modalEl && !modalEl._cdkCleanupBound) {
+            modalEl._cdkCleanupBound = true;
+            modalEl.addEventListener('hidden.bs.modal', function() {
+                if ($.cdkVmDropdownOpen.value) $.toggleCdkDropdown('vm', false);
+                if ($.cdkLxcDropdownOpen.value) $.toggleCdkDropdown('lxc', false);
+            });
+        }
     };
 
     $.redeemCdk = async function() {
