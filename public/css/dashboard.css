@@ -1,3 +1,10 @@
+/* 下拉菜单淡入动画 */
+@keyframes dropdownFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+[data-cdk-dropdown] { animation: dropdownFadeIn 0.18s ease-out; }
+
 /* Custom select dropdown (CDK 兑换等) */
 .custom-select { position: relative; }
 .custom-select-trigger {
@@ -50,6 +57,7 @@
 }
 .custom-select.open .custom-select-dropdown {
     display: block;
+    animation: dropdownFadeIn 0.18s ease-out;
 }
 .custom-select-dropdown .option {
     padding: 10px 14px;

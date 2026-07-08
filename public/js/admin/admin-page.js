@@ -55,24 +55,19 @@ var App = {
         $.toggleAdminDropdown = function(target) {
             var dd = target.parentElement;
             var isOpen = dd.classList.contains('open');
-            // 关闭所有已打开的下拉，释放 z-index，移回原位
+            // 关闭所有已打开的下拉，淡出后移回原位
             document.querySelectorAll('.dropdown-table.open').forEach(function(el) {
                 el.classList.remove('open');
-                var menu = el.querySelector('.dropdown-menu-table');
-                // menu 可能已移到 body，也检查 body 下属于该 dropdown 的 menu
-                if (!menu) menu = el._movedMenu;
+                var menu = el._movedMenu;
                 if (menu) {
-                    menu.style.display = 'none';
-                    if (menu._dropdownZIndex != null) {
-                        window.ModalZIndexManager.release(menu._dropdownZIndex);
-                        menu._dropdownZIndex = null;
-                        menu.style.zIndex = '';
-                    }
-                    // 移回原 DOM 位置
-                    if (menu._originalParent) {
-                        menu._originalParent.appendChild(menu);
-                        menu._originalParent = null;
-                    }
+                    window.closeFixedDropdownAnimated(menu, function() {
+                        menu.style.display = 'none';
+                        if (menu._originalParent) {
+                            menu._originalParent.appendChild(menu);
+                            menu._originalParent = null;
+                        }
+                        el._movedMenu = null;
+                    });
                 }
             });
             if (!isOpen) {
@@ -321,17 +316,14 @@ app.component('port-forward-list', {
                   dd.classList.remove('open');
                   var menu = dd._movedMenu;
                   if (menu) {
-                      menu.style.display = 'none';
-                      if (menu._dropdownZIndex != null) {
-                          window.ModalZIndexManager.release(menu._dropdownZIndex);
-                          menu._dropdownZIndex = null;
-                          menu.style.zIndex = '';
-                      }
-                      if (menu._originalParent) {
-                          menu._originalParent.appendChild(menu);
-                          menu._originalParent = null;
-                      }
-                      dd._movedMenu = null;
+                      window.closeFixedDropdownAnimated(menu, function() {
+                          menu.style.display = 'none';
+                          if (menu._originalParent) {
+                              menu._originalParent.appendChild(menu);
+                              menu._originalParent = null;
+                          }
+                          dd._movedMenu = null;
+                      });
                   }
               }
           });

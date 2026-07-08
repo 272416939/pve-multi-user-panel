@@ -539,15 +539,15 @@
         var otherOpen = type === 'vm' ? $.cdkLxcDropdownOpen : $.cdkVmDropdownOpen;
         if (otherOpen.value) {
             var otherDropdown = document.querySelector('[data-cdk-dropdown="' + (type === 'vm' ? 'lxc' : 'vm') + '"]');
-            if (otherDropdown) window.releaseFixedDropdown(otherDropdown);
-            otherOpen.value = false;
+            if (otherDropdown) window.closeFixedDropdownAnimated(otherDropdown, function() { otherOpen.value = false; });
+            else otherOpen.value = false;
         }
 
         var openRef = type === 'vm' ? $.cdkVmDropdownOpen : $.cdkLxcDropdownOpen;
         if (!open) {
             var dropdown = document.querySelector('[data-cdk-dropdown="' + type + '"]');
-            if (dropdown) window.releaseFixedDropdown(dropdown);
-            openRef.value = false;
+            if (dropdown) window.closeFixedDropdownAnimated(dropdown, function() { openRef.value = false; });
+            else openRef.value = false;
         } else {
             openRef.value = true;
             Vue.nextTick(function() {

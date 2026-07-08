@@ -82,17 +82,14 @@ document.addEventListener('click', function(e) {
             dd.classList.remove('open');
             var menu = dd._movedMenu;
             if (menu) {
-                menu.style.display = 'none';
-                if (menu._dropdownZIndex != null) {
-                    window.ModalZIndexManager.release(menu._dropdownZIndex);
-                    menu._dropdownZIndex = null;
-                    menu.style.zIndex = '';
-                }
-                if (menu._originalParent) {
-                    menu._originalParent.appendChild(menu);
-                    menu._originalParent = null;
-                }
-                dd._movedMenu = null;
+                window.closeFixedDropdownAnimated(menu, function() {
+                    menu.style.display = 'none';
+                    if (menu._originalParent) {
+                        menu._originalParent.appendChild(menu);
+                        menu._originalParent = null;
+                    }
+                    dd._movedMenu = null;
+                });
             }
         }
     });

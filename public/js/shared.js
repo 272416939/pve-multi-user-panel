@@ -554,3 +554,25 @@ window.releaseFixedDropdown = function(dropdownEl) {
     }
 };
 
+// 带淡出动画的关闭：先播放淡出动画，结束后回调
+window.closeFixedDropdownAnimated = function(dropdownEl, callback) {
+    if (!dropdownEl) { if (callback) callback(); return; }
+    // 保留 z-index 直到动画结束
+    dropdownEl.style.animation = 'dropdownFadeOut 0.15s ease-out forwards';
+    var done = function() {
+        dropdownEl.removeEventListener('animationend', done);
+        dropdownEl.style.animation = '';
+        if (dropdownEl._dropdownZIndex != null) {
+            if (window.ModalZIndexManager) window.ModalZIndexManager.release(dropdownEl._dropdownZIndex);
+            dropdownEl._dropdownZIndex = null;
+            dropdownEl.style.zIndex = '';
+        }
+        if (callback) callback();
+    };
+    dropdownEl.addEventListener('animationend', done, { once: true });
+    // 兜底：200ms 后强制完成（防止 animationend 不触发）
+    setTimeout(function() {
+        if (dropdownEl.style.animation) done();
+    }, 200);
+};
+

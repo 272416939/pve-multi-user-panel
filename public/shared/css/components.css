@@ -340,6 +340,15 @@ tr:hover td { background: var(--bg-hover); }
     transition: color 0.3s ease; }
 .chart-card canvas { width: 100% !important; height: 220px !important; max-height: 220px; flex-shrink: 0; }
 
+/* 下拉菜单淡入动画 */
+@keyframes dropdownFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes dropdownFadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to { opacity: 0; transform: translateY(-4px); }
+}
 /* ========== 表格内操作按钮组 ========== */
 .btn-group-table { display: inline-flex; gap: 2px; vertical-align: middle; }
 .dropdown-table { display: inline-block; position: relative; vertical-align: middle; margin-left: 4px; }
@@ -349,7 +358,7 @@ tr:hover td { background: var(--bg-hover); }
     border: 1px solid var(--border-color); border-radius: 8px;
     box-shadow: var(--shadow-md); list-style: none;
     transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
-.dropdown-table.open .dropdown-menu-table { display: block; }
+.dropdown-table.open .dropdown-menu-table { display: block; animation: dropdownFadeIn 0.18s ease-out; }
 .dropdown-menu-table li a { display: block; padding: 6px 14px; font-size: 13px; color: var(--text-primary);
     text-decoration: none; transition: background 0.15s; white-space: nowrap; }
 .dropdown-menu-table li a:hover { background: rgba(99,102,241,0.15); color: #fff; }

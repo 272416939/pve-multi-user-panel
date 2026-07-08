@@ -327,22 +327,19 @@
     $.toggleAdminDropdown = function(target) {
         var dd = target.parentElement;
         var isOpen = dd.classList.contains('open');
-        // 关闭所有已打开的下拉，释放 z-index，移回原位
+        // 关闭所有已打开的下拉，淡出后移回原位
         document.querySelectorAll('.dropdown-table.open').forEach(function(el) {
             el.classList.remove('open');
             var menu = el._movedMenu;
             if (menu) {
-                menu.style.display = 'none';
-                if (menu._dropdownZIndex != null) {
-                    window.ModalZIndexManager.release(menu._dropdownZIndex);
-                    menu._dropdownZIndex = null;
-                    menu.style.zIndex = '';
-                }
-                if (menu._originalParent) {
-                    menu._originalParent.appendChild(menu);
-                    menu._originalParent = null;
-                }
-                el._movedMenu = null;
+                window.closeFixedDropdownAnimated(menu, function() {
+                    menu.style.display = 'none';
+                    if (menu._originalParent) {
+                        menu._originalParent.appendChild(menu);
+                        menu._originalParent = null;
+                    }
+                    el._movedMenu = null;
+                });
             }
         });
         if (!isOpen) {
