@@ -159,7 +159,7 @@ watch($.user, function(u) {
             var sb = document.getElementById('sidebar');
             var ol = document.getElementById('sidebarOverlay');
             if (sb) sb.classList.remove('open');
-            if (ol) ol.style.display = 'none';
+            if (ol) ol.classList.remove('show');
         }
         // Clear all active states including parent menus
         document.querySelectorAll('.sidebar-nav .nav-item').forEach(function(item) {

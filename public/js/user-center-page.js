@@ -651,7 +651,7 @@ const App = {
                 var sb = document.getElementById('sidebar');
                 var ol = document.getElementById('sidebarOverlay');
                 if (sb) sb.classList.remove('open');
-                if (ol) ol.style.display = 'none';
+                if (ol) ol.classList.remove('show');
             }
         };
 
@@ -1324,7 +1324,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 var sb = document.getElementById('sidebar');
                 var ol = document.getElementById('sidebarOverlay');
                 if (sb) sb.classList.remove('open');
-                if (ol) ol.style.display = 'none';
+                if (ol) ol.classList.remove('show');
                 // 如果是<a>标签且有href，延迟导航确保先关闭
                 if (item.tagName === 'A' && item.href && item.href !== window.location.href) {
                     e.preventDefault();
