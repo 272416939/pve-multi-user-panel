@@ -1,5 +1,21 @@
 # Changelog
 
+## [2.29.0] - 2026-07-09
+
+### Security
+- fix(security): 安全审计修复 - 密码哈希升级 + 密钥派生一致性 + TLS 开关 + 安全响应头
+  - **密码哈希升级**：SHA256 -> bcryptjs（cost=12），兼容旧格式，登录时自动 lazy re-hash 升级，用户无感知
+  - **密钥派生一致性修复**：`crypto-utils.js` 统一从 `token.js` 获取 JWT_SECRET，删除危险默认回退值，修复 JWT 签名与配置加密密钥不同步的 bug
+  - **TLS 验证开关**：PVE 节点设置新增"TLS 严格证书验证"开关，控制 PVE API / VNC 代理 / SMTP 邮件三处 TLS 证书验证，默认关闭兼容自签证书
+  - **支付回调参数污染修复**：`wallet.js` 回调参数从 query+body 合并改为按请求方法取单一来源
+  - **安全响应头**：添加 HSTS / X-Content-Type-Options / Referrer-Policy / Permissions-Policy
+  - **JWT 有效期缩短**：24h -> 2h，配合 Refresh Token（7天）自动续期，用户体验不受影响
+  - **卫生清理**：删除 `server.js.bak` 备份文件，`.env.example` 占位符化
+
+### Changed
+- 新增依赖：`bcryptjs`（密码哈希）
+- 新增配置键：`pve:strict_tls`、`smtp:strict_tls`
+
 ## [2.28.22] - 2026-07-09
 
 ### Added
