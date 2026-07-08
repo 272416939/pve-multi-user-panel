@@ -143,6 +143,7 @@
     $.trimContent = trimContent;
     $.getGeekAvatar = getGeekAvatar;
     $.formatDateTimeLocal = formatDateTimeLocal;
+    $.copyText = function(text) { if (window.copyText) window.copyText(text); };
     $.parseMarkdown = function(text) {
         if (!text) return '';
         try {

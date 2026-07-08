@@ -1246,6 +1246,7 @@ const App = {
             customConfirmMessage,
             getGeekAvatar,
             formatDate,
+            copyText: function(text) { if (window.copyText) window.copyText(text); },
             logout,
             loadProfile,
             loadMemos,

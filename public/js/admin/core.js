@@ -45,6 +45,7 @@ $.detailVmChartData = null;
     $.trimContent = trimContent;
     $.formatDateTimeLocal = formatDateTimeLocal;
     $.getGeekAvatar = getGeekAvatar;
+    $.copyText = function(text) { if (window.copyText) window.copyText(text); };
 
     // ==================== computed ====================
     $.userRole = computed(function() {
