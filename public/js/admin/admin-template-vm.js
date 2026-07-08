@@ -5,7 +5,6 @@
                     <div v-if="activeTabVm === 'manage'">
                         <div class="module-header">
                             <h4 class="module-title">虚拟机列表</h4>
-                            <pv-button @click="openCdkRedeem" variant="glass">CDK 兑换</pv-button>
                         </div>
                     <div v-if="vmsLoading" class="text-center py-4">
                         <div class="spinner-border text-primary" role="status">

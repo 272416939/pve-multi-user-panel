@@ -93,7 +93,7 @@ body {
 .nav-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
 .nav-text { white-space: nowrap; }
 .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px); z-index: 899; }
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); z-index: 950; }
 
 /* ===== Sidebar Submenu ===== */
 .nav-submenu { display: none !important; flex-direction: column; }
