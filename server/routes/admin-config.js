@@ -564,6 +564,13 @@ router.post('/admin/cache/clear', authMiddleware, adminMiddleware, async (req, r
             req.app.locals.siteConfigCache.data = null;
             req.app.locals.siteConfigCache.expires = 0;
         }
+        // 清除 Redis 页面渲染缓存
+        try {
+            var redis = require('../api/redis').getRedisClient();
+            if (redis) {
+                await redis.del('page:login');
+            }
+        } catch (e) {}
         res.json({ message: '所有缓存已清除' });
     } catch (e) {
         console.error('[admin] cache clear:', e.message);

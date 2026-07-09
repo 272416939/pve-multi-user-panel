@@ -99,19 +99,19 @@
         <button id="scaleBtn" aria-label="切换缩放">适应窗口</button>
     </div>
 
-    <script type="module" nonce="<%= cspNonce %>">
+    <script type="module" nonce="<%= locals.cspNonce %>">
         import RFB from '/novnc/core/rfb.js';
 
-        const error = <%- JSON.stringify(typeof error !== 'undefined' ? error : null) %>;
+        const error = <%- JSON.stringify(typeof locals.error !== 'undefined' ? locals.error : null) %>;
         if (error) {
             document.getElementById('statusText').textContent = error;
             document.getElementById('connecting').innerHTML = '<span id="error-msg">' + error + '</span>';
             throw new Error(error);
         }
 
-        const ticket = <%- JSON.stringify(ticket) %>;
-        const vmid = <%- JSON.stringify(vmid) %>;
-        const type = <%- JSON.stringify(type) %>;
+        const ticket = <%- JSON.stringify(locals.ticket) %>;
+        const vmid = <%- JSON.stringify(locals.vmid) %>;
+        const type = <%- JSON.stringify(locals.type) %>;
         const session = new URLSearchParams(location.search).get('session');
 
         const statusText = document.getElementById('statusText');

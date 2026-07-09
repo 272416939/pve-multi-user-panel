@@ -5,7 +5,7 @@
     <script src="js/app-version.js" defer></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><%= siteConfig.name %> | 用户中心</title>
+    <title><%= locals.siteConfig.name %> | 用户中心</title>
     <link href="https://jsd.owoser.cn/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="shared/css/tokens.css" rel="stylesheet">
     <link href="shared/css/layout.css?_b=202607081800" rel="stylesheet">
@@ -16,7 +16,7 @@
     <script src="https://jsd.owoser.cn/npm/dompurify@3.0.8/dist/purify.min.js"></script>
 </head>
 <body>
-<%- include('../partials/header', { brandName: siteConfig.logo_text, showRefresh: true, showMessages: true }) %>
+<%- include('../partials/header', { brandName: locals.siteConfig.logo_text, showRefresh: true, showMessages: true }) %>
 <%- include('../partials/sidebar-user-center') %>
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <main class="main-wrap" id="mainContent">
