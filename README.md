@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.28.21-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.29.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -102,6 +102,9 @@
 | 40 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
 | 41 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
 | 42 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
+| 43 | **EJS 模板缓存** | 编译后缓存在内存，`NODE_ENV=production` 自动启用 |
+| 44 | **Gzip 压缩** | compression 中间件，所有响应压缩 60-80% |
+| 45 | **资源预加载** | preconnect / dns-prefetch / script defer 优化首屏加载 |
 
 ---
 
@@ -124,6 +127,10 @@ cd pve-multi-user-panel
 
 # 安装依赖
 npm install
+
+# 如果使用国内镜像源（如腾讯云、阿里云），npm 10+ 可能因 lockfile 中的 resolved
+# URL 与本地 registry 不一致而报错 EALLOWREMOTE，此时可执行：
+# rm -rf node_modules package-lock.json && npm install
 
 # 创建配置文件
 cp .env.example .env
@@ -479,12 +486,55 @@ MYSQL_DATABASE=pve_panel
 当「系统更新」功能无法使用时，SSH 进入项目目录执行：
 
 ```bash
-git fetch origin && git reset --hard origin/main && npm install --production
+git fetch origin && git reset --hard origin/main && npm install --production && pm2 restart pve-panel
 ```
 
-然后重启服务（PM2 / systemd / 手动重启均可）。
+> 如果更新后 `npm install` 报 `EALLOWREMOTE` 错误，说明本地 npm registry 与 lockfile 不一致，执行：
+> ```bash
+> rm -rf node_modules package-lock.json && npm install --production && pm2 restart pve-panel
+> ```
 
 > 如需回滚：`git reflog` 查找旧 commit hash，`git reset --hard <hash>` 回滚。
+
+---
+
+## ⚡ 性能优化
+
+### 高并发优化（v2.29.0 新增）
+
+| 优化项 | 效果 | 说明 |
+|--------|------|------|
+| **EJS 模板缓存** | 消除模板编译开销 | 编译后的模板函数缓存在内存，避免每次请求读磁盘+编译 |
+| **禁用 `with` 语句** | 渲染性能提升 2-3 倍 | V8 引擎可优化模板渲染，模板变量显式引用 `locals.xxx` |
+| **Gzip 压缩** | 体积减少 60%+ | 所有 HTML/CSS/JS/JSON 响应自动压缩 |
+| **静态资源长效缓存** | JS/CSS 缓存 1 天 | 启用 `immutable` 标记，浏览器不再重复请求 |
+| **资源预加载提示** | 节省数百毫秒连接时间 | `preconnect` + `dns-prefetch` 提前建立 CDN 连接 |
+| **非关键脚本 defer** | 不阻塞首屏渲染 | marked/DOMPurify/Chart.js 等延迟加载 |
+| **登录页 Redis 缓存** | 高并发下直接返回缓存 HTML | 60s TTL，站点配置更新时自动失效 |
+| **站点配置进程内存缓存** | 减少数据库查询 | 60s TTL，API 请求和静态资源跳过 |
+| **CSP nonce 优化** | 减少 crypto 开销 | 静态资源文件跳过 nonce 生成 |
+
+### 数据库连接池
+
+在高并发场景下建议调大连接池：
+
+```bash
+# .env 中设置
+MYSQL_CONNECTION_LIMIT=25
+```
+
+如果使用 PM2 cluster 多进程模式，总连接数 = 进程数 × 连接池大小，建议不超过 MySQL `max_connections`（默认 151）。
+
+### 认证 & 安全
+
+| 优化项 | 说明 |
+|--------|------|
+| **密码哈希** | bcryptjs (cost=12)，登录时自动升级旧 SHA256 密码 |
+| **JWT 有效期** | 2h（访问令牌）+ 7天（刷新令牌），自动续期 |
+| **TLS 证书验证** | PVE 节点设置中可开关，默认关闭（兼容自签证书） |
+| **加密** | AES-256-GCM 加密存储敏感配置，密钥从 JWT_SECRET 派生 |
+| **速率限制** | 登录 5次/分钟、2FA 3次/分钟、API 全局 300次/分钟/IP |
+| **安全响应头** | HSTS / X-Content-Type-Options / Referrer-Policy / Permissions-Policy |
 
 ---
 
