@@ -164,6 +164,7 @@ npm run dev
 | `PORT` | 面板服务端口 | `3002` |
 | `SITE_URL` | 外部访问域名（反向代理必填） | `https://your-domain.com` |
 | `JWT_SECRET` | JWT 签名密钥（生产环境请修改） | — |
+| `NODE_ENV` | 运行环境，留空自动设为 `production` | `production` |
 | `DEBUG` | 调试日志开关 | `false` |
 > **PVE 节点配置**（API 地址、Token、SSH 连接）已迁移到面板内管理，首次部署后在 **管理后台 > 系统设置 > PVE节点设置** 中配置。Token 和 SSH 密码使用 AES-256-GCM 加密存储。
 
