@@ -445,6 +445,22 @@ httpServer.listen(PORT, async () => {
         app.locals.redis = null;
     }
 
+    // 启动时预编译所有 EJS 模板，避免首个用户访问时等待编译
+    try {
+        const ejs = require('ejs');
+        const fs = require('fs');
+        const templateDir = path.join(__dirname, '../views/pages');
+        var pages = ['admin', 'dashboard', 'login', 'user-center', 'vnc', 'terminal'];
+        for (var i = 0; i < pages.length; i++) {
+            var file = path.join(templateDir, pages[i] + '.ejs');
+            var source = fs.readFileSync(file, 'utf8');
+            ejs.compile(source, { filename: file, _with: false, compileDebug: false });
+        }
+        console.log('[template] 预编译完成: ' + pages.length + ' 个模板');
+    } catch (e) {
+        console.warn('[template] 预编译失败（不影响运行，首次访问时自动编译）:', e.message);
+    }
+
     try {
         const pveApi = require('./api/pve-api');
         await pveApi.detectNode();
