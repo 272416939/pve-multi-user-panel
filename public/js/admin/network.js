@@ -107,15 +107,22 @@
     };
 
     // 将 cname_domain 逗号分隔字符串解析为 {label, domain} 数组
+    // 存储格式: label||.domain 或 中文前缀.domain（旧格式兼容）
     $.parseCnameEntries = function() {
         var raw = $.networkConfig.cname_domain || '';
         var items = raw.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
         $.cnameEntries.value = items.map(function(item) {
-            // 以第一个 . 分隔标签和域名，标签可以是中英文、数字等任何字符
-            var dotIdx = item.indexOf('.');
-            if (dotIdx > 0) {
-                return { label: item.substring(0, dotIdx), domain: item.substring(dotIdx) };
+            // 新格式: label||.domain
+            var sep = item.indexOf('||');
+            if (sep > -1) {
+                return { label: item.substring(0, sep), domain: item.substring(sep + 2) };
             }
+            // 旧格式兼容: 中文前缀 + .域名（如 自动.auto.mcsr.cc）
+            var match = item.match(/^([\u4e00-\u9fa5]+)(\..+)$/);
+            if (match) return { label: match[1], domain: match[2] };
+            // 以 . 开头，无标签
+            if (item.startsWith('.')) return { label: '', domain: item };
+            // 兜底：整个作为域名
             return { label: '', domain: item };
         });
         if ($.cnameEntries.value.length === 0) $.cnameEntries.value.push({ label: '', domain: '' });
@@ -133,9 +140,10 @@
     $.saveNetworkConfig = async function() {
         try {
             // 将 cnameEntries 拼接回 cname_domain 逗号分隔字符串
+            // 新格式: label||.domain（|| 分隔，避免与域名中的 . 冲突）
             $.networkConfig.cname_domain = $.cnameEntries.value
-                .map(function(e) { return (e.label || '') + (e.domain || ''); })
-                .filter(function(s) { return s.trim(); })
+                .map(function(e) { return (e.label || '') + '||' + (e.domain || ''); })
+                .filter(function(s) { return s.replace(/\|\|/g, '').trim(); })
                 .join(',');
             await api('/admin/network/config', { method: 'PUT', body: $.networkConfig });
             alert('配置已保存');

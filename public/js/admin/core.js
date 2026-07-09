@@ -472,11 +472,16 @@ watch($.user, function(u) {
         if (!cnameDomain) return [];
         var domains = cnameDomain.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
         return domains.map(function(domain) {
-            // 以第一个 . 分隔标签和域名（标签可以是中英文、数字等任何字符）
-            var dotIdx = domain.indexOf('.');
-            if (dotIdx > 0) {
-                return { label: domain.substring(0, dotIdx), domain: deviceId + domain.substring(dotIdx) };
+            // 新格式: label||.domain
+            var sep = domain.indexOf('||');
+            if (sep > -1) {
+                return { label: domain.substring(0, sep), domain: deviceId + domain.substring(sep + 2) };
             }
+            // 旧格式兼容: 中文前缀 + .域名
+            var match = domain.match(/^([\u4e00-\u9fa5]+)(\..+)$/);
+            if (match) return { label: match[1], domain: deviceId + match[2] };
+            // 无标签，直接加 deviceId 前缀
+            if (domain.startsWith('.')) return { label: '', domain: deviceId + domain };
             return { label: '', domain: deviceId + '.' + domain };
         });
     };
