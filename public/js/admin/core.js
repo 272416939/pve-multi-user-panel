@@ -472,17 +472,11 @@ watch($.user, function(u) {
         if (!cnameDomain) return [];
         var domains = cnameDomain.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
         return domains.map(function(domain) {
-            // 提取前导中文字符作为线路名前缀
-            var match = domain.match(/^([\u4e00]+)(.*)$/);
-            if (match) {
-                var prefix = match[1];
-                var rest = match[2];
-                if (rest.startsWith('.')) {
-                    return { label: prefix, domain: deviceId + rest };
-                }
-                return { label: prefix, domain: deviceId + '.' + rest };
+            // 以第一个 . 分隔标签和域名（标签可以是中英文、数字等任何字符）
+            var dotIdx = domain.indexOf('.');
+            if (dotIdx > 0) {
+                return { label: domain.substring(0, dotIdx), domain: deviceId + domain.substring(dotIdx) };
             }
-            // 无中文前缀，直接在域名前加 deviceId.
             return { label: '', domain: deviceId + '.' + domain };
         });
     };

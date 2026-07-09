@@ -111,8 +111,11 @@
         var raw = $.networkConfig.cname_domain || '';
         var items = raw.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
         $.cnameEntries.value = items.map(function(item) {
-            var match = item.match(/^([\u4e00-\u9fa5]+)(.*)$/);
-            if (match) return { label: match[1], domain: match[2] || '' };
+            // 以第一个 . 分隔标签和域名，标签可以是中英文、数字等任何字符
+            var dotIdx = item.indexOf('.');
+            if (dotIdx > 0) {
+                return { label: item.substring(0, dotIdx), domain: item.substring(dotIdx) };
+            }
             return { label: '', domain: item };
         });
         if ($.cnameEntries.value.length === 0) $.cnameEntries.value.push({ label: '', domain: '' });
