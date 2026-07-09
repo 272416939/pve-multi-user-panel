@@ -128,10 +128,6 @@ cd pve-multi-user-panel
 # 安装依赖
 npm install
 
-# 如果使用国内镜像源（如腾讯云、阿里云），npm 10+ 可能因 lockfile 中的 resolved
-# URL 与本地 registry 不一致而报错 EALLOWREMOTE，此时可执行：
-# rm -rf node_modules package-lock.json && npm install
-
 # 创建配置文件
 cp .env.example .env
 ```
@@ -489,10 +485,11 @@ MYSQL_DATABASE=pve_panel
 git fetch origin && git reset --hard origin/main && npm install --production && pm2 restart pve-panel
 ```
 
-> 如果更新后 `npm install` 报 `EALLOWREMOTE` 错误，说明本地 npm registry 与 lockfile 不一致，执行：
+> 如果更新后 `npm install` 报 `EALLOWREMOTE` 错误，说明本地 npm registry 与 lockfile 不一致，删除 lockfile 重新生成即可：
 > ```bash
 > rm -rf node_modules package-lock.json && npm install --production && pm2 restart pve-panel
 > ```
+> **注意：** `package-lock.json` 不由仓库管理，由用户本地 `npm install` 自动生成。
 
 > 如需回滚：`git reflog` 查找旧 commit hash，`git reset --hard <hash>` 回滚。
 

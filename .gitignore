@@ -18,6 +18,8 @@ data/
 
 # 依赖
 node_modules/
+# lockfile 由用户本地 npm install 自动生成，不推送
+package-lock.json
 
 # 备份文件
 *.bak
