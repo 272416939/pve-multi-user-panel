@@ -258,7 +258,7 @@
                         <div class="card mt-3" style="position: relative; z-index: 1;">
                             <div class="card-header"><h5 class="mb-0">CNAME 域名设置</h5></div>
                             <div class="card-body">
-                                <p class="text-muted small mb-3">配置统一公网域名，所有虚拟机/容器通过此域名访问。节点名称支持中文、英文、数字，域名必须以 <code>.</code> 开头（如 <code>.auto.mcsr.cc</code>），域名前会自动加上 VMID。</p>
+                                <p class="text-muted small mb-3">配置统一公网域名，所有虚拟机/容器通过此域名访问。节点名称支持中文、英文、数字，域名必须以 <code>.</code> 开头（如 <code>.example.com</code>），域名前会自动加上 VMID。</p>
                                 <div v-for="(entry, idx) in cnameEntries" :key="idx" class="row g-2 mb-2 align-items-center">
                                     <div class="col-md-3">
                                         <input type="text" class="form-control form-control-sm" v-model="entry.label" placeholder="节点名称（如 电信）">
