@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const path = require('path');
 const http = require('http');
 const fs = require('fs');
@@ -43,6 +44,19 @@ const PORT = process.env.PORT || 3000;
 app.set('trust proxy', 1);
 // MISC-9 修复：禁用 X-Powered-By 头，不暴露框架信息
 app.disable('x-powered-by');
+
+// Gzip 压缩：所有 HTML/CSS/JS/JSON 响应压缩 70-80%
+// 放在中间件最前面，确保所有下游响应都经过压缩
+app.use(compression({
+    threshold: 512,    // 小于 512 字节不压缩（小文件收益低）
+    level: 6,          // 压缩级别 1-9，6 是速度/体积的最佳平衡
+    filter: (req, res) => {
+        // WebSocket 升级请求不压缩
+        if (req.headers['upgrade'] === 'websocket') return false;
+        // 默认使用 compression 的 filter（检查 Content-Type）
+        return compression.filter(req, res);
+    }
+}));
 
 // 生产环境标记（启用模板缓存、错误信息脱敏等 Express 内置优化）
 if (!process.env.NODE_ENV) {
