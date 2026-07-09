@@ -44,9 +44,17 @@ app.set('trust proxy', 1);
 // MISC-9 修复：禁用 X-Powered-By 头，不暴露框架信息
 app.disable('x-powered-by');
 
+// 生产环境标记（启用模板缓存、错误信息脱敏等 Express 内置优化）
+if (!process.env.NODE_ENV) {
+    process.env.NODE_ENV = 'production';
+    console.log('[system] NODE_ENV 未设置，已自动设为 production（启用模板缓存等优化）');
+}
+
 // EJS 模板引擎配置
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
+// 启用模板缓存：编译后的模板函数缓存在内存，避免每次请求重新读磁盘+编译
+app.set('view cache', true);
 
 app.use(cors({
     origin: function (origin, callback) {
@@ -72,6 +80,11 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ limit: '1mb', extended: true }));
 
 app.use((req, res, next) => {
+    // 优化：静态资源文件跳过 CSP nonce 生成（减少 crypto 开销）
+    var ext = req.path.split('.').pop();
+    if (['js', 'css', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'woff', 'woff2', 'ttf', 'map'].includes(ext)) {
+        return next();
+    }
     // XSS-4 修复：生成 per-request CSP nonce，替换 unsafe-inline
     const cspNonce = crypto.randomBytes(16).toString('base64');
     res.locals.cspNonce = cspNonce;
@@ -108,12 +121,19 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static(path.join(__dirname, '../public'), {
+    etag: true,
+    lastModified: true,
+    maxAge: '1h',
     setHeaders: (res, filePath) => {
         res.removeHeader('Expires');
         if (filePath.endsWith('.html')) {
             res.setHeader('Cache-Control', 'no-cache, must-revalidate');
         } else if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
-            res.setHeader('Cache-Control', 'public, max-age=3600');
+            res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+        } else if (filePath.endsWith('.png') || filePath.endsWith('.jpg') || filePath.endsWith('.jpeg') || filePath.endsWith('.gif') || filePath.endsWith('.svg') || filePath.endsWith('.ico')) {
+            res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+        } else if (filePath.endsWith('.woff') || filePath.endsWith('.woff2') || filePath.endsWith('.ttf')) {
+            res.setHeader('Cache-Control', 'public, max-age=2592000, immutable');
         } else {
             res.setHeader('Cache-Control', 'public, max-age=3600');
         }
@@ -150,17 +170,16 @@ app.get('/health', (req, res) => {
 });
 
 // 公开接口：获取站点配置（供前端和登录页使用）
+// 优化：使用站点配置缓存，避免每次请求查 4 次数据库
 app.get('/api/site/config', async (req, res) => {
     try {
+        var data = await getSiteConfigCached();
         var db = require('./api/db');
-        var name = await db.config.get('site:name') || 'PVE 多用户控制面板';
-        var logoText = await db.config.get('site:logo_text') || 'PVE 面板';
-        var loginTitle = await db.config.get('site:login_title') || 'PVE Panel';
         var registerEnabled = await db.config.get('register:enabled') || '0';
         res.json({
-            name: name,
-            logo_text: logoText,
-            login_title: loginTitle,
+            name: data.name,
+            logo_text: data.logo_text,
+            login_title: data.login_title,
             register_enabled: registerEnabled === '1'
         });
     } catch (e) {
@@ -229,9 +248,8 @@ httpServer.on('upgrade', (request, socket, head) => {
 });
 
 // EJS 渲染中间件：注入站点配置到 res.locals.siteConfig
-// 优先 Redis 缓存（多实例一致），回退到进程内存缓存
+// 优化：API 请求和静态资源请求跳过，只对页面渲染请求执行
 app.locals.siteConfigCache = { data: null, expires: 0 };
-// 惰性 getter：Redis 初始化在 DB 就绪后（listen 回调中）才完成
 function getRedisClient() { return require('./api/redis').getRedisClient(); }
 var SITE_CONFIG_REDIS_KEY = 'site_config';
 var SITE_CONFIG_TTL = 60; // 秒
@@ -267,7 +285,6 @@ async function getSiteConfigCached() {
         var data = { name: name, logo_text: logoText, login_title: loginTitle };
         cache.data = data;
         cache.expires = now + SITE_CONFIG_TTL * 1000;
-        // 写入 Redis
         if (redis) {
             try { await redis.set(SITE_CONFIG_REDIS_KEY, JSON.stringify(data), 'EX', SITE_CONFIG_TTL); } catch (e) {}
         }
@@ -277,7 +294,15 @@ async function getSiteConfigCached() {
     }
 }
 
+// 优化：只对页面渲染请求（/admin /dashboard 等）执行站点配置查询，API 和静态资源跳过
 app.use(async (req, res, next) => {
+    // API 请求、静态文件、WebSocket 升级请求跳过
+    if (req.path.startsWith('/api/') || req.path.startsWith('/images/') ||
+        req.path.startsWith('/shared/') || req.path.startsWith('/css/') ||
+        req.path.startsWith('/js/') || req.path.startsWith('/components/') ||
+        req.path.startsWith('/novnc/') || req.path.startsWith('/health')) {
+        return next();
+    }
     try {
         res.locals.siteConfig = await getSiteConfigCached();
     } catch (e) {
