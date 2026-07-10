@@ -49,7 +49,7 @@
                                 <div class="circle-wrap">
                                     <svg width="160" height="160" viewBox="-7 -7 144 144">
                                         <circle class="circle-bg" cx="65" cy="65" r="60"></circle>
-                                        <circle class="circle-progress" :style="{ strokeDashoffset: circleVmOffset }" cx="65" cy="65" r="60"></circle>
+                                        <circle class="circle-progress" :style="{ strokeDashoffset: circleVmOffset }" cx="65" cy="65" r="60" transform="rotate(-90 65 65)"></circle>
                                     </svg>
                                     <div class="circle-text">
                                         <div class="circle-num">{{ userVms.length }}</div>
@@ -67,7 +67,7 @@
                                 <div class="circle-wrap">
                                     <svg width="160" height="160" viewBox="-7 -7 144 144">
                                         <circle class="circle-bg" cx="65" cy="65" r="60"></circle>
-                                        <circle class="circle-progress" :style="{ strokeDashoffset: circleCtOffset, stroke: userLxcContainers.length > 0 ? '#36D399' : '#6B7280' }" cx="65" cy="65" r="60"></circle>
+                                        <circle class="circle-progress" :style="{ strokeDashoffset: circleCtOffset, stroke: userLxcContainers.length > 0 ? '#36D399' : '#6B7280' }" cx="65" cy="65" r="60" transform="rotate(-90 65 65)"></circle>
                                     </svg>
                                     <div class="circle-text">
                                         <div class="circle-num">{{ userLxcContainers.length }}</div>
