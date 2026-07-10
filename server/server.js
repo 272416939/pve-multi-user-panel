@@ -338,15 +338,18 @@ app.get('/terminal.html', (req, res) => res.redirect(301, '/terminal'));
 
 // EJS 页面路由（含 Redis 渲染缓存）
 // 登录页：全量缓存，所有用户看到的内容相同
+// 注意：缓存 HTML 中包含 CSP nonce，返回前需替换为当前请求的 nonce
 app.get('/login', async (req, res) => {
-    // 已登录用户直接重定向
-    const authHeader = req.headers.cookie;
-    // 尝试从 Redis 获取缓存的登录页 HTML
     var redis = getRedisClient();
     if (redis) {
         try {
             var cached = await redis.get('page:login');
-            if (cached) return res.send(cached);
+            if (cached) {
+                // 替换缓存中的 nonce 为当前请求的 nonce（CSP 策略要求每请求不同）
+                var currentNonce = res.locals.cspNonce;
+                cached = cached.replace(/nonce="[^"]+"/g, 'nonce="' + currentNonce + '"');
+                return res.send(cached);
+            }
         } catch (e) {}
     }
     res.render('pages/login', { title: '登录', page: 'login' }, function(err, html) {
