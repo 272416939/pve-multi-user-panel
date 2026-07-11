@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.29.1] - 2026-07-11
+
+### Fixed
+- fix(renew): 修复续费报错 `withTransaction is not defined`（500 错误）
+  - `server/routes/wallet.js` 补全 `withTransaction` 导入，续费事务恢复正常
+- fix(renew): 修复续费资源显示异常
+  - 续费弹窗显示 VMID/CTID（如 `VM 108 (ID: 108)`），无名称资源也能正确辨识
+  - 修复到期时间字段错误：`expire_time` → `expiration_date`
+  - 所有续费入口统一调用 `openRenewModal()`，确保计费周期、数量等状态正确初始化
+
 ## [2.29.0] - 2026-07-09
 
 ### Security
