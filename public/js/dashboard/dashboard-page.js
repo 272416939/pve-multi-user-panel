@@ -26,9 +26,17 @@ var $ = window.__dashboard;
                 if (!expireTime) return '';
                 var diff = new Date(expireTime) - new Date();
                 var days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-                if (days <= 0) return '(已到期)';
-                if (days <= 7) return '(剩余' + days + '天)';
-                return '';
+                if (days <= 0) return '已到期';
+                return '剩余' + days + '天';
+            };
+            $.getExpiryColor = function(expireTime) {
+                if (!expireTime) return '';
+                var diff = new Date(expireTime) - new Date();
+                var days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                if (days <= 0) return 'text-danger';
+                if (days <= 3) return 'text-danger';
+                if (days <= 7) return 'text-warning';
+                return 'text-success';
             };
             return $;
         }

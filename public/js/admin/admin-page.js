@@ -56,6 +56,22 @@ var App = {
         $.initNetwork();
         $.initUpdate();
         $.initTemplate();
+        $.daysUntilExpire = function(expireTime) {
+            if (!expireTime) return '';
+            var diff = new Date(expireTime) - new Date();
+            var days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            if (days <= 0) return '已到期';
+            return '剩余' + days + '天';
+        };
+        $.getExpiryColor = function(expireTime) {
+            if (!expireTime) return '';
+            var diff = new Date(expireTime) - new Date();
+            var days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+            if (days <= 0) return 'text-danger';
+            if (days <= 3) return 'text-danger';
+            if (days <= 7) return 'text-warning';
+            return 'text-success';
+        };
         $.toggleAdminDropdown = function(target) {
             var dd = target.parentElement;
             var isOpen = dd.classList.contains('open');

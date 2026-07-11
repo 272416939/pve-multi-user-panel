@@ -242,7 +242,8 @@
         var vm = $.userVms.value.find(function(v) { return v.id == vmId; });
         if (!vm) return '';
         var exp = vm.expiration_date ? formatDate(vm.expiration_date) : '未设置';
-        return (vm.name || 'VM ' + vm.vm_id) + '（到期: ' + exp + '）';
+        var remain = vm.expiration_date ? $.daysUntilExpire(vm.expiration_date) : '';
+        return (vm.name || 'VM ' + vm.vm_id) + '（到期: ' + exp + ' ' + remain + '）';
     };
 
     // ===== Snapshot 函数 =====

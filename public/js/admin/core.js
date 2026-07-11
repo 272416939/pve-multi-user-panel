@@ -581,12 +581,14 @@ watch($.user, function(u) {
             var vm = $.userVms.value.find(function(v) { return v.id == resourceId; });
             if (!vm) return '';
             var exp = vm.expiration_date ? formatDate(vm.expiration_date) : '未设置';
-            return (vm.name || 'VM ' + vm.vm_id) + '（到期: ' + exp + '）';
+            var remain = vm.expiration_date ? $.daysUntilExpire(vm.expiration_date) : '';
+            return (vm.name || 'VM ' + vm.vm_id) + '（到期: ' + exp + ' ' + remain + '）';
         } else {
             var ct = $.userLxcContainers.value.find(function(c) { return c.id == resourceId; });
             if (!ct) return '';
             var exp = ct.expiration_date ? formatDate(ct.expiration_date) : '未设置';
-            return (ct.name || 'CT ' + ct.ct_id) + '（到期: ' + exp + '）';
+            var remain = ct.expiration_date ? $.daysUntilExpire(ct.expiration_date) : '';
+            return (ct.name || 'CT ' + ct.ct_id) + '（到期: ' + exp + ' ' + remain + '）';
         }
     };
 

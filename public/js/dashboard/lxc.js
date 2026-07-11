@@ -590,7 +590,8 @@
         var ct = $.userLxcContainers.value.find(function(c) { return c.id == id; });
         if (!ct) return '';
         var exp = ct.expiration_date ? formatDate(ct.expiration_date) : '未设置';
-        return (ct.name || 'CT ' + ct.ct_id) + '（到期: ' + exp + '）';
+        var remain = ct.expiration_date ? $.daysUntilExpire(ct.expiration_date) : '';
+        return (ct.name || 'CT ' + ct.ct_id) + '（到期: ' + exp + ' ' + remain + '）';
     };
 
     // ===== initLxc =====

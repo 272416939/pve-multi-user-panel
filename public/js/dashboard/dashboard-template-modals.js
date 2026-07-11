@@ -606,7 +606,7 @@
                                 <div v-for="vm in userVms" :key="vm.id" class="option" role="option"
                                      :class="{ selected: cdkRedeemForm.vm_id == vm.id }"
                                      @click="cdkRedeemForm.vm_id = vm.id; toggleCdkDropdown('vm', false);">
-                                    {{ vm.name || 'VM ' + vm.vm_id }}（到期: {{ vm.expiration_date ? formatDate(vm.expiration_date) : '未设置' }}）
+                                    {{ vm.name || 'VM ' + vm.vm_id }}（到期: {{ vm.expiration_date ? formatDate(vm.expiration_date) : '未设置' }} <span :class="getExpiryColor(vm.expiration_date)">{{ vm.expiration_date ? daysUntilExpire(vm.expiration_date) : '' }}</span>）
                                 </div>
                             </div>
                         </Teleport>
@@ -631,7 +631,7 @@
                                 <div v-for="ct in userLxcContainers" :key="ct.id" class="option" role="option"
                                      :class="{ selected: cdkRedeemForm.container_id == ct.id }"
                                      @click="cdkRedeemForm.container_id = ct.id; toggleCdkDropdown('lxc', false);">
-                                    {{ ct.name || 'CT ' + ct.ct_id }}（到期: {{ ct.expiration_date ? formatDate(ct.expiration_date) : '未设置' }}）
+                                    {{ ct.name || 'CT ' + ct.ct_id }}（到期: {{ ct.expiration_date ? formatDate(ct.expiration_date) : '未设置' }} <span :class="getExpiryColor(ct.expiration_date)">{{ ct.expiration_date ? daysUntilExpire(ct.expiration_date) : '' }}</span>）
                                 </div>
                             </div>
                         </Teleport>
@@ -669,7 +669,7 @@
             <div class="modal-body">
                 <p v-if="renewResource">续费资源：{{ renewResource.name || (renewResource.vm_id ? 'VM ' + renewResource.vm_id : 'CT ' + renewResource.ct_id) }} <span class="text-muted">(ID: {{ renewResource.vm_id || renewResource.ct_id }})</span></p>
                 <p v-if="renewResource">续费价格：¥{{ parseFloat(renewResource.renewal_price||0).toFixed(2) }} / {{ renewPeriodLabel(renewResource.renewal_period) }}</p>
-                <p v-if="renewResource && renewResource.expiration_date">到期时间：{{ formatDate(renewResource.expiration_date) }} <span v-if="renewResource.expiration_date" class="text-warning small">({{ daysUntilExpire(renewResource.expiration_date) }})</span></p>
+                <p v-if="renewResource && renewResource.expiration_date">到期时间：{{ formatDate(renewResource.expiration_date) }} <span :class="getExpiryColor(renewResource.expiration_date) + ' small'">({{ daysUntilExpire(renewResource.expiration_date) }})</span></p>
                 <div class="mb-3">
                     <label class="form-label">计费周期</label>
                     <select class="form-select" v-model="renewFormPeriod" style="max-width:200px;">

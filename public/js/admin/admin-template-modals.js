@@ -328,14 +328,14 @@
                                                     <div v-for="vm in userVms" :key="vm.id" class="option" role="option"
                                                          :class="{ selected: cdkRedeemForm.resource_id == vm.id }"
                                                          @click="cdkRedeemForm.resource_id = vm.id; cdkVmDropdownOpen = false;">
-                                                        {{ vm.name || 'VM ' + vm.vm_id }}（到期: {{ vm.expiration_date ? formatDate(vm.expiration_date) : '未设置' }}）
+                                                        {{ vm.name || 'VM ' + vm.vm_id }}（到期: {{ vm.expiration_date ? formatDate(vm.expiration_date) : '未设置' }} <span v-if="vm.expiration_date" :class="getExpiryColor(vm.expiration_date)">{{ daysUntilExpire(vm.expiration_date) }}</span>）
                                                     </div>
                                                 </div>
                                                 <div v-else>
                                                     <div v-for="ct in userLxcContainers" :key="ct.id" class="option" role="option"
                                                          :class="{ selected: cdkRedeemForm.resource_id == ct.id }"
                                                          @click="cdkRedeemForm.resource_id = ct.id; cdkVmDropdownOpen = false;">
-                                                        {{ ct.name || 'CT ' + ct.ct_id }}（到期: {{ ct.expiration_date ? formatDate(ct.expiration_date) : '未设置' }}）
+                                                        {{ ct.name || 'CT ' + ct.ct_id }}（到期: {{ ct.expiration_date ? formatDate(ct.expiration_date) : '未设置' }} <span v-if="ct.expiration_date" :class="getExpiryColor(ct.expiration_date)">{{ daysUntilExpire(ct.expiration_date) }}</span>）
                                                     </div>
                                                 </div>
                                             </div>

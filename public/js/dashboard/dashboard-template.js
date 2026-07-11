@@ -617,7 +617,7 @@
                     <div class="info-item"><span class="info-label">续费价格</span><span class="info-value">{{ detailVm.renewal_price ? detailVm.renewal_price + '元/' + (detailVm.renewal_period === 'year' ? '年' : detailVm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
                     <div class="info-item">
                         <span class="info-label">到期时间</span>
-                        <span class="info-value" :class="detailVm.expiration_date && new Date(detailVm.expiration_date) < new Date() ? 'text-danger' : ''">{{ detailVm.expiration_date ? formatDate(detailVm.expiration_date) : '未设置' }}</span>
+                        <span class="info-value" :class="detailVm.expiration_date ? getExpiryColor(detailVm.expiration_date) : ''">{{ detailVm.expiration_date ? formatDate(detailVm.expiration_date) + '（' + daysUntilExpire(detailVm.expiration_date) + '）' : '未设置' }}</span>
                     </div>
                     <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '镜像' : '操作系统' }}</span><span class="info-value">{{ detailVmOsStr }}</span></div>
                     <div class="info-item"><span class="info-label">运行状态</span><span class="info-value">{{ detailVmStatusStr }}</span></div>
