@@ -136,6 +136,7 @@
                             </div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">到期时间</span><span class="vm-mobile-card-value" :class="getExpiryColor(vm.expiration_date)">{{ vm.expiration_date ? formatDate(vm.expiration_date) + ' ' + daysUntilExpire(vm.expiration_date) : '-' }}</span></div>
                             <div class="vm-mobile-card-row" v-if="vm.config?.ciuser"><span class="vm-mobile-card-label">账号</span><span class="vm-mobile-card-value">{{ vm.config.ciuser }}</span></div>
                         </div>
                         <div v-if="vm._provisioning" class="text-center text-muted py-2"><small>正在开通中，请稍后刷新</small></div>
@@ -172,6 +173,7 @@
                                     <th>内网IP</th>
                                     <th>CNAME域名</th>
                                     <th>配置</th>
+                                    <th>到期时间</th>
                                     <th>续费价格</th>
                                     <th>系统</th>
                                     <th>状态</th>
@@ -199,6 +201,7 @@
                                         <span v-else class="text-muted">-</span>
                                     </td>
                                     <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm._provisioning ? '' : (vm.config || vm.status ? '/ ' + formatDiskSize(vm) : '') }}</td>
+                                    <td><span v-if="vm._provisioning" class="text-muted">-</span><span v-else :class="getExpiryColor(vm.expiration_date)">{{ vm.expiration_date ? formatDate(vm.expiration_date) + ' ' + daysUntilExpire(vm.expiration_date) : '-' }}</span></td>
                                     <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                     <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                     <td>
@@ -243,7 +246,7 @@
                                     </td>
                                 </tr>
                                 <tr v-if="userVms.length === 0">
-                                    <td colspan="9" class="text-center text-muted py-4">暂无虚拟机</td>
+                                    <td colspan="10" class="text-center text-muted py-4">暂无虚拟机</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -293,6 +296,7 @@
                             </div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ ct.config ? (ct.config.cores || 1) + '核 ' + formatMemory(ct.config.memory) : '-' }} / {{ formatDiskSize(ct) }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : ct.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">到期时间</span><span class="vm-mobile-card-value" :class="getExpiryColor(ct.expiration_date)">{{ ct.expiration_date ? formatDate(ct.expiration_date) + ' ' + daysUntilExpire(ct.expiration_date) : '-' }}</span></div>
                             <div class="vm-mobile-card-row" v-if="ct.template_name"><span class="vm-mobile-card-label">镜像</span><span class="vm-mobile-card-value">{{ ct.template_name }}</span></div>
                         </div>
                         <div v-if="ct._provisioning" class="text-center text-muted py-2"><small>正在开通中，请稍后刷新</small></div>
@@ -328,6 +332,7 @@
                                     <th>内网IP</th>
                                     <th>CNAME域名</th>
                                     <th>配置</th>
+                                    <th>到期时间</th>
                                     <th>续费价格</th>
                                     <th>镜像</th>
                                     <th>状态</th>
@@ -354,6 +359,7 @@
                                         <span v-else class="text-muted">-</span>
                                     </td>
                                     <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct._provisioning ? '' : (ct.config || ct.status ? '/ ' + formatDiskSize(ct) : '') }}</td>
+                                    <td><span v-if="ct._provisioning" class="text-muted">-</span><span v-else :class="getExpiryColor(ct.expiration_date)">{{ ct.expiration_date ? formatDate(ct.expiration_date) + ' ' + daysUntilExpire(ct.expiration_date) : '-' }}</span></td>
                                     <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : ct.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                     <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                     <td>
@@ -398,7 +404,7 @@
                                     </td>
                                 </tr>
                                 <tr v-if="userLxcContainers.length === 0">
-                                    <td colspan="8" class="text-center text-muted py-4">暂无容器</td>
+                                    <td colspan="9" class="text-center text-muted py-4">暂无容器</td>
                                 </tr>
                             </tbody>
                         </table>
