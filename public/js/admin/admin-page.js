@@ -120,6 +120,9 @@ var App = {
 };
 var app = Vue.createApp(App);
 
+  // 注册全局属性，确保模板任意作用域都能找到
+  app.config.globalProperties.daysUntilExpire = $.daysUntilExpire;
+  app.config.globalProperties.getExpiryColor = $.getExpiryColor;
 // Global error handler — catch render errors and show on screen
 app.config.errorHandler = function(err, instance, info) {
     console.error('[Vue Error]', err, instance, info);
