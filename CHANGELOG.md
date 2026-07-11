@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.30.0] - 2026-07-11
+
+### Added
+- feat(ui): 到期时间始终显示剩余天数并按阈值着色
+  - 新增 `getExpiryColor()` 函数：>7 天绿色、3~7 天黄色、<3 天红色
+  - 所有到期时间展示点（续费弹窗、详情弹窗、CDK 下拉列表、资源列表）统一显示"剩余 X 天"
+  - 覆盖 Dashboard 和 Admin 两端
+
+### Fixed
+- fix(dashboard): 总览 SVG 环形进度条从 3 点改为 12 点起始位置
+- fix(dashboard): VM/LXC 编辑弹窗权限控制，普通用户仅可见名称和保存按钮
+  - 隐藏"分配给、到期时间、续费价格、计费周期、MAC 分组、移除"等管理字段
+  - 后端已有限制，前端同步增加 `v-if="user.role === 'admin'"` 双重防护
+- fix(update): PM2 集群模式下自动更新使用 `pm2 reload` 滚动重启所有实例
+  - 检测到 PM2 环境时，使用 `spawn` 分离子进程执行 `pm2 reload all`
+  - 逐个替换 worker 实例，零停机，所有实例加载新代码
+  - 非 PM2 环境保持原有 `process.exit(0)` 逻辑
+
 ## [2.29.1] - 2026-07-11
 
 ### Fixed
