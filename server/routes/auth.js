@@ -250,12 +250,11 @@ router.post('/auth/refresh', async (req, res) => {
         }
 
         // 签发新的 access token + 新的 refresh token
-        const newAccessToken = generateAccessToken(user, record.id);
         const newRefreshToken = generateRefreshToken();
 
         // 存储新的 refresh token
         const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000);
-        await db.refreshTokens.create({
+        const newRecord = await db.refreshTokens.create({
             user_id: user.id,
             device_name: record.device_name,
             token: newRefreshToken,
@@ -264,6 +263,9 @@ router.post('/auth/refresh', async (req, res) => {
             created_at: new Date().toISOString(),
             expires_at: expiresAt.toISOString()
         });
+
+        // 用新记录的 id 生成 access token，确保设备校验通过
+        const newAccessToken = generateAccessToken(user, newRecord.id);
 
         res.json({ token: newAccessToken, refreshToken: newRefreshToken });
     } catch (error) {
