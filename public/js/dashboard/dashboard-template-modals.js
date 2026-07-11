@@ -15,21 +15,21 @@
                         <label class="form-label">名称</label>
                         <input type="text" class="form-control" v-model="editVmForm.name">
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">分配给</label>
                         <select class="form-select" v-model="editVmForm.user_id">
                             <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
                         </select>
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">到期时间</label>
                         <input type="datetime-local" class="form-control" v-model="editVmForm.expiration_date" step="1">
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">续费价格</label>
                         <input type="number" step="0.01" min="0" class="form-control" v-model="editVmForm.renewal_price" placeholder="如: 50.00">
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">计费周期</label>
                         <select class="form-select" v-model="editVmForm.renewal_period">
                             <option value="month">月（30天计）</option>
@@ -37,7 +37,7 @@
                             <option value="year">年（365天计）</option>
                         </select>
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">MAC分组</label>
                         <select class="form-select" v-model="editVmForm.mac_group_id">
                             <option value="">不加入分组</option>
@@ -46,7 +46,7 @@
                     </div>
                     <div class="d-flex gap-2">
                         <pv-button type="submit" variant="primary" formnovalidate>保存</pv-button>
-                        <pv-button type="button" @click="removeVm" variant="outline-warning">移除（仅解绑）</pv-button>
+                        <pv-button v-if="user && user.role === 'admin'" type="button" @click="removeVm" variant="outline-warning">移除（仅解绑）</pv-button>
                     </div>
                 </form>
             </div>
@@ -309,21 +309,21 @@
                         <label class="form-label">名称</label>
                         <input type="text" class="form-control" v-model="editLxcForm.name">
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">分配给</label>
                         <select class="form-select" v-model="editLxcForm.user_id">
                             <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
                         </select>
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">到期时间</label>
                         <input type="datetime-local" class="form-control" v-model="editLxcForm.expiration_date" step="1">
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">续费价格</label>
                         <input type="number" step="0.01" min="0" class="form-control" v-model="editLxcForm.renewal_price" placeholder="如: 50.00">
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">计费周期</label>
                         <select class="form-select" v-model="editLxcForm.renewal_period">
                             <option value="month">月（30天计）</option>
@@ -331,7 +331,7 @@
                             <option value="year">年（365天计）</option>
                         </select>
                     </div>
-                    <div class="mb-3">
+                    <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">MAC分组</label>
                         <select class="form-select" v-model="editLxcForm.mac_group_id">
                             <option value="">不加入分组</option>
@@ -340,7 +340,7 @@
                     </div>
                     <div class="d-flex gap-2">
                         <pv-button type="submit" variant="primary" formnovalidate>保存</pv-button>
-                        <pv-button type="button" @click="removeLxc" variant="warning">移除（仅解绑）</pv-button>
+                        <pv-button v-if="user && user.role === 'admin'" type="button" @click="removeLxc" variant="warning">移除（仅解绑）</pv-button>
                     </div>
                 </form>
             </div>
