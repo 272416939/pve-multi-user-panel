@@ -354,7 +354,31 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             message: '更新成功，服务正在重启...' + (usedFallback ? `（${userSource} 源不可达，已回退到 ${userSource === 'gitee' ? 'github' : 'gitee'} 源）` : '')
         });
         console.log('\n[系统更新] 自动更新完成，服务即将重启（此为正常行为，非异常崩溃）\n');
-        setTimeout(() => process.exit(0), 1000);
+
+        // PM2 集群模式检测：pm_id 或 NODE_APP_INSTANCE 由 PM2 自动注入
+        const isPM2 = process.env.pm_id !== undefined || process.env.NODE_APP_INSTANCE !== undefined;
+        if (isPM2) {
+            // PM2 滚动重启（graceful reload）：逐个替换实例，零停机，所有 worker 加载新代码
+            // 使用 spawn 分离子进程，避免当前 worker 退出后中断执行
+            try {
+                const { spawn } = require('child_process');
+                const child = spawn('pm2', ['reload', 'all'], {
+                    detached: true,
+                    stdio: 'ignore',
+                    cwd: projectRoot,
+                    env: { ...process.env }
+                });
+                child.unref();
+                // 给 reload 命令 2s 窗口启动，当前 worker 再自行退出
+                setTimeout(() => process.exit(0), 2000);
+            } catch (e) {
+                console.error('[系统更新] PM2 reload 失败，回退到 process.exit:', e.message);
+                setTimeout(() => process.exit(0), 1000);
+            }
+        } else {
+            // 非 PM2 模式：直接退出，由 systemd/supervisor/Docker 等进程管理器自动拉起
+            setTimeout(() => process.exit(0), 1000);
+        }
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
     }
