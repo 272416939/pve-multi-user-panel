@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.30.1] - 2026-07-12
+
+### Fixed
+- fix(auth): 修复 token 自动刷新后立即被强制下线
+  - `/auth/refresh` 端点先创建新 refresh token 记录再生成 access token，解决新旧 ID 错位问题
+- fix(ui): 修复 `getExpiryColor is not a function` 模板渲染错误
+  - 将函数定义移到 Vue `setup()` 之外，注册为 `app.config.globalProperties` 全局属性
+- fix(dashboard): 主列表视图（VM/LXC 表格 + 移动端卡片）添加到期时间列
+  - 显示日期 + 剩余天数 + 颜色标识（>7天绿、3-7天黄、<3天红）
+  - 同时补充 Admin 端 VM/LXC 表格到期时间列
+
 ## [2.30.0] - 2026-07-11
 
 ### Added
