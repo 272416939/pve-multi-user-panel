@@ -152,7 +152,7 @@
                                     <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
                                     <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
-                                    <li><a href="#" @click.prevent="renewResource = vm; renewShow = true">续费</a></li>
+                                    <li><a href="#" @click.prevent="openRenewModal(vm)">续费</a></li>
                                     <li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
                                     <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
                                 </ul>
@@ -234,7 +234,7 @@
                                                     <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
                                                     <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
                                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
-                                                    <li><a href="#" @click.prevent="renewResource = vm; renewShow = true">续费</a></li>
+                                                    <li><a href="#" @click.prevent="openRenewModal(vm)">续费</a></li>
                                                     <li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
                                                     <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
                                                 </ul>
@@ -309,7 +309,7 @@
                                     <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
                                     <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
                                     <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
-                                    <li><a href="#" @click.prevent="renewResource = ct; renewShow = true">续费</a></li>
+                                    <li><a href="#" @click.prevent="openRenewModal(ct)">续费</a></li>
                                     <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
                                     <li><a href="#" @click.prevent="openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
                                 </ul>
@@ -389,7 +389,7 @@
                                                     <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
                                                     <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
                                                     <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
-                                                    <li><a href="#" @click.prevent="renewResource = ct; renewShow = true">续费</a></li>
+                                                    <li><a href="#" @click.prevent="openRenewModal(ct)">续费</a></li>
                                                     <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
                                                     <li><a href="#" @click.prevent="openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
                                                 </ul>

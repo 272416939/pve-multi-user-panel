@@ -667,9 +667,9 @@
                 <pv-button type="button" variant="close" @click="renewShow = false"></pv-button>
             </div>
             <div class="modal-body">
-                <p v-if="renewResource">续费资源：{{ renewResource.name || '资源' }}</p>
+                <p v-if="renewResource">续费资源：{{ renewResource.name || (renewResource.vm_id ? 'VM ' + renewResource.vm_id : 'CT ' + renewResource.ct_id) }} <span class="text-muted">(ID: {{ renewResource.vm_id || renewResource.ct_id }})</span></p>
                 <p v-if="renewResource">续费价格：¥{{ parseFloat(renewResource.renewal_price||0).toFixed(2) }} / {{ renewPeriodLabel(renewResource.renewal_period) }}</p>
-                <p v-if="renewResource && renewResource.expire_time">到期时间：{{ renewResource.expire_time }} <span v-if="renewResource.expire_time" class="text-warning small">({{ daysUntilExpire(renewResource.expire_time) }})</span></p>
+                <p v-if="renewResource && renewResource.expiration_date">到期时间：{{ formatDate(renewResource.expiration_date) }} <span v-if="renewResource.expiration_date" class="text-warning small">({{ daysUntilExpire(renewResource.expiration_date) }})</span></p>
                 <div class="mb-3">
                     <label class="form-label">计费周期</label>
                     <select class="form-select" v-model="renewFormPeriod" style="max-width:200px;">
