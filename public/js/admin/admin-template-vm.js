@@ -78,6 +78,7 @@
                                             <th>内网IP</th>
                                             <th>CNAME域名</th>
                                             <th>配置</th>
+                                            <th>到期时间</th>
                                             <th>续费价格</th>
                                             <th>系统</th>
                                             <th>状态</th>
@@ -98,6 +99,7 @@
                                                 <span v-else class="text-muted">-</span>
                                             </td>
                                             <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.config || vm.status ? '/ ' + formatDiskSize(vm) : '' }}</td>
+                                            <td><span v-if="vm.expiration_date" :class="getExpiryColor(vm.expiration_date)">{{ formatDate(vm.expiration_date) + ' ' + daysUntilExpire(vm.expiration_date) }}</span><span v-else class="text-muted">-</span></td>
                                             <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                             <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                             <td><span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
@@ -134,7 +136,7 @@
                                             </td>
                                         </tr>
                                         <tr v-if="userVms.length === 0">
-                                            <td colspan="10" class="text-center text-muted py-4">暂无虚拟机</td>
+                                            <td colspan="12" class="text-center text-muted py-4">暂无虚拟机</td>
                                         </tr>
                                     </tbody>
                                 </table>

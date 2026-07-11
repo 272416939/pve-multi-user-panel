@@ -322,6 +322,7 @@
                                                 <th>内网IP</th>
                                                 <th>CNAME域名</th>
                                                 <th>配置</th>
+                                                <th>到期时间</th>
                                                 <th>续费价格</th>
                                                 <th>镜像</th>
                                                 <th>状态</th>
@@ -341,6 +342,7 @@
                                                     <span v-else class="text-muted">-</span>
                                                 </td>
                                                 <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct.config || ct.status ? '/ ' + formatDiskSize(ct) : '' }}</td>
+                                                <td><span v-if="ct.expiration_date" :class="getExpiryColor(ct.expiration_date)">{{ formatDate(ct.expiration_date) + ' ' + daysUntilExpire(ct.expiration_date) }}</span><span v-else class="text-muted">-</span></td>
                                                 <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : ct.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                                 <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                                 <td><span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span></td>
@@ -378,7 +380,7 @@
                                                 </td>
                                             </tr>
                                             <tr v-if="userLxcContainers.length === 0">
-                                                <td colspan="9" class="text-center text-muted py-4">暂无 LXC 容器</td>
+                                                <td colspan="11" class="text-center text-muted py-4">暂无 LXC 容器</td>
                                             </tr>
                                         </tbody>
                                     </table>
