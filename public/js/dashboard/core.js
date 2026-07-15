@@ -37,6 +37,8 @@
     $.vmPwdResource = ref(null);
     $.vmPwdCiuser = ref('');
     $.vmPwdNewPassword = ref('');
+    $.vmPwdConfirm = ref('');
+    $.vmPwdShowPwd = ref(false);
     $.vmPwdError = ref('');
 
     // ===== 套餐订购状态 =====
@@ -421,6 +423,8 @@
     $.openVmPasswordReset = async function(vm) {
         $.vmPwdResource.value = vm;
         $.vmPwdNewPassword.value = '';
+        $.vmPwdConfirm.value = '';
+        $.vmPwdShowPwd.value = false;
         $.vmPwdError.value = '';
         $.vmPwdCiuser.value = vm.config?.ciuser || false;
         if ($.vmPwdCiuser.value === false) {
@@ -475,6 +479,8 @@
         var vm = $.vmPwdResource.value;
         if (!vm) { $.vmPwdError.value = '请选择虚拟机'; return; }
         var pwd = $.vmPwdNewPassword.value;
+        var confirm = $.vmPwdConfirm.value;
+        if (pwd !== confirm) { alert('两次输入的密码不一致'); return; }
         var pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
         if (!pwd || !pwdRegex.test(pwd)) { alert('密码至少8位，需包含大小写英文、数字和特殊字符'); return; }
         try {

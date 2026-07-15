@@ -14,6 +14,7 @@
     $.lxcForm = ref({ ostemplate: '', hostname: '', password: '', confirmPassword: '', storage: '', cores: 1, memory: 512, swap: 512, disk: 8, features: '', net0Bridge: 'vmbr0', net0Ip: '', net0Mac: '', net0Ip6: '', unprivileged: true, start: true });
     $.lxcAssignForm = ref({ ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' });
     $.lxcPasswordForm = ref({ password: '', confirmPassword: '' });
+    $.adminLxcPwdShowPwd = ref(false);
     $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
     $.lxcIpError = Vue.ref('');
     $.lxcIpLoading = Vue.ref(false);
@@ -290,6 +291,7 @@
     $.openResetLxcPasswordModal = function(ct) {
         $.selectedLxc.value = ct;
         $.lxcPasswordForm.value = { password: '', confirmPassword: '' };
+        $.adminLxcPwdShowPwd.value = false;
         $.bsModalShow('resetLxcPasswordModal');
     };
 

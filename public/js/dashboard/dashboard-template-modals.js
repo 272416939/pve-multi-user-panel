@@ -281,11 +281,16 @@
                 <form @submit.prevent="submitLxcPasswordReset">
                     <div class="mb-3">
                         <label class="form-label">新密码</label>
-                        <input type="password" class="form-control" v-model="lxcPasswordForm.password" required autocomplete="new-password">
+                        <div class="input-group">
+                            <input :type="lxcPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="lxcPasswordForm.password" required autocomplete="new-password" placeholder="至少8位，需包含英文+数字+符号">
+                            <button class="btn btn-outline-secondary" type="button" @click="lxcPwdShowPwd = !lxcPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
+                                <span v-if="lxcPwdShowPwd">🙈</span><span v-else>👁️</span>
+                            </button>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">确认密码</label>
-                        <input type="password" class="form-control" v-model="lxcPasswordForm.confirm" required autocomplete="new-password">
+                        <input type="password" class="form-control" v-model="lxcPasswordForm.confirm" required autocomplete="new-password" placeholder="请再次输入密码">
                     </div>
                     <pv-button type="submit" variant="primary">重置密码</pv-button>
                 </form>
@@ -711,7 +716,16 @@
                     <p v-if="vmPwdResource">账号：{{ vmPwdCiuser }}</p>
                     <div class="mb-3">
                         <label class="form-label">新密码</label>
-                        <input type="password" class="form-control" v-model="vmPwdNewPassword" placeholder="至少8位，需包含英文+数字+符号">
+                        <div class="input-group">
+                            <input :type="vmPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="vmPwdNewPassword" placeholder="至少8位，需包含英文+数字+符号">
+                            <button class="btn btn-outline-secondary" type="button" @click="vmPwdShowPwd = !vmPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
+                                <span v-if="vmPwdShowPwd">🙈</span><span v-else>👁️</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">确认密码</label>
+                        <input type="password" class="form-control" v-model="vmPwdConfirm" placeholder="请再次输入密码" autocomplete="new-password">
                     </div>
                     <div v-if="vmPwdError" class="alert alert-danger py-2">{{ vmPwdError }}</div>
                 </div>

@@ -11,6 +11,7 @@
     $.lxcOpTimestamps = ref(new Map());
     $.editLxcForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null });
     $.lxcPasswordForm = ref({ password: '', confirm: '' });
+    $.lxcPwdShowPwd = ref(false);
     $.lxcPasswordError = ref('');
     $.lxcPasswordResetCtId = ref(null);
     $.lxcPasswordResetCtName = ref('');
@@ -241,6 +242,7 @@
         $.lxcPasswordResetCtId.value = ct.ct_id;
         $.lxcPasswordResetCtName.value = ct.name || 'CT ' + ct.ct_id;
         $.lxcPasswordForm.value = { password: '', confirm: '' };
+        $.lxcPwdShowPwd.value = false;
         $.lxcPasswordError.value = '';
         $.bsModalShow('lxcPasswordResetModal');
     };
