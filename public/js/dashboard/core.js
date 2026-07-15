@@ -475,7 +475,8 @@
         var vm = $.vmPwdResource.value;
         if (!vm) { $.vmPwdError.value = '请选择虚拟机'; return; }
         var pwd = $.vmPwdNewPassword.value;
-        if (!pwd || pwd.length < 6) { alert('密码长度至少 6 位'); return; }
+        var pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+        if (!pwd || !pwdRegex.test(pwd)) { alert('密码至少8位，需包含大小写英文、数字和特殊字符'); return; }
         try {
             await api('/vm/' + vm.vm_id + '/reset-password', { method: 'POST', body: JSON.stringify({ password: pwd }) });
             $.vmPwdShow.value = false;

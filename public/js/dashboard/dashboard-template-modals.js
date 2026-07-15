@@ -711,14 +711,14 @@
                     <p v-if="vmPwdResource">账号：{{ vmPwdCiuser }}</p>
                     <div class="mb-3">
                         <label class="form-label">新密码</label>
-                        <input type="password" class="form-control" v-model="vmPwdNewPassword" placeholder="至少6位">
+                        <input type="password" class="form-control" v-model="vmPwdNewPassword" placeholder="至少8位，需包含英文+数字+符号">
                     </div>
                     <div v-if="vmPwdError" class="alert alert-danger py-2">{{ vmPwdError }}</div>
                 </div>
             </div>
             <div class="modal-footer" v-if="vmPwdCiuser !== false">
                 <pv-button type="button" @click="vmPwdShow = false" variant="secondary">取消</pv-button>
-                <pv-button type="button" @click="submitVmPasswordReset" :disabled="!vmPwdNewPassword || vmPwdNewPassword.length < 6" variant="primary">确认重置</pv-button>
+                <pv-button type="button" @click="submitVmPasswordReset" :disabled="!vmPwdNewPassword || vmPwdNewPassword.length < 8" variant="primary">确认重置</pv-button>
             </div>
             <div class="modal-footer" v-if="vmPwdCiuser === false">
                 <pv-button type="button" @click="vmPwdShow = false" variant="secondary">关闭</pv-button>

@@ -778,8 +778,9 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '无效的容器 ID' });
         }
 
-        if (!password || password.length < 8) {
-            return res.status(400).json({ error: '密码长度至少 8 位' });
+        var passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+        if (!password || !passwordRegex.test(password)) {
+            return res.status(400).json({ error: '密码至少8位，需包含大小写英文、数字和特殊字符' });
         }
  
         const allCts = await db.lxcContainers.getAll();

@@ -638,6 +638,39 @@
         }
     };
 
+    // ==================== VM 重置密码 ====================
+    $.adminVmPwdVm = ref(null);
+    $.adminVmPwdCiuser = ref('');
+    $.adminVmPwdNewPassword = ref('');
+    $.adminVmPwdError = ref('');
+
+    $.openAdminVmPasswordReset = async function(vm) {
+        $.adminVmPwdVm.value = vm;
+        $.adminVmPwdNewPassword.value = '';
+        $.adminVmPwdError.value = '';
+        $.adminVmPwdCiuser.value = vm.config?.ciuser || false;
+        $.bsModalShow('resetAdminVmPasswordModal');
+    };
+
+    $.submitAdminVmPasswordReset = async function() {
+        $.adminVmPwdError.value = '';
+        var vm = $.adminVmPwdVm.value;
+        if (!vm) { $.adminVmPwdError.value = '请选择虚拟机'; return; }
+        var pwd = $.adminVmPwdNewPassword.value;
+        var pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+        if (!pwd || !pwdRegex.test(pwd)) { alert('密码至少8位，需包含大小写英文、数字和特殊字符'); return; }
+        try {
+            await api('/vm/' + vm.vm_id + '/reset-password', {
+                method: 'POST',
+                body: JSON.stringify({ password: pwd })
+            });
+            $.bsModalHide('resetAdminVmPasswordModal');
+            alert('密码重置成功');
+        } catch (e) {
+            $.adminVmPwdError.value = e.message;
+        }
+    };
+
     $.initVm = function() {
         watch(function() { return $.activeTabVm.value; }, function(val) {
             if (val === 'network') $.loadForwardRules('vm');

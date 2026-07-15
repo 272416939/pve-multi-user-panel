@@ -60,6 +60,7 @@
                                             <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                             <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
                                             <li><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
+                                            <li><a href="#" @click.prevent="openAdminVmPasswordReset(vm)">重置密码</a></li>
                                         </ul>
                                     </div>
                                 </div>
@@ -130,6 +131,7 @@
                                                             <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                                             <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
                                                             <li><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
+                                                            <li><a href="#" @click.prevent="openAdminVmPasswordReset(vm)">重置密码</a></li>
                                                         </ul>
                                                     </div>
                                                 </div>

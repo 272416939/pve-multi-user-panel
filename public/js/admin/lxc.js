@@ -268,6 +268,10 @@
         var f = $.lxcPasswordForm.value;
         if (!f.password) return alert('请输入新密码');
         if (f.password !== f.confirmPassword) return alert('两次输入的密码不一致');
+        var pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+        if (!pwdRegex.test(f.password)) {
+            return alert('密码至少8位，需包含大小写英文、数字和特殊字符');
+        }
         var ct = $.selectedLxc.value;
         if (!ct) return;
         try {

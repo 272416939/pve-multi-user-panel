@@ -692,6 +692,39 @@
                 </div>
                 </Teleport>
 
+                <!-- VM 重置密码弹窗 -->
+                <Teleport to="body">
+                <div class="modal fade" id="resetAdminVmPasswordModal" tabindex="-1">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">重置密码 - VM {{ adminVmPwdVm?.vm_id }}</h5>
+                                <pv-button type="button" data-bs-dismiss="modal"></pv-button>
+                            </div>
+                            <div class="modal-body">
+                                <div v-if="adminVmPwdCiuser === false" class="alert alert-danger py-2 mb-0">当前虚拟机未配置Cloud-init驱动，请联系管理员！</div>
+                                <div v-else>
+                                    <p v-if="adminVmPwdVm">资源：{{ adminVmPwdVm.name || ('VM ' + adminVmPwdVm.vm_id) }}</p>
+                                    <p v-if="adminVmPwdVm">账号：{{ adminVmPwdCiuser }}</p>
+                                    <div class="mb-3">
+                                        <label class="form-label">新密码</label>
+                                        <input type="password" class="form-control" v-model="adminVmPwdNewPassword" placeholder="至少8位，需包含英文+数字+符号">
+                                    </div>
+                                    <div v-if="adminVmPwdError" class="alert alert-danger py-2">{{ adminVmPwdError }}</div>
+                                </div>
+                            </div>
+                            <div class="modal-footer" v-if="adminVmPwdCiuser !== false">
+                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+                                <pv-button type="button" @click="submitAdminVmPasswordReset" :disabled="!adminVmPwdNewPassword || adminVmPwdNewPassword.length < 8" variant="primary">确认重置</pv-button>
+                            </div>
+                            <div class="modal-footer" v-if="adminVmPwdCiuser === false">
+                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">关闭</pv-button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </Teleport>
+
                 <!-- 重置 VM IP 弹窗 -->
                 <Teleport to="body">
                 <div class="modal fade" id="resetVmIpModal" tabindex="-1">
