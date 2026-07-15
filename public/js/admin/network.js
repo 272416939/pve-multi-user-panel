@@ -32,6 +32,7 @@
     $.maxForwardPerUser = ref(10);
     $.checkResult = ref(null);
     $.forwardFilterType = ref('all');
+    $.forwardSearchText = ref('');
 
     // 设备端口转发弹窗
     $.deviceModal = reactive({ device: { deviceId: null, type: 'vm', name: '', ip: '' } });
@@ -196,24 +197,39 @@
     // 端口转发
     $.loadForwardRules = async function(type) {
         $.forwardRulesLoading.value = true;
-        // 不再强制重置页码：编辑/删除后应保持当前页（避免跳转第一页）
         try {
-            if (type === 'all') {
-                var rules = await api('/port-forwards');
-                $.forwardRules.value = rules || [];
-            } else {
-                var rules = await api('/port-forwards?type=' + type);
-                $.forwardRules.value = rules || [];
-            }
+            var search = ($.forwardSearchText.value || '').trim();
+            var url = '/port-forwards';
+            if (type && type !== 'all') url += '?type=' + type;
+            if (search) url += (url.indexOf('?') > -1 ? '&' : '?') + 'search=' + encodeURIComponent(search);
+            var rules = await api(url);
+            $.forwardRules.value = rules || [];
             // 获取当前用户数量
             var userRules = await api('/port-forwards');
             $.userForwardCount.value = (userRules || []).length;
-            // 页码修正：如果当前页超过新的总页数，回到最后一页（避免删除后停留在空页）
+            // 页码修正
             var total = $.forwardRules.value.length;
             var totalPages = Math.ceil(total / $.forwardPageSize);
             if ($.forwardPage.value > totalPages) $.forwardPage.value = Math.max(1, totalPages);
         } catch (e) { console.error('加载转发规则失败:', e); }
         finally { $.forwardRulesLoading.value = false; }
+    };
+
+    $.onForwardTypeChange = function() {
+        var type = $.forwardForm.type;
+        $.forwardForm.vm_id = null;
+        $.forwardForm.ct_id = null;
+        $.forwardForm.ip = '';
+        $.checkResult.value = null;
+        if (type !== 'general') {
+            try {
+                api('/port-forwards/extract-ips').then(function(devices) {
+                    $.availableDevices.value = (devices || []).filter(function(d) { return d.type === type; });
+                }).catch(function(e) { console.error('加载设备列表失败:', e); });
+            } catch (e) { console.error('加载设备列表失败:', e); }
+        } else {
+            $.availableDevices.value = [];
+        }
     };
 
     $.openAddForward = async function(type) {

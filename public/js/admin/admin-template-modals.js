@@ -1357,9 +1357,9 @@
                                 <div class="mb-3" v-if="userRole === 'admin'">
                                     <label class="form-label">类型</label>
                                     <div>
-                                        <label class="me-3"><input type="radio" v-model="forwardForm.type" value="vm"> VM</label>
-                                        <label class="me-3"><input type="radio" v-model="forwardForm.type" value="lxc"> LXC</label>
-                                        <label class="me-3"><input type="radio" v-model="forwardForm.type" value="general"> 通用</label>
+                                        <label class="me-3"><input type="radio" v-model="forwardForm.type" value="vm" @change="onForwardTypeChange"> VM</label>
+                                        <label class="me-3"><input type="radio" v-model="forwardForm.type" value="lxc" @change="onForwardTypeChange"> LXC</label>
+                                        <label class="me-3"><input type="radio" v-model="forwardForm.type" value="general" @change="onForwardTypeChange"> 通用</label>
                                     </div>
                                 </div>
                                 <div class="mb-3" v-if="forwardForm.type !== 'general'">
@@ -1382,7 +1382,7 @@
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">目标 IP</label>
-                                    <input type="text" class="form-control" v-model="forwardForm.ip" placeholder="选中设备自动填入或手动输入">
+                                    <input type="text" class="form-control" v-model="forwardForm.ip" :disabled="forwardForm.type !== 'general'" :placeholder="forwardForm.type === 'general' ? '请输入目标 IP' : '选择设备后自动填入'">
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">规则名称</label>

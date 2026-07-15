@@ -188,7 +188,7 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
 
 router.get('/port-forwards', authMiddleware, async (req, res) => {
     try {
-        const { type, vm_id, ct_id } = req.query;
+        const { type, vm_id, ct_id, search } = req.query;
         let rules;
         if (req.user.role === 'admin') {
             if (type) rules = await db.portForwards.getByType(type);
@@ -196,6 +196,15 @@ router.get('/port-forwards', authMiddleware, async (req, res) => {
         } else {
             rules = await db.portForwards.getByUserId(req.user.id);
             if (type) rules = rules.filter(r => r.type === type);
+        }
+        // 搜索过滤：按 IP 或端口匹配
+        if (search && search.trim()) {
+            var s = search.trim().toLowerCase();
+            rules = rules.filter(function(r) {
+                return (r.ip && r.ip.toLowerCase().indexOf(s) > -1) ||
+                       String(r.internal_port || '').indexOf(s) > -1 ||
+                       String(r.external_port || '').indexOf(s) > -1;
+            });
         }
         res.json(rules);
     } catch (e) {

@@ -149,18 +149,19 @@ app.config.errorHandler = function(err, instance, info) {
 app.component('port-forward-list', {
     template: '\
         <div>\
-            <div class="d-flex justify-content-between align-items-center mb-3">\
-                <h4 class="mb-0">端口转发管理</h4>\
-                <div class="d-flex align-items-center gap-2">\
-                    <select class="form-select form-select-sm" style="width:auto" v-model="forwardFilterType" @change="filterForward">\
-                        <option value="all">全部</option>\
-                        <option value="vm">VM</option>\
-                        <option value="lxc">LXC</option>\
-                        <option value="general">通用</option>\
-                    </select>\
-                    <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">添加端口转发</pv-button>\
-                    <pv-button variant="danger" size="sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</pv-button>\
-                </div>\
+<div class="d-flex justify-content-between align-items-center mb-3">\
+	                <h4 class="mb-0">端口转发管理</h4>\
+	                <div class="d-flex align-items-center gap-2">\
+	                    <select class="form-select form-select-sm" style="width:auto" v-model="forwardFilterType" @change="filterForward">\
+	                        <option value="all">全部</option>\
+	                        <option value="vm">VM</option>\
+	                        <option value="lxc">LXC</option>\
+	                        <option value="general">通用</option>\
+	                    </select>\
+	                    <input type="text" class="form-control form-control-sm" style="width:200px" v-model="forwardSearchText" placeholder="搜索 IP 或端口..." @input="onForwardSearch">\
+	                    <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">添加端口转发</pv-button>\
+	                    <pv-button variant="danger" size="sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</pv-button>\
+	                </div>\
             </div>\
             <div v-if="forwardRulesLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>\
             <div v-else-if="forwardRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>\
@@ -245,6 +246,10 @@ app.component('port-forward-list', {
         forwardFilterType: {
             get() { return $.forwardFilterType ? $.forwardFilterType.value : 'all'; },
             set(val) { if ($.forwardFilterType) $.forwardFilterType.value = val; }
+        },
+        forwardSearchText: {
+            get() { return $.forwardSearchText ? $.forwardSearchText.value : ''; },
+            set(val) { if ($.forwardSearchText) $.forwardSearchText.value = val; }
         }
     },
     methods: {
@@ -255,6 +260,10 @@ app.component('port-forward-list', {
         batchDelete() { $.batchDeleteForwards(); },
         toggleAll(e) { $.toggleSelectAllForwards(e); },
         filterForward() {
+            var t = $.forwardFilterType ? $.forwardFilterType.value : 'all';
+            $.loadForwardRules(t);
+        },
+        onForwardSearch() {
             var t = $.forwardFilterType ? $.forwardFilterType.value : 'all';
             $.loadForwardRules(t);
         },
