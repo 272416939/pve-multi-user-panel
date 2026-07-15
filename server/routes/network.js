@@ -197,13 +197,14 @@ router.get('/port-forwards', authMiddleware, async (req, res) => {
             rules = await db.portForwards.getByUserId(req.user.id);
             if (type) rules = rules.filter(r => r.type === type);
         }
-        // 搜索过滤：按 IP 或端口匹配
+        // 搜索过滤：按 IP、内网端口、外网端口、名称匹配
         if (search && search.trim()) {
             var s = search.trim().toLowerCase();
             rules = rules.filter(function(r) {
                 return (r.ip && r.ip.toLowerCase().indexOf(s) > -1) ||
                        String(r.internal_port || '').indexOf(s) > -1 ||
-                       String(r.external_port || '').indexOf(s) > -1;
+                       String(r.external_port || '').indexOf(s) > -1 ||
+                       (r.name && r.name.toLowerCase().indexOf(s) > -1);
             });
         }
         res.json(rules);
