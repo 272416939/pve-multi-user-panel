@@ -12,6 +12,17 @@ const { loadSentRemindersFromDb, checkExpiredVms, checkExpiredLxc } = require('.
 const pkg = require('../../package.json');
 const { safeError } = require('../utils/safe-error');
 const { maskSecret, isMasked } = require('../utils/crypto-utils');
+const crypto = require('crypto');
+
+// 获取当前 HEAD commit hash（用于同版本号不同 commit 的判断）
+function getCurrentCommit(projectRoot) {
+    try {
+        return execSync('git rev-parse HEAD', { cwd: projectRoot, timeout: 5000, stdio: 'pipe' })
+            .toString().trim();
+    } catch (e) {
+        return null;
+    }
+}
 
 router.get('/admin/storage', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -254,10 +265,43 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
         const current = parseVer(pkg.version);
         const latest = parseVer(tag);
         const hasUpdate = compareVer(current, latest) === 1;
+
+        // 同版本号检测：版本相同但 commit 不同时也提示可更新
+        let sameVersionDifferentCommit = false;
+        if (!hasUpdate && pkg.version === tag) {
+            var projectRoot = path.join(__dirname, '..', '..');
+            var currentCommit = getCurrentCommit(projectRoot);
+            if (currentCommit && response.data.target_commitish) {
+                sameVersionDifferentCommit = currentCommit !== response.data.target_commitish;
+            } else if (currentCommit && response.data.tag_name) {
+                // 通过 tag 名称获取远程 commit
+                try {
+                    var remoteCommit = execSync('git rev-parse refs/tags/' + response.data.tag_name, {
+                        cwd: projectRoot, timeout: 5000, stdio: 'pipe'
+                    }).toString().trim();
+                    sameVersionDifferentCommit = currentCommit !== remoteCommit;
+                } catch (e) {
+                    // 本地可能没有该 tag，尝试 fetch
+                    try {
+                        execSync('git fetch origin tag ' + response.data.tag_name + ' --no-tags', {
+                            cwd: projectRoot, timeout: 15000, stdio: 'pipe'
+                        });
+                        var remoteCommit = execSync('git rev-parse refs/tags/' + response.data.tag_name, {
+                            cwd: projectRoot, timeout: 5000, stdio: 'pipe'
+                        }).toString().trim();
+                        sameVersionDifferentCommit = currentCommit !== remoteCommit;
+                    } catch (e2) {
+                        // 无法获取远程 commit，忽略
+                    }
+                }
+            }
+        }
+
         res.json({
             current_version: pkg.version,
             latest_version: tag,
-            has_update: hasUpdate,
+            has_update: hasUpdate || sameVersionDifferentCommit,
+            same_version_diff_commit: sameVersionDifferentCommit,
             source: source,
             fallback_note: fallbackNote || undefined,
             release: {
