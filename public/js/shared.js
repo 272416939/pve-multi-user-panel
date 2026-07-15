@@ -569,15 +569,31 @@ window.positionFixedDropdown = function(triggerEl, dropdownEl) {
     if (!triggerEl || !dropdownEl) return;
     var rect = triggerEl.getBoundingClientRect();
     var menuWidth = dropdownEl.offsetWidth || 160;
+    var menuHeight = dropdownEl.offsetHeight || 200;
     // 默认左对齐触发器，下拉菜单在按钮正下方
     var left = rect.left;
+    var top = rect.bottom + 4;
     // 如果超出屏幕右边，则右对齐触发器（向左展开）
     if (left + menuWidth > window.innerWidth - 8) {
         left = rect.right - menuWidth;
     }
     if (left < 8) left = 8; // 防止超出左边
+    // 如果超出屏幕底部，则向上展开（dropdown 显示在按钮上方）
+    if (top + menuHeight > window.innerHeight - 8) {
+        top = rect.top - menuHeight - 4;
+        // 如果向上展开也超出顶部，则回退到按钮下方并限制最大高度
+        if (top < 8) {
+            top = 8;
+            var maxH = window.innerHeight - top - 8;
+            dropdownEl.style.maxHeight = maxH + 'px';
+            dropdownEl.style.overflowY = 'auto';
+        }
+    } else {
+        dropdownEl.style.maxHeight = '';
+        dropdownEl.style.overflowY = '';
+    }
     dropdownEl.style.left = left + 'px';
-    dropdownEl.style.top = (rect.bottom + 4) + 'px';
+    dropdownEl.style.top = top + 'px';
     dropdownEl.style.minWidth = '160px';
 };
 
