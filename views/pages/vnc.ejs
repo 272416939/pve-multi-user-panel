@@ -37,8 +37,14 @@
         #screen {
             flex: 1; display: flex; align-items: center;
             justify-content: center; position: relative; min-height: 0;
+            overflow: hidden;
         }
-        #screen canvas { display: block; }
+        /* 确保 canvas 尺寸不受 CSS 继承影响，坐标映射依赖精确的 getBoundingClientRect */
+        #screen canvas {
+            display: block;
+            box-sizing: content-box;
+            touch-action: none;
+        }
         #connecting { color: #888; font-size: 14px; }
         .spinner {
             display: inline-block; width: 16px; height: 16px;
@@ -135,6 +141,12 @@
             statusText.innerHTML = '已连接';
             connectingEl.style.display = 'none';
             document.getElementById('disconnectBtn').textContent = '已连接';
+            // 连接成功后才设置 scaleViewport，确保 framebuffer 尺寸已知
+            // 避免在 viewport 为 0 时计算 scale 导致坐标映射错误
+            if (rfb) {
+                rfb.scaleViewport = scaled;
+                rfb.resizeSession = false;
+            }
         }
 
         function onDisconnected() {
@@ -152,8 +164,6 @@
                 });
                 rfb.addEventListener('connect', onConnected);
                 rfb.addEventListener('disconnect', onDisconnected);
-                rfb.scaleViewport = scaled;
-                rfb.resizeSession = false;
             } catch(e) {
                 var errorSpan = document.createElement('span');
                 errorSpan.id = 'error-msg';
@@ -171,6 +181,11 @@
 
         document.getElementById('ctrlAltDelBtn').addEventListener('click', function() {
             if (rfb) rfb.sendCtrlAltDel();
+        });
+
+        // Win 键按钮：发送 Win 键按下再释放
+        document.getElementById('winBtn').addEventListener('click', function() {
+            if (rfb) sendKeys([getKeyCode('L_Win')]);
         });
 
         function sendKeys(keys) {

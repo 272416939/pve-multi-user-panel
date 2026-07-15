@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.31.0] - 2026-07-15
+
+### Fixed
+- fix(vnc): 修复 VNC 控制台鼠标点击偏移问题
+  - `scaleViewport` 从 `connectVnc()` 移到 `onConnected()` 回调中设置
+  - 确保服务器 framebuffer 尺寸已知后再计算缩放比例，避免 viewport 为 0 时坐标映射错误
+  - CSS 修复：`#screen` 添加 `overflow: hidden` 防止滚动条干扰坐标计算
+  - Canvas 添加 `box-sizing: content-box` 和 `touch-action: none` 确保精确的 `getBoundingClientRect()`
+- fix(vnc): 添加 Win 键按钮事件处理（此前按钮无响应）
+
 ## [2.30.1] - 2026-07-12
 
 ### Fixed
