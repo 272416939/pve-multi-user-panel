@@ -777,9 +777,9 @@ router.post('/vm/:vmid/reset-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '无效的虚拟机 ID' });
         }
 
-        var passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+        var passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,13}$/;
         if (!password || !passwordRegex.test(password)) {
-            return res.status(400).json({ error: '密码至少8位，需包含大小写英文、数字和特殊字符' });
+            return res.status(400).json({ error: '密码需8-13位，包含大小写英文、数字和特殊字符' });
         }
 
         const allVms = await db.vms.getAll();

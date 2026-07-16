@@ -252,9 +252,9 @@
             alert('两次输入的密码不一致');
             return;
         }
-        var pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,}$/;
+        var pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,13}$/;
         if (!$.lxcPasswordForm.value.password || !pwdRegex.test($.lxcPasswordForm.value.password)) {
-            alert('密码至少8位，需包含大小写英文、数字和特殊字符');
+            alert('密码需8-13位，包含大小写英文、数字和特殊字符');
             return;
         }
         $.lxcPasswordError.value = '';
