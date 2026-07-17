@@ -243,7 +243,7 @@
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">订单号</label>
-                                        <input type="text" class="form-control form-control-sm" v-model="txFilter.order_no" placeholder="精确搜索" @keyup.enter="loadTx(1)">
+                                        <input type="text" class="form-control form-control-sm" v-model="txFilter.order_no" placeholder="精确搜索" autocomplete="off" @keyup.enter="loadTx(1)">
                                     </div>
                                     <div class="col-md-2">
                                         <pv-button variant="primary" size="sm" @click="loadTx(1)">查询</pv-button>
@@ -292,7 +292,7 @@
                                 <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">订单号</label>
-                                        <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号" @keyup.enter="loadMyOrders(1)">
+                                        <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号" autocomplete="off" @keyup.enter="loadMyOrders(1)">
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">类型</label>

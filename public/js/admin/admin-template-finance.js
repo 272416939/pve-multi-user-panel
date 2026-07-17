@@ -43,7 +43,7 @@
                             </div>
                             <div class="col-md-2">
                                 <label class="form-label small mb-1">订单号搜索</label>
-                                <input type="text" class="form-control form-control-sm" v-model="financeFilter.order_no" placeholder="精确搜索" @keyup.enter="loadTransactions(1)">
+                                <input type="text" class="form-control form-control-sm" v-model="financeFilter.order_no" placeholder="精确搜索" autocomplete="off" @keyup.enter="loadTransactions(1)">
                             </div>
                             <div class="col-md-2 d-flex gap-2 align-items-center">
                                 <pv-button @click="loadTransactions(1)" size="sm">查询</pv-button>
@@ -103,7 +103,7 @@
                                 <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">订单号</label>
-                                        <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号">
+                                        <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号" autocomplete="off">
                                     </div>
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">类型</label>
