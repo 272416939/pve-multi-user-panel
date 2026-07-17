@@ -2331,6 +2331,8 @@ module.exports = {
         updateExpire: (id, expireTime) => execute('UPDATE disks SET expire_time = ?, updated_at = ? WHERE id = ?', [expireTime, mysqlNow(), parseInt(id)]),
         updateCapacity: (id, capacityGb) => execute('UPDATE disks SET capacity_gb = ?, updated_at = ? WHERE id = ?', [parseInt(capacityGb), mysqlNow(), parseInt(id)]),
         markDestroyed: (id) => execute('UPDATE disks SET status = ?, updated_at = ? WHERE id = ?', ['destroyed', mysqlNow(), parseInt(id)]),
+        // 硬删除：仅允许删除已销毁状态的磁盘记录（清理已销毁的磁盘记录用）
+        hardDelete: (id) => execute('DELETE FROM disks WHERE id = ? AND status = ?', [parseInt(id), 'destroyed']),
         getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)")
     },
 

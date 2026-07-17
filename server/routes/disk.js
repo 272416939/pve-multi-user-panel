@@ -387,8 +387,8 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       return res.status(400).json({ error: '请先卸载磁盘再销毁' });
     }
     if (disk.status === 'destroyed') {
-      // 已销毁的记录直接删除
-      await db.disks.markDestroyed(disk.id);
+      // 已销毁的记录：硬删除清理（PVE 卷早已释放）
+      await db.disks.hardDelete(disk.id);
       return res.json({ success: true });
     }
 
