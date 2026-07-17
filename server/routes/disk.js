@@ -380,13 +380,45 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
 
   try {
     var disk = req.disk;
+    var user = await db.users.getById(req.user.id);
 
     // 已绑定的磁盘必须先卸载
     if (disk.status === 'bound') {
       return res.status(400).json({ error: '请先卸载磁盘再销毁' });
     }
     if (disk.status === 'destroyed') {
-      return res.status(400).json({ error: '磁盘已销毁' });
+      // 已销毁的记录直接删除
+      await db.disks.markDestroyed(disk.id);
+      return res.json({ success: true });
+    }
+
+    var refundAmount = 0;
+    var refundDesc = '';
+
+    // 销毁前计算退款（剩余时间 > 7 天则按剩余天数比例退款）
+    if (disk.expire_time && disk.status !== 'expired' && disk.status !== 'grace') {
+      var expireDate = new Date(disk.expire_time);
+      var now = new Date();
+      var diffMs = expireDate - now;
+      var diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      if (diffDays > 7) {
+        // 按剩余天数/总购买天数 * 购买金额 计算退款
+        var createDate = disk.create_time ? new Date(disk.create_time) : null;
+        if (createDate) {
+          var totalMs = expireDate - createDate;
+          var factor = diffMs / totalMs;
+          var originalPrice = parseFloat(disk.price_per_gb) * parseInt(disk.capacity_gb);
+          if (originalPrice > 0) {
+            refundAmount = parseFloat((originalPrice * factor).toFixed(2));
+            // 有对应的 spec，按季/年折扣计算
+            if (disk.quarterly_discount || disk.yearly_discount) {
+              var discount = disk.yearly_discount || disk.quarterly_discount || 0;
+              refundAmount = parseFloat((refundAmount * (1 - discount / 100)).toFixed(2));
+            }
+          }
+        }
+        refundDesc = '销毁退款（剩余 ' + diffDays + ' 天）';
+      }
     }
 
     // 文档 7.8：竞争条件防护 - SELECT ... FOR UPDATE 行锁
@@ -400,15 +432,28 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       // 执行 PVE 销毁
       await diskUtils.destroyDisk(lockedDisk.volume_id);
 
-      // 条件更新（防止并发）
+      // 如果有退款，执行退款
+      if (refundAmount > 0) {
+        await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [refundAmount, req.user.id]);
+        var refundOrderNo = generateOrderNo('refund');
+        var balanceBefore = parseFloat(user.balance || '0');
+        var balanceAfter = balanceBefore + refundAmount;
+        await conn.execute(
+          'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [req.user.id, refundOrderNo, db.now(), 'balance_refund', 'refund', refundAmount, null, null, balanceBefore, balanceAfter, 'disk', disk.id, '', '', db.now()]
+        );
+      }
+
+      // 条件更新
       await conn.execute(
         'UPDATE disks SET status = ?, updated_at = NOW() WHERE id = ? AND status != ?',
         ['destroyed', disk.id, 'destroyed']
       );
     });
 
-    res.json({ success: true });
+    res.json({ success: true, refund: refundAmount > 0, refund_amount: refundAmount });
   } catch (e) {
+    console.error('[disk destroy] 失败:', e);
     res.status(500).json({ error: safeError(e) });
   }
 });
