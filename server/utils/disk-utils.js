@@ -158,23 +158,43 @@ async function unbindDisk(vmid, bus, dev) {
   await runSshCommand(cmd);
 }
 
-// 扩容磁盘 - qm resize <vmid> <volume> <size>
-// 已挂载磁盘使用其 bind_vmid，游离磁盘使用中转 VM（disk:temp_vmid，默认 9999）
-async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid) {
+// 扩容磁盘 - qm resize <vmid> <bus+dev> <size>
+// 已挂载磁盘：使用 bind_vmid + bind_bus + bind_dev（如 scsi0）
+// 游离磁盘：先挂载到中转 VM，扩容后再卸载
+async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid, bindBus, bindDev) {
   var safeVol = validateVolumeId(volumeId);
   var safeSize = validateParam('sizeGb', newSizeGb);
-  // 优先使用磁盘绑定的 vmid（已挂载场景），否则使用中转 VM（游离场景）
-  var safeVmid;
-  if (bindVmid && Number.isInteger(parseInt(bindVmid)) && parseInt(bindVmid) >= 100) {
-    safeVmid = parseInt(bindVmid);
+
+  if (bindVmid && Number.isInteger(parseInt(bindVmid)) && parseInt(bindVmid) >= 100 && bindBus && bindDev) {
+    // 已挂载磁盘：直接用绑定的 vmid + 总线设备名（如 scsi0）
+    var safeVmid = parseInt(bindVmid);
+    var safeBus = validateParam('bus', bindBus);
+    var safeDev = validateParam('dev', bindDev);
+    var cmd = 'qm resize ' + safeVmid + ' ' + safeBus + safeDev + ' ' + safeSize + 'G';
+    await runSshCommand(cmd);
   } else {
-    safeVmid = parseInt(tempVmid) || 9999;
-    if (!Number.isInteger(safeVmid) || safeVmid < 100 || safeVmid > 999999999) {
-      safeVmid = 9999;
+    // 游离磁盘：挂载到中转 VM -> 扩容 -> 卸载
+    var transitVmid = parseInt(tempVmid) || 9999;
+    if (!Number.isInteger(transitVmid) || transitVmid < 100 || transitVmid > 999999999) {
+      transitVmid = 9999;
+    }
+    // 挂载到中转 VM（scsi30 避免冲突）
+    var attachCmd = 'qm set ' + transitVmid + ' --scsi30 ' + safeVol;
+    await runSshCommand(attachCmd);
+    try {
+      // 执行扩容
+      var resizeCmd = 'qm resize ' + transitVmid + ' scsi30 ' + safeSize + 'G';
+      await runSshCommand(resizeCmd);
+    } finally {
+      // 无论成功失败都卸载
+      try {
+        var detachCmd = 'qm set ' + transitVmid + ' --delete scsi30';
+        await runSshCommand(detachCmd);
+      } catch (e) {
+        console.error('[disk-utils] 卸载中转磁盘失败:', e.message);
+      }
     }
   }
-  var cmd = 'qm resize ' + safeVmid + ' ' + safeVol + ' ' + safeSize + 'G';
-  await runSshCommand(cmd);
 }
 
 // 销毁磁盘 - pvesm free <vol>

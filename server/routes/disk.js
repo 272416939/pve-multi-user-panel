@@ -428,7 +428,7 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
         var cfgVal = await db.config.get('disk:temp_vmid');
         if (cfgVal) tempVmid = cfgVal;
       } catch (e) {}
-      await diskUtils.resizeDisk(disk.volume_id, newSize, tempVmid, disk.bind_vmid);
+      await diskUtils.resizeDisk(disk.volume_id, newSize, tempVmid, disk.bind_vmid, disk.bind_bus, disk.bind_dev);
     } catch (pveErr) {
       // PVE 扩容失败：回滚退款 + 恢复容量 + 退款流水
       console.error('[disk resize] PVE 扩容失败，回滚:', pveErr.message);
