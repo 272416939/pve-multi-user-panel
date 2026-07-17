@@ -337,10 +337,40 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
 
 async function importExistingDisks() {
   try {
+    // ===== 第一步：清理 PVE 中已不存在的孤立磁盘记录 =====
+    var allDisks = await db.disks.getAll();
+    var cleanedCount = 0;
+    for (var d = 0; d < allDisks.length; d++) {
+      var disk = allDisks[d];
+      if (disk.status === 'destroyed') continue; // 已销毁的跳过
+      
+      try {
+        var sshConfig = await getPveSshConfig();
+        if (!sshConfig.host || !sshConfig.password) continue;
+        
+        // 检查卷是否存在：pvesm status 返回包含该 volume_id 的行
+        var cmd = 'pvesm status 2>/dev/null | grep -q "' + disk.volume_id + '"';
+        var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
+        if (result.code !== 0) {
+          // PVE 卷不存在，删除孤立记录
+          await db.disks.hardDelete(disk.id);
+          cleanedCount++;
+          console.log('[disk-import] 清理孤立磁盘记录:', disk.volume_id);
+        }
+      } catch (e) {
+        // 检查失败，跳过该记录
+        console.error('[disk-import] 检查磁盘 ' + disk.volume_id + ' 失败:', e.message);
+      }
+    }
+    if (cleanedCount > 0) {
+      console.log('[disk-import] 清理了 ' + cleanedCount + ' 个孤立磁盘记录');
+    }
+
+    // ===== 第二步：正常导入流程 =====
     var allVms = await db.vms.getAll();
     if (!allVms || allVms.length === 0) {
       console.log('[disk-import] 无虚拟机，跳过导入');
-      return { total_vms: 0, imported: 0, skipped: 0, unmatched: 0 };
+      return { total_vms: 0, imported: 0, skipped: 0, unmatched: 0, cleaned: cleanedCount };
     }
 
     var totalImported = 0;
@@ -476,7 +506,8 @@ async function importExistingDisks() {
       imported: totalImported,
       skipped: totalSkipped,
       unmatched: totalUnmatched,
-      unmatched_list: unmatchedList
+      unmatched_list: unmatchedList,
+      cleaned: cleanedCount
     };
     console.log('[disk-import] 导入完成:', JSON.stringify(report));
     return report;

@@ -369,13 +369,18 @@
   };
 
   $.diskPage.importExistingDisks = async function() {
-    var ok = await customConfirm('确定导入存量磁盘？\n此操作会扫描 PVE 并导入未在台账中的磁盘。');
+    var ok = await customConfirm('确定导入存量磁盘？\n此操作会扫描 PVE，清理孤立记录并导入未在台账中的磁盘。');
     if (!ok) return;
     try {
       var res = await authFetch('/api/disk-import', { method: 'POST' });
       var data = await res.json();
       if (!res.ok) return alert(data.error || '导入失败');
-      alert('导入完成：' + (data.report || '成功'));
+      var msg = '导入完成';
+      if (data.cleaned > 0) msg += '\n清理孤立记录: ' + data.cleaned + ' 个';
+      if (data.imported > 0) msg += '\n新导入: ' + data.imported + ' 个';
+      if (data.skipped > 0) msg += '\n跳过已存在: ' + data.skipped + ' 个';
+      if (data.unmatched > 0) msg += '\n未匹配规格: ' + data.unmatched + ' 个';
+      alert(msg);
       await $.diskPage.loadAllDisks();
     } catch (e) {
       alert('导入失败: ' + e.message);
