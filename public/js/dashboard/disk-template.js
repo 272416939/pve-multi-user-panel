@@ -58,8 +58,8 @@
             <td class="text-center">{{ disk.capacity_gb }} GiB</td>
             <td class="text-center"><span :class="getDiskStatusClass(disk.status)">{{ getDiskStatusText(disk.status) }}</span></td>
             <td class="text-center">{{ disk.bind_vmid ? 'VM-' + disk.bind_vmid : '-' }}</td>
-            <td class="text-center" :class="getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? formatDate(disk.expire_time) : '-') }}</td>
-            <td class="text-center" :class="getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? daysUntilExpire(disk.expire_time) : '-') }}</td>
+            <td class="text-center" :class="disk.status === 'destroyed' ? '' : getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? formatDate(disk.expire_time) : '-') }}</td>
+            <td class="text-center" :class="disk.status === 'destroyed' ? '' : getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? daysUntilExpire(disk.expire_time) : '-') }}</td>
             <td class="text-center">
               <div v-if="disk.status !== 'destroyed'" class="disk-auto-renew-switch">
                 <input class="form-check-input" type="checkbox" role="switch" :checked="disk.auto_renew === 1" @change="toggleDiskAutoRenew(disk, $event.target.checked)">
