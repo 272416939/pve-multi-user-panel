@@ -292,9 +292,10 @@
         background: var(--glass-surface);
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
         border: 1px solid var(--border-color); border-radius: 12px;
-        overflow: visible; box-shadow: var(--shadow-md);
+        overflow: hidden; box-shadow: var(--shadow-md);
+        position: relative;
     }
-    .table-scroll { overflow: visible; pointer-events: auto; }
+    .table-scroll { overflow-x: auto; pointer-events: auto; }
     .vm-table-wrap { margin-top: 0; }
 
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
@@ -410,7 +411,7 @@
         box-shadow: 0 8px 24px rgba(0,0,0,0.4); list-style: none;
     }
     .dropdown-table.open .dropdown-menu-table { display: block; }
-    .table-scroll { overflow: visible !important; }
+    .table-scroll { overflow-x: auto !important; }
     .table-scroll table { overflow: visible; }
     .table-scroll tbody { overflow: visible; }
     .table-scroll tr { overflow: visible; }
