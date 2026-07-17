@@ -497,6 +497,11 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
       // 原子扣款
       await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [amount, req.user.id]);
       var balanceAfter = balanceBefore - amount;
+      // 创建续费订单
+      await conn.execute(
+        'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        [orderNo, req.user.id, 'disk', disk.spec_id || 0, 0, period, periodCount, amount, 0, 0, disk.capacity_gb, '续费磁盘 ' + (disk.disk_name || disk.volume_id), disk.id, 'completed']
+      );
       // 流水
       await conn.execute(
         'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',

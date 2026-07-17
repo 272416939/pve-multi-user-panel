@@ -718,7 +718,7 @@ router.get('/orders', authMiddleware, async (req, res) => {
             var order_no = (req.query.order_no || '').trim();
             if (order_no.length > 50) return res.status(400).json({ error: '订单号过长' });
             if (order_no) params.order_no = order_no;
-            if (req.query.type && ['vm', 'lxc'].includes(req.query.type)) params.type = req.query.type;
+            if (req.query.type && ['vm', 'lxc', 'disk'].includes(req.query.type)) params.type = req.query.type;
             if (req.query.status && ['completed', 'pending'].includes(req.query.status)) params.status = req.query.status;
             var result = await db.orders.getByUser(req.user.id, params);
             result.rows = await Promise.all((result.rows || result.data || []).map(async function(order) {
@@ -729,6 +729,8 @@ router.get('/orders', authMiddleware, async (req, res) => {
                 } else if (order.type === 'lxc') {
                     var pkg = await db.lxcPackages.getById(order.package_id);
                     packageName = pkg ? pkg.name : '';
+                } else if (order.type === 'disk') {
+                    packageName = order.resource_name || '数据盘';
                 }
                 return Object.assign({}, order, { package_name: packageName });
             }));
@@ -744,6 +746,8 @@ router.get('/orders', authMiddleware, async (req, res) => {
             } else if (order.type === 'lxc') {
                 var pkg = await db.lxcPackages.getById(order.package_id);
                 packageName = pkg ? pkg.name : '';
+            } else if (order.type === 'disk') {
+                packageName = order.resource_name || '数据盘';
             }
             return Object.assign({}, order, { package_name: packageName });
         }));

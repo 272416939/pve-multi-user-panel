@@ -13,12 +13,12 @@
   </div>
 
   <!-- 顶栏功能按钮 -->
-  <div class="mb-3">
-    <button class="btn btn-primary btn-sm me-2" @click="openCreateDiskModal">新建</button>
-    <button class="btn btn-outline-secondary btn-sm me-2" @click="openBindModal" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'free')">挂载</button>
-    <button class="btn btn-outline-secondary btn-sm me-2" @click="unbindDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'bound')">卸载</button>
-    <button class="btn btn-outline-danger btn-sm me-2" @click="destroyDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status === 'bound')">销毁</button>
-    <button class="btn btn-outline-primary btn-sm" @click="resizeDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1">扩容</button>
+  <div class="mb-3 d-flex gap-2 flex-wrap">
+    <pv-button variant="glass" size="sm" @click="openCreateDiskModal">新建</pv-button>
+    <pv-button variant="outline" size="sm" @click="openBindModal" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'free')">挂载</pv-button>
+    <pv-button variant="outline" size="sm" @click="unbindDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'bound')">卸载</pv-button>
+    <pv-button variant="outline-danger" size="sm" @click="destroyDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status === 'bound')">销毁</pv-button>
+    <pv-button variant="outline-warning" size="sm" @click="resizeDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1">扩容</pv-button>
   </div>
 
   <!-- 加载中 -->
