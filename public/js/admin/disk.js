@@ -261,7 +261,7 @@
   $.diskPage.lifecycleForm = ref({
     warn_days: 7, warn_frequency: 'daily', grace_days: 3,
     grace_frequency: 'twice_daily', shutdown_timeout: 300,
-    retention_days: 15, check_time: '02:00', auto_renew_days: 1
+    retention_days: 15, auto_renew_days: 1
   });
 
   $.diskPage.loadLifecycleConfig = async function() {
@@ -277,7 +277,6 @@
         grace_frequency: data.grace_frequency || 'twice_daily',
         shutdown_timeout: data.shutdown_timeout || 300,
         retention_days: data.retention_days || 15,
-        check_time: data.check_time || '02:00',
         auto_renew_days: data.auto_renew_days || 1
       };
     } catch (e) {
@@ -314,7 +313,7 @@
     $.diskPage.lifecycleForm.value = {
       warn_days: 7, warn_frequency: 'daily', grace_days: 3,
       grace_frequency: 'twice_daily', shutdown_timeout: 300,
-      retention_days: 15, check_time: '02:00', auto_renew_days: 1
+      retention_days: 15, auto_renew_days: 1
     };
   };
 

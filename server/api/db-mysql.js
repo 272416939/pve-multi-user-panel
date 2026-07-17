@@ -585,7 +585,6 @@ async function initDb() {
         grace_frequency VARCHAR(20) DEFAULT 'twice_daily',
         shutdown_timeout INT DEFAULT 300,
         retention_days INT DEFAULT 15,
-        check_time VARCHAR(5) DEFAULT '02:00',
         auto_renew_days INT DEFAULT 1,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
@@ -2340,7 +2339,7 @@ module.exports = {
         upsert: async (data) => {
             var existing = await queryOne('SELECT id FROM disk_lifecycle_config WHERE id = 1');
             if (existing) {
-                const allowedColumns = ['warn_days', 'warn_frequency', 'grace_days', 'grace_frequency', 'shutdown_timeout', 'retention_days', 'check_time', 'auto_renew_days'];
+                const allowedColumns = ['warn_days', 'warn_frequency', 'grace_days', 'grace_frequency', 'shutdown_timeout', 'retention_days', 'auto_renew_days'];
                 const fields = [];
                 const values = [];
                 for (const key of Object.keys(data)) {
@@ -2355,8 +2354,8 @@ module.exports = {
                 await execute(`UPDATE disk_lifecycle_config SET ${fields.join(', ')} WHERE id = 1`, values);
             } else {
                 await execute(
-                    'INSERT INTO disk_lifecycle_config (id, warn_days, warn_frequency, grace_days, grace_frequency, shutdown_timeout, retention_days, check_time, auto_renew_days) VALUES (1,?,?,?,?,?,?,?,?)',
-                    [parseInt(data.warn_days) || 7, data.warn_frequency || 'daily', parseInt(data.grace_days) || 3, data.grace_frequency || 'twice_daily', parseInt(data.shutdown_timeout) || 300, parseInt(data.retention_days) || 15, data.check_time || '02:00', parseInt(data.auto_renew_days) || 1]
+                    'INSERT INTO disk_lifecycle_config (id, warn_days, warn_frequency, grace_days, grace_frequency, shutdown_timeout, retention_days, auto_renew_days) VALUES (1,?,?,?,?,?,?,?)',
+                    [parseInt(data.warn_days) || 7, data.warn_frequency || 'daily', parseInt(data.grace_days) || 3, data.grace_frequency || 'twice_daily', parseInt(data.shutdown_timeout) || 300, parseInt(data.retention_days) || 15, parseInt(data.auto_renew_days) || 1]
                 );
             }
             return queryOne('SELECT * FROM disk_lifecycle_config WHERE id = 1');

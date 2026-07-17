@@ -255,7 +255,6 @@ router.put('/lifecycle-config', authMiddleware, adminMiddleware, async (req, res
       grace_frequency: ['daily', 'twice_daily'].indexOf(req.body.grace_frequency) !== -1 ? req.body.grace_frequency : 'twice_daily',
       shutdown_timeout: parseInt(req.body.shutdown_timeout) || 300,
       retention_days: parseInt(req.body.retention_days) || 15,
-      check_time: /^\d{2}:\d{2}$/.test(req.body.check_time) ? req.body.check_time : '02:00',
       auto_renew_days: parseInt(req.body.auto_renew_days) || 1
     };
 

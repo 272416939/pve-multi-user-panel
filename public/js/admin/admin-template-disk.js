@@ -139,14 +139,6 @@
                 <td>逾期自动销毁</td>
               </tr>
               <tr>
-                <td>到期巡检执行时间</td>
-                <td>
-                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.check_time }}</span>
-                  <input v-else class="form-control form-control-sm" v-model="diskPage.lifecycleForm.value.check_time" style="width:120px" placeholder="HH:mm">
-                </td>
-                <td>每日固定时间</td>
-              </tr>
-              <tr>
                 <td>自动续费提前天数</td>
                 <td>
                   <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.auto_renew_days }} 天</span>
