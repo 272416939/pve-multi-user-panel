@@ -371,9 +371,24 @@
   $.diskPage.importExistingDisks = async function() {
     var ok = await customConfirm('确定导入存量磁盘？\n此操作会扫描 PVE，清理孤立记录并导入未在台账中的磁盘。');
     if (!ok) return;
+
+    // 显示加载中弹窗
+    var loadingEl = document.createElement('div');
+    loadingEl.className = 'modal-backdrop fade show';
+    loadingEl.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    loadingEl.innerHTML = '<div style="background:var(--card-bg,#1e1e2e);border-radius:12px;padding:40px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.4);">'
+      + '<div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status"></div>'
+      + '<p class="mt-3 mb-0" style="color:var(--text-primary,#fff);font-size:16px;">正在扫描 PVE 并导入磁盘...</p>'
+      + '<p class="mt-1 mb-0" style="color:var(--text-secondary,#999);font-size:13px;">请稍候，可能需要一些时间</p>'
+      + '</div>';
+    document.body.appendChild(loadingEl);
+
     try {
       var res = await authFetch('/api/disk-import', { method: 'POST' });
       var data = await res.json();
+      // 移除加载弹窗
+      document.body.removeChild(loadingEl);
+
       if (!res.ok) return alert(data.error || '导入失败');
       var msg = '导入完成';
       if (data.cleaned > 0) msg += '\n清理孤立记录: ' + data.cleaned + ' 个';
@@ -383,6 +398,8 @@
       alert(msg);
       await $.diskPage.loadAllDisks();
     } catch (e) {
+      // 移除加载弹窗
+      if (loadingEl.parentNode) document.body.removeChild(loadingEl);
       alert('导入失败: ' + e.message);
     }
   };
