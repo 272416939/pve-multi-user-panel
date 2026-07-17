@@ -1,5 +1,6 @@
 const schedule = require('node-schedule');
 const { checkExpiredVms, checkExpiredLxc, loadSentRemindersFromDb } = require('../services/expiry-check');
+const { checkExpiredDisks, checkStorageCapacityAlert } = require('../services/disk-expiry-check');
 const { resumeRunningBackups, resumeRunningLxcBackups } = require('../services/backup-polling');
 const { syncPortForwardsFromIkuai } = require('../services/ikuai-sync');
 const ikuaiApi = require('../api/ikuai-api');
@@ -136,6 +137,28 @@ function initScheduledTasks() {
         }
     });
 
+    // 磁盘到期巡检（每 5 分钟检查，文档 4.1/5.4.5）
+    schedule.scheduleJob('*/5 * * * *', async () => {
+        if (await tryAcquireLock('lock:disk-expiry-check')) {
+            try {
+                await checkExpiredDisks();
+            } finally {
+                await releaseLock('lock:disk-expiry-check');
+            }
+        }
+    });
+
+    // 存储容量告警检查（每小时，文档 3.3.3：90% 触发邮件）
+    schedule.scheduleJob('0 * * * *', async () => {
+        if (await tryAcquireLock('lock:disk-storage-alert')) {
+            try {
+                await checkStorageCapacityAlert();
+            } finally {
+                await releaseLock('lock:disk-storage-alert');
+            }
+        }
+    });
+
     setTimeout(async () => {
         if (ikuaiApi.isConfigured()) {
             try {
@@ -162,6 +185,9 @@ function initScheduledTasks() {
     resumeRunningLxcBackups();
     checkExpiredVms();
     checkExpiredLxc();
+    // 磁盘到期巡检 + 存储容量告警（启动时执行一次）
+    checkExpiredDisks();
+    checkStorageCapacityAlert();
 }
 
 module.exports = { initScheduledTasks, recoverProvisioningTasks };

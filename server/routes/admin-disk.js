@@ -8,6 +8,7 @@ var { safeError } = require('../utils/safe-error');
 var cacheStore = require('../utils/cache-store');
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
+var { importExistingDisks } = require('../services/disk-expiry-check');
 
 // 规格列表缓存（5 分钟 TTL）
 var specCache = cacheStore.create('disk_specs', 300);
@@ -260,6 +261,18 @@ router.put('/lifecycle-config', authMiddleware, adminMiddleware, async (req, res
 
     var config = await db.diskLifecycleConfig.upsert(data);
     res.json(config);
+  } catch (e) {
+    res.status(500).json({ error: safeError(e) });
+  }
+});
+
+// ==================== 存量虚拟机数据盘导入（文档 4.5） ====================
+
+// 导入存量虚拟机数据盘（幂等，可重复执行）
+router.post('/disk-import', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    var report = await importExistingDisks();
+    res.json(report);
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
   }

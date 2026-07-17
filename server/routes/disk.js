@@ -191,30 +191,45 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
     if (disk.user_id !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ error: '无权操作' });
     }
-    if (disk.status !== 'free' && disk.status !== 'expired') {
-      return res.status(400).json({ error: '磁盘当前状态不允许挂载（状态：' + disk.status + '）' });
-    }
 
-    // 读取系统盘总线类型，数据盘沿用同一总线
-    var bus = await diskUtils.getSystemDiskBus(vm.vm_id);
-    // 自动分配空闲设备号
-    var dev = await diskUtils.getAvailableDevNumber(vm.vm_id, bus);
+    // 文档 7.8：竞争条件防护 - SELECT ... FOR UPDATE 行锁 + 条件更新
+    var bindResult = await withTransaction(async (conn) => {
+      // 读取当前状态（带行锁）
+      var [rows] = await conn.execute('SELECT * FROM disks WHERE id = ? FOR UPDATE', [disk.id]);
+      var lockedDisk = rows[0];
+      if (!lockedDisk) throw new Error('磁盘不存在');
 
-    // 读取规格的 QoS 参数（从数据库读取，非用户输入）
-    var qosParams = {
-      mbps_rd: disk.mbps_rd, mbps_rd_max: disk.mbps_rd_max,
-      mbps_wr: disk.mbps_wr, mbps_wr_max: disk.mbps_wr_max,
-      iops_rd: disk.iops_rd, iops_rd_max: disk.iops_rd_max,
-      iops_wr: disk.iops_wr, iops_wr_max: disk.iops_wr_max
-    };
+      // 状态前置校验（持锁状态下校验，防止并发冲突）
+      if (lockedDisk.status !== 'free' && lockedDisk.status !== 'expired') {
+        throw new Error('磁盘当前状态不允许挂载（状态：' + lockedDisk.status + '），可能被其他操作占用');
+      }
 
-    // 执行 PVE 挂载
-    var result = await diskUtils.bindDisk(vm.vm_id, disk.volume_id, bus, dev, qosParams);
+      // 读取系统盘总线类型，数据盘沿用同一总线
+      var bus = await diskUtils.getSystemDiskBus(vm.vm_id);
+      // 自动分配空闲设备号
+      var dev = await diskUtils.getAvailableDevNumber(vm.vm_id, bus);
 
-    // 更新台账
-    await db.disks.bind(disk.id, vm.vm_id, result.bus, result.dev);
+      // 读取规格的 QoS 参数（从数据库读取，非用户输入）
+      var qosParams = {
+        mbps_rd: lockedDisk.mbps_rd, mbps_rd_max: lockedDisk.mbps_rd_max,
+        mbps_wr: lockedDisk.mbps_wr, mbps_wr_max: lockedDisk.mbps_wr_max,
+        iops_rd: lockedDisk.iops_rd, iops_rd_max: lockedDisk.iops_rd_max,
+        iops_wr: lockedDisk.iops_wr, iops_wr_max: lockedDisk.iops_wr_max
+      };
 
-    res.json({ success: true, bus: result.bus, dev: result.dev });
+      // 执行 PVE 挂载
+      var result = await diskUtils.bindDisk(vm.vm_id, lockedDisk.volume_id, bus, dev, qosParams);
+
+      // 条件更新（WHERE status = 原状态，双重保障防并发）
+      await conn.execute(
+        'UPDATE disks SET status = ?, bind_vmid = ?, bind_bus = ?, bind_dev = ?, updated_at = NOW() WHERE id = ? AND status = ?',
+        ['bound', vm.vm_id, result.bus, result.dev, disk.id, lockedDisk.status]
+      );
+
+      return result;
+    });
+
+    res.json({ success: true, bus: bindResult.bus, dev: bindResult.dev });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
   }
@@ -235,11 +250,24 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
       return res.status(400).json({ error: '磁盘绑定信息不完整' });
     }
 
-    // 执行 PVE 卸载
-    await diskUtils.unbindDisk(disk.bind_vmid, disk.bind_bus, disk.bind_dev);
+    // 文档 7.8：竞争条件防护 - SELECT ... FOR UPDATE 行锁
+    await withTransaction(async (conn) => {
+      var [rows] = await conn.execute('SELECT * FROM disks WHERE id = ? FOR UPDATE', [disk.id]);
+      var lockedDisk = rows[0];
+      if (!lockedDisk) throw new Error('磁盘不存在');
+      if (lockedDisk.status !== 'bound') {
+        throw new Error('磁盘状态已变更，可能被其他操作处理中');
+      }
 
-    // 更新台账
-    await db.disks.unbind(disk.id);
+      // 执行 PVE 卸载
+      await diskUtils.unbindDisk(lockedDisk.bind_vmid, lockedDisk.bind_bus, lockedDisk.bind_dev);
+
+      // 条件更新（WHERE status = 'bound'，防止并发）
+      await conn.execute(
+        'UPDATE disks SET status = ?, bind_vmid = NULL, bind_bus = NULL, bind_dev = NULL, updated_at = NOW() WHERE id = ? AND status = ?',
+        ['free', disk.id, 'bound']
+      );
+    });
 
     res.json({ success: true });
   } catch (e) {
@@ -299,11 +327,23 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       return res.status(400).json({ error: '磁盘已销毁' });
     }
 
-    // 执行 PVE 销毁
-    await diskUtils.destroyDisk(disk.volume_id);
+    // 文档 7.8：竞争条件防护 - SELECT ... FOR UPDATE 行锁
+    await withTransaction(async (conn) => {
+      var [rows] = await conn.execute('SELECT * FROM disks WHERE id = ? FOR UPDATE', [disk.id]);
+      var lockedDisk = rows[0];
+      if (!lockedDisk) throw new Error('磁盘不存在');
+      if (lockedDisk.status === 'bound') throw new Error('请先卸载磁盘再销毁');
+      if (lockedDisk.status === 'destroyed') throw new Error('磁盘已销毁');
 
-    // 台账标记已销毁
-    await db.disks.markDestroyed(disk.id);
+      // 执行 PVE 销毁
+      await diskUtils.destroyDisk(lockedDisk.volume_id);
+
+      // 条件更新（防止并发）
+      await conn.execute(
+        'UPDATE disks SET status = ?, updated_at = NOW() WHERE id = ? AND status != ?',
+        ['destroyed', disk.id, 'destroyed']
+      );
+    });
 
     res.json({ success: true });
   } catch (e) {
