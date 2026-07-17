@@ -125,6 +125,14 @@
     return spec ? spec.max_size_gb : 2000;
   };
 
+  // 获取选中的规格对象（用于显示备注等）
+  $.selectedSpec = Vue.computed(function() {
+    var specId = $.diskPurchaseForm.value.spec_id;
+    if (!specId) return null;
+    var specs = $.diskOptions.value && $.diskOptions.value.specs ? $.diskOptions.value.specs : [];
+    return specs.find(function(s) { return s.id === parseInt(specId); }) || null;
+  });
+
   // 选择规格时自动设置容量范围
   $.onSpecChange = function() {
     var specId = $.diskPurchaseForm.value.spec_id;

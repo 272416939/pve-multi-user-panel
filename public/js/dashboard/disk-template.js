@@ -102,9 +102,13 @@
         <div class="mb-3">
           <label class="form-label">容量 (GiB) <small class="text-muted">范围：{{ getSelectedSpecMin() }}-{{ getSelectedSpecMax() }} GiB</small></label>
           <div class="d-flex align-items-center gap-2">
-            <input class="form-control" type="range" v-model.number="diskPurchaseForm.capacity_gb" :min="getSelectedSpecMin()" :max="getSelectedSpecMax()" style="flex:1">
-            <input class="form-control" type="number" v-model.number="diskPurchaseForm.capacity_gb" :min="getSelectedSpecMin()" :max="getSelectedSpecMax()" style="width:100px">
+            <input class="form-control" type="range" v-model.number="diskPurchaseForm.capacity_gb" :min="getSelectedSpecMin()" :max="getSelectedSpecMax()" @input="calcDiskPrice" style="flex:1">
+            <input class="form-control" type="number" v-model.number="diskPurchaseForm.capacity_gb" :min="getSelectedSpecMin()" :max="getSelectedSpecMax()" @input="calcDiskPrice" style="width:100px">
           </div>
+        </div>
+        <div class="mb-3" v-if="selectedSpec">
+          <label class="form-label">规格备注</label>
+          <p class="text-muted small mb-0">{{ selectedSpec.description || '暂无备注' }}</p>
         </div>
         <div class="mb-3">
           <label class="form-label">硬盘名称</label>

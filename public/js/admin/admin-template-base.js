@@ -88,7 +88,7 @@
                 <!-- 硬盘设置（父菜单，仅admin） -->
                 <a v-if="user && user.role === 'admin'" class="nav-item has-children" :class="{ active: activeSection === 'disk-settings' }" href="#" @click.prevent="toggleSubmenu('disk-settings')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
-                    <span class="nav-text">硬盘设置</span>
+                    <span class="nav-text">硬盘套餐管理</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-disk-settings">
