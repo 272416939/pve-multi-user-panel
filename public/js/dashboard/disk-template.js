@@ -61,8 +61,10 @@
             <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? formatDate(disk.expire_time) : '-' }}</td>
             <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? daysUntilExpire(disk.expire_time) : '-' }}</td>
             <td>
-              <div v-if="disk.status !== 'destroyed'" class="form-check form-switch m-0" style="display:inline-block;">
-                <input class="form-check-input" type="checkbox" :checked="disk.auto_renew === 1" @change="toggleDiskAutoRenew(disk, $event.target.checked)" style="cursor:pointer;">
+              <div v-if="disk.status !== 'destroyed'" class="d-flex align-items-center justify-content-center" style="height:100%;min-height:32px;">
+                <div class="form-check form-switch m-0 p-0 disk-auto-renew-switch">
+                  <input class="form-check-input" type="checkbox" :checked="disk.auto_renew === 1" @change="toggleDiskAutoRenew(disk, $event.target.checked)" style="cursor:pointer;margin:0;">
+                </div>
               </div>
               <span v-else class="text-muted">-</span>
             </td>
