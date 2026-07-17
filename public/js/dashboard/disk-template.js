@@ -231,7 +231,7 @@
         <p v-if="resizeTargetDisk">当前容量：<strong>{{ resizeTargetDisk.capacity_gb }} GiB</strong></p>
         <div class="mb-3">
           <label class="form-label">新增容量（GiB，增量值，非目标容量）</label>
-          <input type="number" class="form-control" v-model.number="resizeInputAddGb" min="1" step="1" @input="calcResizePrice">
+          <input type="number" class="form-control" v-model.number="resizeInputAddGb" min="1" step="1" @input="resizeInputAddGb = parseInt(resizeInputAddGb) || 0; calcResizePrice()">
           <small class="text-muted">扩容后总容量：{{ (resizeTargetDisk ? resizeTargetDisk.capacity_gb : 0) + (resizeInputAddGb || 0) }} GiB</small>
         </div>
         <!-- 扩容费用 -->
