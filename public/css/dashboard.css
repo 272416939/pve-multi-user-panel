@@ -473,20 +473,18 @@
         --bs-table-color: var(--text-primary);
         --bs-table-hover-bg: rgba(99,102,241,0.04); --bs-table-active-bg: rgba(99,102,241,0.06);
     }
-    /* 选中行高亮 - 不随鼠标移开消失 */
+    /* 选中行高亮 - 不随鼠标移开消失，仅用背景色避免溢出 R 角 */
     table tbody tr.table-active,
     table tbody tr.table-active:hover,
     .table tbody tr.table-active,
     .table tbody tr.table-active:hover {
         background: rgba(99,102,241,0.12) !important;
-        box-shadow: inset 0 0 0 1px rgba(99,102,241,0.3);
     }
     [data-theme="light"] table tbody tr.table-active,
     [data-theme="light"] table tbody tr.table-active:hover,
     [data-theme="light"] .table tbody tr.table-active,
     [data-theme="light"] .table tbody tr.table-active:hover {
         background: rgba(99,102,241,0.15) !important;
-        box-shadow: inset 0 0 0 1px rgba(99,102,241,0.4);
     }
     .table-dark { background: var(--bg-hover) !important; border-color: var(--border-color) !important; }
     .table > thead, .table-striped > thead, .table-sm > thead, .table-hover > thead, .table-dark > thead {
