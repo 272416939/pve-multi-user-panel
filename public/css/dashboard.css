@@ -357,6 +357,10 @@
     .table-btn.btn-primary:hover { background: rgba(129,140,248,0.2); color: var(--color-primary-hover); }
     .table-btn.btn-danger { color: var(--color-danger); background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.18); }
     .table-btn.btn-danger:hover { background: rgba(239,68,68,0.18); color: var(--color-danger); }
+    .table-btn.btn-info { color: #06b6d4; background: rgba(6,182,212,0.08); border-color: rgba(6,182,212,0.2); }
+    .table-btn.btn-info:hover { background: rgba(6,182,212,0.18); color: #22d3ee; }
+    .table-btn.btn-warning { color: var(--color-warning, #f59e0b); background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); }
+    .table-btn.btn-warning:hover { background: rgba(245,158,11,0.18); color: #fbbf24; }
 
     .table-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; white-space: nowrap; }
     .btn-group-table { display: inline-flex; gap: 4px; align-items: center; }

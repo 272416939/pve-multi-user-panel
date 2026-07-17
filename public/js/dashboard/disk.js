@@ -231,7 +231,8 @@
   // ===== 卸载磁盘 =====
   $.unbindDisk = async function(disk) {
     if (!disk) return;
-    if (!confirm('确定卸载磁盘 "' + (disk.disk_name || disk.volume_id) + '"?\n注意：请先关闭虚拟机')) return;
+    var ok = await customConfirm('确定卸载磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n注意：请先关闭虚拟机');
+    if (!ok) return;
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/unbind', {
         method: 'POST'
@@ -248,10 +249,16 @@
   // ===== 扩容磁盘 =====
   $.resizeDisk = async function(disk) {
     if (!disk) return;
-    var newSize = prompt('当前容量：' + disk.capacity_gb + ' GiB\n请输入新容量（GiB）：', disk.capacity_gb + 10);
-    if (!newSize) return;
-    newSize = parseInt(newSize);
-    if (isNaN(newSize) || newSize <= disk.capacity_gb) {
+    $.resizeTargetDisk.value = disk;
+    $.resizeNewCapacity.value = parseInt(disk.capacity_gb) + 10;
+    $.bsModalShow('resizeDiskModal');
+  };
+
+  $.submitResizeDisk = async function() {
+    var disk = $.resizeTargetDisk.value;
+    if (!disk) return;
+    var newSize = parseInt($.resizeNewCapacity.value);
+    if (isNaN(newSize) || newSize <= parseInt(disk.capacity_gb)) {
       return alert('新容量必须大于当前容量（' + disk.capacity_gb + ' GiB）');
     }
     try {
@@ -263,6 +270,7 @@
       var data = await res.json();
       if (!res.ok) return alert(data.error || '扩容失败');
       alert('扩容成功，新容量：' + data.new_capacity + ' GiB');
+      $.bsModalHide('resizeDiskModal');
       await $.loadDisks();
     } catch (e) {
       alert('扩容失败: ' + e.message);
@@ -272,7 +280,8 @@
   // ===== 销毁磁盘 =====
   $.destroyDisk = async function(disk) {
     if (!disk) return;
-    if (!confirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"?\n此操作不可恢复！')) return;
+    var ok = await customConfirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n此操作不可恢复！');
+    if (!ok) return;
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/destroy', {
         method: 'POST'
@@ -293,7 +302,8 @@
   // ===== 删除已销毁的磁盘记录 =====
   $.deleteDestroyedDisk = async function(disk) {
     if (!disk) return;
-    if (!confirm('确定删除此已销毁的磁盘记录？')) return;
+    var ok = await customConfirm('确定删除此已销毁的磁盘记录？');
+    if (!ok) return;
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/destroy', {
         method: 'POST'

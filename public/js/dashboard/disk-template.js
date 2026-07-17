@@ -60,8 +60,8 @@
             <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? formatDate(disk.expire_time) : '-' }}</td>
             <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? daysUntilExpire(disk.expire_time) : '-' }}</td>
             <td>
-              <button v-if="disk.status !== 'destroyed'" class="btn btn-sm btn-outline-primary" @click="openDiskRenewModal(disk)">续费</button>
-              <button v-else class="btn btn-sm btn-outline-danger" @click="deleteDestroyedDisk(disk)">删除</button>
+              <button v-if="disk.status !== 'destroyed'" class="table-btn btn-info" @click="openDiskRenewModal(disk)">续费</button>
+              <button v-else class="table-btn btn-danger" @click="deleteDestroyedDisk(disk)">删除</button>
             </td>
           </tr>
           <tr v-if="disks.length === 0">
@@ -206,6 +206,30 @@
       <div class="modal-footer" style="border-top:1px solid var(--border-color);">
         <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
         <pv-button @click="submitRenewDisk" variant="primary" :disabled="renewAmount <= 0">确定续费</pv-button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 扩容弹窗 -->
+<div class="modal fade" id="resizeDiskModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="background:var(--bg-modal);color:var(--text-primary);">
+      <div class="modal-header" style="border-bottom:1px solid var(--border-color);">
+        <h5 class="modal-title">扩容磁盘</h5>
+        <pv-button type="button" variant="close" data-bs-dismiss="modal"></pv-button>
+      </div>
+      <div class="modal-body">
+        <p v-if="resizeTargetDisk">磁盘：{{ resizeTargetDisk.disk_name || resizeTargetDisk.volume_id }}</p>
+        <p v-if="resizeTargetDisk">当前容量：<strong>{{ resizeTargetDisk.capacity_gb }} GiB</strong></p>
+        <div class="mb-3">
+          <label class="form-label">新容量（GiB，需大于当前容量）</label>
+          <input type="number" class="form-control" v-model.number="resizeNewCapacity" min="1" step="1">
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border-color);">
+        <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
+        <pv-button @click="submitResizeDisk" variant="primary" :disabled="!resizeNewCapacity || (resizeTargetDisk && resizeNewCapacity <= resizeTargetDisk.capacity_gb)">确定扩容</pv-button>
       </div>
     </div>
   </div>
