@@ -181,7 +181,12 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
       );
       // 获取 insertId
       var [insertResult] = await conn.execute('SELECT LAST_INSERT_ID() as id');
-      createdDiskIds.push(insertResult[0].id);
+      var newDiskId = insertResult[0].id;
+      createdDiskIds.push(newDiskId);
+      // 回填订单 resource_id（单块磁盘场景，多块磁盘用首块 ID 关联）
+      if (i === 0) {
+        await conn.execute('UPDATE orders SET resource_id = ? WHERE order_no = ?', [String(newDiskId), orderNo]);
+      }
     }
   });
 
@@ -483,33 +488,67 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
     var refundAmount = 0;
     var refundDesc = '';
 
-    // 销毁退款优化：3天内全额，3-15天按剩余比例，>15天不退款
+    // 销毁退款优化：按订单分单退款
+    // 查询该磁盘所有已完成的付费订单（购买+扩容+续费）
+    var paidOrders = [];
+    var totalPaid = 0;
     if (disk.expire_time && disk.status !== 'expired' && disk.status !== 'grace') {
-      var expireDate = new Date(disk.expire_time);
-      var now = new Date();
-      var createDate = disk.create_time ? new Date(disk.create_time) : null;
-      var daysSinceCreation = createDate ? Math.floor((now - createDate) / (1000 * 60 * 60 * 24)) : 999;
-      var originalPrice = parseFloat(disk.price_per_gb) * parseInt(disk.capacity_gb);
-      if (disk.quarterly_discount || disk.yearly_discount) {
-        var disc = disk.yearly_discount || disk.quarterly_discount || 0;
-        originalPrice = parseFloat((originalPrice * (1 - disc / 100)).toFixed(2));
+      try {
+        var orderResult = await db.orders.getAll({
+          type: 'disk',
+          resource_id: String(disk.id),
+          status: 'completed',
+          limit: 200
+        });
+        paidOrders = orderResult.rows || orderResult.data || [];
+      } catch (e) {
+        console.error('[disk destroy] 查询订单失败:', e.message);
       }
+      totalPaid = paidOrders.reduce(function(sum, o) {
+        return sum + parseFloat(o.amount || 0);
+      }, 0);
 
-      if (daysSinceCreation <= 3) {
-        // 3天内全额退款
-        refundAmount = originalPrice;
-        refundDesc = '全额退款（开通 ' + daysSinceCreation + ' 天）';
-      } else if (daysSinceCreation <= 15) {
-        // 3-15天按剩余天数比例退款
-        if (createDate) {
-          var totalMs = expireDate - createDate;
-          var remainingMs = expireDate - now;
-          var factor = remainingMs / totalMs;
-          refundAmount = parseFloat((originalPrice * factor).toFixed(2));
+      var now = new Date();
+      var expireDate = new Date(disk.expire_time);
+      var createDate = disk.create_time ? new Date(disk.create_time) : null;
+
+      // 按订单分单计算退款
+      for (var oi = 0; oi < paidOrders.length; oi++) {
+        var origOrder = paidOrders[oi];
+        var orderPaid = parseFloat(origOrder.amount || 0);
+        if (orderPaid <= 0) continue;
+        var orderCreateTime = new Date(origOrder.created_at);
+        var orderDays = Math.floor((now - orderCreateTime) / (1000 * 60 * 60 * 24));
+
+        var orderRefund = 0;
+        if (orderDays <= 3) {
+          // 3天内全额退款
+          orderRefund = orderPaid;
+        } else if (orderDays <= 15) {
+          // 3-15天按剩余天数比例退款
+          if (createDate && expireDate > orderCreateTime) {
+            var totalMs = expireDate - orderCreateTime;
+            var remainingMs = expireDate - now;
+            var factor = remainingMs / totalMs;
+            if (factor > 0) {
+              orderRefund = parseFloat((orderPaid * factor).toFixed(2));
+            }
+          }
         }
-        refundDesc = '按剩余天数退款（开通 ' + daysSinceCreation + ' 天）';
+        // >15天不退款
+        refundAmount += orderRefund;
       }
-      // > 15天不退款，refundAmount=0，前端会弹出警告
+      refundAmount = parseFloat(refundAmount.toFixed(2));
+
+      // 生成退款描述
+      var diskCreateDate = createDate ? Math.floor((now - createDate) / (1000 * 60 * 60 * 24)) : 999;
+      if (diskCreateDate <= 3) {
+        refundDesc = '全额退款（开通 ' + diskCreateDate + ' 天）';
+      } else if (diskCreateDate <= 15) {
+        refundDesc = '按剩余天数退款（开通 ' + diskCreateDate + ' 天）';
+      } else {
+        refundDesc = '该磁盘开通时间大于15天无法进行退款操作';
+      }
     }
 
     // 文档 7.8：竞争条件防护 - SELECT ... FOR UPDATE 行锁
@@ -523,16 +562,43 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       // 执行 PVE 销毁
       await diskUtils.destroyDisk(lockedDisk.volume_id);
 
-      // 如果有退款，执行退款
-      if (refundAmount > 0) {
+      // 按订单分单退款
+      if (refundAmount > 0 && paidOrders.length > 0) {
         await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [refundAmount, req.user.id]);
-        var refundOrderNo = generateOrderNo('refund');
         var balanceBefore = parseFloat(user.balance || '0');
         var balanceAfter = balanceBefore + refundAmount;
-        await conn.execute(
-          'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [req.user.id, refundOrderNo, db.now(), 'balance_refund', 'refund', refundAmount, null, null, balanceBefore, balanceAfter, 'disk', disk.id, '', '', db.now()]
-        );
+        var now2 = new Date();
+
+        for (var ri = 0; ri < paidOrders.length; ri++) {
+          var origOrder2 = paidOrders[ri];
+          var orderPaid2 = parseFloat(origOrder2.amount || 0);
+          if (orderPaid2 <= 0) continue;
+          var orderCreateTime2 = new Date(origOrder2.created_at);
+          var orderDays2 = Math.floor((now2 - orderCreateTime2) / (1000 * 60 * 60 * 24));
+
+          var orderRefund2 = 0;
+          if (orderDays2 <= 3) {
+            orderRefund2 = orderPaid2;
+          } else if (orderDays2 <= 15) {
+            var expireDate2 = new Date(disk.expire_time);
+            var createDate2 = disk.create_time ? new Date(disk.create_time) : null;
+            if (createDate2 && expireDate2 > orderCreateTime2) {
+              var totalMs2 = expireDate2 - orderCreateTime2;
+              var remainingMs2 = expireDate2 - now2;
+              var factor2 = remainingMs2 / totalMs2;
+              if (factor2 > 0) {
+                orderRefund2 = parseFloat((orderPaid2 * factor2).toFixed(2));
+              }
+            }
+          }
+          if (orderRefund2 > 0) {
+            var refundOrderNo = generateOrderNo('refund');
+            await conn.execute(
+              'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [req.user.id, refundOrderNo, db.now(), 'balance_refund', 'refund', orderRefund2, null, null, balanceBefore, balanceAfter, 'disk', disk.id, origOrder2.order_no, '', db.now()]
+            );
+          }
+        }
       }
 
       // 条件更新

@@ -252,7 +252,7 @@
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-hover table-sm mb-0 table-align-center">
-                                        <thead><tr><th>支付时间</th><th>支付方式</th><th>商户订单号</th><th>支付流水号</th><th>类型</th><th>金额</th></tr></thead>
+                                        <thead><tr><th>支付时间</th><th>支付方式</th><th>订单号</th><th>关联订单</th><th>类型</th><th>金额</th></tr></thead>
                                         <tbody>
                                             <tr v-for="tx in txList" :key="tx.id">
                                                 <td>{{ formatDate(tx.pay_time) }}</td>

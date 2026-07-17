@@ -1998,6 +1998,7 @@ module.exports = {
             if (params.user_id) { where.push('o.user_id = ?'); args.push(params.user_id); }
             if (params.type) { where.push('o.type = ?'); args.push(params.type); }
             if (params.status) { where.push('o.status = ?'); args.push(params.status); }
+            if (params.resource_id) { where.push('o.resource_id = ?'); args.push(String(params.resource_id)); }
             if (params.start_time) { where.push('o.created_at >= ?'); args.push(params.start_time); }
             if (params.end_time) { where.push('o.created_at <= ?'); args.push(params.end_time); }
             var whereClause = where.length > 0 ? 'WHERE ' + where.join(' AND ') : '';
