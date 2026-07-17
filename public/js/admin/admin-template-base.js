@@ -85,19 +85,7 @@
                     <a class="nav-item" data-subsection="templates-lxc" href="#" @click.prevent="switchPage('lxc-templates')"><span class="nav-text">LXC 模板</span></a>
                 </div>
 
-                <!-- 硬盘设置（父菜单，仅admin） -->
-                <a v-if="user && user.role === 'admin'" class="nav-item has-children" :class="{ active: activeSection === 'disk-settings' }" href="#" @click.prevent="toggleSubmenu('disk-settings')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
-                    <span class="nav-text">硬盘套餐管理</span>
-                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
-                </a>
-                <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-disk-settings">
-                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'storage-groups' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'storage-groups'"><span class="nav-text">存储分组管理</span></a>
-                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'specs' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'specs'"><span class="nav-text">数据盘管理</span></a>
-                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'lifecycle' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'lifecycle'"><span class="nav-text">生命周期管理</span></a>
-                </div>
-
-                <!-- 套餐管理（父菜单，仅admin） -->
+ <!-- 套餐管理（父菜单，仅admin） -->
                 <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('packages')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
                     <span class="nav-text">套餐管理</span>
@@ -108,6 +96,19 @@
                     <a class="nav-item" data-subsection="packages-vm-groups" href="#" @click.prevent="switchPage('vm-package-groups')"><span class="nav-text">VM 套餐分组</span></a>
                     <a class="nav-item" data-subsection="packages-lxc" href="#" @click.prevent="switchPage('lxc-packages')"><span class="nav-text">LXC 套餐</span></a>
                     <a class="nav-item" data-subsection="packages-lxc-groups" href="#" @click.prevent="switchPage('lxc-package-groups')"><span class="nav-text">LXC 套餐分组</span></a>
+                </div>
+
+               
+                <!-- 硬盘套餐管理（父菜单，仅admin） -->
+                <a v-if="user && user.role === 'admin'" class="nav-item has-children" :class="{ active: activeSection === 'disk-settings' }" href="#" @click.prevent="toggleSubmenu('disk-settings')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
+                    <span class="nav-text">硬盘套餐管理</span>
+                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+                </a>
+                <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-disk-settings">
+                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'storage-groups' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'storage-groups'"><span class="nav-text">存储分组管理</span></a>
+                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'specs' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'specs'"><span class="nav-text">数据盘管理</span></a>
+                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'lifecycle' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'lifecycle'"><span class="nav-text">生命周期管理</span></a>
                 </div>
 
                 <!-- 财务管理（父菜单，仅admin） -->
