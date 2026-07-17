@@ -352,7 +352,10 @@ async function importExistingDisks() {
       
       try {
         var sshConfig = await getPveSshConfig();
-        if (!sshConfig.host || !sshConfig.password) continue;
+        if (!sshConfig.host || !sshConfig.password) {
+          console.warn('[disk-import] SSH 配置不完整，跳过清理');
+          continue;
+        }
         
         // 解析 volume_id（格式：storage:volume_name）
         var volParts = (disk.volume_id || '').split(':');
@@ -365,11 +368,9 @@ async function importExistingDisks() {
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
         if (result.code !== 0 || (result.stderr && result.stderr.indexOf('does not exist') !== -1)) {
           // PVE 卷不存在，直接删除孤立记录
-          const [delResult] = await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
-          if (delResult.affectedRows > 0) {
-            cleanedCount++;
-            console.log('[disk-import] 清理孤立 legacy 磁盘记录:', disk.volume_id);
-          }
+          await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
+          cleanedCount++;
+          console.log('[disk-import] 清理孤立 legacy 磁盘记录:', disk.volume_id);
         }
       } catch (e) {
         // 检查失败，跳过该记录
