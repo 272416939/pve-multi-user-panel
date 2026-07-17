@@ -726,7 +726,7 @@ router.get('/orders', authMiddleware, async (req, res) => {
             if (order_no.length > 50) return res.status(400).json({ error: '订单号过长' });
             if (order_no) params.order_no = order_no;
             if (req.query.type && ['vm', 'lxc', 'disk'].includes(req.query.type)) params.type = req.query.type;
-            if (req.query.status && ['completed', 'pending'].includes(req.query.status)) params.status = req.query.status;
+            if (req.query.status && ['completed', 'pending', 'refunded', 'destroyed'].includes(req.query.status)) params.status = req.query.status;
             var result = await db.orders.getByUser(req.user.id, params);
             result.rows = await Promise.all((result.rows || result.data || []).map(async function(order) {
                 var packageName = '';

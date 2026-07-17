@@ -120,6 +120,8 @@
                                             <option value="">全部</option>
                                             <option value="completed">已开通</option>
                                             <option value="pending">处理中</option>
+                                            <option value="refunded">已退款</option>
+                                            <option value="destroyed">已销毁</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2">
@@ -150,7 +152,7 @@
                                             <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
                                             <td>{{ o.period_count }}</td>
                                             <td>{{ o.amount }} 元</td>
-                                            <td><span class="badge" :class="o.status === 'completed' ? 'bg-success' : o.status === 'refunded' ? 'bg-danger' : 'bg-warning'">{{ o.status === 'completed' ? '已开通' : o.status === 'refunded' ? '已退款' : o.status === 'pending' ? '处理中' : o.status }}</span></td>
+                                            <td><span class="badge" :class="o.status === 'completed' ? 'bg-success' : o.status === 'refunded' ? 'bg-danger' : o.status === 'destroyed' ? 'bg-secondary' : 'bg-warning'">{{ o.status === 'completed' ? '已开通' : o.status === 'refunded' ? '已退款' : o.status === 'destroyed' ? '已销毁' : o.status === 'pending' ? '处理中' : o.status }}</span></td>
                                             <td>{{ formatDate(o.created_at) }}</td>
                                         </tr>
                                         <tr v-if="!orders || orders.length === 0"><td colspan="9" class="text-center text-muted">暂无订单</td></tr>

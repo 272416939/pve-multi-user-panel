@@ -597,7 +597,17 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
               'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
               [req.user.id, refundOrderNo, db.now(), 'balance_refund', 'refund', orderRefund2, null, null, balanceBefore, balanceAfter, 'disk', disk.id, origOrder2.order_no, '', db.now()]
             );
+            // 原订单标记为已退款
+            await conn.execute('UPDATE orders SET status = ? WHERE order_no = ?', ['refunded', origOrder2.order_no]);
+          } else {
+            // 无退款的订单（>15天）标记为已销毁无退款
+            await conn.execute('UPDATE orders SET status = ? WHERE order_no = ?', ['destroyed', origOrder2.order_no]);
           }
+        }
+      } else {
+        // 没有退款的场景（>15天），所有订单标记为已销毁无退款
+        for (var ni = 0; ni < paidOrders.length; ni++) {
+          await conn.execute('UPDATE orders SET status = ? WHERE order_no = ? AND status = ?', ['destroyed', paidOrders[ni].order_no, 'completed']);
         }
       }
 
