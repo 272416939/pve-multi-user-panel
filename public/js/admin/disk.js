@@ -64,6 +64,7 @@
       sort_order: group ? group.sort_order : 0
     };
     $.diskPage.showStorageGroupModal.value = true;
+    $.bsModalShow('storageGroupModal');
   };
 
   $.diskPage.saveStorageGroup = async function() {
@@ -82,7 +83,7 @@
       });
       var data = await res.json();
       if (!res.ok) return alert(data.error || '操作失败');
-      $.diskPage.showStorageGroupModal.value = false;
+      $.bsModalHide('storageGroupModal');
       await $.diskPage.loadStorageGroups();
     } catch (e) {
       alert('操作失败: ' + e.message);
@@ -153,6 +154,7 @@
     }
     $.diskPage.showQosSection.value = false;
     $.diskPage.showDiskSpecModal.value = true;
+    $.bsModalShow('diskSpecModal');
   };
 
   $.diskPage.saveDiskSpec = async function() {
@@ -187,7 +189,7 @@
       });
       var data = await res.json();
       if (!res.ok) return alert(data.error || '操作失败');
-      $.diskPage.showDiskSpecModal.value = false;
+      $.bsModalHide('diskSpecModal');
       await $.diskPage.loadDiskSpecs();
     } catch (e) {
       alert('操作失败: ' + e.message);

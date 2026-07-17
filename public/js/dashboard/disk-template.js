@@ -74,7 +74,7 @@
     <div class="modal-content" style="background:var(--bg-modal);color:var(--text-primary);">
       <div class="modal-header" style="border-bottom:1px solid var(--border-color);">
         <h5 class="modal-title">购买数据盘</h5>
-        <pv-button type="button" variant="close" @click="showCreateDiskModal = false"></pv-button>
+        <pv-button type="button" variant="close" data-bs-dismiss="modal"></pv-button>
       </div>
       <div class="modal-body">
         <div class="mb-3">
@@ -132,7 +132,7 @@
         </div>
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--border-color);">
-        <pv-button type="button" @click="showCreateDiskModal = false" variant="outline">关闭</pv-button>
+        <pv-button type="button" data-bs-dismiss="modal" variant="outline">关闭</pv-button>
         <pv-button @click="submitPurchaseDisk" variant="primary" :disabled="!diskPurchaseForm.spec_id || purchasePrice <= 0">确定</pv-button>
       </div>
     </div>
@@ -145,7 +145,7 @@
     <div class="modal-content" style="background:var(--bg-modal);color:var(--text-primary);">
       <div class="modal-header" style="border-bottom:1px solid var(--border-color);">
         <h5 class="modal-title">挂载磁盘</h5>
-        <pv-button type="button" variant="close" @click="showBindModal = false"></pv-button>
+        <pv-button type="button" variant="close" data-bs-dismiss="modal"></pv-button>
       </div>
       <div class="modal-body">
         <p v-if="bindTargetDisk">磁盘：{{ bindTargetDisk.disk_name || bindTargetDisk.volume_id }} ({{ bindTargetDisk.capacity_gb }} GiB)</p>
@@ -159,7 +159,7 @@
         </div>
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--border-color);">
-        <pv-button type="button" @click="showBindModal = false" variant="outline">取消</pv-button>
+        <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
         <pv-button @click="submitBindDisk" variant="primary" :disabled="!bindTargetVmid">确定挂载</pv-button>
       </div>
     </div>
@@ -172,7 +172,7 @@
     <div class="modal-content" style="background:var(--bg-modal);color:var(--text-primary);">
       <div class="modal-header" style="border-bottom:1px solid var(--border-color);">
         <h5 class="modal-title">续费磁盘</h5>
-        <pv-button type="button" variant="close" @click="showRenewModal = false"></pv-button>
+        <pv-button type="button" variant="close" data-bs-dismiss="modal"></pv-button>
       </div>
       <div class="modal-body">
         <p v-if="renewDisk">磁盘：{{ renewDisk.disk_name || renewDisk.volume_id }} ({{ renewDisk.capacity_gb }} GiB)</p>
@@ -189,7 +189,7 @@
         </div>
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--border-color);">
-        <pv-button type="button" @click="showRenewModal = false" variant="outline">取消</pv-button>
+        <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
         <pv-button @click="submitRenewDisk" variant="primary" :disabled="renewAmount <= 0">确定续费</pv-button>
       </div>
     </div>

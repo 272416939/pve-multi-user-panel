@@ -130,6 +130,7 @@
     };
     $.purchasePrice.value = 0;
     $.showCreateDiskModal.value = true;
+    $.bsModalShow('createDiskModal');
   };
 
   // ===== 提交购买 =====
@@ -153,7 +154,7 @@
       });
       var data = await res.json();
       if (!res.ok) return alert(data.error || '购买失败');
-      $.showCreateDiskModal.value = false;
+      $.bsModalHide('createDiskModal');
       alert('购买成功');
       await $.loadDisks();
     } catch (e) {
@@ -178,6 +179,7 @@
       });
     }
     $.showBindModal.value = true;
+    $.bsModalShow('bindDiskModal');
   };
 
   // ===== 提交挂载 =====
@@ -193,7 +195,7 @@
       });
       var data = await res.json();
       if (!res.ok) return alert(data.error || '挂载失败');
-      $.showBindModal.value = false;
+      $.bsModalHide('bindDiskModal');
       alert('挂载成功（总线: ' + data.bus + ', 设备号: ' + data.dev + '）');
       await $.loadDisks();
     } catch (e) {
@@ -266,6 +268,7 @@
     $.renewPeriodCount.value = 1;
     $.calcRenewAmount();
     $.showRenewModal.value = true;
+    $.bsModalShow('renewDiskModal');
   };
 
   $.calcRenewAmount = function() {
@@ -293,7 +296,7 @@
       });
       var data = await res.json();
       if (!res.ok) return alert(data.error || '续费失败');
-      $.showRenewModal.value = false;
+      $.bsModalHide('renewDiskModal');
       alert('续费成功');
       await $.loadDisks();
     } catch (e) {

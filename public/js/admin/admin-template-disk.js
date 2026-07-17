@@ -86,9 +86,9 @@
       </div>
       <div class="card-body">
         <div v-if="diskPage.lifecycleConfig.value">
-          <table class="table table-bordered">
-            <thead class="table-light">
-              <tr><th style="width:200px">配置项</th><th>当前值</th><th style="width:100px">说明</th></tr>
+          <table class="table table-striped table-hover">
+            <thead>
+              <tr><th style="width:200px">配置项</th><th>当前值</th><th style="width:120px">说明</th></tr>
             </thead>
             <tbody>
               <tr>
