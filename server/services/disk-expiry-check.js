@@ -338,15 +338,17 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
 async function importExistingDisks() {
   try {
     // ===== 第一步：清理 PVE 中已不存在的孤立磁盘记录（仅清理 legacy 磁盘） =====
-    // 注意：只清理状态为 expired/destroyed 的 legacy 磁盘
-    // 不清理 bound/free 状态的磁盘，因为 PVE 可能使用 qemu 管理的卷而非 pvesm 可见
+    // 孤立记录定义：台账中有记录，但 PVE 中卷已不存在
+    // 只清理 bound/free 状态的 legacy 磁盘，因为：
+    // - bound/free：正常使用状态，PVE 卷不存在说明被手动删除
+    // - expired/grace：正常到期状态，VM 续费后会恢复，不应清理
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
     for (var d = 0; d < allDisks.length; d++) {
       var disk = allDisks[d];
       if (!disk.is_legacy) continue;
-      // 只清理已过期/已分离的 legacy 磁盘，不清理 bound/free 状态的
-      if (disk.status !== 'expired' && disk.status !== 'grace') continue;
+      // 只清理 bound/free 状态的 legacy 磁盘
+      if (disk.status !== 'bound' && disk.status !== 'free') continue;
       
       try {
         var sshConfig = await getPveSshConfig();
