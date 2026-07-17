@@ -146,7 +146,6 @@
             <pv-button @click="diskPage.cancelEditLifecycle" variant="secondary" size="sm">取消</pv-button>
             <pv-button @click="diskPage.resetLifecycleDefaults" variant="outline" size="sm">恢复默认</pv-button>
           </div>
-          <div v-if="diskPage.lifecycleSaveMsg" class="alert alert-success mt-3 py-2 mb-0">{{ diskPage.lifecycleSaveMsg }}</div>
         </div>
         <div v-else class="text-center text-muted py-3">加载中...</div>
       </div>

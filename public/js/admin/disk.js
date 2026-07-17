@@ -303,8 +303,7 @@
       if (!res.ok) return alert(data.error || '保存失败');
       $.diskPage.editingLifecycle.value = false;
       await $.diskPage.loadLifecycleConfig();
-      $.diskPage.lifecycleSaveMsg.value = '保存成功';
-      setTimeout(function() { $.diskPage.lifecycleSaveMsg.value = ''; }, 3000);
+      alert('保存成功');
     } catch (e) {
       alert('保存失败: ' + e.message);
     }
