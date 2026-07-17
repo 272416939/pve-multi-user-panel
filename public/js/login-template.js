@@ -44,8 +44,10 @@
                                     <span class="login-field-error" v-if="twofaError">{{ twofaError }}</span>
                                 </div>
                                 <p class="text-muted small text-center mb-3" style="font-size:0.82rem;line-height:1.5;">请输入身份验证器中的 6 位验证码，或使用恢复码登录</p>
-                                <pv-button type="button" variant="primary" @click="verifyTwofa">验证</pv-button>
-                                <pv-button type="button" variant="secondary" @click="backToLogin">返回</pv-button>
+                                <div class="d-flex gap-2 mt-3">
+                                <pv-button type="button" variant="primary" @click="verifyTwofa" style="flex:1">验证</pv-button>
+                                <pv-button type="button" variant="secondary" @click="backToLogin" style="flex:1">返回</pv-button>
+                                </div>
                             </div>
                             </div>
                             <div v-else-if="currentView === 'register'" class="register-form">
