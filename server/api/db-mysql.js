@@ -2314,8 +2314,8 @@ module.exports = {
     // 磁盘资产台账
     disks: {
         getById: (id) => queryOne('SELECT * FROM disks WHERE id = ?', [parseInt(id)]),
-        getByUserId: (userId) => queryAll('SELECT d.*, u.username FROM disks d LEFT JOIN users u ON d.user_id = u.id WHERE d.user_id = ? ORDER BY d.id DESC', [parseInt(userId)]),
-        getAll: () => queryAll('SELECT d.*, u.username FROM disks d LEFT JOIN users u ON d.user_id = u.id ORDER BY d.id DESC'),
+        getByUserId: (userId) => queryAll('SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name FROM disks d LEFT JOIN users u ON d.user_id = u.id LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id LEFT JOIN disk_specs ds ON d.spec_id = ds.id WHERE d.user_id = ? ORDER BY d.id DESC', [parseInt(userId)]),
+        getAll: () => queryAll('SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name FROM disks d LEFT JOIN users u ON d.user_id = u.id LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id LEFT JOIN disk_specs ds ON d.spec_id = ds.id ORDER BY d.id DESC'),
         getByVolumeId: (volId) => queryOne('SELECT * FROM disks WHERE volume_id = ?', [volId]),
         create: async (data) => {
             const [result] = await execute(

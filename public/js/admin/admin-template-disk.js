@@ -51,18 +51,33 @@
                 <h6 class="card-title mb-1">{{ spec.disk_type }}</h6>
                 <span class="text-muted small">{{ spec.name }}</span>
               </div>
-              <span class="badge" :class="spec.enabled ? 'bg-success' : 'bg-secondary'">{{ spec.enabled ? '启用' : '禁用' }}</span>
+              <span class="badge" :class="spec.enabled ? 'bg-success' : 'bg-secondary'">
+                <span v-if="spec.enabled">● 启用</span>
+                <span v-else>● 禁用</span>
+              </span>
             </div>
+            <div class="text-muted small mb-1"><strong>存储分组：</strong>{{ spec.group_name || '-' }}</div>
             <hr class="my-2">
             <div class="small">
-              <div><strong>存储分组：</strong>{{ spec.group_name || '-' }}</div>
               <div><strong>起售量：</strong>{{ spec.min_size_gb }} GiB &nbsp; <strong>截止量：</strong>{{ spec.max_size_gb }} GiB</div>
               <div><strong>月  价：</strong>￥{{ spec.price_per_gb }} 元/GiB</div>
               <div v-if="spec.quarterly_discount"><strong>季  付：</strong>{{ spec.quarterly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).quarterly }}/GiB/月）</div>
               <div v-if="spec.yearly_discount"><strong>年  付：</strong>{{ spec.yearly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).yearly }}/GiB/月）</div>
               <div><strong>存储池：</strong>{{ spec.storage_pool }}</div>
-              <div v-if="spec.mbps_rd || spec.mbps_wr"><strong>带宽限速：</strong>读 {{ spec.mbps_rd || '无' }} MB/s 写 {{ spec.mbps_wr || '无' }} MB/s</div>
-              <div v-if="spec.iops_rd || spec.iops_wr"><strong>IOPS 限速：</strong>读 {{ spec.iops_rd || '无' }} ops/s 写 {{ spec.iops_wr || '无' }} ops/s</div>
+              <div v-if="spec.mbps_rd || spec.mbps_wr"><strong>带宽限速：</strong>读 {{ spec.mbps_rd || '无' }} MB/s (突发 {{ spec.mbps_rd_max || '无' }}) / 写 {{ spec.mbps_wr || '无' }} MB/s (突发 {{ spec.mbps_wr_max || '无' }})</div>
+              <div v-if="spec.iops_rd || spec.iops_wr"><strong>IOPS 限速：</strong>读 {{ spec.iops_rd || '无' }} (突发 {{ spec.iops_rd_max || '无' }}) / 写 {{ spec.iops_wr || '无' }} (突发 {{ spec.iops_wr_max || '无' }})</div>
+              <div v-if="spec.description" class="mt-1 text-muted">{{ spec.description }}</div>
+            </div>
+            <!-- 存储池容量使用进度条 -->
+            <div v-if="diskPage.getStorageInfo(spec.storage_pool)" class="mt-2">
+              <div class="d-flex justify-content-between small text-muted mb-1">
+                <span>存储池使用率</span>
+                <span>{{ diskPage.getStorageInfo(spec.storage_pool).used_pct }}%</span>
+              </div>
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar" :class="diskPage.getStorageUsageClass(diskPage.getStorageInfo(spec.storage_pool).used_pct)" :style="{ width: diskPage.getStorageInfo(spec.storage_pool).used_pct + '%' }"></div>
+              </div>
+              <div class="small text-muted mt-1">剩余：{{ diskPage.formatStorageSize(diskPage.getStorageInfo(spec.storage_pool).avail_gb) }} / 总量：{{ diskPage.formatStorageSize(diskPage.getStorageInfo(spec.storage_pool).total_gb) }}</div>
             </div>
             <div class="mt-3">
               <pv-button @click="diskPage.openDiskSpecForm(spec)" variant="outline" size="sm">编辑</pv-button>
@@ -270,8 +285,7 @@
             <label class="form-label">存储位置</label>
             <select class="form-select" v-model="diskPage.diskSpecForm.value.storage_pool">
               <option value="">请选择</option>
-              <option value="local-lvm">local-lvm</option>
-              <option value="local">local</option>
+              <option v-for="s in diskPage.pveStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} (剩余 {{ diskPage.formatStorageSize(s.avail_gb) }})</option>
             </select>
           </div>
           <div class="col-md-3">

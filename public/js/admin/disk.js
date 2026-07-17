@@ -104,6 +104,7 @@
 
   // ===== 硬盘规格管理 =====
   $.diskPage.diskSpecs = ref([]);
+  $.diskPage.pveStorages = ref([]);
   $.diskPage.diskSpecForm = ref({
     name: '', disk_type: 'NVME', storage_group_id: '', enabled: true,
     min_size_gb: 10, max_size_gb: 2000, price_per_gb: 0.8,
@@ -126,7 +127,44 @@
     }
   };
 
-  $.diskPage.openDiskSpecForm = function(spec) {
+  // 加载 PVE 存储列表（供存储位置下拉）
+  $.diskPage.loadPveStorages = async function() {
+    try {
+      var res = await authFetch('/api/pve-storages');
+      if (!res.ok) throw new Error('加载失败');
+      $.diskPage.pveStorages.value = await res.json();
+    } catch (e) {
+      console.error('[disk] 加载 PVE 存储列表失败:', e.message);
+    }
+  };
+
+  // 格式化存储容量显示
+  $.diskPage.formatStorageSize = function(gb) {
+    if (!gb || gb <= 0) return '未知';
+    if (gb >= 1024) return (gb / 1024).toFixed(1) + ' TiB';
+    return gb + ' GiB';
+  };
+
+  // 存储使用率颜色分级（文档 3.3.3）
+  $.diskPage.getStorageUsageClass = function(pct) {
+    if (pct >= 90) return 'bg-danger';
+    if (pct >= 70) return 'bg-warning';
+    return 'bg-success';
+  };
+
+  // 根据存储池名称查找 PVE 存储信息
+  $.diskPage.getStorageInfo = function(poolName) {
+    if (!poolName) return null;
+    var storages = $.diskPage.pveStorages.value || [];
+    for (var i = 0; i < storages.length; i++) {
+      if (storages[i].storage === poolName) return storages[i];
+    }
+    return null;
+  };
+
+  $.diskPage.openDiskSpecForm = async function(spec) {
+    // 先加载 PVE 存储列表（供存储位置下拉）
+    await $.diskPage.loadPveStorages();
     $.diskPage.editingDiskSpec.value = spec;
     if (spec) {
       $.diskPage.diskSpecForm.value = {
@@ -285,5 +323,6 @@
     $.diskPage.loadStorageGroups();
     $.diskPage.loadDiskSpecs();
     $.diskPage.loadLifecycleConfig();
+    $.diskPage.loadPveStorages();
   };
 })();

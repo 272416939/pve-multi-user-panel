@@ -108,6 +108,23 @@
     });
   };
 
+  // 获取选中规格的最低/最大容量（用于容量滑块范围）
+  $.getSelectedSpecMin = function() {
+    var specId = $.diskPurchaseForm.value.spec_id;
+    if (!specId) return 10;
+    var specs = $.diskOptions.value && $.diskOptions.value.specs ? $.diskOptions.value.specs : [];
+    var spec = specs.find(function(s) { return s.id === parseInt(specId); });
+    return spec ? spec.min_size_gb : 10;
+  };
+
+  $.getSelectedSpecMax = function() {
+    var specId = $.diskPurchaseForm.value.spec_id;
+    if (!specId) return 2000;
+    var specs = $.diskOptions.value && $.diskOptions.value.specs ? $.diskOptions.value.specs : [];
+    var spec = specs.find(function(s) { return s.id === parseInt(specId); });
+    return spec ? spec.max_size_gb : 2000;
+  };
+
   // 选择规格时自动设置容量范围
   $.onSpecChange = function() {
     var specId = $.diskPurchaseForm.value.spec_id;

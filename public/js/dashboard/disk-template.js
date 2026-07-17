@@ -35,12 +35,14 @@
             <th style="width:40px"><input type="checkbox" @change="selectedDisks = $event.target.checked ? disks.map(function(d) { return d.id; }) : []" :checked="selectedDisks.length === disks.length && disks.length > 0"></th>
             <th>ID</th>
             <th>名称</th>
+            <th>存储分组</th>
             <th>规格名称</th>
             <th>类型</th>
             <th>容量</th>
             <th>状态</th>
             <th>绑定虚拟机</th>
             <th>到期时间</th>
+            <th>剩余天数</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -49,18 +51,20 @@
             <td><input type="checkbox" v-model="selectedDisks" :value="disk.id"></td>
             <td>{{ disk.id }}</td>
             <td>{{ disk.disk_name || '-' }}</td>
-            <td>{{ disk.spec_id ? disk.spec_id : '-' }}</td>
+            <td>{{ disk.group_name || '-' }}</td>
+            <td>{{ disk.spec_name || '-' }}</td>
             <td><span :class="getDiskTypeBadge(disk.disk_type)">{{ disk.disk_type }}</span></td>
             <td>{{ disk.capacity_gb }} GiB</td>
             <td><span :class="getDiskStatusClass(disk.status)">{{ getDiskStatusText(disk.status) }}</span></td>
             <td>{{ disk.bind_vmid ? 'VM-' + disk.bind_vmid : '-' }}</td>
             <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? formatDate(disk.expire_time) : '-' }}</td>
+            <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? daysUntilExpire(disk.expire_time) : '-' }}</td>
             <td>
               <button class="btn btn-sm btn-outline-primary" @click="openRenewModal(disk)" :disabled="disk.status === 'destroyed'">续费</button>
             </td>
           </tr>
           <tr v-if="disks.length === 0">
-            <td colspan="10" class="text-center text-muted py-4">暂无硬盘，点击"新建"购买数据盘</td>
+            <td colspan="12" class="text-center text-muted py-4">暂无硬盘，点击"新建"购买数据盘</td>
           </tr>
         </tbody>
       </table>
@@ -78,31 +82,37 @@
       </div>
       <div class="modal-body">
         <div class="mb-3">
-          <label class="form-label">存储分组</label>
-          <select class="form-select" v-model="diskPurchaseForm.storage_group_id" @change="diskPurchaseForm.spec_id = ''; calcDiskPrice()">
-            <option value="">请选择</option>
-            <option v-for="g in diskOptionsGroups" :key="g.id" :value="g.id">{{ g.name }}</option>
-          </select>
+          <label class="form-label">存储分组（必选）</label>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm" v-for="g in diskOptionsGroups" :key="g.id" :class="diskPurchaseForm.storage_group_id === g.id ? 'btn-primary' : 'btn-outline-secondary'" @click="diskPurchaseForm.storage_group_id = g.id; diskPurchaseForm.spec_id = ''; calcDiskPrice()">{{ g.name }}</button>
+            <span v-if="diskOptionsGroups.length === 0" class="text-muted small">暂无可用存储分组</span>
+          </div>
         </div>
         <div class="mb-3">
-          <label class="form-label">硬盘规格</label>
-          <select class="form-select" v-model="diskPurchaseForm.spec_id" @change="onSpecChange">
-            <option value="">请选择</option>
-            <option v-for="s in getSpecsByGroup(diskPurchaseForm.storage_group_id)" :key="s.id" :value="s.id">
-              {{ s.name }} ({{ s.disk_type }}) - ￥{{ s.price_per_gb }}/GiB/月
-            </option>
-          </select>
+          <label class="form-label">硬盘规格（必选）</label>
+          <div v-if="diskPurchaseForm.storage_group_id" class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm" v-for="s in getSpecsByGroup(diskPurchaseForm.storage_group_id)" :key="s.id" :class="diskPurchaseForm.spec_id === s.id ? 'btn-primary' : 'btn-outline-secondary'" @click="diskPurchaseForm.spec_id = s.id; onSpecChange()">
+              <div>{{ s.name }} ({{ s.disk_type }})</div>
+              <small class="d-block">￥{{ s.price_per_gb }}/GiB/月 <span v-if="s.quarterly_discount">季{{s.quarterly_discount}}%off</span> <span v-if="s.yearly_discount">年{{s.yearly_discount}}%off</span></small>
+            </button>
+            <span v-if="getSpecsByGroup(diskPurchaseForm.storage_group_id).length === 0" class="text-muted small">该分组暂无可用规格</span>
+          </div>
+          <span v-else class="text-muted small">请先选择存储分组</span>
         </div>
         <div class="mb-3">
-          <label class="form-label">容量 (GiB)</label>
+          <label class="form-label">容量 (GiB) <small class="text-muted">范围：{{ getSelectedSpecMin() }}-{{ getSelectedSpecMax() }} GiB</small></label>
           <div class="d-flex align-items-center gap-2">
-            <input class="form-control" type="range" v-model.number="diskPurchaseForm.capacity_gb" min="10" max="2000" style="flex:1">
-            <input class="form-control" type="number" v-model.number="diskPurchaseForm.capacity_gb" min="10" style="width:100px">
+            <input class="form-control" type="range" v-model.number="diskPurchaseForm.capacity_gb" :min="getSelectedSpecMin()" :max="getSelectedSpecMax()" style="flex:1">
+            <input class="form-control" type="number" v-model.number="diskPurchaseForm.capacity_gb" :min="getSelectedSpecMin()" :max="getSelectedSpecMax()" style="width:100px">
           </div>
         </div>
         <div class="mb-3">
           <label class="form-label">硬盘名称</label>
           <input class="form-control" v-model="diskPurchaseForm.disk_name" maxlength="100" placeholder="选填">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">计费模式</label>
+          <div class="text-muted small">包年包月</div>
         </div>
         <div class="mb-3">
           <label class="form-label">购买时长</label>

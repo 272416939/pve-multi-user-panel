@@ -7,6 +7,7 @@ var { authMiddleware, adminMiddleware } = require('../middleware/auth');
 var { safeError } = require('../utils/safe-error');
 var cacheStore = require('../utils/cache-store');
 var db = require('../api/db');
+var pveApi = require('../api/pve-api');
 
 // 规格列表缓存（5 分钟 TTL）
 var specCache = cacheStore.create('disk_specs', 300);
@@ -17,6 +18,36 @@ function clearDiskCache() {
   specCache.del('all');
   groupCache.del('all');
 }
+
+// ==================== PVE 存储列表（供规格弹窗存储位置下拉） ====================
+
+// 获取 PVE 所有存储及剩余容量（文档 3.3：下拉展示 PVE 所有存储及剩余容量）
+router.get('/pve-storages', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    var storages = await pveApi.getAllStorages();
+    // 格式化返回：{ storage, type, total, used, avail, total_gb, avail_gb }
+    var result = (storages || []).map(function(s) {
+      var total = parseInt(s.total) || 0;
+      var used = parseInt(s.used) || 0;
+      var avail = total - used;
+      // PVE 返回字节，转 GiB
+      var totalGb = Math.floor(total / (1024 * 1024 * 1024));
+      var availGb = Math.floor(avail / (1024 * 1024 * 1024));
+      var usedPct = total > 0 ? Math.round((used / total) * 100) : 0;
+      return {
+        storage: s.storage,
+        type: s.type || '',
+        total_gb: totalGb,
+        avail_gb: availGb,
+        used_pct: usedPct,
+        content: s.content || ''
+      };
+    });
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: safeError(e) });
+  }
+});
 
 // ==================== 存储分组管理 ====================
 
