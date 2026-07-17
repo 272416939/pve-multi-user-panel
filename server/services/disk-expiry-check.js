@@ -185,8 +185,9 @@ async function checkExpiredDisks() {
     var now = new Date();
     var today = todayStr();
 
-    // 获取所有即将到期/已到期的磁盘
+    // 获取所有即将到期/已到期的磁盘（排除 legacy 磁盘，legacy 随 VM 计费）
     var disks = await db.disks.getExpiring();
+    disks = disks.filter(function(d) { return !d.is_legacy; });
     if (!disks || disks.length === 0) return;
 
     console.log('[disk-expiry] 巡检 ' + disks.length + ' 个磁盘');
@@ -436,10 +437,11 @@ async function importExistingDisks() {
               disk_type: diskType,
               capacity_gb: capacityGb,
               status: 'bound',
-              price_per_gb: pricePerGb,
-              quarterly_discount: qDiscount,
-              yearly_discount: yDiscount,
+              price_per_gb: 0,
+              quarterly_discount: 0,
+              yearly_discount: 0,
               auto_renew: 0,
+              is_legacy: 1,
               expire_time: vm.expiration_date || null,
               mbps_rd: matchedSpec ? matchedSpec.mbps_rd : null,
               mbps_rd_max: matchedSpec ? matchedSpec.mbps_rd_max : null,

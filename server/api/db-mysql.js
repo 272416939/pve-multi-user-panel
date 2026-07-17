@@ -562,6 +562,7 @@ async function initDb() {
         quarterly_discount INT DEFAULT 0,
         yearly_discount INT DEFAULT 0,
         auto_renew TINYINT(1) DEFAULT 0,
+        is_legacy TINYINT(1) DEFAULT 0,
         create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
         expire_time DATETIME DEFAULT NULL,
         mbps_rd INT DEFAULT NULL,
@@ -576,7 +577,8 @@ async function initDb() {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_disks_user (user_id),
         INDEX idx_disks_status (status),
-        INDEX idx_disks_vmid (bind_vmid)
+        INDEX idx_disks_vmid (bind_vmid),
+        INDEX idx_disks_legacy (is_legacy)
     )`);
 
     // 创建磁盘生命周期配置表
@@ -810,7 +812,17 @@ async function createDefaultAdmin() {
         console.log('================================================');
     }
 
-    // 兼容旧数据库：添加 must_change_password 字段（如果不存在）
+// 兼容旧数据库：添加 is_legacy 字段（如果不存在）+ 存量迁移
+try {
+    await execute("ALTER TABLE disks ADD COLUMN is_legacy TINYINT(1) DEFAULT 0");
+    // 存量迁移：将名称以 imported- 开头的磁盘标记为 legacy
+    await execute("UPDATE disks SET is_legacy = 1 WHERE disk_name LIKE 'imported-%' AND is_legacy = 0");
+    console.log('[DB] disks.is_legacy 字段迁移完成');
+} catch (e) {
+    // 字段已存在，忽略错误
+}
+
+// 兼容旧数据库：添加 must_change_password 字段（如果不存在）
     try {
         await execute("ALTER TABLE users ADD COLUMN must_change_password INT DEFAULT 0");
     } catch (e) {
@@ -2316,17 +2328,21 @@ module.exports = {
         countDisksBySpec: (specId) => queryOne('SELECT COUNT(*) AS cnt FROM disks WHERE spec_id = ? AND status != ?', [parseInt(specId), 'destroyed'])
     },
 
-    // 磁盘资产台账
+// 磁盘资产台账
     disks: {
         getById: (id) => queryOne('SELECT * FROM disks WHERE id = ?', [parseInt(id)]),
         getByUserId: (userId) => queryAll('SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name FROM disks d LEFT JOIN users u ON d.user_id = u.id LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id LEFT JOIN disk_specs ds ON d.spec_id = ds.id WHERE d.user_id = ? ORDER BY d.id DESC', [parseInt(userId)]),
         getAll: () => queryAll('SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name FROM disks d LEFT JOIN users u ON d.user_id = u.id LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id LEFT JOIN disk_specs ds ON d.spec_id = ds.id ORDER BY d.id DESC'),
         getByVolumeId: (volId) => queryOne('SELECT * FROM disks WHERE volume_id = ?', [volId]),
+        // 查询绑定到指定 VMID 的所有磁盘
+        getByBindVmid: (vmid) => queryAll('SELECT * FROM disks WHERE bind_vmid = ?', [parseInt(vmid)]),
+        // 删除绑定到指定 VMID 的 legacy 磁盘记录（不操作 PVE，VM 移除/销毁时调用）
+        deleteByBindVmid: (vmid) => execute('DELETE FROM disks WHERE bind_vmid = ? AND is_legacy = 1', [parseInt(vmid)]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-                [data.volume_id, data.disk_name || '', data.spec_id || null, parseInt(data.user_id), parseInt(data.storage_group_id), data.storage_pool, data.disk_type, parseInt(data.capacity_gb), data.status || 'free', parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.auto_renew ? 1 : 0, data.expire_time || null, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null]
+                `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, is_legacy, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                [data.volume_id, data.disk_name || '', data.spec_id || null, parseInt(data.user_id), parseInt(data.storage_group_id), data.storage_pool, data.disk_type, parseInt(data.capacity_gb), data.status || 'free', parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.auto_renew ? 1 : 0, data.is_legacy ? 1 : 0, data.expire_time || null, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null]
             );
             return queryOne('SELECT * FROM disks WHERE id = ?', [result.insertId]);
         },

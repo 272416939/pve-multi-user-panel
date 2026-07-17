@@ -51,7 +51,7 @@
           <tr v-for="disk in disks" :key="disk.id">
             <td class="text-center"><input type="checkbox" v-model="selectedDisks" :value="disk.id"></td>
             <td class="text-center">{{ disk.id }}</td>
-            <td>{{ disk.disk_name || '-' }}</td>
+            <td>{{ disk.disk_name || '-' }}<span v-if="disk.is_legacy" class="text-muted small ms-1">(随VM)</span></td>
             <td>{{ disk.group_name || '-' }}</td>
             <td>{{ disk.spec_name || '-' }}</td>
             <td class="text-center"><span :class="getDiskTypeBadge(disk.disk_type)">{{ disk.disk_type }}</span></td>
@@ -67,8 +67,9 @@
               <span v-else class="text-muted">-</span>
             </td>
             <td class="text-center">
-              <button v-if="disk.status !== 'destroyed'" class="table-btn btn-info" @click="openDiskRenewModal(disk)">续费</button>
-              <button v-else class="table-btn btn-danger" @click="deleteDestroyedDisk(disk)">删除</button>
+              <button v-if="disk.status !== 'destroyed' && !disk.is_legacy" class="table-btn btn-info" @click="openDiskRenewModal(disk)">续费</button>
+              <span v-if="disk.status !== 'destroyed' && disk.is_legacy" class="text-muted small">-</span>
+              <button v-else-if="disk.status === 'destroyed'" class="table-btn btn-danger" @click="deleteDestroyedDisk(disk)">删除</button>
             </td>
           </tr>
           <tr v-if="disks.length === 0">

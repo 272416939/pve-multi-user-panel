@@ -414,6 +414,12 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
             }
         } catch (e) { console.error('VM MAC分组删除失败:', e.message); }
     }
+    // 清理绑定在当前 VM 上的 legacy 磁盘台账记录（不操作 PVE 磁盘本身）
+    try {
+        if (vm && vm.vm_id) {
+            await db.disks.deleteByBindVmid(vm.vm_id);
+        }
+    } catch (e) { console.error('清理 legacy 磁盘记录失败:', e.message); }
     await db.vms.delete(vmId);
     // 发送移除通知
     if (removedVmInfo) {
@@ -862,6 +868,10 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                     }
                 } catch (e) { console.error('VM MAC分组删除失败:', e.message); }
             }
+            // 清理绑定在当前 VM 上的 legacy 磁盘台账记录（不操作 PVE 磁盘本身）
+            try {
+                await db.disks.deleteByBindVmid(vm.vm_id);
+            } catch (e) { console.error('清理 legacy 磁盘记录失败:', e.message); }
             await db.vms.delete(vm.id);
         }
 

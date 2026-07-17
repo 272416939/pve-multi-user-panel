@@ -596,6 +596,8 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
             // 2. 更新到期时间
             if (type === 'vm') {
                 await conn.execute('UPDATE vms SET expiration_date = ? WHERE id = ?', [newExpiration, resource.id]);
+                // 同步更新绑定 VM 的 legacy 磁盘到期时间（不独立计费，随 VM 走）
+                await conn.execute('UPDATE disks SET expire_time = ? WHERE bind_vmid = ? AND is_legacy = 1', [newExpiration, resource.vm_id]);
             } else {
                 await conn.execute('UPDATE lxc_containers SET expiration_date = ? WHERE id = ?', [newExpiration, resource.id]);
             }
