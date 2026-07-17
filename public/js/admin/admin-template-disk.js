@@ -130,7 +130,7 @@
                 <option value="daily">每日1次</option>
                 <option value="twice_daily">每日2次</option>
               </select>
-              <div class="form-text">-</div>
+              <div class="form-text">&nbsp;</div>
             </div>
             <div class="col-md-4">
               <label class="form-label">宽限期提醒频率</label>
@@ -138,7 +138,7 @@
                 <option value="daily">每日1次</option>
                 <option value="twice_daily">每日2次</option>
               </select>
-              <div class="form-text">-</div>
+              <div class="form-text">&nbsp;</div>
             </div>
           </div>
           <div class="mt-4 d-flex gap-2">
