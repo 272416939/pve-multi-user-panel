@@ -354,10 +354,16 @@ async function importExistingDisks() {
         var sshConfig = await getPveSshConfig();
         if (!sshConfig.host || !sshConfig.password) continue;
         
-        // 使用 pvesm path 检查卷是否存在（比 pvesm status 更准确）
-        var cmd = 'pvesm path ' + disk.volume_id + ' 2>/dev/null';
+        // 解析 volume_id（格式：storage:volume_name）
+        var volParts = (disk.volume_id || '').split(':');
+        if (volParts.length !== 2) continue;
+        var storagePool = volParts[0];
+        var volName = volParts[1];
+        
+        // 使用 pvesh get 检查卷是否存在
+        var cmd = 'pvesh get /storage/' + storagePool + '/content/' + volName + ' --noborder 2>&1';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
-        if (result.code !== 0 || (result.stderr && result.stderr.indexOf('no such') !== -1) || (result.stdout || '').trim() === '') {
+        if (result.code !== 0 || (result.stderr && result.stderr.indexOf('does not exist') !== -1)) {
           // PVE 卷不存在，直接删除孤立记录
           const [delResult] = await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
           if (delResult.affectedRows > 0) {
@@ -367,6 +373,9 @@ async function importExistingDisks() {
         }
       } catch (e) {
         // 检查失败，跳过该记录
+        console.error('[disk-import] 检查磁盘 ' + disk.volume_id + ' 失败:', e.message);
+      }
+    }
         console.error('[disk-import] 检查磁盘 ' + disk.volume_id + ' 失败:', e.message);
       }
     }
