@@ -474,13 +474,19 @@
         --bs-table-hover-bg: rgba(99,102,241,0.04); --bs-table-active-bg: rgba(99,102,241,0.06);
     }
     /* 选中行高亮 - 不随鼠标移开消失 */
-    .table tr.table-active {
+    table tbody tr.table-active,
+    table tbody tr.table-active:hover,
+    .table tbody tr.table-active,
+    .table tbody tr.table-active:hover {
         background: rgba(99,102,241,0.12) !important;
-        outline: 1px solid rgba(99,102,241,0.3);
+        outline: 1px solid rgba(99,102,241,0.3) !important;
     }
-    [data-theme="light"] .table tr.table-active {
+    [data-theme="light"] table tbody tr.table-active,
+    [data-theme="light"] table tbody tr.table-active:hover,
+    [data-theme="light"] .table tbody tr.table-active,
+    [data-theme="light"] .table tbody tr.table-active:hover {
         background: rgba(99,102,241,0.15) !important;
-        outline: 1px solid rgba(99,102,241,0.4);
+        outline: 1px solid rgba(99,102,241,0.4) !important;
     }
     .table-dark { background: var(--bg-hover) !important; border-color: var(--border-color) !important; }
     .table > thead, .table-striped > thead, .table-sm > thead, .table-hover > thead, .table-dark > thead {
