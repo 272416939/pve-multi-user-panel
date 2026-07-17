@@ -55,8 +55,8 @@ function validateVolumeId(volumeId) {
   // 第二层：前缀校验（仅允许 disk-pool- 前缀的数据盘）
   var parts = volumeId.split(':');
   var volName = parts[1] || '';
-  // 允许 disk-pool- 前缀或 imported- 前缀（存量导入）
-  if (volName.indexOf('disk-pool-') !== 0 && volName.indexOf('imported-') !== 0) {
+  // 允许 vm- 前缀（PVE 命名规范）、disk-pool- 前缀或 imported- 前缀（存量导入）
+  if (volName.indexOf('vm-') !== 0 && volName.indexOf('disk-pool-') !== 0 && volName.indexOf('imported-') !== 0) {
     throw new Error('不允许操作非数据盘卷（仅允许 disk-pool- 或 imported- 前缀）');
   }
   // 第三层：禁止操作系统盘
@@ -95,9 +95,9 @@ async function createDisk(storage, sizeGb, userId, tempVmid) {
     safeVmid = 9999;
   }
 
-  // 服务端生成卷名前缀（用户不可控）
-  var random = crypto.randomBytes(6).toString('hex');
-  var volName = 'disk-pool-u' + safeUserId + '-' + random;
+  // 服务端生成卷名（PVE 命名规范：vm-{vmid}-disk-{数字}）
+  var randSuffix = crypto.randomBytes(4).readUInt32BE(0) % 10000;
+  var volName = 'vm-' + safeVmid + '-disk-' + randSuffix;
 
   // pvesm alloc 语法：pvesm alloc <storage> <vmid> <filename> <size>
   // vmid 必须是一个真实存在的 VM ID（不能为 0）
