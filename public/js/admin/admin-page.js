@@ -82,7 +82,7 @@ var App = {
         if (!$.diskPage.diskSpecForm) $.diskPage.diskSpecForm = Vue.ref({ name: '', disk_type: 'NVME', storage_group_id: '', enabled: true, min_size_gb: 10, max_size_gb: 2000, price_per_gb: 0.8, quarterly_discount: 0, yearly_discount: 0, storage_pool: '', mbps_rd: '', mbps_rd_max: '', mbps_wr: '', mbps_wr_max: '', iops_rd: '', iops_rd_max: '', iops_wr: '', iops_wr_max: '', description: '' });
         if (!$.diskPage.editingLifecycle) $.diskPage.editingLifecycle = Vue.ref(false);
         if (!$.diskPage.lifecycleForm) $.diskPage.lifecycleForm = Vue.ref({ warn_days: 7, warn_frequency: 'daily', grace_days: 3, grace_frequency: 'twice_daily', shutdown_timeout: 300, retention_days: 15, auto_renew_days: 1 });
-        if (!$.activeTabDisk) $.activeTabDisk = Vue.ref('storage-groups');
+        if (!$.activeTabDisk) $.activeTabDisk = Vue.ref(localStorage.getItem('admin_activeTabDisk') || 'storage-groups');
         $.initCore();
         $.initVm();
         $.initLxc();

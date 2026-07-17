@@ -15,7 +15,7 @@
     $.activeTab = ref((savedTab === 'assign' ? 'users' : savedTab) || 'users');
     $.activeTabLxc = ref(localStorage.getItem('admin_activeTabLxc') || 'create');
     $.activeTabVm = ref(localStorage.getItem('admin_activeTabVm') || 'manage');
-    $.activeTabDisk = ref('storage-groups');
+    $.activeTabDisk = ref(localStorage.getItem('admin_activeTabDisk') || 'storage-groups');
     $.loading = ref(false);
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
@@ -883,7 +883,7 @@ $.initDetailCharts = function() {
                 await $.loadData();
                 await $.loadMacGroups();
                 // Auto-expand submenu based on current section
-                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance'];
+                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance', 'disk-settings'];
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
                         var section = $.activeSection.value;
@@ -1050,6 +1050,10 @@ $.initDetailCharts = function() {
 
         watch($.activeTabTemplates, function(newTab) {
             localStorage.setItem('admin_activeTabTemplates', newTab);
+        });
+
+        watch($.activeTabDisk, function(newTab) {
+            localStorage.setItem('admin_activeTabDisk', newTab);
         });
 
         watch($.activeSection, function(val) {
