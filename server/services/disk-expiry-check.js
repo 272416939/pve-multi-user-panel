@@ -377,9 +377,6 @@ async function importExistingDisks() {
         console.error('[disk-import] 检查磁盘 ' + disk.volume_id + ' 失败:', e.message);
       }
     }
-        console.error('[disk-import] 检查磁盘 ' + disk.volume_id + ' 失败:', e.message);
-      }
-    }
     if (cleanedCount > 0) {
       console.log('[disk-import] 清理了 ' + cleanedCount + ' 个孤立 legacy 磁盘记录');
     }
