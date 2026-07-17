@@ -9,21 +9,6 @@
 <!-- 硬盘设置 -->
 <div v-if="activeSection === 'disk-settings' && diskPage && diskPage.storageGroups">
 
-  <!-- 子标签导航 -->
-  <div class="mb-3">
-    <ul class="nav nav-tabs">
-      <li class="nav-item">
-        <a class="nav-link" :class="{ active: activeTabDisk === 'storage-groups' }" href="#" @click.prevent="activeTabDisk = 'storage-groups'">存储分组管理</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" :class="{ active: activeTabDisk === 'specs' }" href="#" @click.prevent="activeTabDisk = 'specs'">数据盘管理</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" :class="{ active: activeTabDisk === 'lifecycle' }" href="#" @click.prevent="activeTabDisk = 'lifecycle'">生命周期与到期处理</a>
-      </li>
-    </ul>
-  </div>
-
   <!-- ====== 存储分组管理 ====== -->
   <div v-if="activeTabDisk === 'storage-groups'">
     <div class="d-flex justify-content-between align-items-center mb-3">
