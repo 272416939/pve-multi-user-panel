@@ -18,6 +18,21 @@ var PARAM_PATTERNS = {
   diskType: { type: 'enum', values: ['NVME', 'SATA', 'HDD', 'U2'] },
 };
 
+// 系统盘总线设备名防护：禁止操作 *0（如 scsi0、virtio0、sata0）
+function isSystemDiskBus(bus, dev) {
+  return parseInt(dev) === 0;
+}
+
+// 校验总线设备名（如 scsi1）非系统盘
+function validateBusDev(bus, dev) {
+  var safeBus = validateParam('bus', bus);
+  var safeDev = validateParam('dev', dev);
+  if (isSystemDiskBus(safeBus, safeDev)) {
+    throw new Error('禁止操作系统盘（' + safeBus + safeDev + '）');
+  }
+  return safeBus + safeDev;
+}
+
 function validateParam(name, value) {
   var rule = PARAM_PATTERNS[name];
   if (!rule) throw new Error('未知参数: ' + name);
@@ -117,8 +132,7 @@ async function createDisk(storage, sizeGb, userId, tempVmid) {
 async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
   var safeVmid = validateParam('vmid', vmid);
   var safeVol = validateVolumeId(volumeId);
-  var safeBus = validateParam('bus', bus);
-  var safeDev = validateParam('dev', dev);
+  var busDev = validateBusDev(bus, dev); // 校验并拼接，禁止系统盘位置
   qosParams = qosParams || {};
 
   // VM 状态前置检查（必须关机）
@@ -137,16 +151,15 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
     }
   }
 
-  var cmd = 'qm set ' + safeVmid + ' --' + safeBus + safeDev + ' ' + diskConfig;
+  var cmd = 'qm set ' + safeVmid + ' --' + busDev + ' ' + diskConfig;
   await runSshCommand(cmd);
-  return { bus: safeBus, dev: safeDev };
+  return { bus: bus, dev: parseInt(dev) };
 }
 
 // 卸载磁盘 - qm set <vmid> --delete <bus><dev>
 async function unbindDisk(vmid, bus, dev) {
   var safeVmid = validateParam('vmid', vmid);
-  var safeBus = validateParam('bus', bus);
-  var safeDev = validateParam('dev', dev);
+  var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
 
   // VM 状态前置检查（必须关机）
   var vmStatus = await pveApi.getVmStatus(safeVmid);
@@ -154,35 +167,34 @@ async function unbindDisk(vmid, bus, dev) {
     throw new Error('虚拟机正在运行，需先关机再卸载');
   }
 
-  var cmd = 'qm set ' + safeVmid + ' --delete ' + safeBus + safeDev;
+  var cmd = 'qm set ' + safeVmid + ' --delete ' + busDev;
   await runSshCommand(cmd);
 }
 
 // 扩容磁盘 - qm resize <vmid> <bus+dev> <size>
-// 已挂载磁盘：使用 bind_vmid + bind_bus + bind_dev（如 scsi0）
-// 游离磁盘：先挂载到中转 VM，扩容后再卸载
+// 已挂载磁盘：使用 bind_vmid + bind_bus + bind_dev（如 scsi1，禁止 scsi0）
+// 游离磁盘：先挂载到中转 VM（scsi30），扩容后再卸载
 async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid, bindBus, bindDev) {
   var safeVol = validateVolumeId(volumeId);
   var safeSize = validateParam('sizeGb', newSizeGb);
 
   if (bindVmid && Number.isInteger(parseInt(bindVmid)) && parseInt(bindVmid) >= 100 && bindBus && bindDev) {
-    // 已挂载磁盘：直接用绑定的 vmid + 总线设备名（如 scsi0）
+    // 已挂载磁盘：校验总线设备名（禁止系统盘 scsi0/virtio0/sata0）
     var safeVmid = parseInt(bindVmid);
-    var safeBus = validateParam('bus', bindBus);
-    var safeDev = validateParam('dev', bindDev);
-    var cmd = 'qm resize ' + safeVmid + ' ' + safeBus + safeDev + ' ' + safeSize + 'G';
+    var busDev = validateBusDev(bindBus, bindDev);
+    var cmd = 'qm resize ' + safeVmid + ' ' + busDev + ' ' + safeSize + 'G';
     await runSshCommand(cmd);
   } else {
-    // 游离磁盘：挂载到中转 VM -> 扩容 -> 卸载
+    // 游离磁盘：挂载到中转 VM（scsi30 避免冲突，且 != 0 系统盘位置）-> 扩容 -> 卸载
     var transitVmid = parseInt(tempVmid) || 9999;
     if (!Number.isInteger(transitVmid) || transitVmid < 100 || transitVmid > 999999999) {
       transitVmid = 9999;
     }
-    // 挂载到中转 VM（scsi30 避免冲突）
+    // 挂载到中转 VM（scsi30 固定位置，非系统盘 scsi0）
     var attachCmd = 'qm set ' + transitVmid + ' --scsi30 ' + safeVol;
     await runSshCommand(attachCmd);
     try {
-      // 执行扩容
+      // 执行扩容（scsi30 非 0，安全）
       var resizeCmd = 'qm resize ' + transitVmid + ' scsi30 ' + safeSize + 'G';
       await runSshCommand(resizeCmd);
     } finally {
