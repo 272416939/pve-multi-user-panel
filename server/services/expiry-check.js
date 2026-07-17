@@ -227,6 +227,10 @@ const checkExpiredVms = async () => {
                     if (status.status === 'running') {
                         await pveApi.shutdownVm(vm.vm_id);
                     }
+                    // 标记关机原因为"到期自动关机"，便于续费后判断是否自动开机
+                    try {
+                        if (vm.id) await db.vms.update(vm.id, { shutdown_reason: 'expired' });
+                    } catch (e) { console.error(`[expiry] VM ${vm.vm_id} 标记关机原因失败:`, e.message); }
                 } catch (error) {
                     console.error(`处理虚拟机 ${vm.vm_id} 失败:`, error.message);
                     if (error.response) {
@@ -366,6 +370,10 @@ async function checkExpiredLxc() {
                         await pveApi.stopLxc(ct.ct_id);
                         console.log(`[LXC到期] 已自动关机 CT ${ct.ct_id} (${ct.name || ''})`);
                     }
+                    // 标记关机原因为"到期自动关机"
+                    try {
+                        if (ct.id) await db.lxcContainers.update(ct.id, { shutdown_reason: 'expired' });
+                    } catch (e) { console.error(`[expiry] CT ${ct.ct_id} 标记关机原因失败:`, e.message); }
                 } catch (e) {
                     console.error(`自动关机 LXC ${ct.ct_id} 失败:`, e.message);
                 }

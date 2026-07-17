@@ -607,17 +607,24 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         });
 
         // 续费后自动开机（PVE 操作不放入事务，避免长事务）
+        // 仅当关机原因是"到期自动关机"才自动开机，用户手动关机的资源不自动开机
         try {
             var renewVmid = type === 'vm' ? resource.vm_id : resource.ct_id;
-            if (type === 'vm') {
-                var renewStatus = await pveApi.getVmStatus(renewVmid);
-                if (renewStatus && renewStatus.status === 'stopped') {
-                    await pveApi.startVm(renewVmid);
-                }
-            } else {
-                var renewLxcStatus = await pveApi.getLxcStatus(renewVmid);
-                if (renewLxcStatus && renewLxcStatus.status === 'stopped') {
-                    await pveApi.startLxc(renewVmid);
+            var freshResource = type === 'vm'
+                ? await db.vms.getByVmid(renewVmid)
+                : (await db.lxcContainers.getByCtId(renewVmid))[0];
+            var shouldAutoStart = freshResource && freshResource.shutdown_reason === 'expired';
+            if (shouldAutoStart) {
+                if (type === 'vm') {
+                    var renewStatus = await pveApi.getVmStatus(renewVmid);
+                    if (renewStatus && renewStatus.status === 'stopped') {
+                        await pveApi.startVm(renewVmid);
+                    }
+                } else {
+                    var renewLxcStatus = await pveApi.getLxcStatus(renewVmid);
+                    if (renewLxcStatus && renewLxcStatus.status === 'stopped') {
+                        await pveApi.startLxc(renewVmid);
+                    }
                 }
             }
         } catch (startErr) { console.error('[wallet] 续费自动开机失败:', startErr.message); }

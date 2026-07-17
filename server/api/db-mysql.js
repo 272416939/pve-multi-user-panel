@@ -117,6 +117,8 @@ async function initDb() {
     try { await execute('ALTER TABLE vms ADD COLUMN quarterly_discount VARCHAR(10) DEFAULT \'\''); } catch (_) {}
     try { await execute('ALTER TABLE vms ADD COLUMN yearly_discount VARCHAR(10) DEFAULT \'\''); } catch (_) {}
     try { await execute('ALTER TABLE vms ADD COLUMN pve_upid VARCHAR(200) DEFAULT \'\''); } catch (_) {}
+    // 关机原因：null=未关机/正常, 'manual'=用户手动关机, 'expired'=到期自动关机
+    try { await execute('ALTER TABLE vms ADD COLUMN shutdown_reason VARCHAR(20) DEFAULT NULL'); } catch (_) {}
 
     // 创建虚拟机提醒记录表
     await execute(`
@@ -311,6 +313,8 @@ async function initDb() {
     try { await execute('ALTER TABLE lxc_containers ADD COLUMN quarterly_discount VARCHAR(10) DEFAULT \'\''); } catch (_) {}
     try { await execute('ALTER TABLE lxc_containers ADD COLUMN yearly_discount VARCHAR(10) DEFAULT \'\''); } catch (_) {}
     try { await execute('ALTER TABLE lxc_containers ADD COLUMN pve_upid VARCHAR(200) DEFAULT \'\''); } catch (_) {}
+    // 关机原因：null=未关机/正常, 'manual'=用户手动关机, 'expired'=到期自动关机
+    try { await execute('ALTER TABLE lxc_containers ADD COLUMN shutdown_reason VARCHAR(20) DEFAULT NULL'); } catch (_) {}
 
     // 创建 LXC 提醒记录表
     await execute(`
@@ -943,7 +947,7 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'vm_id', 'user_id', 'expiration_date',
-                'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'backup_storage', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'backup_storage', 'reminderSent', 'lastReminderDate', 'shutdown_reason'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1691,7 +1695,7 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'ct_id', 'user_id', 'expiration_date',
-                'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate'];
+                'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate', 'shutdown_reason'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -2331,6 +2335,8 @@ module.exports = {
         updateExpire: (id, expireTime) => execute('UPDATE disks SET expire_time = ?, updated_at = ? WHERE id = ?', [expireTime, mysqlNow(), parseInt(id)]),
         updateCapacity: (id, capacityGb) => execute('UPDATE disks SET capacity_gb = ?, updated_at = ? WHERE id = ?', [parseInt(capacityGb), mysqlNow(), parseInt(id)]),
         markDestroyed: (id) => execute('UPDATE disks SET status = ?, updated_at = ? WHERE id = ?', ['destroyed', mysqlNow(), parseInt(id)]),
+        // 切换自动续费开关（0=关闭, 1=开启）
+        updateAutoRenew: (id, enabled) => execute('UPDATE disks SET auto_renew = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, mysqlNow(), parseInt(id)]),
         // 硬删除：仅允许删除已销毁状态的磁盘记录（清理已销毁的磁盘记录用）
         hardDelete: (id) => execute('DELETE FROM disks WHERE id = ? AND status = ?', [parseInt(id), 'destroyed']),
         getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)")

@@ -43,6 +43,7 @@
             <th>绑定虚拟机</th>
             <th>到期时间</th>
             <th>剩余天数</th>
+            <th>自动续费</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -60,12 +61,18 @@
             <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? formatDate(disk.expire_time) : '-' }}</td>
             <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? daysUntilExpire(disk.expire_time) : '-' }}</td>
             <td>
+              <div v-if="disk.status !== 'destroyed'" class="form-check form-switch m-0" style="display:inline-block;">
+                <input class="form-check-input" type="checkbox" :checked="disk.auto_renew === 1" @change="toggleDiskAutoRenew(disk, $event.target.checked)" style="cursor:pointer;">
+              </div>
+              <span v-else class="text-muted">-</span>
+            </td>
+            <td>
               <button v-if="disk.status !== 'destroyed'" class="table-btn btn-info" @click="openDiskRenewModal(disk)">续费</button>
               <button v-else class="table-btn btn-danger" @click="deleteDestroyedDisk(disk)">删除</button>
             </td>
           </tr>
           <tr v-if="disks.length === 0">
-            <td colspan="12" class="text-center text-muted py-4">暂无硬盘，点击"新建"购买数据盘</td>
+            <td colspan="13" class="text-center text-muted py-4">暂无硬盘，点击"新建"购买数据盘</td>
           </tr>
         </tbody>
       </table>

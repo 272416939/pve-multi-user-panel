@@ -489,6 +489,8 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
         }
 
         await pveApi.startVm(vmid);
+        // 启动成功后清除关机原因标记
+        try { if (vm) await db.vms.update(vm.id, { shutdown_reason: null }); } catch (_) {}
         res.json({ message: '虚拟机启动成功' });
     } catch (error) {
         res.status(500).json({ error: '启动虚拟机失败' });
@@ -516,6 +518,8 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
         }
 
         await pveApi.shutdownVm(vmid);
+        // 标记为用户手动关机（续费后不自动开机）
+        try { if (vm) await db.vms.update(vm.id, { shutdown_reason: 'manual' }); } catch (_) {}
         res.json({ message: '虚拟机关机成功' });
     } catch (error) {
         res.status(500).json({ error: '关闭虚拟机失败' });
@@ -543,6 +547,8 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
         }
 
         await pveApi.stopVm(vmid);
+        // 标记为用户手动关机（续费后不自动开机）
+        try { if (vm) await db.vms.update(vm.id, { shutdown_reason: 'manual' }); } catch (_) {}
         res.json({ message: '虚拟机已强制停止' });
     } catch (error) {
         res.status(500).json({ error: '停止虚拟机失败' });

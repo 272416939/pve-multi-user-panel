@@ -519,4 +519,15 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
   }
 });
 
+// 切换自动续费开关
+router.post('/disks/:id/auto-renew', authMiddleware, checkDiskOwnership, async (req, res) => {
+  try {
+    var enabled = req.body.enabled ? 1 : 0;
+    await db.disks.updateAutoRenew(req.disk.id, enabled);
+    res.json({ success: true, auto_renew: enabled });
+  } catch (e) {
+    res.status(500).json({ error: safeError(e) });
+  }
+});
+
 module.exports = router;

@@ -317,6 +317,29 @@
     }
   };
 
+  // ===== 切换自动续费开关 =====
+  $.toggleDiskAutoRenew = async function(disk, enabled) {
+    if (!disk) return;
+    try {
+      var res = await authFetch('/api/disks/' + disk.id + '/auto-renew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: enabled ? 1 : 0 })
+      });
+      var data = await res.json();
+      if (!res.ok) {
+        // 失败时回滚 UI
+        disk.auto_renew = enabled ? 0 : 1;
+        return alert(data.error || '切换失败');
+      }
+      disk.auto_renew = data.auto_renew;
+    } catch (e) {
+      // 失败时回滚 UI
+      disk.auto_renew = enabled ? 0 : 1;
+      alert('切换失败: ' + e.message);
+    }
+  };
+
   // ===== 续费 =====
   $.openDiskRenewModal = function(disk) {
     $.renewDisk.value = disk;

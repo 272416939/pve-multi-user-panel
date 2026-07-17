@@ -492,6 +492,8 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
         }
 
         await pveApi.startLxc(vmid);
+        // 启动成功后清除关机原因标记
+        try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: null }); } catch (_) {}
         res.json({ message: 'LXC 容器启动成功' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -519,6 +521,8 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
         }
 
         await pveApi.shutdownLxc(vmid);
+        // 标记为用户手动关机（续费后不自动开机）
+        try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: 'manual' }); } catch (_) {}
         res.json({ message: 'LXC 容器关机命令已发送' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -546,6 +550,8 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
         }
 
         await pveApi.stopLxc(vmid);
+        // 标记为用户手动关机（续费后不自动开机）
+        try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: 'manual' }); } catch (_) {}
         res.json({ message: 'LXC 容器已强制停止' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
