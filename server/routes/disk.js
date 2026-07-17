@@ -463,7 +463,7 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
 
 // 销毁磁盘
 router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req, res) => {
-  var limit = await checkRateLimit('disk_destroy:' + req.user.id, 2, 10000);
+  var limit = await checkRateLimit('disk_destroy:' + req.user.id, 20, 60000);
   if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁' });
 
   try {
