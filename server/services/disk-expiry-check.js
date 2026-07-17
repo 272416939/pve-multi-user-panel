@@ -338,22 +338,24 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
 async function importExistingDisks() {
   try {
     // ===== 第一步：清理 PVE 中已不存在的孤立磁盘记录（仅清理 legacy 磁盘） =====
+    // 注意：只清理状态为 expired/destroyed 的 legacy 磁盘
+    // 不清理 bound/free 状态的磁盘，因为 PVE 可能使用 qemu 管理的卷而非 pvesm 可见
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
     for (var d = 0; d < allDisks.length; d++) {
       var disk = allDisks[d];
-      // 只清理 legacy 磁盘（导入存量磁盘），不清理用户购买的独立磁盘
       if (!disk.is_legacy) continue;
-      if (disk.status === 'destroyed') continue; // 已销毁的跳过
+      // 只清理已过期/已分离的 legacy 磁盘，不清理 bound/free 状态的
+      if (disk.status !== 'expired' && disk.status !== 'grace') continue;
       
       try {
         var sshConfig = await getPveSshConfig();
         if (!sshConfig.host || !sshConfig.password) continue;
         
-        // 检查卷是否存在：pvesm status 返回包含该 volume_id 的行
-        var cmd = 'pvesm status 2>/dev/null | grep -q "' + disk.volume_id + '"';
+        // 使用 pvesm path 检查卷是否存在（比 pvesm status 更准确）
+        var cmd = 'pvesm path ' + disk.volume_id + ' 2>/dev/null';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
-        if (result.code !== 0) {
+        if (result.code !== 0 || (result.stderr && result.stderr.indexOf('no such') !== -1) || (result.stdout || '').trim() === '') {
           // PVE 卷不存在，直接删除孤立记录
           const [delResult] = await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
           if (delResult.affectedRows > 0) {
@@ -406,7 +408,7 @@ async function importExistingDisks() {
             var volId = parts[0];
             if (!volId || volId.indexOf(':') === -1) continue;
 
-            // 按 volume_id 查重（幂等导入）
+            // 按 volume_id 查重（幂等导入）- 无论是否 legacy 都跳过已存在的记录
             var existing = await db.disks.getByVolumeId(volId);
             if (existing) {
               totalSkipped++;
