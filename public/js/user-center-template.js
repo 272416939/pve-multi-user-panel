@@ -311,7 +311,7 @@
                             </div>
                             <div class="table-responsive">
                                     <table class="table table-hover table-sm mb-0 table-align-center">
-                                        <thead><tr><th>订单号</th><th>套餐/产品</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>时间</th></tr></thead>
+                                        <thead><tr><th>订单号</th><th>套餐/产品</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>状态</th><th>时间</th></tr></thead>
                                     <tbody>
                                         <tr v-for="o in myOrders" :key="o.id">
                                             <td><code style="font-size:11px;">{{ o.order_no }}</code></td>
@@ -320,9 +320,10 @@
                                             <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
                                             <td>{{ o.period_count }}</td>
                                             <td>¥{{ o.amount }}</td>
+                                            <td><span class="badge" :class="o.status === 'completed' ? 'bg-success' : o.status === 'refunded' ? 'bg-danger' : 'bg-warning'">{{ o.status === 'completed' ? '已开通' : o.status === 'refunded' ? '已退款' : o.status === 'pending' ? '处理中' : o.status }}</span></td>
                                             <td>{{ formatDate(o.created_at) }}</td>
                                         </tr>
-                                        <tr v-if="!myOrders || myOrders.length === 0"><td colspan="7" class="text-center text-muted py-4">暂无订单记录</td></tr>
+                                        <tr v-if="!myOrders || myOrders.length === 0"><td colspan="8" class="text-center text-muted py-4">暂无订单记录</td></tr>
                                     </tbody>
                                 </table>
                             </div>
