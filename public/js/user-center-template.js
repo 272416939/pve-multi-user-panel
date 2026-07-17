@@ -563,7 +563,7 @@
                                 </div>
                                 <div class="message-detail-content markdown-body" style="line-height:1.7;white-space:pre-wrap;" v-html="parseMarkdown(currentMsg.content)"></div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer d-flex gap-2">
                                 <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger">删除</pv-button>
                                 <pv-button type="button" data-bs-dismiss="modal">关闭</pv-button>
                             </div>
@@ -645,7 +645,7 @@
                                 <p class="mb-2">请输入当前密码以确认禁用：</p>
                                 <input type="password" class="form-control" v-model="twofaDisablePassword" placeholder="当前密码">
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer d-flex gap-2">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
                                 <pv-button type="button" @click="disableTwofa" :disabled="!twofaDisablePassword" variant="danger">确认禁用</pv-button>
                             </div>

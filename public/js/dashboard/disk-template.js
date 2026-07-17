@@ -68,9 +68,11 @@
               <span v-else class="text-muted">-</span>
             </td>
             <td class="text-center">
-              <button v-if="disk.status !== 'destroyed' && !disk.is_legacy" class="table-btn btn-info" @click="openDiskRenewModal(disk)">续费</button>
-              <button v-if="disk.status !== 'destroyed' && disk.is_legacy" class="table-btn btn-secondary" disabled title="legacy磁盘随VM管理">续费</button>
-              <button v-else-if="disk.status === 'destroyed'" class="table-btn btn-danger" @click="deleteDestroyedDisk(disk)">删除</button>
+              <div class="table-actions" style="justify-content:center;">
+                <button v-if="disk.status !== 'destroyed' && !disk.is_legacy" class="table-btn btn-info" @click="openDiskRenewModal(disk)">续费</button>
+                <button v-if="disk.status !== 'destroyed' && disk.is_legacy" class="table-btn btn-secondary" disabled title="legacy磁盘随VM管理">续费</button>
+                <button v-else-if="disk.status === 'destroyed'" class="table-btn btn-danger" @click="deleteDestroyedDisk(disk)">删除</button>
+              </div>
             </td>
           </tr>
           <tr v-if="disks.length === 0">
@@ -155,7 +157,7 @@
           总价：<strong class="fs-5">￥{{ purchasePrice }}</strong>
         </div>
       </div>
-      <div class="modal-footer" style="border-top:1px solid var(--border-color);">
+      <div class="modal-footer d-flex gap-2" style="border-top:1px solid var(--border-color);">
         <pv-button type="button" data-bs-dismiss="modal" variant="outline">关闭</pv-button>
         <pv-button @click="submitPurchaseDisk" variant="primary" :disabled="!diskPurchaseForm.spec_id || purchasePrice <= 0">确定</pv-button>
       </div>
@@ -187,7 +189,7 @@
           </div>
         </div>
       </div>
-      <div class="modal-footer" style="border-top:1px solid var(--border-color);">
+      <div class="modal-footer d-flex gap-2" style="border-top:1px solid var(--border-color);">
         <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
         <pv-button @click="submitBindDisk" variant="primary" :disabled="!bindTargetVmid">确定挂载</pv-button>
       </div>
@@ -217,7 +219,7 @@
           续费金额：<strong class="fs-5">￥{{ renewAmount }}</strong>
         </div>
       </div>
-      <div class="modal-footer" style="border-top:1px solid var(--border-color);">
+      <div class="modal-footer d-flex gap-2" style="border-top:1px solid var(--border-color);">
         <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
         <pv-button @click="submitRenewDisk" variant="primary" :disabled="renewAmount <= 0">确定续费</pv-button>
       </div>
@@ -255,7 +257,7 @@
           ⚠ 磁盘已挂载到虚拟机，扩容完成后需要关闭虚拟机再开机（非重启）才能生效
         </p>
       </div>
-      <div class="modal-footer" style="border-top:1px solid var(--border-color);">
+      <div class="modal-footer d-flex gap-2" style="border-top:1px solid var(--border-color);">
         <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
         <pv-button @click="submitResizeDisk" variant="primary" :disabled="!resizeInputAddGb || resizeInputAddGb <= 0 || resizePrice < 0">确定扩容</pv-button>
       </div>

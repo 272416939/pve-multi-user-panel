@@ -657,7 +657,7 @@
                     </div>
                 </div>
             </div>
-            <div class="modal-footer" v-if="cdkRedeemStep === 'input'">
+            <div class="modal-footer d-flex gap-2" v-if="cdkRedeemStep === 'input'">
                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
                 <pv-button type="button" @click="redeemCdk" :disabled="!cdkRedeemForm.code || (cdkRedeemType === 'vm' && !cdkRedeemForm.vm_id) || (cdkRedeemType === 'lxc' && !cdkRedeemForm.container_id)" variant="primary">确认兑换</pv-button>
             </div>
@@ -710,7 +710,7 @@
                 <p>当前余额：¥{{ walletBalance }}</p>
                 <div v-if="renewError" class="alert alert-danger py-2">{{ renewError }}</div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer d-flex gap-2">
                 <pv-button type="button" @click="renewShow = false" variant="secondary">取消</pv-button>
                 <pv-button type="button" @click="submitRenew" variant="primary">确认续费</pv-button>
             </div>
@@ -756,7 +756,7 @@
                     <div v-if="vmPwdError" class="alert alert-danger py-2">{{ vmPwdError }}</div>
                 </div>
             </div>
-            <div class="modal-footer" v-if="vmPwdCiuser !== false">
+            <div class="modal-footer d-flex gap-2" v-if="vmPwdCiuser !== false">
                 <pv-button type="button" @click="vmPwdShow = false" variant="secondary">取消</pv-button>
                 <pv-button type="button" @click="submitVmPasswordReset" :disabled="!vmPwdNewPassword || vmPwdNewPassword.length < 8" variant="primary">确认重置</pv-button>
             </div>
@@ -830,7 +830,7 @@
             </div>
             <div class="alert alert-info">应付：<strong>{{ orderTotal }} 元</strong></div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer d-flex gap-2">
             <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
             <pv-button type="button" @click="confirmOrder" :disabled="orderLoading" variant="primary">{{ orderLoading ? '处理中...' : '确认开通' }}</pv-button>
         </div>
@@ -856,7 +856,7 @@
                 </div>
                 <div class="message-detail-content" style="line-height:1.7;white-space:pre-wrap;">{{ currentMsg.content }}</div>
             </div>
-            <div class="modal-footer">
+            <div class="modal-footer d-flex gap-2">
                 <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger">删除</pv-button>
                 <pv-button type="button" data-bs-dismiss="modal">关闭</pv-button>
             </div>

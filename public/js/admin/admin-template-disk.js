@@ -213,10 +213,12 @@
               <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.formatDate(disk.expire_time) : '-') }}</td>
               <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.daysUntilExpire(disk.expire_time) : '-') }}</td>
               <td>
-                <button v-if="disk.status !== 'destroyed'" class="table-btn btn-primary" @click="diskPage.openEditDiskForm(disk)">编辑</button>
-                <button v-if="disk.status !== 'destroyed' && !disk.is_legacy" class="table-btn btn-danger" @click="diskPage.destroyDisk(disk)">销毁</button>
-                <button v-if="disk.status !== 'destroyed' && disk.is_legacy" class="table-btn btn-secondary" disabled title="legacy磁盘随VM销毁">销毁</button>
-                <button v-else-if="disk.status === 'destroyed'" class="table-btn btn-danger" @click="diskPage.hardDeleteDisk(disk)">删除</button>
+                <div class="table-actions">
+                  <button v-if="disk.status !== 'destroyed'" class="table-btn btn-primary" @click="diskPage.openEditDiskForm(disk)">编辑</button>
+                  <button v-if="disk.status !== 'destroyed' && !disk.is_legacy" class="table-btn btn-danger" @click="diskPage.destroyDisk(disk)">销毁</button>
+                  <button v-if="disk.status !== 'destroyed' && disk.is_legacy" class="table-btn btn-secondary" disabled title="legacy磁盘随VM销毁">销毁</button>
+                  <button v-else-if="disk.status === 'destroyed'" class="table-btn btn-danger" @click="diskPage.hardDeleteDisk(disk)">删除</button>
+                </div>
               </td>
             </tr>
             <tr v-if="!diskPage.allDisks.value || diskPage.allDisks.value.length === 0">

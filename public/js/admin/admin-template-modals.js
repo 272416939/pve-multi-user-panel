@@ -18,7 +18,7 @@
                                 </div>
                                 <div class="message-detail-content markdown-body" style="line-height:1.7;" v-html="parseMarkdown(currentMsg.content)"></div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer d-flex gap-2">
                                 <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger">删除</pv-button>
                                 <pv-button type="button" data-bs-dismiss="modal">关闭</pv-button>
                             </div>
@@ -132,7 +132,7 @@
                                 </div>
                                 <div v-if="rechargeError" class="alert alert-danger py-2">{{ rechargeError }}</div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer d-flex gap-2">
                                 <pv-button @click="rechargeShow = false" variant="secondary">取消</pv-button>
                                 <pv-button @click="submitRecharge">确认充值</pv-button>
                             </div>
@@ -350,7 +350,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="modal-footer" v-if="cdkRedeemStep === 'input'">
+                            <div class="modal-footer d-flex gap-2" v-if="cdkRedeemStep === 'input'">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
                                 <pv-button type="button" @click="redeemCdk" :disabled="!cdkRedeemForm.code || !cdkRedeemForm.resource_id" variant="primary">确认兑换</pv-button>
                             </div>
@@ -690,7 +690,7 @@
                                 </div>
                                 <div v-if="lxcIpError" class="alert alert-danger py-2">{{ lxcIpError }}</div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer d-flex gap-2">
                                 <pv-button type="button" data-bs-dismiss="modal">取消</pv-button>
                                 <pv-button type="button" @click="confirmResetLxcIp" :disabled="lxcIpLoading">
 
@@ -741,7 +741,7 @@
                                     <div v-if="adminVmPwdError" class="alert alert-danger py-2">{{ adminVmPwdError }}</div>
                                 </div>
                             </div>
-                            <div class="modal-footer" v-if="adminVmPwdCiuser !== false">
+                            <div class="modal-footer d-flex gap-2" v-if="adminVmPwdCiuser !== false">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
                                 <pv-button type="button" @click="submitAdminVmPasswordReset" :disabled="!adminVmPwdNewPassword || adminVmPwdNewPassword.length < 8" variant="primary">确认重置</pv-button>
                             </div>
@@ -792,7 +792,7 @@
                                 </div>
                                 <div v-if="vmIpError" class="alert alert-danger py-2">{{ vmIpError }}</div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer d-flex gap-2">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
                                 <pv-button type="button" @click="confirmResetVmIp" :disabled="vmIpLoading" variant="warning">
                                     <span v-if="vmIpLoading" class="spinner-border spinner-border-sm me-1"></span>
@@ -1188,7 +1188,7 @@
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="templatePage.vmTemplateForm.value.description"></textarea></div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer d-flex gap-2">
                                 <pv-button @click="bsModalHide('vmTemplateModal')">取消</pv-button>
                                 <pv-button @click="templatePage.saveVmTemplate()">保存</pv-button>
                             </div>
@@ -1266,7 +1266,7 @@
                                     <div class="col-12"><label class="form-label">描述</label><textarea class="form-control" rows="2" v-model="templatePage.lxcTemplateForm.value.description"></textarea></div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer d-flex gap-2">
                                 <pv-button @click="bsModalHide('lxcTemplateModal')" variant="secondary">取消</pv-button>
                                 <pv-button @click="templatePage.saveLxcTemplate()" variant="primary">保存</pv-button>
                             </div>
@@ -1414,7 +1414,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
+                            <div class="modal-footer d-flex gap-2">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
                                 <pv-button type="button" @click="submitForward" :disabled="checkResult === false" variant="primary">提交</pv-button>
                             </div>
