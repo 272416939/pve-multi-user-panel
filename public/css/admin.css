@@ -175,9 +175,9 @@
 
 /* ========== 表格布局样式 ========== */
 .table-container { background: var(--glass-bg); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-color); border-radius: 12px; overflow: visible; box-shadow: var(--shadow-sm);
+    border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm);
     transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
-.table-scroll { overflow: visible; pointer-events: auto; }
+.table-scroll { overflow-x: auto; pointer-events: auto; }
 .vm-table-wrap { margin-top: 0; }
 
 /* 子Tab导航（玻璃态药丸风格） */

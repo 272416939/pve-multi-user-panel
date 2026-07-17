@@ -415,7 +415,6 @@
     .table-scroll table { overflow: visible; }
     .table-scroll tbody { overflow: visible; }
     .table-scroll tr { overflow: visible; }
-    .table-scroll td { overflow: visible !important; }
     .dropdown-menu-table li .dropdown-item {
         display: block; padding: 6px 14px; font-size: 13px;
         color: var(--text-primary); text-decoration: none;
