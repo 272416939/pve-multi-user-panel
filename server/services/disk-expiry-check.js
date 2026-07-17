@@ -339,25 +339,21 @@ async function importExistingDisks() {
   try {
     // ===== 第一步：清理 PVE 中已不存在的孤立磁盘记录（仅清理 legacy 磁盘） =====
     // 孤立记录定义：台账中有记录，但 PVE 中卷已不存在
-    // 只清理 bound/free 状态的 legacy 磁盘，因为：
-    // - bound/free：正常使用状态，PVE 卷不存在说明被手动删除
-    // - expired/grace：正常到期状态，VM 续费后会恢复，不应清理
+    // 注意：只清理那些真正孤立的记录（PVE 卷被手动删除）
+    // bound 状态的 legacy 磁盘如果 PVE 卷还存在，说明是正常挂载状态，不应清理
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
     for (var d = 0; d < allDisks.length; d++) {
       var disk = allDisks[d];
       if (!disk.is_legacy) continue;
-      // 只清理 bound/free 状态的 legacy 磁盘
-      if (disk.status !== 'bound' && disk.status !== 'free') continue;
+      // 只清理 bound 状态的 legacy 磁盘（free 状态的 legacy 磁盘可能是分离但卷仍在）
+      // 注意：bound 状态的 legacy 磁盘如果卷还在，说明正常挂载，不应清理
+      if (disk.status !== 'bound') continue;
       
       try {
         var sshConfig = await getPveSshConfig();
-        if (!sshConfig.host || !sshConfig.password) {
-          console.warn('[disk-import] SSH 配置不完整，跳过清理');
-          continue;
-        }
+        if (!sshConfig.host || !sshConfig.password) continue;
         
-        // 解析 volume_id（格式：storage:volume_name）
         var volParts = (disk.volume_id || '').split(':');
         if (volParts.length !== 2) continue;
         var storagePool = volParts[0];
@@ -366,14 +362,13 @@ async function importExistingDisks() {
         // 使用 pvesh get 检查卷是否存在
         var cmd = 'pvesh get /storage/' + storagePool + '/content/' + volName + ' --noborder 2>&1';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
-        if (result.code !== 0 || (result.stderr && result.stderr.indexOf('does not exist') !== -1)) {
-          // PVE 卷不存在，直接删除孤立记录
+        // 只有当命令明确返回错误（卷不存在）时才清理
+        if (result.code !== 0 && result.stderr && result.stderr.indexOf('does not exist') !== -1) {
           await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
           cleanedCount++;
           console.log('[disk-import] 清理孤立 legacy 磁盘记录:', disk.volume_id);
         }
       } catch (e) {
-        // 检查失败，跳过该记录
         console.error('[disk-import] 检查磁盘 ' + disk.volume_id + ' 失败:', e.message);
       }
     }
