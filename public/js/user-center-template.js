@@ -303,9 +303,19 @@
                                             <option value="disk">磁盘</option>
                                         </select>
                                     </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small mb-1">状态</label>
+                                        <select class="form-select form-select-sm" v-model="orderFilter.status">
+                                            <option value="">全部</option>
+                                            <option value="completed">已开通</option>
+                                            <option value="pending">处理中</option>
+                                            <option value="refunded">已退款</option>
+                                            <option value="destroyed">已销毁</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-2 d-flex gap-2">
                                         <pv-button @click="loadMyOrders(1)" size="sm">查询</pv-button>
-                                        <pv-button @click="orderFilter={order_no:'',type:''};loadMyOrders(1)" variant="outline" size="sm">重置</pv-button>
+                                        <pv-button @click="orderFilter={order_no:'',type:'',status:''};loadMyOrders(1)" variant="outline" size="sm">重置</pv-button>
                                     </div>
                                 </div>
                             </div>

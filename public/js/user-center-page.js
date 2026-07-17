@@ -44,7 +44,7 @@ const App = {
         const myOrders = ref([]);
         const orderPage = ref(1);
         const orderTotal = ref(0);
-        const orderFilter = ref({ order_no: '', type: '' });
+        const orderFilter = ref({ order_no: '', type: '', status: '' });
 
         // 充值轮询相关
         const rechargePendingOrderNo = ref('');
@@ -482,6 +482,7 @@ const App = {
                 const params = { page: orderPage.value, limit: 20 };
                 if (orderFilter.value.order_no) params.order_no = orderFilter.value.order_no;
                 if (orderFilter.value.type) params.type = orderFilter.value.type;
+                if (orderFilter.value.status) params.status = orderFilter.value.status;
                 const res = await api('/orders?' + new URLSearchParams(params));
                 if (Array.isArray(res)) {
                     myOrders.value = res;
