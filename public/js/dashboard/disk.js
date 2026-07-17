@@ -308,7 +308,7 @@
   };
 
   // ===== 续费 =====
-  $.openRenewModal = function(disk) {
+  $.openDiskRenewModal = function(disk) {
     $.renewDisk.value = disk;
     $.renewPeriod.value = 'month';
     $.renewPeriodCount.value = 1;

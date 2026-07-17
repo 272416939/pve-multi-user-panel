@@ -60,7 +60,7 @@
             <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? formatDate(disk.expire_time) : '-' }}</td>
             <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? daysUntilExpire(disk.expire_time) : '-' }}</td>
             <td>
-              <button v-if="disk.status !== 'destroyed'" class="btn btn-sm btn-outline-primary" @click="openRenewModal(disk)">续费</button>
+              <button v-if="disk.status !== 'destroyed'" class="btn btn-sm btn-outline-primary" @click="openDiskRenewModal(disk)">续费</button>
               <button v-else class="btn btn-sm btn-outline-danger" @click="deleteDestroyedDisk(disk)">删除</button>
             </td>
           </tr>
