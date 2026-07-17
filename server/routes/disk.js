@@ -102,7 +102,13 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     var periodCount = parseInt(req.body.period_count) || 1;
     var quantity = Math.min(parseInt(req.body.quantity) || 1, 10); // 最多 10 块
     var autoRenew = req.body.auto_renew ? 1 : 0;
-    var diskName = (req.body.disk_name || '').toString().trim().substring(0, 100);
+    var diskName = (req.body.disk_name || '').toString().trim();
+    // 长度限制：最多 8 字符
+    if (diskName.length > 8) {
+      return res.status(400).json({ error: '硬盘名称不能超过8字符' });
+    }
+    // XSS 防护：剥离 HTML 标签（Vue 模板已自动转义，后端也做防御）
+    diskName = diskName.replace(/<[^>]*>/g, '').substring(0, 8);
 
     // 参数校验
     if (!Number.isInteger(specId) || specId < 1) return res.status(400).json({ error: '无效的规格ID' });
@@ -152,10 +158,10 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, req.user.id]);
     var balanceAfter = balanceBefore - totalAmount;
 
-    // 创建订单（type='disk'）
+    // 创建订单（type='disk'，resource_name 格式：新购 xxGiB）
     await conn.execute(
       'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [orderNo, req.user.id, 'disk', specId, 0, period, periodCount, totalAmount, 0, 0, capacityGb * quantity, '数据盘 x' + quantity, '', 'pending']
+      [orderNo, req.user.id, 'disk', specId, 0, period, periodCount, totalAmount, 0, 0, capacityGb * quantity, '新购 ' + (capacityGb * quantity) + 'GiB', '', 'pending']
     );
 
     // 创建流水记录
@@ -367,6 +373,30 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
     // 更新台账容量
     await db.disks.updateCapacity(disk.id, newSize);
 
+    // 创建扩容订单记录（审计用，amount=0 表示免费扩容）
+    var resizeOrderNo = generateOrderNo('disk');
+    var resizeResourceName = '扩容 ' + disk.id + '|' + disk.capacity_gb + 'GiB->' + newSize + 'GiB';
+    try {
+      await db.orders.create({
+        order_no: resizeOrderNo,
+        user_id: req.user.id,
+        type: 'disk',
+        package_id: disk.spec_id || 0,
+        template_id: 0,
+        period: 'month',
+        period_count: 0,
+        amount: 0,
+        cores: 0,
+        memory: 0,
+        disk_size: newSize,
+        resource_name: resizeResourceName,
+        resource_id: String(disk.id),
+        status: 'completed'
+      });
+    } catch (orderErr) {
+      console.error('[disk resize] 创建订单记录失败:', orderErr.message);
+    }
+
     res.json({ success: true, new_capacity: newSize });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -497,10 +527,10 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
       // 原子扣款
       await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [amount, req.user.id]);
       var balanceAfter = balanceBefore - amount;
-      // 创建续费订单
+      // 创建续费订单（resource_name 格式：续费 diskId|xxGiB）
       await conn.execute(
         'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-        [orderNo, req.user.id, 'disk', disk.spec_id || 0, 0, period, periodCount, amount, 0, 0, disk.capacity_gb, '续费磁盘 ' + (disk.disk_name || disk.volume_id), disk.id, 'completed']
+        [orderNo, req.user.id, 'disk', disk.spec_id || 0, 0, period, periodCount, amount, 0, 0, disk.capacity_gb, '续费 ' + disk.id + '|' + disk.capacity_gb + 'GiB', disk.id, 'completed']
       );
       // 流水
       await conn.execute(

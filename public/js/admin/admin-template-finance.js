@@ -139,7 +139,7 @@
                             <div class="table-responsive">
                                 <table class="table table-striped mb-0 table-align-center">
                                     <thead>
-                                        <tr><th>订单号</th><th>用户名</th><th>套餐</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>状态</th><th>开通时间</th></tr>
+                                        <tr><th>订单号</th><th>用户名</th><th>套餐/产品</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>状态</th><th>开通时间</th></tr>
                                     </thead>
                                     <tbody>
                                         <tr v-for="o in orders" :key="o.id">

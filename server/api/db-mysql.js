@@ -2006,7 +2006,7 @@ module.exports = {
             args.push(limit, offset);
             var rows = await queryAll(`
                 SELECT o.*, u.username,
-                    COALESCE(vp.name, lxp.name, '') as package_name
+                    COALESCE(vp.name, lxp.name, o.resource_name, '') as package_name
                 FROM orders o
                 LEFT JOIN users u ON o.user_id = u.id
                 LEFT JOIN vm_packages vp ON o.type = 'vm' AND o.package_id = vp.id

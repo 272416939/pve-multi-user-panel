@@ -310,8 +310,8 @@
                                 </div>
                             </div>
                             <div class="table-responsive">
-                                <table class="table table-hover table-sm mb-0 table-align-center">
-                                    <thead><tr><th>订单号</th><th>套餐</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>时间</th></tr></thead>
+                                    <table class="table table-hover table-sm mb-0 table-align-center">
+                                        <thead><tr><th>订单号</th><th>套餐/产品</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>时间</th></tr></thead>
                                     <tbody>
                                         <tr v-for="o in myOrders" :key="o.id">
                                             <td><code style="font-size:11px;">{{ o.order_no }}</code></td>
