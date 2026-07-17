@@ -251,7 +251,31 @@
     if (!disk) return;
     $.resizeTargetDisk.value = disk;
     $.resizeNewCapacity.value = parseInt(disk.capacity_gb) + 10;
+    $.calcResizePrice();
     $.bsModalShow('resizeDiskModal');
+  };
+
+  // 计算扩容费用（前端预计算，仅展示）
+  $.calcResizePrice = function() {
+    var disk = $.resizeTargetDisk.value;
+    if (!disk || !disk.expire_time) { $.resizePrice.value = 0; return; }
+    var newSize = parseInt($.resizeNewCapacity.value) || 0;
+    var oldSize = parseInt(disk.capacity_gb) || 0;
+    if (newSize <= oldSize) { $.resizePrice.value = 0; return; }
+    var diffGb = newSize - oldSize;
+    // 从 diskOptions 中查找 spec 的最新价格
+    var specId = disk.spec_id;
+    var pricePerGb = parseFloat(disk.price_per_gb);
+    if (specId) {
+      var spec = ($.diskOptions.value.specs || []).find(function(s) { return s.id === parseInt(specId); });
+      if (spec && spec.price_per_gb) pricePerGb = parseFloat(spec.price_per_gb);
+    }
+    var expireDate = new Date(disk.expire_time);
+    var now = new Date();
+    if (expireDate <= now) { $.resizePrice.value = -1; return; }
+    var diffDays = Math.ceil((expireDate - now) / (1000 * 60 * 60 * 24));
+    var amount = (diffGb * pricePerGb / 30) * diffDays;
+    $.resizePrice.value = parseFloat(amount.toFixed(2));
   };
 
   $.submitResizeDisk = async function() {
@@ -261,6 +285,11 @@
     if (isNaN(newSize) || newSize <= parseInt(disk.capacity_gb)) {
       return alert('新容量必须大于当前容量（' + disk.capacity_gb + ' GiB）');
     }
+    // 检查余额（前端提示）
+    if ($.resizePrice.value > 0 && $.user && parseFloat($.user.balance) < $.resizePrice.value) {
+      var ok = await customConfirm('余额不足，扩容费用 ¥' + $.resizePrice.value + '，当前余额 ¥' + parseFloat($.user.balance || 0).toFixed(2) + '\n是否继续尝试？');
+      if (!ok) return;
+    }
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/resize', {
         method: 'POST',
@@ -269,7 +298,7 @@
       });
       var data = await res.json();
       if (!res.ok) return alert(data.error || '扩容失败');
-      alert('扩容成功，新容量：' + data.new_capacity + ' GiB');
+      alert('扩容成功，新容量：' + data.new_capacity + ' GiB，费用：¥' + (data.amount || 0));
       $.bsModalHide('resizeDiskModal');
       await $.loadDisks();
     } catch (e) {
@@ -280,7 +309,17 @@
   // ===== 销毁磁盘 =====
   $.destroyDisk = async function(disk) {
     if (!disk) return;
-    var ok = await customConfirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n此操作不可恢复！');
+    // 检查创建时间是否超过 15 天
+    var extraWarning = '';
+    if (disk.create_time) {
+      var createDate = new Date(disk.create_time);
+      var now = new Date();
+      var daysSince = Math.floor((now - createDate) / (1000 * 60 * 60 * 24));
+      if (daysSince > 15) {
+        extraWarning = '\n\n⚠ 警告：该磁盘开通时间已超过 ' + daysSince + ' 天，无法进行退款操作，确定销毁将无退款！';
+      }
+    }
+    var ok = await customConfirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n此操作不可恢复！' + extraWarning);
     if (!ok) return;
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/destroy', {
@@ -290,6 +329,8 @@
       if (!res.ok) return alert(data.error || '销毁失败');
       if (data.refund) {
         alert('销毁成功，已退款 ¥' + data.refund_amount);
+      } else if (data.refund_desc) {
+        alert(data.refund_desc + '\n销毁成功');
       } else {
         alert('销毁成功');
       }

@@ -352,11 +352,19 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
     var disk = req.disk;
     var newSize = parseInt(req.body.capacity_gb);
 
+    // 前置校验
     if (!Number.isInteger(newSize) || newSize <= 0) {
       return res.status(400).json({ error: '无效的容量' });
     }
     if (newSize <= disk.capacity_gb) {
       return res.status(400).json({ error: '新容量必须大于当前容量（' + disk.capacity_gb + ' GiB）' });
+    }
+    if (disk.status === 'destroyed' || disk.status === 'expired') {
+      return res.status(400).json({ error: '磁盘已过期或已销毁，无法扩容' });
+    }
+    // 已过期时间校验
+    if (disk.expire_time && new Date(disk.expire_time) <= new Date()) {
+      return res.status(400).json({ error: '磁盘已过期，无法扩容' });
     }
 
     // 校验规格最大容量
@@ -367,38 +375,72 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
       }
     }
 
-    // 执行 PVE 扩容
-    await diskUtils.resizeDisk(disk.volume_id, newSize);
+    // 获取当前 spec 价格（使用最新 spec 价格，而非磁盘快照价格）
+    var currentSpec = disk.spec_id ? await db.diskSpecs.getById(disk.spec_id) : null;
+    var currentPricePerGb = currentSpec ? parseFloat(currentSpec.price_per_gb) : parseFloat(disk.price_per_gb);
 
-    // 更新台账容量
-    await db.disks.updateCapacity(disk.id, newSize);
-
-    // 创建扩容订单记录（审计用，amount=0 表示免费扩容）
-    var resizeOrderNo = generateOrderNo('disk');
-    var resizeResourceName = '扩容 ' + disk.id + '|' + disk.capacity_gb + 'GiB->' + newSize + 'GiB';
-    try {
-      await db.orders.create({
-        order_no: resizeOrderNo,
-        user_id: req.user.id,
-        type: 'disk',
-        package_id: disk.spec_id || 0,
-        template_id: 0,
-        period: 'month',
-        period_count: 0,
-        amount: 0,
-        cores: 0,
-        memory: 0,
-        disk_size: newSize,
-        resource_name: resizeResourceName,
-        resource_id: String(disk.id),
-        status: 'completed'
-      });
-    } catch (orderErr) {
-      console.error('[disk resize] 创建订单记录失败:', orderErr.message);
+    // 计算扩容费用
+    var resizeAmount = diskUtils.calcResizeAmount(disk.capacity_gb, newSize, currentPricePerGb, disk.expire_time);
+    if (resizeAmount < 0) {
+      return res.status(400).json({ error: '磁盘已过期，无法扩容' });
     }
 
-    res.json({ success: true, new_capacity: newSize });
+    // 余额检查
+    var user = await db.users.getById(req.user.id);
+    var balanceBefore = parseFloat(user.balance || '0');
+    if (balanceBefore < resizeAmount) {
+      return res.status(400).json({ error: '余额不足，扩容费用 ' + resizeAmount + ' 元，当前余额 ' + balanceBefore.toFixed(2) + ' 元' });
+    }
+
+    var resizeOrderNo = generateOrderNo('disk');
+    var resizeResourceName = '扩容 ' + disk.id + '|' + disk.capacity_gb + 'GiB->' + newSize + 'GiB';
+    var dbNow = db.now();
+
+    // 事务：扣款 + 创建订单 + 流水 + 更新容量 + 更新价格
+    await withTransaction(async (conn) => {
+      // 原子扣款
+      await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [resizeAmount, req.user.id]);
+      var balanceAfter = balanceBefore - resizeAmount;
+
+      // 创建订单
+      await conn.execute(
+        'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+        [resizeOrderNo, req.user.id, 'disk', disk.spec_id || 0, 0, 'month', 0, resizeAmount, 0, 0, newSize, resizeResourceName, disk.id, 'pending']
+      );
+
+      // 创建流水
+      await conn.execute(
+        'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [req.user.id, resizeOrderNo, dbNow, 'balance', 'disk_purchase', resizeAmount, 'month', 0, balanceBefore, balanceAfter, 'disk', disk.id, '', '', dbNow]
+      );
+
+      // 更新台账容量 + 更新 price_per_gb 为 spec 最新价格（续费按新价）
+      await conn.execute(
+        'UPDATE disks SET capacity_gb = ?, price_per_gb = ?, updated_at = NOW() WHERE id = ?',
+        [newSize, currentPricePerGb, disk.id]
+      );
+    });
+
+    // 执行 PVE 扩容（事务外）
+    try {
+      await diskUtils.resizeDisk(disk.volume_id, newSize);
+    } catch (pveErr) {
+      // PVE 扩容失败：回滚退款 + 恢复容量
+      console.error('[disk resize] PVE 扩容失败，回滚:', pveErr.message);
+      await withTransaction(async (conn) => {
+        await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [resizeAmount, req.user.id]);
+        await conn.execute('UPDATE disks SET capacity_gb = ?, price_per_gb = ?, updated_at = NOW() WHERE id = ?', [disk.capacity_gb, disk.price_per_gb, disk.id]);
+        await db.orders.updateStatus(resizeOrderNo, 'refunded');
+      });
+      return res.status(500).json({ error: 'PVE 扩容失败，已退款' });
+    }
+
+    // 订单标记完成
+    await db.orders.updateStatus(resizeOrderNo, 'completed');
+
+    res.json({ success: true, new_capacity: newSize, amount: resizeAmount });
   } catch (e) {
+    console.error('[disk resize] 失败:', e);
     res.status(500).json({ error: safeError(e) });
   }
 });
@@ -425,30 +467,33 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
     var refundAmount = 0;
     var refundDesc = '';
 
-    // 销毁前计算退款（剩余时间 > 7 天则按剩余天数比例退款）
+    // 销毁退款优化：3天内全额，3-15天按剩余比例，>15天不退款
     if (disk.expire_time && disk.status !== 'expired' && disk.status !== 'grace') {
       var expireDate = new Date(disk.expire_time);
       var now = new Date();
-      var diffMs = expireDate - now;
-      var diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDays > 7) {
-        // 按剩余天数/总购买天数 * 购买金额 计算退款
-        var createDate = disk.create_time ? new Date(disk.create_time) : null;
+      var createDate = disk.create_time ? new Date(disk.create_time) : null;
+      var daysSinceCreation = createDate ? Math.floor((now - createDate) / (1000 * 60 * 60 * 24)) : 999;
+      var originalPrice = parseFloat(disk.price_per_gb) * parseInt(disk.capacity_gb);
+      if (disk.quarterly_discount || disk.yearly_discount) {
+        var disc = disk.yearly_discount || disk.quarterly_discount || 0;
+        originalPrice = parseFloat((originalPrice * (1 - disc / 100)).toFixed(2));
+      }
+
+      if (daysSinceCreation <= 3) {
+        // 3天内全额退款
+        refundAmount = originalPrice;
+        refundDesc = '全额退款（开通 ' + daysSinceCreation + ' 天）';
+      } else if (daysSinceCreation <= 15) {
+        // 3-15天按剩余天数比例退款
         if (createDate) {
           var totalMs = expireDate - createDate;
-          var factor = diffMs / totalMs;
-          var originalPrice = parseFloat(disk.price_per_gb) * parseInt(disk.capacity_gb);
-          if (originalPrice > 0) {
-            refundAmount = parseFloat((originalPrice * factor).toFixed(2));
-            // 有对应的 spec，按季/年折扣计算
-            if (disk.quarterly_discount || disk.yearly_discount) {
-              var discount = disk.yearly_discount || disk.quarterly_discount || 0;
-              refundAmount = parseFloat((refundAmount * (1 - discount / 100)).toFixed(2));
-            }
-          }
+          var remainingMs = expireDate - now;
+          var factor = remainingMs / totalMs;
+          refundAmount = parseFloat((originalPrice * factor).toFixed(2));
         }
-        refundDesc = '销毁退款（剩余 ' + diffDays + ' 天）';
+        refundDesc = '按剩余天数退款（开通 ' + daysSinceCreation + ' 天）';
       }
+      // > 15天不退款，refundAmount=0，前端会弹出警告
     }
 
     // 文档 7.8：竞争条件防护 - SELECT ... FOR UPDATE 行锁
@@ -481,7 +526,7 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       );
     });
 
-    res.json({ success: true, refund: refundAmount > 0, refund_amount: refundAmount });
+    res.json({ success: true, refund: refundAmount > 0, refund_amount: refundAmount, refund_desc: refundDesc });
   } catch (e) {
     console.error('[disk destroy] 失败:', e);
     res.status(500).json({ error: safeError(e) });

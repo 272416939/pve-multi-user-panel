@@ -231,12 +231,25 @@
         <p v-if="resizeTargetDisk">当前容量：<strong>{{ resizeTargetDisk.capacity_gb }} GiB</strong></p>
         <div class="mb-3">
           <label class="form-label">新容量（GiB，需大于当前容量）</label>
-          <input type="number" class="form-control" v-model.number="resizeNewCapacity" min="1" step="1">
+          <input type="number" class="form-control" v-model.number="resizeNewCapacity" min="1" step="1" @input="calcResizePrice">
         </div>
+        <!-- 扩容费用 -->
+        <div v-if="resizePrice > 0" class="alert alert-info py-2 mb-2 text-center">
+          扩容费用：<strong class="fs-5">¥{{ resizePrice }}</strong>
+          <small class="d-block text-muted mt-1">按剩余天数比例计算</small>
+        </div>
+        <div v-else-if="resizePrice < 0" class="alert alert-warning py-2 mb-2">
+          磁盘已过期，无法扩容
+        </div>
+        <!-- 提示 -->
+        <p class="text-danger small mb-1"><i class="bi bi-exclamation-triangle"></i> 扩容后无法缩容</p>
+        <p v-if="resizeTargetDisk && resizeTargetDisk.status === 'bound'" class="text-warning small mb-0">
+          ⚠ 磁盘已挂载到虚拟机，扩容完成后需要关闭虚拟机再开机（非重启）才能生效
+        </p>
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--border-color);">
         <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
-        <pv-button @click="submitResizeDisk" variant="primary" :disabled="!resizeNewCapacity || (resizeTargetDisk && resizeNewCapacity <= resizeTargetDisk.capacity_gb)">确定扩容</pv-button>
+        <pv-button @click="submitResizeDisk" variant="primary" :disabled="!resizeNewCapacity || (resizeTargetDisk && resizeNewCapacity <= resizeTargetDisk.capacity_gb) || resizePrice < 0">确定扩容</pv-button>
       </div>
     </div>
   </div>

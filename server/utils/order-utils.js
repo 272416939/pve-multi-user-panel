@@ -51,22 +51,33 @@ async function setVmAffinity(vmid, affinityValue) {
 }
 
 /**
- * 统一订单号生成：{前缀}{YYYYMMDDHHmm}{8位随机数字}
- * @param {string} category - vm(KTVM)/lxc(KTLXC)/refund(TK)/alipay(ZFB)/wxpay(WX)/syspay(SYSPAY)
+ * 统一订单号生成
+ * - 开通/续费/扩容类：DD{YYYYMMDDHHmmss}{8位随机}（24位）
+ * - 退款/充值类：保留原前缀（TK/ZFB/WX/SYSPAY）+ {YYYYMMDDHHmm}{8位随机}
+ * @param {string} category - vm/lxc/disk(DD) / refund(TK) / alipay(ZFB) / wxpay(WX) / syspay(SYSPAY)
  * @returns {string} 订单号
  */
 function generateOrderNo(category) {
-    var prefixes = { vm: 'KTVM', lxc: 'KTLXC', refund: 'TK', alipay: 'ZFB', wxpay: 'WX', syspay: 'SYSPAY', disk: 'KTDISK' };
-    var prefix = prefixes[category];
-    if (!prefix) throw new Error('未知的订单类别: ' + category);
+    var specialPrefixes = { refund: 'TK', alipay: 'ZFB', wxpay: 'WX', syspay: 'SYSPAY' };
     var now = new Date();
+    var rand = String(crypto.randomBytes(4).readUInt32BE(0) % 100000000).padStart(8, '0');
+    if (specialPrefixes[category]) {
+        var prefix = specialPrefixes[category];
+        var ts = String(now.getFullYear()) +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') +
+            String(now.getHours()).padStart(2, '0') +
+            String(now.getMinutes()).padStart(2, '0');
+        return prefix + ts + rand;
+    }
+    // 开通/续费/扩容类统一 DD 前缀，含秒
     var ts = String(now.getFullYear()) +
         String(now.getMonth() + 1).padStart(2, '0') +
         String(now.getDate()).padStart(2, '0') +
         String(now.getHours()).padStart(2, '0') +
-        String(now.getMinutes()).padStart(2, '0');
-    var rand = String(crypto.randomBytes(4).readUInt32BE(0) % 100000000).padStart(8, '0');
-    return prefix + ts + rand;
+        String(now.getMinutes()).padStart(2, '0') +
+        String(now.getSeconds()).padStart(2, '0');
+    return 'DD' + ts + rand;
 }
 
 module.exports = { getPeriodMonths, calculateAmount, deductBalance, setVmAffinity, generateOrderNo };

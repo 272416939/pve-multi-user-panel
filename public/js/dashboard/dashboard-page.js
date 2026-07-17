@@ -56,6 +56,7 @@ var App = {
             if (!$.resizeTargetDisk) $.resizeTargetDisk = Vue.ref(null);
             if (!$.resizeNewCapacity) $.resizeNewCapacity = Vue.ref(0);
             if (!$.showResizeModal) $.showResizeModal = Vue.ref(false);
+            if (!$.resizePrice) $.resizePrice = Vue.ref(0);
             if (!$.diskOptionsGroups) $.diskOptionsGroups = Vue.computed(function() { var o = $.diskOptions && $.diskOptions.value; return (o && o.groups) ? o.groups : []; });
             $.initCore();
             $.initVm();
