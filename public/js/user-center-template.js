@@ -300,6 +300,7 @@
                                             <option value="">全部</option>
                                             <option value="vm">VM</option>
                                             <option value="lxc">LXC</option>
+                                            <option value="disk">磁盘</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2 d-flex gap-2">
@@ -315,7 +316,7 @@
                                         <tr v-for="o in myOrders" :key="o.id">
                                             <td><code style="font-size:11px;">{{ o.order_no }}</code></td>
                                             <td>{{ o.package_name }}</td>
-                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : 'badge bg-success'">{{ o.type === 'vm' ? 'VM' : 'LXC' }}</span></td>
+                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.type === 'vm' ? 'VM' : o.type === 'lxc' ? 'LXC' : '磁盘' }}</span></td>
                                             <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
                                             <td>{{ o.period_count }}</td>
                                             <td>¥{{ o.amount }}</td>
