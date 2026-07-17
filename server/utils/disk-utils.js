@@ -135,12 +135,6 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
   var busDev = validateBusDev(bus, dev); // 校验并拼接，禁止系统盘位置
   qosParams = qosParams || {};
 
-  // VM 状态前置检查（必须关机）
-  var vmStatus = await pveApi.getVmStatus(safeVmid);
-  if (vmStatus.status !== 'stopped') {
-    throw new Error('虚拟机必须处于关机状态才能挂载磁盘');
-  }
-
   // 拼接限速参数（从数据库规格读取，非用户输入）
   var diskConfig = safeVol;
   var qosFields = ['mbps_rd', 'mbps_rd_max', 'mbps_wr', 'mbps_wr_max', 'iops_rd', 'iops_rd_max', 'iops_wr', 'iops_wr_max'];

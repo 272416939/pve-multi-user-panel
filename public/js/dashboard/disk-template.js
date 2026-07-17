@@ -172,12 +172,17 @@
       <div class="modal-body">
         <p v-if="bindTargetDisk">磁盘：{{ bindTargetDisk.disk_name || bindTargetDisk.volume_id }} ({{ bindTargetDisk.capacity_gb }} GiB)</p>
         <div class="mb-3">
-          <label class="form-label">目标虚拟机（仅显示已关机 VM）</label>
+          <label class="form-label">目标虚拟机</label>
           <select class="form-select" v-model="bindTargetVmid">
             <option value="">请选择</option>
-            <option v-for="vm in userVmsForBind" :key="vm.id" :value="vm.vm_id">{{ vm.name || ('VM ' + vm.vm_id) }}</option>
+            <option v-for="vm in userVmsForBind" :key="vm.id" :value="vm.vm_id">{{ vm.name || ('VM ' + vm.vm_id) }}{{ vm.status && vm.status.status !== 'stopped' ? '（运行中）' : '' }}</option>
           </select>
-          <div v-if="userVmsForBind.length === 0" class="text-warning small mt-1">没有已关机的虚拟机</div>
+          <div v-if="userVmsForBind.length === 0" class="text-warning small mt-1">没有可用的虚拟机</div>
+          <div v-if="bindTargetVmid" class="text-warning small mt-1">
+            <template v-for="vm in userVmsForBind" :key="vm.id">
+              <span v-if="vm.vm_id === parseInt(bindTargetVmid) && vm.status && vm.status.status !== 'stopped'">⚠ 虚拟机正在运行，挂载后需要关机再开机才能正常使用硬盘</span>
+            </template>
+          </div>
         </div>
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--border-color);">

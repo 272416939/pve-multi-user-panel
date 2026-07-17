@@ -197,11 +197,9 @@
     }
     $.bindTargetDisk.value = disk;
     $.bindTargetVmid.value = '';
-    // 获取用户已关机的 VM 列表
+    // 获取用户全部 VM 列表（不限制关机状态）
     if ($.userVms && $.userVms.value) {
-      $.userVmsForBind.value = $.userVms.value.filter(function(vm) {
-        return vm.status && vm.status.status === 'stopped';
-      });
+      $.userVmsForBind.value = $.userVms.value;
     }
     $.showBindModal.value = true;
     $.bsModalShow('bindDiskModal');
