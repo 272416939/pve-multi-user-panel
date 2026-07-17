@@ -682,6 +682,18 @@
                 <p v-if="renewResource">续费资源：{{ renewResource.name || (renewResource.vm_id ? 'VM ' + renewResource.vm_id : 'CT ' + renewResource.ct_id) }} <span class="text-muted">(ID: {{ renewResource.vm_id || renewResource.ct_id }})</span></p>
                 <p v-if="renewResource">续费价格：¥{{ parseFloat(renewResource.renewal_price||0).toFixed(2) }} / {{ renewPeriodLabel(renewResource.renewal_period) }}</p>
                 <p v-if="renewResource && renewResource.expiration_date">到期时间：{{ formatDate(renewResource.expiration_date) }} <span :class="getExpiryColor(renewResource.expiration_date) + ' small'">({{ daysUntilExpire(renewResource.expiration_date) }})</span></p>
+                <!-- 关联数据盘续费（仅 VM） -->
+                <div v-if="renewResource && renewResource.vm_id !== undefined && diskListForRenew && diskListForRenew.length > 0" class="mb-3">
+                    <label class="form-label">关联数据盘续费</label>
+                    <div v-for="disk in diskListForRenew" :key="disk.id" class="form-check mb-1">
+                        <input type="checkbox" :id="'disk-renew-' + disk.id" v-model="disk._selected" class="form-check-input">
+                        <label :for="'disk-renew-' + disk.id" class="form-check-label">
+                            {{ disk.disk_name || disk.volume_id }}（{{ disk.capacity_gb }} GiB）
+                            <span class="text-muted small">到期 {{ formatDate(disk.expire_time) }} +￥{{ calcDiskRenewPrice(disk).toFixed(2) }}</span>
+                        </label>
+                    </div>
+                    <div v-if="selectedDiskRenewTotal > 0" class="text-muted small mt-1">磁盘续费小计：¥{{ selectedDiskRenewTotal.toFixed(2) }}</div>
+                </div>
                 <div class="mb-3">
                     <label class="form-label">计费周期</label>
                     <select class="form-select" v-model="renewFormPeriod" style="max-width:200px;">

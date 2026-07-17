@@ -33,6 +33,29 @@
     $.renewFormPeriod = ref('month');
     $.renewError = ref('');
 
+    // 续费关联磁盘
+    $.diskListForRenew = ref([]);
+    $.selectedDiskRenewTotal = computed(function() {
+        var disks = $.diskListForRenew.value || [];
+        var total = 0;
+        for (var i = 0; i < disks.length; i++) {
+            if (disks[i]._selected) {
+                total += $.calcDiskRenewPrice(disks[i]);
+            }
+        }
+        return total;
+    });
+    $.calcDiskRenewPrice = function(disk) {
+        if (!disk) return 0;
+        var period = $.renewFormPeriod.value;
+        var monthly = parseFloat(disk.price_per_gb) * parseInt(disk.capacity_gb);
+        var months = period === 'quarter' ? 3 : period === 'year' ? 12 : 1;
+        var discount = 0;
+        if (period === 'quarter' && disk.quarterly_discount) discount = parseInt(disk.quarterly_discount);
+        if (period === 'year' && disk.yearly_discount) discount = parseInt(disk.yearly_discount);
+        return parseFloat((monthly * months * (1 - discount / 100)).toFixed(2));
+    };
+
     $.vmPwdShow = ref(false);
     $.vmPwdResource = ref(null);
     $.vmPwdCiuser = ref('');
@@ -389,27 +412,31 @@
         var period = $.renewFormPeriod.value;
         var qty = $.renewQuantity.value || 1;
 
+        var base = 0;
         if (period === storedPeriod) {
-            return storedPrice * qty;
-        }
-        var monthlyPrice = parseFloat(resource.monthly_price || '0');
-        if (monthlyPrice > 0) {
-            var monthsMap = { month: 1, quarter: 3, year: 12 };
-            var newMonths = monthsMap[period] || 1;
-            var discount = 0;
-            if (period === 'quarter') {
-                discount = Math.min(Math.max(parseInt(resource.quarterly_discount) || 0, 0), 100);
-            } else if (period === 'year') {
-                discount = Math.min(Math.max(parseInt(resource.yearly_discount) || 0, 0), 100);
+            base = storedPrice * qty;
+        } else {
+            var monthlyPrice = parseFloat(resource.monthly_price || '0');
+            if (monthlyPrice > 0) {
+                var monthsMap = { month: 1, quarter: 3, year: 12 };
+                var newMonths = monthsMap[period] || 1;
+                var discount = 0;
+                if (period === 'quarter') {
+                    discount = Math.min(Math.max(parseInt(resource.quarterly_discount) || 0, 0), 100);
+                } else if (period === 'year') {
+                    discount = Math.min(Math.max(parseInt(resource.yearly_discount) || 0, 0), 100);
+                }
+                base = monthlyPrice * newMonths * qty * (1 - discount / 100);
+            } else {
+                var monthsMap2 = { month: 1, quarter: 3, year: 12 };
+                var storedMonths = monthsMap2[storedPeriod] || 1;
+                var monthlyBase = storedPrice / storedMonths;
+                var newMonths2 = monthsMap2[period] || 1;
+                base = monthlyBase * newMonths2 * qty;
             }
-            var baseAmount = monthlyPrice * newMonths * qty;
-            return parseFloat((baseAmount * (1 - discount / 100)).toFixed(2));
         }
-        var monthsMap2 = { month: 1, quarter: 3, year: 12 };
-        var storedMonths = monthsMap2[storedPeriod] || 1;
-        var monthlyBase = storedPrice / storedMonths;
-        var newMonths2 = monthsMap2[period] || 1;
-        return monthlyBase * newMonths2 * qty;
+        // 加上磁盘续费总额
+        return base + $.selectedDiskRenewTotal.value;
     };
 
     $.openRenewModal = function(resource) {
@@ -417,7 +444,29 @@
         $.renewFormPeriod.value = resource.renewal_period || 'month';
         $.renewQuantity.value = 1;
         $.renewError.value = '';
+        $.diskListForRenew.value = [];
+        // 仅 VM 类型加载关联磁盘
+        if (resource.vm_id !== undefined) {
+            $.loadDiskListForRenew(resource.vm_id);
+        }
         $.renewShow.value = true;
+    };
+
+    $.loadDiskListForRenew = async function(vmid) {
+        try {
+            var res = await api('/disks');
+            if (res && Array.isArray(res)) {
+                var bound = res.filter(function(d) {
+                    return d.bind_vmid === vmid && d.status !== 'destroyed';
+                });
+                for (var i = 0; i < bound.length; i++) {
+                    bound[i]._selected = false;
+                }
+                $.diskListForRenew.value = bound;
+            }
+        } catch (e) {
+            console.error('[renew] 加载关联磁盘失败:', e.message);
+        }
     };
 
     $.openVmPasswordReset = async function(vm) {
@@ -443,32 +492,85 @@
         if (!resource) { $.renewError.value = '请选择续费资源'; return; }
         var qty = $.renewQuantity.value;
         if (!Number.isInteger(qty) || qty < 1) { $.renewError.value = '续费数量必须为正整数'; return; }
-        var totalPrice = $.calcRenewTotal().toFixed(2);
+        var vmTotal = $.calcRenewTotal();
+        var diskTotal = $.selectedDiskRenewTotal.value;
+        var grandTotal = vmTotal + diskTotal;
+        var totalPrice = grandTotal.toFixed(2);
         var bal = parseFloat($.walletBalance.value);
         if (bal < parseFloat(totalPrice)) {
             $.renewError.value = '余额不足，应付 ¥' + totalPrice + '，当前余额 ¥' + bal.toFixed(2) + '，请先充值';
             return;
         }
         try {
-            var res = await api('/wallet/renew', {
-                method: 'POST',
-                body: {
-                    type: resource.vm_id !== undefined ? 'vm' : 'lxc',
-                    vmid: resource.vm_id,
-                    ctid: resource.ct_id,
-                    quantity: qty,
-                    period: $.renewFormPeriod.value
+            // 1. 先续费 VM/LXC
+            if (vmTotal > 0) {
+                var res = await api('/wallet/renew', {
+                    method: 'POST',
+                    body: {
+                        type: resource.vm_id !== undefined ? 'vm' : 'lxc',
+                        vmid: resource.vm_id,
+                        ctid: resource.ct_id,
+                        quantity: qty,
+                        period: $.renewFormPeriod.value
+                    }
+                });
+                if (!res.success) {
+                    $.renewError.value = res.error || '续费失败';
+                    return;
                 }
-            });
-            if (res.success) {
-                $.renewShow.value = false;
                 $.walletBalance.value = parseFloat(res.balance).toFixed(2);
-                alert('续费成功！已从余额中扣除 ¥' + totalPrice + '，新到期时间：' + (res.new_expiration || '已更新'));
-                $.loadData();
-                $.loadLxcContainers();
-            } else {
-                $.renewError.value = res.error || '续费失败';
             }
+
+            // 2. 续费勾选的磁盘
+            var disks = $.diskListForRenew.value || [];
+            var renewedDiskIds = [];
+            var diskFailed = false;
+            for (var i = 0; i < disks.length; i++) {
+                if (disks[i]._selected) {
+                    try {
+                        var dres = await fetch('/api/disks/' + disks[i].id + '/renew', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+                            body: JSON.stringify({
+                                period: $.renewFormPeriod.value,
+                                period_count: qty
+                            })
+                        });
+                        var ddata = await dres.json();
+                        if (!dres.ok) {
+                            diskFailed = true;
+                            $.renewError.value = '磁盘 ' + (disks[i].disk_name || disks[i].volume_id) + ' 续费失败: ' + (ddata.error || '未知错误');
+                            break;
+                        }
+                        renewedDiskIds.push(disks[i].id);
+                    } catch (e) {
+                        diskFailed = true;
+                        $.renewError.value = '磁盘续费请求失败: ' + e.message;
+                        break;
+                    }
+                }
+            }
+            if (diskFailed) {
+                // 部分磁盘续费失败，尝试回滚已续费的磁盘
+                for (var j = 0; j < renewedDiskIds.length; j++) {
+                    try {
+                        await fetch('/api/disks/' + renewedDiskIds[j] + '/renew', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+                            body: JSON.stringify({ period: 'month', period_count: -1 })
+                        });
+                    } catch (e) {}
+                }
+                return;
+            }
+
+            $.renewShow.value = false;
+            $.walletBalance.value = parseFloat(res ? res.balance : $.walletBalance.value).toFixed(2);
+            alert('续费成功！已从余额中扣除 ¥' + totalPrice);
+            $.loadData();
+            $.loadLxcContainers();
+            // 刷新磁盘列表
+            if ($.loadDisks) $.loadDisks();
         } catch (e) {
             $.renewError.value = '请求失败，请稍后重试';
         }

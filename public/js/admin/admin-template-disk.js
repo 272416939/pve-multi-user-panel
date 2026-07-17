@@ -75,7 +75,7 @@
                 <span>{{ diskPage.getStorageInfo(spec.storage_pool).used_pct }}%</span>
               </div>
               <div class="progress" style="height:6px;">
-                <div class="progress-bar" :class="diskPage.getStorageUsageClass(diskPage.getStorageInfo(spec.storage_pool).used_pct)" :style="{ width: diskPage.getStorageInfo(spec.storage_pool).used_pct + '%' }"></div>
+                <div class="progress-bar" :style="{ width: diskPage.getStorageInfo(spec.storage_pool).used_pct + '%', backgroundColor: diskPage.getStorageBarColor(diskPage.getStorageInfo(spec.storage_pool).used_pct) }"></div>
               </div>
               <div class="small text-muted mt-1">剩余：{{ diskPage.formatStorageSize(diskPage.getStorageInfo(spec.storage_pool).avail_gb) }} / 总量：{{ diskPage.formatStorageSize(diskPage.getStorageInfo(spec.storage_pool).total_gb) }}</div>
             </div>
@@ -93,11 +93,8 @@
   <!-- ====== 生命周期与到期处理 ====== -->
   <div v-if="activeTabDisk === 'lifecycle'">
     <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
+      <div class="card-header">
         <span>生命周期参数配置</span>
-        <div>
-          <pv-button v-if="!diskPage.editingLifecycle.value" @click="diskPage.editLifecycle" variant="outline" size="sm">编辑</pv-button>
-        </div>
       </div>
       <div class="card-body">
         <div v-if="diskPage.lifecycleConfig.value">
@@ -109,48 +106,42 @@
               <tr>
                 <td>预警提前天数</td>
                 <td>
-                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.warn_days }} 天</span>
-                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.warn_days" style="width:120px">
+                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.warn_days" style="width:120px">
                 </td>
                 <td>到期前提醒</td>
               </tr>
               <tr>
                 <td>宽限期时长</td>
                 <td>
-                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.grace_days }} 天</span>
-                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.grace_days" style="width:120px">
+                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.grace_days" style="width:120px">
                 </td>
                 <td>到期后缓冲</td>
               </tr>
               <tr>
                 <td>优雅关机超时</td>
                 <td>
-                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.shutdown_timeout }} 秒</span>
-                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.shutdown_timeout" style="width:120px">
+                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.shutdown_timeout" style="width:120px">
                 </td>
                 <td>超时强制断电</td>
               </tr>
               <tr>
                 <td>保留期时长</td>
                 <td>
-                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.retention_days }} 天</span>
-                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.retention_days" style="width:120px">
+                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.retention_days" style="width:120px">
                 </td>
                 <td>逾期自动销毁</td>
               </tr>
               <tr>
                 <td>自动续费提前天数</td>
                 <td>
-                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.auto_renew_days }} 天</span>
-                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.auto_renew_days" style="width:120px">
+                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.auto_renew_days" style="width:120px">
                 </td>
                 <td>到期前自动续费</td>
               </tr>
               <tr>
                 <td>预警提醒频率</td>
                 <td>
-                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.warn_frequency }}</span>
-                  <select v-else class="form-select form-select-sm" v-model="diskPage.lifecycleForm.value.warn_frequency" style="width:120px">
+                  <select class="form-select form-select-sm" v-model="diskPage.lifecycleForm.value.warn_frequency" style="width:120px">
                     <option value="daily">每日1次</option>
                     <option value="twice_daily">每日2次</option>
                   </select>
@@ -160,8 +151,7 @@
               <tr>
                 <td>宽限期提醒频率</td>
                 <td>
-                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.grace_frequency }}</span>
-                  <select v-else class="form-select form-select-sm" v-model="diskPage.lifecycleForm.value.grace_frequency" style="width:120px">
+                  <select class="form-select form-select-sm" v-model="diskPage.lifecycleForm.value.grace_frequency" style="width:120px">
                     <option value="daily">每日1次</option>
                     <option value="twice_daily">每日2次</option>
                   </select>
@@ -170,7 +160,7 @@
               </tr>
             </tbody>
           </table>
-          <div v-if="diskPage.editingLifecycle.value" class="mt-3">
+          <div class="mt-3">
             <pv-button @click="diskPage.saveLifecycleConfig" variant="primary" size="sm">保存</pv-button>
             <pv-button @click="diskPage.cancelEditLifecycle" variant="secondary" size="sm">取消</pv-button>
             <pv-button @click="diskPage.resetLifecycleDefaults" variant="outline" size="sm" class="ms-2">恢复默认</pv-button>

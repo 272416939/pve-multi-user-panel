@@ -37,6 +37,8 @@
                                     <option value="renewal">服务器续费</option>
                                     <option value="admin_recharge">后台充值</option>
                                     <option value="new_order">新购服务器</option>
+                                    <option value="disk_purchase">新购硬盘</option>
+                                    <option value="disk_renewal">续费硬盘</option>
                                 </select>
                             </div>
                             <div class="col-md-2">
@@ -69,7 +71,7 @@
                                     <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method === 'manual' ? '系统' : tx.pay_method === 'balance_refund' ? '余额退款' : tx.pay_method === 'alipay_refund' ? '支付宝退款' : tx.pay_method === 'wxpay_refund' ? '微信退款' : tx.pay_method }}</td>
                                     <td><code style="font-size:11px;">{{ tx.order_no }}</code></td>
                                     <td><code style="font-size:11px;">{{ tx.trade_no || '-' }}</code></td>
-                                    <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'refund' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : 'badge badge-renewal'" :style="tx.trade_type !== 'recharge' && tx.trade_type !== 'admin_recharge' && tx.trade_type !== 'refund' && tx.trade_type !== 'new_order' ? 'background:#0d9488;color:#fff' : ''">{{ tx.trade_type === 'recharge' ? '余额充值' : tx.trade_type === 'admin_recharge' ? '后台充值' : tx.trade_type === 'refund' ? '订单退款' : tx.trade_type === 'new_order' ? '新购服务器' : '服务器续费' }}</span></td>
+                                    <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'refund' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : tx.trade_type === 'disk_purchase' ? 'badge bg-info' : tx.trade_type === 'disk_renewal' ? 'badge bg-primary' : 'badge badge-renewal'" :style="tx.trade_type !== 'recharge' && tx.trade_type !== 'admin_recharge' && tx.trade_type !== 'refund' && tx.trade_type !== 'new_order' && tx.trade_type !== 'disk_purchase' && tx.trade_type !== 'disk_renewal' ? 'background:#0d9488;color:#fff' : ''">{{ tx.trade_type === 'recharge' ? '余额充值' : tx.trade_type === 'admin_recharge' ? '后台充值' : tx.trade_type === 'refund' ? '订单退款' : tx.trade_type === 'new_order' ? '新购服务器' : tx.trade_type === 'disk_purchase' ? '新购硬盘' : tx.trade_type === 'disk_renewal' ? '续费硬盘' : '服务器续费' }}</span></td>
                                     <td>¥{{ tx.amount }}</td>
                                 </tr>
                                 <tr v-if="!transactionList || transactionList.length === 0">
@@ -109,6 +111,7 @@
                                             <option value="">全部</option>
                                             <option value="vm">VM</option>
                                             <option value="lxc">LXC</option>
+                                            <option value="disk">磁盘</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2">
@@ -143,7 +146,7 @@
                                             <td><code>{{ o.order_no }}</code></td>
                                             <td>{{ o.username }}</td>
                                             <td>{{ o.package_name }}</td>
-                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : 'badge bg-success'">{{ o.type === 'vm' ? 'VM' : 'LXC' }}</span></td>
+                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.type === 'vm' ? 'VM' : o.type === 'lxc' ? 'LXC' : '磁盘' }}</span></td>
                                             <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
                                             <td>{{ o.period_count }}</td>
                                             <td>{{ o.amount }} 元</td>

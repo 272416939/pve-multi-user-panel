@@ -152,6 +152,13 @@
     return 'bg-success';
   };
 
+  // 存储进度条颜色（加深）
+  $.diskPage.getStorageBarColor = function(pct) {
+    if (pct >= 90) return '#dc3545';
+    if (pct >= 70) return '#fd7e14';
+    return '#198754';
+  };
+
   // 根据存储池名称查找 PVE 存储信息
   $.diskPage.getStorageInfo = function(poolName) {
     if (!poolName) return null;
@@ -282,10 +289,6 @@
     } catch (e) {
       console.error('[disk] 加载生命周期配置失败:', e.message);
     }
-  };
-
-  $.diskPage.editLifecycle = function() {
-    $.diskPage.editingLifecycle.value = true;
   };
 
   $.diskPage.saveLifecycleConfig = async function() {
