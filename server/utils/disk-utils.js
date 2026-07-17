@@ -159,16 +159,20 @@ async function unbindDisk(vmid, bus, dev) {
 }
 
 // 扩容磁盘 - qm resize <vmid> <volume> <size>
-// 使用中转 VM（db 配置 disk:temp_vmid，默认 9999）执行扩容
-async function resizeDisk(volumeId, newSizeGb, tempVmid) {
+// 已挂载磁盘使用其 bind_vmid，游离磁盘使用中转 VM（disk:temp_vmid，默认 9999）
+async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid) {
   var safeVol = validateVolumeId(volumeId);
   var safeSize = validateParam('sizeGb', newSizeGb);
-  var safeVmid = parseInt(tempVmid) || 9999;
-  if (!Number.isInteger(safeVmid) || safeVmid < 100 || safeVmid > 999999999) {
-    safeVmid = 9999;
+  // 优先使用磁盘绑定的 vmid（已挂载场景），否则使用中转 VM（游离场景）
+  var safeVmid;
+  if (bindVmid && Number.isInteger(parseInt(bindVmid)) && parseInt(bindVmid) >= 100) {
+    safeVmid = parseInt(bindVmid);
+  } else {
+    safeVmid = parseInt(tempVmid) || 9999;
+    if (!Number.isInteger(safeVmid) || safeVmid < 100 || safeVmid > 999999999) {
+      safeVmid = 9999;
+    }
   }
-  // qm resize <vmid> <storage:volume_name> <size> 支持直接操作存储卷
-  // 传入中转 VM 的 vmid 而非 0，避免 vmid 校验问题
   var cmd = 'qm resize ' + safeVmid + ' ' + safeVol + ' ' + safeSize + 'G';
   await runSshCommand(cmd);
 }
