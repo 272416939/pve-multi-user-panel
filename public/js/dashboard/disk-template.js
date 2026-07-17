@@ -32,41 +32,41 @@
       <table>
         <thead>
           <tr>
-            <th style="width:40px"><input type="checkbox" @change="selectedDisks = $event.target.checked ? disks.map(function(d) { return d.id; }) : []" :checked="selectedDisks.length === disks.length && disks.length > 0"></th>
-            <th>ID</th>
+            <th style="width:40px" class="text-center"><input type="checkbox" @change="selectedDisks = $event.target.checked ? disks.map(function(d) { return d.id; }) : []" :checked="selectedDisks.length === disks.length && disks.length > 0"></th>
+            <th class="text-center">ID</th>
             <th>名称</th>
             <th>存储分组</th>
             <th>规格名称</th>
-            <th>类型</th>
-            <th>容量</th>
-            <th>状态</th>
-            <th>绑定虚拟机</th>
-            <th>到期时间</th>
-            <th>剩余天数</th>
-            <th>自动续费</th>
-            <th>操作</th>
+            <th class="text-center">类型</th>
+            <th class="text-center">容量</th>
+            <th class="text-center">状态</th>
+            <th class="text-center">绑定虚拟机</th>
+            <th class="text-center">到期时间</th>
+            <th class="text-center">剩余天数</th>
+            <th class="text-center">自动续费</th>
+            <th class="text-center">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="disk in disks" :key="disk.id">
-            <td><input type="checkbox" v-model="selectedDisks" :value="disk.id"></td>
-            <td>{{ disk.id }}</td>
+            <td class="text-center"><input type="checkbox" v-model="selectedDisks" :value="disk.id"></td>
+            <td class="text-center">{{ disk.id }}</td>
             <td>{{ disk.disk_name || '-' }}</td>
             <td>{{ disk.group_name || '-' }}</td>
             <td>{{ disk.spec_name || '-' }}</td>
-            <td><span :class="getDiskTypeBadge(disk.disk_type)">{{ disk.disk_type }}</span></td>
-            <td>{{ disk.capacity_gb }} GiB</td>
-            <td><span :class="getDiskStatusClass(disk.status)">{{ getDiskStatusText(disk.status) }}</span></td>
-            <td>{{ disk.bind_vmid ? 'VM-' + disk.bind_vmid : '-' }}</td>
-            <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? formatDate(disk.expire_time) : '-' }}</td>
-            <td :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? daysUntilExpire(disk.expire_time) : '-' }}</td>
+            <td class="text-center"><span :class="getDiskTypeBadge(disk.disk_type)">{{ disk.disk_type }}</span></td>
+            <td class="text-center">{{ disk.capacity_gb }} GiB</td>
+            <td class="text-center"><span :class="getDiskStatusClass(disk.status)">{{ getDiskStatusText(disk.status) }}</span></td>
+            <td class="text-center">{{ disk.bind_vmid ? 'VM-' + disk.bind_vmid : '-' }}</td>
+            <td class="text-center" :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? formatDate(disk.expire_time) : '-' }}</td>
+            <td class="text-center" :class="getExpiryColor(disk.expire_time)">{{ disk.expire_time ? daysUntilExpire(disk.expire_time) : '-' }}</td>
             <td class="text-center">
               <div v-if="disk.status !== 'destroyed'" class="disk-auto-renew-switch">
                 <input class="form-check-input" type="checkbox" role="switch" :checked="disk.auto_renew === 1" @change="toggleDiskAutoRenew(disk, $event.target.checked)">
               </div>
               <span v-else class="text-muted">-</span>
             </td>
-            <td>
+            <td class="text-center">
               <button v-if="disk.status !== 'destroyed'" class="table-btn btn-info" @click="openDiskRenewModal(disk)">续费</button>
               <button v-else class="table-btn btn-danger" @click="deleteDestroyedDisk(disk)">删除</button>
             </td>
