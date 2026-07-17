@@ -430,12 +430,22 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
       } catch (e) {}
       await diskUtils.resizeDisk(disk.volume_id, newSize, tempVmid, disk.bind_vmid);
     } catch (pveErr) {
-      // PVE 扩容失败：回滚退款 + 恢复容量
+      // PVE 扩容失败：回滚退款 + 恢复容量 + 退款流水
       console.error('[disk resize] PVE 扩容失败，回滚:', pveErr.message);
       await withTransaction(async (conn) => {
+        // 退款
         await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [resizeAmount, req.user.id]);
+        // 恢复容量和价格
         await conn.execute('UPDATE disks SET capacity_gb = ?, price_per_gb = ?, updated_at = NOW() WHERE id = ?', [disk.capacity_gb, disk.price_per_gb, disk.id]);
-        await db.orders.updateStatus(resizeOrderNo, 'refunded');
+        // 退款流水
+        var refundOrderNo = generateOrderNo('refund');
+        var refundBalanceAfter = balanceBefore - resizeAmount + resizeAmount;
+        await conn.execute(
+          'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [req.user.id, refundOrderNo, dbNow, 'balance_refund', 'refund', resizeAmount, 'month', 0, balanceBefore - resizeAmount, refundBalanceAfter, 'disk', disk.id, resizeOrderNo, '', dbNow]
+        );
+        // 订单标记 refunded
+        await conn.execute('UPDATE orders SET status = ? WHERE order_no = ?', ['refunded', resizeOrderNo]);
       });
       return res.status(500).json({ error: 'PVE 扩容失败，已退款' });
     }
