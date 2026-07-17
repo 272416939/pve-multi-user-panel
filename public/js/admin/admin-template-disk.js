@@ -25,7 +25,7 @@
               <span class="badge bg-info me-1" v-for="spec in diskPage.diskSpecs.value.filter(s => s.storage_group_id === g.id)" :key="spec.id">{{ spec.disk_type }}</span>
               <span v-if="diskPage.diskSpecs.value.filter(s => s.storage_group_id === g.id).length === 0" class="text-muted small">暂无</span>
             </div>
-            <div class="mt-3">
+            <div class="mt-3 d-flex gap-2">
               <pv-button @click="diskPage.openStorageGroupForm(g)" variant="outline" size="sm">编辑</pv-button>
               <pv-button @click="diskPage.deleteStorageGroup(g.id)" variant="outline-danger" size="sm">删除</pv-button>
             </div>
@@ -79,7 +79,7 @@
               </div>
               <div class="small text-muted mt-1">剩余：{{ diskPage.formatStorageSize(diskPage.getStorageInfo(spec.storage_pool).avail_gb) }} / 总量：{{ diskPage.formatStorageSize(diskPage.getStorageInfo(spec.storage_pool).total_gb) }}</div>
             </div>
-            <div class="mt-3">
+            <div class="mt-3 d-flex gap-2">
               <pv-button @click="diskPage.openDiskSpecForm(spec)" variant="outline" size="sm">编辑</pv-button>
               <pv-button @click="diskPage.deleteDiskSpec(spec.id)" variant="outline-danger" size="sm">删除</pv-button>
             </div>
