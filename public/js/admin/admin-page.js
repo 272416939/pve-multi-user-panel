@@ -68,6 +68,21 @@ var App = {
         if (!$.redisConfig) $.redisConfig = Vue.ref({ host: '', port: 6379, password: '', db: 0, prefix: 'pve:' });
         if (!$.redisConfigSaving) $.redisConfigSaving = Vue.ref(false);
         if (!$.redisTesting) $.redisTesting = Vue.ref(false);
+        // 硬盘设置兜底初始化
+        if (!$.diskPage) $.diskPage = {};
+        if (!$.diskPage.storageGroups) $.diskPage.storageGroups = Vue.ref([]);
+        if (!$.diskPage.diskSpecs) $.diskPage.diskSpecs = Vue.ref([]);
+        if (!$.diskPage.lifecycleConfig) $.diskPage.lifecycleConfig = Vue.ref(null);
+        if (!$.diskPage.editingStorageGroup) $.diskPage.editingStorageGroup = Vue.ref(null);
+        if (!$.diskPage.showStorageGroupModal) $.diskPage.showStorageGroupModal = Vue.ref(false);
+        if (!$.diskPage.storageGroupForm) $.diskPage.storageGroupForm = Vue.ref({ name: '', sort_order: 0 });
+        if (!$.diskPage.editingDiskSpec) $.diskPage.editingDiskSpec = Vue.ref(null);
+        if (!$.diskPage.showDiskSpecModal) $.diskPage.showDiskSpecModal = Vue.ref(false);
+        if (!$.diskPage.showQosSection) $.diskPage.showQosSection = Vue.ref(false);
+        if (!$.diskPage.diskSpecForm) $.diskPage.diskSpecForm = Vue.ref({ name: '', disk_type: 'NVME', storage_group_id: '', enabled: true, min_size_gb: 10, max_size_gb: 2000, price_per_gb: 0.8, quarterly_discount: 0, yearly_discount: 0, storage_pool: '', mbps_rd: '', mbps_rd_max: '', mbps_wr: '', mbps_wr_max: '', iops_rd: '', iops_rd_max: '', iops_wr: '', iops_wr_max: '', description: '' });
+        if (!$.diskPage.editingLifecycle) $.diskPage.editingLifecycle = Vue.ref(false);
+        if (!$.diskPage.lifecycleForm) $.diskPage.lifecycleForm = Vue.ref({ warn_days: 7, warn_frequency: 'daily', grace_days: 3, grace_frequency: 'twice_daily', shutdown_timeout: 300, retention_days: 15, check_time: '02:00', auto_renew_days: 1 });
+        if (!$.activeTabDisk) $.activeTabDisk = Vue.ref('storage-groups');
         $.initCore();
         $.initVm();
         $.initLxc();
@@ -75,6 +90,7 @@ var App = {
         $.initNetwork();
         $.initUpdate();
         $.initTemplate();
+        $.initDisk && $.initDisk();
         $.toggleAdminDropdown = function(target) {
             var dd = target.parentElement;
             var isOpen = dd.classList.contains('open');

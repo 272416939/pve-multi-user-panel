@@ -1,0 +1,381 @@
+// public/js/admin/admin-template-disk.js - 管理员硬盘设置模板
+// 安全设计：使用 Vue {{ }} 插值，无 v-html 渲染用户数据，CSP nonce 合规
+// 注意：diskPage 是普通对象，其属性是 ref，模板中使用 diskPage.xxx.value 访问
+
+(function() {
+  if (!window.__adminTemplateParts) window.__adminTemplateParts = [];
+
+  window.__adminTemplateParts.push(`
+<!-- 硬盘设置 -->
+<div v-if="activeSection === 'disk-settings' && diskPage && diskPage.storageGroups">
+
+  <!-- 子标签导航 -->
+  <div class="mb-3">
+    <ul class="nav nav-tabs">
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: activeTabDisk === 'storage-groups' }" href="#" @click.prevent="activeTabDisk = 'storage-groups'">存储分组管理</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: activeTabDisk === 'specs' }" href="#" @click.prevent="activeTabDisk = 'specs'">数据盘管理</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: activeTabDisk === 'lifecycle' }" href="#" @click.prevent="activeTabDisk = 'lifecycle'">生命周期与到期处理</a>
+      </li>
+    </ul>
+  </div>
+
+  <!-- ====== 存储分组管理 ====== -->
+  <div v-if="activeTabDisk === 'storage-groups'">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">存储分组管理</h5>
+      <pv-button @click="diskPage.openStorageGroupForm(null)" size="sm">+ 新建分组</pv-button>
+    </div>
+    <div class="row">
+      <div class="col-md-4 mb-3" v-for="g in diskPage.storageGroups.value" :key="g.id">
+        <div class="card h-100">
+          <div class="card-body">
+            <h6 class="card-title">{{ g.name }}</h6>
+            <p class="text-muted small mb-2">已绑定硬盘类型：</p>
+            <div>
+              <span class="badge bg-info me-1" v-for="spec in diskPage.diskSpecs.value.filter(s => s.storage_group_id === g.id)" :key="spec.id">{{ spec.disk_type }}</span>
+              <span v-if="diskPage.diskSpecs.value.filter(s => s.storage_group_id === g.id).length === 0" class="text-muted small">暂无</span>
+            </div>
+            <div class="mt-3">
+              <pv-button @click="diskPage.openStorageGroupForm(g)" variant="outline" size="sm">编辑</pv-button>
+              <pv-button @click="diskPage.deleteStorageGroup(g.id)" variant="outline-danger" size="sm">删除</pv-button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="diskPage.storageGroups.value.length === 0" class="col-12 text-center text-muted py-5">暂无存储分组，点击「新建分组」创建</div>
+    </div>
+  </div>
+
+  <!-- ====== 数据盘规格管理 ====== -->
+  <div v-if="activeTabDisk === 'specs'">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h5 class="mb-0">硬盘规格管理</h5>
+      <pv-button @click="diskPage.openDiskSpecForm(null)" size="sm">+ 新建硬盘</pv-button>
+    </div>
+    <div class="row">
+      <div class="col-md-6 mb-3" v-for="spec in diskPage.diskSpecs.value" :key="spec.id">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <h6 class="card-title mb-1">{{ spec.disk_type }}</h6>
+                <span class="text-muted small">{{ spec.name }}</span>
+              </div>
+              <span class="badge" :class="spec.enabled ? 'bg-success' : 'bg-secondary'">{{ spec.enabled ? '启用' : '禁用' }}</span>
+            </div>
+            <hr class="my-2">
+            <div class="small">
+              <div><strong>存储分组：</strong>{{ spec.group_name || '-' }}</div>
+              <div><strong>起售量：</strong>{{ spec.min_size_gb }} GiB &nbsp; <strong>截止量：</strong>{{ spec.max_size_gb }} GiB</div>
+              <div><strong>月  价：</strong>￥{{ spec.price_per_gb }} 元/GiB</div>
+              <div v-if="spec.quarterly_discount"><strong>季  付：</strong>{{ spec.quarterly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).quarterly }}/GiB/月）</div>
+              <div v-if="spec.yearly_discount"><strong>年  付：</strong>{{ spec.yearly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).yearly }}/GiB/月）</div>
+              <div><strong>存储池：</strong>{{ spec.storage_pool }}</div>
+              <div v-if="spec.mbps_rd || spec.mbps_wr"><strong>带宽限速：</strong>读 {{ spec.mbps_rd || '无' }} MB/s 写 {{ spec.mbps_wr || '无' }} MB/s</div>
+              <div v-if="spec.iops_rd || spec.iops_wr"><strong>IOPS 限速：</strong>读 {{ spec.iops_rd || '无' }} ops/s 写 {{ spec.iops_wr || '无' }} ops/s</div>
+            </div>
+            <div class="mt-3">
+              <pv-button @click="diskPage.openDiskSpecForm(spec)" variant="outline" size="sm">编辑</pv-button>
+              <pv-button @click="diskPage.deleteDiskSpec(spec.id)" variant="outline-danger" size="sm">删除</pv-button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="diskPage.diskSpecs.value.length === 0" class="col-12 text-center text-muted py-5">暂无规格，点击「新建硬盘」创建</div>
+    </div>
+  </div>
+
+  <!-- ====== 生命周期与到期处理 ====== -->
+  <div v-if="activeTabDisk === 'lifecycle'">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>生命周期参数配置</span>
+        <div>
+          <pv-button v-if="!diskPage.editingLifecycle.value" @click="diskPage.editLifecycle" variant="outline" size="sm">编辑</pv-button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div v-if="diskPage.lifecycleConfig.value">
+          <table class="table table-bordered">
+            <thead class="table-light">
+              <tr><th style="width:200px">配置项</th><th>当前值</th><th style="width:100px">说明</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>预警提前天数</td>
+                <td>
+                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.warn_days }} 天</span>
+                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.warn_days" style="width:120px">
+                </td>
+                <td>到期前提醒</td>
+              </tr>
+              <tr>
+                <td>宽限期时长</td>
+                <td>
+                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.grace_days }} 天</span>
+                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.grace_days" style="width:120px">
+                </td>
+                <td>到期后缓冲</td>
+              </tr>
+              <tr>
+                <td>优雅关机超时</td>
+                <td>
+                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.shutdown_timeout }} 秒</span>
+                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.shutdown_timeout" style="width:120px">
+                </td>
+                <td>超时强制断电</td>
+              </tr>
+              <tr>
+                <td>保留期时长</td>
+                <td>
+                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.retention_days }} 天</span>
+                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.retention_days" style="width:120px">
+                </td>
+                <td>逾期自动销毁</td>
+              </tr>
+              <tr>
+                <td>到期巡检执行时间</td>
+                <td>
+                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.check_time }}</span>
+                  <input v-else class="form-control form-control-sm" v-model="diskPage.lifecycleForm.value.check_time" style="width:120px" placeholder="HH:mm">
+                </td>
+                <td>每日固定时间</td>
+              </tr>
+              <tr>
+                <td>自动续费提前天数</td>
+                <td>
+                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.auto_renew_days }} 天</span>
+                  <input v-else class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.auto_renew_days" style="width:120px">
+                </td>
+                <td>到期前自动续费</td>
+              </tr>
+              <tr>
+                <td>预警提醒频率</td>
+                <td>
+                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.warn_frequency }}</span>
+                  <select v-else class="form-select form-select-sm" v-model="diskPage.lifecycleForm.value.warn_frequency" style="width:120px">
+                    <option value="daily">每日1次</option>
+                    <option value="twice_daily">每日2次</option>
+                  </select>
+                </td>
+                <td>-</td>
+              </tr>
+              <tr>
+                <td>宽限期提醒频率</td>
+                <td>
+                  <span v-if="!diskPage.editingLifecycle.value">{{ diskPage.lifecycleConfig.value.grace_frequency }}</span>
+                  <select v-else class="form-select form-select-sm" v-model="diskPage.lifecycleForm.value.grace_frequency" style="width:120px">
+                    <option value="daily">每日1次</option>
+                    <option value="twice_daily">每日2次</option>
+                  </select>
+                </td>
+                <td>-</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="diskPage.editingLifecycle.value" class="mt-3">
+            <pv-button @click="diskPage.saveLifecycleConfig" variant="primary" size="sm">保存</pv-button>
+            <pv-button @click="diskPage.cancelEditLifecycle" variant="secondary" size="sm">取消</pv-button>
+            <pv-button @click="diskPage.resetLifecycleDefaults" variant="outline" size="sm" class="ms-2">恢复默认</pv-button>
+          </div>
+        </div>
+        <div v-else class="text-center text-muted py-3">加载中...</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<!-- end disk-settings -->
+
+<!-- 存储分组弹窗 -->
+<div class="modal fade" id="storageGroupModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{{ diskPage.editingStorageGroup.value ? '编辑存储分组' : '新建存储分组' }}</h5>
+        <pv-button type="button" variant="close" data-bs-dismiss="modal" @click="diskPage.showStorageGroupModal.value = false"></pv-button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">分组名称</label>
+          <input class="form-control" v-model="diskPage.storageGroupForm.value.name" placeholder="如 NVME-A" maxlength="50">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <pv-button type="button" data-bs-dismiss="modal" variant="secondary" @click="diskPage.showStorageGroupModal.value = false">取消</pv-button>
+        <pv-button @click="diskPage.saveStorageGroup" variant="primary">确定</pv-button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 硬盘规格弹窗 -->
+<div class="modal fade" id="diskSpecModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">{{ diskPage.editingDiskSpec.value ? '编辑硬盘规格' : '新建硬盘规格' }}</h5>
+        <pv-button type="button" variant="close" data-bs-dismiss="modal" @click="diskPage.showDiskSpecModal.value = false"></pv-button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <!-- 基本信息 -->
+          <div class="col-12"><h6 class="border-bottom pb-2">基本信息</h6></div>
+          <div class="col-md-6">
+            <label class="form-label">规格名称</label>
+            <input class="form-control" v-model="diskPage.diskSpecForm.value.name" maxlength="100" placeholder="如 企业级 NVME 高性能盘">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">类型</label>
+            <select class="form-select" v-model="diskPage.diskSpecForm.value.disk_type">
+              <option value="NVME">NVME</option>
+              <option value="SATA">SATA</option>
+              <option value="HDD">HDD</option>
+              <option value="U2">U2</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">存储分组</label>
+            <select class="form-select" v-model="diskPage.diskSpecForm.value.storage_group_id">
+              <option value="">请选择</option>
+              <option v-for="g in diskPage.storageGroups.value" :key="g.id" :value="g.id">{{ g.name }}</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">启用状态</label>
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" v-model="diskPage.diskSpecForm.value.enabled" id="specEnabled">
+              <label class="form-check-label" for="specEnabled">启用</label>
+            </div>
+          </div>
+          <div class="col-md-9">
+            <label class="form-label">规格描述</label>
+            <textarea class="form-control" rows="2" v-model="diskPage.diskSpecForm.value.description" maxlength="500" placeholder="展示在用户购买页的描述信息"></textarea>
+          </div>
+
+          <!-- 容量与定价 -->
+          <div class="col-12"><h6 class="border-bottom pb-2 mt-2">容量与定价</h6></div>
+          <div class="col-md-3">
+            <label class="form-label">最低容量</label>
+            <div class="input-group">
+              <input class="form-control" type="number" v-model.number="diskPage.diskSpecForm.value.min_size_gb" min="1">
+              <span class="input-group-text">GiB</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">最大容量</label>
+            <div class="input-group">
+              <input class="form-control" type="number" v-model.number="diskPage.diskSpecForm.value.max_size_gb" min="1">
+              <span class="input-group-text">GiB</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">每 GiB 月单价</label>
+            <div class="input-group">
+              <span class="input-group-text">￥</span>
+              <input class="form-control" type="number" step="0.0001" v-model.number="diskPage.diskSpecForm.value.price_per_gb" min="0">
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">存储位置</label>
+            <select class="form-select" v-model="diskPage.diskSpecForm.value.storage_pool">
+              <option value="">请选择</option>
+              <option value="local-lvm">local-lvm</option>
+              <option value="local">local</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">季付折扣</label>
+            <div class="input-group">
+              <input class="form-control" type="number" v-model.number="diskPage.diskSpecForm.value.quarterly_discount" min="0" max="100" placeholder="0">
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">年付折扣</label>
+            <div class="input-group">
+              <input class="form-control" type="number" v-model.number="diskPage.diskSpecForm.value.yearly_discount" min="0" max="100" placeholder="0">
+              <span class="input-group-text">%</span>
+            </div>
+          </div>
+
+          <!-- QoS 限速参数 -->
+          <div class="col-12">
+            <a href="#" @click.prevent="diskPage.showQosSection.value = !diskPage.showQosSection.value" class="text-decoration-none">
+              <h6 class="border-bottom pb-2 mt-2">QoS 限速参数 <small class="text-muted">({{ diskPage.showQosSection.value ? '收起' : '展开' }})</small></h6>
+            </a>
+          </div>
+          <template v-if="diskPage.showQosSection.value">
+            <div class="col-md-3">
+              <label class="form-label">读取限速</label>
+              <div class="input-group">
+                <input class="form-control" type="number" v-model="diskPage.diskSpecForm.value.mbps_rd" min="0" placeholder="留空无限制">
+                <span class="input-group-text">MB/s</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">读突发峰值</label>
+              <div class="input-group">
+                <input class="form-control" type="number" v-model="diskPage.diskSpecForm.value.mbps_rd_max" min="0" placeholder="留空无限制">
+                <span class="input-group-text">MB</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">写入限制</label>
+              <div class="input-group">
+                <input class="form-control" type="number" v-model="diskPage.diskSpecForm.value.mbps_wr" min="0" placeholder="留空无限制">
+                <span class="input-group-text">MB/s</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">写突发峰值</label>
+              <div class="input-group">
+                <input class="form-control" type="number" v-model="diskPage.diskSpecForm.value.mbps_wr_max" min="0" placeholder="留空无限制">
+                <span class="input-group-text">MB</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">读取 IOPS</label>
+              <div class="input-group">
+                <input class="form-control" type="number" v-model="diskPage.diskSpecForm.value.iops_rd" min="0" placeholder="留空无限制">
+                <span class="input-group-text">ops/s</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">读 IOPS 突发</label>
+              <div class="input-group">
+                <input class="form-control" type="number" v-model="diskPage.diskSpecForm.value.iops_rd_max" min="0" placeholder="留空无限制">
+                <span class="input-group-text">ops</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">写入 IOPS</label>
+              <div class="input-group">
+                <input class="form-control" type="number" v-model="diskPage.diskSpecForm.value.iops_wr" min="0" placeholder="留空无限制">
+                <span class="input-group-text">ops/s</span>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">写 IOPS 突发</label>
+              <div class="input-group">
+                <input class="form-control" type="number" v-model="diskPage.diskSpecForm.value.iops_wr_max" min="0" placeholder="留空无限制">
+                <span class="input-group-text">ops</span>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <pv-button type="button" data-bs-dismiss="modal" variant="secondary" @click="diskPage.showDiskSpecModal.value = false">取消</pv-button>
+        <pv-button @click="diskPage.saveDiskSpec" variant="primary">确定</pv-button>
+      </div>
+    </div>
+  </div>
+</div>
+  `);
+})();

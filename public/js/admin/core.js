@@ -15,6 +15,7 @@
     $.activeTab = ref((savedTab === 'assign' ? 'users' : savedTab) || 'users');
     $.activeTabLxc = ref(localStorage.getItem('admin_activeTabLxc') || 'create');
     $.activeTabVm = ref(localStorage.getItem('admin_activeTabVm') || 'manage');
+    $.activeTabDisk = ref('storage-groups');
     $.loading = ref(false);
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');

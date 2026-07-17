@@ -56,7 +56,7 @@ async function setVmAffinity(vmid, affinityValue) {
  * @returns {string} 订单号
  */
 function generateOrderNo(category) {
-    var prefixes = { vm: 'KTVM', lxc: 'KTLXC', refund: 'TK', alipay: 'ZFB', wxpay: 'WX', syspay: 'SYSPAY' };
+    var prefixes = { vm: 'KTVM', lxc: 'KTLXC', refund: 'TK', alipay: 'ZFB', wxpay: 'WX', syspay: 'SYSPAY', disk: 'KTDISK' };
     var prefix = prefixes[category];
     if (!prefix) throw new Error('未知的订单类别: ' + category);
     var now = new Date();

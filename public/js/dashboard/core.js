@@ -1174,6 +1174,9 @@
         if (section === 'order') {
             $.loadPackages();
         }
+        if (section === 'disk' && $.loadDisks) {
+            $.loadDisks();
+        }
     };
 
     // ===== 生命周期 =====

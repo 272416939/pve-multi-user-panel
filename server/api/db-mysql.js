@@ -500,6 +500,96 @@ async function initDb() {
         updated_at DATETIME NOT NULL DEFAULT NOW()
     )`);
 
+    // 创建存储分组表
+    await execute(`
+    CREATE TABLE IF NOT EXISTS storage_groups (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(50) NOT NULL UNIQUE,
+        sort_order INT DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+
+    // 创建硬盘规格表
+    await execute(`
+    CREATE TABLE IF NOT EXISTS disk_specs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL DEFAULT '',
+        disk_type VARCHAR(20) NOT NULL,
+        storage_group_id INT NOT NULL,
+        enabled TINYINT(1) DEFAULT 1,
+        min_size_gb INT NOT NULL DEFAULT 10,
+        max_size_gb INT NOT NULL DEFAULT 2000,
+        price_per_gb DECIMAL(10,4) NOT NULL DEFAULT 0.0000,
+        quarterly_discount INT DEFAULT 0,
+        yearly_discount INT DEFAULT 0,
+        mbps_rd INT DEFAULT NULL,
+        mbps_rd_max INT DEFAULT NULL,
+        mbps_wr INT DEFAULT NULL,
+        mbps_wr_max INT DEFAULT NULL,
+        iops_rd INT DEFAULT NULL,
+        iops_rd_max INT DEFAULT NULL,
+        iops_wr INT DEFAULT NULL,
+        iops_wr_max INT DEFAULT NULL,
+        storage_pool VARCHAR(100) NOT NULL,
+        description TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_disk_specs_group (storage_group_id)
+    )`);
+
+    // 创建磁盘资产台账表
+    await execute(`
+    CREATE TABLE IF NOT EXISTS disks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        volume_id VARCHAR(255) NOT NULL UNIQUE,
+        disk_name VARCHAR(100) DEFAULT '',
+        spec_id INT DEFAULT NULL,
+        user_id INT NOT NULL,
+        storage_group_id INT NOT NULL,
+        storage_pool VARCHAR(100) NOT NULL,
+        disk_type VARCHAR(20) NOT NULL,
+        capacity_gb INT NOT NULL,
+        status ENUM('free','bound','grace','expired','destroyed') DEFAULT 'free',
+        bind_vmid INT DEFAULT NULL,
+        bind_bus VARCHAR(10) DEFAULT NULL,
+        bind_dev INT DEFAULT NULL,
+        price_per_gb DECIMAL(10,4) NOT NULL,
+        quarterly_discount INT DEFAULT 0,
+        yearly_discount INT DEFAULT 0,
+        auto_renew TINYINT(1) DEFAULT 0,
+        create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+        expire_time DATETIME DEFAULT NULL,
+        mbps_rd INT DEFAULT NULL,
+        mbps_rd_max INT DEFAULT NULL,
+        mbps_wr INT DEFAULT NULL,
+        mbps_wr_max INT DEFAULT NULL,
+        iops_rd INT DEFAULT NULL,
+        iops_rd_max INT DEFAULT NULL,
+        iops_wr INT DEFAULT NULL,
+        iops_wr_max INT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_disks_user (user_id),
+        INDEX idx_disks_status (status),
+        INDEX idx_disks_vmid (bind_vmid)
+    )`);
+
+    // 创建磁盘生命周期配置表
+    await execute(`
+    CREATE TABLE IF NOT EXISTS disk_lifecycle_config (
+        id INT PRIMARY KEY DEFAULT 1,
+        warn_days INT DEFAULT 7,
+        warn_frequency VARCHAR(20) DEFAULT 'daily',
+        grace_days INT DEFAULT 3,
+        grace_frequency VARCHAR(20) DEFAULT 'twice_daily',
+        shutdown_timeout INT DEFAULT 300,
+        retention_days INT DEFAULT 15,
+        check_time VARCHAR(5) DEFAULT '02:00',
+        auto_renew_days INT DEFAULT 1,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`);
+
     // 初始化默认配置
     await initDefaultConfig();
 
@@ -830,6 +920,7 @@ module.exports = {
         getAll: () => queryAll('SELECT * FROM vms'),
         getByUserId: (userId) => queryAll('SELECT * FROM vms WHERE user_id = ?', [userId]),
         getById: (id) => queryOne('SELECT * FROM vms WHERE id = ?', [id]),
+        getByVmid: (vmid) => queryOne('SELECT * FROM vms WHERE vm_id = ?', [parseInt(vmid)]),
         create: async (vm) => {
             const [result] = await execute(
                 `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, created_at)
@@ -2149,4 +2240,126 @@ module.exports = {
             }
         }
     },
+
+    // ==================== 硬盘管理 ====================
+
+    // 存储分组
+    storageGroups: {
+        getAll: () => queryAll('SELECT * FROM storage_groups ORDER BY sort_order, id'),
+        getById: (id) => queryOne('SELECT * FROM storage_groups WHERE id = ?', [parseInt(id)]),
+        create: async (data) => {
+            const [result] = await execute(
+                'INSERT INTO storage_groups (name, sort_order) VALUES (?, ?)',
+                [data.name || '', parseInt(data.sort_order) || 0]
+            );
+            return queryOne('SELECT * FROM storage_groups WHERE id = ?', [result.insertId]);
+        },
+        update: async (id, updates) => {
+            const allowedColumns = ['name', 'sort_order'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            if (Object.keys(updates).length === 0) return;
+            const fields = [];
+            const values = [];
+            for (const [key, value] of Object.entries(updates)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+            fields.push('updated_at = ?');
+            values.push(mysqlNow());
+            values.push(parseInt(id));
+            await execute(`UPDATE storage_groups SET ${fields.join(', ')} WHERE id = ?`, values);
+            return queryOne('SELECT * FROM storage_groups WHERE id = ?', [parseInt(id)]);
+        },
+        delete: (id) => execute('DELETE FROM storage_groups WHERE id = ?', [parseInt(id)]),
+        countDisksByGroup: (groupId) => queryOne('SELECT COUNT(*) AS cnt FROM disks WHERE storage_group_id = ? AND status != ?', [parseInt(groupId), 'destroyed'])
+    },
+
+    // 硬盘规格
+    diskSpecs: {
+        getAll: () => queryAll('SELECT ds.*, sg.name AS group_name FROM disk_specs ds LEFT JOIN storage_groups sg ON ds.storage_group_id = sg.id ORDER BY sg.sort_order, ds.id'),
+        getById: (id) => queryOne('SELECT * FROM disk_specs WHERE id = ?', [parseInt(id)]),
+        getByGroup: (groupId) => queryAll('SELECT * FROM disk_specs WHERE storage_group_id = ? AND enabled = 1 ORDER BY id', [parseInt(groupId)]),
+        create: async (data) => {
+            const [result] = await execute(
+                `INSERT INTO disk_specs (name, disk_type, storage_group_id, enabled, min_size_gb, max_size_gb, price_per_gb, quarterly_discount, yearly_discount, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max, storage_pool, description)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                [data.name || '', data.disk_type, parseInt(data.storage_group_id), data.enabled ? 1 : 0, parseInt(data.min_size_gb) || 10, parseInt(data.max_size_gb) || 2000, parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null, data.storage_pool || '', data.description || null]
+            );
+            return queryOne('SELECT * FROM disk_specs WHERE id = ?', [result.insertId]);
+        },
+        update: async (id, updates) => {
+            const allowedColumns = ['name', 'disk_type', 'storage_group_id', 'enabled', 'min_size_gb', 'max_size_gb', 'price_per_gb', 'quarterly_discount', 'yearly_discount', 'mbps_rd', 'mbps_rd_max', 'mbps_wr', 'mbps_wr_max', 'iops_rd', 'iops_rd_max', 'iops_wr', 'iops_wr_max', 'storage_pool', 'description'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            if (Object.keys(updates).length === 0) return;
+            const fields = [];
+            const values = [];
+            for (const [key, value] of Object.entries(updates)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+            fields.push('updated_at = ?');
+            values.push(mysqlNow());
+            values.push(parseInt(id));
+            await execute(`UPDATE disk_specs SET ${fields.join(', ')} WHERE id = ?`, values);
+            return queryOne('SELECT * FROM disk_specs WHERE id = ?', [parseInt(id)]);
+        },
+        delete: (id) => execute('DELETE FROM disk_specs WHERE id = ?', [parseInt(id)]),
+        countDisksBySpec: (specId) => queryOne('SELECT COUNT(*) AS cnt FROM disks WHERE spec_id = ? AND status != ?', [parseInt(specId), 'destroyed'])
+    },
+
+    // 磁盘资产台账
+    disks: {
+        getById: (id) => queryOne('SELECT * FROM disks WHERE id = ?', [parseInt(id)]),
+        getByUserId: (userId) => queryAll('SELECT d.*, u.username FROM disks d LEFT JOIN users u ON d.user_id = u.id WHERE d.user_id = ? ORDER BY d.id DESC', [parseInt(userId)]),
+        getAll: () => queryAll('SELECT d.*, u.username FROM disks d LEFT JOIN users u ON d.user_id = u.id ORDER BY d.id DESC'),
+        getByVolumeId: (volId) => queryOne('SELECT * FROM disks WHERE volume_id = ?', [volId]),
+        create: async (data) => {
+            const [result] = await execute(
+                `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                [data.volume_id, data.disk_name || '', data.spec_id || null, parseInt(data.user_id), parseInt(data.storage_group_id), data.storage_pool, data.disk_type, parseInt(data.capacity_gb), data.status || 'free', parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.auto_renew ? 1 : 0, data.expire_time || null, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null]
+            );
+            return queryOne('SELECT * FROM disks WHERE id = ?', [result.insertId]);
+        },
+        updateStatus: (id, status) => execute('UPDATE disks SET status = ?, updated_at = ? WHERE id = ?', [status, mysqlNow(), parseInt(id)]),
+        bind: (id, vmid, bus, dev) => execute('UPDATE disks SET status = ?, bind_vmid = ?, bind_bus = ?, bind_dev = ?, updated_at = ? WHERE id = ?', ['bound', parseInt(vmid), bus, parseInt(dev), mysqlNow(), parseInt(id)]),
+        unbind: (id) => execute('UPDATE disks SET status = ?, bind_vmid = NULL, bind_bus = NULL, bind_dev = NULL, updated_at = ? WHERE id = ?', ['free', mysqlNow(), parseInt(id)]),
+        updateExpire: (id, expireTime) => execute('UPDATE disks SET expire_time = ?, updated_at = ? WHERE id = ?', [expireTime, mysqlNow(), parseInt(id)]),
+        updateCapacity: (id, capacityGb) => execute('UPDATE disks SET capacity_gb = ?, updated_at = ? WHERE id = ?', [parseInt(capacityGb), mysqlNow(), parseInt(id)]),
+        markDestroyed: (id) => execute('UPDATE disks SET status = ?, updated_at = ? WHERE id = ?', ['destroyed', mysqlNow(), parseInt(id)]),
+        getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)")
+    },
+
+    // 磁盘生命周期配置
+    diskLifecycleConfig: {
+        get: () => queryOne('SELECT * FROM disk_lifecycle_config WHERE id = 1'),
+        upsert: async (data) => {
+            var existing = await queryOne('SELECT id FROM disk_lifecycle_config WHERE id = 1');
+            if (existing) {
+                const allowedColumns = ['warn_days', 'warn_frequency', 'grace_days', 'grace_frequency', 'shutdown_timeout', 'retention_days', 'check_time', 'auto_renew_days'];
+                const fields = [];
+                const values = [];
+                for (const key of Object.keys(data)) {
+                    if (allowedColumns.includes(key)) {
+                        fields.push(`${key} = ?`);
+                        values.push(data[key]);
+                    }
+                }
+                if (fields.length === 0) return queryOne('SELECT * FROM disk_lifecycle_config WHERE id = 1');
+                fields.push('updated_at = ?');
+                values.push(mysqlNow());
+                await execute(`UPDATE disk_lifecycle_config SET ${fields.join(', ')} WHERE id = 1`, values);
+            } else {
+                await execute(
+                    'INSERT INTO disk_lifecycle_config (id, warn_days, warn_frequency, grace_days, grace_frequency, shutdown_timeout, retention_days, check_time, auto_renew_days) VALUES (1,?,?,?,?,?,?,?,?)',
+                    [parseInt(data.warn_days) || 7, data.warn_frequency || 'daily', parseInt(data.grace_days) || 3, data.grace_frequency || 'twice_daily', parseInt(data.shutdown_timeout) || 300, parseInt(data.retention_days) || 15, data.check_time || '02:00', parseInt(data.auto_renew_days) || 1]
+                );
+            }
+            return queryOne('SELECT * FROM disk_lifecycle_config WHERE id = 1');
+        }
+    }
 };

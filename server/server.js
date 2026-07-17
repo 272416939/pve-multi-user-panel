@@ -238,6 +238,8 @@ app.use('/api', require('./routes/admin-wallet'));
 app.use('/api', require('./routes/ikuai'));
 app.use('/api', require('./routes/template'));
 app.use('/api', require('./routes/package'));
+app.use('/api', require('./routes/disk'));
+app.use('/api', require('./routes/admin-disk'));
 
 const vncProxy = require('./websocket/vnc-proxy');
 const terminalProxy = require('./websocket/terminal-proxy');

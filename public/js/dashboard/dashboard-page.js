@@ -36,11 +36,30 @@ var App = {
             if (!$.lxcConfirmState) $.lxcConfirmState = Vue.ref({ ctId: null, action: null });
             if (!$.userVms) $.userVms = Vue.ref([]);
             if (!$.userLxcContainers) $.userLxcContainers = Vue.ref([]);
+            // 硬盘管理兜底初始化
+            if (!$.disks) $.disks = Vue.ref([]);
+            if (!$.selectedDisks) $.selectedDisks = Vue.ref([]);
+            if (!$.diskLoading) $.diskLoading = Vue.ref(false);
+            if (!$.diskOptions) $.diskOptions = Vue.ref({ groups: [], specs: [] });
+            if (!$.showCreateDiskModal) $.showCreateDiskModal = Vue.ref(false);
+            if (!$.showBindModal) $.showBindModal = Vue.ref(false);
+            if (!$.showRenewModal) $.showRenewModal = Vue.ref(false);
+            if (!$.bindTargetDisk) $.bindTargetDisk = Vue.ref(null);
+            if (!$.bindTargetVmid) $.bindTargetVmid = Vue.ref('');
+            if (!$.userVmsForBind) $.userVmsForBind = Vue.ref([]);
+            if (!$.renewDisk) $.renewDisk = Vue.ref(null);
+            if (!$.renewPeriod) $.renewPeriod = Vue.ref('month');
+            if (!$.renewPeriodCount) $.renewPeriodCount = Vue.ref(1);
+            if (!$.renewAmount) $.renewAmount = Vue.ref(0);
+            if (!$.purchasePrice) $.purchasePrice = Vue.ref(0);
+            if (!$.diskPurchaseForm) $.diskPurchaseForm = Vue.ref({ spec_id: '', storage_group_id: '', capacity_gb: 100, disk_name: '', period: 'month', period_count: 1, quantity: 1, auto_renew: false });
+            if (!$.diskOptionsGroups) $.diskOptionsGroups = Vue.computed(function() { var o = $.diskOptions && $.diskOptions.value; return (o && o.groups) ? o.groups : []; });
             $.initCore();
             $.initVm();
             $.initLxc();
             $.initForward();
             $.initMessage();
+            $.initDisk && $.initDisk();
             return $;
         }
     };
