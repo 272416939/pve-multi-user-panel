@@ -645,6 +645,9 @@ const App = {
             if (tab === 'memos') await loadMemos();
             if (tab === 'messages') await loadMessages();
             if (tab === 'security') { await loadDevices(); await loadTwofaStatus(); }
+            // 钱包/订单数据在切换 tab 时重新拉取（watch 也会触发，这里显式调用避免竞态）
+            if (tab === 'wallet-transactions') await loadTx(1);
+            if (tab === 'orders') await loadMyOrders(1);
             // settings 数据在 onMounted 时已通过 loadProfile 加载
             // 移动端自动收起侧边栏
             if (window.innerWidth <= 768) {
