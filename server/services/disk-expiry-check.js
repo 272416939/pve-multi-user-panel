@@ -337,11 +337,13 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
 
 async function importExistingDisks() {
   try {
-    // ===== 第一步：清理 PVE 中已不存在的孤立磁盘记录 =====
+    // ===== 第一步：清理 PVE 中已不存在的孤立磁盘记录（仅清理 legacy 磁盘） =====
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
     for (var d = 0; d < allDisks.length; d++) {
       var disk = allDisks[d];
+      // 只清理 legacy 磁盘（导入存量磁盘），不清理用户购买的独立磁盘
+      if (!disk.is_legacy) continue;
       if (disk.status === 'destroyed') continue; // 已销毁的跳过
       
       try {
@@ -356,7 +358,7 @@ async function importExistingDisks() {
           const [delResult] = await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
           if (delResult.affectedRows > 0) {
             cleanedCount++;
-            console.log('[disk-import] 清理孤立磁盘记录:', disk.volume_id);
+            console.log('[disk-import] 清理孤立 legacy 磁盘记录:', disk.volume_id);
           }
         }
       } catch (e) {
@@ -365,7 +367,7 @@ async function importExistingDisks() {
       }
     }
     if (cleanedCount > 0) {
-      console.log('[disk-import] 清理了 ' + cleanedCount + ' 个孤立磁盘记录');
+      console.log('[disk-import] 清理了 ' + cleanedCount + ' 个孤立 legacy 磁盘记录');
     }
 
     // ===== 第二步：正常导入流程 =====
