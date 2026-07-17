@@ -160,10 +160,10 @@
               </tr>
             </tbody>
           </table>
-          <div class="mt-3">
+          <div class="mt-3 d-flex gap-2">
             <pv-button @click="diskPage.saveLifecycleConfig" variant="primary" size="sm">保存</pv-button>
             <pv-button @click="diskPage.cancelEditLifecycle" variant="secondary" size="sm">取消</pv-button>
-            <pv-button @click="diskPage.resetLifecycleDefaults" variant="outline" size="sm" class="ms-2">恢复默认</pv-button>
+            <pv-button @click="diskPage.resetLifecycleDefaults" variant="outline" size="sm">恢复默认</pv-button>
           </div>
         </div>
         <div v-else class="text-center text-muted py-3">加载中...</div>
