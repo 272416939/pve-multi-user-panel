@@ -65,7 +65,8 @@ router.get('/disks', authMiddleware, async (req, res) => {
   try {
     var disks;
     if (req.user.role === 'admin') {
-      disks = await db.disks.getAll();
+      // 管理员只看到分配给自己的磁盘（admin 用户有独立的 user_id）
+      disks = await db.disks.getByUserId(req.user.id);
     } else {
       disks = await db.disks.getByUserId(req.user.id);
     }
