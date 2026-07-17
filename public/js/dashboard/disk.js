@@ -279,10 +279,31 @@
       });
       var data = await res.json();
       if (!res.ok) return alert(data.error || '销毁失败');
-      alert('销毁成功');
+      if (data.refund) {
+        alert('销毁成功，已退款 ¥' + data.refund_amount);
+      } else {
+        alert('销毁成功');
+      }
       await $.loadDisks();
     } catch (e) {
       alert('销毁失败: ' + e.message);
+    }
+  };
+
+  // ===== 删除已销毁的磁盘记录 =====
+  $.deleteDestroyedDisk = async function(disk) {
+    if (!disk) return;
+    if (!confirm('确定删除此已销毁的磁盘记录？')) return;
+    try {
+      var res = await authFetch('/api/disks/' + disk.id + '/destroy', {
+        method: 'POST'
+      });
+      var data = await res.json();
+      if (!res.ok) return alert(data.error || '删除失败');
+      alert('已删除');
+      await $.loadDisks();
+    } catch (e) {
+      alert('删除失败: ' + e.message);
     }
   };
 
