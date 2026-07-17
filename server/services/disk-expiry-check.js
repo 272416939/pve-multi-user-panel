@@ -352,10 +352,12 @@ async function importExistingDisks() {
         var cmd = 'pvesm status 2>/dev/null | grep -q "' + disk.volume_id + '"';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
         if (result.code !== 0) {
-          // PVE 卷不存在，删除孤立记录
-          await db.disks.hardDelete(disk.id);
-          cleanedCount++;
-          console.log('[disk-import] 清理孤立磁盘记录:', disk.volume_id);
+          // PVE 卷不存在，直接删除孤立记录
+          const [delResult] = await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
+          if (delResult.affectedRows > 0) {
+            cleanedCount++;
+            console.log('[disk-import] 清理孤立磁盘记录:', disk.volume_id);
+          }
         }
       } catch (e) {
         // 检查失败，跳过该记录
