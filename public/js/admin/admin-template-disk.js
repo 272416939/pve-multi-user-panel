@@ -98,73 +98,55 @@
       </div>
       <div class="card-body">
         <div v-if="diskPage.lifecycleConfig.value">
-          <table class="table table-striped table-hover table-align-center">
-            <thead>
-              <tr><th style="width:200px">配置项</th><th>当前值</th><th style="width:120px">说明</th></tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>预警提前天数</td>
-                <td>
-                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.warn_days" style="width:120px">
-                </td>
-                <td>到期前提醒</td>
-              </tr>
-              <tr>
-                <td>宽限期时长</td>
-                <td>
-                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.grace_days" style="width:120px">
-                </td>
-                <td>到期后缓冲</td>
-              </tr>
-              <tr>
-                <td>优雅关机超时</td>
-                <td>
-                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.shutdown_timeout" style="width:120px">
-                </td>
-                <td>超时强制断电</td>
-              </tr>
-              <tr>
-                <td>保留期时长</td>
-                <td>
-                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.retention_days" style="width:120px">
-                </td>
-                <td>逾期自动销毁</td>
-              </tr>
-              <tr>
-                <td>自动续费提前天数</td>
-                <td>
-                  <input class="form-control form-control-sm" type="number" v-model.number="diskPage.lifecycleForm.value.auto_renew_days" style="width:120px">
-                </td>
-                <td>到期前自动续费</td>
-              </tr>
-              <tr>
-                <td>预警提醒频率</td>
-                <td>
-                  <select class="form-select form-select-sm" v-model="diskPage.lifecycleForm.value.warn_frequency" style="width:120px">
-                    <option value="daily">每日1次</option>
-                    <option value="twice_daily">每日2次</option>
-                  </select>
-                </td>
-                <td>-</td>
-              </tr>
-              <tr>
-                <td>宽限期提醒频率</td>
-                <td>
-                  <select class="form-select form-select-sm" v-model="diskPage.lifecycleForm.value.grace_frequency" style="width:120px">
-                    <option value="daily">每日1次</option>
-                    <option value="twice_daily">每日2次</option>
-                  </select>
-                </td>
-                <td>-</td>
-              </tr>
-            </tbody>
-          </table>
-          <div class="mt-3 d-flex gap-2">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">预警提前天数</label>
+              <input class="form-control" type="number" v-model.number="diskPage.lifecycleForm.value.warn_days" min="0">
+              <div class="form-text">到期前提醒</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">宽限期时长</label>
+              <input class="form-control" type="number" v-model.number="diskPage.lifecycleForm.value.grace_days" min="0">
+              <div class="form-text">到期后缓冲</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">优雅关机超时（秒）</label>
+              <input class="form-control" type="number" v-model.number="diskPage.lifecycleForm.value.shutdown_timeout" min="0">
+              <div class="form-text">超时强制断电</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">保留期时长</label>
+              <input class="form-control" type="number" v-model.number="diskPage.lifecycleForm.value.retention_days" min="0">
+              <div class="form-text">逾期自动销毁</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">自动续费提前天数</label>
+              <input class="form-control" type="number" v-model.number="diskPage.lifecycleForm.value.auto_renew_days" min="0">
+              <div class="form-text">到期前自动续费</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">预警提醒频率</label>
+              <select class="form-select" v-model="diskPage.lifecycleForm.value.warn_frequency">
+                <option value="daily">每日1次</option>
+                <option value="twice_daily">每日2次</option>
+              </select>
+              <div class="form-text">-</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">宽限期提醒频率</label>
+              <select class="form-select" v-model="diskPage.lifecycleForm.value.grace_frequency">
+                <option value="daily">每日1次</option>
+                <option value="twice_daily">每日2次</option>
+              </select>
+              <div class="form-text">-</div>
+            </div>
+          </div>
+          <div class="mt-4 d-flex gap-2">
             <pv-button @click="diskPage.saveLifecycleConfig" variant="primary" size="sm">保存</pv-button>
             <pv-button @click="diskPage.cancelEditLifecycle" variant="secondary" size="sm">取消</pv-button>
             <pv-button @click="diskPage.resetLifecycleDefaults" variant="outline" size="sm">恢复默认</pv-button>
           </div>
+          <div v-if="diskPage.lifecycleSaveMsg" class="alert alert-success mt-3 py-2 mb-0">{{ diskPage.lifecycleSaveMsg }}</div>
         </div>
         <div v-else class="text-center text-muted py-3">加载中...</div>
       </div>

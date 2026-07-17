@@ -265,6 +265,7 @@
   // ===== 生命周期配置 =====
   $.diskPage.lifecycleConfig = ref(null);
   $.diskPage.editingLifecycle = ref(false);
+  $.diskPage.lifecycleSaveMsg = ref('');
   $.diskPage.lifecycleForm = ref({
     warn_days: 7, warn_frequency: 'daily', grace_days: 3,
     grace_frequency: 'twice_daily', shutdown_timeout: 300,
@@ -302,6 +303,8 @@
       if (!res.ok) return alert(data.error || '保存失败');
       $.diskPage.editingLifecycle.value = false;
       await $.diskPage.loadLifecycleConfig();
+      $.diskPage.lifecycleSaveMsg.value = '保存成功';
+      setTimeout(function() { $.diskPage.lifecycleSaveMsg.value = ''; }, 3000);
     } catch (e) {
       alert('保存失败: ' + e.message);
     }
