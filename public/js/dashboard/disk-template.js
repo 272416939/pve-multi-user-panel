@@ -61,8 +61,11 @@
             <td class="text-center" :class="disk.status === 'destroyed' ? '' : getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? formatDate(disk.expire_time) : '-') }}</td>
             <td class="text-center" :class="disk.status === 'destroyed' ? '' : getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? daysUntilExpire(disk.expire_time) : '-') }}</td>
             <td class="text-center">
-              <div v-if="disk.status !== 'destroyed'" class="disk-auto-renew-switch">
+              <div v-if="disk.status !== 'destroyed' && !disk.is_legacy" class="disk-auto-renew-switch">
                 <input class="form-check-input" type="checkbox" role="switch" :checked="disk.auto_renew === 1" @change="toggleDiskAutoRenew(disk, $event.target.checked)">
+              </div>
+              <div v-else-if="disk.status !== 'destroyed' && disk.is_legacy" class="disk-auto-renew-switch">
+                <input class="form-check-input" type="checkbox" role="switch" :checked="disk.auto_renew === 1" disabled title="legacy磁盘随VM管理">
               </div>
               <span v-else class="text-muted">-</span>
             </td>
