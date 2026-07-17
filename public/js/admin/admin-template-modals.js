@@ -190,7 +190,7 @@
 </pv-button>
                                 </div>
                                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                                    <table class="table table-sm mb-0">
+                                    <table class="table table-sm mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>#</th>
@@ -545,7 +545,7 @@
                                     <div class="card-body p-0">
                                         <div v-if="backups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
                                         <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
-                                            <table class="table table-striped mb-0 table-sm">
+                                            <table class="table table-striped mb-0 table-sm table-align-center">
                                                 <thead style="position:sticky;top:0;">
                                                     <tr>
                                                         <th class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer"></th>
@@ -1024,7 +1024,7 @@
                                     <div class="card-body p-0">
                                         <div v-if="lxcBackups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
                                         <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
-                                            <table class="table table-striped mb-0 table-sm">
+                                            <table class="table table-striped mb-0 table-sm table-align-center">
                                                 <thead style="position:sticky;top:0;">
                                                     <tr>
                                                         <th class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer"></th>
@@ -1442,7 +1442,7 @@
                                     </div>
                                     <div v-if="deviceRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>
                                     <div v-else class="table-responsive mb-0">
-                                        <table class="table table-striped table-hover mb-0">
+                                        <table class="table table-striped table-hover mb-0 table-align-center">
                                             <thead><tr>
                                                 <th>名称</th><th>目标 IP</th><th>内网端口</th><th>外网端口</th><th>协议</th><th>状态</th><th>操作</th>
                                             </tr></thead>

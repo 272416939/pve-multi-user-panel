@@ -226,7 +226,7 @@
                     <div class="card-body p-0">
                         <div v-if="backups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
                         <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
-                            <table class="table table-striped mb-0 table-sm">
+                            <table class="table table-striped mb-0 table-sm table-align-center">
                                 <thead style="position:sticky;top:0;">
                                     <tr>
                                         <th class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer"></th>
@@ -526,7 +526,7 @@
                     <div class="card-body p-0">
                         <div v-if="lxcBackups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
                         <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
-                            <table class="table table-striped mb-0 table-sm">
+                            <table class="table table-striped mb-0 table-sm table-align-center">
                                 <thead style="position:sticky;top:0;">
                                     <tr>
                                         <th class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer"></th>

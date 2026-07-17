@@ -164,7 +164,7 @@
                 <!-- 桌面端表格视图 -->
                 <div class="table-container d-none d-md-block">
                     <div class="table-scroll">
-                        <table>
+                        <table class="table-align-center">
                             <thead>
                                 <tr>
                                     <th>ID</th>
@@ -324,7 +324,7 @@
                 <!-- 桌面端表格视图 -->
                 <div class="table-container d-none d-md-block">
                     <div class="table-scroll">
-                        <table>
+                        <table class="table-align-center">
                             <thead>
                                 <tr>
                                     <th>ID</th>
@@ -523,7 +523,7 @@
                     </div>
                     <div v-if="deviceRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>
                     <div v-else class="table-responsive mb-0">
-                        <table class="table table-striped table-hover mb-0">
+                        <table class="table table-striped table-hover mb-0 table-align-center">
                             <thead><tr>
                                 <th>名称</th><th>目标 IP</th><th>内网端口</th><th>外网端口</th><th>协议</th><th>状态</th><th>操作</th>
                             </tr></thead>

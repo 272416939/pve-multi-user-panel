@@ -314,6 +314,16 @@
     }
     tr:hover td { background: var(--bg-hover); }
 
+    /* 通用表格居中对齐：th/td 默认居中，含文本的列（带 .text-start 或 .col-text）左对齐 */
+    .table-align-center thead th,
+    .table-align-center td { text-align: center; }
+    .table-align-center td.text-start,
+    .table-align-center td.col-text,
+    .table-align-center td.align-left { text-align: left; }
+    .table-align-center thead th.text-start,
+    .table-align-center thead th.col-text,
+    .table-align-center thead th.align-left { text-align: left; }
+
     .tag-run {
         display: inline-block; padding: 2px 10px; border-radius: 20px;
         font-size: 12px; font-weight: 600;

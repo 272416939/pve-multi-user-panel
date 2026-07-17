@@ -182,7 +182,7 @@ app.component('port-forward-list', {
             <div v-if="forwardRulesLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>\
             <div v-else-if="forwardRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>\
             <div v-else class="table-responsive">\
-                <table class="table table-striped table-hover">\
+                <table class="table table-striped table-hover table-align-center">\
                     <thead>\
                         <tr>\
                             <th v-if="userRole === \'admin\'" class="checkbox-col"><input type="checkbox" @change="toggleAll"></th>\

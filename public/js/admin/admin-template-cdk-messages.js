@@ -103,7 +103,7 @@
                                 </div>
                             </div>
                             <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-                                <table class="table table-striped mb-0 table-sm">
+                                <table class="table table-striped mb-0 table-sm table-align-center">
                                     <thead style="position: sticky; top: 0;">
                                         <tr>
                                             <th class="checkbox-col">

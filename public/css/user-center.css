@@ -74,6 +74,16 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
 }
 .table tbody tr:hover td { background: var(--bg-hover) !important; }
 
+/* 通用表格居中对齐：th/td 默认居中，含文本的列（带 .text-start 或 .col-text）左对齐 */
+.table-align-center thead th,
+.table-align-center td { text-align: center; }
+.table-align-center td.text-start,
+.table-align-center td.col-text,
+.table-align-center td.align-left { text-align: left; }
+.table-align-center thead th.text-start,
+.table-align-center thead th.col-text,
+.table-align-center thead th.align-left { text-align: left; }
+
 /* ===== Badge 玻璃态色调 ===== */
 .badge {
     padding: 3px 10px; font-size: 11px; font-weight: 600; border-radius: 6px; border: none;

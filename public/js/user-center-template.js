@@ -251,7 +251,7 @@
                                     </div>
                                 </div>
                                 <div class="table-responsive">
-                                    <table class="table table-hover table-sm mb-0">
+                                    <table class="table table-hover table-sm mb-0 table-align-center">
                                         <thead><tr><th>支付时间</th><th>支付方式</th><th>商户订单号</th><th>支付流水号</th><th>类型</th><th>金额</th></tr></thead>
                                         <tbody>
                                             <tr v-for="tx in txList" :key="tx.id">
@@ -310,7 +310,7 @@
                                 </div>
                             </div>
                             <div class="table-responsive">
-                                <table class="table table-hover table-sm mb-0">
+                                <table class="table table-hover table-sm mb-0 table-align-center">
                                     <thead><tr><th>订单号</th><th>套餐</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>时间</th></tr></thead>
                                     <tbody>
                                         <tr v-for="o in myOrders" :key="o.id">
@@ -354,7 +354,7 @@
                                     暂无登录设备记录
                                 </div>
                                 <div v-else class="table-responsive">
-                                    <table class="table table-sm mb-0">
+                                    <table class="table table-sm mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>设备</th>
@@ -598,7 +598,7 @@
                                     <svg class="me-2 flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                                     <span>请立即保存这些恢复码！每个恢复码只能使用一次。</span>
                                 </div>
-                                <table class="table table-sm table-hover">
+                                <table class="table table-sm table-hover table-align-center">
                                     <thead><tr><th>#</th><th>恢复码</th><th>状态</th><th>创建时间</th></tr></thead>
                                     <tbody>
                                         <tr v-for="(rc, idx) in twofaRecoveryCodes" :key="rc.id">

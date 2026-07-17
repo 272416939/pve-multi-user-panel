@@ -10,7 +10,7 @@
                             <pv-button @click="templatePage.openVmTemplateForm(null)" size="sm">+ 新建 VM 模板</pv-button>
                         </div>
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
+                            <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
                                     <tr>
                                         <th>ID</th><th>名称</th><th>模板 VM</th><th>CPU</th><th>内存</th><th>目标存储</th><th>克隆模式</th><th>网桥</th><th>状态</th><th>操作</th>
@@ -47,7 +47,7 @@
                             <pv-button @click="templatePage.openLxcTemplateForm(null)" size="sm">+ 新建 LXC 模板</pv-button>
                         </div>
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
+                            <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
                                     <tr>
                                         <th>ID</th><th>名称</th><th>模板路径</th><th>存储</th><th>CPU</th><th>内存</th><th>磁盘</th><th>状态</th><th>操作</th>

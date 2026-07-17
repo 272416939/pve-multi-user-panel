@@ -192,7 +192,7 @@
                             <h5>待分配的容器:</h5>
                             <div class="card mb-4">
                                 <div class="table-responsive">
-                                    <table class="table table-striped mb-0">
+                                    <table class="table table-striped mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>CT ID</th>
@@ -220,7 +220,7 @@
                             <h5>已分配的容器:</h5>
                             <div class="card">
                                 <div class="table-responsive">
-                                    <table class="table table-striped mb-0">
+                                    <table class="table table-striped mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>CT ID</th>
@@ -313,7 +313,7 @@
                         <!-- 桌面端表格视图 -->
                         <div class="table-container d-none d-md-block">
                                 <div class="table-scroll">
-                                    <table>
+                                    <table class="table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>CTID</th>

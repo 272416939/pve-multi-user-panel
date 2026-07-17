@@ -29,7 +29,7 @@
                         </div>
                         <div class="card">
                             <div class="table-responsive">
-                                <table class="table table-striped mb-0">
+                                <table class="table table-striped mb-0 table-align-center">
                                     <thead>
                                         <tr>
                                             <th>ID</th>

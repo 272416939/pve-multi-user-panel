@@ -9,7 +9,7 @@
                             <pv-button @click="packagePage.openVmPackageForm(null)" size="sm">+ 新建套餐</pv-button>
                         </div>
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
+                            <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
                                     <tr><th class="drag-handle-th"></th><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
@@ -66,7 +66,7 @@
                             <pv-button @click="packagePage.openVmGroupForm(null)" size="sm">+ 新建分组</pv-button>
                         </div>
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
+                            <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
                                     <tr><th class="drag-handle-th"></th><th>ID</th><th>分组名</th><th>套餐数量</th><th>操作</th></tr>
                                 </thead>
@@ -108,7 +108,7 @@
                             <pv-button @click="packagePage.openLxcPackageForm(null)" size="sm">+ 新建套餐</pv-button>
                         </div>
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
+                            <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
                                     <tr><th class="drag-handle-th"></th><th>ID</th><th>套餐名</th><th>分组</th><th>模板</th><th>CPU</th><th>内存</th><th>Swap</th><th>磁盘</th><th>月付</th><th>季付折扣</th><th>年付折扣</th><th>库存</th><th>已售</th><th>状态</th><th>操作</th></tr>
                                 </thead>
@@ -155,7 +155,7 @@
                             <pv-button @click="packagePage.openLxcGroupForm(null)" size="sm">+ 新建分组</pv-button>
                         </div>
                         <div class="table-responsive">
-                            <table class="table table-hover align-middle">
+                            <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
                                     <tr><th class="drag-handle-th"></th><th>ID</th><th>分组名</th><th>套餐数量</th><th>操作</th></tr>
                                 </thead>

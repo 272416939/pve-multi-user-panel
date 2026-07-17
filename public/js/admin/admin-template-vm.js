@@ -69,7 +69,7 @@
                         <!-- 桌面端表格视图 -->
                         <div class="table-container d-none d-md-block">
                             <div class="table-scroll">
-                                <table>
+                                <table class="table-align-center">
                                     <thead>
                                         <tr>
                                             <th>VMID</th>
@@ -231,7 +231,7 @@
                             <h5>待分配的虚拟机:</h5>
                             <div class="card mb-4">
                                 <div class="table-responsive">
-                                    <table class="table table-striped mb-0">
+                                    <table class="table table-striped mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>VM ID</th>
@@ -259,7 +259,7 @@
                             <h5>已分配的虚拟机:</h5>
                             <div class="card">
                                 <div class="table-responsive">
-                                    <table class="table table-striped mb-0">
+                                    <table class="table table-striped mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>VM ID</th>
