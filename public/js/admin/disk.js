@@ -336,7 +336,8 @@
 
   $.diskPage.destroyDisk = async function(disk) {
     if (!disk) return;
-    if (!confirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n管理员销毁不受15天限制，3天内全额退款，超过3天按剩余时间比例退款。')) return;
+    var ok = await customConfirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n管理员销毁不受15天限制，3天内全额退款，超过3天按剩余时间比例退款。');
+    if (!ok) return;
     try {
       var res = await authFetch('/api/admin/disks/' + disk.id + '/destroy', { method: 'POST' });
       var data = await res.json();
@@ -354,7 +355,8 @@
 
   $.diskPage.hardDeleteDisk = async function(disk) {
     if (!disk) return;
-    if (!confirm('确定删除此已销毁的磁盘记录？')) return;
+    var ok = await customConfirm('确定删除此已销毁的磁盘记录？');
+    if (!ok) return;
     try {
       var res = await authFetch('/api/admin/disks/' + disk.id + '/destroy', { method: 'POST' });
       var data = await res.json();
@@ -367,7 +369,8 @@
   };
 
   $.diskPage.importExistingDisks = async function() {
-    if (!confirm('确定导入存量磁盘？此操作会扫描 PVE 并导入未在台账中的磁盘。')) return;
+    var ok = await customConfirm('确定导入存量磁盘？\n此操作会扫描 PVE 并导入未在台账中的磁盘。');
+    if (!ok) return;
     try {
       var res = await authFetch('/api/disk-import', { method: 'POST' });
       var data = await res.json();
