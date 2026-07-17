@@ -277,4 +277,179 @@ router.post('/disk-import', authMiddleware, adminMiddleware, async (req, res) =>
   }
 });
 
+// ==================== 数据盘管理（管理员） ====================
+
+// 获取所有用户的数据盘
+router.get('/admin/disks', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    var disks = await db.disks.getAll();
+    res.json({ rows: disks });
+  } catch (e) {
+    res.status(500).json({ error: safeError(e) });
+  }
+});
+
+// 管理员销毁磁盘（不受15天限制，3天内全额，超过3天按剩余比例退款）
+router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (req, res) => {
+  var diskId = parseInt(req.params.id);
+  if (!Number.isInteger(diskId) || diskId < 1) {
+    return res.status(400).json({ error: '无效的磁盘ID' });
+  }
+
+  try {
+    var disk = await db.disks.getById(diskId);
+    if (!disk) return res.status(404).json({ error: '磁盘不存在' });
+
+    // 已销毁的记录：硬删除
+    if (disk.status === 'destroyed') {
+      await db.disks.hardDelete(disk.id);
+      return res.json({ success: true });
+    }
+
+    // 已挂载的磁盘必须先卸载
+    if (disk.status === 'bound') {
+      return res.status(400).json({ error: '请先卸载磁盘再销毁' });
+    }
+
+    var refundAmount = 0;
+    var refundDesc = '';
+
+    // 查询该磁盘所有已完成的付费订单
+    var paidOrders = [];
+    if (disk.expire_time && disk.status !== 'expired' && disk.status !== 'grace') {
+      try {
+        var orderResult = await db.orders.getAll({
+          type: 'disk',
+          resource_id: String(disk.id),
+          status: 'completed',
+          limit: 200
+        });
+        paidOrders = orderResult.rows || orderResult.data || [];
+      } catch (e) {
+        console.error('[admin disk destroy] 查询订单失败:', e.message);
+      }
+
+      var now = new Date();
+      var expireDate = new Date(disk.expire_time);
+      var { withTransaction } = require('../utils/with-transaction');
+      var { generateOrderNo } = require('../utils/order-utils');
+
+      // 按订单分单计算退款（管理员不受15天限制）
+      for (var oi = 0; oi < paidOrders.length; oi++) {
+        var origOrder = paidOrders[oi];
+        var orderPaid = parseFloat(origOrder.amount || 0);
+        if (orderPaid <= 0) continue;
+        var orderCreateTime = new Date(origOrder.created_at);
+        var orderDays = Math.floor((now - orderCreateTime) / (1000 * 60 * 60 * 24));
+
+        var orderRefund = 0;
+        if (orderDays <= 3) {
+          // 3天内全额退款
+          orderRefund = orderPaid;
+        } else {
+          // 超过3天：按剩余时间比例退款（不受15天限制）
+          if (expireDate > orderCreateTime) {
+            var totalMs = expireDate - orderCreateTime;
+            var remainingMs = expireDate - now;
+            if (remainingMs > 0) {
+              var factor = remainingMs / totalMs;
+              orderRefund = parseFloat((orderPaid * factor).toFixed(2));
+            }
+          }
+        }
+        refundAmount += orderRefund;
+      }
+      refundAmount = parseFloat(refundAmount.toFixed(2));
+
+      var diskCreateDate = disk.create_time ? Math.floor((now - new Date(disk.create_time)) / (1000 * 60 * 60 * 24)) : 0;
+      if (diskCreateDate <= 3) {
+        refundDesc = '管理员操作：全额退款（开通 ' + diskCreateDate + ' 天）';
+      } else {
+        refundDesc = '管理员操作：按剩余时间比例退款（开通 ' + diskCreateDate + ' 天）';
+      }
+    }
+
+    var user = await db.users.getById(disk.user_id);
+    var diskUtils = require('../utils/disk-utils');
+
+    // 事务：PVE销毁 + 退款 + 订单状态更新
+    var { withTransaction } = require('../utils/with-transaction');
+    var { generateOrderNo } = require('../utils/order-utils');
+
+    await withTransaction(async (conn) => {
+      var [rows] = await conn.execute('SELECT * FROM disks WHERE id = ? FOR UPDATE', [disk.id]);
+      var lockedDisk = rows[0];
+      if (!lockedDisk) throw new Error('磁盘不存在');
+      if (lockedDisk.status === 'bound') throw new Error('请先卸载磁盘再销毁');
+      if (lockedDisk.status === 'destroyed') throw new Error('磁盘已销毁');
+
+      // 执行 PVE 销毁
+      try {
+        await diskUtils.destroyDisk(lockedDisk.volume_id);
+      } catch (pveErr) {
+        // PVE 卷可能已不存在，继续执行
+        console.error('[admin disk destroy] PVE 销毁失败:', pveErr.message);
+      }
+
+      // 按订单分单退款
+      if (refundAmount > 0 && paidOrders.length > 0) {
+        await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [refundAmount, disk.user_id]);
+        var balanceBefore = parseFloat(user.balance || '0');
+        var balanceAfter = balanceBefore + refundAmount;
+        var now2 = new Date();
+        var dbNow = db.now();
+
+        for (var ri = 0; ri < paidOrders.length; ri++) {
+          var origOrder2 = paidOrders[ri];
+          var orderPaid2 = parseFloat(origOrder2.amount || 0);
+          if (orderPaid2 <= 0) continue;
+          var orderCreateTime2 = new Date(origOrder2.created_at);
+          var orderDays2 = Math.floor((now2 - orderCreateTime2) / (1000 * 60 * 60 * 24));
+
+          var orderRefund2 = 0;
+          if (orderDays2 <= 3) {
+            orderRefund2 = orderPaid2;
+          } else {
+            var expireDate2 = new Date(disk.expire_time);
+            if (expireDate2 > orderCreateTime2) {
+              var totalMs2 = expireDate2 - orderCreateTime2;
+              var remainingMs2 = expireDate2 - now2;
+              if (remainingMs2 > 0) {
+                var factor2 = remainingMs2 / totalMs2;
+                orderRefund2 = parseFloat((orderPaid2 * factor2).toFixed(2));
+              }
+            }
+          }
+          if (orderRefund2 > 0) {
+            var refundOrderNo = generateOrderNo('refund');
+            await conn.execute(
+              'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [disk.user_id, refundOrderNo, dbNow, 'balance_refund', 'refund', orderRefund2, null, null, balanceBefore, balanceAfter, 'disk', disk.id, origOrder2.order_no, '', dbNow]
+            );
+            await conn.execute('UPDATE orders SET status = ? WHERE order_no = ?', ['refunded', origOrder2.order_no]);
+          } else {
+            await conn.execute('UPDATE orders SET status = ? WHERE order_no = ?', ['destroyed', origOrder2.order_no]);
+          }
+        }
+      } else {
+        // 无退款，订单标记已销毁
+        for (var ni = 0; ni < paidOrders.length; ni++) {
+          await conn.execute('UPDATE orders SET status = ? WHERE order_no = ? AND status = ?', ['destroyed', paidOrders[ni].order_no, 'completed']);
+        }
+      }
+
+      // 更新磁盘状态
+      await conn.execute(
+        'UPDATE disks SET status = ?, updated_at = NOW() WHERE id = ? AND status != ?',
+        ['destroyed', disk.id, 'destroyed']
+      );
+    });
+
+    res.json({ success: true, refund: refundAmount > 0, refund_amount: refundAmount, refund_desc: refundDesc });
+  } catch (e) {
+    console.error('[admin disk destroy] 失败:', e);
+    res.status(500).json({ error: safeError(e) });
+  }
+});
+
 module.exports = router;

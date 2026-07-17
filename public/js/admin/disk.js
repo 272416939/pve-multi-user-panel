@@ -320,11 +320,103 @@
     };
   };
 
+  // ===== 数据盘管理 =====
+  $.diskPage.allDisks = ref([]);
+
+  $.diskPage.loadAllDisks = async function() {
+    try {
+      var res = await authFetch('/api/admin/disks');
+      if (!res.ok) throw new Error('加载失败');
+      var data = await res.json();
+      $.diskPage.allDisks.value = data.rows || data.data || data || [];
+    } catch (e) {
+      console.error('[disk] 加载数据盘失败:', e.message);
+    }
+  };
+
+  $.diskPage.destroyDisk = async function(disk) {
+    if (!disk) return;
+    if (!confirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n管理员销毁不受15天限制，3天内全额退款，超过3天按剩余时间比例退款。')) return;
+    try {
+      var res = await authFetch('/api/admin/disks/' + disk.id + '/destroy', { method: 'POST' });
+      var data = await res.json();
+      if (!res.ok) return alert(data.error || '销毁失败');
+      if (data.refund_amount > 0) {
+        alert('销毁成功，已退款 ¥' + data.refund_amount);
+      } else {
+        alert('销毁成功');
+      }
+      await $.diskPage.loadAllDisks();
+    } catch (e) {
+      alert('销毁失败: ' + e.message);
+    }
+  };
+
+  $.diskPage.hardDeleteDisk = async function(disk) {
+    if (!disk) return;
+    if (!confirm('确定删除此已销毁的磁盘记录？')) return;
+    try {
+      var res = await authFetch('/api/admin/disks/' + disk.id + '/destroy', { method: 'POST' });
+      var data = await res.json();
+      if (!res.ok) return alert(data.error || '删除失败');
+      alert('已删除');
+      await $.diskPage.loadAllDisks();
+    } catch (e) {
+      alert('删除失败: ' + e.message);
+    }
+  };
+
+  $.diskPage.importExistingDisks = async function() {
+    if (!confirm('确定导入存量磁盘？此操作会扫描 PVE 并导入未在台账中的磁盘。')) return;
+    try {
+      var res = await authFetch('/api/disk-import', { method: 'POST' });
+      var data = await res.json();
+      if (!res.ok) return alert(data.error || '导入失败');
+      alert('导入完成：' + (data.report || '成功'));
+      await $.diskPage.loadAllDisks();
+    } catch (e) {
+      alert('导入失败: ' + e.message);
+    }
+  };
+
+  // 辅助函数
+  $.diskPage.formatDate = function(d) {
+    if (!d) return '-';
+    var date = new Date(d);
+    return date.getFullYear() + '-' + String(date.getMonth() + 1).padStart(2, '0') + '-' + String(date.getDate()).padStart(2, '0') + ' ' + String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+  };
+
+  $.diskPage.daysUntilExpire = function(expireTime) {
+    if (!expireTime) return '-';
+    var expire = new Date(expireTime);
+    var now = new Date();
+    var diff = expire - now;
+    if (diff <= 0) return '0';
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
+
+  $.diskPage.getDiskStatusText = function(status) {
+    var map = { free: '空闲', bound: '已挂载', grace: '宽限期', expired: '已过期', destroyed: '已销毁' };
+    return map[status] || status;
+  };
+
+  $.diskPage.getDiskStatusClass = function(status) {
+    var map = {
+      free: 'badge bg-success',
+      bound: 'badge bg-primary',
+      grace: 'badge bg-warning',
+      expired: 'badge bg-danger',
+      destroyed: 'badge bg-secondary'
+    };
+    return map[status] || 'badge bg-secondary';
+  };
+
   // 初始化入口
   $.initDisk = function() {
     $.diskPage.loadStorageGroups();
     $.diskPage.loadDiskSpecs();
     $.diskPage.loadLifecycleConfig();
     $.diskPage.loadPveStorages();
+    $.diskPage.loadAllDisks();
   };
 })();

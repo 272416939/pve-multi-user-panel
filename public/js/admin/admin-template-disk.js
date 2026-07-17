@@ -171,6 +171,61 @@
     </div>
   </div>
 
+  <!-- 数据盘管理 -->
+  <div v-if="activeTabDisk === 'data-disks'">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="module-title mb-0">数据盘管理</h4>
+      <div class="d-flex gap-2">
+        <pv-button variant="outline" size="sm" @click="diskPage.importExistingDisks()">导入存量磁盘</pv-button>
+        <pv-button variant="outline" size="sm" @click="diskPage.loadAllDisks()">刷新</pv-button>
+      </div>
+    </div>
+    <div class="table-container">
+      <div class="table-scroll">
+        <table class="table table-hover table-sm table-align-center">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>用户</th>
+              <th>名称</th>
+              <th>存储分组</th>
+              <th>规格</th>
+              <th>类型</th>
+              <th>容量</th>
+              <th>状态</th>
+              <th>绑定VM</th>
+              <th>到期时间</th>
+              <th>剩余天数</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="disk in diskPage.allDisks.value" :key="disk.id">
+              <td>{{ disk.id }}</td>
+              <td>{{ disk.username || '-' }}</td>
+              <td>{{ disk.disk_name || '-' }}</td>
+              <td>{{ disk.group_name || '-' }}</td>
+              <td>{{ disk.spec_name || '-' }}</td>
+              <td>{{ disk.disk_type }}</td>
+              <td>{{ disk.capacity_gb }} GiB</td>
+              <td><span :class="diskPage.getDiskStatusClass(disk.status)">{{ diskPage.getDiskStatusText(disk.status) }}</span></td>
+              <td>{{ disk.bind_vmid ? 'VM-' + disk.bind_vmid : '-' }}</td>
+              <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.formatDate(disk.expire_time) : '-') }}</td>
+              <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.daysUntilExpire(disk.expire_time) : '-') }}</td>
+              <td>
+                <button v-if="disk.status !== 'destroyed'" class="table-btn btn-danger" @click="diskPage.destroyDisk(disk)">销毁</button>
+                <button v-else class="table-btn btn-danger" @click="diskPage.hardDeleteDisk(disk)">删除</button>
+              </td>
+            </tr>
+            <tr v-if="!diskPage.allDisks.value || diskPage.allDisks.value.length === 0">
+              <td colspan="12" class="text-center text-muted py-4">暂无数据盘</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div>
 <!-- end disk-settings -->
 
