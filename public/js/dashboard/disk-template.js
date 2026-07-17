@@ -230,8 +230,9 @@
         <p v-if="resizeTargetDisk">磁盘：{{ resizeTargetDisk.disk_name || resizeTargetDisk.volume_id }}</p>
         <p v-if="resizeTargetDisk">当前容量：<strong>{{ resizeTargetDisk.capacity_gb }} GiB</strong></p>
         <div class="mb-3">
-          <label class="form-label">新容量（GiB，需大于当前容量）</label>
-          <input type="number" class="form-control" v-model.number="resizeNewCapacity" min="1" step="1" @input="calcResizePrice">
+          <label class="form-label">新增容量（GiB，增量值，非目标容量）</label>
+          <input type="number" class="form-control" v-model.number="resizeInputAddGb" min="1" step="1" @input="calcResizePrice">
+          <small class="text-muted">扩容后总容量：{{ (resizeTargetDisk ? resizeTargetDisk.capacity_gb : 0) + (resizeInputAddGb || 0) }} GiB</small>
         </div>
         <!-- 扩容费用 -->
         <div v-if="resizePrice > 0" class="alert alert-info py-2 mb-2 text-center">
@@ -249,7 +250,7 @@
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--border-color);">
         <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
-        <pv-button @click="submitResizeDisk" variant="primary" :disabled="!resizeNewCapacity || (resizeTargetDisk && resizeNewCapacity <= resizeTargetDisk.capacity_gb) || resizePrice < 0">确定扩容</pv-button>
+        <pv-button @click="submitResizeDisk" variant="primary" :disabled="!resizeInputAddGb || resizeInputAddGb <= 0 || resizePrice < 0">确定扩容</pv-button>
       </div>
     </div>
   </div>

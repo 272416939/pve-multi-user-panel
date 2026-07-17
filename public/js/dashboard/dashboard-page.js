@@ -54,7 +54,7 @@ var App = {
             if (!$.purchasePrice) $.purchasePrice = Vue.ref(0);
             if (!$.diskPurchaseForm) $.diskPurchaseForm = Vue.ref({ spec_id: '', storage_group_id: '', capacity_gb: 100, disk_name: '', period: 'month', period_count: 1, quantity: 1, auto_renew: false });
             if (!$.resizeTargetDisk) $.resizeTargetDisk = Vue.ref(null);
-            if (!$.resizeNewCapacity) $.resizeNewCapacity = Vue.ref(0);
+            if (!$.resizeInputAddGb) $.resizeInputAddGb = Vue.ref(0);
             if (!$.showResizeModal) $.showResizeModal = Vue.ref(false);
             if (!$.resizePrice) $.resizePrice = Vue.ref(0);
             if (!$.diskOptionsGroups) $.diskOptionsGroups = Vue.computed(function() { var o = $.diskOptions && $.diskOptions.value; return (o && o.groups) ? o.groups : []; });

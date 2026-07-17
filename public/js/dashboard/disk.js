@@ -250,7 +250,7 @@
   $.resizeDisk = async function(disk) {
     if (!disk) return;
     $.resizeTargetDisk.value = disk;
-    $.resizeNewCapacity.value = parseInt(disk.capacity_gb) + 10;
+    $.resizeInputAddGb.value = 10;
     $.calcResizePrice();
     $.bsModalShow('resizeDiskModal');
   };
@@ -259,10 +259,10 @@
   $.calcResizePrice = function() {
     var disk = $.resizeTargetDisk.value;
     if (!disk || !disk.expire_time) { $.resizePrice.value = 0; return; }
-    var newSize = parseInt($.resizeNewCapacity.value) || 0;
+    var addGb = parseInt($.resizeInputAddGb.value) || 0;
     var oldSize = parseInt(disk.capacity_gb) || 0;
-    if (newSize <= oldSize) { $.resizePrice.value = 0; return; }
-    var diffGb = newSize - oldSize;
+    if (addGb <= 0) { $.resizePrice.value = 0; return; }
+    var diffGb = addGb;
     // 从 diskOptions 中查找 spec 的最新价格
     var specId = disk.spec_id;
     var pricePerGb = parseFloat(disk.price_per_gb);
@@ -281,10 +281,11 @@
   $.submitResizeDisk = async function() {
     var disk = $.resizeTargetDisk.value;
     if (!disk) return;
-    var newSize = parseInt($.resizeNewCapacity.value);
-    if (isNaN(newSize) || newSize <= parseInt(disk.capacity_gb)) {
-      return alert('新容量必须大于当前容量（' + disk.capacity_gb + ' GiB）');
+    var addGb = parseInt($.resizeInputAddGb.value) || 0;
+    if (addGb <= 0) {
+      return alert('新增容量必须大于0');
     }
+    var newSize = parseInt(disk.capacity_gb) + addGb;
     // 检查余额（前端提示）
     if ($.resizePrice.value > 0 && $.user && parseFloat($.user.balance) < $.resizePrice.value) {
       var ok = await customConfirm('余额不足，扩容费用 ¥' + $.resizePrice.value + '，当前余额 ¥' + parseFloat($.user.balance || 0).toFixed(2) + '\n是否继续尝试？');
