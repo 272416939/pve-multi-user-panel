@@ -30,27 +30,25 @@
   <div v-else class="table-container">
     <div class="table-scroll">
       <table>
-        <thead>
-          <tr>
-            <th style="width:40px" class="text-center"><input type="checkbox" @change="selectedDisks = $event.target.checked ? disks.map(function(d) { return d.id; }) : []" :checked="selectedDisks.length === disks.length && disks.length > 0"></th>
-            <th class="text-center">ID</th>
-            <th>名称</th>
-            <th>存储分组</th>
-            <th>规格名称</th>
-            <th class="text-center">类型</th>
-            <th class="text-center">容量</th>
-            <th class="text-center">状态</th>
-            <th class="text-center">绑定虚拟机</th>
-            <th class="text-center">到期时间</th>
-            <th class="text-center">剩余天数</th>
-            <th class="text-center">自动续费</th>
-            <th class="text-center">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="disk in disks" :key="disk.id">
-            <td class="text-center"><input type="checkbox" v-model="selectedDisks" :value="disk.id"></td>
-            <td class="text-center">{{ disk.id }}</td>
+<thead>
+            <tr>
+              <th class="text-center">ID</th>
+              <th>名称</th>
+              <th>存储分组</th>
+              <th>规格名称</th>
+              <th class="text-center">类型</th>
+              <th class="text-center">容量</th>
+              <th class="text-center">状态</th>
+              <th class="text-center">绑定虚拟机</th>
+              <th class="text-center">到期时间</th>
+              <th class="text-center">剩余天数</th>
+              <th class="text-center">自动续费</th>
+              <th class="text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="disk in disks" :key="disk.id" @click="selectDisk(disk.id)" :class="{ 'table-active': selectedDisks.includes(disk.id) }" style="cursor:pointer">
+              <td class="text-center">{{ disk.id }}</td>
             <td>{{ disk.disk_name || '-' }}<span v-if="disk.is_legacy" class="text-muted small ms-1">(随VM)</span></td>
             <td>{{ disk.group_name || '-' }}</td>
             <td>{{ disk.spec_name || '-' }}</td>
@@ -76,7 +74,7 @@
             </td>
           </tr>
           <tr v-if="disks.length === 0">
-            <td colspan="13" class="text-center text-muted py-4">暂无硬盘，点击"新建"购买数据盘</td>
+            <td colspan="12" class="text-center text-muted py-4">暂无硬盘，点击"新建"购买数据盘</td>
           </tr>
         </tbody>
       </table>

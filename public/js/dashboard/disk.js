@@ -73,6 +73,16 @@
     }
   };
 
+  // ===== 行点击选中（单选） =====
+  $.selectDisk = function(diskId) {
+    if ($.selectedDisks.value.length === 1 && $.selectedDisks.value[0] === diskId) {
+      // 再次点击取消选中
+      $.selectedDisks.value = [];
+    } else {
+      $.selectedDisks.value = [diskId];
+    }
+  };
+
   // ===== 加载购买选项 =====
   $.loadDiskOptions = async function() {
     try {
