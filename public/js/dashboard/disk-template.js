@@ -15,10 +15,10 @@
   <!-- 顶栏功能按钮 -->
   <div class="mb-3 d-flex gap-2 flex-wrap">
     <pv-button variant="glass" size="sm" @click="openCreateDiskModal">新建</pv-button>
-    <pv-button variant="outline" size="sm" @click="openBindModal" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'free')">挂载</pv-button>
-    <pv-button variant="outline" size="sm" @click="unbindDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'bound')">卸载</pv-button>
-    <pv-button variant="outline-danger" size="sm" @click="destroyDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status === 'bound')">销毁</pv-button>
-    <pv-button variant="outline-warning" size="sm" @click="resizeDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1">扩容</pv-button>
+    <pv-button variant="outline" size="sm" @click="openBindModal" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'free') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)">挂载</pv-button>
+    <pv-button variant="outline" size="sm" @click="unbindDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'bound') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)">卸载</pv-button>
+    <pv-button variant="outline-danger" size="sm" @click="destroyDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status === 'bound') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)">销毁</pv-button>
+    <pv-button variant="outline-warning" size="sm" @click="resizeDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)">扩容</pv-button>
   </div>
 
   <!-- 加载中 -->

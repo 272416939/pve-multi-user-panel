@@ -260,6 +260,12 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
 
   try {
     var disk = req.disk;
+
+    // legacy 磁盘不允许独立操作（随 VM 管理）
+    if (disk.is_legacy) {
+      return res.status(403).json({ error: 'legacy 磁盘随 VM 管理，不支持独立操作' });
+    }
+
     var vm = req.vm;
 
     // 二次校验
@@ -318,6 +324,11 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
   try {
     var disk = req.disk;
 
+    // legacy 磁盘不允许独立操作（随 VM 管理）
+    if (disk.is_legacy) {
+      return res.status(403).json({ error: 'legacy 磁盘随 VM 管理，不支持独立操作' });
+    }
+
     if (disk.status !== 'bound') {
       return res.status(400).json({ error: '磁盘当前未绑定任何虚拟机' });
     }
@@ -357,6 +368,12 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
 
   try {
     var disk = req.disk;
+
+    // legacy 磁盘不允许独立操作（随 VM 管理）
+    if (disk.is_legacy) {
+      return res.status(403).json({ error: 'legacy 磁盘随 VM 管理，不支持独立操作' });
+    }
+
     var newSize = parseInt(req.body.capacity_gb);
 
     // 前置校验
@@ -475,6 +492,11 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
   try {
     var disk = req.disk;
     var user = await db.users.getById(req.user.id);
+
+    // legacy 磁盘不允许独立操作（随 VM 管理）
+    if (disk.is_legacy) {
+      return res.status(403).json({ error: 'legacy 磁盘随 VM 管理，不支持独立操作' });
+    }
 
     // 已绑定的磁盘必须先卸载
     if (disk.status === 'bound') {
@@ -633,6 +655,12 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
 
   try {
     var disk = req.disk;
+
+    // legacy 磁盘不允许独立操作（随 VM 管理）
+    if (disk.is_legacy) {
+      return res.status(403).json({ error: 'legacy 磁盘随 VM 管理，不支持独立操作' });
+    }
+
     var period = req.body.period;
     var periodCount = parseInt(req.body.period_count) || 1;
 
@@ -690,8 +718,15 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
 // 切换自动续费开关
 router.post('/disks/:id/auto-renew', authMiddleware, checkDiskOwnership, async (req, res) => {
   try {
+    var disk = req.disk;
+
+    // legacy 磁盘不允许独立操作（随 VM 管理）
+    if (disk.is_legacy) {
+      return res.status(403).json({ error: 'legacy 磁盘随 VM 管理，不支持独立操作' });
+    }
+
     var enabled = req.body.enabled ? 1 : 0;
-    await db.disks.updateAutoRenew(req.disk.id, enabled);
+    await db.disks.updateAutoRenew(disk.id, enabled);
     res.json({ success: true, auto_renew: enabled });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
