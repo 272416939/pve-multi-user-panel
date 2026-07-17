@@ -203,12 +203,7 @@
             <tr v-for="disk in diskPage.allDisks.value" :key="disk.id">
               <td>{{ disk.id }}</td>
               <td>{{ disk.username || '-' }}</td>
-              <td>
-                <span v-if="disk.is_legacy" class="text-muted small ms-1">(随VM)</span>
-              </td>
-              <td>{{ disk.disk_name || '-' }}
-                <span v-if="disk.is_legacy" class="text-muted small ms-1">(随VM)</span>
-              </td>
+              <td>{{ disk.disk_name || '-' }}<span v-if="disk.is_legacy" class="text-muted small ms-1">(随VM)</span></td>
               <td>{{ disk.group_name || '-' }}</td>
               <td>{{ disk.spec_name || '-' }}</td>
               <td>{{ disk.disk_type }}</td>
