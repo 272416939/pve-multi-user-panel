@@ -105,12 +105,12 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     var quantity = Math.min(parseInt(req.body.quantity) || 1, 10); // 最多 10 块
     var autoRenew = req.body.auto_renew ? 1 : 0;
     var diskName = (req.body.disk_name || '').toString().trim();
-    // 长度限制：最多 8 字符
-    if (diskName.length > 8) {
-      return res.status(400).json({ error: '硬盘名称不能超过8字符' });
+    // 长度限制：最多 30 字符（适配导入磁盘名称如 imported-108-scsi1）
+    if (diskName.length > 30) {
+      return res.status(400).json({ error: '硬盘名称不能超过30字符' });
     }
     // XSS 防护：剥离 HTML 标签（Vue 模板已自动转义，后端也做防御）
-    diskName = diskName.replace(/<[^>]*>/g, '').substring(0, 8);
+    diskName = diskName.replace(/<[^>]*>/g, '').substring(0, 30);
 
     // 参数校验
     if (!Number.isInteger(specId) || specId < 1) return res.status(400).json({ error: '无效的规格ID' });

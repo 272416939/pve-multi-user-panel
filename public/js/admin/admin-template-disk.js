@@ -213,6 +213,7 @@
               <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.formatDate(disk.expire_time) : '-') }}</td>
               <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.daysUntilExpire(disk.expire_time) : '-') }}</td>
               <td>
+                <button v-if="disk.status !== 'destroyed'" class="table-btn btn-primary" @click="diskPage.openEditDiskForm(disk)">编辑</button>
                 <button v-if="disk.status !== 'destroyed'" class="table-btn btn-danger" @click="diskPage.destroyDisk(disk)">销毁</button>
                 <button v-else class="table-btn btn-danger" @click="diskPage.hardDeleteDisk(disk)">删除</button>
               </td>
@@ -409,6 +410,41 @@
       <div class="modal-footer">
         <pv-button type="button" data-bs-dismiss="modal" variant="secondary" @click="diskPage.showDiskSpecModal.value = false">取消</pv-button>
         <pv-button @click="diskPage.saveDiskSpec" variant="primary">确定</pv-button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 编辑磁盘弹窗 -->
+<div class="modal fade" id="editDiskModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">编辑磁盘</h5>
+        <pv-button type="button" variant="close" data-bs-dismiss="modal" @click="diskPage.showEditDiskModal.value = false"></pv-button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">磁盘名称</label>
+          <input class="form-control" v-model="diskPage.editDiskForm.value.disk_name" maxlength="30" placeholder="最多30字符">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">存储分组</label>
+          <select class="form-select" v-model="diskPage.editDiskForm.value.storage_group_id">
+            <option v-for="g in diskPage.storageGroups.value" :key="g.id" :value="g.id">{{ g.name }}</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">规格 <span class="text-muted small">（选择后自动填充对应存储分组）</span></label>
+          <select class="form-select" v-model="diskPage.editDiskForm.value.spec_id" @change="diskPage.onSpecChange">
+            <option :value="null">无规格</option>
+            <option v-for="s in diskPage.diskSpecs.value" :key="s.id" :value="s.id">{{ s.name }} ({{ s.disk_type }})</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <pv-button type="button" data-bs-dismiss="modal" variant="secondary" @click="diskPage.showEditDiskModal.value = false">取消</pv-button>
+        <pv-button @click="diskPage.saveEditDisk" variant="primary">保存</pv-button>
       </div>
     </div>
   </div>

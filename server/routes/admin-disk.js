@@ -289,6 +289,54 @@ router.get('/admin/disks', authMiddleware, adminMiddleware, async (req, res) => 
   }
 });
 
+// 编辑磁盘（名称、存储分组、规格）
+router.put('/admin/disks/:id', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    var id = parseInt(req.params.id);
+    if (!Number.isInteger(id) || id < 1) {
+      return res.status(400).json({ error: '无效的磁盘ID' });
+    }
+
+    var diskName = (req.body.disk_name || '').toString().trim();
+    var storageGroupId = parseInt(req.body.storage_group_id);
+    var specId = req.body.spec_id !== undefined && req.body.spec_id !== null ? parseInt(req.body.spec_id) : null;
+
+    // 名称长度限制：30 字符
+    if (diskName.length > 30) {
+      return res.status(400).json({ error: '硬盘名称不能超过30字符' });
+    }
+    // XSS 防护
+    diskName = diskName.replace(/<[^>]*>/g, '').substring(0, 30);
+
+    // 验证磁盘存在
+    var disk = await db.disks.getById(id);
+    if (!disk) return res.status(404).json({ error: '磁盘不存在' });
+
+    // 验证存储分组存在
+    var group = await db.storageGroups.getById(storageGroupId);
+    if (!group) return res.status(400).json({ error: '存储分组不存在' });
+
+    // 验证规格存在（如果指定）
+    if (specId !== null) {
+      var spec = await db.diskSpecs.getById(specId);
+      if (!spec) return res.status(400).json({ error: '规格不存在' });
+    }
+
+    // 更新磁盘
+    await db.disks.update(id, {
+      disk_name: diskName,
+      storage_group_id: storageGroupId,
+      spec_id: specId
+    });
+
+    // 重新获取完整信息
+    var updated = await db.disks.getById(id);
+    res.json(updated);
+  } catch (e) {
+    res.status(500).json({ error: safeError(e) });
+  }
+});
+
 // 管理员销毁磁盘（不受15天限制，3天内全额，超过3天按剩余比例退款）
 router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (req, res) => {
   var diskId = parseInt(req.params.id);

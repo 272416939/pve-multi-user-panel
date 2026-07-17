@@ -2338,6 +2338,27 @@ module.exports = {
         markDestroyed: (id) => execute('UPDATE disks SET status = ?, updated_at = ? WHERE id = ?', ['destroyed', mysqlNow(), parseInt(id)]),
         // 切换自动续费开关（0=关闭, 1=开启）
         updateAutoRenew: (id, enabled) => execute('UPDATE disks SET auto_renew = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, mysqlNow(), parseInt(id)]),
+        // 更新磁盘字段（仅更新提供值的字段）
+        update: (id, data) => {
+            const fields = [];
+            const values = [];
+            if (data.disk_name !== undefined) {
+                fields.push('disk_name = ?');
+                values.push(data.disk_name);
+            }
+            if (data.storage_group_id !== undefined) {
+                fields.push('storage_group_id = ?');
+                values.push(parseInt(data.storage_group_id));
+            }
+            if (data.spec_id !== undefined) {
+                fields.push('spec_id = ?');
+                values.push(data.spec_id || null);
+            }
+            fields.push('updated_at = ?');
+            values.push(mysqlNow());
+            values.push(parseInt(id));
+            return execute(`UPDATE disks SET ${fields.join(', ')} WHERE id = ?`, values);
+        },
         // 硬删除：仅允许删除已销毁状态的磁盘记录（清理已销毁的磁盘记录用）
         hardDelete: (id) => execute('DELETE FROM disks WHERE id = ? AND status = ?', [parseInt(id), 'destroyed']),
         getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)")

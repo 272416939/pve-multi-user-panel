@@ -119,8 +119,8 @@
           <p class="text-muted small mb-0">{{ selectedSpec.description || '暂无备注' }}</p>
         </div>
         <div class="mb-3">
-          <label class="form-label">硬盘名称 <span class="small text-muted">{{ (diskPurchaseForm.disk_name || '').length }}/8</span></label>
-          <input class="form-control" v-model="diskPurchaseForm.disk_name" maxlength="8" @input="diskPurchaseForm.disk_name = (diskPurchaseForm.disk_name || '').slice(0, 8)" placeholder="选填，最多8字符" autocomplete="off">
+          <label class="form-label">硬盘名称 <span class="small text-muted">{{ (diskPurchaseForm.disk_name || '').length }}/30</span></label>
+          <input class="form-control" v-model="diskPurchaseForm.disk_name" maxlength="30" @input="diskPurchaseForm.disk_name = (diskPurchaseForm.disk_name || '').slice(0, 30)" placeholder="选填，最多30字符" autocomplete="off">
         </div>
         <div class="mb-3">
           <label class="form-label">计费模式</label>

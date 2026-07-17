@@ -382,6 +382,58 @@
     }
   };
 
+  // ===== 编辑磁盘 =====
+  $.diskPage.editingDisk = ref(null);
+  $.diskPage.editDiskForm = ref({ disk_name: '', storage_group_id: '', spec_id: null });
+  $.diskPage.showEditDiskModal = ref(false);
+
+  $.diskPage.openEditDiskForm = function(disk) {
+    $.diskPage.editingDisk.value = disk;
+    $.diskPage.editDiskForm.value = {
+      disk_name: disk.disk_name || '',
+      storage_group_id: disk.storage_group_id,
+      spec_id: disk.spec_id
+    };
+    $.diskPage.showEditDiskModal.value = true;
+    $.bsModalShow('editDiskModal');
+  };
+
+  // 规格变更时自动填充存储分组（但可手动调整）
+  $.diskPage.onSpecChange = function() {
+    var specId = $.diskPage.editDiskForm.value.spec_id;
+    if (specId) {
+      var spec = $.diskPage.diskSpecs.value.find(function(s) { return s.id === specId; });
+      if (spec) {
+        $.diskPage.editDiskForm.value.storage_group_id = spec.storage_group_id;
+      }
+    }
+  };
+
+  $.diskPage.saveEditDisk = async function() {
+    try {
+      var f = $.diskPage.editDiskForm.value;
+      if (!f.disk_name || !f.disk_name.trim()) return alert('请输入磁盘名称');
+      if (!f.storage_group_id) return alert('请选择存储分组');
+
+      var res = await authFetchJson('/api/admin/disks/' + $.diskPage.editingDisk.value.id, {
+        method: 'PUT',
+        body: JSON.stringify({
+          disk_name: f.disk_name.trim(),
+          storage_group_id: parseInt(f.storage_group_id),
+          spec_id: f.spec_id || null
+        })
+      });
+      var data = await res.json();
+      if (!res.ok) return alert(data.error || '编辑失败');
+      $.bsModalHide('editDiskModal');
+      $.diskPage.showEditDiskModal.value = false;
+      alert('编辑成功');
+      await $.diskPage.loadAllDisks();
+    } catch (e) {
+      alert('编辑失败: ' + e.message);
+    }
+  };
+
   // 辅助函数
   $.diskPage.formatDate = function(d) {
     if (!d) return '-';
