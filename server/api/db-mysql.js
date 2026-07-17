@@ -2341,7 +2341,7 @@ module.exports = {
         create: async (data) => {
             const [result] = await execute(
                 `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, is_legacy, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
                 [data.volume_id, data.disk_name || '', data.spec_id || null, parseInt(data.user_id), parseInt(data.storage_group_id), data.storage_pool, data.disk_type, parseInt(data.capacity_gb), data.status || 'free', parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.auto_renew ? 1 : 0, data.is_legacy ? 1 : 0, data.expire_time || null, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null]
             );
             return queryOne('SELECT * FROM disks WHERE id = ?', [result.insertId]);
