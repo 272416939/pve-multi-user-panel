@@ -773,6 +773,7 @@ async function initDefaultConfig() {
         'redis:password': '',
         'redis:db': '0',
         'redis:prefix': 'pve:',
+        'disk:temp_vmid': '9999',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {

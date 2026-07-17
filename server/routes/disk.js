@@ -182,8 +182,15 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
   var pveSuccess = true;
   var failedDiskIds = [];
   try {
+    // 读取临时 VMID 配置
+    var tempVmid = '9999';
+    try {
+      var cfgVal = await db.config.get('disk:temp_vmid');
+      if (cfgVal) tempVmid = cfgVal;
+    } catch (e) {}
+
     for (var i = 0; i < quantity; i++) {
-      var volumeId = await diskUtils.createDisk(spec.storage_pool, capacityGb, req.user.id);
+      var volumeId = await diskUtils.createDisk(spec.storage_pool, capacityGb, req.user.id, tempVmid);
       createdDiskVolumeIds.push(volumeId);
       // 更新台账 volume_id 为真实值
       // db 是 db-mysql 的 module.exports，直接使用 execute

@@ -82,19 +82,26 @@ async function runSshCommand(cmd) {
 // ==================== 磁盘操作 ====================
 
 // 创建游离磁盘 - pvesm alloc <storage> <vmid> <filename> <size> [OPTIONS]
-// 注意：pvesm alloc 的 vmid 参数是必须的，游离磁盘传 0 占位
-async function createDisk(storage, sizeGb, userId) {
+// 注意：pvesm alloc 的 vmid 参数必须是一个真实存在的 VM ID
+// 使用临时 VMID（disk:temp_vmid 配置项，默认 9999）作为中转
+async function createDisk(storage, sizeGb, userId, tempVmid) {
   var safeStorage = validateParam('storage', storage);
   var safeSize = validateParam('sizeGb', sizeGb);
   var safeUserId = parseInt(userId) || 0;
+  var safeVmid = parseInt(tempVmid) || 9999;
+
+  // 校验临时 VMID 范围
+  if (!Number.isInteger(safeVmid) || safeVmid < 100 || safeVmid > 999999999) {
+    safeVmid = 9999;
+  }
 
   // 服务端生成卷名前缀（用户不可控）
   var random = crypto.randomBytes(6).toString('hex');
   var volName = 'disk-pool-u' + safeUserId + '-' + random;
 
   // pvesm alloc 语法：pvesm alloc <storage> <vmid> <filename> <size>
-  // 游离磁盘不使用 vmid，但语法要求必须有，传 0 占位
-  var cmd = 'pvesm alloc ' + safeStorage + ' ' + '0' + ' ' + volName + ' ' + safeSize + 'G';
+  // vmid 必须是一个真实存在的 VM ID（不能为 0）
+  var cmd = 'pvesm alloc ' + safeStorage + ' ' + safeVmid + ' ' + volName + ' ' + safeSize + 'G';
   var stdout = await runSshCommand(cmd);
 
   // 解析返回的 volume_id
