@@ -158,26 +158,18 @@ async function unbindDisk(vmid, bus, dev) {
   await runSshCommand(cmd);
 }
 
-// 扩容磁盘 - pvesm resize <vol> <size>G
-// 注意：pvesm resize 不支持，改用 qm resize <vmid> <disk> <size>（需先绑定到 VM）
-// 对于游离磁盘，需先挂载到中转 VM（vmid=tempVmid）执行扩容，再卸载
-// 当前实现：通过 qm resize 命令，detach 后扩容
-async function resizeDisk(volumeId, newSizeGb) {
+// 扩容磁盘 - qm resize <vmid> <volume> <size>
+// 使用中转 VM（db 配置 disk:temp_vmid，默认 9999）执行扩容
+async function resizeDisk(volumeId, newSizeGb, tempVmid) {
   var safeVol = validateVolumeId(volumeId);
   var safeSize = validateParam('sizeGb', newSizeGb);
-
-  // pvesm resize 不存在，改用 qm resize 需要 volume_id 格式为 storage:volume_name
-  // qm resize <VMID> <disk> <size> 中的 disk 是总线设备名（如 scsi0）
-  // 对于游离磁盘，无法直接使用 qm resize，需要先绑定到中转 VM
-  // 方案：使用 qm disk resize 或直接通过 dd/resize2fs 等命令操作
-  // 直接使用 qm resize 需要知道 VMID 和总线设备名
-  // 对于游离磁盘，改用 pvesm alloc 创建新卷 + dd 复制 + pvesm free 旧卷 的方式
-  // 但更简单的方案：直接使用 qm resize 命令，volume 格式为 storage:volume_name
-  // 参考 PVE 文档: qm resize <vmid> <disk> <size> [--digest <digest>]
-  // 其中 disk 可以是 storage:volume_name 格式
-  // 实际测试：qm resize 0 local:vm-9999-disk-1234 +10G 也可以工作
-  // 使用 vmid=0 作为临时值（PVE 允许 qm resize 使用 vmid=0）
-  var cmd = 'qm resize 0 ' + safeVol + ' ' + safeSize + 'G';
+  var safeVmid = parseInt(tempVmid) || 9999;
+  if (!Number.isInteger(safeVmid) || safeVmid < 100 || safeVmid > 999999999) {
+    safeVmid = 9999;
+  }
+  // qm resize <vmid> <storage:volume_name> <size> 支持直接操作存储卷
+  // 传入中转 VM 的 vmid 而非 0，避免 vmid 校验问题
+  var cmd = 'qm resize ' + safeVmid + ' ' + safeVol + ' ' + safeSize + 'G';
   await runSshCommand(cmd);
 }
 
