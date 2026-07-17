@@ -3,6 +3,7 @@
 // 参照文档 7.3 节：数据隔离（WHERE user_id = ?）+ 操作校验（中间件归属校验）
 
 var express = require('express');
+var crypto = require('crypto');
 var router = express.Router();
 var { authMiddleware } = require('../middleware/auth');
 var { checkRateLimit } = require('../middleware/rate-limiter');
@@ -176,7 +177,7 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
       await conn.execute(
         `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [volId, diskName || ('数据盘-' + (i + 1)), specId, req.user.id, spec.storage_group_id, spec.storage_pool, spec.disk_type, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null]
+        [volId, diskName || ('数据盘-' + crypto.randomBytes(2).toString('hex')), specId, req.user.id, spec.storage_group_id, spec.storage_pool, spec.disk_type, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null]
       );
       // 获取 insertId
       var [insertResult] = await conn.execute('SELECT LAST_INSERT_ID() as id');
