@@ -1923,7 +1923,7 @@ module.exports = {
             if (params.order_no) { sql += ' AND order_no = ?'; args.push(params.order_no); }
             if (params.start_time) { sql += ' AND pay_time >= ?'; args.push(params.start_time); }
             if (params.end_time) { sql += ' AND pay_time <= ?'; args.push(params.end_time); }
-            sql += ' ORDER BY created_at DESC';
+            sql += ' ORDER BY id DESC';
             // SQL-2 修复：LIMIT/OFFSET 强制 parseInt + 上限保护
             var limit = parseInt(params.limit) || 0;
             var offset = parseInt(params.offset) || 0;
