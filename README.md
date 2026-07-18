@@ -447,28 +447,33 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 
 ### 💾 数据盘管理（Admin 硬盘设置）
 
-#### 磁盘中转虚拟机（VMID 9999）
+<details>
+<summary><strong>⚠️ 必须操作：创建中转虚拟机（VMID 9999）</strong></summary>
 
-系统使用 **PVE 的 `pvesm alloc` 命令创建游离磁盘**，该命令要求传入一个真实存在的 VMID 作为参数（PVE 内部会创建 `vm-{vmid}-disk-{rand}` 格式的卷名）。因此 **需要在 PVE 上创建一个专用的中转虚拟机**。
+**数据盘管理系统必须依赖 VMID 9999 的中转虚拟机才能正常工作，这是强制性要求，非可选。**
+
+系统使用 PVE 的 `pvesm alloc` 命令创建游离磁盘，该命令要求传入一个真实存在的 VMID 作为参数（PVE 内部会创建 `vm-{vmid}-disk-{rand}` 格式的卷名）。PVE **不允许传 `0` 或任意值，必须是一个真实存在的 VM ID**。
 
 **中转虚拟机要求：**
-- **VMID：** `9999`（默认，可在系统设置中修改 `disk:temp_vmid` 配置项）
-- **状态：** 可以关机或开机（不会影响使用，因为 pvesm alloc 不需要 VM 运行）
-- **资源：** 极低，可以是最小配置（1 核、128MB 内存、无系统盘即可）
-- **用途：** 仅作为 `pvesm alloc` 创建磁盘卷时的 ID 占位符
+- **VMID：必须为 `9999`**（硬编码，不可修改）
+- **状态：** 可以关机或开机（pvesm alloc 不需要 VM 运行）
+- **资源：** 极低，最小配置即可（1 核、128MB 内存、无系统盘）
+- **用途：** 仅作为创建磁盘卷时的 ID 占位符 + 扩容游离磁盘时的临时挂载点
 
 **为什么需要中转 VM？**
-1. **创建磁盘：** `pvesm alloc <storage> <vmid> <volname> <size>` → VMID `9999`
-2. **扩容游离磁盘：** 暂挂到中转 VM 的 `scsi30` 位置 → `qm resize` → 扩容完成后自动卸载
-3. **PVE API 限制：** `pvesm alloc` 的 vmid 参数必须是一个真实存在的 VM ID，不能传 `0` 或任意值
+1. **创建磁盘：** `pvesm alloc <storage> <vmid> <volname> <size>` → VMID 必须真实存在
+2. **扩容游离磁盘：** 暂挂到中转 VM 的 `scsi30` 位置 → `qm resize` → 自动卸载
+3. **PVE 硬性要求：** `pvesm alloc` 的 vmid 传 `0` 会报错，传不存在的 VMID 也会报错
 
-**如何创建中转 VM：**
+**创建中转 VM（部署后第一步）：**
 ```bash
-# SSH 到 PVE 节点，创建一个最小配置的虚拟机
-qm create 9999 --name "disk-transfer-vm" --memory 128 --cores 1 --net0 virtio,bridge=vmbr0
+# SSH 到 PVE 节点
+qm create 9999 --name "disk-transfer-vm" --memory 128 --cores 1
 ```
 
-> **注意：** 如果使用非 `9999` 的 VMID，请在系统设置中配置 `disk:temp_vmid` 参数。中转 VM 创建后无需安装操作系统，也不会产生实际资源占用。
+> **注意：** 中转 VM 无需安装操作系统，不会产生实际资源占用。**如果不创建 VMID 9999，数据盘购买和扩容功能将无法使用。**
+
+</details>
 
 #### 存储分组管理
 
