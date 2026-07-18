@@ -119,7 +119,13 @@
           </div>
         </div>
         <div class="mb-3" v-if="selectedSpec">
-          <label class="form-label">规格备注</label>
+          <label class="form-label">规格详情</label>
+          <div v-if="selectedSpec.mbps_rd || selectedSpec.mbps_wr" class="small mb-1">
+            <strong>带宽限速：</strong>读 {{ selectedSpec.mbps_rd || '无' }} MB/s (突发 {{ selectedSpec.mbps_rd_max || '无' }}) / 写 {{ selectedSpec.mbps_wr || '无' }} MB/s (突发 {{ selectedSpec.mbps_wr_max || '无' }})
+          </div>
+          <div v-if="selectedSpec.iops_rd || selectedSpec.iops_wr" class="small mb-1">
+            <strong>IOPS 限速：</strong>读 {{ selectedSpec.iops_rd || '无' }} (突发 {{ selectedSpec.iops_rd_max || '无' }}) / 写 {{ selectedSpec.iops_wr || '无' }} (突发 {{ selectedSpec.iops_wr_max || '无' }})
+          </div>
           <p class="text-muted small mb-0">{{ selectedSpec.description || '暂无备注' }}</p>
         </div>
         <div class="mb-3">

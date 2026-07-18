@@ -75,12 +75,12 @@
             <div class="small">
               <div><strong>起售量：</strong>{{ spec.min_size_gb }} GiB &nbsp; <strong>截止量：</strong>{{ spec.max_size_gb }} GiB</div>
               <div><strong>月  价：</strong>￥{{ parseFloat(spec.price_per_gb).toFixed(2) }} 元/GiB</div>
-              <div v-if="spec.quarterly_discount"><strong>季  付：</strong>{{ spec.quarterly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).quarterly }}/GiB/月）</div>
-              <div v-if="spec.yearly_discount"><strong>年  付：</strong>{{ spec.yearly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).yearly }}/GiB/月）</div>
-              <div><strong>存储池：</strong>{{ spec.storage_pool }}</div>
-              <div v-if="spec.mbps_rd || spec.mbps_wr"><strong>带宽限速：</strong>读 {{ spec.mbps_rd || '无' }} MB/s (突发 {{ spec.mbps_rd_max || '无' }}) / 写 {{ spec.mbps_wr || '无' }} MB/s (突发 {{ spec.mbps_wr_max || '无' }})</div>
-              <div v-if="spec.iops_rd || spec.iops_wr"><strong>IOPS 限速：</strong>读 {{ spec.iops_rd || '无' }} (突发 {{ spec.iops_rd_max || '无' }}) / 写 {{ spec.iops_wr || '无' }} (突发 {{ spec.iops_wr_max || '无' }})</div>
-              <div v-if="spec.description" class="mt-1 text-muted">{{ spec.description }}</div>
+              <div><strong>季  付：</strong><span v-if="spec.quarterly_discount">{{ spec.quarterly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).quarterly }}/GiB/月）</span><span v-else>-</span></div>
+              <div><strong>年  付：</strong><span v-if="spec.yearly_discount">{{ spec.yearly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).yearly }}/GiB/月）</span><span v-else>-</span></div>
+              <div><strong>存储池：</strong>{{ spec.storage_pool || '-' }}</div>
+              <div><strong>带宽限速：</strong>读 {{ spec.mbps_rd || '无' }} MB/s (突发 {{ spec.mbps_rd_max || '无' }}) / 写 {{ spec.mbps_wr || '无' }} MB/s (突发 {{ spec.mbps_wr_max || '无' }})</div>
+              <div><strong>IOPS 限速：</strong>读 {{ spec.iops_rd || '无' }} (突发 {{ spec.iops_rd_max || '无' }}) / 写 {{ spec.iops_wr || '无' }} (突发 {{ spec.iops_wr_max || '无' }})</div>
+              <div class="mt-1 text-muted"><strong>备  注：</strong>{{ spec.description || '-' }}</div>
             </div>
             <!-- 存储池容量使用进度条 -->
             <div v-if="diskPage.getStorageInfo(spec.storage_pool)" class="mt-2">
