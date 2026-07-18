@@ -131,8 +131,12 @@ router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, 
     if (!Array.isArray(order)) return res.status(400).json({ error: '无效的排序数据' });
     for (var i = 0; i < order.length; i++) {
       var item = order[i];
-      if (!item.id || !Number.isInteger(parseInt(item.id))) continue;
-      await db.storageGroups.update(parseInt(item.id), { sort_order: parseInt(item.sort_order) || i });
+      var itemId = parseInt(item.id);
+      var itemSort = parseInt(item.sort_order);
+      if (!Number.isInteger(itemId) || itemId < 1) {
+        return res.status(400).json({ error: '无效的ID', detail: item.id });
+      }
+      await db.storageGroups.update(itemId, { sort_order: Number.isInteger(itemSort) ? itemSort : i });
     }
     clearDiskCache();
     res.json({ success: true });
