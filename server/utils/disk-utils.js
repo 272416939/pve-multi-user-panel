@@ -113,23 +113,24 @@ async function createDisk(storage, sizeGb, userId, tempVmid, diskFormat) {
     safeVmid = 9999;
   }
 
-  // 服务端生成卷名（PVE 命名规范：vm-{vmid}-disk-{数字}）
+  // 服务端生成卷名（PVE 命名规范：vm-{vmid}-disk-{数字}，卷名本身不带扩展名）
   var randSuffix = crypto.randomBytes(4).readUInt32BE(0) % 10000;
   var volName = 'vm-' + safeVmid + '-disk-' + randSuffix;
-  // 文件系统类存储需要追加扩展名（DIR/BTRFS 等需带 .raw/.qcow2 等后缀，否则 pvesm 报 unable to parse）
+
+  // pvesm alloc 语法：pvesm alloc <storage> <vmid> <filename> <size> [--format <format>]
+  // vmid 必须是一个真实存在的 VM ID（不能为 0）
+  // DIR/BTRFS 等文件系统类存储通过 --format 参数指定格式，
+  // PVE 会自动追加 .raw/.qcow2 等扩展名到实际文件（卷名本身保持无扩展名）
+  // 块设备类存储（lvm/lvmthin/zfspool/rbd）无需 --format
+  var cmd = 'pvesm alloc ' + safeStorage + ' ' + safeVmid + ' ' + volName + ' ' + safeSize + 'G';
   if (diskFormat) {
     var safeFormat = validateParam('diskFormat', diskFormat);
-    volName = volName + '.' + safeFormat;
+    cmd += ' --format ' + safeFormat;
   }
-
-  // pvesm alloc 语法：pvesm alloc <storage> <vmid> <filename> <size>
-  // vmid 必须是一个真实存在的 VM ID（不能为 0）
-  var cmd = 'pvesm alloc ' + safeStorage + ' ' + safeVmid + ' ' + volName + ' ' + safeSize + 'G';
   var stdout = await runSshCommand(cmd);
 
-  // 解析返回的 volume_id
+  // 解析返回的 volume_id（PVE 会返回完整 volume_id，DIR 存储可能含子路径 9999/vm-...ext）
   var volumeId = safeStorage + ':' + volName;
-  // pvesm alloc 有时返回完整 volume_id（DIR 存储含子路径 9999/vm-...ext），有时返回 volname
   if (stdout && stdout.indexOf(':') > -1 && stdout.indexOf(safeStorage) === 0) {
     volumeId = stdout.trim();
   }
