@@ -2262,7 +2262,7 @@ module.exports = {
 
     // 存储分组
     storageGroups: {
-        getAll: () => queryAll('SELECT * FROM storage_groups ORDER BY sort_order, id'),
+        getAll: () => queryAll('SELECT * FROM storage_groups ORDER BY sort_order ASC, id ASC'),
         getById: (id) => queryOne('SELECT * FROM storage_groups WHERE id = ?', [parseInt(id)]),
         create: async (data) => {
             const [result] = await execute(
