@@ -14,7 +14,8 @@
       type: { type: String, default: 'button' }
     },
     emits: ['click', 'pv-click'],
-    inheritAttrs: false,
+    // 不设置 inheritAttrs: false，让 Vue 3 自动把 $attrs（title/data-*/aria-* 等）
+    // 透传到根元素 <button>，这样 :title 悬停提示就能生效
     methods: {
       handleClick: function(e) {
         if (this.disabled) { e.preventDefault(); e.stopPropagation(); return; }
@@ -38,29 +39,15 @@
 
       var cls = 'pv-btn pv-btn-' + v;
       var children = v === 'close'
-        ? [h('span', { attrs: { 'aria-hidden': 'true' } }, '\u00d7')]
+        ? [h('span', { 'aria-hidden': 'true' }, '\u00d7')]
         : (this.$slots.default ? this.$slots.default() : []);
 
-      // 透传 fallthrough 属性（title、data-*、aria-* 等），让 :title 悬停提示生效
-      var btnAttrs = {
+      return h('button', {
         type: this.type,
         disabled: this.disabled || undefined,
-        class: cls
-      };
-      // Vue 3 中 $attrs 包含未声明为 props 的属性（title、data-*、aria-* 等）
-      // 注意：class/style 已单独处理；on* 开头的会被 Vue 当作事件监听器，不应作为 attr
-      if (this.$attrs && typeof this.$attrs === 'object') {
-        for (var key in this.$attrs) {
-          if (key === 'class' || key === 'style') continue; // 已有 class 处理
-          if (/^on[A-Z]/.test(key)) continue; // 事件监听器由 Vue 单独处理，避免重复
-          if (Object.prototype.hasOwnProperty.call(this.$attrs, key)) {
-            btnAttrs[key] = this.$attrs[key];
-          }
-        }
-      }
-      btnAttrs.onClick = this.handleClick;
-
-      return h('button', btnAttrs, children);
+        class: cls,
+        onClick: this.handleClick
+      }, children);
     }
   };
 
