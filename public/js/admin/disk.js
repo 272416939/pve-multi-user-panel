@@ -399,6 +399,49 @@
 
   // ===== 数据盘管理 =====
   $.diskPage.allDisks = ref([]);
+  $.diskPage.selectedDiskIds = ref([]);
+  $.diskPage.batchGroupId = ref(null);
+  $.diskPage.showBatchEditGroupModal = ref(false);
+
+  $.diskPage.selectAllDisks = function(checked) {
+    if (checked) {
+      $.diskPage.selectedDiskIds.value = $.diskPage.allDisks.value
+        .filter(function(d) { return d.status !== 'destroyed'; })
+        .map(function(d) { return d.id; });
+    } else {
+      $.diskPage.selectedDiskIds.value = [];
+    }
+  };
+
+  $.diskPage.openBatchEditGroup = function() {
+    if ($.diskPage.selectedDiskIds.value.length === 0) return alert('请先选择要修改的磁盘');
+    $.diskPage.batchGroupId.value = null;
+    $.diskPage.showBatchEditGroupModal.value = true;
+    $.bsModalShow('batchEditGroupModal');
+  };
+
+  $.diskPage.submitBatchEditGroup = async function() {
+    var groupId = $.diskPage.batchGroupId.value;
+    if (!groupId) return alert('请选择目标存储分组');
+    var ids = $.diskPage.selectedDiskIds.value;
+    if (ids.length === 0) return alert('请先选择磁盘');
+
+    try {
+      var res = await authFetchJson('/api/admin/disks/batch/storage-group', {
+        method: 'PUT',
+        body: JSON.stringify({ disk_ids: ids, storage_group_id: groupId })
+      });
+      var data = await res.json();
+      if (!res.ok) return alert(data.error || '修改失败');
+      $.bsModalHide('batchEditGroupModal');
+      $.diskPage.showBatchEditGroupModal.value = false;
+      alert('修改成功，共更新 ' + data.updated + '/' + data.total + ' 个磁盘');
+      $.diskPage.selectedDiskIds.value = [];
+      await $.diskPage.loadAllDisks();
+    } catch (e) {
+      alert('修改失败: ' + e.message);
+    }
+  };
 
   $.diskPage.loadAllDisks = async function() {
     try {

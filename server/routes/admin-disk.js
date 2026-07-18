@@ -344,6 +344,42 @@ router.put('/admin/disks/:id', authMiddleware, adminMiddleware, async (req, res)
   }
 });
 
+// 批量修改磁盘存储分组
+router.put('/admin/disks/batch/storage-group', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    var diskIds = req.body.disk_ids;
+    var storageGroupId = parseInt(req.body.storage_group_id);
+
+    if (!Array.isArray(diskIds) || diskIds.length === 0) {
+      return res.status(400).json({ error: '请选择要修改的磁盘' });
+    }
+    if (!Number.isInteger(storageGroupId) || storageGroupId < 1) {
+      return res.status(400).json({ error: '请选择有效的存储分组' });
+    }
+
+    // 验证存储分组存在
+    var group = await db.storageGroups.getById(storageGroupId);
+    if (!group) return res.status(400).json({ error: '存储分组不存在' });
+
+    // 批量更新
+    var updated = 0;
+    for (var i = 0; i < diskIds.length; i++) {
+      var id = parseInt(diskIds[i]);
+      if (!Number.isInteger(id) || id < 1) continue;
+      try {
+        await db.disks.update(id, { storage_group_id: storageGroupId });
+        updated++;
+      } catch (e) {
+        console.error('[batch] 更新磁盘 ' + id + ' 失败:', e.message);
+      }
+    }
+
+    res.json({ success: true, updated: updated, total: diskIds.length });
+  } catch (e) {
+    res.status(500).json({ error: safeError(e) });
+  }
+});
+
 // 管理员销毁磁盘（不受15天限制，3天内全额，超过3天按剩余比例退款）
 router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (req, res) => {
   var diskId = parseInt(req.params.id);

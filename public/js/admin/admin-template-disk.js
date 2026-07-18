@@ -172,6 +172,7 @@
       <h4 class="module-title mb-0">数据盘管理</h4>
       <div class="d-flex gap-2">
         <pv-button variant="outline" size="sm" @click="diskPage.importExistingDisks()">导入存量磁盘</pv-button>
+        <pv-button variant="primary" size="sm" @click="diskPage.openBatchEditGroup()" :disabled="diskPage.selectedDiskIds.value.length === 0">批量修改分组</pv-button>
         <pv-button variant="outline" size="sm" @click="diskPage.loadAllDisks()">刷新</pv-button>
       </div>
     </div>
@@ -180,6 +181,7 @@
         <table class="table table-hover table-sm table-align-center">
           <thead>
             <tr>
+              <th style="width:36px" class="text-center"><input type="checkbox" :checked="diskPage.selectedDiskIds.value.length === diskPage.allDisks.value.filter(d => d.status !== 'destroyed').length && diskPage.allDisks.value.length > 0" @change="diskPage.selectAllDisks($event.target.checked)"></th>
               <th>ID</th>
               <th>用户</th>
               <th>名称</th>
@@ -196,7 +198,7 @@
           </thead>
           <tbody>
             <tr v-for="disk in diskPage.allDisks.value" :key="disk.id">
-              <td>{{ disk.id }}</td>
+              <td class="text-center"><input type="checkbox" :value="disk.id" v-model="diskPage.selectedDiskIds.value"></td>
               <td>{{ disk.username || '-' }}</td>
               <td>{{ disk.disk_name || '-' }}<span v-if="disk.is_legacy" class="text-muted small ms-1">(随VM)</span></td>
               <td>{{ disk.group_name || '-' }}</td>
@@ -217,7 +219,7 @@
               </td>
             </tr>
             <tr v-if="!diskPage.allDisks.value || diskPage.allDisks.value.length === 0">
-              <td colspan="12" class="text-center text-muted py-4">暂无数据盘</td>
+              <td colspan="13" class="text-center text-muted py-4">暂无数据盘</td>
             </tr>
           </tbody>
         </table>
@@ -443,6 +445,32 @@
       <div class="modal-footer">
         <pv-button type="button" data-bs-dismiss="modal" variant="secondary" @click="diskPage.showEditDiskModal.value = false">取消</pv-button>
         <pv-button @click="diskPage.saveEditDisk" variant="primary">保存</pv-button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 批量修改分组弹窗 -->
+<div class="modal fade" id="batchEditGroupModal" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">批量修改存储分组</h5>
+        <pv-button type="button" variant="close" data-bs-dismiss="modal" @click="diskPage.showBatchEditGroupModal.value = false"></pv-button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3">已选择 <strong>{{ diskPage.selectedDiskIds.value.length }}</strong> 个磁盘</p>
+        <div class="mb-3">
+          <label class="form-label">目标存储分组</label>
+          <select class="form-select" v-model="diskPage.batchGroupId.value">
+            <option :value="null">请选择</option>
+            <option v-for="g in diskPage.storageGroups.value" :key="g.id" :value="g.id">{{ g.name }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+        <pv-button @click="diskPage.submitBatchEditGroup" variant="primary" :disabled="!diskPage.batchGroupId.value">确定修改</pv-button>
       </div>
     </div>
   </div>
