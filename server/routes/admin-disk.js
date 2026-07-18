@@ -82,6 +82,34 @@ router.post('/storage-groups', authMiddleware, adminMiddleware, async (req, res)
   }
 });
 
+// 批量更新存储分组排序（必须在 :id 路由之前注册，避免 sort 被 :id 匹配）
+router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    var order = req.body.order;
+    if (!Array.isArray(order)) return res.status(400).json({ error: '无效的排序数据' });
+    
+    var ids = [];
+    for (var i = 0; i < order.length; i++) {
+      var item = order[i];
+      var val = (item && item.id) ? item.id : item;
+      var n = parseInt(val);
+      if (!Number.isInteger(n) || n < 1) {
+        return res.status(400).json({ error: '无效的ID', value: val });
+      }
+      ids.push(n);
+    }
+    
+    for (var i = 0; i < ids.length; i++) {
+      await db.storageGroups.update(ids[i], { sort_order: i });
+    }
+    clearDiskCache();
+    res.json({ success: true });
+  } catch (e) {
+    console.error('[storage-groups] sort error:', e.message);
+    res.status(500).json({ error: safeError(e) });
+  }
+});
+
 // 编辑存储分组
 router.put('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
@@ -125,34 +153,6 @@ router.delete('/storage-groups/:id', authMiddleware, adminMiddleware, async (req
 });
 
 // 批量更新存储分组排序
-router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    var order = req.body.order;
-    if (!Array.isArray(order)) return res.status(400).json({ error: '无效的排序数据' });
-    
-    var ids = [];
-    for (var i = 0; i < order.length; i++) {
-      var item = order[i];
-      var val = (item && item.id) ? item.id : item;
-      var n = parseInt(val);
-      if (!Number.isInteger(n) || n < 1) {
-        return res.status(400).json({ error: '无效的ID', value: val });
-      }
-      ids.push(n);
-    }
-    
-    // 参考套餐分组：使用 db.storageGroups 的 update 方法
-    for (var i = 0; i < ids.length; i++) {
-      await db.storageGroups.update(ids[i], { sort_order: i });
-    }
-    clearDiskCache();
-    res.json({ success: true });
-  } catch (e) {
-    console.error('[storage-groups] sort error:', e.message);
-    res.status(500).json({ error: safeError(e) });
-  }
-});
-
 // ==================== 硬盘规格管理 ====================
 
 // 获取所有规格
