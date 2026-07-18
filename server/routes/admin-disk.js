@@ -82,28 +82,6 @@ router.post('/storage-groups', authMiddleware, adminMiddleware, async (req, res)
   }
 });
 
-// 编辑存储分组
-router.put('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
-  try {
-    var id = parseInt(req.params.id);
-    var name = (req.body.name || '').toString().trim();
-    var sortOrder = parseInt(req.body.sort_order) || 0;
-
-    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID' });
-    if (!name) return res.status(400).json({ error: '请输入分组名称' });
-    if (name.length > 50) return res.status(400).json({ error: '分组名称不能超过 50 字符' });
-
-    var group = await db.storageGroups.update(id, { name: name, sort_order: sortOrder });
-    clearDiskCache();
-    res.json(group);
-  } catch (e) {
-    if (e && e.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ error: '分组名称已存在' });
-    }
-    res.status(500).json({ error: safeError(e) });
-  }
-});
-
 // 删除存储分组
 router.delete('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
