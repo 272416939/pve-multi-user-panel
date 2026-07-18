@@ -151,15 +151,10 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
 }
 
 // 卸载磁盘 - qm set <vmid> --delete <bus><dev>
+// SCSI 支持热插拔，无需检查 VM 状态
 async function unbindDisk(vmid, bus, dev) {
   var safeVmid = validateParam('vmid', vmid);
   var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
-
-  // VM 状态前置检查（必须关机）
-  var vmStatus = await pveApi.getVmStatus(safeVmid);
-  if (vmStatus.status !== 'stopped') {
-    throw new Error('虚拟机正在运行，需先关机再卸载');
-  }
 
   var cmd = 'qm set ' + safeVmid + ' --delete ' + busDev;
   await runSshCommand(cmd);

@@ -285,9 +285,9 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
         throw new Error('磁盘当前状态不允许挂载（状态：' + lockedDisk.status + '），可能被其他操作占用');
       }
 
-      // 读取系统盘总线类型，数据盘沿用同一总线
-      var bus = await diskUtils.getSystemDiskBus(vm.vm_id);
-      // 自动分配空闲设备号
+      // 统一使用 SCSI 总线（支持热插拔，无需关机即可挂载/卸载）
+      var bus = 'scsi';
+      // 自动分配空闲 scsi 设备号
       var dev = await diskUtils.getAvailableDevNumber(vm.vm_id, bus);
 
       // 读取规格的 QoS 参数（从数据库读取，非用户输入）

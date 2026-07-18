@@ -227,10 +227,9 @@ async function checkExpiredDisks() {
           if (disk.status === 'destroyed') continue;
 
           if (disk.status === 'bound' || disk.status === 'grace') {
-            // 停机分离：先关机 VM，再分离磁盘
+            // SCSI 支持热插拔，直接分离磁盘，无需关机
             if (disk.bind_vmid) {
-              console.log('[disk-expiry] 磁盘 ' + disk.id + ' 进入停机分离流程（VM ' + disk.bind_vmid + '）');
-              await gracefulShutdownVm(disk.bind_vmid, shutdownTimeout);
+              console.log('[disk-expiry] 磁盘 ' + disk.id + ' 到期分离（VM ' + disk.bind_vmid + '）');
               await detachDiskFromVm(disk);
               // 发送到期分离通知
               if (!await isDiskReminderSent(disk.id, 'expired', today)) {
