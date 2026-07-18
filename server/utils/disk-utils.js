@@ -113,24 +113,24 @@ async function createDisk(storage, sizeGb, userId, tempVmid, diskFormat) {
     safeVmid = 9999;
   }
 
-  // 服务端生成卷名（PVE 命名规范：vm-{vmid}-disk-{数字}，卷名本身不带扩展名）
+  // 服务端生成卷名（PVE 命名规范：vm-{vmid}-disk-{数字}）
   var randSuffix = crypto.randomBytes(4).readUInt32BE(0) % 10000;
   var volName = 'vm-' + safeVmid + '-disk-' + randSuffix;
-
-  // pvesm alloc 语法：pvesm alloc <storage> <vmid> <filename> <size> [--format <format>]
-  // vmid 必须是一个真实存在的 VM ID（不能为 0）
-  // DIR/BTRFS 等文件系统类存储通过 --format 参数指定格式，
-  // PVE 会自动追加 .raw/.qcow2 等扩展名到实际文件（卷名本身保持无扩展名）
-  // 块设备类存储（lvm/lvmthin/zfspool/rbd）无需 --format
-  var cmd = 'pvesm alloc ' + safeStorage + ' ' + safeVmid + ' ' + volName + ' ' + safeSize + 'G';
+  // DIR/BTRFS 等文件系统类存储的卷名必须带扩展名（.raw/.qcow2/.vmdk）
+  // pvesm alloc 对这类存储的卷名解析规则：必须有扩展名才能识别格式
   if (diskFormat) {
     var safeFormat = validateParam('diskFormat', diskFormat);
-    cmd += ' --format ' + safeFormat;
+    volName = volName + '.' + safeFormat;
   }
+
+  // pvesm alloc 语法：pvesm alloc <storage> <vmid> <filename> <size>
+  // vmid 必须是一个真实存在的 VM ID（不能为 0）
+  var cmd = 'pvesm alloc ' + safeStorage + ' ' + safeVmid + ' ' + volName + ' ' + safeSize + 'G';
   var stdout = await runSshCommand(cmd);
 
-  // 解析返回的 volume_id（PVE 会返回完整 volume_id，DIR 存储可能含子路径 9999/vm-...ext）
+  // 解析返回的 volume_id
   var volumeId = safeStorage + ':' + volName;
+  // pvesm alloc 有时返回完整 volume_id（DIR 存储含子路径 9999/vm-...ext），有时返回 volname
   if (stdout && stdout.indexOf(':') > -1 && stdout.indexOf(safeStorage) === 0) {
     volumeId = stdout.trim();
   }
@@ -155,12 +155,9 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
   qosParams = qosParams || {};
 
   // 拼接限速参数（从数据库规格读取，非用户输入）
+  // 注意：volume_id 本身已含扩展名（DIR 存储：storage:9999/vm-...qcow2），
+  // PVE 会从扩展名自动识别格式，不要再附加 format=xxx（否则会冲突报错）
   var diskConfig = safeVol;
-  // DIR 存储的 raw/qcow2/vmdk 文件需显式附加 format=xxx（PVE 部分场景下无法自动识别）
-  var fmt = inferDiskFormat(safeVol);
-  if (fmt) {
-    diskConfig += ',format=' + fmt;
-  }
   var qosFields = ['mbps_rd', 'mbps_rd_max', 'mbps_wr', 'mbps_wr_max', 'iops_rd', 'iops_rd_max', 'iops_wr', 'iops_wr_max'];
   for (var i = 0; i < qosFields.length; i++) {
     var f = qosFields[i];
@@ -204,10 +201,8 @@ async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid, bindBus, bind
       transitVmid = 9999;
     }
     // 挂载到中转 VM（scsi30 固定位置，非系统盘 scsi0）
-    // 附加 format=xxx 参数（DIR 存储的 raw/qcow2/vmdk 文件需显式指定 format）
-    var transitFmt = inferDiskFormat(safeVol);
-    var transitVolCfg = transitFmt ? (safeVol + ',format=' + transitFmt) : safeVol;
-    var attachCmd = 'qm set ' + transitVmid + ' --scsi30 ' + transitVolCfg;
+    // volume_id 已含扩展名，PVE 自动识别格式，无需附加 format=
+    var attachCmd = 'qm set ' + transitVmid + ' --scsi30 ' + safeVol;
     await runSshCommand(attachCmd);
     try {
       // 执行扩容（scsi30 非 0，安全）
