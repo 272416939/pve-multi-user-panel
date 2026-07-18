@@ -20,6 +20,39 @@ function clearDiskCache() {
   groupCache.del('all');
 }
 
+// 文件系统类存储类型（需选择磁盘格式扩展名）
+var FILE_SYSTEM_STORAGE_TYPES = ['dir', 'btrfs', 'nfs', 'cephfs'];
+// 各存储类型支持的磁盘格式
+var DISK_FORMATS_BY_STORAGE_TYPE = {
+  dir: ['raw', 'qcow2', 'vmdk'],
+  btrfs: ['raw', 'qcow2', 'subvol'],
+  nfs: ['raw', 'qcow2', 'vmdk'],
+  cephfs: ['raw', 'qcow2']
+};
+
+// 校验并规范化 disk_format：根据所选 storage_pool 对应的 PVE 存储类型联动校验
+// 返回 { ok: true, diskFormat: 'qcow2'|null } 或 { ok: false, error: '...' }
+async function validateDiskFormat(storagePool, diskFormat) {
+  var pveStorageType = '';
+  try {
+    var storages = await pveApi.getAllStorages();
+    var matched = (storages || []).find(function(s) { return s.storage === storagePool; });
+    pveStorageType = matched ? (matched.type || '') : '';
+  } catch (e) {
+    // PVE 查询失败时保守放行（不阻断主流程，由 pvesm alloc 自身兜底）
+    return { ok: true, diskFormat: diskFormat || null };
+  }
+  if (FILE_SYSTEM_STORAGE_TYPES.indexOf(pveStorageType) !== -1) {
+    var allowed = DISK_FORMATS_BY_STORAGE_TYPE[pveStorageType] || [];
+    if (!diskFormat || allowed.indexOf(diskFormat) === -1) {
+      return { ok: false, error: '该存储类型（' + pveStorageType + '）必须选择磁盘格式，支持：' + allowed.join('/') };
+    }
+    return { ok: true, diskFormat: diskFormat };
+  }
+  // 块设备存储类型不存储扩展名
+  return { ok: true, diskFormat: null };
+}
+
 // ==================== PVE 存储列表（供规格弹窗存储位置下拉） ====================
 
 // 获取 PVE 所有存储及剩余容量（文档 3.3：下拉展示 PVE 所有存储及剩余容量）
@@ -181,6 +214,10 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
     // 价格精度统一 2 位小数，超过 2 位时按 2 位舍入（避免 DECIMAL(10,2) 静默截断）
     var pricePerGbVal = Math.round(parseFloat(data.price_per_gb) * 100) / 100;
 
+    // 校验磁盘格式与存储类型联动
+    var fmtResult = await validateDiskFormat(data.storage_pool.trim(), data.disk_format);
+    if (!fmtResult.ok) return res.status(400).json({ error: fmtResult.error });
+
     var spec = await db.diskSpecs.create({
       name: data.name.trim(),
       disk_type: data.disk_type,
@@ -196,6 +233,7 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
       iops_rd: data.iops_rd || null, iops_rd_max: data.iops_rd_max || null,
       iops_wr: data.iops_wr || null, iops_wr_max: data.iops_wr_max || null,
       storage_pool: data.storage_pool.trim(),
+      disk_format: fmtResult.diskFormat,
       description: data.description || null
     });
     clearDiskCache();
@@ -217,6 +255,10 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
     if (!data.storage_pool || !data.storage_pool.trim()) return res.status(400).json({ error: '请选择存储位置' });
     var pricePerGbVal2 = Math.round(parseFloat(data.price_per_gb) * 100) / 100;
 
+    // 校验磁盘格式与存储类型联动
+    var fmtResult2 = await validateDiskFormat(data.storage_pool.trim(), data.disk_format);
+    if (!fmtResult2.ok) return res.status(400).json({ error: fmtResult2.error });
+
     var spec = await db.diskSpecs.update(id, {
       name: data.name.trim(),
       disk_type: data.disk_type,
@@ -232,6 +274,7 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
       iops_rd: data.iops_rd || null, iops_rd_max: data.iops_rd_max || null,
       iops_wr: data.iops_wr || null, iops_wr_max: data.iops_wr_max || null,
       storage_pool: data.storage_pool.trim(),
+      disk_format: fmtResult2.diskFormat,
       description: data.description || null
     });
     clearDiskCache();

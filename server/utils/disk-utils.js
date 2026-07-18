@@ -11,11 +11,12 @@ var { calculateAmount } = require('./order-utils');
 var PARAM_PATTERNS = {
   vmid:     { type: 'int', min: 100, max: 999999999 },
   storage:  { type: 'string', pattern: /^[a-zA-Z0-9_-]+$/ },
-  volumeId: { type: 'string', pattern: /^[a-zA-Z0-9_-]+:[a-zA-Z0-9_.\-]+$/ },
+  volumeId: { type: 'string', pattern: /^[a-zA-Z0-9_-]+:[a-zA-Z0-9_./\-]+$/ },
   bus:      { type: 'enum', values: ['scsi', 'sata', 'virtio'] },
   dev:      { type: 'int', min: 1, max: 30 }, // 永不从 0 开始（系统盘保护）
   sizeGb:   { type: 'int', min: 1, max: 10000 },
   diskType: { type: 'enum', values: ['NVME', 'SATA', 'HDD', 'U2'] },
+  diskFormat: { type: 'enum', values: ['raw', 'qcow2', 'vmdk', 'subvol'] },
 };
 
 // 系统盘总线设备名防护：禁止操作 *0（如 scsi0、virtio0、sata0）
@@ -74,8 +75,8 @@ function validateVolumeId(volumeId) {
   if (volName.indexOf('vm-') !== 0 && volName.indexOf('disk-pool-') !== 0 && volName.indexOf('imported-') !== 0) {
     throw new Error('不允许操作非数据盘卷（仅允许 disk-pool- 或 imported- 前缀）');
   }
-  // 第三层：禁止操作系统盘
-  if (/disk-0$/.test(volName)) {
+  // 第三层：禁止操作系统盘（兼容 .raw/.qcow2/.vmdk/.subvol 扩展名）
+  if (/disk-0(\.(raw|qcow2|vmdk|subvol))?$/.test(volName)) {
     throw new Error('禁止操作系统盘');
   }
   return volumeId;
@@ -99,7 +100,9 @@ async function runSshCommand(cmd) {
 // 创建游离磁盘 - pvesm alloc <storage> <vmid> <filename> <size> [OPTIONS]
 // 注意：pvesm alloc 的 vmid 参数必须是一个真实存在的 VM ID
 // 使用临时 VMID（disk:temp_vmid 配置项，默认 9999）作为中转
-async function createDisk(storage, sizeGb, userId, tempVmid) {
+// diskFormat：文件系统类存储（dir/btrfs/nfs/cephfs）需传扩展名（raw/qcow2/vmdk/subvol），
+//             块设备类存储（lvm/lvmthin/zfspool/rbd）传 null/undefined
+async function createDisk(storage, sizeGb, userId, tempVmid, diskFormat) {
   var safeStorage = validateParam('storage', storage);
   var safeSize = validateParam('sizeGb', sizeGb);
   var safeUserId = parseInt(userId) || 0;
@@ -113,6 +116,11 @@ async function createDisk(storage, sizeGb, userId, tempVmid) {
   // 服务端生成卷名（PVE 命名规范：vm-{vmid}-disk-{数字}）
   var randSuffix = crypto.randomBytes(4).readUInt32BE(0) % 10000;
   var volName = 'vm-' + safeVmid + '-disk-' + randSuffix;
+  // 文件系统类存储需要追加扩展名（DIR/BTRFS 等需带 .raw/.qcow2 等后缀，否则 pvesm 报 unable to parse）
+  if (diskFormat) {
+    var safeFormat = validateParam('diskFormat', diskFormat);
+    volName = volName + '.' + safeFormat;
+  }
 
   // pvesm alloc 语法：pvesm alloc <storage> <vmid> <filename> <size>
   // vmid 必须是一个真实存在的 VM ID（不能为 0）
@@ -121,7 +129,7 @@ async function createDisk(storage, sizeGb, userId, tempVmid) {
 
   // 解析返回的 volume_id
   var volumeId = safeStorage + ':' + volName;
-  // pvesm alloc 有时返回完整 volume_id，有时返回 volname
+  // pvesm alloc 有时返回完整 volume_id（DIR 存储含子路径 9999/vm-...ext），有时返回 volname
   if (stdout && stdout.indexOf(':') > -1 && stdout.indexOf(safeStorage) === 0) {
     volumeId = stdout.trim();
   }

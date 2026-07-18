@@ -183,9 +183,9 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     for (var i = 0; i < quantity; i++) {
       var volId = spec.storage_pool + ':pending-' + orderNo + '-' + i;
       await conn.execute(
-        `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [volId, diskName || ('数据盘-' + crypto.randomBytes(2).toString('hex')), specId, req.user.id, spec.storage_group_id, spec.storage_pool, spec.disk_type, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null]
+        `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, disk_format, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [volId, diskName || ('数据盘-' + crypto.randomBytes(2).toString('hex')), specId, req.user.id, spec.storage_group_id, spec.storage_pool, spec.disk_type, spec.disk_format || null, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null]
       );
       // 获取 insertId
       var [insertResult] = await conn.execute('SELECT LAST_INSERT_ID() as id');
@@ -210,7 +210,7 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     } catch (e) {}
 
     for (var i = 0; i < quantity; i++) {
-      var volumeId = await diskUtils.createDisk(spec.storage_pool, capacityGb, req.user.id, tempVmid);
+      var volumeId = await diskUtils.createDisk(spec.storage_pool, capacityGb, req.user.id, tempVmid, spec.disk_format);
       createdDiskVolumeIds.push(volumeId);
       // 更新台账 volume_id 为真实值
       // db 是 db-mysql 的 module.exports，直接使用 execute
@@ -379,6 +379,13 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
     // legacy 磁盘不允许独立操作（随 VM 管理）
     if (disk.is_legacy) {
       return res.status(403).json({ error: 'legacy 磁盘随 VM 管理，不支持独立操作' });
+    }
+
+    // 不支持扩容的磁盘格式（vmdk/subvol qemu 不支持 resize；DIR 上的 raw 文件扩容不可靠）
+    // qcow2 和 NULL（块设备存储）支持扩容
+    var UNSUPPORTED_RESIZE_FORMATS = ['vmdk', 'subvol', 'raw'];
+    if (disk.disk_format && UNSUPPORTED_RESIZE_FORMATS.indexOf(disk.disk_format) !== -1) {
+      return res.status(403).json({ error: '该磁盘格式（' + disk.disk_format + '）不支持扩容' });
     }
 
     var newSize = parseInt(req.body.capacity_gb);

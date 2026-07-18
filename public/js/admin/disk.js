@@ -183,7 +183,7 @@
   $.diskPage.diskSpecForm = ref({
     name: '', disk_type: 'NVME', storage_group_id: '', enabled: true,
     min_size_gb: 10, max_size_gb: 2000, price_per_gb: 0.8,
-    quarterly_discount: 0, yearly_discount: 0, storage_pool: '',
+    quarterly_discount: 0, yearly_discount: 0, storage_pool: '', disk_format: 'qcow2',
     mbps_rd: '', mbps_rd_max: '', mbps_wr: '', mbps_wr_max: '',
     iops_rd: '', iops_rd_max: '', iops_wr: '', iops_wr_max: '',
     description: ''
@@ -244,6 +244,26 @@
     return null;
   };
 
+  // 判断所选存储是否为文件系统类（需选择磁盘格式扩展名）
+  $.diskPage.isFileSystemStorage = function(poolName) {
+    var info = $.diskPage.getStorageInfo(poolName);
+    if (!info || !info.type) return false;
+    return ['dir', 'btrfs', 'nfs', 'cephfs'].indexOf(info.type) !== -1;
+  };
+
+  // 切换存储位置时联动重置磁盘格式
+  $.diskPage.onStoragePoolChange = function() {
+    if ($.diskPage.isFileSystemStorage($.diskPage.diskSpecForm.value.storage_pool)) {
+      // 文件系统存储默认 qcow2
+      if (!$.diskPage.diskSpecForm.value.disk_format) {
+        $.diskPage.diskSpecForm.value.disk_format = 'qcow2';
+      }
+    } else {
+      // 块设备存储清空格式
+      $.diskPage.diskSpecForm.value.disk_format = '';
+    }
+  };
+
   $.diskPage.openDiskSpecForm = async function(spec) {
     // 先加载 PVE 存储列表（供存储位置下拉）
     await $.diskPage.loadPveStorages();
@@ -256,6 +276,7 @@
         price_per_gb: spec.price_per_gb || 0.8,
         quarterly_discount: spec.quarterly_discount || 0, yearly_discount: spec.yearly_discount || 0,
         storage_pool: spec.storage_pool || '',
+        disk_format: spec.disk_format || 'qcow2',
         mbps_rd: spec.mbps_rd || '', mbps_rd_max: spec.mbps_rd_max || '',
         mbps_wr: spec.mbps_wr || '', mbps_wr_max: spec.mbps_wr_max || '',
         iops_rd: spec.iops_rd || '', iops_rd_max: spec.iops_rd_max || '',
@@ -266,7 +287,7 @@
       $.diskPage.diskSpecForm.value = {
         name: '', disk_type: 'NVME', storage_group_id: '', enabled: true,
         min_size_gb: 10, max_size_gb: 2000, price_per_gb: 0.8,
-        quarterly_discount: 0, yearly_discount: 0, storage_pool: '',
+        quarterly_discount: 0, yearly_discount: 0, storage_pool: '', disk_format: 'qcow2',
         mbps_rd: '', mbps_rd_max: '', mbps_wr: '', mbps_wr_max: '',
         iops_rd: '', iops_rd_max: '', iops_wr: '', iops_wr_max: '',
         description: ''
@@ -300,6 +321,7 @@
           quarterly_discount: parseInt(f.quarterly_discount) || 0,
           yearly_discount: parseInt(f.yearly_discount) || 0,
           storage_pool: f.storage_pool.trim(),
+          disk_format: f.disk_format || null,
           mbps_rd: f.mbps_rd || null, mbps_rd_max: f.mbps_rd_max || null,
           mbps_wr: f.mbps_wr || null, mbps_wr_max: f.mbps_wr_max || null,
           iops_rd: f.iops_rd || null, iops_rd_max: f.iops_rd_max || null,

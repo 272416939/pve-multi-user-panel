@@ -138,12 +138,12 @@ async function detachDiskFromVm(disk) {
 
 async function destroyExpiredDisk(disk) {
   try {
-    // 校验 volume_id 格式（安全防护）
-    if (!disk.volume_id || !/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_.\-]+$/.test(disk.volume_id)) {
+    // 校验 volume_id 格式（安全防护，允许 / 子路径兼容 DIR 存储）
+    if (!disk.volume_id || !/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_./\-]+$/.test(disk.volume_id)) {
       throw new Error('无效的卷标识');
     }
-    // 系统盘防护
-    if (/disk-0$/.test(disk.volume_id)) {
+    // 系统盘防护（兼容 .raw/.qcow2/.vmdk/.subvol 扩展名）
+    if (/disk-0(\.(raw|qcow2|vmdk|subvol))?$/.test(disk.volume_id)) {
       throw new Error('禁止销毁系统盘');
     }
 
@@ -358,8 +358,8 @@ async function importExistingDisks() {
         var storagePool = volParts[0];
         var volName = volParts[1];
         
-        // 使用 pvesh get 检查卷是否存在
-        var cmd = 'pvesh get /storage/' + storagePool + '/content/' + volName + ' --noborder 2>&1';
+        // 使用 pvesh get 检查卷是否存在（DIR 存储的 volName 含 / 子路径，需编码）
+        var cmd = 'pvesh get "/storage/' + storagePool + '/content/' + encodeURIComponent(volName) + '" --noborder 2>&1';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
         // 只有当命令明确返回错误（卷不存在）时才清理
         if (result.code !== 0 && result.stderr && result.stderr.indexOf('does not exist') !== -1) {
@@ -474,6 +474,7 @@ async function importExistingDisks() {
               storage_group_id: groupId,
               storage_pool: storagePool,
               disk_type: diskType,
+              disk_format: null, // legacy 磁盘随 VM，不限制格式
               capacity_gb: capacityGb,
               status: 'bound',
               price_per_gb: 0,

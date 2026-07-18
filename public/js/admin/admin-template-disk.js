@@ -78,6 +78,7 @@
               <div><strong>季  付：</strong><span v-if="spec.quarterly_discount">{{ spec.quarterly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).quarterly }}/GiB/月）</span><span v-else>-</span></div>
               <div><strong>年  付：</strong><span v-if="spec.yearly_discount">{{ spec.yearly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).yearly }}/GiB/月）</span><span v-else>-</span></div>
               <div><strong>存储池：</strong>{{ spec.storage_pool || '-' }}</div>
+              <div><strong>磁盘格式：</strong>{{ spec.disk_format || '默认' }}</div>
               <div><strong>带宽限速：</strong>读 {{ spec.mbps_rd || '无' }} MB/s (突发 {{ spec.mbps_rd_max || '无' }}) / 写 {{ spec.mbps_wr || '无' }} MB/s (突发 {{ spec.mbps_wr_max || '无' }})</div>
               <div><strong>IOPS 限速：</strong>读 {{ spec.iops_rd || '无' }} (突发 {{ spec.iops_rd_max || '无' }}) / 写 {{ spec.iops_wr || '无' }} (突发 {{ spec.iops_wr_max || '无' }})</div>
               <div class="mt-1 text-muted"><strong>备  注：</strong>{{ spec.description || '-' }}</div>
@@ -321,10 +322,20 @@
           </div>
           <div class="col-md-3">
             <label class="form-label">存储位置</label>
-            <select class="form-select" v-model="diskPage.diskSpecForm.value.storage_pool">
+            <select class="form-select" v-model="diskPage.diskSpecForm.value.storage_pool" @change="diskPage.onStoragePoolChange()">
               <option value="">请选择</option>
-              <option v-for="s in diskPage.pveStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} (剩余 {{ diskPage.formatStorageSize(s.avail_gb) }})</option>
+              <option v-for="s in diskPage.pveStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} ({{ s.type || '未知' }}，剩余 {{ diskPage.formatStorageSize(s.avail_gb) }})</option>
             </select>
+          </div>
+          <div class="col-md-3" v-if="diskPage.isFileSystemStorage(diskPage.diskSpecForm.value.storage_pool)">
+            <label class="form-label">磁盘格式</label>
+            <select class="form-select" v-model="diskPage.diskSpecForm.value.disk_format">
+              <option value="qcow2">qcow2（推荐，支持快照/扩容）</option>
+              <option value="raw">raw（最佳性能，不支持扩容）</option>
+              <option value="vmdk" v-if="diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool) && diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool).type !== 'btrfs'">vmdk（兼容 VMware，不支持扩容）</option>
+              <option value="subvol" v-if="diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool) && diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool).type === 'btrfs'">subvol（BTRFS 子卷，不支持扩容）</option>
+            </select>
+            <div class="form-text">该存储类型需选择磁盘格式</div>
           </div>
           <div class="col-md-3">
             <label class="form-label">季付折扣</label>

@@ -536,6 +536,7 @@ async function initDb() {
         iops_wr INT DEFAULT NULL,
         iops_wr_max INT DEFAULT NULL,
         storage_pool VARCHAR(100) NOT NULL,
+        disk_format VARCHAR(20) DEFAULT NULL,
         description TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -553,6 +554,7 @@ async function initDb() {
         storage_group_id INT NOT NULL,
         storage_pool VARCHAR(100) NOT NULL,
         disk_type VARCHAR(20) NOT NULL,
+        disk_format VARCHAR(20) DEFAULT NULL,
         capacity_gb INT NOT NULL,
         status ENUM('free','bound','grace','expired','destroyed') DEFAULT 'free',
         bind_vmid INT DEFAULT NULL,
@@ -673,6 +675,21 @@ async function migrateSchema() {
         console.log('[db] 迁移: disks.price_per_gb -> DECIMAL(10,2)');
     } catch (e) {
         console.error('[db] 迁移 disks.price_per_gb 失败:', e.message);
+    }
+
+    // 磁盘规格新增 disk_format 列（DIR/BTRFS 等文件系统存储需要扩展名）
+    try {
+        await execute("ALTER TABLE disk_specs ADD COLUMN disk_format VARCHAR(20) DEFAULT NULL AFTER storage_pool");
+        console.log('[db] 迁移: disk_specs.disk_format 列已添加');
+    } catch (e) {
+        if (!e.message.toLowerCase().includes('duplicate')) console.error('[db] 迁移 disk_specs.disk_format 失败:', e.message);
+    }
+    // 磁盘台账新增 disk_format 列（从 spec 复制，用于判断是否支持扩容）
+    try {
+        await execute("ALTER TABLE disks ADD COLUMN disk_format VARCHAR(20) DEFAULT NULL AFTER disk_type");
+        console.log('[db] 迁移: disks.disk_format 列已添加');
+    } catch (e) {
+        if (!e.message.toLowerCase().includes('duplicate')) console.error('[db] 迁移 disks.disk_format 失败:', e.message);
     }
 
     await safeAlter('vm_packages', 'sort_order', "INT NOT NULL DEFAULT 0");
@@ -2315,14 +2332,14 @@ module.exports = {
         getByGroup: (groupId) => queryAll('SELECT * FROM disk_specs WHERE storage_group_id = ? AND enabled = 1 ORDER BY id', [parseInt(groupId)]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO disk_specs (name, disk_type, storage_group_id, enabled, min_size_gb, max_size_gb, price_per_gb, quarterly_discount, yearly_discount, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max, storage_pool, description)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-                [data.name || '', data.disk_type, parseInt(data.storage_group_id), data.enabled ? 1 : 0, parseInt(data.min_size_gb) || 10, parseInt(data.max_size_gb) || 2000, parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null, data.storage_pool || '', data.description || null]
+                `INSERT INTO disk_specs (name, disk_type, storage_group_id, enabled, min_size_gb, max_size_gb, price_per_gb, quarterly_discount, yearly_discount, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max, storage_pool, disk_format, description)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                [data.name || '', data.disk_type, parseInt(data.storage_group_id), data.enabled ? 1 : 0, parseInt(data.min_size_gb) || 10, parseInt(data.max_size_gb) || 2000, parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null, data.storage_pool || '', data.disk_format || null, data.description || null]
             );
             return queryOne('SELECT * FROM disk_specs WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'disk_type', 'storage_group_id', 'enabled', 'min_size_gb', 'max_size_gb', 'price_per_gb', 'quarterly_discount', 'yearly_discount', 'mbps_rd', 'mbps_rd_max', 'mbps_wr', 'mbps_wr_max', 'iops_rd', 'iops_rd_max', 'iops_wr', 'iops_wr_max', 'storage_pool', 'description'];
+            const allowedColumns = ['name', 'disk_type', 'storage_group_id', 'enabled', 'min_size_gb', 'max_size_gb', 'price_per_gb', 'quarterly_discount', 'yearly_discount', 'mbps_rd', 'mbps_rd_max', 'mbps_wr', 'mbps_wr_max', 'iops_rd', 'iops_rd_max', 'iops_wr', 'iops_wr_max', 'storage_pool', 'disk_format', 'description'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -2355,9 +2372,9 @@ module.exports = {
         deleteByBindVmid: (vmid) => execute('DELETE FROM disks WHERE bind_vmid = ? AND is_legacy = 1', [parseInt(vmid)]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, is_legacy, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-                [data.volume_id, data.disk_name || '', data.spec_id || null, parseInt(data.user_id), parseInt(data.storage_group_id), data.storage_pool, data.disk_type, parseInt(data.capacity_gb), data.status || 'free', parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.auto_renew ? 1 : 0, data.is_legacy ? 1 : 0, data.expire_time || null, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null]
+                `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, disk_format, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, is_legacy, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                [data.volume_id, data.disk_name || '', data.spec_id || null, parseInt(data.user_id), parseInt(data.storage_group_id), data.storage_pool, data.disk_type, data.disk_format || null, parseInt(data.capacity_gb), data.status || 'free', parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.auto_renew ? 1 : 0, data.is_legacy ? 1 : 0, data.expire_time || null, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null]
             );
             return queryOne('SELECT * FROM disks WHERE id = ?', [result.insertId]);
         },

@@ -258,6 +258,25 @@
   };
 
   // ===== 扩容磁盘 =====
+  // 判断选中的磁盘是否无法扩容（legacy 或 不支持扩容的格式）
+  $.selectedDiskCannotResize = function() {
+    if ($.selectedDisks.value.length !== 1) return false;
+    var d = $.disks.value.find(function(x) { return x.id === $.selectedDisks.value[0]; });
+    if (!d) return false;
+    if (d.is_legacy) return true;
+    if (d.disk_format && ['vmdk', 'subvol', 'raw'].indexOf(d.disk_format) !== -1) return true;
+    return false;
+  };
+  // 选中磁盘无法扩容时的悬停提示文案
+  $.selectedDiskResizeTitle = function() {
+    if ($.selectedDisks.value.length !== 1) return '';
+    var d = $.disks.value.find(function(x) { return x.id === $.selectedDisks.value[0]; });
+    if (!d) return '';
+    if (d.is_legacy) return 'legacy磁盘随VM管理';
+    if (d.disk_format && ['vmdk', 'subvol', 'raw'].indexOf(d.disk_format) !== -1) return '该磁盘格式（' + d.disk_format + '）不支持扩容';
+    return '';
+  };
+
   $.resizeDisk = async function(disk) {
     if (!disk) return;
     $.resizeTargetDisk.value = disk;

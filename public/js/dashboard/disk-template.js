@@ -18,7 +18,7 @@
     <pv-button variant="outline" size="sm" @click="openBindModal" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'free') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">挂载</pv-button>
     <pv-button variant="outline" size="sm" @click="unbindDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'bound') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">卸载</pv-button>
     <pv-button variant="outline-danger" size="sm" @click="destroyDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status === 'bound') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">销毁</pv-button>
-    <pv-button variant="outline-warning" size="sm" @click="resizeDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">扩容</pv-button>
+    <pv-button variant="outline-warning" size="sm" @click="resizeDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || selectedDiskCannotResize()" :title="selectedDiskResizeTitle()">扩容</pv-button>
   </div>
 
   <!-- 加载中 -->
@@ -127,6 +127,9 @@
             <strong>IOPS 限速：</strong>读 {{ selectedSpec.iops_rd || '无' }} (突发 {{ selectedSpec.iops_rd_max || '无' }}) / 写 {{ selectedSpec.iops_wr || '无' }} (突发 {{ selectedSpec.iops_wr_max || '无' }})
           </div>
           <p class="text-muted small mb-0">{{ selectedSpec.description || '暂无备注' }}</p>
+          <div v-if="selectedSpec.disk_format && ['vmdk','subvol','raw'].indexOf(selectedSpec.disk_format) !== -1" class="alert alert-warning small py-1 px-2 mt-2 mb-0">
+            <i class="bi bi-exclamation-triangle"></i> 该磁盘格式不支持扩容，购买后无法增加容量
+          </div>
         </div>
         <div class="mb-3">
           <label class="form-label">硬盘名称 <span class="small text-muted">{{ (diskPurchaseForm.disk_name || '').length }}/30</span></label>
