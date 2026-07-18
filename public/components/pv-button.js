@@ -14,6 +14,7 @@
       type: { type: String, default: 'button' }
     },
     emits: ['click', 'pv-click'],
+    inheritAttrs: false,
     methods: {
       handleClick: function(e) {
         if (this.disabled) { e.preventDefault(); e.stopPropagation(); return; }
@@ -40,12 +41,26 @@
         ? [h('span', { attrs: { 'aria-hidden': 'true' } }, '\u00d7')]
         : (this.$slots.default ? this.$slots.default() : []);
 
-      return h('button', {
+      // 透传 fallthrough 属性（title、data-*、aria-* 等），让 :title 悬停提示生效
+      var btnAttrs = {
         type: this.type,
         disabled: this.disabled || undefined,
-        class: cls,
-        onClick: this.handleClick
-      }, children);
+        class: cls
+      };
+      // Vue 3 中 $attrs 包含未声明为 props 的属性（title、data-*、aria-* 等）
+      // 注意：class/style 已单独处理；on* 开头的会被 Vue 当作事件监听器，不应作为 attr
+      if (this.$attrs && typeof this.$attrs === 'object') {
+        for (var key in this.$attrs) {
+          if (key === 'class' || key === 'style') continue; // 已有 class 处理
+          if (/^on[A-Z]/.test(key)) continue; // 事件监听器由 Vue 单独处理，避免重复
+          if (Object.prototype.hasOwnProperty.call(this.$attrs, key)) {
+            btnAttrs[key] = this.$attrs[key];
+          }
+        }
+      }
+      btnAttrs.onClick = this.handleClick;
+
+      return h('button', btnAttrs, children);
     }
   };
 
