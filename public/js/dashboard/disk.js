@@ -37,10 +37,13 @@
   $.renewPeriodCount = ref(1);
   $.renewAmount = ref(0);
 
-  // 计算属性：从 diskOptions 安全提取 groups（Vue 3 模板自动解包）
+  // 计算属性：从 diskOptions 安全提取 groups（按 sort_order 排序）
   $.diskOptionsGroups = computed(function() {
     var opts = $.diskOptions.value;
-    return (opts && opts.groups) ? opts.groups : [];
+    var groups = (opts && opts.groups) ? opts.groups : [];
+    return groups.slice().sort(function(a, b) {
+      return (a.sort_order || 0) - (b.sort_order || 0) || (a.id || 0) - (b.id || 0);
+    });
   });
 
   // 获取 token 的辅助函数
