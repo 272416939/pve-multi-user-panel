@@ -182,9 +182,9 @@
             <option v-for="vm in userVmsForBind" :key="vm.id" :value="vm.vm_id">{{ vm.name || ('VM ' + vm.vm_id) }}{{ vm.status && vm.status.status !== 'stopped' ? '（运行中）' : '' }}</option>
           </select>
           <div v-if="userVmsForBind.length === 0" class="text-warning small mt-1">没有可用的虚拟机</div>
-          <div v-if="bindTargetVmid" class="text-warning small mt-1">
+          <div v-if="bindTargetVmid" class="text-success small mt-1">
             <template v-for="vm in userVmsForBind" :key="vm.id">
-              <span v-if="vm.vm_id === parseInt(bindTargetVmid) && vm.status && vm.status.status !== 'stopped'">⚠ 虚拟机正在运行，挂载后需要关机再开机才能正常使用硬盘</span>
+              <span v-if="vm.vm_id === parseInt(bindTargetVmid) && vm.status && vm.status.status !== 'stopped'">✅ 支持热插拔，正在运行的虚拟机也可以挂载</span>
             </template>
           </div>
         </div>
@@ -253,8 +253,8 @@
         </div>
         <!-- 提示 -->
         <p class="text-danger small mb-1"><i class="bi bi-exclamation-triangle"></i> 扩容后无法缩容</p>
-        <p v-if="resizeTargetDisk && resizeTargetDisk.status === 'bound'" class="text-warning small mb-0">
-          ⚠ 磁盘已挂载到虚拟机，扩容完成后需要关闭虚拟机再开机（非重启）才能生效
+        <p v-if="resizeTargetDisk && resizeTargetDisk.status === 'bound'" class="text-success small mb-0">
+          ✅ 支持热插拔扩容，无需关机
         </p>
       </div>
       <div class="modal-footer d-flex gap-2" style="border-top:1px solid var(--border-color);">

@@ -239,7 +239,7 @@
   // ===== 卸载磁盘 =====
   $.unbindDisk = async function(disk) {
     if (!disk) return;
-    var ok = await customConfirm('确定卸载磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n注意：请先关闭虚拟机');
+    var ok = await customConfirm('确定卸载磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\nSCSI 支持热插拔，无需关闭虚拟机');
     if (!ok) return;
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/unbind', {
