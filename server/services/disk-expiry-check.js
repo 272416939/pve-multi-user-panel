@@ -117,7 +117,7 @@ async function detachDiskFromVm(disk) {
     var sshConfig = await getPveSshConfig();
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
 
-    var cmd = 'qm set ' + safeVmid + ' --delete ' + disk.bind_bus + safeDev;
+    var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + disk.bind_bus + safeDev;
     var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
     if (result.code !== 0) {
       throw new Error('分离磁盘失败: ' + (result.stderr || result.stdout));

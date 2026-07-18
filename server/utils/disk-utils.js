@@ -150,13 +150,13 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
   return { bus: bus, dev: parseInt(dev) };
 }
 
-// 卸载磁盘 - qm set <vmid> --delete <bus><dev>
-// SCSI 支持热插拔，无需检查 VM 状态
+// 卸载磁盘 - qm unlink <vmid> --idlist <bus><dev>
+// 使用 qm unlink 而非 qm set --delete，兼容 Windows VM（不会留下划线状态）
 async function unbindDisk(vmid, bus, dev) {
   var safeVmid = validateParam('vmid', vmid);
   var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
 
-  var cmd = 'qm set ' + safeVmid + ' --delete ' + busDev;
+  var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + busDev;
   await runSshCommand(cmd);
 }
 
