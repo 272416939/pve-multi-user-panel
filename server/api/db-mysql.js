@@ -2377,7 +2377,9 @@ module.exports = {
         },
         // 硬删除：仅允许删除已销毁状态的磁盘记录（清理已销毁的磁盘记录用）
         hardDelete: (id) => execute('DELETE FROM disks WHERE id = ? AND status = ?', [parseInt(id), 'destroyed']),
-        getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)")
+        getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)"),
+        // 更新绑定到指定 VMID 的 legacy 磁盘的 user_id（VM 换绑时同步）
+        updateUserId: (vmid, userId) => execute('UPDATE disks SET user_id = ?, updated_at = ? WHERE bind_vmid = ? AND is_legacy = 1', [parseInt(userId), mysqlNow(), parseInt(vmid)])
     },
 
     // 磁盘生命周期配置

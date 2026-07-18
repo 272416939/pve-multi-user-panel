@@ -176,6 +176,15 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     if (existingVms.find(vm => vm.vm_id === parsedVmId && vm.user_id === parsedUserId)) {
         return res.status(400).json({ error: '该虚拟机已分配给此用户' });
     }
+
+    // 如果该 VMID 之前已分配给其他用户，先清理旧记录并同步 legacy 磁盘 user_id
+    var oldVms = existingVms.filter(function(v) { return v.vm_id === parsedVmId; });
+    for (var oi = 0; oi < oldVms.length; oi++) {
+        // 同步更新绑定在该 VM 上的 legacy 磁盘的 user_id
+        await db.disks.updateUserId(parsedVmId, parsedUserId);
+        // 删除旧分配记录
+        await db.vms.delete(oldVms[oi].id);
+    }
  
     const newVm = await db.vms.create({
         vm_id: parsedVmId,
@@ -325,6 +334,8 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
         updates.user_id = parseInt(user_id);
         updates.reminderSent = false;
         await db.vms.reminders.clear(vmId);
+        // 同步更新绑定在该 VM 上的 legacy 磁盘的 user_id
+        await db.disks.updateUserId(vm.vm_id, parseInt(user_id));
     }
 
     // MAC 分组变更
