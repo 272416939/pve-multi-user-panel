@@ -524,7 +524,7 @@ async function initDb() {
         enabled TINYINT(1) DEFAULT 1,
         min_size_gb INT NOT NULL DEFAULT 10,
         max_size_gb INT NOT NULL DEFAULT 2000,
-        price_per_gb DECIMAL(10,4) NOT NULL DEFAULT 0.0000,
+        price_per_gb DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         quarterly_discount INT DEFAULT 0,
         yearly_discount INT DEFAULT 0,
         mbps_rd INT DEFAULT NULL,
@@ -558,7 +558,7 @@ async function initDb() {
         bind_vmid INT DEFAULT NULL,
         bind_bus VARCHAR(10) DEFAULT NULL,
         bind_dev INT DEFAULT NULL,
-        price_per_gb DECIMAL(10,4) NOT NULL,
+        price_per_gb DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         quarterly_discount INT DEFAULT 0,
         yearly_discount INT DEFAULT 0,
         auto_renew TINYINT(1) DEFAULT 0,
@@ -659,6 +659,21 @@ async function migrateSchema() {
     await safeAlter('vm_packages', 'sold_count', "INT NOT NULL DEFAULT 0");
     await safeAlter('lxc_packages', 'stock', 'INT');
     await safeAlter('lxc_packages', 'sold_count', "INT NOT NULL DEFAULT 0");
+
+    // 价格精度统一为 2 位小数（原 4 位：DECIMAL(10,4) -> DECIMAL(10,2)）
+    // 幂等：MODIFY COLUMN 即使类型已是目标类型也不会报错
+    try {
+        await execute("ALTER TABLE disk_specs MODIFY COLUMN price_per_gb DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+        console.log('[db] 迁移: disk_specs.price_per_gb -> DECIMAL(10,2)');
+    } catch (e) {
+        console.error('[db] 迁移 disk_specs.price_per_gb 失败:', e.message);
+    }
+    try {
+        await execute("ALTER TABLE disks MODIFY COLUMN price_per_gb DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+        console.log('[db] 迁移: disks.price_per_gb -> DECIMAL(10,2)');
+    } catch (e) {
+        console.error('[db] 迁移 disks.price_per_gb 失败:', e.message);
+    }
 
     await safeAlter('vm_packages', 'sort_order', "INT NOT NULL DEFAULT 0");
     await safeAlter('lxc_packages', 'sort_order', "INT NOT NULL DEFAULT 0");

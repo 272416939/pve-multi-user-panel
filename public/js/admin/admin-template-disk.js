@@ -74,7 +74,7 @@
             <hr class="my-2">
             <div class="small">
               <div><strong>起售量：</strong>{{ spec.min_size_gb }} GiB &nbsp; <strong>截止量：</strong>{{ spec.max_size_gb }} GiB</div>
-              <div><strong>月  价：</strong>￥{{ spec.price_per_gb }} 元/GiB</div>
+              <div><strong>月  价：</strong>￥{{ parseFloat(spec.price_per_gb).toFixed(2) }} 元/GiB</div>
               <div v-if="spec.quarterly_discount"><strong>季  付：</strong>{{ spec.quarterly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).quarterly }}/GiB/月）</div>
               <div v-if="spec.yearly_discount"><strong>年  付：</strong>{{ spec.yearly_discount }}% off（￥{{ diskPage.calcDiscountedPrice(spec).yearly }}/GiB/月）</div>
               <div><strong>存储池：</strong>{{ spec.storage_pool }}</div>
@@ -316,7 +316,7 @@
             <label class="form-label">每 GiB 月单价</label>
             <div class="input-group">
               <span class="input-group-text">￥</span>
-              <input class="form-control" type="number" step="0.0001" v-model.number="diskPage.diskSpecForm.value.price_per_gb" min="0">
+              <input class="form-control" type="number" step="0.01" v-model.number="diskPage.diskSpecForm.value.price_per_gb" min="0">
             </div>
           </div>
           <div class="col-md-3">

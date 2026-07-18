@@ -328,12 +328,12 @@
     }
   };
 
-  // 计算折扣后单价
+  // 计算折扣后单价（显示用 2 位小数，计算时用原始 parseFloat 值保证精度）
   $.diskPage.calcDiscountedPrice = function(spec) {
     var monthly = parseFloat(spec.price_per_gb) || 0;
     return {
-      quarterly: (monthly * (1 - (parseInt(spec.quarterly_discount) || 0) / 100)).toFixed(4),
-      yearly: (monthly * (1 - (parseInt(spec.yearly_discount) || 0) / 100)).toFixed(4)
+      quarterly: (monthly * (1 - (parseInt(spec.quarterly_discount) || 0) / 100)).toFixed(2),
+      yearly: (monthly * (1 - (parseInt(spec.yearly_discount) || 0) / 100)).toFixed(2)
     };
   };
 

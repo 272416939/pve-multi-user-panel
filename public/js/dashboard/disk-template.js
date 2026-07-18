@@ -105,7 +105,7 @@
           <div v-if="diskPurchaseForm.storage_group_id" class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm" v-for="s in getSpecsByGroup(diskPurchaseForm.storage_group_id)" :key="s.id" :class="diskPurchaseForm.spec_id === s.id ? 'btn-primary' : 'btn-outline-secondary'" @click="diskPurchaseForm.spec_id = s.id; onSpecChange()">
               <div>{{ s.name }} ({{ s.disk_type }})</div>
-              <small class="d-block">￥{{ s.price_per_gb }}/GiB/月 <span v-if="s.quarterly_discount">季{{s.quarterly_discount}}%off</span> <span v-if="s.yearly_discount">年{{s.yearly_discount}}%off</span></small>
+              <small class="d-block">￥{{ parseFloat(s.price_per_gb).toFixed(2) }}/GiB/月 <span v-if="s.quarterly_discount">季{{s.quarterly_discount}}%off</span> <span v-if="s.yearly_discount">年{{s.yearly_discount}}%off</span></small>
             </button>
             <span v-if="getSpecsByGroup(diskPurchaseForm.storage_group_id).length === 0" class="text-muted small">该分组暂无可用规格</span>
           </div>

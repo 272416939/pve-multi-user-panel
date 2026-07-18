@@ -178,6 +178,8 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
     if (!data.min_size_gb || data.min_size_gb < 1) return res.status(400).json({ error: '最低容量必须大于 0' });
     if (!data.max_size_gb || data.max_size_gb < data.min_size_gb) return res.status(400).json({ error: '最大容量必须大于等于最低容量' });
     if (data.price_per_gb === undefined || data.price_per_gb === null || data.price_per_gb < 0) return res.status(400).json({ error: '请输入有效的单价' });
+    // 价格精度统一 2 位小数，超过 2 位时按 2 位舍入（避免 DECIMAL(10,2) 静默截断）
+    var pricePerGbVal = Math.round(parseFloat(data.price_per_gb) * 100) / 100;
 
     var spec = await db.diskSpecs.create({
       name: data.name.trim(),
@@ -186,7 +188,7 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
       enabled: data.enabled ? 1 : 0,
       min_size_gb: parseInt(data.min_size_gb),
       max_size_gb: parseInt(data.max_size_gb),
-      price_per_gb: parseFloat(data.price_per_gb),
+      price_per_gb: pricePerGbVal,
       quarterly_discount: parseInt(data.quarterly_discount) || 0,
       yearly_discount: parseInt(data.yearly_discount) || 0,
       mbps_rd: data.mbps_rd || null, mbps_rd_max: data.mbps_rd_max || null,
@@ -213,6 +215,7 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
     if (['NVME', 'SATA', 'HDD', 'U2'].indexOf(data.disk_type) === -1) return res.status(400).json({ error: '无效的硬盘类型' });
     if (!data.storage_group_id) return res.status(400).json({ error: '请选择存储分组' });
     if (!data.storage_pool || !data.storage_pool.trim()) return res.status(400).json({ error: '请选择存储位置' });
+    var pricePerGbVal2 = Math.round(parseFloat(data.price_per_gb) * 100) / 100;
 
     var spec = await db.diskSpecs.update(id, {
       name: data.name.trim(),
@@ -221,7 +224,7 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
       enabled: data.enabled ? 1 : 0,
       min_size_gb: parseInt(data.min_size_gb),
       max_size_gb: parseInt(data.max_size_gb),
-      price_per_gb: parseFloat(data.price_per_gb),
+      price_per_gb: pricePerGbVal2,
       quarterly_discount: parseInt(data.quarterly_discount) || 0,
       yearly_discount: parseInt(data.yearly_discount) || 0,
       mbps_rd: data.mbps_rd || null, mbps_rd_max: data.mbps_rd_max || null,
