@@ -1,13 +1,46 @@
 # Changelog
 
-## [2.31.0] - 2026-07-15
+## [2.32.0] - 2026-07-18
+
+### Added
+- feat(disk): 完整的数据盘管理系统
+  - 用户端：购买/挂载/卸载/扩容/续费数据盘，支持 NVME/SATA/HDD/U2 规格
+  - Admin 端：存储分组管理、硬盘规格管理（含 QoS 限速参数）
+  - Admin 端：生命周期参数配置（预警/宽限期/保留期/自动续费）
+  - Admin 端：数据盘列表查看/编辑/销毁，导入存量磁盘
+  - Admin 端：数据盘编辑功能（修改名称、存储分组、规格）
+- feat(legacy-disk): 存量磁盘导入与计费隔离
+  - 导入磁盘标记为 `is_legacy`，随 VM 计费，不独立续费
+  - VM 续费时自动同步 legacy 磁盘到期时间
+  - VM 移除/销毁时自动删除 legacy 磁盘台账记录（PVE 磁盘保留）
+  - 磁盘到期巡检跳过 legacy 磁盘
+  - 导入前自动清理 PVE 中已不存在的孤立记录
+  - 用户端 legacy 磁盘禁用独立操作（挂载/卸载/销毁/扩容/续费）
+  - 后端所有操作端点增加 is_legacy 安全检查
+- feat(disk-import): 导入时增加 loading 动画弹窗，完成后弹出结果详情
+
+### Changed
+- 新购磁盘名称限制从 8 字符放宽至 30 字符（适配 `imported-108-scsi1` 格式）
+- 生命周期表单从表格布局改为网格布局，更清晰易用
 
 ### Fixed
-- fix(vnc): 修复 VNC 控制台鼠标点击偏移问题
-  - `scaleViewport` 从 `connectVnc()` 移到 `onConnected()` 回调中设置
-  - 确保服务器 framebuffer 尺寸已知后再计算缩放比例，避免 viewport 为 0 时坐标映射错误
-  - CSS 修复：`#screen` 添加 `overflow: hidden` 防止滚动条干扰坐标计算
-  - Canvas 添加 `box-sizing: content-box` 和 `touch-action: none` 确保精确的 `getBoundingClientRect()`
+- fix(disk-import): 修复 INSERT 列数与占位符不匹配导致的导入失败
+- fix(admin-disk): 修复表格表头错位
+- fix(disk-import): 孤立删除使用硬删除绕过 destroyed 状态检查
+- fix(disk-import): 仅清理 legacy 磁盘，不清理用户购买的独立磁盘
+- fix(disk-import): 清理仅限 bound/free 状态的 legacy 孤立记录
+- fix(disk-import): 修复孤立磁盘检查命令语法错误
+- fix(disk-import): 强化清理条件，需明确返回 "does not exist" 才清理
+- fix(ui): 表格容器 overflow:hidden 裁剪 R 角溢出（admin.css / dashboard.css）
+- fix(ui): 全面修复按钮间距 - 所有 modal-footer 加 gap-2 + 磁盘操作列加 .table-actions
+- fix(ui): 登录页 2FA 验证/返回按钮加 gap-2 间距
+- fix(ui): admin 硬盘设置卡片按钮加 gap-2（存储分组/规格/生命周期）
+- fix(ui): 选中行高亮使用 box-shadow 适配表格 R 角
+- fix(ui): 亮色/暗色模式选中行高亮分别适配
+
+### Notes
+- ⚠️ 重要：需在 PVE 上创建 VMID 9999 的中转虚拟机（详见 README.md 数据盘管理章节）
+- 已导入的存量磁盘会自动迁移标记为 `is_legacy`，无需重新导入
 - fix(vnc): 添加 Win 键按钮事件处理（此前按钮无响应）
 
 ## [2.30.1] - 2026-07-12

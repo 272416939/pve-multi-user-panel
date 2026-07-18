@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.29.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.32.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -95,16 +95,27 @@
 | 37 | **备份进度 WS 推送** | 备份/恢复完成后 pushToUser 实时通知，消灭 10s 前端轮询 |
 | 38 | **PVE 状态复用** | GET /user/vms 和 /user/lxc 优先命中 pushStatus 缓存，PVE API 调用减半 |
 
+### 💾 数据盘管理（v2.32.0 新增）
+| # | 功能 | 说明 |
+|---|------|------|
+| 45 | **数据盘购买** | 用户自助购买 NVME/SATA/HDD/U2 数据盘，挂载到 VM |
+| 46 | **数据盘续费** | 独立计费周期（月/季/年），自动续费开关 |
+| 47 | **数据盘扩容** | 随时扩容，按新容量价差收费，扩容部分独立计费 |
+| 48 | **数据盘挂载/卸载** | 仅支持已关机的 VM，挂载时自动注入 QoS 限速参数 |
+| 49 | **存量磁盘导入** | 管理员手动扫描 PVE 中未管理的存量数据盘并导入台账 |
+| 50 | **Legacy 磁盘标识** | 导入的存量磁盘标记为 `legacy`，随 VM 计费，不独立续费 |
+| 51 | **数据盘管理（Admin）** | 管理后台查看/编辑/销毁所有用户数据盘，支持存储分组和规格管理 |
+
 ### 🗄️ 基础设施（v1.8.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 39 | **MySQL 数据库** | MySQL 5.7+ 唯一驱动，utf8mb4 编码，自动建表迁移 |
-| 40 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
-| 41 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
-| 42 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
-| 43 | **EJS 模板缓存** | 编译后缓存在内存，`NODE_ENV=production` 自动启用 |
-| 44 | **Gzip 压缩** | compression 中间件，所有响应压缩 60-80% |
-| 45 | **资源预加载** | preconnect / dns-prefetch / script defer 优化首屏加载 |
+| 52 | **MySQL 数据库** | MySQL 5.7+ 唯一驱动，utf8mb4 编码，自动建表迁移 |
+| 53 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
+| 54 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
+| 55 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
+| 56 | **EJS 模板缓存** | 编译后缓存在内存，`NODE_ENV=production` 自动启用 |
+| 57 | **Gzip 压缩** | compression 中间件，所有响应压缩 60-80% |
+| 58 | **资源预加载** | preconnect / dns-prefetch / script defer 优化首屏加载 |
 
 ---
 
@@ -239,44 +250,47 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 │   │   ├── safe-error.js      # 统一错误脱敏（safeError）
 │   │   ├── username-blacklist.js
 │   │   └── with-transaction.js # MySQL 事务封装
-│   ├── routes/                # 路由模块（16 个）
-│   │   ├── auth.js            # 认证 + 2FA + 忘记密码
-│   │   ├── user.js            # 用户中心 + 2FA + 设备 + Push ticket
-│   │   ├── admin-user.js      # 用户管理
-│   │   ├── vm.js              # VM 管理
-│   │   ├── lxc.js             # LXC 管理
-│   │   ├── snapshot.js        # 快照
-│   │   ├── backup.js          # 备份恢复
-│   │   ├── cdk.js             # CDK 兑换码
-│   │   ├── wallet.js          # 充值/续费/交易流水 + 支付回调
-│   │   ├── admin-wallet.js    # 管理后台交易流水/CSV 导出
-│   │   ├── message.js         # 站内消息
-│   │   ├── admin-config.js    # 系统配置（SMTP/到期/快照/支付等）
-│   │   ├── network.js         # 端口转发 + DHCP + ikuai 同步
-│   │   ├── package.js         # VM/LXC 套餐订购
-│   │   ├── template.js        # VM/LXC 模板管理
-│   │   └── ikuai.js           # ikuai MAC 分组
-│   ├── websocket/
-│   │   ├── vnc-proxy.js       # VNC WebSocket 代理（ticket + Redis 校验）
-│   │   ├── terminal-proxy.js  # xterm.js SSH PTY 代理（JWT HS256 固定）
-│   │   └── push-proxy.js      # 统一状态推送（未读角标/实时监控/备份进度）
-│   ├── services/
-│   │   ├── expiry-check.js    # 到期检查与提醒
-│   │   ├── backup-polling.js  # 备份/恢复进度轮询
-│   │   ├── ikuai-sync.js      # ikuai 定时同步
-│   │   └── dhcp.js            # DHCP 静态绑定工具
-│   ├── schedule/
-│   │   └── tasks.js           # 定时任务
-│   ├── api/
-│   │   ├── db.js              # 数据库模块（MySQL 驱动加载）
-│   │   ├── db-mysql.js        # MySQL 驱动（mysql2/promise 连接池 + 列名白名单）
-│   │   ├── redis.js           # Redis 缓存客户端（可选）
-│   │   ├── pve-api.js         # PVE REST API 封装
-│   │   ├── ikuai-api.js       # ikuai API 封装
-│   │   └── ssh-exec.js        # SSH 执行工具（vmid 白名单 + stdin 传密码）
-│   └── sdk/
-│       ├── ikuai-sdk/         # ikuai SDK（ikuai-sdk.js + ikuai-sdk.mjs）
-│       └── pay/               # 支付网关 SDK（V1 MD5 + V2 RSA）
+	│   ├── routes/                # 路由模块（18 个）
+	│   │   ├── auth.js            # 认证 + 2FA + 忘记密码
+	│   │   ├── user.js            # 用户中心 + 2FA + 设备 + Push ticket
+	│   │   ├── admin-user.js      # 用户管理
+	│   │   ├── vm.js              # VM 管理
+	│   │   ├── lxc.js             # LXC 管理
+	│   │   ├── snapshot.js        # 快照
+	│   │   ├── backup.js          # 备份恢复
+	│   │   ├── cdk.js             # CDK 兑换码
+	│   │   ├── wallet.js          # 充值/续费/交易流水 + 支付回调
+	│   │   ├── admin-wallet.js    # 管理后台交易流水/CSV 导出
+	│   │   ├── message.js         # 站内消息
+	│   │   ├── admin-config.js    # 系统配置（SMTP/到期/快照/支付等）
+	│   │   ├── network.js         # 端口转发 + DHCP + ikuai 同步
+	│   │   ├── package.js         # VM/LXC 套餐订购
+	│   │   ├── template.js        # VM/LXC 模板管理
+	│   │   ├── ikuai.js           # ikuai MAC 分组
+	│   │   ├── disk.js            # 💾 用户侧数据盘 CRUD（购买/挂载/卸载/扩容/销毁/续费）
+	│   │   └── admin-disk.js      # 💾 管理后台数据盘/存储分组/规格/生命周期管理
+	│   ├── websocket/
+	│   │   ├── vnc-proxy.js       # VNC WebSocket 代理（ticket + Redis 校验）
+	│   │   ├── terminal-proxy.js  # xterm.js SSH PTY 代理（JWT HS256 固定）
+	│   │   └── push-proxy.js      # 统一状态推送（未读角标/实时监控/备份进度）
+	│   ├── services/
+	│   │   ├── expiry-check.js    # 到期检查与提醒
+	│   │   ├── backup-polling.js  # 备份/恢复进度轮询
+	│   │   ├── ikuai-sync.js      # ikuai 定时同步
+	│   │   ├── dhcp.js            # DHCP 静态绑定工具
+	│   │   └── disk-expiry-check.js # 💾 磁盘到期巡检（预警/宽限期/停机分离/销毁回收）
+	│   ├── schedule/
+	│   │   └── tasks.js           # 定时任务
+	│   ├── api/
+	│   │   ├── db.js              # 数据库模块（MySQL 驱动加载）
+	│   │   ├── db-mysql.js        # MySQL 驱动（mysql2/promise 连接池 + 列名白名单）
+	│   │   ├── redis.js           # Redis 缓存客户端（可选）
+	│   │   ├── pve-api.js         # PVE REST API 封装
+	│   │   ├── ikuai-api.js       # ikuai API 封装
+	│   │   └── ssh-exec.js        # SSH 执行工具（vmid 白名单 + stdin 传密码）
+	│   └── sdk/
+	│       ├── ikuai-sdk/         # ikuai SDK（ikuai-sdk.js + ikuai-sdk.mjs）
+	│       └── pay/               # 支付网关 SDK（V1 MD5 + V2 RSA）
 ├── views/                     # EJS 模板（服务端渲染）
 │   ├── partials/
 │   │   ├── header.ejs         # 统一顶栏（品牌/刷新/主题/消息/用户菜单）
@@ -403,6 +417,7 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 | **SMTP 配置** | 邮件服务器，到期提醒天数，备份快照配置 |
 | **CDK 管理** | 生成/分发/导出 CDK 兑换码 |
 | **消息管理** | 全体推送/指定用户发送站内消息 |
+| **硬盘设置** | 💾 **存储分组/规格管理、生命周期配置、数据盘管理（查看/编辑/销毁/导入存量磁盘）** |
 | **系统更新** | 检查更新、查看更新日志、一键更新 |
 
 ### 普通用户功能
@@ -411,6 +426,7 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 |--------|------|
 | **我的虚拟机** | 查看/操作 VM，VNC，端口转发，CDK 兑换续费 |
 | **我的 LXC 容器** | 查看/操作 LXC，终端，端口转发，重置密码 |
+| **硬盘管理** | 💾 购买/挂载/卸载/扩容/续费数据盘，支持按规格选购 |
 | **用户中心** | 头像/邮箱/密码，2FA 设置，备忘录，消息管理 |
 | **账户余额** | 支付宝/微信在线充值，余额续费，交易明细查询 |
 
@@ -429,7 +445,70 @@ VM 和 LXC 管理区域各有一个「网络」子标签页，用于管理端口
 - 到期后自动关机，续费提醒每日 1 次，最多 3 天
 - 提醒持久化到数据库/Redis，重启不重复发送
 
-### MySQL 配置
+### 💾 数据盘管理（Admin 硬盘设置）
+
+#### 磁盘中转虚拟机（VMID 9999）
+
+系统使用 **PVE 的 `pvesm alloc` 命令创建游离磁盘**，该命令要求传入一个真实存在的 VMID 作为参数（PVE 内部会创建 `vm-{vmid}-disk-{rand}` 格式的卷名）。因此 **需要在 PVE 上创建一个专用的中转虚拟机**。
+
+**中转虚拟机要求：**
+- **VMID：** `9999`（默认，可在系统设置中修改 `disk:temp_vmid` 配置项）
+- **状态：** 可以关机或开机（不会影响使用，因为 pvesm alloc 不需要 VM 运行）
+- **资源：** 极低，可以是最小配置（1 核、128MB 内存、无系统盘即可）
+- **用途：** 仅作为 `pvesm alloc` 创建磁盘卷时的 ID 占位符
+
+**为什么需要中转 VM？**
+1. **创建磁盘：** `pvesm alloc <storage> <vmid> <volname> <size>` → VMID `9999`
+2. **扩容游离磁盘：** 暂挂到中转 VM 的 `scsi30` 位置 → `qm resize` → 扩容完成后自动卸载
+3. **PVE API 限制：** `pvesm alloc` 的 vmid 参数必须是一个真实存在的 VM ID，不能传 `0` 或任意值
+
+**如何创建中转 VM：**
+```bash
+# SSH 到 PVE 节点，创建一个最小配置的虚拟机
+qm create 9999 --name "disk-transfer-vm" --memory 128 --cores 1 --net0 virtio,bridge=vmbr0
+```
+
+> **注意：** 如果使用非 `9999` 的 VMID，请在系统设置中配置 `disk:temp_vmid` 参数。中转 VM 创建后无需安装操作系统，也不会产生实际资源占用。
+
+#### 存储分组管理
+
+管理员可在「硬盘设置 > 存储分组管理」中创建/编辑/删除存储分组（如 NVME-A、SATA-B），用于对磁盘类型进行分类。
+
+#### 硬盘规格管理
+
+管理员可在「硬盘设置 > 硬盘规格管理」中配置磁盘规格：
+- 类型（NVME/SATA/HDD/U2）、存储分组绑定
+- 容量范围、单价、季付/年付折扣
+- QoS 限速参数（MBPS/IOPS 读写限速及突发峰值）
+- 存储池关联（展示实时容量使用率）
+
+#### 生命周期配置
+
+管理员可在「硬盘设置 > 生命周期参数配置」中设置：
+- 预警提前天数、宽限期时长
+- 优雅关机超时、保留期时长
+- 自动续费提前天数
+- 预警/宽限期提醒频率
+
+#### 数据盘管理（Admin）
+
+管理员可在「硬盘设置 > 数据盘管理」中：
+- **查看：** 所有用户的数据盘列表（ID/用户/名称/存储分组/规格/容量/状态/绑定VM/到期时间）
+- **编辑：** 修改磁盘名称、存储分组、规格
+- **销毁：** 管理员销毁（3 天内全额退款，超过 3 天按剩余时间比例）
+- **导入存量磁盘：** 扫描 PVE 中未管理的存量数据盘，自动匹配规格并导入台账（标记为 `legacy`，随 VM 续费）
+
+#### 用户硬盘管理
+
+用户可在仪表盘「硬盘管理」中：
+- **购买：** 选择规格/容量/周期，余额支付
+- **挂载：** 将空闲磁盘挂载到自己的 VM（需 VM 关机），自动注入 QoS 限速
+- **卸载：** 从 VM 卸载磁盘
+- **扩容：** 随时扩容，按价差收费
+- **续费：** 月/季/年续费，支持自动续费
+- **销毁：** 15 天内按比例退款，超过 15 天无退款
+
+> **Legacy 磁盘说明：** 通过「导入存量磁盘」导入的磁盘标记为 `(随VM)`，不参与独立计费和续费，到期时间随绑定 VM 同步。VM 被移除时，legacy 磁盘台账自动删除（PVE 磁盘保留，可重新导入）。
 
 ```bash
 # .env 中设置
