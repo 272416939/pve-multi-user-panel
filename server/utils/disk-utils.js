@@ -136,6 +136,16 @@ async function createDisk(storage, sizeGb, userId, tempVmid, diskFormat) {
   return volumeId;
 }
 
+// 从 volume_id 推断磁盘格式（如 vm-9999-disk-0.raw -> raw）
+// 用于 qm set 时自动附加 format=xxx 参数（DIR 存储的 raw 文件必须显式指定 format）
+function inferDiskFormat(volumeId) {
+  if (!volumeId) return '';
+  var parts = volumeId.split(':');
+  var volName = parts[1] || '';
+  var m = volName.match(/\.(raw|qcow2|vmdk|subvol)$/);
+  return m ? m[1] : '';
+}
+
 // 挂载磁盘到 VM（注入限速参数）- qm set <vmid> --<bus><dev> <vol>,qos...
 async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
   var safeVmid = validateParam('vmid', vmid);
@@ -145,6 +155,11 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
 
   // 拼接限速参数（从数据库规格读取，非用户输入）
   var diskConfig = safeVol;
+  // DIR 存储的 raw/qcow2/vmdk 文件需显式附加 format=xxx（PVE 部分场景下无法自动识别）
+  var fmt = inferDiskFormat(safeVol);
+  if (fmt) {
+    diskConfig += ',format=' + fmt;
+  }
   var qosFields = ['mbps_rd', 'mbps_rd_max', 'mbps_wr', 'mbps_wr_max', 'iops_rd', 'iops_rd_max', 'iops_wr', 'iops_wr_max'];
   for (var i = 0; i < qosFields.length; i++) {
     var f = qosFields[i];
@@ -188,7 +203,10 @@ async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid, bindBus, bind
       transitVmid = 9999;
     }
     // 挂载到中转 VM（scsi30 固定位置，非系统盘 scsi0）
-    var attachCmd = 'qm set ' + transitVmid + ' --scsi30 ' + safeVol;
+    // 附加 format=xxx 参数（DIR 存储的 raw/qcow2/vmdk 文件需显式指定 format）
+    var transitFmt = inferDiskFormat(safeVol);
+    var transitVolCfg = transitFmt ? (safeVol + ',format=' + transitFmt) : safeVol;
+    var attachCmd = 'qm set ' + transitVmid + ' --scsi30 ' + transitVolCfg;
     await runSshCommand(attachCmd);
     try {
       // 执行扩容（scsi30 非 0，安全）
