@@ -130,21 +130,14 @@ router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, 
     var order = req.body.order;
     if (!Array.isArray(order)) return res.status(400).json({ error: '无效的排序数据' });
     
-    // 提取 ID 数组，参考套餐分组 batchUpdateSortOrder 模式
-    var ids = [];
+    var sql = 'UPDATE storage_groups SET sort_order = ? WHERE id = ?';
     for (var i = 0; i < order.length; i++) {
       var item = order[i];
-      var itemId = parseInt(item.id || item);
+      var itemId = parseInt(typeof item === 'object' ? item.id : item);
       if (!Number.isInteger(itemId) || itemId < 1) {
         return res.status(400).json({ error: '无效的ID', value: item.id || item });
       }
-      ids.push(itemId);
-    }
-    
-    // 批量更新：按顺序赋值 sort_order = 0,1,2...
-    var sql = 'UPDATE storage_groups SET sort_order = ? WHERE id = ?';
-    for (var i = 0; i < ids.length; i++) {
-      await db.execute ? await db.execute(sql, [i, ids[i]]) : await db.getPool().execute(sql, [i, ids[i]]);
+      await db.getPool().execute(sql, [i, itemId]);
     }
     clearDiskCache();
     res.json({ success: true });
