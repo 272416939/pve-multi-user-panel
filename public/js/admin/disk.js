@@ -171,6 +171,12 @@
     }
   };
 
+  // 清除缓存
+  $.diskPage.clearGroupCache = function() {
+    var token = getToken();
+    fetch('/api/storage-groups', { headers: { 'Authorization': 'Bearer ' + token } });
+  };
+
   // ===== 硬盘规格管理 =====
   $.diskPage.diskSpecs = ref([]);
   $.diskPage.pveStorages = ref([]);

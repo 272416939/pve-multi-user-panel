@@ -85,6 +85,8 @@ router.get('/disk-options', authMiddleware, async (req, res) => {
     if (req.user.role !== 'admin') {
       specs = specs.filter(function(s) { return s.enabled; });
     }
+    // 服务端按 sort_order 排序
+    groups.sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0) || (a.id || 0) - (b.id || 0); });
     res.json({ groups: groups, specs: specs });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
