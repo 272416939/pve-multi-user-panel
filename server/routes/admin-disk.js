@@ -130,14 +130,20 @@ router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, 
     var order = req.body.order;
     if (!Array.isArray(order)) return res.status(400).json({ error: '无效的排序数据' });
     
-    var sql = 'UPDATE storage_groups SET sort_order = ? WHERE id = ?';
+    var ids = [];
     for (var i = 0; i < order.length; i++) {
       var item = order[i];
-      var itemId = parseInt(typeof item === 'object' ? item.id : item);
-      if (!Number.isInteger(itemId) || itemId < 1) {
-        return res.status(400).json({ error: '无效的ID', value: item.id || item });
+      var val = (item && item.id) ? item.id : item;
+      var n = parseInt(val);
+      if (!Number.isInteger(n) || n < 1) {
+        return res.status(400).json({ error: '无效的ID', value: val });
       }
-      await db.getPool().execute(sql, [i, itemId]);
+      ids.push(n);
+    }
+    
+    // 参考套餐分组：使用 db.storageGroups 的 update 方法
+    for (var i = 0; i < ids.length; i++) {
+      await db.storageGroups.update(ids[i], { sort_order: i });
     }
     clearDiskCache();
     res.json({ success: true });
