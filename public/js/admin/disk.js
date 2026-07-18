@@ -102,6 +102,66 @@
     }
   };
 
+  // ===== 存储分组拖拽排序 =====
+  $.diskPage.dragIndex = ref(null);
+  $.diskPage.dragOverIdx = ref(null);
+
+  $.diskPage.onDragStart = function(e, index) {
+    $.diskPage.dragIndex.value = index;
+    e.target.style.opacity = '0.5';
+    e.target.style.transform = 'scale(0.95)';
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  $.diskPage.onDragOver = function(e, index) {
+    e.preventDefault();
+    $.diskPage.dragOverIdx.value = index;
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  $.diskPage.onDragLeave = function() {
+    $.diskPage.dragOverIdx.value = null;
+  };
+
+  $.diskPage.onDrop = function(e, index) {
+    e.preventDefault();
+    var fromIdx = $.diskPage.dragIndex.value;
+    if (fromIdx === null || fromIdx === index) {
+      $.diskPage.dragIndex.value = null;
+      $.diskPage.dragOverIdx.value = null;
+      return;
+    }
+    var groups = $.diskPage.storageGroups.value.slice();
+    var moved = groups.splice(fromIdx, 1)[0];
+    groups.splice(index, 0, moved);
+    $.diskPage.storageGroups.value = groups;
+    $.diskPage.dragIndex.value = null;
+    $.diskPage.dragOverIdx.value = null;
+    $.diskPage.saveGroupSort();
+  };
+
+  $.diskPage.onDragEnd = function(e) {
+    e.target.style.opacity = '';
+    e.target.style.transform = '';
+    $.diskPage.dragIndex.value = null;
+    $.diskPage.dragOverIdx.value = null;
+  };
+
+  $.diskPage.saveGroupSort = async function() {
+    var groups = $.diskPage.storageGroups.value;
+    var order = groups.map(function(g, i) { return { id: g.id, sort_order: i }; });
+    try {
+      var res = await authFetchJson('/api/storage-groups/sort', {
+        method: 'PUT',
+        body: JSON.stringify({ order: order })
+      });
+      var data = await res.json();
+      if (!res.ok) console.error('[disk] 保存排序失败:', data.error);
+    } catch (e) {
+      console.error('[disk] 保存排序失败:', e.message);
+    }
+  };
+
   // ===== 硬盘规格管理 =====
   $.diskPage.diskSpecs = ref([]);
   $.diskPage.pveStorages = ref([]);

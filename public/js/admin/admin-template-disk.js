@@ -16,10 +16,24 @@
       <pv-button @click="diskPage.openStorageGroupForm(null)" size="sm">+ 新建分组</pv-button>
     </div>
     <div class="row">
-      <div class="col-md-4 mb-3" v-for="g in diskPage.storageGroups.value" :key="g.id">
+      <div class="col-md-4 mb-3" v-for="(g, idx) in diskPage.storageGroups.value" :key="g.id"
+        draggable="true"
+        @dragstart="diskPage.onDragStart($event, idx)"
+        @dragover="diskPage.onDragOver($event, idx)"
+        @dragleave="diskPage.onDragLeave"
+        @drop="diskPage.onDrop($event, idx)"
+        @dragend="diskPage.onDragEnd($event)"
+        :class="{
+          'sort-dragging': diskPage.dragIndex.value === idx,
+          'sort-drag-over': diskPage.dragOverIdx.value === idx && diskPage.dragIndex.value !== idx
+        }"
+        style="transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;">
         <div class="card h-100">
           <div class="card-body">
-            <h6 class="card-title">{{ g.name }}</h6>
+            <div class="d-flex align-items-center mb-2">
+              <span class="text-muted me-2" style="cursor:grab;font-size:16px;">⠿</span>
+              <h6 class="card-title mb-0">{{ g.name }}</h6>
+            </div>
             <p class="text-muted small mb-2">已绑定硬盘类型：</p>
             <div>
               <span class="badge bg-info me-1" v-for="spec in diskPage.diskSpecs.value.filter(s => s.storage_group_id === g.id)" :key="spec.id">{{ spec.disk_type }}</span>

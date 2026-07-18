@@ -382,6 +382,11 @@ tr:hover td { background: var(--bg-hover); }
 .markdown-body pre { background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; overflow-x: auto; }
 .markdown-body pre code { background: transparent; padding: 0; color: var(--text-primary); font-size: 0.9em; }
 
+/* ========== 拖拽排序 ========== */
+.sort-dragging { opacity: 0.4; transform: scale(0.95); }
+.sort-drag-over { position: relative; }
+.sort-drag-over .card { border-color: var(--color-primary) !important; box-shadow: 0 0 0 2px rgba(99,102,241,0.3), var(--shadow-md) !important; transform: translateY(4px); }
+
 /* admin page 结束 */
 
 /* ========== 消息通知红点呼吸动画 ========== */

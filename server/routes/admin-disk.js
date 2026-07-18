@@ -124,6 +124,23 @@ router.delete('/storage-groups/:id', authMiddleware, adminMiddleware, async (req
   }
 });
 
+// 批量更新存储分组排序
+router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, res) => {
+  try {
+    var order = req.body.order;
+    if (!Array.isArray(order)) return res.status(400).json({ error: '无效的排序数据' });
+    for (var i = 0; i < order.length; i++) {
+      var item = order[i];
+      if (!item.id || !Number.isInteger(parseInt(item.id))) continue;
+      await db.storageGroups.update(parseInt(item.id), { sort_order: parseInt(item.sort_order) || i });
+    }
+    clearDiskCache();
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: safeError(e) });
+  }
+});
+
 // ==================== 硬盘规格管理 ====================
 
 // 获取所有规格
