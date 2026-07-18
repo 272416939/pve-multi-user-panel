@@ -131,19 +131,19 @@ async function createDisk(storage, sizeGb, userId, tempVmid, diskFormat) {
 
   // 解析返回的 volume_id
   // pvesm alloc 对不同存储类型的 stdout 格式不同：
-  // - LVM/LVM-thin：返回完整 volume_id（storage:vm-9999-disk-0）
-  // - DIR/BTRFS：可能返回裸卷名（vm-9999-disk-0.raw）或完整 volume_id（storage:9999/vm-...raw）
-  // 对 DIR 存储，volume_id 必须含子路径：<storage>:<vmid>/<volName>
-  var volumeId;
-  if (stdout && stdout.indexOf(':') > -1 && stdout.indexOf(safeStorage) === 0) {
-    // stdout 是完整 volume_id（含 storage: 前缀）
-    volumeId = stdout.trim();
-  } else if (stdout && stdout.trim() === volName) {
-    // stdout 是裸卷名（DIR 存储常见），需自行拼接完整 volume_id 含子路径
-    volumeId = safeStorage + ':' + safeVmid + '/' + volName;
-  } else {
-    // 兜底：用 storage:volName（适用于 LVM 等无子路径存储）
-    volumeId = safeStorage + ':' + volName;
+  // - LVM/LVM-thin：单行，直接返回完整 volume_id（storage:vm-9999-disk-0）
+  // - DIR/BTRFS：多行，最后一行为 "successfully created 'storage:9999/vm-...ext'"
+  //   真正的 volume_id 在单引号中，含子路径 <vmid>/
+  var volumeId = safeStorage + ':' + volName; // 兜底
+  if (stdout) {
+    // 优先匹配 "successfully created 'xxx'" 中的 volume_id（DIR 存储场景）
+    var m = stdout.match(/successfully created '([^']+)'/);
+    if (m && m[1]) {
+      volumeId = m[1].trim();
+    } else if (stdout.indexOf(':') > -1 && stdout.indexOf(safeStorage) === 0) {
+      // 单行完整 volume_id（LVM 场景）
+      volumeId = stdout.trim();
+    }
   }
   console.log('[createDisk] 返回 volume_id:', volumeId);
   return volumeId;
