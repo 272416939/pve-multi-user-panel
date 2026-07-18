@@ -127,13 +127,25 @@ async function createDisk(storage, sizeGb, userId, tempVmid, diskFormat) {
   // vmid 必须是一个真实存在的 VM ID（不能为 0）
   var cmd = 'pvesm alloc ' + safeStorage + ' ' + safeVmid + ' ' + volName + ' ' + safeSize + 'G';
   var stdout = await runSshCommand(cmd);
+  console.log('[createDisk] pvesm alloc stdout:', JSON.stringify(stdout), 'volName:', volName, 'storage:', safeStorage);
 
   // 解析返回的 volume_id
-  var volumeId = safeStorage + ':' + volName;
-  // pvesm alloc 有时返回完整 volume_id（DIR 存储含子路径 9999/vm-...ext），有时返回 volname
+  // pvesm alloc 对不同存储类型的 stdout 格式不同：
+  // - LVM/LVM-thin：返回完整 volume_id（storage:vm-9999-disk-0）
+  // - DIR/BTRFS：可能返回裸卷名（vm-9999-disk-0.raw）或完整 volume_id（storage:9999/vm-...raw）
+  // 对 DIR 存储，volume_id 必须含子路径：<storage>:<vmid>/<volName>
+  var volumeId;
   if (stdout && stdout.indexOf(':') > -1 && stdout.indexOf(safeStorage) === 0) {
+    // stdout 是完整 volume_id（含 storage: 前缀）
     volumeId = stdout.trim();
+  } else if (stdout && stdout.trim() === volName) {
+    // stdout 是裸卷名（DIR 存储常见），需自行拼接完整 volume_id 含子路径
+    volumeId = safeStorage + ':' + safeVmid + '/' + volName;
+  } else {
+    // 兜底：用 storage:volName（适用于 LVM 等无子路径存储）
+    volumeId = safeStorage + ':' + volName;
   }
+  console.log('[createDisk] 返回 volume_id:', volumeId);
   return volumeId;
 }
 
