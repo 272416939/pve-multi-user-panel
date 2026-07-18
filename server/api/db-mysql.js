@@ -663,18 +663,30 @@ async function migrateSchema() {
     await safeAlter('lxc_packages', 'sold_count', "INT NOT NULL DEFAULT 0");
 
     // 价格精度统一为 2 位小数（原 4 位：DECIMAL(10,4) -> DECIMAL(10,2)）
-    // 幂等：MODIFY COLUMN 即使类型已是目标类型也不会报错
-    try {
-        await execute("ALTER TABLE disk_specs MODIFY COLUMN price_per_gb DECIMAL(10,2) NOT NULL DEFAULT 0.00");
-        console.log('[db] 迁移: disk_specs.price_per_gb -> DECIMAL(10,2)');
-    } catch (e) {
-        console.error('[db] 迁移 disk_specs.price_per_gb 失败:', e.message);
+    // 检查列类型后再决定是否执行（避免每次启动重复打印迁移日志）
+    async function checkColumnType(tableName, columnName) {
+        try {
+            var rows = await queryAll("SELECT DATA_TYPE, NUMERIC_PRECISION, NUMERIC_SCALE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?", [tableName, columnName]);
+            return rows && rows[0] ? { type: rows[0].DATA_TYPE, precision: rows[0].NUMERIC_PRECISION, scale: rows[0].NUMERIC_SCALE } : null;
+        } catch (e) { return null; }
     }
-    try {
-        await execute("ALTER TABLE disks MODIFY COLUMN price_per_gb DECIMAL(10,2) NOT NULL DEFAULT 0.00");
-        console.log('[db] 迁移: disks.price_per_gb -> DECIMAL(10,2)');
-    } catch (e) {
-        console.error('[db] 迁移 disks.price_per_gb 失败:', e.message);
+    var specPriceType = await checkColumnType('disk_specs', 'price_per_gb');
+    if (specPriceType && (specPriceType.scale !== 2)) {
+        try {
+            await execute("ALTER TABLE disk_specs MODIFY COLUMN price_per_gb DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+            console.log('[db] 迁移: disk_specs.price_per_gb -> DECIMAL(10,2)');
+        } catch (e) {
+            console.error('[db] 迁移 disk_specs.price_per_gb 失败:', e.message);
+        }
+    }
+    var diskPriceType = await checkColumnType('disks', 'price_per_gb');
+    if (diskPriceType && (diskPriceType.scale !== 2)) {
+        try {
+            await execute("ALTER TABLE disks MODIFY COLUMN price_per_gb DECIMAL(10,2) NOT NULL DEFAULT 0.00");
+            console.log('[db] 迁移: disks.price_per_gb -> DECIMAL(10,2)');
+        } catch (e) {
+            console.error('[db] 迁移 disks.price_per_gb 失败:', e.message);
+        }
     }
 
     // 磁盘规格新增 disk_format 列（DIR/BTRFS 等文件系统存储需要扩展名）
