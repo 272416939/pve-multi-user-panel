@@ -68,15 +68,18 @@ function validateParam(name, value) {
 function validateVolumeId(volumeId) {
   // 第一层：正则白名单
   validateParam('volumeId', volumeId);
-  // 第二层：前缀校验（仅允许 disk-pool- 前缀的数据盘）
+  // 第二层：前缀校验（仅允许数据盘卷）
   var parts = volumeId.split(':');
   var volName = parts[1] || '';
+  // DIR/BTRFS 存储的 volume_id 含子路径（如 9999/vm-9999-disk-0.raw），
+  // 需取最后一段 / 之后的实际卷名再做前缀校验
+  var lastSeg = volName.split('/').pop() || volName;
   // 允许 vm- 前缀（PVE 命名规范）、disk-pool- 前缀或 imported- 前缀（存量导入）
-  if (volName.indexOf('vm-') !== 0 && volName.indexOf('disk-pool-') !== 0 && volName.indexOf('imported-') !== 0) {
+  if (lastSeg.indexOf('vm-') !== 0 && lastSeg.indexOf('disk-pool-') !== 0 && lastSeg.indexOf('imported-') !== 0) {
     throw new Error('不允许操作非数据盘卷（仅允许 disk-pool- 或 imported- 前缀）');
   }
   // 第三层：禁止操作系统盘（兼容 .raw/.qcow2/.vmdk/.subvol 扩展名）
-  if (/disk-0(\.(raw|qcow2|vmdk|subvol))?$/.test(volName)) {
+  if (/disk-0(\.(raw|qcow2|vmdk|subvol))?$/.test(lastSeg)) {
     throw new Error('禁止操作系统盘');
   }
   return volumeId;
