@@ -1,5 +1,34 @@
 # Changelog
 
+## [2.32.1] - 2026-07-19
+
+### Added
+- feat(disk): 统一使用 SCSI 总线，支持热插拔挂载/卸载
+- feat(admin): 存储分组支持拖拽排序 + 动效
+- feat(admin): 数据盘表格增加多选 + 批量修改存储分组
+- feat(disk-ui): 规格卡片统一字段占位 + 购买磁盘展示限速信息
+
+### Changed
+- refactor(disk): 价格精度统一为 2 位小数（`DECIMAL(10,4)` -> `DECIMAL(10,2)`，前端输入步长同步）
+
+### Fixed
+- fix(disk): 卸载改用 `qm unlink` 兼容 Windows VM，消除划线状态
+- fix(ui): 移除挂载/卸载/扩容的关机提示，改为热插拔提示
+- fix(vm): VM 换绑时同步更新 legacy 磁盘 `user_id`
+- fix(disk): 存储分组排序全面修复
+  - 购买弹窗按 `sort_order` 排序，新建分组自动分配 `sort_order`
+  - `disk-options` 接口服务端排序 + 清除缓存
+  - 数据库 SQL 明确 `ASC` + 服务端 `parseInt` 强转
+  - 修复排序端点 ID 校验逻辑
+- fix(storage-groups): 排序端点实现修复
+  - 改用套餐分组一致的 `batchUpdateSortOrder` 模式
+  - 修复 `db.execute` 调用方式
+  - 改用 `db.storageGroups.update` 避免直接 SQL 权限问题
+- fix(admin-disk): 路由顺序修复
+  - 恢复丢失的 `PUT /storage-groups/:id` 路由
+  - 彻底移除重复的 `/storage-groups/sort` 路由
+- chore(ui): 同步更新 admin/dashboard 缓存版本号
+
 ## [2.32.0] - 2026-07-18
 
 ### Added
