@@ -72,6 +72,15 @@
       var f = $.diskPage.storageGroupForm.value;
       if (!f.name || !f.name.trim()) return alert('请输入分组名称');
 
+      // 新建时自动获取当前最大 sort_order + 1
+      var sortOrder = parseInt(f.sort_order) || 0;
+      if (!$.diskPage.editingStorageGroup.value) {
+        var groups = $.diskPage.storageGroups.value;
+        if (groups.length > 0) {
+          sortOrder = Math.max.apply(null, groups.map(function(g) { return g.sort_order || 0; })) + 1;
+        }
+      }
+
       var url = $.diskPage.editingStorageGroup.value
         ? '/api/storage-groups/' + $.diskPage.editingStorageGroup.value.id
         : '/api/storage-groups';
@@ -79,7 +88,7 @@
 
       var res = await authFetchJson(url, {
         method: method,
-        body: JSON.stringify({ name: f.name.trim(), sort_order: parseInt(f.sort_order) || 0 })
+        body: JSON.stringify({ name: f.name.trim(), sort_order: sortOrder })
       });
       var data = await res.json();
       if (!res.ok) return alert(data.error || '操作失败');
