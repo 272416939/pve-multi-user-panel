@@ -393,12 +393,20 @@ async function importExistingDisks() {
         }
 
         // 解析输出，收集该存储池所有存在的 volume_id
+        // pvesm list 输出为表格格式：
+        //   Volid                                    Format  Type              Size VMID
+        //   nvme2T:vm-102-disk-1                     raw     images    108447924224 102
+        // volume_id 是每行第一个字段（到第一个空格为止）
         var existingVols = {};
         var lines = (result.stdout || '').split('\n');
         for (var li = 0; li < lines.length; li++) {
           var line = lines[li].trim();
-          if (line && line.indexOf(poolName + ':') === 0) {
-            existingVols[line] = true;
+          if (!line || line.indexOf('Volid') === 0) continue; // 跳过表头和空行
+          // volume_id 是第一个字段（冒号前后的部分，到第一个空格）
+          var firstSpace = line.indexOf(' ');
+          var volId = firstSpace > 0 ? line.substring(0, firstSpace) : line;
+          if (volId.indexOf(poolName + ':') === 0) {
+            existingVols[volId] = true;
           }
         }
 
