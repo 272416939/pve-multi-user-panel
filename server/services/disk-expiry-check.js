@@ -360,39 +360,61 @@ async function importExistingDisks() {
     var cleanedCount = 0;
     var sshConfig = await getPveSshConfig();
     console.log('[disk-import] 孤立磁盘清理：开始检查，共 ' + allDisks.length + ' 条磁盘记录');
+
+    // 按存储池分组收集需要检查的卷，避免重复查询同一存储池
+    var storagePools = {};
     for (var d = 0; d < allDisks.length; d++) {
       var disk = allDisks[d];
       if (!disk.is_legacy) continue;
-      // 只清理可能孤立的活跃状态（free 状态可能是分离但卷仍在，不清理）
       if (disk.status !== 'bound' && disk.status !== 'grace' && disk.status !== 'expired') continue;
+      var volParts = (disk.volume_id || '').split(':');
+      if (volParts.length !== 2) continue;
+      var pool = volParts[0];
+      if (!storagePools[pool]) storagePools[pool] = [];
+      storagePools[pool].push({ disk: disk, volumeId: disk.volume_id });
+    }
 
+    // 逐个存储池查询所有卷，再比对台账
+    for (var poolName in storagePools) {
+      var entries = storagePools[poolName];
       try {
         if (!sshConfig.host || !sshConfig.password) continue;
 
-        var volParts = (disk.volume_id || '').split(':');
-        if (volParts.length !== 2) continue;
-        var storagePool = volParts[0];
-        var volName = volParts[1]; // DIR 存储: 9999/vm-...raw，LVM: vm-...disk-0
-
-        // 使用 pvesm list 检查卷是否存在（比 pvesh get 更可靠）
-        // pvesm list <storage> --volid <volume_id> 返回匹配的卷列表
-        var cmd = 'pvesm list ' + storagePool + ' --volid ' + disk.volume_id + ' 2>&1';
+        // pvesm list <storage> 列出该存储所有卷
+        // 输出格式：每行一个 volume_id（如 nvme2T:vm-101-disk-0）
+        var cmd = 'pvesm list ' + poolName + ' 2>&1';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
-        var combinedOutput = (result.stdout || '') + (result.stderr || '');
-        console.log('[disk-import] 检查磁盘 id=' + disk.id + ' vol=' + disk.volume_id +
-          ' status=' + disk.status + ' code=' + result.code +
-          ' stdout=' + JSON.stringify(result.stdout) + ' stderr=' + JSON.stringify(result.stderr));
+        console.log('[disk-import] 存储池 ' + poolName + ' 卷列表 code=' + result.code +
+          ' stdout=' + JSON.stringify(result.stdout));
 
-        // pvesm list 对不存在的卷返回空输出 + code 0，存在的卷返回 volume_id 行
-        // 如果输出为空或不含 storage: 说明卷不存在
-        var outputTrimmed = combinedOutput.trim();
-        if (!outputTrimmed || outputTrimmed.indexOf(storagePool + ':') === -1) {
-          await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
-          cleanedCount++;
-          console.log('[disk-import] 清理孤立 legacy 磁盘记录:', disk.volume_id, '(', disk.status, ')');
+        if (result.code !== 0) {
+          console.warn('[disk-import] 查询存储池 ' + poolName + ' 失败，跳过该池的清理');
+          continue;
+        }
+
+        // 解析输出，收集该存储池所有存在的 volume_id
+        var existingVols = {};
+        var lines = (result.stdout || '').split('\n');
+        for (var li = 0; li < lines.length; li++) {
+          var line = lines[li].trim();
+          if (line && line.indexOf(poolName + ':') === 0) {
+            existingVols[line] = true;
+          }
+        }
+
+        // 比对台账，清理不存在的卷
+        for (var ei = 0; ei < entries.length; ei++) {
+          var entry = entries[ei];
+          if (!existingVols[entry.volumeId]) {
+            await db.getPool().execute('DELETE FROM disks WHERE id = ?', [entry.disk.id]);
+            cleanedCount++;
+            console.log('[disk-import] 清理孤立 legacy 磁盘记录:', entry.volumeId, '(', entry.disk.status, ')');
+          } else {
+            console.log('[disk-import] 磁盘存在，保留:', entry.volumeId);
+          }
         }
       } catch (e) {
-        console.error('[disk-import] 检查磁盘 ' + disk.volume_id + ' 失败:', e.message);
+        console.error('[disk-import] 检查存储池 ' + poolName + ' 失败:', e.message);
       }
     }
     if (cleanedCount > 0) {
