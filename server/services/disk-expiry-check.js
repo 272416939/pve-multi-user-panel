@@ -356,10 +356,11 @@ async function importExistingDisks() {
     // 孤立记录定义：台账中有记录，但 PVE 中卷已不存在
     // 注意：只清理那些真正孤立的记录（PVE 卷被手动删除）
     // 清理范围：bound/grace/expired 状态的 legacy 磁盘（free 状态的可能是分离但卷仍在，不清理）
+    var DEBUG = process.env.DEBUG === 'true';
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
     var sshConfig = await getPveSshConfig();
-    console.log('[disk-import] 孤立磁盘清理：开始检查，共 ' + allDisks.length + ' 条磁盘记录');
+    if (DEBUG) console.log('[disk-import] 孤立磁盘清理：开始检查，共 ' + allDisks.length + ' 条磁盘记录');
 
     // 按存储池分组收集需要检查的卷，避免重复查询同一存储池
     var storagePools = {};
@@ -381,10 +382,10 @@ async function importExistingDisks() {
         if (!sshConfig.host || !sshConfig.password) continue;
 
         // pvesm list <storage> 列出该存储所有卷
-        // 输出格式：每行一个 volume_id（如 nvme2T:vm-101-disk-0）
+        // 输出为表格格式，volume_id 是每行第一个字段（到第一个空格为止）
         var cmd = 'pvesm list ' + poolName + ' 2>&1';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
-        console.log('[disk-import] 存储池 ' + poolName + ' 卷列表 code=' + result.code +
+        if (DEBUG) console.log('[disk-import] 存储池 ' + poolName + ' 卷列表 code=' + result.code +
           ' stdout=' + JSON.stringify(result.stdout));
 
         if (result.code !== 0) {
@@ -393,16 +394,12 @@ async function importExistingDisks() {
         }
 
         // 解析输出，收集该存储池所有存在的 volume_id
-        // pvesm list 输出为表格格式：
-        //   Volid                                    Format  Type              Size VMID
-        //   nvme2T:vm-102-disk-1                     raw     images    108447924224 102
-        // volume_id 是每行第一个字段（到第一个空格为止）
         var existingVols = {};
         var lines = (result.stdout || '').split('\n');
         for (var li = 0; li < lines.length; li++) {
           var line = lines[li].trim();
           if (!line || line.indexOf('Volid') === 0) continue; // 跳过表头和空行
-          // volume_id 是第一个字段（冒号前后的部分，到第一个空格）
+          // volume_id 是第一个字段（到第一个空格为止）
           var firstSpace = line.indexOf(' ');
           var volId = firstSpace > 0 ? line.substring(0, firstSpace) : line;
           if (volId.indexOf(poolName + ':') === 0) {
@@ -417,7 +414,7 @@ async function importExistingDisks() {
             await db.getPool().execute('DELETE FROM disks WHERE id = ?', [entry.disk.id]);
             cleanedCount++;
             console.log('[disk-import] 清理孤立 legacy 磁盘记录:', entry.volumeId, '(', entry.disk.status, ')');
-          } else {
+          } else if (DEBUG) {
             console.log('[disk-import] 磁盘存在，保留:', entry.volumeId);
           }
         }
