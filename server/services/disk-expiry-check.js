@@ -359,6 +359,7 @@ async function importExistingDisks() {
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
     var sshConfig = await getPveSshConfig();
+    console.log('[disk-import] 孤立磁盘清理：开始检查，共 ' + allDisks.length + ' 条磁盘记录');
     for (var d = 0; d < allDisks.length; d++) {
       var disk = allDisks[d];
       if (!disk.is_legacy) continue;
@@ -373,15 +374,19 @@ async function importExistingDisks() {
         var storagePool = volParts[0];
         var volName = volParts[1]; // DIR 存储: 9999/vm-...raw，LVM: vm-...disk-0
 
-        // 使用 pvesh get 检查卷是否存在
-        // 注意：volName 中的 / 是 PVE API 路径的一部分（DIR 存储子路径），不应编码
-        // pvesh get /storage/{storage}/content/{volName} --noborder
-        var cmd = 'pvesh get "/storage/' + storagePool + '/content/' + volName + '" --noborder 2>&1';
+        // 使用 pvesm list 检查卷是否存在（比 pvesh get 更可靠）
+        // pvesm list <storage> --volid <volume_id> 返回匹配的卷列表
+        var cmd = 'pvesm list ' + storagePool + ' --volid ' + disk.volume_id + ' 2>&1';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
-        // 只有当命令明确返回错误（卷不存在）时才清理
-        // PVE 对不存在的卷返回 "no such volume" 或 "does not exist" 或 "Parameter verification failed"
-        var errOutput = (result.stderr || '') + (result.stdout || '');
-        if (result.code !== 0 && (errOutput.indexOf('does not exist') !== -1 || errOutput.indexOf('no such volume') !== -1 || errOutput.indexOf('Parameter verification failed') !== -1)) {
+        var combinedOutput = (result.stdout || '') + (result.stderr || '');
+        console.log('[disk-import] 检查磁盘 id=' + disk.id + ' vol=' + disk.volume_id +
+          ' status=' + disk.status + ' code=' + result.code +
+          ' stdout=' + JSON.stringify(result.stdout) + ' stderr=' + JSON.stringify(result.stderr));
+
+        // pvesm list 对不存在的卷返回空输出 + code 0，存在的卷返回 volume_id 行
+        // 如果输出为空或不含 storage: 说明卷不存在
+        var outputTrimmed = combinedOutput.trim();
+        if (!outputTrimmed || outputTrimmed.indexOf(storagePool + ':') === -1) {
           await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
           cleanedCount++;
           console.log('[disk-import] 清理孤立 legacy 磁盘记录:', disk.volume_id, '(', disk.status, ')');
