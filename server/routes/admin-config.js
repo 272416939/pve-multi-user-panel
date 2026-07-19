@@ -424,7 +424,12 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             setTimeout(() => process.exit(0), 1000);
         }
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        console.error('[系统更新] 未预期错误:', error.message, error.stack);
+        // 更新失败时返回具体错误信息（而非通用 safeError），便于用户排查
+        const errMsg = error.message || String(error);
+        // 避免泄露敏感路径/凭据，仅返回关键错误描述
+        const safeMsg = errMsg.replace(/\/[^\s]+\/\.git/g, '<repo>').replace(/https:\/\/[^\s]+/g, '<url>');
+        res.status(500).json({ error: '更新失败: ' + safeMsg });
     }
 });
 
