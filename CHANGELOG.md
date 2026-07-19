@@ -1,5 +1,40 @@
 # Changelog
 
+## [2.32.2] - 2026-07-19
+
+### Added
+- feat(disk): 新增磁盘格式选择 + DIR 存储支持 + 不支持扩容格式警告
+- feat(disk-ui): 磁盘操作 loading 动画，防止用户频繁点击
+- feat(logger): 统一日志工具，所有控制台输出带时间戳和前缀
+
+### Changed
+- refactor(log): disk-utils.js 调试日志改用 `logger.debug`
+- chore(log): disk-expiry-check 日志精简，日常只输出必要信息
+- chore(disk-import): 调试日志改为 DEBUG 模式才输出
+
+### Fixed
+- fix(disk): DIR 存储卷名/格式冲突全面修复
+  - DIR 存储卷名带扩展名 + 挂载不附加 `format=` 避免冲突
+  - `createDisk` 从 `'successfully created'` 提取 DIR 存储 volume_id
+  - `createDisk` DIR 存储 `pvesm alloc` 返回裸卷名时拼接子路径
+  - `validateVolumeId` 兼容 DIR 存储子路径格式（`9999/vm-...`）
+- fix(disk-import): 孤立磁盘清理逻辑修复（4 次迭代）
+  - 改用 `pvesm list` 检查卷存在性 + 详细调试日志
+  - 修复误删正常磁盘台账问题（严重）
+  - 解析 `pvesm list` 表格格式提取 volume_id
+- fix(disk-import): 修复孤立磁盘清理失效问题
+- fix(disk-specs): INSERT 占位符多 1 个导致 Column count 不匹配
+- fix(unbind): `qm unlink` 卸载逻辑修复
+  - busy 错误时 guest 内磁盘已卸载，不阻塞到期分离
+  - 改回 `qm unlink` + busy 错误不阻塞到期分离
+  - busy 错误后自动重试一次 `qm unlink`
+- fix(db): 价格精度迁移幂等化，避免每次启动重复打印迁移日志
+- fix(pv-button): 透传 fallthrough 属性（`title`/`data-*`/`aria-*`）+ 简化 title 透传实现
+
+### Notes
+- 新增脏数据修复脚本 `scripts/fix-dir-volume-id.js`，修复之前 bug 留下的 DIR 存储 volume_id 缺子路径脏数据
+  - 用法：`node scripts/fix-dir-volume-id.js` (dry-run) / `--apply` (实际修复)
+
 ## [2.32.1] - 2026-07-19
 
 ### Added
