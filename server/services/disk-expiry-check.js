@@ -355,33 +355,36 @@ async function importExistingDisks() {
     // ===== 第一步：清理 PVE 中已不存在的孤立磁盘记录（仅清理 legacy 磁盘） =====
     // 孤立记录定义：台账中有记录，但 PVE 中卷已不存在
     // 注意：只清理那些真正孤立的记录（PVE 卷被手动删除）
-    // bound 状态的 legacy 磁盘如果 PVE 卷还存在，说明是正常挂载状态，不应清理
+    // 清理范围：bound/grace/expired 状态的 legacy 磁盘（free 状态的可能是分离但卷仍在，不清理）
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
+    var sshConfig = await getPveSshConfig();
     for (var d = 0; d < allDisks.length; d++) {
       var disk = allDisks[d];
       if (!disk.is_legacy) continue;
-      // 只清理 bound 状态的 legacy 磁盘（free 状态的 legacy 磁盘可能是分离但卷仍在）
-      // 注意：bound 状态的 legacy 磁盘如果卷还在，说明正常挂载，不应清理
-      if (disk.status !== 'bound') continue;
-      
+      // 只清理可能孤立的活跃状态（free 状态可能是分离但卷仍在，不清理）
+      if (disk.status !== 'bound' && disk.status !== 'grace' && disk.status !== 'expired') continue;
+
       try {
-        var sshConfig = await getPveSshConfig();
         if (!sshConfig.host || !sshConfig.password) continue;
-        
+
         var volParts = (disk.volume_id || '').split(':');
         if (volParts.length !== 2) continue;
         var storagePool = volParts[0];
-        var volName = volParts[1];
-        
-        // 使用 pvesh get 检查卷是否存在（DIR 存储的 volName 含 / 子路径，需编码）
-        var cmd = 'pvesh get "/storage/' + storagePool + '/content/' + encodeURIComponent(volName) + '" --noborder 2>&1';
+        var volName = volParts[1]; // DIR 存储: 9999/vm-...raw，LVM: vm-...disk-0
+
+        // 使用 pvesh get 检查卷是否存在
+        // 注意：volName 中的 / 是 PVE API 路径的一部分（DIR 存储子路径），不应编码
+        // pvesh get /storage/{storage}/content/{volName} --noborder
+        var cmd = 'pvesh get "/storage/' + storagePool + '/content/' + volName + '" --noborder 2>&1';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
         // 只有当命令明确返回错误（卷不存在）时才清理
-        if (result.code !== 0 && result.stderr && result.stderr.indexOf('does not exist') !== -1) {
+        // PVE 对不存在的卷返回 "no such volume" 或 "does not exist" 或 "Parameter verification failed"
+        var errOutput = (result.stderr || '') + (result.stdout || '');
+        if (result.code !== 0 && (errOutput.indexOf('does not exist') !== -1 || errOutput.indexOf('no such volume') !== -1 || errOutput.indexOf('Parameter verification failed') !== -1)) {
           await db.getPool().execute('DELETE FROM disks WHERE id = ?', [disk.id]);
           cleanedCount++;
-          console.log('[disk-import] 清理孤立 legacy 磁盘记录:', disk.volume_id);
+          console.log('[disk-import] 清理孤立 legacy 磁盘记录:', disk.volume_id, '(', disk.status, ')');
         }
       } catch (e) {
         console.error('[disk-import] 检查磁盘 ' + disk.volume_id + ' 失败:', e.message);
