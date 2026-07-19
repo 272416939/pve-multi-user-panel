@@ -189,23 +189,20 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
 // 卸载磁盘 - qm set <vmid> --delete <bus><dev>
 // 标准卸载方式，兼容所有存储类型（DIR/LVM/BTRFS 等）
 // 注意：Windows VM 可能因磁盘仍被占用而报 "still busy in guest"，
-// 此时需用户在 guest 内安全弹出磁盘后再卸载
+// 但此时 guest 内磁盘实际已卸载，PVE 配置层留划线状态（用户可手动点还原清理）
 async function unbindDisk(vmid, bus, dev) {
   var safeVmid = validateParam('vmid', vmid);
   var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
 
-  // 先尝试标准 qm set --delete
   var cmd = 'qm set ' + safeVmid + ' --delete ' + busDev;
   try {
     await runSshCommand(cmd);
-    return;
   } catch (e) {
     var errMsg = e.message || '';
-    // 如果是 hotplug busy 错误（Windows VM 常见），明确提示
+    // busy 错误（Windows VM 常见）：guest 内磁盘已卸载，PVE 留划线状态
     if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
-      throw new Error('磁盘仍被虚拟机占用，请先在虚拟机内安全弹出该磁盘后再卸载');
+      throw new Error('磁盘已在虚拟机内卸载，但 PVE 配置仍保留划线状态，请到 PVE 管理界面点击该磁盘的「还原」按钮清理');
     }
-    // 其他错误继续抛出
     throw e;
   }
 }

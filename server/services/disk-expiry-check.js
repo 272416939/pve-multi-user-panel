@@ -118,16 +118,19 @@ async function detachDiskFromVm(disk) {
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
 
     // 标准卸载方式 qm set --delete，兼容所有存储类型（DIR/LVM/BTRFS 等）
+    // 注意：busy 错误时 guest 内磁盘实际已卸载（Windows 划线状态仅 PVE 配置层显示），
+    // 不阻塞流程，台账状态照常更新为 expired（避免白嫖）
     var cmd = 'qm set ' + safeVmid + ' --delete ' + disk.bind_bus + safeDev;
     var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
     if (result.code !== 0) {
       var errMsg = (result.stderr || result.stdout || '');
-      // hotplug busy 错误（Windows VM 常见），记录日志继续
+      // hotplug busy 错误（Windows VM 常见）：guest 内磁盘已卸载，
+      // PVE 配置留划线状态（用户可手动点还原清理），不阻塞到期分离流程
       if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
-        console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 被 VM ' + safeVmid + ' 占用，将在下次巡检重试');
-        return false;
+        console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 卸载报 busy（guest 内已卸载，PVE 留划线状态），继续标记 expired');
+      } else {
+        throw new Error('分离磁盘失败: ' + errMsg);
       }
-      throw new Error('分离磁盘失败: ' + errMsg);
     }
 
     // 更新台账：状态 -> expired（到期分离游离态）
