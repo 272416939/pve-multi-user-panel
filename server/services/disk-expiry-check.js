@@ -117,17 +117,23 @@ async function detachDiskFromVm(disk) {
     var sshConfig = await getPveSshConfig();
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
 
-    // qm unlink 卸载磁盘（优于 qm set --delete，不留划线状态）
-    // 注意：busy 错误时 guest 内磁盘实际已卸载（Windows 划线状态仅 PVE 配置层显示），
-    // 不阻塞流程，台账状态照常更新为 expired（避免白嫖）
+    // qm unlink 卸载磁盘（不留划线状态，Linux VM 完全清理）
+    // Windows VM 首次可能报 busy，但 guest 内磁盘已卸载，自动重试一次即可成功
     var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + disk.bind_bus + safeDev;
     var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
     if (result.code !== 0) {
       var errMsg = (result.stderr || result.stdout || '');
-      // hotplug busy 错误（Windows VM 常见）：guest 内磁盘已卸载，
-      // PVE 配置留划线状态（用户可手动点还原清理），不阻塞到期分离流程
+      // hotplug busy 错误（Windows VM 常见）：guest 内磁盘已卸载，等待 1 秒后重试一次
       if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
-        console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 卸载报 busy（guest 内已卸载，PVE 留划线状态），继续标记 expired');
+        console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 首次 unlink 报 busy，等待 1 秒后重试...');
+        await new Promise(function(resolve) { setTimeout(resolve, 1000); });
+        var retryResult = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
+        if (retryResult.code !== 0) {
+          // 重试仍失败：guest 内磁盘已卸载，仅 PVE 配置留划线状态，不阻塞流程
+          console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 重试 unlink 仍报错（guest 内已卸载，PVE 留划线状态），继续标记 expired');
+        } else {
+          console.log('[disk-expiry] 磁盘 ' + disk.id + ' 重试 unlink 成功');
+        }
       } else {
         throw new Error('分离磁盘失败: ' + errMsg);
       }

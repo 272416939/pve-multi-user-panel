@@ -187,10 +187,9 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
 }
 
 // 卸载磁盘 - qm unlink <vmid> --idlist <bus><dev>
-// qm unlink 优于 qm set --delete：
-// - 不会留划线状态（Linux VM 完全清理）
-// - Windows VM 可能报 "virtioscsi busy" 错误，但 guest 内磁盘实际已卸载
-//   PVE 配置层留划线状态，用户可到 PVE 点「还原」清理
+// qm unlink 优于 qm set --delete：不留划线状态（Linux VM 完全清理）
+// Windows VM 可能首次报 "virtioscsi busy"，但 guest 内磁盘已被移除，
+// 此时自动重试一次即可成功从 PVE 配置移除（无需用户手动到 PVE 点还原）
 async function unbindDisk(vmid, bus, dev) {
   var safeVmid = validateParam('vmid', vmid);
   var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
@@ -200,9 +199,19 @@ async function unbindDisk(vmid, bus, dev) {
     await runSshCommand(cmd);
   } catch (e) {
     var errMsg = e.message || '';
-    // busy 错误（Windows VM 常见）：guest 内磁盘已卸载，PVE 留划线状态
+    // busy 错误（Windows VM 常见）：guest 内磁盘已卸载，PVE 配置仍保留
+    // 自动重试一次（此时 guest 内已无磁盘占用，unlink 应能成功清理 PVE 配置）
     if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
-      throw new Error('磁盘已在虚拟机内卸载，但 PVE 配置仍保留划线状态，请到 PVE 管理界面点击该磁盘的「还原」按钮清理');
+      console.log('[unbindDisk] 首次 unlink 报 busy，等待 1 秒后重试...');
+      await new Promise(function(resolve) { setTimeout(resolve, 1000); });
+      try {
+        await runSshCommand(cmd);
+        console.log('[unbindDisk] 重试 unlink 成功，PVE 配置已清理');
+        return;
+      } catch (e2) {
+        // 重试仍失败，提示用户手动处理
+        throw new Error('磁盘已在虚拟机内卸载，但 PVE 配置仍保留划线状态，请到 PVE 管理界面点击该磁盘的「还原」后再次卸载');
+      }
     }
     throw e;
   }
