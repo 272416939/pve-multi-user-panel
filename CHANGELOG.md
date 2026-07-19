@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.32.3] - 2026-07-19
+
+### ⚠️ 重要：本次升级必须使用手动更新
+
+> 本次版本修复了面板「系统自动更新」功能的致命问题（git dubious ownership 导致自动更新返回 500）。由于修复代码本身包含在此版本中，旧版本的面板无法通过自动更新升级到 v2.32.3，**必须手动执行一次 git pull 完成本次升级**。升级后自动更新功能即可恢复正常工作。
+
+**手动更新步骤**（SSH 进入项目目录执行）：
+
+```bash
+git fetch origin && git reset --hard origin/main && npm install --production && pm2 restart pve-panel
+```
+
+> 详细说明见 README.md「🔄 手动更新」章节。
+
+### Fixed
+- fix(update): **git dubious ownership 导致 fetch 失败**（自动更新 500 根因）
+  - 三重保障：`git config --system --add safe.directory` + `git -c safe.directory=<path> fetch` + `git -c safe.directory=<path> reset --hard`
+  - `--system` 失败时回退 `--global`，覆盖 PM2 运行用户与项目目录所有者不同的情况
+- fix(update): 输出 git fetch 失败的详细错误日志（退出码 + stderr + stdout）
+- fix(update): 自动更新失败返回具体错误信息而非通用「操作失败，请稍后重试」
+
 ## [2.32.2] - 2026-07-19
 
 ### Added
