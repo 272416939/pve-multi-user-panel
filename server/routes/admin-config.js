@@ -336,11 +336,16 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             return res.status(400).json({ error: '更新失败: 当前项目不是 git 仓库，无法使用在线更新。请手动下载最新版本覆盖更新。' });
         }
 
-        // 添加 safe.directory 避免权限检测报错
+        // 添加 safe.directory 避免 dubious ownership 检测报错
+        // 方式 1: --system 级别（所有用户生效），方式 2: --global（当前用户）
         try {
-            execSync(`git config --global --add safe.directory ${projectRoot}`, { timeout: 5000, stdio: 'pipe' });
-        } catch (e) {
-            // 忽略失败，继续执行
+            execSync(`git config --system --add safe.directory ${projectRoot}`, { timeout: 5000, stdio: 'pipe' });
+        } catch (e1) {
+            try {
+                execSync(`git config --global --add safe.directory ${projectRoot}`, { timeout: 5000, stdio: 'pipe' });
+            } catch (e2) {
+                // 忽略失败，下面用 -c 内联配置兜底
+            }
         }
 
         // 确定更新源 URL：公共仓库支持免认证 fetch
@@ -356,9 +361,11 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
 
         // fetch 阶段：使用完整 URL 免认证拉取公共仓库
         // GIT_TERMINAL_PROMPT=0 禁止交互式认证提示（避免卡住等待输入）
+        // -c safe.directory 兜底避免 dubious ownership 报错（即使 config 未生效）
+        const safeGitDir = projectRoot.replace(/"/g, '\\"');
         const tryFetchUrl = (url) => {
             try {
-                const out = execSync(`git fetch ${url} main 2>&1`, {
+                const out = execSync(`git -c safe.directory=${safeGitDir} fetch ${url} main 2>&1`, {
                     cwd: projectRoot,
                     timeout: 90000,
                     encoding: 'utf-8',
@@ -388,9 +395,10 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
 
         // reset 到 FETCH_HEAD（git fetch <url> <branch> 后最新提交在 FETCH_HEAD）
         try {
-            execSync('git reset --hard FETCH_HEAD', { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
+            execSync(`git -c safe.directory=${safeGitDir} reset --hard FETCH_HEAD`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
         } catch (error) {
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
+            console.error('[系统更新] git reset 失败:', stderr);
             return res.status(500).json({ error: '更新失败: git reset 失败，请检查仓库状态' });
         }
         try {
