@@ -2345,7 +2345,7 @@ module.exports = {
         create: async (data) => {
             const [result] = await execute(
                 `INSERT INTO disk_specs (name, disk_type, storage_group_id, enabled, min_size_gb, max_size_gb, price_per_gb, quarterly_discount, yearly_discount, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max, storage_pool, disk_format, description)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
                 [data.name || '', data.disk_type, parseInt(data.storage_group_id), data.enabled ? 1 : 0, parseInt(data.min_size_gb) || 10, parseInt(data.max_size_gb) || 2000, parseFloat(data.price_per_gb) || 0, parseInt(data.quarterly_discount) || 0, parseInt(data.yearly_discount) || 0, data.mbps_rd || null, data.mbps_rd_max || null, data.mbps_wr || null, data.mbps_wr_max || null, data.iops_rd || null, data.iops_rd_max || null, data.iops_wr || null, data.iops_wr_max || null, data.storage_pool || '', data.disk_format || null, data.description || null]
             );
             return queryOne('SELECT * FROM disk_specs WHERE id = ?', [result.insertId]);
