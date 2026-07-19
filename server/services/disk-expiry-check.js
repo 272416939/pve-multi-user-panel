@@ -7,10 +7,11 @@ var pveApi = require('../api/pve-api');
 var { createEmailTemplate, sendEmail } = require('../utils/email');
 var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 var { getRedisClient } = require('../api/redis');
+var logger = require('../utils/logger');
 
 var isChecking = false;
 // DEBUG 模式下输出完整巡检/导入过程日志；日常模式只输出有实际动作的日志
-var DEBUG = process.env.DEBUG === 'true';
+var DEBUG = logger.isDebug();
 
 // ==================== Redis 提醒去重（复用 VM 模式） ====================
 
@@ -64,7 +65,7 @@ async function sendDiskReminderEmail(user, disk, stage) {
     var html = createEmailTemplate('硬盘到期提醒', content, siteName);
     await sendEmail(user.email, subject, html);
   } catch (e) {
-    console.error('[disk-expiry] 发送提醒邮件失败:', e.message);
+    logger.error('[disk-expiry] 发送提醒邮件失败:', e.message);
   }
 }
 
@@ -90,12 +91,12 @@ async function gracefulShutdownVm(vmid, timeout) {
     }
 
     // 超时强制断电
-    console.warn('[disk-expiry] VM ' + vmid + ' 优雅关机超时，强制断电');
+    logger.warn('[disk-expiry] VM ' + vmid + ' 优雅关机超时，强制断电');
     await pveApi.stopVm(vmid);
     await new Promise(function(r) { setTimeout(r, 3000); });
     return true;
   } catch (e) {
-    console.error('[disk-expiry] 关机 VM ' + vmid + ' 失败:', e.message);
+    logger.error('[disk-expiry] 关机 VM ' + vmid + ' 失败:', e.message);
     return false;
   }
 }
@@ -127,14 +128,14 @@ async function detachDiskFromVm(disk) {
       var errMsg = (result.stderr || result.stdout || '');
       // hotplug busy 错误（Windows VM 常见）：guest 内磁盘已卸载，等待 1 秒后重试一次
       if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
-        if (DEBUG) console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 首次 unlink 报 busy，等待 1 秒后重试...');
+        logger.debug('[disk-expiry] 磁盘 ' + disk.id + ' 首次 unlink 报 busy，等待 1 秒后重试...');
         await new Promise(function(resolve) { setTimeout(resolve, 1000); });
         var retryResult = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
         if (retryResult.code !== 0) {
           // 重试仍失败：guest 内磁盘已卸载，仅 PVE 配置留划线状态，不阻塞流程
-          console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 重试 unlink 仍报错（guest 内已卸载，PVE 留划线状态），继续标记 expired');
-        } else if (DEBUG) {
-          console.log('[disk-expiry] 磁盘 ' + disk.id + ' 重试 unlink 成功');
+          logger.warn('[disk-expiry] 磁盘 ' + disk.id + ' 重试 unlink 仍报错（guest 内已卸载，PVE 留划线状态），继续标记 expired');
+        } else {
+          logger.debug('[disk-expiry] 磁盘 ' + disk.id + ' 重试 unlink 成功');
         }
       } else {
         throw new Error('分离磁盘失败: ' + errMsg);
@@ -144,10 +145,10 @@ async function detachDiskFromVm(disk) {
     // 更新台账：状态 -> expired（到期分离游离态）
     await db.disks.updateStatus(disk.id, 'expired');
     await db.disks.unbind(disk.id);
-    console.log('[disk-expiry] 磁盘 ' + disk.id + ' 已从 VM ' + safeVmid + ' 分离');
+    logger.info('[disk-expiry] 磁盘 ' + disk.id + ' 已从 VM ' + safeVmid + ' 分离');
     return true;
   } catch (e) {
-    console.error('[disk-expiry] 分离磁盘 ' + disk.id + ' 失败:', e.message);
+    logger.error('[disk-expiry] 分离磁盘 ' + disk.id + ' 失败:', e.message);
     return false;
   }
 }
@@ -175,10 +176,10 @@ async function destroyExpiredDisk(disk) {
     }
 
     await db.disks.markDestroyed(disk.id);
-    console.log('[disk-expiry] 磁盘 ' + disk.id + ' (' + disk.volume_id + ') 已销毁回收');
+    logger.info('[disk-expiry] 磁盘 ' + disk.id + ' (' + disk.volume_id + ') 已销毁回收');
     return true;
   } catch (e) {
-    console.error('[disk-expiry] 销毁磁盘 ' + disk.id + ' 失败:', e.message);
+    logger.error('[disk-expiry] 销毁磁盘 ' + disk.id + ' 失败:', e.message);
     return false;
   }
 }
@@ -208,7 +209,7 @@ async function checkExpiredDisks() {
     disks = disks.filter(function(d) { return !d.is_legacy; });
     if (!disks || disks.length === 0) return;
 
-    if (DEBUG) console.log('[disk-expiry] 巡检 ' + disks.length + ' 个磁盘');
+    logger.debug('[disk-expiry] 巡检 ' + disks.length + ' 个磁盘');
 
     for (var i = 0; i < disks.length; i++) {
       var disk = disks[i];
@@ -247,7 +248,7 @@ async function checkExpiredDisks() {
           if (disk.status === 'bound' || disk.status === 'grace') {
             // SCSI 支持热插拔，直接分离磁盘，无需关机
             if (disk.bind_vmid) {
-              console.log('[disk-expiry] 磁盘 ' + disk.id + ' 到期分离（VM ' + disk.bind_vmid + '）');
+              logger.info('[disk-expiry] 磁盘 ' + disk.id + ' 到期分离（VM ' + disk.bind_vmid + '）');
               await detachDiskFromVm(disk);
               // 发送到期分离通知
               if (!await isDiskReminderSent(disk.id, 'expired', today)) {
@@ -266,17 +267,17 @@ async function checkExpiredDisks() {
             // 重新计算：到期后 grace_days 天分离，再 retention_days 天销毁
             var actualDestroyDate = new Date(expireDate.getTime() + (graceDays + retentionDays) * 24 * 60 * 60 * 1000);
             if (now >= actualDestroyDate) {
-              console.log('[disk-expiry] 磁盘 ' + disk.id + ' 保留期结束，执行销毁回收');
+              logger.info('[disk-expiry] 磁盘 ' + disk.id + ' 保留期结束，执行销毁回收');
               await destroyExpiredDisk(disk);
             }
           }
         }
       } catch (e) {
-        console.error('[disk-expiry] 处理磁盘 ' + disk.id + ' 异常:', e.message);
+        logger.error('[disk-expiry] 处理磁盘 ' + disk.id + ' 异常:', e.message);
       }
     }
   } catch (e) {
-    console.error('[disk-expiry] 巡检异常:', e.message);
+    logger.error('[disk-expiry] 巡检异常:', e.message);
   } finally {
     isChecking = false;
   }
@@ -312,7 +313,7 @@ async function checkStorageCapacityAlert() {
       }
     }
   } catch (e) {
-    console.error('[disk-expiry] 存储容量告警检查失败:', e.message);
+    logger.error('[disk-expiry] 存储容量告警检查失败:', e.message);
   }
 }
 
@@ -344,9 +345,9 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
         try { await sendEmail(admin.email, subject, html); } catch (e) {}
       }
     }
-    console.log('[disk-expiry] 存储容量告警邮件已发送给 ' + admins.rows.length + ' 个管理员');
+    logger.info('[disk-expiry] 存储容量告警邮件已发送给 ' + admins.rows.length + ' 个管理员');
   } catch (e) {
-    console.error('[disk-expiry] 发送存储告警邮件失败:', e.message);
+    logger.error('[disk-expiry] 发送存储告警邮件失败:', e.message);
   }
 }
 
@@ -361,7 +362,7 @@ async function importExistingDisks() {
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
     var sshConfig = await getPveSshConfig();
-    if (DEBUG) console.log('[disk-import] 孤立磁盘清理：开始检查，共 ' + allDisks.length + ' 条磁盘记录');
+    logger.debug('[disk-import] 孤立磁盘清理：开始检查，共 ' + allDisks.length + ' 条磁盘记录');
 
     // 按存储池分组收集需要检查的卷，避免重复查询同一存储池
     var storagePools = {};
@@ -386,11 +387,11 @@ async function importExistingDisks() {
         // 输出为表格格式，volume_id 是每行第一个字段（到第一个空格为止）
         var cmd = 'pvesm list ' + poolName + ' 2>&1';
         var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
-        if (DEBUG) console.log('[disk-import] 存储池 ' + poolName + ' 卷列表 code=' + result.code +
+        logger.debug('[disk-import] 存储池 ' + poolName + ' 卷列表 code=' + result.code +
           ' stdout=' + JSON.stringify(result.stdout));
 
         if (result.code !== 0) {
-          console.warn('[disk-import] 查询存储池 ' + poolName + ' 失败，跳过该池的清理');
+          logger.warn('[disk-import] 查询存储池 ' + poolName + ' 失败，跳过该池的清理');
           continue;
         }
 
@@ -414,23 +415,23 @@ async function importExistingDisks() {
           if (!existingVols[entry.volumeId]) {
             await db.getPool().execute('DELETE FROM disks WHERE id = ?', [entry.disk.id]);
             cleanedCount++;
-            if (DEBUG) console.log('[disk-import] 清理孤立 legacy 磁盘记录:', entry.volumeId, '(', entry.disk.status, ')');
-          } else if (DEBUG) {
-            console.log('[disk-import] 磁盘存在，保留:', entry.volumeId);
-          }
+            logger.debug('[disk-import] 清理孤立 legacy 磁盘记录:', entry.volumeId, '(', entry.disk.status, ')');
+          } else {
+          logger.debug('[disk-import] 磁盘存在，保留:', entry.volumeId);
+        }
         }
       } catch (e) {
-        console.error('[disk-import] 检查存储池 ' + poolName + ' 失败:', e.message);
+        logger.error('[disk-import] 检查存储池 ' + poolName + ' 失败:', e.message);
       }
     }
     if (cleanedCount > 0) {
-      console.log('[disk-import] 清理了 ' + cleanedCount + ' 个孤立 legacy 磁盘记录');
+      logger.info('[disk-import] 清理了 ' + cleanedCount + ' 个孤立 legacy 磁盘记录');
     }
 
     // ===== 第二步：正常导入流程 =====
     var allVms = await db.vms.getAll();
     if (!allVms || allVms.length === 0) {
-      if (DEBUG) console.log('[disk-import] 无虚拟机，跳过导入');
+      logger.debug('[disk-import] 无虚拟机，跳过导入');
       return { total_vms: 0, imported: 0, skipped: 0, unmatched: 0, cleaned: cleanedCount };
     }
 
@@ -559,7 +560,7 @@ async function importExistingDisks() {
           }
         }
       } catch (e) {
-        console.error('[disk-import] 导入 VM ' + vm.vm_id + ' 数据盘失败:', e.message);
+        logger.error('[disk-import] 导入 VM ' + vm.vm_id + ' 数据盘失败:', e.message);
       }
     }
 
@@ -578,14 +579,14 @@ async function importExistingDisks() {
     if (report.unmatched > 0) parts.push('未匹配 ' + report.unmatched);
     if (report.cleaned > 0) parts.push('清理 ' + report.cleaned);
     if (parts.length > 0) {
-      console.log('[disk-import] 导入完成: ' + parts.join(', '));
-    } else if (DEBUG) {
-      console.log('[disk-import] 导入完成: 无变化');
-    }
-    if (DEBUG) console.log('[disk-import] 完整报告:', JSON.stringify(report));
+      logger.info('[disk-import] 导入完成: ' + parts.join(', '));
+    } else {
+          logger.debug('[disk-import] 导入完成: 无变化');
+        }
+    logger.debug('[disk-import] 完整报告:', JSON.stringify(report));
     return report;
   } catch (e) {
-    console.error('[disk-import] 导入异常:', e.message);
+    logger.error('[disk-import] 导入异常:', e.message);
     return { error: e.message };
   }
 }

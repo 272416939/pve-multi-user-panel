@@ -7,6 +7,8 @@ const fs = require('fs');
 const pkg = require('../package.json');
 const { WebSocket } = require('ws');
 require('dotenv').config();
+// 统一日志工具：覆盖全局 console，自动添加时间戳和前缀（必须在其他模块之前引入）
+require('./utils/logger');
 const crypto = require('crypto');
 const { authMiddleware } = require('./middleware/auth');
 const { checkRateLimit } = require('./middleware/rate-limiter');
