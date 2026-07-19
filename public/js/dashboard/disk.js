@@ -14,6 +14,8 @@
   $.diskOptions = ref({ groups: [], specs: [] });
   $.selectedDisks = ref([]);
   $.diskLoading = ref(false);
+  $.diskActionLoading = ref(false);  // 磁盘操作中（挂载/卸载/扩容/销毁），防止重复点击
+  $.diskActionText = ref('');        // 操作中显示的文字（如"卸载中..."）
 
   // 购买弹窗状态
   $.showCreateDiskModal = ref(false);
@@ -223,6 +225,9 @@
     var disk = $.bindTargetDisk.value;
     var vmid = $.bindTargetVmid.value;
     if (!vmid) { return alert('请选择目标虚拟机'); }
+    if ($.diskActionLoading.value) return;
+    $.diskActionLoading.value = true;
+    $.diskActionText.value = '挂载中...';
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/bind', {
         method: 'POST',
@@ -230,30 +235,39 @@
         body: JSON.stringify({ vmid: parseInt(vmid) })
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '挂载失败');
+      if (!res.ok) { alert(data.error || '挂载失败'); return; }
       $.bsModalHide('bindDiskModal');
       alert('挂载成功（总线: ' + data.bus + ', 设备号: ' + data.dev + '）');
       await $.loadDisks();
     } catch (e) {
       alert('挂载失败: ' + e.message);
+    } finally {
+      $.diskActionLoading.value = false;
+      $.diskActionText.value = '';
     }
   };
 
   // ===== 卸载磁盘 =====
   $.unbindDisk = async function(disk) {
     if (!disk) return;
+    if ($.diskActionLoading.value) return;
     var ok = await customConfirm('确定卸载磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\nSCSI 支持热插拔，无需关闭虚拟机');
     if (!ok) return;
+    $.diskActionLoading.value = true;
+    $.diskActionText.value = '卸载中...';
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/unbind', {
         method: 'POST'
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '卸载失败');
+      if (!res.ok) { alert(data.error || '卸载失败'); return; }
       alert('卸载成功');
       await $.loadDisks();
     } catch (e) {
       alert('卸载失败: ' + e.message);
+    } finally {
+      $.diskActionLoading.value = false;
+      $.diskActionText.value = '';
     }
   };
 
@@ -321,6 +335,9 @@
       var ok = await customConfirm('余额不足，扩容费用 ¥' + $.resizePrice.value + '，当前余额 ¥' + parseFloat($.user.balance || 0).toFixed(2) + '\n是否继续尝试？');
       if (!ok) return;
     }
+    if ($.diskActionLoading.value) return;
+    $.diskActionLoading.value = true;
+    $.diskActionText.value = '扩容中...';
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/resize', {
         method: 'POST',
@@ -328,12 +345,15 @@
         body: JSON.stringify({ capacity_gb: newSize })
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '扩容失败');
+      if (!res.ok) { alert(data.error || '扩容失败'); return; }
       alert('扩容成功，新容量：' + data.new_capacity + ' GiB，费用：¥' + (data.amount || 0));
       $.bsModalHide('resizeDiskModal');
       await $.loadDisks();
     } catch (e) {
       alert('扩容失败: ' + e.message);
+    } finally {
+      $.diskActionLoading.value = false;
+      $.diskActionText.value = '';
     }
   };
 
@@ -352,12 +372,15 @@
     }
     var ok = await customConfirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n此操作不可恢复！' + extraWarning);
     if (!ok) return;
+    if ($.diskActionLoading.value) return;
+    $.diskActionLoading.value = true;
+    $.diskActionText.value = '销毁中...';
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/destroy', {
         method: 'POST'
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '销毁失败');
+      if (!res.ok) { alert(data.error || '销毁失败'); return; }
       if (data.refund) {
         alert('销毁成功，已退款 ¥' + data.refund_amount);
       } else if (data.refund_desc) {
@@ -368,6 +391,9 @@
       await $.loadDisks();
     } catch (e) {
       alert('销毁失败: ' + e.message);
+    } finally {
+      $.diskActionLoading.value = false;
+      $.diskActionText.value = '';
     }
   };
 

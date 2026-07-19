@@ -13,12 +13,19 @@
   </div>
 
   <!-- 顶栏功能按钮 -->
-  <div class="mb-3 d-flex gap-2 flex-wrap">
-    <pv-button variant="glass" size="sm" @click="openCreateDiskModal">新建</pv-button>
-    <pv-button variant="outline" size="sm" @click="openBindModal" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'free') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">挂载</pv-button>
-    <pv-button variant="outline" size="sm" @click="unbindDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'bound') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">卸载</pv-button>
-    <pv-button variant="outline-danger" size="sm" @click="destroyDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status === 'bound') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">销毁</pv-button>
-    <pv-button variant="outline-warning" size="sm" @click="resizeDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="selectedDisks.length !== 1 || selectedDiskCannotResize()" :title="selectedDiskResizeTitle()">扩容</pv-button>
+  <div class="mb-3 d-flex gap-2 flex-wrap align-items-center">
+    <pv-button variant="glass" size="sm" @click="openCreateDiskModal" :disabled="diskActionLoading">新建</pv-button>
+    <pv-button variant="outline" size="sm" @click="openBindModal" :disabled="diskActionLoading || selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'free') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">挂载</pv-button>
+    <pv-button variant="outline" size="sm" @click="unbindDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="diskActionLoading || selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status !== 'bound') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">
+      <span v-if="diskActionLoading && diskActionText === '卸载中...'" class="spinner-border spinner-border-sm me-1" role="status"></span>卸载
+    </pv-button>
+    <pv-button variant="outline-danger" size="sm" @click="destroyDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="diskActionLoading || selectedDisks.length !== 1 || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.status === 'bound') || (selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy)" :title="selectedDisks.length === 1 && disks.find(function(d) { return d.id === selectedDisks[0]; })?.is_legacy ? 'legacy磁盘随VM管理' : ''">
+      <span v-if="diskActionLoading && diskActionText === '销毁中...'" class="spinner-border spinner-border-sm me-1" role="status"></span>销毁
+    </pv-button>
+    <pv-button variant="outline-warning" size="sm" @click="resizeDisk(disks.find(function(d) { return d.id === selectedDisks[0]; }))" :disabled="diskActionLoading || selectedDisks.length !== 1 || selectedDiskCannotResize()" :title="selectedDiskResizeTitle()">扩容</pv-button>
+    <span v-if="diskActionLoading" class="text-muted small ms-2">
+      <span class="spinner-border spinner-border-sm me-1" role="status"></span>{{ diskActionText }}
+    </span>
   </div>
 
   <!-- 加载中 -->
@@ -200,7 +207,9 @@
       </div>
       <div class="modal-footer d-flex gap-2" style="border-top:1px solid var(--border-color);">
         <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
-        <pv-button @click="submitBindDisk" variant="primary" :disabled="!bindTargetVmid">确定挂载</pv-button>
+        <pv-button @click="submitBindDisk" variant="primary" :disabled="diskActionLoading || !bindTargetVmid">
+          <span v-if="diskActionLoading && diskActionText === '挂载中...'" class="spinner-border spinner-border-sm me-1" role="status"></span>确定挂载
+        </pv-button>
       </div>
     </div>
   </div>
@@ -268,7 +277,9 @@
       </div>
       <div class="modal-footer d-flex gap-2" style="border-top:1px solid var(--border-color);">
         <pv-button type="button" data-bs-dismiss="modal" variant="outline">取消</pv-button>
-        <pv-button @click="submitResizeDisk" variant="primary" :disabled="!resizeInputAddGb || resizeInputAddGb <= 0 || resizePrice < 0">确定扩容</pv-button>
+        <pv-button @click="submitResizeDisk" variant="primary" :disabled="diskActionLoading || !resizeInputAddGb || resizeInputAddGb <= 0 || resizePrice < 0">
+          <span v-if="diskActionLoading && diskActionText === '扩容中...'" class="spinner-border spinner-border-sm me-1" role="status"></span>确定扩容
+        </pv-button>
       </div>
     </div>
   </div>
