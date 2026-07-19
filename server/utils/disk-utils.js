@@ -5,6 +5,7 @@ var crypto = require('crypto');
 var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 var pveApi = require('../api/pve-api');
 var { calculateAmount } = require('./order-utils');
+var logger = require('./logger');
 
 // ==================== 参数白名单校验 ====================
 // 参照文档 7.2.1 节：每个参数在拼接前经过严格白名单校验
@@ -130,7 +131,7 @@ async function createDisk(storage, sizeGb, userId, tempVmid, diskFormat) {
   // vmid 必须是一个真实存在的 VM ID（不能为 0）
   var cmd = 'pvesm alloc ' + safeStorage + ' ' + safeVmid + ' ' + volName + ' ' + safeSize + 'G';
   var stdout = await runSshCommand(cmd);
-  console.log('[createDisk] pvesm alloc stdout:', JSON.stringify(stdout), 'volName:', volName, 'storage:', safeStorage);
+  logger.debug('[createDisk] pvesm alloc stdout:', JSON.stringify(stdout), 'volName:', volName, 'storage:', safeStorage);
 
   // 解析返回的 volume_id
   // pvesm alloc 对不同存储类型的 stdout 格式不同：
@@ -148,7 +149,7 @@ async function createDisk(storage, sizeGb, userId, tempVmid, diskFormat) {
       volumeId = stdout.trim();
     }
   }
-  console.log('[createDisk] 返回 volume_id:', volumeId);
+  logger.debug('[createDisk] 返回 volume_id:', volumeId);
   return volumeId;
 }
 
@@ -202,11 +203,11 @@ async function unbindDisk(vmid, bus, dev) {
     // busy 错误（Windows VM 常见）：guest 内磁盘已卸载，PVE 配置仍保留
     // 自动重试一次（此时 guest 内已无磁盘占用，unlink 应能成功清理 PVE 配置）
     if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
-      console.log('[unbindDisk] 首次 unlink 报 busy，等待 1 秒后重试...');
+      logger.debug('[unbindDisk] 首次 unlink 报 busy，等待 1 秒后重试...');
       await new Promise(function(resolve) { setTimeout(resolve, 1000); });
       try {
         await runSshCommand(cmd);
-        console.log('[unbindDisk] 重试 unlink 成功，PVE 配置已清理');
+        logger.debug('[unbindDisk] 重试 unlink 成功，PVE 配置已清理');
         return;
       } catch (e2) {
         // 重试仍失败，提示用户手动处理
@@ -250,7 +251,7 @@ async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid, bindBus, bind
         var detachCmd = 'qm set ' + transitVmid + ' --delete scsi30';
         await runSshCommand(detachCmd);
       } catch (e) {
-        console.error('[disk-utils] 卸载中转磁盘失败:', e.message);
+        logger.error('[disk-utils] 卸载中转磁盘失败:', e.message);
       }
     }
   }
