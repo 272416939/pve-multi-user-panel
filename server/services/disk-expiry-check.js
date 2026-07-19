@@ -9,6 +9,8 @@ var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 var { getRedisClient } = require('../api/redis');
 
 var isChecking = false;
+// DEBUG 模式下输出完整巡检/导入过程日志；日常模式只输出有实际动作的日志
+var DEBUG = process.env.DEBUG === 'true';
 
 // ==================== Redis 提醒去重（复用 VM 模式） ====================
 
@@ -125,13 +127,13 @@ async function detachDiskFromVm(disk) {
       var errMsg = (result.stderr || result.stdout || '');
       // hotplug busy 错误（Windows VM 常见）：guest 内磁盘已卸载，等待 1 秒后重试一次
       if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
-        console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 首次 unlink 报 busy，等待 1 秒后重试...');
+        if (DEBUG) console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 首次 unlink 报 busy，等待 1 秒后重试...');
         await new Promise(function(resolve) { setTimeout(resolve, 1000); });
         var retryResult = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
         if (retryResult.code !== 0) {
           // 重试仍失败：guest 内磁盘已卸载，仅 PVE 配置留划线状态，不阻塞流程
           console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 重试 unlink 仍报错（guest 内已卸载，PVE 留划线状态），继续标记 expired');
-        } else {
+        } else if (DEBUG) {
           console.log('[disk-expiry] 磁盘 ' + disk.id + ' 重试 unlink 成功');
         }
       } else {
@@ -206,7 +208,7 @@ async function checkExpiredDisks() {
     disks = disks.filter(function(d) { return !d.is_legacy; });
     if (!disks || disks.length === 0) return;
 
-    console.log('[disk-expiry] 巡检 ' + disks.length + ' 个磁盘');
+    if (DEBUG) console.log('[disk-expiry] 巡检 ' + disks.length + ' 个磁盘');
 
     for (var i = 0; i < disks.length; i++) {
       var disk = disks[i];
@@ -356,7 +358,6 @@ async function importExistingDisks() {
     // 孤立记录定义：台账中有记录，但 PVE 中卷已不存在
     // 注意：只清理那些真正孤立的记录（PVE 卷被手动删除）
     // 清理范围：bound/grace/expired 状态的 legacy 磁盘（free 状态的可能是分离但卷仍在，不清理）
-    var DEBUG = process.env.DEBUG === 'true';
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
     var sshConfig = await getPveSshConfig();
@@ -413,7 +414,7 @@ async function importExistingDisks() {
           if (!existingVols[entry.volumeId]) {
             await db.getPool().execute('DELETE FROM disks WHERE id = ?', [entry.disk.id]);
             cleanedCount++;
-            console.log('[disk-import] 清理孤立 legacy 磁盘记录:', entry.volumeId, '(', entry.disk.status, ')');
+            if (DEBUG) console.log('[disk-import] 清理孤立 legacy 磁盘记录:', entry.volumeId, '(', entry.disk.status, ')');
           } else if (DEBUG) {
             console.log('[disk-import] 磁盘存在，保留:', entry.volumeId);
           }
@@ -429,7 +430,7 @@ async function importExistingDisks() {
     // ===== 第二步：正常导入流程 =====
     var allVms = await db.vms.getAll();
     if (!allVms || allVms.length === 0) {
-      console.log('[disk-import] 无虚拟机，跳过导入');
+      if (DEBUG) console.log('[disk-import] 无虚拟机，跳过导入');
       return { total_vms: 0, imported: 0, skipped: 0, unmatched: 0, cleaned: cleanedCount };
     }
 
@@ -570,7 +571,18 @@ async function importExistingDisks() {
       unmatched_list: unmatchedList,
       cleaned: cleanedCount
     };
-    console.log('[disk-import] 导入完成:', JSON.stringify(report));
+    // 日常只输出摘要行（导入/跳过/清理数），DEBUG 模式输出完整 report（含 unmatched_list）
+    var parts = [];
+    if (report.imported > 0) parts.push('新导入 ' + report.imported);
+    if (report.skipped > 0) parts.push('跳过 ' + report.skipped);
+    if (report.unmatched > 0) parts.push('未匹配 ' + report.unmatched);
+    if (report.cleaned > 0) parts.push('清理 ' + report.cleaned);
+    if (parts.length > 0) {
+      console.log('[disk-import] 导入完成: ' + parts.join(', '));
+    } else if (DEBUG) {
+      console.log('[disk-import] 导入完成: 无变化');
+    }
+    if (DEBUG) console.log('[disk-import] 完整报告:', JSON.stringify(report));
     return report;
   } catch (e) {
     console.error('[disk-import] 导入异常:', e.message);
