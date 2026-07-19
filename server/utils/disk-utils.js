@@ -186,14 +186,28 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
   return { bus: bus, dev: parseInt(dev) };
 }
 
-// 卸载磁盘 - qm unlink <vmid> --idlist <bus><dev>
-// 使用 qm unlink 而非 qm set --delete，兼容 Windows VM（不会留下划线状态）
+// 卸载磁盘 - qm set <vmid> --delete <bus><dev>
+// 标准卸载方式，兼容所有存储类型（DIR/LVM/BTRFS 等）
+// 注意：Windows VM 可能因磁盘仍被占用而报 "still busy in guest"，
+// 此时需用户在 guest 内安全弹出磁盘后再卸载
 async function unbindDisk(vmid, bus, dev) {
   var safeVmid = validateParam('vmid', vmid);
   var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
 
-  var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + busDev;
-  await runSshCommand(cmd);
+  // 先尝试标准 qm set --delete
+  var cmd = 'qm set ' + safeVmid + ' --delete ' + busDev;
+  try {
+    await runSshCommand(cmd);
+    return;
+  } catch (e) {
+    var errMsg = e.message || '';
+    // 如果是 hotplug busy 错误（Windows VM 常见），明确提示
+    if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
+      throw new Error('磁盘仍被虚拟机占用，请先在虚拟机内安全弹出该磁盘后再卸载');
+    }
+    // 其他错误继续抛出
+    throw e;
+  }
 }
 
 // 扩容磁盘 - qm resize <vmid> <bus+dev> <size>

@@ -117,10 +117,17 @@ async function detachDiskFromVm(disk) {
     var sshConfig = await getPveSshConfig();
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
 
-    var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + disk.bind_bus + safeDev;
+    // 标准卸载方式 qm set --delete，兼容所有存储类型（DIR/LVM/BTRFS 等）
+    var cmd = 'qm set ' + safeVmid + ' --delete ' + disk.bind_bus + safeDev;
     var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
     if (result.code !== 0) {
-      throw new Error('分离磁盘失败: ' + (result.stderr || result.stdout));
+      var errMsg = (result.stderr || result.stdout || '');
+      // hotplug busy 错误（Windows VM 常见），记录日志继续
+      if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
+        console.warn('[disk-expiry] 磁盘 ' + disk.id + ' 被 VM ' + safeVmid + ' 占用，将在下次巡检重试');
+        return false;
+      }
+      throw new Error('分离磁盘失败: ' + errMsg);
     }
 
     // 更新台账：状态 -> expired（到期分离游离态）
