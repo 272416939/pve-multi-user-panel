@@ -358,14 +358,19 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
         // GIT_TERMINAL_PROMPT=0 禁止交互式认证提示（避免卡住等待输入）
         const tryFetchUrl = (url) => {
             try {
-                execSync(`git fetch ${url} main`, {
+                const out = execSync(`git fetch ${url} main 2>&1`, {
                     cwd: projectRoot,
                     timeout: 90000,
-                    stdio: 'pipe',
+                    encoding: 'utf-8',
                     env: { ...process.env, GIT_TERMINAL_PROMPT: '0' }
                 });
+                console.log('[系统更新] git fetch 成功:', url, out ? out.substring(0, 200) : '(无输出)');
                 return true;
             } catch (e) {
+                const stderr = e.stderr ? e.stderr.toString().trim() : '';
+                const stdout = e.stdout ? e.stdout.toString().trim() : '';
+                console.error('[系统更新] git fetch 失败:', url, 'code=' + (e.status || e.code),
+                    'stderr=' + stderr.substring(0, 500), 'stdout=' + stdout.substring(0, 500));
                 return false;
             }
         };
