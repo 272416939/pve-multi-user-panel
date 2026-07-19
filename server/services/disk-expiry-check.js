@@ -117,10 +117,10 @@ async function detachDiskFromVm(disk) {
     var sshConfig = await getPveSshConfig();
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
 
-    // 标准卸载方式 qm set --delete，兼容所有存储类型（DIR/LVM/BTRFS 等）
+    // qm unlink 卸载磁盘（优于 qm set --delete，不留划线状态）
     // 注意：busy 错误时 guest 内磁盘实际已卸载（Windows 划线状态仅 PVE 配置层显示），
     // 不阻塞流程，台账状态照常更新为 expired（避免白嫖）
-    var cmd = 'qm set ' + safeVmid + ' --delete ' + disk.bind_bus + safeDev;
+    var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + disk.bind_bus + safeDev;
     var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
     if (result.code !== 0) {
       var errMsg = (result.stderr || result.stdout || '');

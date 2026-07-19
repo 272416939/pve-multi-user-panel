@@ -186,15 +186,16 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
   return { bus: bus, dev: parseInt(dev) };
 }
 
-// 卸载磁盘 - qm set <vmid> --delete <bus><dev>
-// 标准卸载方式，兼容所有存储类型（DIR/LVM/BTRFS 等）
-// 注意：Windows VM 可能因磁盘仍被占用而报 "still busy in guest"，
-// 但此时 guest 内磁盘实际已卸载，PVE 配置层留划线状态（用户可手动点还原清理）
+// 卸载磁盘 - qm unlink <vmid> --idlist <bus><dev>
+// qm unlink 优于 qm set --delete：
+// - 不会留划线状态（Linux VM 完全清理）
+// - Windows VM 可能报 "virtioscsi busy" 错误，但 guest 内磁盘实际已卸载
+//   PVE 配置层留划线状态，用户可到 PVE 点「还原」清理
 async function unbindDisk(vmid, bus, dev) {
   var safeVmid = validateParam('vmid', vmid);
   var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
 
-  var cmd = 'qm set ' + safeVmid + ' --delete ' + busDev;
+  var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + busDev;
   try {
     await runSshCommand(cmd);
   } catch (e) {
