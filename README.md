@@ -249,6 +249,10 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 │   │   ├── random-name.js     # VM/LXC 随机名称
 │   │   ├── safe-error.js      # 统一错误脱敏（safeError）
 │   │   ├── username-blacklist.js
+│   │   ├── crypto-utils.js    # AES-256-GCM 加密工具（JWT_SECRET 派生等）
+│   │   ├── disk-utils.js      # 💾 磁盘操作工具（创建/销毁/扩容/挂载/卸载/QoS）
+│   │   ├── logger.js          # 统一日志工具
+│   │   ├── password-hash.js   # bcryptjs 密码哈希
 │   │   └── with-transaction.js # MySQL 事务封装
 	│   ├── routes/                # 路由模块（18 个）
 	│   │   ├── auth.js            # 认证 + 2FA + 忘记密码
@@ -339,8 +343,8 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 │   │   ├── terminal-keyboard.js    # 终端快捷键捕获（复制/粘贴/透传）
 │   │   ├── terminal-shortcuts-help.js # 终端快捷键说明 modal
 │   │   ├── lib/               # 第三方库（DOMPurify）
-│   │   ├── admin/             # 管理后台模块（core/admin/vm/lxc/network/update/package/template + admin-template-* 拆分模块）
-│   │   └── dashboard/         # 用户面板模块（core/vm/lxc/forward/message + dashboard-template-*）
+│   │   ├── admin/             # 管理后台模块（core/admin/vm/lxc/network/update/package/template/disk + admin-template-* 拆分模块）
+│   │   └── dashboard/         # 用户面板模块（core/vm/lxc/forward/message/disk + dashboard-template-*）
 │   └── novnc/                 # noVNC 库
 ├── test/                      # Mocha + Chai 测试
 ├── .env.example               # 配置模板
@@ -500,7 +504,7 @@ qm create 9999 --name "disk-transfer-vm" --memory 128 --cores 1
 管理员可在「硬盘设置 > 数据盘管理」中：
 - **查看：** 所有用户的数据盘列表（ID/用户/名称/存储分组/规格/容量/状态/绑定VM/到期时间）
 - **编辑：** 修改磁盘名称、存储分组、规格
-- **销毁：** 管理员销毁（3 天内全额退款，超过 3 天按剩余时间比例）
+- **销毁：** 3 天内全额退款，超过 3 天按剩余时间比例退款（不受 15 天限制，详见 [退款规则](#退款规则)）
 - **导入存量磁盘：** 扫描 PVE 中未管理的存量数据盘，自动匹配规格并导入台账（标记为 `legacy`，随 VM 续费）
 
 #### 用户硬盘管理
@@ -511,9 +515,111 @@ qm create 9999 --name "disk-transfer-vm" --memory 128 --cores 1
 - **卸载：** 从 VM 卸载磁盘
 - **扩容：** 随时扩容，按价差收费
 - **续费：** 月/季/年续费，支持自动续费
-- **销毁：** 15 天内按比例退款，超过 15 天无退款
+- **销毁：** 按订单分单退款（3 天内全额、3-15 天按剩余比例、超过 15 天不退，详见 [退款规则](#退款规则)）
 
 > **Legacy 磁盘说明：** 通过「导入存量磁盘」导入的磁盘标记为 `(随VM)`，不参与独立计费和续费，到期时间随绑定 VM 同步。VM 被移除时，legacy 磁盘台账自动删除（PVE 磁盘保留，可重新导入）。
+
+#### 退款规则
+
+磁盘退款并非独立功能，而是「销毁磁盘」动作的副产物。系统对每笔历史订单（购买 / 扩容 / 续费）**逐单计算退款金额**后求和，不按磁盘整体计算。
+
+##### 触发场景
+
+| # | 场景 | 触发入口 | 退款规则 |
+|---|------|----------|----------|
+| 1 | 用户销毁磁盘 | `POST /api/disks/:id/destroy` | ≤3 天全额；3-15 天按剩余时间比例；>15 天不退 |
+| 2 | 管理员销毁磁盘 | `POST /api/admin/disks/:id/destroy` | ≤3 天全额；>3 天按剩余时间比例（**不受 15 天限制**） |
+| 3 | 购买失败回滚 | `pvesm alloc` 创建卷失败 | 全额回滚该笔订单金额 |
+| 4 | 扩容失败回滚 | `qm resize` 扩容失败 | 全额回滚扩容差价并恢复容量 |
+
+##### 退款公式（按订单分单计算）
+
+对每笔 `type='disk'` 且 `status='completed'` 的历史订单，计算如下：
+
+```text
+orderDays   = floor((now - order.created_at) / 86400000)        // 订单创建至今的天数
+totalMs     = disk.expire_time - order.created_at                // 订单覆盖的总时长
+remainingMs = disk.expire_time - now                            // 剩余未使用时长
+factor      = remainingMs / totalMs                             // 剩余时间比例
+orderRefund = round2(orderPaid * factor)                        // 单笔退款金额
+
+refundAmount = Σ orderRefund                                     // 退款总额
+```
+
+**用户销毁**（受 15 天截止）：
+
+| orderDays | 退款计算 |
+|-----------|----------|
+| ≤ 3 天 | `orderRefund = orderPaid`（全额退） |
+| 3-15 天 | `orderRefund = round2(orderPaid * factor)`（仅当 `factor > 0`） |
+| > 15 天 | `orderRefund = 0`（不退） |
+
+**管理员销毁**（无 15 天截止）：
+
+| orderDays | 退款计算 |
+|-----------|----------|
+| ≤ 3 天 | `orderRefund = orderPaid`（全额退） |
+| > 3 天 | `orderRefund = round2(orderPaid * factor)`（仅当 `remainingMs > 0`，按剩余时间比例退） |
+
+> **退款基数：** `orderPaid = order.amount`（订单实付金额，**已含季付/年付折扣**），退款时不重新计价、不重新调用定价函数。
+
+##### 落库流程（事务 + 行锁）
+
+销毁退款在 `withTransaction` + `SELECT ... FOR UPDATE` 行锁中执行，保证并发安全：
+
+```text
+1. SELECT * FROM disks WHERE id = ? FOR UPDATE        // 行锁防并发
+2. diskUtils.destroyDisk(volume_id)                   // PVE 执行 pvesm free 释放卷
+3. UPDATE users SET balance = balance + refundAmount   // 退款入账用户余额
+4. INSERT INTO transaction_records                    // 逐笔写退款流水（见下表）
+5. UPDATE orders SET status='refunded' / 'destroyed'  // 原订单状态更新
+6. UPDATE disks SET status='destroyed'                // 磁盘台账标记销毁
+```
+
+##### 退款流水字段（`transaction_records` 表）
+
+| 字段 | 值 | 说明 |
+|------|-----|------|
+| `trade_type` | `'refund'` | 交易类型：退款 |
+| `pay_method` | `'balance_refund'` | 退款方式：余额退回 |
+| `resource_type` | `'disk'` | 资源类型：数据盘 |
+| `resource_id` | 磁盘 id | 关联磁盘 |
+| `trade_no` | 原订单号（KTVM/KLXC/KP 前缀） | 关联原订单 |
+| `order_no` | `TK` + 时间 + 8 位随机数字 | 新退款订单号 |
+| `balance_before` / `balance_after` | 用户余额前后值 | 余额快照 |
+| `amount` | 该笔订单退款额 | 退款金额 |
+
+##### 订单状态机
+
+```text
+pending ──(支付完成)──> completed ──(销毁退款)──> refunded
+                                   └─(销毁无退款)──> destroyed
+```
+
+- 购买/扩容/续费成功 → `completed`
+- 销毁且产生退款 → `refunded`（每笔有退款的订单一条流水）
+- 销毁但无退款（>15 天用户销毁） → `destroyed`
+
+##### 退款条件限制
+
+- **必须先卸载**：磁盘状态为 `bound`（已挂载）时禁止销毁，先执行卸载
+- **不可重复销毁**：状态为 `destroyed` 的磁盘再次销毁会报错
+- **过期/宽限期不退款**：状态为 `expired` / `grace` 的磁盘，`paidOrders` 不参与退款计算
+- **Legacy 磁盘不独立退款**：通过「导入存量磁盘」导入的磁盘随 VM 管理，不参与独立销毁退款
+- **系统盘受保护**：`scsi0` / `sata0` / `virtio0` 及 `disk-0` 卷禁止任何操作
+- **磁盘类型不影响退款**：`NVME` / `SATA` / `HDD` / `U2` 退款逻辑一致，仅定价与 QoS 不同
+
+##### 前端响应字段
+
+销毁接口返回 `{ success, refund, refund_amount, refund_desc }`，前端据此弹窗提示退款金额：
+
+| `refund_desc` | 触发条件 |
+|---------------|----------|
+| `全额退款（开通 X 天）` | 磁盘开通 ≤3 天 |
+| `按剩余天数退款（开通 X 天）` | 磁盘开通 3-15 天（用户）或 >3 天（管理员） |
+| `该磁盘开通时间大于15天无法进行退款操作` | 用户销毁且开通 >15 天 |
+
+> **提示：** 扩容后磁盘台账的 `price_per_gb` 会更新为新规格单价（后续续费按新价），但**已购历史订单的退款基数不变**，仍以原订单实付金额为准。
 
 ```bash
 # .env 中设置
