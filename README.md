@@ -670,11 +670,39 @@ MYSQL_DATABASE=pve_panel
 
 ## 🔄 手动更新
 
-当「系统更新」功能无法使用时，SSH 进入项目目录执行：
+当「系统更新」功能无法使用时，SSH 进入项目目录手动更新。根据目标版本选择对应流程：
+
+### 正式版（main 分支）
+
+**GitHub 源**（`origin`）：
 
 ```bash
-git fetch origin && git reset --hard origin/main && npm install --production && pm2 restart pve-panel
+git fetch origin && git checkout main && git reset --hard origin/main && npm install --production && pm2 restart pve-panel
 ```
+
+**Gitee 源**（`gitee`）：
+
+```bash
+git fetch gitee && git checkout main && git reset --hard gitee/main && npm install --production && pm2 restart pve-panel
+```
+
+### Beta 版（beta 分支）
+
+> Beta 版包含尚未正式发布的新功能，可能存在不稳定因素。仅建议测试环境或愿意尝鲜的用户使用。生产环境请使用正式版。
+
+**GitHub 源**（`origin`）：
+
+```bash
+git fetch origin && git checkout beta && git reset --hard origin/beta && npm install --production && pm2 restart pve-panel
+```
+
+**Gitee 源**（`gitee`）：
+
+```bash
+git fetch gitee && git checkout beta && git reset --hard gitee/beta && npm install --production && pm2 restart pve-panel
+```
+
+### 通用说明
 
 > 如果更新后 `npm install` 报 `EALLOWREMOTE` 错误，说明本地 npm registry 与 lockfile 不一致，删除 lockfile 重新生成即可：
 > ```bash
@@ -683,6 +711,8 @@ git fetch origin && git reset --hard origin/main && npm install --production && 
 > **注意：** `package-lock.json` 不由仓库管理，由用户本地 `npm install` 自动生成。
 
 > 如需回滚：`git reflog` 查找旧 commit hash，`git reset --hard <hash>` 回滚。
+
+> 如需在正式版与 beta 版之间切换，先 `git fetch <remote>` 获取最新引用，再用对应分支的 `git checkout` + `git reset --hard <remote>/<branch>` 命令即可，无需重新克隆。
 
 ---
 
