@@ -209,8 +209,8 @@
               <td>{{ disk.capacity_gb }} GiB</td>
               <td><span :class="diskPage.getDiskStatusClass(disk.status)">{{ diskPage.getDiskStatusText(disk.status) }}</span></td>
               <td>{{ disk.bind_vmid ? 'VM-' + disk.bind_vmid : '-' }}</td>
-              <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.formatDate(disk.expire_time) : '-') }}</td>
-              <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.daysUntilExpire(disk.expire_time) : '-') }}</td>
+              <td>{{ disk.status === 'destroyed' ? '0' : (disk.is_legacy ? '随VM' : (disk.expire_time ? diskPage.formatDate(disk.expire_time) : '-')) }}</td>
+              <td>{{ disk.status === 'destroyed' ? '0' : (disk.is_legacy ? '随VM' : (disk.expire_time ? diskPage.daysUntilExpire(disk.expire_time) : '-')) }}</td>
               <td>
                 <div class="table-actions">
                   <button v-if="disk.status !== 'destroyed'" class="table-btn btn-primary" @click="diskPage.openEditDiskForm(disk)">编辑</button>
