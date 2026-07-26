@@ -125,6 +125,64 @@ async function recoverProvisioningTasks() {
     console.log('[recovery] 开通中记录恢复完成');
 }
 
+// v1.3 新增：系统切换崩溃恢复
+// 扫描 status='running' 且 started_at < NOW() - 30min 的切换记录
+async function recoverOsSwitchTasks() {
+    var db = require('../api/db');
+    var pveApi = require('../api/pve-api');
+
+    var staleLogs = [];
+    try {
+        var beforeTime = new Date(Date.now() - 30 * 60 * 1000);
+        staleLogs = await db.vmOsSwitchLogs.getStaleRunning(beforeTime);
+    } catch (e) {
+        console.error('[recovery] 查询过期切换记录失败:', e.message);
+        return;
+    }
+
+    if (staleLogs.length === 0) return;
+    console.log('[recovery] 发现 ' + staleLogs.length + ' 条过期切换记录，开始恢复...');
+
+    for (var i = 0; i < staleLogs.length; i++) {
+        var log = staleLogs[i];
+        try {
+            var vmStatus = await pveApi.getVmStatus(log.vm_id);
+            var config = await pveApi.getVmConfig(log.vm_id);
+            var tmpl = await db.osTemplates.getById(log.to_os_template_id);
+
+            // 简单判定：VM running 且 ciuser 匹配
+            if (vmStatus.status === 'running' && tmpl && config.ciuser === tmpl.ciuser) {
+                await db.vmOsSwitchLogs.update(log.id, {
+                    status: 'success',
+                    finished_at: new Date(),
+                    error_message: 'recovered by startup check (assumed success)'
+                });
+                var vm = await db.vms.getByVmid(log.vm_id);
+                if (vm) {
+                    await db.vms.update(vm.id, {
+                        current_os_template_id: log.to_os_template_id,
+                        last_os_switch_at: new Date(),
+                        os_switch_pve_upid: ''
+                    });
+                }
+                console.log('[recovery] 系统切换记录 ' + log.id + ' 恢复为 success');
+            } else {
+                await db.vmOsSwitchLogs.update(log.id, {
+                    status: 'failed',
+                    admin_intervention_required: 1,
+                    finished_at: new Date(),
+                    error_message: 'startup recovery: VM state inconsistent'
+                });
+                var vm2 = await db.vms.getByVmid(log.vm_id);
+                if (vm2) await db.vms.update(vm2.id, { os_switch_pve_upid: '' });
+                console.log('[recovery] 系统切换记录 ' + log.id + ' 标记为 failed（需管理员介入）');
+            }
+        } catch (e) {
+            console.error('[recovery] 恢复系统切换记录 ' + log.id + ' 失败:', e.message);
+        }
+    }
+}
+
 function initScheduledTasks() {
     schedule.scheduleJob('*/5 * * * *', async () => {
         if (await tryAcquireLock('lock:expiry-check')) {
@@ -178,6 +236,12 @@ function initScheduledTasks() {
         } catch (e) {
             console.error('[recovery] 开通中记录恢复异常:', e.message);
         }
+        // v1.3 新增：系统切换崩溃恢复
+        try {
+            await recoverOsSwitchTasks();
+        } catch (e) {
+            console.error('[recovery] 系统切换恢复异常:', e.message);
+        }
     }, 10000);
 
     loadSentRemindersFromDb();
@@ -190,4 +254,4 @@ function initScheduledTasks() {
     checkStorageCapacityAlert();
 }
 
-module.exports = { initScheduledTasks, recoverProvisioningTasks };
+module.exports = { initScheduledTasks, recoverProvisioningTasks, recoverOsSwitchTasks };

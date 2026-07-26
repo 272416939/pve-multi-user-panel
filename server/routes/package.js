@@ -100,6 +100,30 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         if (!template) return res.status(404).json({ error: '关联模板不存在' });
         if (template.status !== 'active') return res.status(400).json({ error: '关联模板已停用' });
 
+        // v1.3 新增：解析 OS 模板 ID（前端订购弹窗传入）
+        var osTemplateId = parseInt(req.body.os_template_id) || 0;
+        var osTemplate = null;
+        if (osTemplateId > 0) {
+            osTemplate = await db.osTemplates.getById(osTemplateId);
+            if (!osTemplate || osTemplate.status !== 'active') {
+                return res.status(400).json({ error: 'OS 模板不存在或已下架' });
+            }
+            // 校验 allowed_package_ids 约束
+            if (osTemplate.allowed_package_ids && osTemplate.allowed_package_ids.length > 0) {
+                var allowedIds = osTemplate.allowed_package_ids.split(',').map(function(s) { return parseInt(s.trim()); }).filter(Number.isInteger);
+                if (allowedIds.length > 0 && allowedIds.indexOf(pkg.id) === -1) {
+                    return res.status(400).json({ error: '该系统模板不适用于当前套餐' });
+                }
+            }
+        } else if (pkg.default_os_template_id) {
+            // 前端未选，使用套餐默认
+            osTemplate = await db.osTemplates.getById(pkg.default_os_template_id);
+        }
+
+        // 克隆源：优先用 OS 模板，回退到套餐模板
+        var cloneSourceVmid = osTemplate ? osTemplate.template_vmid : template.template_vmid;
+        var finalTargetStorage = osTemplate ? osTemplate.target_storage : template.target_storage;
+
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
         var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
@@ -134,9 +158,9 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         // 检查模板 VM 状态，full clone 需要模板处于停止状态
         try {
-            var tmplStatus = await pveApi.getVmStatus(template.template_vmid);
+            var tmplStatus = await pveApi.getVmStatus(cloneSourceVmid);
             if (tmplStatus && tmplStatus.status === 'running') {
-                console.error('[package] 模板 VM ' + template.template_vmid + ' 正在运行，无法进行 full clone');
+                console.error('[package] 模板 VM ' + cloneSourceVmid + ' 正在运行，无法进行 full clone');
                 return res.status(400).json({ error: '模板虚拟机正在运行，请先停止后再订购' });
             }
         } catch (statusErr) {
@@ -145,10 +169,10 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         var newVm = null;
         try {
-            var upid = await pveApi.cloneVm(template.template_vmid, newVmid, {
+            var upid = await pveApi.cloneVm(cloneSourceVmid, newVmid, {
                 name: randomName,
-                storage: template.target_storage || undefined,
-                clone_mode: template.clone_mode || 'full'
+                storage: finalTargetStorage || undefined,
+                clone_mode: 'full'
             });
 
             // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪
@@ -160,7 +184,8 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                 monthly_price: String(pkg.monthly_price || ''),
                 quarterly_discount: String(pkg.quarterly_discount || ''),
                 yearly_discount: String(pkg.yearly_discount || ''),
-                pve_upid: upid
+                pve_upid: upid,
+                current_os_template_id: osTemplate ? osTemplate.id : null
             });
 
             // 等待 clone 任务完成
@@ -170,7 +195,17 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             newVm = await db.vms.update(newVm.id, { pve_upid: '' });
 
             var vmUpdateCfg = { cores: template.cores, memory: template.memory };
-            if (template.ciuser) {
+            // v1.3 新增：如果选择了 OS 模板，使用 OS 模板的 ciuser 和 ostype
+            if (osTemplate) {
+                if (osTemplate.ciuser) {
+                    vmUpdateCfg.ciuser = osTemplate.ciuser;
+                    vmUpdateCfg.cipassword = generateRandomPassword();
+                }
+                // 写入 ostype（如 l26=Linux 6.x, w10=Windows 10）
+                if (osTemplate.ostype) {
+                    vmUpdateCfg.ostype = osTemplate.ostype;
+                }
+            } else if (template.ciuser) {
                 vmUpdateCfg.ciuser = template.ciuser;
                 vmUpdateCfg.cipassword = generateRandomPassword();
             }
@@ -532,6 +567,39 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
     } catch (e) {
         console.error('[package] 用户订购 LXC 失败:', e.message);
         logPveError(e);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+// ===== v1.3 新增：获取套餐可选的 OS 模板列表 =====
+router.get('/vm-packages/:id/available-os-templates', authMiddleware, async (req, res) => {
+    try {
+        var pkg = await db.vmPackages.getById(req.params.id);
+        if (!pkg) return res.status(404).json({ error: '套餐不存在' });
+
+        var allTemplates = await db.osTemplates.getEnabled();
+        var available = allTemplates.filter(function(t) {
+            if (!t.allowed_package_ids || t.allowed_package_ids.length === 0) return true;
+            return t.allowed_package_ids.indexOf(pkg.id) !== -1;
+        });
+
+        res.json({
+            success: true,
+            data: available.map(function(t) {
+                return {
+                    id: t.id,
+                    name: t.name,
+                    os_type: t.os_type,
+                    os_version: t.os_version,
+                    ostype: t.ostype,
+                    system_disk_size: t.system_disk_size,
+                    switch_price: t.switch_price,
+                    description: t.description
+                };
+            }),
+            default_id: pkg.default_os_template_id || null
+        });
+    } catch (e) {
         res.status(500).json({ error: safeError(e) });
     }
 });

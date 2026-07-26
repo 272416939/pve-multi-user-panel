@@ -155,6 +155,7 @@
                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                     <li><a href="#" @click.prevent="openRenewModal(vm)">续费</a></li>
                                     <li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
+                                    <li><a href="#" @click.prevent="osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
                                     <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
                                 </ul>
                             </div>
@@ -238,9 +239,10 @@
                                                     <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
                                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                                     <li><a href="#" @click.prevent="openRenewModal(vm)">续费</a></li>
-                                                    <li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
-                                                    <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
-                                                </ul>
+<li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
+                                    <li><a href="#" @click.prevent="osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
+                                    <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
+                                </ul>
                                             </div>
                                         </div>
                                     </td>

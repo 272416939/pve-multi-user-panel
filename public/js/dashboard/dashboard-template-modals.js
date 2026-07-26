@@ -814,6 +814,24 @@
         <div class="modal-header"><h5 class="modal-title">确认订购</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="mb-3"><strong>{{ orderPackage.name }}</strong></div>
+            <!-- v1.3 新增：操作系统选择（仅 VM 套餐显示） -->
+            <div class="mb-3" v-if="orderType === 'vm'">
+                <label class="form-label">操作系统</label>
+                <select class="form-select" v-model="orderForm.os_template_id" :disabled="orderOsLoading">
+                    <option :value="0" v-if="orderOsTemplates.length > 0">默认（{{ orderPackage.default_os_template_name || '系统推荐' }}）</option>
+                    <option :value="0" v-else>不指定（开通后可在「切换系统」中变更）</option>
+                    <option v-for="t in orderOsTemplates" :key="t.id" :value="t.id">
+                        {{ t.name }} ({{ t.os_type }} {{ t.os_version }}, {{ t.system_disk_size }}GB)
+                    </option>
+                </select>
+                <div class="form-text text-muted" v-if="orderOsLoading">加载中...</div>
+                <div class="form-text text-muted" v-else-if="orderOsTemplates.length === 0">
+                    该套餐暂无可选系统，将使用默认模板开通，开通后可切换
+                </div>
+                <div class="form-text text-muted" v-else>
+                    选择系统后将影响磁盘容量和初始系统，<strong>不影响价格</strong>
+                </div>
+            </div>
             <div class="mb-3">
                 <label class="form-label">计费周期</label>
                 <div class="order-period-display">

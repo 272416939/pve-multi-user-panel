@@ -207,6 +207,10 @@ watch($.user, function(u) {
             section = 'packages'; subId = 'packages-lxc-groups';
             $.activeTabPackages.value = 'lxc-groups';
             window.packagePage.loadLxcPackageGroups();
+        } else if (page === 'os-templates') {
+            section = 'templates';
+            subId = 'templates-os';
+            if (window.__admin.osTemplatePage) window.__admin.osTemplatePage.load();
         }
         if (!section) return;
         $.switchSection(section);

@@ -365,18 +365,43 @@ function calcResizeAmount(oldSizeGb, newSizeGb, pricePerGb, expireTime) {
   return parseFloat(amount.toFixed(2));
 }
 
-module.exports = {
-  validateParam,
-  validateVolumeId,
-  createDisk,
-  bindDisk,
-  unbindDisk,
-  resizeDisk,
-  destroyDisk,
-  getSystemDiskBus,
-  getAvailableDevNumber,
-  checkStorageCapacity,
-  calcDiskAmount,
-  calcRenewAmount,
-  calcResizeAmount,
+// ==================== 系统切换内部函数（仅供 os-switch-utils.js 使用） ====================
+// 绕过 dev=0 检查，仅通过 Node.js 进程内 require 访问，不暴露给 HTTP 路由层
+const _internal = {
+  unbindSystemDisk: async (vmid, bus) => {
+    var safeVmid = validateParam('vmid', vmid);
+    if (!['scsi', 'sata', 'virtio'].includes(bus)) throw new Error('invalid bus');
+    var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + bus + '0';
+    await runSshCommand(cmd);
+  },
+  destroySystemDisk: async (volumeId) => {
+    if (!/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_./\-]+$/.test(volumeId)) {
+      throw new Error('invalid volume id');
+    }
+    var parts = volumeId.split(':');
+    var volName = parts[1] || '';
+    var lastSeg = volName.split('/').pop() || volName;
+    if (!/^(vm-|disk-pool-|imported-)/.test(lastSeg)) {
+      throw new Error('invalid volume prefix');
+    }
+    var cmd = 'pvesm free ' + volumeId;
+    await runSshCommand(cmd);
+  }
 };
+
+	module.exports = {
+	  validateParam,
+	  validateVolumeId,
+	  createDisk,
+	  bindDisk,
+	  unbindDisk,
+	  resizeDisk,
+	  destroyDisk,
+	  getSystemDiskBus,
+	  getAvailableDevNumber,
+	  checkStorageCapacity,
+	  calcDiskAmount,
+	  calcRenewAmount,
+	  calcResizeAmount,
+	  _internal,
+	};

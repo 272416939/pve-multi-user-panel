@@ -11,6 +11,8 @@ const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindin
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
+const osSwitchUtils = require('../utils/os-switch-utils');
+const { generateOrderNo } = require('../utils/order-utils');
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -894,13 +896,253 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             return res.status(500).json({ error: 'PVE 销毁虚拟机失败：' + safeError(e) });
         }
 
-        res.json({ message: '虚拟机已销毁' });
-    } catch (error) {
-        console.error('销毁虚拟机失败:', error);
-        res.status(500).json({ error: safeError(error) });
-    }
-});
+res.json({ message: '虚拟机已销毁' });
+        } catch (error) {
+            console.error('销毁虚拟机失败:', error);
+            res.status(500).json({ error: safeError(error) });
+        }
+    });
 
+    // ==================== 系统切换端点（v1.3） ====================
 
-module.exports = router;
+    // POST /vm/:vmid/switch-os — 用户切换系统
+    router.post('/vm/:vmid/switch-os', authMiddleware, async (req, res) => {
+        const vmid = parseInt(req.params.vmid);
+        const rateLimit = await checkRateLimit('ratelimit:os-switch:' + req.user.id, 1, 60000);
+        if (!rateLimit.allowed) {
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        }
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+            return res.status(400).json({ error: '无效的 VMID' });
+        }
+        const vm = await db.vms.getByVmid(vmid);
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        const isAdmin = req.user.role === 'admin';
+        if (vm.user_id !== req.user.id && !isAdmin) {
+            return res.status(403).json({ error: '无权限操作' });
+        }
+        if (vm.expiration_date && new Date(vm.expiration_date) < new Date() && !isAdmin) {
+            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+        }
+        const runningSwitch = await db.vmOsSwitchLogs.getRunningByVmid(vmid);
+        if (runningSwitch) {
+            return res.status(409).json({ error: '该虚拟机正在切换系统中，请稍候' });
+        }
+        const osTemplateId = parseInt(req.body.os_template_id);
+        if (!Number.isInteger(osTemplateId) || osTemplateId < 1) {
+            return res.status(400).json({ error: '无效的 OS 模板 ID' });
+        }
+        const osTemplate = await db.osTemplates.getById(osTemplateId);
+        if (!osTemplate || !osTemplate.enabled || osTemplate.status !== 'active') {
+            return res.status(400).json({ error: 'OS 模板不存在或已下架' });
+        }
+        if (osTemplate.allowed_package_ids) {
+            const allowedIds = osTemplate.allowed_package_ids.split(',').map(s => parseInt(s.trim())).filter(Number.isInteger);
+            if (allowedIds.length > 0 && vm.package_id && !allowedIds.includes(vm.package_id)) {
+                return res.status(403).json({ error: '当前套餐不允许切换到该系统' });
+            }
+        }
+        const vmStatus = await pveApi.getVmStatus(vmid);
+        if (vmStatus.status !== 'stopped') {
+            return res.status(400).json({ error: '请先关机后再切换系统' });
+        }
+        let oldSysDiskSizeGb = 0;
+        try {
+            const oldConfig = await pveApi.getVmConfig(vmid);
+            for (const bus of ['scsi', 'sata', 'virtio']) {
+                const raw = String(oldConfig[bus + '0'] || '');
+                const m = raw.match(/size=(\d+)([GM])/i);
+                if (m) {
+                    const v = parseInt(m[1]);
+                    oldSysDiskSizeGb = m[2].toUpperCase() === 'M' ? Math.ceil(v / 1024) : v;
+                    break;
+                }
+            }
+        } catch (e) { /* ignore */ }
+        const requiredGb = Math.max(oldSysDiskSizeGb, osTemplate.system_disk_size);
+        await osSwitchUtils.checkTargetStorageCapacity(osTemplate.target_storage, requiredGb);
+
+        let orderNo = '';
+        let amountCharged = 0;
+        if (parseFloat(osTemplate.switch_price) > 0 && !isAdmin) {
+            const totalAmount = parseFloat(osTemplate.switch_price);
+            orderNo = generateOrderNo('os');
+            try {
+                await withTransaction(async (conn) => {
+                    const [userRows] = await conn.execute('SELECT balance FROM users WHERE id = ?', [req.user.id]);
+                    const balance = parseFloat(userRows[0]?.balance || '0');
+                    if (balance < totalAmount) throw new Error('余额不足');
+                    await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, req.user.id]);
+                    await conn.execute(
+                        'INSERT INTO orders (order_no, user_id, type, period, period_count, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
+                        [orderNo, req.user.id, 'os_switch', 'month', 1, totalAmount, 'pending']
+                    );
+                    await conn.execute(
+                        'INSERT INTO transaction_records (user_id, order_no, trade_type, amount, balance_before, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
+                        [req.user.id, orderNo, 'expense', totalAmount, balance, balance - totalAmount]
+                    );
+                });
+                amountCharged = totalAmount;
+            } catch (e) {
+                return res.status(400).json({ error: e.message === '余额不足' ? '余额不足' : safeError(e) });
+            }
+        }
+
+        const switchLog = await db.vmOsSwitchLogs.create({
+            vm_id: vmid,
+            user_id: req.user.id,
+            from_os_template_id: vm.current_os_template_id || null,
+            to_os_template_id: osTemplateId,
+            from_template_vmid: null,
+            to_template_vmid: osTemplate.template_vmid,
+            old_system_volume_id: '',
+            new_system_volume_id: '',
+            data_disks_snapshot: '[]',
+            status: 'running',
+            amount_charged: amountCharged,
+            order_no: orderNo
+        });
+        await db.vms.update(vm.id, { os_switch_pve_upid: 'os-switch-' + switchLog.id });
+
+        (async () => {
+            try {
+                const result = await osSwitchUtils.performOsSwitch(vmid, osTemplate, switchLog.id);
+                await db.vmOsSwitchLogs.update(switchLog.id, {
+                    status: 'success',
+                    new_system_volume_id: result.newVolumeId || '',
+                    data_disks_snapshot: JSON.stringify(result.dataDisks || []),
+                    finished_at: new Date()
+                });
+                await db.vms.update(vm.id, {
+                    current_os_template_id: osTemplateId,
+                    last_os_switch_at: new Date(),
+                    os_switch_pve_upid: ''
+                });
+                if (orderNo) {
+                    await db.orders.updateStatus(orderNo, 'completed');
+                }
+                await db.messages.create({
+                    uid: vm.user_id,
+                    title: '系统切换成功',
+                    content: '您的虚拟机 ' + (vm.name || 'VM ' + vmid) + ' 已成功切换到 ' + osTemplate.name + '。\n登录账号：' + (result.ciResult?.ciuser || '未配置') + '\n新密码：' + (result.ciResult?.password || '') + '\n请尽快登录并修改密码。',
+                    type: 2, send_type: 1
+                });
+            } catch (error) {
+                await db.vmOsSwitchLogs.update(switchLog.id, {
+                    status: 'failed',
+                    error_message: error.message || String(error),
+                    finished_at: new Date()
+                });
+                await db.vms.update(vm.id, { os_switch_pve_upid: '' });
+                if (orderNo && amountCharged > 0) {
+                    try {
+                        await withTransaction(async (conn) => {
+                            await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [amountCharged, req.user.id]);
+                            await conn.execute(
+                                'INSERT INTO transaction_records (user_id, order_no, trade_type, amount, created_at) VALUES (?, ?, ?, ?, NOW())',
+                                [req.user.id, orderNo, 'os_switch_refund', amountCharged]
+                            );
+                            await conn.execute("UPDATE orders SET status = ? WHERE order_no = ?", ['refunded', orderNo]);
+                        });
+                    } catch (refundErr) {
+                        console.error('[os-switch] 退款失败:', refundErr.message);
+                    }
+                }
+                try {
+                    await db.messages.create({
+                        uid: vm.user_id,
+                        title: '系统切换失败',
+                        content: '您的虚拟机 ' + (vm.name || 'VM ' + vmid) + ' 切换系统失败' + (amountCharged > 0 ? '，已自动退款。' : '。') + '\n数据盘未受影响。请稍后重试或联系管理员。',
+                        type: 2, send_type: 1
+                    });
+                } catch (msgErr) {
+                    console.error('[os-switch] 失败通知发送失败:', msgErr.message);
+                }
+            }
+        })();
+
+        res.json({
+            success: true,
+            message: '系统切换已开始，请稍候',
+            switch_log_id: switchLog.id,
+            vmid: vmid
+        });
+    });
+
+    // GET /vm/:vmid/switch-os/status — 查询切换进度
+    router.get('/vm/:vmid/switch-os/status', authMiddleware, async (req, res) => {
+        const vmid = parseInt(req.params.vmid);
+        const rateLimit = await checkRateLimit('ratelimit:os-switch-status:' + req.user.id, 30, 60000);
+        if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁' });
+        const vm = await db.vms.getByVmid(vmid);
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        const log = await db.vmOsSwitchLogs.getRunningByVmid(vmid);
+        if (!log) return res.json({ status: 'idle' });
+        res.json({
+            status: log.status,
+            fail_stage: log.fail_stage || '',
+            admin_intervention_required: !!log.admin_intervention_required
+        });
+    });
+
+    // GET /vm/:vmid/switch-os/logs — 查询单 VM 切换日志（翻页，脱敏）
+    router.get('/vm/:vmid/switch-os/logs', authMiddleware, async (req, res) => {
+        const vmid = parseInt(req.params.vmid);
+        const vm = await db.vms.getByVmid(vmid);
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        const page = Math.min(parseInt(req.query.page) || 1, 1000);
+        const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+        const logs = await db.vmOsSwitchLogs.getByVmidWithPaging(vmid, page, limit);
+        const total = await db.vmOsSwitchLogs.countByVmid(vmid);
+        const safeLogs = logs.map(l => {
+            const { error_message, mac_sync_result, ...safe } = l;
+            return { ...safe, error_message: '', mac_sync_result: '' };
+        });
+        res.json({ success: true, data: safeLogs, total, page, limit });
+    });
+
+    // GET /vm/switch-os/logs — 查询当前用户所有切换日志（翻页，脱敏）
+    router.get('/vm/switch-os/logs', authMiddleware, async (req, res) => {
+        const page = Math.min(parseInt(req.query.page) || 1, 1000);
+        const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+        const logs = await db.vmOsSwitchLogs.getByUserId(req.user.id, page, limit);
+        const total = await db.vmOsSwitchLogs.countByUserId(req.user.id);
+        const safeLogs = logs.map(l => {
+            const { error_message, mac_sync_result, ...safe } = l;
+            return { ...safe, error_message: '', mac_sync_result: '' };
+        });
+        res.json({ success: true, data: safeLogs, total, page, limit });
+    });
+
+    // GET /vm/:vmid/switchable-os — 获取可切换 OS 列表
+    router.get('/vm/:vmid/switchable-os', authMiddleware, async (req, res) => {
+        const vmid = parseInt(req.params.vmid);
+        const vm = await db.vms.getByVmid(vmid);
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        const allOsTemplates = await db.osTemplates.getEnabled();
+        let filtered = allOsTemplates;
+        if (vm.package_id) {
+            filtered = allOsTemplates.filter(t => {
+                if (!t.allowed_package_ids) return true;
+                const allowed = t.allowed_package_ids.split(',').map(s => parseInt(s.trim())).filter(Number.isInteger);
+                return allowed.length === 0 || allowed.includes(vm.package_id);
+            });
+        }
+        res.json({
+            success: true,
+            current_os_template_id: vm.current_os_template_id,
+            data: filtered
+        });
+    });
+
+    module.exports = router;
 
