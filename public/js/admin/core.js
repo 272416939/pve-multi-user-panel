@@ -208,7 +208,7 @@ watch($.user, function(u) {
             $.activeTabPackages.value = 'lxc-groups';
             window.packagePage.loadLxcPackageGroups();
         } else if (page === 'os-templates') {
-            section = 'templates';
+            section = 'templates-os';
             subId = 'templates-os';
             if (window.__admin.osTemplatePage) window.__admin.osTemplatePage.load();
         }

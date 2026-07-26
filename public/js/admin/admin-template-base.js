@@ -81,8 +81,8 @@
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-templates">
-                    <a class="nav-item" data-subsection="templates-vm" href="#" @click.prevent="switchPage('vm-templates')"><span class="nav-text">VM 模板</span></a>
-                    <a class="nav-item" data-subsection="templates-lxc" href="#" @click.prevent="switchPage('lxc-templates')"><span class="nav-text">LXC 模板</span></a>
+                    <a class="nav-item" data-subsection="templates-vm" href="#" @click.prevent="switchPage('vm-templates')"><span class="nav-text">VM 套餐模板</span></a>
+                    <a class="nav-item" data-subsection="templates-lxc" href="#" @click.prevent="switchPage('lxc-templates')"><span class="nav-text">LXC 套餐模板</span></a>
                     <a class="nav-item" data-subsection="templates-os" href="#" @click.prevent="switchPage('os-templates')"><span class="nav-text">系统模板</span></a>
                 </div>
 

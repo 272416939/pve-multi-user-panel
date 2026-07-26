@@ -1,7 +1,7 @@
 (function() {
   if (!window.__adminTemplateParts) window.__adminTemplateParts = [];
   window.__adminTemplateParts.push(`
-<div v-if="activeSection === 'templates'">
+<div v-if="activeSection === 'templates' || activeSection === 'templates-os'">
 
                     <!-- VM 模板管理 -->
                     <div v-if="activeTabTemplates === 'vm'" class="tab-panel">
