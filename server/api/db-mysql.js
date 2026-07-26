@@ -613,7 +613,7 @@ async function initDb() {
         switch_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         icon VARCHAR(100) NOT NULL DEFAULT '',
         sort_order INT NOT NULL DEFAULT 0,
-        allowed_package_ids TEXT NOT NULL DEFAULT '',
+        allowed_package_ids VARCHAR(500) NOT NULL DEFAULT '',
         enabled TINYINT(1) NOT NULL DEFAULT 1,
         status VARCHAR(20) NOT NULL DEFAULT 'active',
         created_at DATETIME NOT NULL DEFAULT NOW(),
