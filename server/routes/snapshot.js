@@ -21,7 +21,7 @@ router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
             if (!owned) return res.status(403).json({ error: '无权操作此容器' });
         }
 
-        const snapshots = await pveApi.getLxcSnapshots(req.params.vmid);
+        const snapshots = await pveApi.getLxcSnapshots(vmid);
         const cfg = await db.snapshotConfig.get();
         const dailyCreate = await db.snapshotLogs.getDailyCount(req.user.id, 'create');
         const dailyRestore = await db.snapshotLogs.getDailyCount(req.user.id, 'restore');
@@ -59,7 +59,7 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
         // 非管理员配额限制
         if (!isAdmin) {
             const cfg = await db.snapshotConfig.get();
-            const snapshots = await pveApi.getLxcSnapshots(req.params.vmid);
+            const snapshots = await pveApi.getLxcSnapshots(vmid);
             if (snapshots.length >= cfg.max_per_vm) {
                 return res.status(400).json({ error: `每台容器最多保留 ${cfg.max_per_vm} 个快照` });
             }
@@ -70,8 +70,8 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
         }
 
         const name = generateSnapshotName();
-        await pveApi.createLxcSnapshot(req.params.vmid, name, description || '');
-        db.snapshotLogs.add(req.user.id, req.params.vmid, 'create');
+        await pveApi.createLxcSnapshot(vmid, name, description || '');
+        db.snapshotLogs.add(req.user.id, vmid, 'create');
         res.json({ message: '快照创建成功' });
     } catch (error) {
         if (error.response?.status === 500 && error.response?.data?.errors?.snapname) {
@@ -113,8 +113,8 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
             }
         }
 
-        await pveApi.rollbackLxcSnapshot(req.params.vmid, req.params.snapname);
-        db.snapshotLogs.add(req.user.id, req.params.vmid, 'restore');
+        await pveApi.rollbackLxcSnapshot(vmid, req.params.snapname);
+        db.snapshotLogs.add(req.user.id, vmid, 'restore');
         res.json({ message: '快照恢复成功，请稍后启动容器' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -142,7 +142,7 @@ router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res)
             return res.status(403).json({ error: '容器未分配，无权限' });
         }
 
-        await pveApi.deleteLxcSnapshot(req.params.vmid, req.params.snapname);
+        await pveApi.deleteLxcSnapshot(vmid, req.params.snapname);
         res.json({ message: '快照已删除' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -151,7 +151,7 @@ router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res)
 
 router.get('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
     try {
-        const vmid = req.params.vmid;
+        const vmid = parseInt(req.params.vmid);
         // 权限校验
         const isAdmin = req.user.role === 'admin';
         if (!isAdmin) {
@@ -162,7 +162,7 @@ router.get('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
             }
         }
 
-        const snapshots = await pveApi.getSnapshots(req.params.vmid);
+        const snapshots = await pveApi.getSnapshots(vmid);
         const cfg = await db.snapshotConfig.get();
         const dailyCreate = await db.snapshotLogs.getDailyCount(req.user.id, 'create');
         const dailyRestore = await db.snapshotLogs.getDailyCount(req.user.id, 'restore');
@@ -200,7 +200,7 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
         // 非管理员配额限制
         if (!isAdmin) {
             const cfg = await db.snapshotConfig.get();
-            const snapshots = await pveApi.getSnapshots(req.params.vmid);
+            const snapshots = await pveApi.getSnapshots(vmid);
             if (snapshots.length >= cfg.max_per_vm) {
                 return res.status(400).json({ error: `每台虚拟机最多保留 ${cfg.max_per_vm} 个快照` });
             }
@@ -211,8 +211,8 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
         }
 
         const name = generateSnapshotName();
-        await pveApi.createSnapshot(req.params.vmid, name, description || '');
-        db.snapshotLogs.add(req.user.id, req.params.vmid, 'create');
+        await pveApi.createSnapshot(vmid, name, description || '');
+        db.snapshotLogs.add(req.user.id, vmid, 'create');
         res.json({ message: '快照创建成功' });
     } catch (error) {
         if (error.response?.status === 500 && error.response?.data?.errors?.snapname) {
@@ -225,6 +225,13 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+            return res.status(400).json({ error: '无效的虚拟机 ID' });
+        }
+        // SEC-001 修复：snapname 白名单校验（唯一缺失的端点）
+        if (!/^[a-zA-Z0-9_-]{2,20}$/.test(req.params.snapname)) {
+            return res.status(400).json({ error: '无效的快照名称' });
+        }
 
         // H-4 修复：统一权限校验模式
         const allVms = await db.vms.getAll();
@@ -241,7 +248,7 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
 
         // 非管理员额外检查
         if (!isAdmin) {
-            const status = await pveApi.getVmStatus(req.params.vmid);
+            const status = await pveApi.getVmStatus(vmid);
             if (status.status !== 'stopped') {
                 return res.status(400).json({ error: '回滚前请先关闭虚拟机' });
             }
@@ -252,8 +259,8 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
             }
         }
 
-        await pveApi.rollbackSnapshot(req.params.vmid, req.params.snapname);
-        db.snapshotLogs.add(req.user.id, req.params.vmid, 'restore');
+        await pveApi.rollbackSnapshot(vmid, req.params.snapname);
+        db.snapshotLogs.add(req.user.id, vmid, 'restore');
         res.json({ message: '快照恢复成功，请稍后启动虚拟机' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -282,7 +289,7 @@ router.delete('/vm/:vmid/snapshots/:snapname', authMiddleware, async (req, res) 
             return res.status(400).json({ error: '无效的快照名称' });
         }
 
-        await pveApi.deleteSnapshot(req.params.vmid, req.params.snapname);
+        await pveApi.deleteSnapshot(vmid, req.params.snapname);
         res.json({ message: '快照已删除' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });

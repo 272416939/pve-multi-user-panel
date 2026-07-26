@@ -200,6 +200,7 @@
           <tbody>
             <tr v-for="disk in diskPage.allDisks.value" :key="disk.id">
               <td class="text-center"><input type="checkbox" :value="disk.id" v-model="diskPage.selectedDiskIds.value"></td>
+              <td>{{ disk.id }}</td>
               <td>{{ disk.username || '-' }}</td>
               <td>{{ disk.disk_name || '-' }}<span v-if="disk.is_legacy" class="text-muted small ms-1">(随VM)</span></td>
               <td>{{ disk.group_name || '-' }}</td>

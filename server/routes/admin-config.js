@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
-const { execSync } = require('child_process');
+const { execSync, execFileSync } = require('child_process');
 const axios = require('axios');
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
@@ -274,19 +274,19 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
             if (currentCommit && response.data.target_commitish) {
                 sameVersionDifferentCommit = currentCommit !== response.data.target_commitish;
             } else if (currentCommit && response.data.tag_name) {
-                // 通过 tag 名称获取远程 commit
+                // 通过 tag 名称获取远程 commit（SEC-007: 改用 execFileSync 数组形式防注入）
                 try {
-                    var remoteCommit = execSync('git rev-parse refs/tags/' + response.data.tag_name, {
+                    var remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
                         cwd: projectRoot, timeout: 5000, stdio: 'pipe'
                     }).toString().trim();
                     sameVersionDifferentCommit = currentCommit !== remoteCommit;
                 } catch (e) {
                     // 本地可能没有该 tag，尝试 fetch
                     try {
-                        execSync('git fetch origin tag ' + response.data.tag_name + ' --no-tags', {
+                        execFileSync('git', ['fetch', 'origin', 'tag', response.data.tag_name, '--no-tags'], {
                             cwd: projectRoot, timeout: 15000, stdio: 'pipe'
                         });
-                        var remoteCommit = execSync('git rev-parse refs/tags/' + response.data.tag_name, {
+                        var remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
                             cwd: projectRoot, timeout: 5000, stdio: 'pipe'
                         }).toString().trim();
                         sameVersionDifferentCommit = currentCommit !== remoteCommit;
