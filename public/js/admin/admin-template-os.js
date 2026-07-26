@@ -1,4 +1,5 @@
 (function () {
+    if (!window.__adminTemplateParts) window.__adminTemplateParts = [];
     window.__adminTemplateParts.push(`
     <!-- OS 模板管理 -->
     <div v-if="activeSection === 'templates-os'">
