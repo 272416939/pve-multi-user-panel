@@ -155,7 +155,13 @@ pushProxy.on('connection', async (clientWs, request) => {
         clientWs.close(1013, '服务器繁忙，连接数已满');
         return;
     }
-    const clientIp = (request.headers['x-forwarded-for'] || '').split(',')[0].trim() || request.socket.remoteAddress;
+    // SEC-003 修复：校验可信代理后再信任 x-forwarded-for
+    // WebSocket upgrade 不经 Express 中间件，trust proxy 不生效
+    const remoteAddr = request.socket.remoteAddress;
+    const isTrustedProxy = remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+    const clientIp = isTrustedProxy
+        ? (request.headers['x-forwarded-for'] || '').split(',')[0].trim() || remoteAddr
+        : remoteAddr;
     const ipConnections = Array.from(SUBSCRIPTIONS.values()).filter(s => s.ip === clientIp).length;
     if (ipConnections >= MAX_PER_IP) {
         clientWs.close(1013, '单IP连接数超限');

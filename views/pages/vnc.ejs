@@ -108,16 +108,16 @@
     <script type="module" nonce="<%= locals.cspNonce %>">
         import RFB from '/novnc/core/rfb.js';
 
-        const error = <%- JSON.stringify(typeof locals.error !== 'undefined' ? locals.error : null) %>;
+        const error = <%- JSON.stringify(typeof locals.error !== 'undefined' ? locals.error : null).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
         if (error) {
             document.getElementById('statusText').textContent = error;
             document.getElementById('connecting').innerHTML = '<span id="error-msg">' + error + '</span>';
             throw new Error(error);
         }
 
-        const ticket = <%- JSON.stringify(locals.ticket) %>;
-        const vmid = <%- JSON.stringify(locals.vmid) %>;
-        const type = <%- JSON.stringify(locals.type) %>;
+        const ticket = <%- JSON.stringify(locals.ticket).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
+        const vmid = <%- JSON.stringify(locals.vmid).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
+        const type = <%- JSON.stringify(locals.type).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
         const session = new URLSearchParams(location.search).get('session');
 
         const statusText = document.getElementById('statusText');

@@ -174,7 +174,7 @@
         try {
             return DOMPurify.sanitize(marked.parse(text));
         } catch (e) {
-            return text;
+            return DOMPurify.sanitize(String(text));
         }
     };
 

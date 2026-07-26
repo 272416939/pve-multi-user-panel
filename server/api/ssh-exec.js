@@ -1,26 +1,27 @@
 const { Client } = require('ssh2');
 
 /**
- * 通过 SSH 在 PVE 节点上执行命令
- * @param {string} host - SSH 主机地址
- * @param {string} username - SSH 用户名
- * @param {string} password - SSH 密码
- * @param {string} command - 要执行的命令
- * @param {number} timeout - 超时时间（毫秒），默认 10 分钟
- * @returns {Promise<{stdout: string, stderr: string, code: number}>}
- */
-function execSSH(host, username, password, command, timeout = 600000) {
-    return new Promise((resolve, reject) => {
-        const conn = new Client();
-        let stdout = '';
-        let stderr = '';
-        let timedOut = false;
+	 * 通过 SSH 在 PVE 节点上执行命令
+	 * @param {string} host - SSH 主机地址
+	 * @param {string} username - SSH 用户名
+	 * @param {string} password - SSH 密码
+	 * @param {string} command - 要执行的命令
+	 * @param {number} timeout - 超时时间（毫秒），默认 10 分钟
+	 * @returns {Promise<{stdout: string, stderr: string, code: number}>}
+	 */
+	function execSSH(host, username, password, command, timeout = 600000) {
+	    return new Promise((resolve, reject) => {
+	        const conn = new Client();
+	        let stdout = '';
+	        let stderr = '';
+	        let timedOut = false;
 
-        const timer = setTimeout(() => {
-            timedOut = true;
-            conn.end();
-            reject(new Error(`SSH 命令执行超时 (${timeout / 1000}s): ${command}`));
-        }, timeout);
+	        const timer = setTimeout(() => {
+	            timedOut = true;
+	            conn.end();
+	            console.error(`[ssh-exec] execSSH 超时: ${command}`);
+	            reject(new Error(`SSH 命令执行超时 (${timeout / 1000}s)`));
+	        }, timeout);
 
         conn.on('ready', () => {
             conn.exec(command, (err, stream) => {
@@ -206,11 +207,12 @@ function execSSHWithStdin(host, username, password, command, stdinData, timeout 
         let stderr = '';
         let timedOut = false;
 
-        const timer = setTimeout(() => {
-            timedOut = true;
-            conn.end();
-            reject(new Error(`SSH 命令执行超时 (${timeout / 1000}s): ${command}`));
-        }, timeout);
+const timer = setTimeout(() => {
+	            timedOut = true;
+	            conn.end();
+	            console.error(`[ssh-exec] execSSHWithStdin 超时: ${command}`);
+	            reject(new Error(`SSH 命令执行超时 (${timeout / 1000}s)`));
+	        }, timeout);
 
         conn.on('ready', () => {
             conn.exec(command, (err, stream) => {

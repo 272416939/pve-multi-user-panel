@@ -253,7 +253,7 @@ class PveApi {
     if (!this.node) {
       await this.detectNode();
     }
-    const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/snapshot/${snapname}/rollback`);
+    const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/snapshot/${encodeURIComponent(snapname)}/rollback`);
     return response.data;
   }
 
@@ -579,7 +579,7 @@ class PveApi {
     if (!this.node) {
       await this.detectNode();
     }
-    const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/snapshot/${snapname}/rollback`);
+    const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/snapshot/${encodeURIComponent(snapname)}/rollback`);
     return response.data;
   }
 
@@ -587,7 +587,7 @@ class PveApi {
     if (!this.node) {
       await this.detectNode();
     }
-    const response = await this.axiosInstance.delete(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/snapshot/${snapname}`);
+    const response = await this.axiosInstance.delete(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/snapshot/${encodeURIComponent(snapname)}`);
     return response.data;
   }
 

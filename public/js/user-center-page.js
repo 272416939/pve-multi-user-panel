@@ -87,7 +87,7 @@ const App = {
             try {
                 return DOMPurify.sanitize(marked.parse(text));
             } catch {
-                return text;
+                return DOMPurify.sanitize(String(text));
             }
         };
 

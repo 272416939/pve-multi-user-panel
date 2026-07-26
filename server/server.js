@@ -124,10 +124,11 @@ app.use((req, res, next) => {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
     // XSS-4 修复：script-src 使用 nonce 替代 unsafe-inline（保留 unsafe-eval 供 Vue 运行时模板编译）
+    // SEC-005/011: CDN 由 jsd.owoser.cn 换回官方 cdn.jsdelivr.net
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
-        "script-src 'self' 'nonce-" + cspNonce + "' 'unsafe-eval' https://jsd.owoser.cn",
-        "style-src 'self' 'unsafe-inline' https://jsd.owoser.cn https://fonts.loli.net",
+        "script-src 'self' 'nonce-" + cspNonce + "' 'unsafe-eval' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.loli.net",
         "font-src 'self' https://gstatic.loli.net",
         "img-src 'self' data: blob: https:",
         "connect-src 'self' ws: wss: https:",
