@@ -119,12 +119,12 @@ window.__admin.osTemplatePage = (function () {
             if (res.success) {
                 closeForm();
                 await load();
-                pvToast.success(editId ? '已更新' : '已创建');
+                alert(editId ? '已更新' : '已创建');
             } else {
-                pvToast.error(res.error || '操作失败');
+                alert(res.error || '操作失败');
             }
         } catch (e) {
-            pvToast.error('请求失败');
+            alert('请求失败');
         } finally {
             saving.value = false;
         }
@@ -135,9 +135,9 @@ window.__admin.osTemplatePage = (function () {
         const res = await api('/admin/os-templates/' + row.id, { method: 'DELETE' });
         if (res.success) {
             await load();
-            pvToast.success('已删除');
+            alert('已删除');
         } else {
-            pvToast.error(res.error || '删除失败');
+            alert(res.error || '删除失败');
         }
     }
 
