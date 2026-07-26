@@ -101,8 +101,8 @@
     setTimeout(function() { clearInterval(pollInterval); }, 300000);
   }
 
-  // 注册到全局
-  window.osSwitch = {
+  // 注册到全局 dashboard 对象，供模板通过 osSwitch.xxx 访问
+  $.osSwitch = {
     openOsSwitchModal: $.openOsSwitchModal,
     closeOsSwitchModal: $.closeOsSwitchModal,
     submitOsSwitch: $.submitOsSwitch
