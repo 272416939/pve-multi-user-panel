@@ -1,20 +1,25 @@
 // 管理端 OS 模板页面逻辑
+// 使用全局 api() 函数发起请求（定义在 shared.js 中，其他页面如 template.js 同样方式使用）
 window.__admin = window.__admin || {};
 window.__admin.osTemplatePage = (function () {
-    const osTemplates = Vue.ref([]);
-    const formVisible = Vue.ref(false);
+    var $ = window.__admin;
+    var Vue = window.Vue;
+    var ref = Vue.ref;
+
+    const osTemplates = ref([]);
+    const formVisible = ref(false);
     const formData = Vue.reactive({
         name: '', template_vmid: '', os_type: '', os_version: '', arch: 'x86_64',
         system_disk_size: 20, target_storage: 'local-lvm', ciuser: '',
         description: '', switch_price: 0, icon: '', sort_order: 0,
         allowed_package_ids: '', enabled: 1, status: 'active'
     });
-    const saving = Vue.ref(false);
+    const saving = ref(false);
     let editId = null;
 
     async function load() {
         try {
-            const res = await authFetch('/api/admin/os-templates');
+            const res = await api('/api/admin/os-templates');
             if (res.success) osTemplates.value = res.data;
         } catch (e) {
             console.error('加载 OS 模板失败', e);
@@ -58,9 +63,9 @@ window.__admin.osTemplatePage = (function () {
     async function save() {
         saving.value = true;
         try {
-            const url = editId ? `/api/admin/os-templates/${editId}` : '/api/admin/os-templates';
+            const url = editId ? '/api/admin/os-templates/' + editId : '/api/admin/os-templates';
             const method = editId ? 'PUT' : 'POST';
-            const res = await authFetch(url, { method, body: JSON.stringify(formData) });
+            const res = await api(url, { method, body: JSON.stringify(formData) });
             if (res.success) {
                 closeForm();
                 await load();
@@ -76,8 +81,8 @@ window.__admin.osTemplatePage = (function () {
     }
 
     async function deleteRow(row) {
-        if (!confirm(`确认删除系统模板「${row.name}」？`)) return;
-        const res = await authFetch(`/api/admin/os-templates/${row.id}`, { method: 'DELETE' });
+        if (!confirm('确认删除系统模板「' + row.name + '」？')) return;
+        const res = await api('/api/admin/os-templates/' + row.id, { method: 'DELETE' });
         if (res.success) {
             await load();
             pvToast.success('已删除');
