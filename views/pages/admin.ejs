@@ -34,7 +34,7 @@
 <script src="js/shared.js?_b=202607191010"></script>
 <script src="components/pv-button.js?_b=202607190730"></script>
 <!-- admin-template 模板片段（IIFE push 到 window.__adminTemplateParts, loader 最后 join） -->
-<script src="js/admin/admin-template-base.js?_b=202607191010"></script>
+<script src="js/admin/admin-template-base.js?_b=<%= Date.now() %>"></script>
 <script src="js/admin/admin-template-overview.js?_b=202607191010"></script>
 <script src="js/admin/admin-template-vm.js?_b=202607191010"></script>
 <script src="js/admin/admin-template-lxc.js?_b=202607191010"></script>
@@ -51,7 +51,7 @@
 <script src="js/admin/admin-template-os.js?_b=<%= Date.now() %>"></script>
 <!-- admin-template loader (join + inject) -->
 <script src="js/admin/admin-template.js?_b=<%= Date.now() %>"></script>
-<script src="js/admin/core.js?_b=202607191010"></script>
+<script src="js/admin/core.js?_b=<%= Date.now() %>"></script>
 <script src="js/admin/admin.js?_b=<%= Date.now() %>"></script>
 <script src="js/admin/vm.js?_b=202607191010"></script>
 <script src="js/admin/lxc.js?_b=202607191010"></script>
