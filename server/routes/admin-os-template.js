@@ -13,7 +13,7 @@ router.use(authMiddleware, adminMiddleware);
 // ==================== OS 模板 CRUD ====================
 
 // GET /api/admin/os-templates
-router.get('/os-templates', async (req, res) => {
+router.get('/admin/os-templates', async (req, res) => {
     try {
         const list = await db.osTemplates.getAll();
         res.json({ success: true, data: list });
@@ -23,7 +23,7 @@ router.get('/os-templates', async (req, res) => {
 });
 
 // GET /api/admin/os-templates/:id
-router.get('/os-templates/:id', async (req, res) => {
+router.get('/admin/os-templates/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID' });
@@ -36,7 +36,7 @@ router.get('/os-templates/:id', async (req, res) => {
 });
 
 // POST /api/admin/os-templates — 创建
-router.post('/os-templates', async (req, res) => {
+router.post('/admin/os-templates', async (req, res) => {
     try {
         const data = req.body;
         if (!data.name || !data.template_vmid) {
@@ -83,7 +83,7 @@ router.post('/os-templates', async (req, res) => {
 });
 
 // PUT /api/admin/os-templates/:id — 更新
-router.put('/os-templates/:id', async (req, res) => {
+router.put('/admin/os-templates/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID' });
@@ -123,7 +123,7 @@ router.put('/os-templates/:id', async (req, res) => {
 });
 
 // DELETE /api/admin/os-templates/:id — 删除（检查引用）
-router.delete('/os-templates/:id', async (req, res) => {
+router.delete('/admin/os-templates/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID' });
@@ -146,7 +146,7 @@ router.delete('/os-templates/:id', async (req, res) => {
 });
 
 // GET /api/admin/os-templates/:id/vms — 查看哪些 VM 正在使用该 OS
-router.get('/os-templates/:id/vms', async (req, res) => {
+router.get('/admin/os-templates/:id/vms', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID' });
@@ -161,7 +161,7 @@ router.get('/os-templates/:id/vms', async (req, res) => {
 // ==================== 切换日志管理 ====================
 
 // GET /api/admin/os-switch-logs — 翻页查询（支持过滤）
-router.get('/os-switch-logs', async (req, res) => {
+router.get('/admin/os-switch-logs', async (req, res) => {
     try {
         const filters = {
             page: Math.min(parseInt(req.query.page) || 1, 1000),
@@ -180,7 +180,7 @@ router.get('/os-switch-logs', async (req, res) => {
 });
 
 // DELETE /api/admin/os-switch-logs/:id — 单条删除（运行中日志禁删）
-router.delete('/os-switch-logs/:id', async (req, res) => {
+router.delete('/admin/os-switch-logs/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (!id || id <= 0) return res.status(400).json({ error: '无效的日志 ID' });
@@ -203,7 +203,7 @@ router.delete('/os-switch-logs/:id', async (req, res) => {
 });
 
 // POST /api/admin/os-switch-logs/batch-delete — 批量删除
-router.post('/os-switch-logs/batch-delete', async (req, res) => {
+router.post('/admin/os-switch-logs/batch-delete', async (req, res) => {
     try {
         const { ids, status, vm_id, user_id, before_date } = req.body;
         if (ids && (!Array.isArray(ids) || ids.length === 0 || ids.length > 500)) {
@@ -222,7 +222,7 @@ router.post('/os-switch-logs/batch-delete', async (req, res) => {
 });
 
 // POST /api/admin/os-switch-logs/clear — 清空全部（高危，需确认串）
-router.post('/os-switch-logs/clear', async (req, res) => {
+router.post('/admin/os-switch-logs/clear', async (req, res) => {
     try {
         if (req.body.confirm !== 'CLEAR_ALL_OS_SWITCH_LOGS') {
             return res.status(400).json({ error: '高危操作，请传入 confirm: "CLEAR_ALL_OS_SWITCH_LOGS" 二次确认' });
