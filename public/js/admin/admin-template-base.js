@@ -83,6 +83,7 @@
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-templates">
                     <a class="nav-item" data-subsection="templates-vm" href="#" @click.prevent="switchPage('vm-templates')"><span class="nav-text">VM 模板</span></a>
                     <a class="nav-item" data-subsection="templates-lxc" href="#" @click.prevent="switchPage('lxc-templates')"><span class="nav-text">LXC 模板</span></a>
+                    <a class="nav-item" data-subsection="templates-os" href="#" @click.prevent="switchPage('os-templates')"><span class="nav-text">系统模板</span></a>
                 </div>
 
  <!-- 套餐管理（父菜单，仅admin） -->

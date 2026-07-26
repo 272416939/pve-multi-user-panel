@@ -7,23 +7,37 @@
                 <h3>可切换系统模板</h3>
                 <pv-button variant="primary" @click="osTemplatePage.openForm()">新增模板</pv-button>
             </div>
-            <pv-table :data="(osTemplatePage?.osTemplates?.value) || []" :columns="[
-                { key: 'id', label: 'ID' },
-                { key: 'name', label: '名称' },
-                { key: 'os_type', label: 'OS 类型' },
-                { key: 'os_version', label: '版本' },
-                { key: 'template_vmid', label: 'PVE 模板 VMID' },
-                { key: 'system_disk_size', label: '系统盘(GB)' },
-                { key: 'target_storage', label: '目标存储' },
-                { key: 'switch_price', label: '切换价格' },
-                { key: 'status', label: '状态' },
-                { key: 'actions', label: '操作' }
-            ]">
-                <template #actions="{ row }">
-                    <pv-button size="sm" @click="osTemplatePage.openForm(row)">编辑</pv-button>
-                    <pv-button size="sm" variant="danger" @click="osTemplatePage.deleteRow(row)">删除</pv-button>
-                </template>
-            </pv-table>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle table-align-center">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th><th>名称</th><th>OS 类型</th><th>版本</th><th>PVE 模板 VMID</th><th>系统盘(GB)</th><th>目标存储</th><th>切换价格</th><th>状态</th><th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="t in (osTemplatePage?.osTemplates?.value) || []" :key="t.id">
+                            <td>{{ t.id }}</td>
+                            <td>{{ t.name }}</td>
+                            <td>{{ t.os_type }}</td>
+                            <td>{{ t.os_version }}</td>
+                            <td>{{ t.template_vmid }}</td>
+                            <td>{{ t.system_disk_size }}</td>
+                            <td>{{ t.target_storage }}</td>
+                            <td>{{ t.switch_price }}</td>
+                            <td><span :class="t.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ t.status === 'active' ? '启用' : (t.status === 'maintenance' ? '维护' : '已弃用') }}</span></td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <pv-button size="sm" @click="osTemplatePage.openForm(t)">编辑</pv-button>
+                                    <pv-button size="sm" variant="danger" @click="osTemplatePage.deleteRow(t)">删除</pv-button>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr v-if="(osTemplatePage?.osTemplates?.value || []).length === 0">
+                            <td colspan="10" class="text-center text-muted">暂无系统模板</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <!-- 新增/编辑模态框 -->
         <div class="modal fade" id="osTemplateFormModal" tabindex="-1">
