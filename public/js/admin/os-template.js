@@ -1,13 +1,16 @@
 // 管理端 OS 模板页面逻辑
-// 使用全局 api() 函数发起请求（定义在 shared.js 中，其他页面如 template.js 同样方式使用）
+// 使用全局 api() 函数发起请求（定义在 shared.js 中）
 window.__admin = window.__admin || {};
 window.__admin.osTemplatePage = (function () {
     var $ = window.__admin;
     var Vue = window.Vue;
     var ref = Vue.ref;
+    var watch = Vue.watch;
 
     const osTemplates = ref([]);
     const formVisible = ref(false);
+    const pveTemplateVms = ref([]);       // PVE 模板 VM 列表（下拉选择用）
+    const pveConfigLoading = ref(false);  // 加载 PVE 模板配置中
     const formData = Vue.reactive({
         name: '', template_vmid: '', os_type: '', os_version: '', arch: 'x86_64',
         system_disk_size: 20, target_storage: 'local-lvm', ciuser: '',
@@ -16,6 +19,52 @@ window.__admin.osTemplatePage = (function () {
     });
     const saving = ref(false);
     let editId = null;
+
+    // 加载 PVE 模板 VM 列表（仅 template=1）
+    async function loadPveTemplates() {
+        try {
+            var data = await api('/pve/vms?template_only=1');
+            // api() 返回的可能是 {available, assigned} 格式，也可能是数组
+            if (data && data.available) {
+                pveTemplateVms.value = (data.available || []).concat(data.assigned || []);
+            } else if (Array.isArray(data)) {
+                pveTemplateVms.value = data;
+            } else if (data && data.data) {
+                pveTemplateVms.value = data.data;
+            } else {
+                pveTemplateVms.value = [];
+            }
+        } catch (e) {
+            console.error('加载 PVE 模板列表失败', e);
+            pveTemplateVms.value = [];
+        }
+    }
+
+    // 选择 PVE 模板后自动填充字段
+    async function onTemplateVmidChange(newVmid) {
+        if (!newVmid) return;
+        pveConfigLoading.value = true;
+        try {
+            var res = await api('/admin/pve-template-config/' + newVmid);
+            if (res && res.success && res.data) {
+                var d = res.data;
+                // 自动填充字段（保留用户已手动修改的 name，仅首次填充）
+                if (!editId) {
+                    formData.name = d.name || '';
+                }
+                formData.os_type = d.os_type || '';
+                formData.os_version = d.os_version || '';
+                formData.arch = d.arch || 'x86_64';
+                formData.system_disk_size = d.system_disk_size || 20;
+                formData.target_storage = d.target_storage || 'local-lvm';
+                formData.ciuser = d.ciuser || '';
+            }
+        } catch (e) {
+            console.error('加载 PVE 模板配置失败', e);
+        } finally {
+            pveConfigLoading.value = false;
+        }
+    }
 
     async function load() {
         try {
@@ -27,6 +76,7 @@ window.__admin.osTemplatePage = (function () {
     }
 
     function openForm(row) {
+        loadPveTemplates();
         if (row) {
             Object.assign(formData, row);
             editId = row.id;
@@ -91,5 +141,5 @@ window.__admin.osTemplatePage = (function () {
         }
     }
 
-    return { osTemplates, formVisible, formData, saving, editId, load, openForm, closeForm, save, deleteRow };
+    return { osTemplates, formVisible, formData, saving, editId, pveTemplateVms, pveConfigLoading, load, openForm, closeForm, save, deleteRow, onTemplateVmidChange, loadPveTemplates };
 })();

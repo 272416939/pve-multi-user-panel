@@ -52,8 +52,12 @@
                             <input class="form-control" v-model="osTemplatePage.formData.name">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">PVE 模板 VMID <span class="text-danger">*</span></label>
-                            <input class="form-control" type="number" v-model="osTemplatePage.formData.template_vmid" min="100">
+                            <label class="form-label">PVE 模板 VM <span class="text-danger">*</span></label>
+                            <select class="form-select" v-model="osTemplatePage.formData.template_vmid" @change="osTemplatePage.onTemplateVmidChange($event.target.value)" :disabled="osTemplatePage.pveConfigLoading">
+                                <option value="">请选择 PVE 模板 VM</option>
+                                <option v-for="v in osTemplatePage.pveTemplateVms" :key="v.vmid" :value="v.vmid">{{ v.name || 'VM ' + v.vmid }} ({{ v.vmid }})</option>
+                            </select>
+                            <div class="form-text text-muted" v-if="osTemplatePage.pveConfigLoading">正在读取模板配置...</div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">OS 类型</label>

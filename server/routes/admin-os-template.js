@@ -10,6 +10,93 @@ const { safeError } = require('../utils/safe-error');
 // 所有端点都需要管理员权限
 router.use(authMiddleware, adminMiddleware);
 
+// ==================== PVE 模板配置自动填充 ====================
+
+// GET /api/admin/pve-template-config/:vmid — 读取 PVE 模板 VM 配置，返回自动填充字段
+router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+            return res.status(400).json({ error: '无效的 VMID' });
+        }
+        const config = await pveApi.getVmConfig(vmid);
+        if (!config) {
+            return res.status(404).json({ error: 'PVE 模板不存在' });
+        }
+
+        // 从 config 解析系统盘容量
+        let systemDiskSize = 20;
+        const buses = ['scsi', 'sata', 'virtio'];
+        for (const bus of buses) {
+            const raw = String(config[bus + '0'] || '');
+            const m = raw.match(/size=(\d+)([GM])/i);
+            if (m) {
+                const v = parseInt(m[1]);
+                systemDiskSize = m[2].toUpperCase() === 'M' ? Math.ceil(v / 1024) : v;
+                break;
+            }
+        }
+
+        // 从 ostype 映射到 os_type
+        const ostype = config.ostype || '';
+        let osType = '';
+        let osVersion = '';
+        if (ostype.startsWith('l')) {
+            osType = 'linux';
+            osVersion = ostype.substring(1) || '';
+        } else if (ostype === 'w10' || ostype === 'w11') {
+            osType = 'windows';
+            osVersion = ostype === 'w11' ? '11' : '10';
+        } else if (ostype === 'w2k19' || ostype === 'w2k22') {
+            osType = 'windows';
+            osVersion = 'server';
+        } else if (ostype === 'solaris') {
+            osType = 'solaris';
+        } else if (ostype === 'other') {
+            osType = 'other';
+        }
+
+        // 从 config 解析 name 用作模板名称
+        const name = config.name || ('VM ' + vmid);
+
+        // 从 config 解析 ciuser
+        const ciuser = config.ciuser || '';
+
+        // 判断架构
+        const arch = config.arch || 'x86_64';
+
+        // 从 config 解析 target_storage 从 scsi0/sata0/virtio0 的 volume_id 提取
+        let targetStorage = 'local-lvm';
+        for (const bus of buses) {
+            const raw = String(config[bus + '0'] || '');
+            if (raw) {
+                const parts = raw.split(':');
+                if (parts.length > 0 && parts[0]) {
+                    targetStorage = parts[0];
+                }
+                break;
+            }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                name: name,
+                os_type: osType,
+                os_version: osVersion,
+                ostype: ostype,
+                arch: arch,
+                system_disk_size: systemDiskSize,
+                target_storage: targetStorage,
+                ciuser: ciuser
+            }
+        });
+    } catch (e) {
+        console.error('[pve-template-config] 读取模板配置失败:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
 // ==================== OS 模板 CRUD ====================
 
 // GET /api/admin/os-templates
