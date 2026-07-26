@@ -85,6 +85,8 @@ var App = {
         // OS 模板兜底初始化
         if (!$.osTemplatePage) $.osTemplatePage = {};
         if (!$.osTemplatePage.osTemplates) $.osTemplatePage.osTemplates = Vue.ref([]);
+        if (!$.osTemplatePage.pveTemplateVms) $.osTemplatePage.pveTemplateVms = Vue.ref([]);
+        if (!$.osTemplatePage.pveConfigLoading) $.osTemplatePage.pveConfigLoading = Vue.ref(false);
         if (!$.osTemplatePage.formData) $.osTemplatePage.formData = Vue.reactive({ name: '', template_vmid: '', os_type: '', os_version: '', arch: 'x86_64', system_disk_size: 20, target_storage: 'local-lvm', ciuser: '', description: '', switch_price: 0, icon: '', sort_order: 0, allowed_package_ids: '', enabled: 1, status: 'active' });
         if (!$.osTemplatePage.saving) $.osTemplatePage.saving = Vue.ref(false);
         if (!$.activeTabDisk) $.activeTabDisk = Vue.ref(localStorage.getItem('admin_activeTabDisk') || 'storage-groups');
