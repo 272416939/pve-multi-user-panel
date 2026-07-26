@@ -19,7 +19,7 @@ window.__admin.osTemplatePage = (function () {
 
     async function load() {
         try {
-            const res = await api('/api/admin/os-templates');
+            const res = await api('/admin/os-templates');
             if (res.success) osTemplates.value = res.data;
         } catch (e) {
             console.error('加载 OS 模板失败', e);
@@ -63,7 +63,7 @@ window.__admin.osTemplatePage = (function () {
     async function save() {
         saving.value = true;
         try {
-            const url = editId ? '/api/admin/os-templates/' + editId : '/api/admin/os-templates';
+            const url = editId ? '/admin/os-templates/' + editId : '/admin/os-templates';
             const method = editId ? 'PUT' : 'POST';
             const res = await api(url, { method, body: JSON.stringify(formData) });
             if (res.success) {
@@ -82,7 +82,7 @@ window.__admin.osTemplatePage = (function () {
 
     async function deleteRow(row) {
         if (!confirm('确认删除系统模板「' + row.name + '」？')) return;
-        const res = await api('/api/admin/os-templates/' + row.id, { method: 'DELETE' });
+        const res = await api('/admin/os-templates/' + row.id, { method: 'DELETE' });
         if (res.success) {
             await load();
             pvToast.success('已删除');
