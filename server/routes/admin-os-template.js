@@ -39,57 +39,57 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
 
         // 从 ostype 映射到 os_type（PVE 所有 ostype 覆盖）
         const ostype = config.ostype || '';
+        console.log('[pve-template-config] VM ' + vmid + ' ostype:', JSON.stringify(ostype));
         let osType = '';
         let osVersion = '';
-        if (ostype.startsWith('l')) {
+        // PVE 9.x 使用 win10/win11/win2019 等格式，老版本用 w10/w11/w2k19
+        const raw = ostype.toLowerCase().replace(/^microsoft\s*/i, '');
+        if (raw.startsWith('l')) {
             osType = 'linux';
-            osVersion = ostype.substring(1) || '';
-        } else if (ostype === 'wxp') {
-            osType = 'windows';
-            osVersion = 'xp';
-        } else if (ostype === 'w2k') {
-            osType = 'windows';
-            osVersion = '2000';
-        } else if (ostype === 'w2k3') {
-            osType = 'windows';
-            osVersion = 'server 2003';
-        } else if (ostype === 'w2k8') {
-            osType = 'windows';
-            osVersion = 'server 2008';
-        } else if (ostype === 'wvista') {
-            osType = 'windows';
-            osVersion = 'vista';
-        } else if (ostype === 'win7') {
-            osType = 'windows';
-            osVersion = '7';
-        } else if (ostype === 'win8') {
-            osType = 'windows';
-            osVersion = '8';
-        } else if (ostype === 'w10') {
+            osVersion = raw.substring(1) || '';
+        } else if (raw === 'win10' || raw === 'w10') {
             osType = 'windows';
             osVersion = '10';
-        } else if (ostype === 'w11') {
+        } else if (raw === 'win11' || raw === 'w11') {
             osType = 'windows';
             osVersion = '11';
-        } else if (ostype === 'w2k12') {
+        } else if (raw === 'win7') {
+            osType = 'windows';
+            osVersion = '7';
+        } else if (raw === 'win8' || raw === 'wvista') {
+            osType = 'windows';
+            osVersion = raw === 'win8' ? '8' : 'vista';
+        } else if (raw === 'wxp' || raw === 'winxp') {
+            osType = 'windows';
+            osVersion = 'xp';
+        } else if (raw === 'w2k' || raw === 'win2000') {
+            osType = 'windows';
+            osVersion = '2000';
+        } else if (/^(w2k3|win2003|win2k3)$/.test(raw)) {
+            osType = 'windows';
+            osVersion = 'server 2003';
+        } else if (/^(w2k8|win2008|win2k8)$/.test(raw)) {
+            osType = 'windows';
+            osVersion = 'server 2008';
+        } else if (/^(w2k12|win2012|win2k12)$/.test(raw)) {
             osType = 'windows';
             osVersion = 'server 2012';
-        } else if (ostype === 'w2k16') {
+        } else if (/^(w2k16|win2016|win2k16)$/.test(raw)) {
             osType = 'windows';
             osVersion = 'server 2016';
-        } else if (ostype === 'w2k19') {
+        } else if (/^(w2k19|win2019|win2k19)$/.test(raw)) {
             osType = 'windows';
             osVersion = 'server 2019';
-        } else if (ostype === 'w2k22') {
+        } else if (/^(w2k22|win2022|win2k22)$/.test(raw)) {
             osType = 'windows';
             osVersion = 'server 2022';
-        } else if (ostype === 'solaris') {
+        } else if (raw === 'solaris') {
             osType = 'solaris';
-        } else if (ostype === 'other') {
+        } else if (raw === 'other' || raw === '') {
             osType = 'other';
-        } else if (ostype) {
-            // 未知的 ostype，直接保留原始值
-            osType = ostype;
+        } else {
+            // 兜底：保留原始值
+            osType = raw;
         }
 
         // 从 config 解析 name 用作模板名称
