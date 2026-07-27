@@ -15,6 +15,7 @@ var { checkRateLimit } = require('../middleware/rate-limiter');
 var { withTransaction } = require('../utils/with-transaction');
 const { safeError } = require('../utils/safe-error');
 const { formatLocalDate } = require('../utils/date');
+const diskUtils = require('../utils/disk-utils');
 
 var VALID_PERIODS = ['month', 'quarter', 'year'];
 
@@ -195,6 +196,38 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             newVm = await db.vms.update(newVm.id, { pve_upid: '' });
 
             var vmUpdateCfg = { cores: template.cores, memory: template.memory };
+
+            // 扩容系统盘到套餐模板设定的目标容量
+            if (template.disk_size && template.disk_size > 0) {
+                try {
+                    var systemBus = await diskUtils.getSystemDiskBus(newVmid);
+                    var resizeCmd = systemBus + '0';
+                    // 先获取当前系统盘实际容量，只大不小
+                    var oldConfig = await pveApi.getVmConfig(newVmid);
+                    var oldSizeGb = 0;
+                    var _buses = ['scsi', 'sata', 'virtio'];
+                    for (var _i = 0; _i < _buses.length; _i++) {
+                        var _raw = String(oldConfig[_buses[_i] + '0'] || '');
+                        var _m = _raw.match(/size=(\d+)([GM])/i);
+                        if (_m) {
+                            oldSizeGb = _m[2].toUpperCase() === 'M' ? Math.ceil(parseInt(_m[1]) / 1024) : parseInt(_m[1]);
+                            break;
+                        }
+                    }
+                    var targetSizeGb = Math.max(oldSizeGb, parseInt(template.disk_size));
+                    if (targetSizeGb > oldSizeGb) {
+                        var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
+                        var sshConfig = await getPveSshConfig();
+                        await execSSH(sshConfig.host, sshConfig.username, sshConfig.password,
+                            'qm resize ' + newVmid + ' ' + resizeCmd + ' ' + targetSizeGb + 'G', 60000);
+                        console.log('[package] VM ' + newVmid + ' 系统盘已扩容到 ' + targetSizeGb + 'G');
+                    }
+                } catch (resizeErr) {
+                    console.error('[package] 系统盘扩容失败:', resizeErr.message);
+                }
+            }
+            }
+
             // v1.3 新增：如果选择了 OS 模板，使用 OS 模板的 ciuser 和 ostype
             if (osTemplate) {
                 if (osTemplate.ciuser) {
