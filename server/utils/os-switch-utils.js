@@ -129,26 +129,64 @@ async function cloneOsTemplateDisk(templateVmid, targetStorage) {
     return { tempVmid, systemVolumeId: actualVolumeId, bus };
 }
 
-// 2.5 使用 pvesm move_volume 将磁盘从临时 VM 移动到目标 VM 的存储目录
-// PVE 7+ 的 pvesm move_volume 格式：
-//   pvesm move_volume <storage> <volume-id> [<target-vmid>] [--delete]
-// 它会自动将文件重命名为 images/<target-vmid>/vm-<target-vmid>-disk-N.raw
-async function moveVolumeToTarget(storage, sourceVolumeId, targetVmid) {
+// 2.5 查询存储类型
+async function getStorageType(storage) {
+    const storages = await pveApi.getAllStorages();
+    const s = storages.find(x => x.storage === storage);
+    return s ? s.type : '';
+}
+
+// 2.6 根据存储类型将磁盘从临时 VM 移动到目标 VM
+// 文件系统类（dir/btrfs/nfs/cephfs）：mv 文件到目标 VM 目录，避免 destroy 时误删
+// 块设备类（lvm/lvmthin/zfs）：使用 pvesm move_volume
+async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, tempVmid) {
     const safeStorage = diskUtils.validateParam('storage', storage);
     const safeVmid = diskUtils.validateParam('vmid', targetVmid);
     // 验证 volume id 格式
     if (!/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_./\-]+$/.test(sourceVolumeId)) {
         throw new Error('无效的 volume id: ' + sourceVolumeId);
     }
-    const cmd = `pvesm move_volume ${safeStorage} ${sourceVolumeId} ${safeVmid}`;
-    const result = await runSsh(cmd);
-    // 从输出中提取新的 volume ID（如 storage:101/vm-101-disk-0.raw）
-    // pvesm move_volume 输出: "moving disk: ... volume 'nvme1Tbak:101/vm-101-disk-0.raw' was moved"
-    const m = result.match(/volume\s+'([^']+)'/);
-    return m ? m[1] : `${safeStorage}:${safeVmid}/vm-${safeVmid}-disk-0.raw`;
+
+    const storageType = await getStorageType(storage);
+
+    if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
+        // 块设备类：使用 pvesm move_volume（PVE 内置命令，自动处理）
+        const cmd = `pvesm move_volume ${safeStorage} ${sourceVolumeId} ${safeVmid}`;
+        const result = await runSsh(cmd);
+        // 从输出中提取新的 volume ID
+        const m = result.match(/volume\s+'([^']+)'/);
+        return m ? m[1] : `${safeStorage}:${safeVmid}/vm-${safeVmid}-disk-0.raw`;
+    } else {
+        // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
+        // 先获取源文件物理路径（如 /mnt/pve/nvme1Tbak/images/104/vm-104-disk-0.raw）
+        const sourcePathCmd = `pvesm path ${sourceVolumeId}`;
+        const sourcePath = (await runSsh(sourcePathCmd)).trim();
+
+        // 获取扩展名
+        const ext = sourcePath.includes('.') ? sourcePath.split('.').pop() : 'raw';
+        const targetFileName = `vm-${safeVmid}-disk-0.${ext}`;
+
+        // 用 pvesm path 查询目标目录：构造一个临时 volumeid 来获取目录路径
+        const dummyVolId = `${safeStorage}:${safeVmid}/${targetFileName}`;
+        const targetPathCmd = `pvesm path ${dummyVolId}`;
+        const targetPathResult = (await runSsh(targetPathCmd)).trim();
+
+        // 目标目录 = 目标路径去掉文件名部分
+        const targetDir = targetPathResult.substring(0, targetPathResult.lastIndexOf('/'));
+        const targetPath = `${targetDir}/${targetFileName}`;
+
+        // 创建目标目录 + mv 文件
+        await runSsh(`mkdir -p '${targetDir}' && mv '${sourcePath}' '${targetPath}'`);
+
+        // 从临时 VM 解绑旧卷（文件已被 mv，卷引用已失效）
+        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
+
+        // 返回新的 volume ID
+        return `${safeStorage}:${safeVmid}/${targetFileName}`;
+    }
 }
 
-// 2.6 清理临时 VM（unlink 系统盘 + destroy，磁盘已被 move_volume 移走所以安全）
+// 2.7 清理临时 VM（unlink 系统盘 + destroy，磁盘已被移走所以安全）
 async function cleanupTempVm(tempVmid, bus) {
     await diskUtils._internal.unbindSystemDisk(tempVmid, bus);
     await pveApi.destroyVm(tempVmid);
@@ -307,12 +345,13 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         ctx.tempBus = cloneResult.bus;
         await updateLogStage(logId, 'move_volume');
 
-        // Stage 4: 使用 pvesm move_volume 将磁盘从临时 VM 移动到目标 VM 的存储目录
-        // 这一步会重命名文件为 images/<vmid>/vm-<vmid>-disk-0.raw
-        const movedVolumeId = await moveVolumeToTarget(
+        // Stage 4: 根据存储类型将磁盘从临时 VM 移动到目标 VM
+        const movedVolumeId = await moveDiskToTarget(
             osTemplate.target_storage,
             cloneResult.systemVolumeId,
-            vmid
+            vmid,
+            cloneResult.bus,
+            cloneResult.tempVmid
         );
         ctx.newVolumeId = movedVolumeId;
         await updateLogStage(logId, 'replace_sys');
@@ -398,7 +437,8 @@ module.exports = {
     parseSystemDisk,
     detachAllDataDisks,
     cloneOsTemplateDisk,
-    moveVolumeToTarget,
+    getStorageType,
+    moveDiskToTarget,
     cleanupTempVm,
     replaceSystemDisk,
     reattachDataDisks,
