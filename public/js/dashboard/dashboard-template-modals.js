@@ -883,5 +883,51 @@
 </div>
 </Teleport>
 
+<!-- 切换系统弹窗 -->
+<Teleport to="body">
+<div class="modal fade" id="osSwitchModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content" style="background:var(--bg-modal)">
+        <div class="modal-header"><h5 class="modal-title">切换操作系统</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-body">
+            <div class="alert alert-warning">
+                <strong>⚠️ 重要提示：</strong>
+                <ul class="mb-0">
+                    <li>切换系统将<strong>清除系统盘所有数据</strong>，请提前备份重要文件</li>
+                    <li>数据盘会自动卸载并重新挂载，<strong>数据不会丢失</strong></li>
+                    <li>切换过程约 3-10 分钟，期间虚拟机将停机</li>
+                    <li>切换完成后将获得新的初始密码</li>
+                    <li v-if="osSwitchPrice > 0">本次切换将扣费 ¥{{ osSwitchPrice }}</li>
+                </ul>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">选择目标系统</label>
+                <div class="row g-2">
+                    <div class="col-md-6" v-for="t in osSwitchList" :key="t.id">
+                        <div class="card cursor-pointer" :class="osSwitchSelectedId === t.id ? 'border-primary' : ''" @click="osSwitchSelectedId = t.id" style="cursor:pointer;transition:all .2s">
+                            <div class="card-body py-2 px-3">
+                                <div class="fw-bold">{{ t.name }}</div>
+                                <div class="small text-muted">{{ t.os_type }} {{ t.os_version }} · {{ t.description ? t.description.substring(0,30) : '' }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="osSwitchList.length === 0" class="text-muted small">暂无可切换的系统</div>
+            </div>
+            <div class="current-os text-muted small mb-2" v-if="osSwitchCurrentName">
+                当前系统：{{ osSwitchCurrentName }}
+            </div>
+            <div class="form-check" v-if="osSwitchSelectedId">
+                <input class="form-check-input" type="checkbox" id="osSwitchConfirm" v-model="osSwitchConfirm">
+                <label class="form-check-label" for="osSwitchConfirm">我已知晓切换将清除系统盘数据，并已备份重要文件</label>
+            </div>
+        </div>
+        <div class="modal-footer d-flex gap-2">
+            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+            <pv-button type="button" variant="danger" :disabled="!osSwitchConfirm || osSwitchSubmitting" :loading="osSwitchSubmitting" @click="submitOsSwitch()">确认切换系统</pv-button>
+        </div>
+    </div></div>
+</div>
+</Teleport>
+
 `);
 })();

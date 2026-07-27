@@ -33,7 +33,12 @@
       console.error('[os-switch] 加载可切换列表失败', e);
       $.osSwitchList.value = [];
     }
-    $.osSwitchModalVisible.value = true;
+    // 使用 Bootstrap Modal API 显示弹窗
+    var el = document.getElementById('osSwitchModal');
+    if (el) {
+      var modal = new bootstrap.Modal(el);
+      modal.show();
+    }
   };
 
   $.closeOsSwitchModal = function() {
@@ -107,4 +112,15 @@
     closeOsSwitchModal: $.closeOsSwitchModal,
     submitOsSwitch: $.submitOsSwitch
   };
+
+  // 关闭弹窗时清理选择状态
+  document.addEventListener('DOMContentLoaded', function() {
+    var el = document.getElementById('osSwitchModal');
+    if (el) {
+      el.addEventListener('hidden.bs.modal', function() {
+        $.osSwitchConfirm.value = false;
+        $.osSwitchSubmitting.value = false;
+      });
+    }
+  });
 })();
