@@ -108,11 +108,25 @@ async function cloneOsTemplateDisk(templateVmid, targetStorage) {
     });
     await pveApi.waitForTask(upid, 300000);
 
+    // 从临时 VM config 读取实际克隆的硬盘卷路径（DIR/BTRFS 存储含子目录和扩展名）
+    const tempConfig = await pveApi.getVmConfig(tempVmid);
+    let actualVolumeId = '';
+    const buses = ['scsi', 'sata', 'virtio'];
+    for (const bus of buses) {
+        if (tempConfig[`${bus}0`]) {
+            actualVolumeId = tempConfig[`${bus}0`].split(',')[0];
+            break;
+        }
+    }
+    if (!actualVolumeId) {
+        throw new Error(`克隆后无法找到临时 VM ${tempVmid} 的系统盘`);
+    }
+
     // 从临时 VM unlink 系统盘（卷保留）
     await diskUtils._internal.unbindSystemDisk(tempVmid, 'scsi');
     // 删除临时 VM（卷已 unlink，不会被删除）
     await pveApi.destroyVm(tempVmid);
-    return { tempVmid, systemVolumeId: `${targetStorage}:vm-${tempVmid}-disk-0` };
+    return { tempVmid, systemVolumeId: actualVolumeId };
 }
 
 // 3. 替换目标 VM 系统盘
