@@ -104,7 +104,7 @@ async function detachAllDataDisks(vmid, dataDisks) {
 }
 
 // 2. 克隆模板系统盘到临时 VMID（仅取 disk-0）
-// 注意：不在此销毁临时 VM，而是返回 tempVmid 由调用方在挂载到目标 VM 后销毁
+// 注意：不在此销毁临时 VM，而是返回 tempVmid 由调用方在 move_volume 后销毁
 async function cloneOsTemplateDisk(templateVmid, targetStorage) {
     const tempVmid = await pveApi.getNextAvailableVmid();
     const upid = await pveApi.cloneVm(templateVmid, tempVmid, {
@@ -129,7 +129,26 @@ async function cloneOsTemplateDisk(templateVmid, targetStorage) {
     return { tempVmid, systemVolumeId: actualVolumeId, bus };
 }
 
-// 2.5 清理临时 VM（unlink 系统盘 + destroy）
+// 2.5 使用 pvesm move_volume 将磁盘从临时 VM 移动到目标 VM 的存储目录
+// PVE 7+ 的 pvesm move_volume 格式：
+//   pvesm move_volume <storage> <volume-id> [<target-vmid>] [--delete]
+// 它会自动将文件重命名为 images/<target-vmid>/vm-<target-vmid>-disk-N.raw
+async function moveVolumeToTarget(storage, sourceVolumeId, targetVmid) {
+    const safeStorage = diskUtils.validateParam('storage', storage);
+    const safeVmid = diskUtils.validateParam('vmid', targetVmid);
+    // 验证 volume id 格式
+    if (!/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_./\-]+$/.test(sourceVolumeId)) {
+        throw new Error('无效的 volume id: ' + sourceVolumeId);
+    }
+    const cmd = `pvesm move_volume ${safeStorage} ${sourceVolumeId} ${safeVmid}`;
+    const result = await runSsh(cmd);
+    // 从输出中提取新的 volume ID（如 storage:101/vm-101-disk-0.raw）
+    // pvesm move_volume 输出: "moving disk: ... volume 'nvme1Tbak:101/vm-101-disk-0.raw' was moved"
+    const m = result.match(/volume\s+'([^']+)'/);
+    return m ? m[1] : `${safeStorage}:${safeVmid}/vm-${safeVmid}-disk-0.raw`;
+}
+
+// 2.6 清理临时 VM（unlink 系统盘 + destroy，磁盘已被 move_volume 移走所以安全）
 async function cleanupTempVm(tempVmid, bus) {
     await diskUtils._internal.unbindSystemDisk(tempVmid, bus);
     await pveApi.destroyVm(tempVmid);
@@ -284,38 +303,47 @@ async function performOsSwitch(vmid, osTemplate, logId) {
 
         // Stage 3: 克隆模板系统盘到临时 VM（不销毁）
         const cloneResult = await cloneOsTemplateDisk(osTemplate.template_vmid, osTemplate.target_storage);
-        ctx.newVolumeId = cloneResult.systemVolumeId;
         ctx.tempVmid = cloneResult.tempVmid;
         ctx.tempBus = cloneResult.bus;
+        await updateLogStage(logId, 'move_volume');
+
+        // Stage 4: 使用 pvesm move_volume 将磁盘从临时 VM 移动到目标 VM 的存储目录
+        // 这一步会重命名文件为 images/<vmid>/vm-<vmid>-disk-0.raw
+        const movedVolumeId = await moveVolumeToTarget(
+            osTemplate.target_storage,
+            cloneResult.systemVolumeId,
+            vmid
+        );
+        ctx.newVolumeId = movedVolumeId;
         await updateLogStage(logId, 'replace_sys');
 
-        // Stage 4: 替换系统盘（容量按原 VM 系统盘容量）
-        await replaceSystemDisk(vmid, systemDisk, cloneResult.systemVolumeId);
+        // Stage 5: 替换目标 VM 系统盘（卸载旧系统盘配置 + 释放旧卷 + 挂载新盘）
+        await replaceSystemDisk(vmid, systemDisk, movedVolumeId);
         await updateLogStage(logId, 'cleanup_temp');
 
-        // Stage 4.5: 清理临时 VM（在磁盘挂载到目标 VM 之后销毁，避免 destroy 删除磁盘文件）
+        // Stage 5.5: 清理临时 VM（此时磁盘已被移走，destroy 安全）
         await cleanupTempVm(cloneResult.tempVmid, cloneResult.bus);
         await updateLogStage(logId, 'reattach_data');
 
-        // Stage 5: 重挂载数据盘
+        // Stage 6: 重挂载数据盘
         await reattachDataDisks(vmid, dataDisks);
         await updateLogStage(logId, 'cloudinit');
 
-        // Stage 6: 更新 cloud-init
+        // Stage 7: 更新 cloud-init
         const ciResult = await updateCloudInit(vmid, osTemplate.ciuser);
         ctx.ciResult = ciResult;
 
-        // Stage 6.5: 更新 VM ostype 与模板一致
+        // Stage 7.5: 更新 VM ostype 与模板一致
         if (osTemplate.ostype) {
             await pveApi.updateVmConfig(vmid, { ostype: osTemplate.ostype });
         }
 
         await updateLogStage(logId, 'start');
 
-        // Stage 7: 启动 VM
+        // Stage 8: 启动 VM
         await pveApi.startVm(vmid);
 
-        // Stage 8: MAC 同步
+        // Stage 9: MAC 同步
         const newConfig = await pveApi.getVmConfig(vmid);
         ctx.newMac = extractMacFromNet0(newConfig.net0);
         if (ctx.oldMac && ctx.newMac && ctx.oldMac !== ctx.newMac) {
@@ -370,6 +398,7 @@ module.exports = {
     parseSystemDisk,
     detachAllDataDisks,
     cloneOsTemplateDisk,
+    moveVolumeToTarget,
     cleanupTempVm,
     replaceSystemDisk,
     reattachDataDisks,
