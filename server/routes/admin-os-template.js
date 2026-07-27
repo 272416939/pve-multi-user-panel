@@ -39,7 +39,7 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
 
         // 从 ostype 映射到 os_type（PVE 所有 ostype 覆盖）
         const ostype = config.ostype || '';
-        console.log('[pve-template-config] VM ' + vmid + ' ostype:', JSON.stringify(ostype));
+        if (process.env.DEBUG === 'true') console.log('[pve-template-config] VM ' + vmid + ' ostype:', JSON.stringify(ostype));
         let osType = '';
         let osVersion = '';
         // PVE 9.x 使用 win10/win11/win2019 等格式，老版本用 w10/w11/w2k19
