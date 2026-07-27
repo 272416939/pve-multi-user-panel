@@ -889,14 +889,14 @@
     <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content" style="background:var(--bg-modal)">
         <div class="modal-header"><h5 class="modal-title">切换操作系统</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
-            <div class="alert alert-warning" style="border:1px solid var(--bs-warning-border-subtle, #ffc107);background:color-mix(in srgb, var(--bs-warning) 12%, var(--bg-card, #fff));">
-                <strong style="color:var(--bs-warning-text-emphasis, #664d00)">⚠️ 重要提示：</strong>
-                <ul class="mb-0" style="color:var(--text-primary)">
-                    <li>切换系统将<strong>清除系统盘所有数据</strong>，请提前备份重要文件</li>
-                    <li>数据盘会自动卸载并重新挂载，<strong>数据不会丢失</strong></li>
+            <div class="alert alert-warning" style="border:1px solid var(--bs-warning-border-subtle, #ffc107);background:color-mix(in srgb, var(--bs-warning) 15%, var(--bg-card, #fff));">
+                <strong style="color:var(--bs-warning-text-emphasis, #664d00);font-size:15px;">⚠️ 重要提示：</strong>
+                <ul class="mb-0 mt-1" style="color:var(--text-primary);line-height:1.8;">
+                    <li>切换系统将<strong style="color:var(--bs-danger);">清除系统盘所有数据</strong>，请提前备份重要文件</li>
+                    <li>数据盘会自动卸载并重新挂载，<strong style="color:var(--bs-success);">数据不会丢失</strong></li>
                     <li>切换过程约 3-10 分钟，期间虚拟机将停机</li>
                     <li>切换完成后将获得新的初始密码</li>
-                    <li v-if="osSwitchPrice > 0">本次切换将扣费 ¥{{ osSwitchPrice }}</li>
+                    <li v-if="osSwitchPrice > 0">本次切换将扣费 <strong style="color:var(--bs-danger);">¥{{ osSwitchPrice }}</strong></li>
                 </ul>
             </div>
             <div class="mb-3">
