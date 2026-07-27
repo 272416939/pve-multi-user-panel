@@ -104,6 +104,7 @@ async function detachAllDataDisks(vmid, dataDisks) {
 }
 
 // 2. 克隆模板系统盘到临时 VMID（仅取 disk-0）
+// 注意：不在此销毁临时 VM，而是返回 tempVmid 由调用方在挂载到目标 VM 后销毁
 async function cloneOsTemplateDisk(templateVmid, targetStorage) {
     const tempVmid = await pveApi.getNextAvailableVmid();
     const upid = await pveApi.cloneVm(templateVmid, tempVmid, {
@@ -116,25 +117,22 @@ async function cloneOsTemplateDisk(templateVmid, targetStorage) {
     // 从临时 VM config 读取实际克隆的硬盘卷路径（DIR/BTRFS 存储含子目录和扩展名）
     const tempConfig = await pveApi.getVmConfig(tempVmid);
     let actualVolumeId = '';
-    const buses = ['scsi', 'sata', 'virtio'];
-    for (const bus of buses) {
-        if (tempConfig[`${bus}0`]) {
-            actualVolumeId = tempConfig[`${bus}0`].split(',')[0];
-            break;
-        }
+    const bus = ['scsi', 'sata', 'virtio'].find(b => tempConfig[`${b}0`]) || 'scsi';
+    const raw = tempConfig[`${bus}0`];
+    if (raw) {
+        actualVolumeId = raw.split(',')[0];
     }
     if (!actualVolumeId) {
         throw new Error(`克隆后无法找到临时 VM ${tempVmid} 的系统盘`);
     }
 
-    // 从临时 VM config 读取真实的 bus 类型（不一定是 scsi）
-    const realBus = tempConfig[`scsi0`] ? 'scsi' : tempConfig[`sata0`] ? 'sata' : tempConfig[`virtio0`] ? 'virtio' : 'scsi';
+    return { tempVmid, systemVolumeId: actualVolumeId, bus };
+}
 
-    // 从临时 VM unlink 系统盘（卷保留）
-    await diskUtils._internal.unbindSystemDisk(tempVmid, realBus);
-    // 删除临时 VM（卷已 unlink，不会被删除）
+// 2.5 清理临时 VM（unlink 系统盘 + destroy）
+async function cleanupTempVm(tempVmid, bus) {
+    await diskUtils._internal.unbindSystemDisk(tempVmid, bus);
     await pveApi.destroyVm(tempVmid);
-    return { tempVmid, systemVolumeId: actualVolumeId };
 }
 
 // 3. 替换目标 VM 系统盘
@@ -284,13 +282,19 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         await detachAllDataDisks(vmid, dataDisks);
         await updateLogStage(logId, 'clone_template');
 
-        // Stage 3: 克隆模板系统盘
+        // Stage 3: 克隆模板系统盘到临时 VM（不销毁）
         const cloneResult = await cloneOsTemplateDisk(osTemplate.template_vmid, osTemplate.target_storage);
         ctx.newVolumeId = cloneResult.systemVolumeId;
+        ctx.tempVmid = cloneResult.tempVmid;
+        ctx.tempBus = cloneResult.bus;
         await updateLogStage(logId, 'replace_sys');
 
         // Stage 4: 替换系统盘（容量按原 VM 系统盘容量）
         await replaceSystemDisk(vmid, systemDisk, cloneResult.systemVolumeId);
+        await updateLogStage(logId, 'cleanup_temp');
+
+        // Stage 4.5: 清理临时 VM（在磁盘挂载到目标 VM 之后销毁，避免 destroy 删除磁盘文件）
+        await cleanupTempVm(cloneResult.tempVmid, cloneResult.bus);
         await updateLogStage(logId, 'reattach_data');
 
         // Stage 5: 重挂载数据盘
@@ -366,6 +370,7 @@ module.exports = {
     parseSystemDisk,
     detachAllDataDisks,
     cloneOsTemplateDisk,
+    cleanupTempVm,
     replaceSystemDisk,
     reattachDataDisks,
     updateCloudInit,
