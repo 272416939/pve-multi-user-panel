@@ -910,7 +910,7 @@ res.json({ message: '虚拟机已销毁' });
     // POST /vm/:vmid/switch-os — 用户切换系统
     router.post('/vm/:vmid/switch-os', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
-        const rateLimit = await checkRateLimit('ratelimit:os-switch:' + req.user.id, 1, 60000);
+        const rateLimit = await checkRateLimit('ratelimit:os-switch:' + req.user.id, 5, 60000);
         if (!rateLimit.allowed) {
             return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
         }
