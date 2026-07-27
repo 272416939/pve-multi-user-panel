@@ -13,14 +13,14 @@
                             <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>ID</th><th>名称</th><th>模板 VM</th><th>CPU</th><th>内存</th><th>目标存储</th><th>克隆模式</th><th>网桥</th><th>状态</th><th>操作</th>
+                                        <th>ID</th><th>名称</th><th>系统盘(GB)</th><th>CPU</th><th>内存</th><th>目标存储</th><th>克隆模式</th><th>网桥</th><th>状态</th><th>操作</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <tr v-for="t in templatePage.vmTemplates.value" :key="t.id">
                                         <td>{{ t.id }}</td>
                                         <td>{{ t.name }}</td>
-                                        <td>{{ t.template_vmid }}</td>
+                                        <td>{{ t.disk_size }}</td>
                                         <td>{{ t.cores }}核</td>
                                         <td>{{ t.memory }}MB</td>
                                         <td>{{ t.target_storage }}</td>
