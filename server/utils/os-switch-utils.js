@@ -136,6 +136,39 @@ async function getStorageType(storage) {
     return s ? s.type : '';
 }
 
+// 2.5.1 获取 LVM 卷的物理设备路径
+// 优先使用 pvesm path，失败时使用 lvs 查询
+async function getLvmDevicePath(volumeId, storage) {
+    // 1. 尝试 pvesm path
+    try {
+        const path = (await runSsh(`pvesm path ${volumeId}`)).trim();
+        if (path) {
+            logger.info(`[os-switch] pvesm path ${volumeId} -> ${path}`);
+            return path;
+        }
+    } catch (e) {
+        logger.info(`[os-switch] pvesm path ${volumeId} 失败: ${e.message.substring(0, 100)}`);
+    }
+    // 2. fallback: 使用 lvs 查询（卷名格式: vm-<vmid>-disk-<n>）
+    // 从 volumeId 中提取卷名（如 nvme2T:vm-103-disk-0 -> vm-103-disk-0）
+    const parts = volumeId.split(':');
+    const volName = parts[1] || '';
+    if (volName) {
+        try {
+            // lvs 输出: /dev/nvme2T/vm-103-disk-0
+            const cmd = `lvs --noheadings -o lv_path ${storage} 2>/dev/null | grep '${volName}' | head -1 | tr -d ' '`;
+            const path = (await runSsh(cmd)).trim();
+            if (path) {
+                logger.info(`[os-switch] lvs fallback ${volumeId} -> ${path}`);
+                return path;
+            }
+        } catch (e) {
+            logger.info(`[os-switch] lvs fallback 失败: ${e.message.substring(0, 100)}`);
+        }
+    }
+    return '';
+}
+
 // 扩展的 SSH 执行（支持自定义超时）
 async function runSshWithTimeout(cmd, timeout = 60000) {
     const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
@@ -200,9 +233,15 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         await runSsh(`pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
 
         // 3. dd 复制数据（超时 10 分钟）
-        const sourceDev = (await runSsh(`pvesm path ${sourceVolumeId}`)).trim();
-        const targetDev = (await runSsh(`pvesm path ${safeStorage}:${safeVmid}/${targetVolName}`)).trim();
-        logger.info(`[os-switch] dd if='${sourceDev}' of='${targetDev}' bs=4M count=${sizeGb}G`);
+        // 获取源卷和目标卷的物理设备路径
+        // 对游离卷 pvesm path 可能返回空，改用 lvs 直接查找
+        const sourceDev = await getLvmDevicePath(sourceVolumeId, safeStorage);
+        const targetDev = await getLvmDevicePath(`${safeStorage}:${safeVmid}/${targetVolName}`, safeStorage);
+        logger.info(`[os-switch] dd 源设备: '${sourceDev}'，目标设备: '${targetDev}'`);
+        if (!sourceDev || !targetDev) {
+            await diskUtils._internal.destroySystemDisk(`${safeStorage}:${safeVmid}/${targetVolName}`);
+            throw new Error(`无法获取 LVM 设备路径 (源: ${sourceDev}, 目标: ${targetDev})`);
+        }
         try {
             await runSshWithTimeout(`dd if='${sourceDev}' of='${targetDev}' bs=4M status=none`, 600000);
         } catch (ddErr) {
