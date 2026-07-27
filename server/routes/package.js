@@ -226,7 +226,6 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                     console.error('[package] 系统盘扩容失败:', resizeErr.message);
                 }
             }
-            }
 
             // v1.3 新增：如果选择了 OS 模板，使用 OS 模板的 ciuser 和 ostype
             if (osTemplate) {
