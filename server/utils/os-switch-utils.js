@@ -170,11 +170,19 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         const sizeStr = listOutput.trim();
         logger.info(`[os-switch] pvesm list 获取源卷大小: '${sizeStr}' (volume: ${sourceVolumeId})`);
         let sizeGb = 0;
-        const sm = sizeStr.match(/(\d+)([GMTP])?/i);
+        // pvesm list 输出的 Size 列是字节数（如 85899345920），或带单位（如 80G）
+        const sm = sizeStr.match(/(\d+)([GMTPB])?/i);
         if (sm) {
             const val = parseInt(sm[1]);
-            const unit = (sm[2] || 'G').toUpperCase();
-            sizeGb = unit === 'T' ? val * 1024 : unit === 'M' ? Math.ceil(val / 1024) : val;
+            const unit = (sm[2] || '').toUpperCase();
+            if (unit === 'T') {
+                sizeGb = val * 1024;
+            } else if (unit === 'G') {
+                sizeGb = val;
+            } else {
+                // 无单位或 M/B，视为字节
+                sizeGb = Math.ceil(val / (1024 * 1024 * 1024));
+            }
         }
         if (sizeGb <= 0) {
             logger.info(`[os-switch] pvesm list 未获取到大小，尝试 stat fallback`);
