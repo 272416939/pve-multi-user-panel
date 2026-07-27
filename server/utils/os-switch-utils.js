@@ -136,6 +136,18 @@ async function getStorageType(storage) {
     return s ? s.type : '';
 }
 
+// 扩展的 SSH 执行（支持自定义超时）
+async function runSshWithTimeout(cmd, timeout = 60000) {
+    const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
+    const sshConfig = await getPveSshConfig();
+    const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, timeout);
+    if (result.code !== 0) {
+        const errDetail = (result.stderr || result.stdout || '').trim();
+        throw new Error(`SSH 命令执行失败 [exit ${result.code}]: ${cmd}\n${errDetail}`);
+    }
+    return result.stdout.trim();
+}
+
 // 2.6 根据存储类型将磁盘从临时 VM 移动到目标 VM
 // 文件系统类（dir/btrfs/nfs/cephfs）：mv 文件到目标 VM 目录，避免 destroy 时误删
 // 块设备类（lvm/lvmthin/zfs）：使用 pvesm move_volume
@@ -150,12 +162,13 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
     const storageType = await getStorageType(storage);
 
     if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
-        // 块设备类：pvesm move_volume 可能在 PVE 9.x 中不可用或语法不同，
-        // 改用 pvesm alloc + dd 方案
+        logger.info(`[os-switch] LVM存储 ${safeStorage}，开始 pvesm alloc + dd 复制`);
+
         // 1. 获取源卷大小（从 pvesm list 输出中解析）
         const listCmd = `pvesm list ${safeStorage} 2>/dev/null | awk -v vol="${sourceVolumeId}" '$1 == vol {print $2}'`;
-        const sizeStr = (await runSsh(listCmd)).trim();
-        // 去掉单位（G/M/T），转为 GB
+        const listOutput = await runSsh(listCmd);
+        const sizeStr = listOutput.trim();
+        logger.info(`[os-switch] pvesm list 获取源卷大小: '${sizeStr}' (volume: ${sourceVolumeId})`);
         let sizeGb = 0;
         const sm = sizeStr.match(/(\d+)([GMTP])?/i);
         if (sm) {
@@ -164,24 +177,28 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
             sizeGb = unit === 'T' ? val * 1024 : unit === 'M' ? Math.ceil(val / 1024) : val;
         }
         if (sizeGb <= 0) {
-            // 尝试从 pvesm path 获取文件大小作为 fallback
+            logger.info(`[os-switch] pvesm list 未获取到大小，尝试 stat fallback`);
             const pathCmd = `pvesm path ${sourceVolumeId}`;
             const srcPath = (await runSsh(pathCmd)).trim();
             const statCmd = `stat -c%s '${srcPath}' 2>/dev/null`;
             const bytes = (await runSsh(statCmd)).trim();
             sizeGb = Math.ceil(parseInt(bytes) / (1024 * 1024 * 1024)) || 20;
         }
+        logger.info(`[os-switch] 计算源卷大小: ${sizeGb}G`);
 
         // 2. 分配目标卷
         const targetVolName = `vm-${safeVmid}-disk-0.raw`;
+        logger.info(`[os-switch] pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
         await runSsh(`pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
 
-        // 3. dd 复制数据（获取源设备和目标设备的物理路径）
+        // 3. dd 复制数据（超时 10 分钟）
         const sourceDev = (await runSsh(`pvesm path ${sourceVolumeId}`)).trim();
         const targetDev = (await runSsh(`pvesm path ${safeStorage}:${safeVmid}/${targetVolName}`)).trim();
-        await runSsh(`dd if='${sourceDev}' of='${targetDev}' bs=4M iflag=count_bytes count=${sizeGb}G status=none`);
+        logger.info(`[os-switch] dd if='${sourceDev}' of='${targetDev}' bs=4M count=${sizeGb}G`);
+        await runSshWithTimeout(`dd if='${sourceDev}' of='${targetDev}' bs=4M iflag=count_bytes count=${sizeGb}G status=none`, 600000);
 
-        // 4. 从临时 VM 解绑并释放旧卷
+        logger.info(`[os-switch] dd 完成，清理临时 VM 卷`);
+        // 从临时 VM 解绑并释放旧卷
         await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
         await diskUtils._internal.destroySystemDisk(sourceVolumeId);
 
