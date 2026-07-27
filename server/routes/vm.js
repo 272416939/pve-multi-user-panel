@@ -883,25 +883,37 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                     }
                 } catch (e) { console.error('VM MAC分组删除失败:', e.message); }
             }
-            // 清理绑定在当前 VM 上的 legacy 磁盘台账记录（不操作 PVE 磁盘本身）
+            // 检查该 VM 上是否有挂载的活跃数据盘（非 legacy）
             try {
-                await db.disks.deleteByBindVmid(vm.vm_id);
-            } catch (e) { console.error('清理 legacy 磁盘记录失败:', e.message); }
+                var boundDisks = await db.disks.getByBindVmid(vmid);
+                var activeDisks = boundDisks.filter(function(d) {
+                    return d.status === 'bound' && !d.is_legacy;
+                });
+                if (activeDisks.length > 0) {
+                    return res.status(400).json({
+                        error: '该虚拟机下挂载了 ' + activeDisks.length + ' 个数据盘，请先卸载再销毁虚拟机'
+                    });
+                }
+            } catch (e) { console.error('[vm] 查询数据盘失败:', e.message); }
+            // 清理绑定在该 VM 上的所有磁盘台账记录（PVE 销毁时磁盘已被一并清理）
+            try {
+                await db.getPool().execute('DELETE FROM disks WHERE bind_vmid = ?', [vmid]);
+            } catch (e) { console.error('清理磁盘记录失败:', e.message); }
             await db.vms.delete(vm.id);
         }
 
-        try {
+try {
             await pveApi.destroyVm(vmid);
             console.log(`[vm] PVE 虚拟机 ${vmid} 已销毁`);
         } catch (e) {
             console.error(`[vm] PVE 销毁 ${vmid} 失败:`, e.message);
-            return res.status(500).json({ error: 'PVE 销毁虚拟机失败：' + safeError(e) });
+            return res.status(500).json({ error: safeError(e, 'PVE 操作失败') });
         }
 
-res.json({ message: '虚拟机已销毁' });
+	res.json({ message: '虚拟机已销毁' });
         } catch (error) {
             console.error('销毁虚拟机失败:', error);
-            res.status(500).json({ error: safeError(error) });
+            res.status(500).json({ error: safeError(error, '系统运行错误，请联系管理人员') });
         }
     });
 
