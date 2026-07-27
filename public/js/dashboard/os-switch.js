@@ -71,7 +71,7 @@
         alert('切换失败');
       }
     } catch (e) {
-      alert('请求失败');
+      alert(e.message || '请求失败');
     } finally {
       $.osSwitchSubmitting.value = false;
     }
