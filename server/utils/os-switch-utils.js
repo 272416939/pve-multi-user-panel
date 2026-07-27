@@ -255,9 +255,19 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         }
 
         logger.info(`[os-switch] dd 完成，清理临时 VM 卷`);
-        // 从临时 VM 解绑并释放旧卷
-        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
-        await diskUtils._internal.destroySystemDisk(sourceVolumeId);
+        // 从临时 VM 解绑并释放旧卷（失败不阻断主流程，后续 cleanupTempVm 会兜底）
+        try {
+            await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
+            logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
+        } catch (e) {
+            logger.info(`[os-switch] 临时 VM unlink 失败（可能已解绑）: ${e.message.substring(0, 100)}`);
+        }
+        try {
+            await diskUtils._internal.destroySystemDisk(sourceVolumeId);
+            logger.info(`[os-switch] 源卷 ${sourceVolumeId} 已释放`);
+        } catch (e) {
+            logger.info(`[os-switch] 源卷释放失败（可能已释放或被引用）: ${e.message.substring(0, 100)}`);
+        }
 
         return targetVolumeId;
     }
@@ -292,7 +302,12 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
 
 // 2.7 清理临时 VM（unlink 系统盘 + destroy，磁盘已被移走所以安全）
 async function cleanupTempVm(tempVmid, bus) {
-    await diskUtils._internal.unbindSystemDisk(tempVmid, bus);
+    // unlink 可能已由 moveDiskToTarget 执行过，失败不阻断
+    try {
+        await diskUtils._internal.unbindSystemDisk(tempVmid, bus);
+    } catch (e) {
+        logger.info(`[os-switch] cleanupTempVm unlink 失败（可能已解绑）: ${e.message.substring(0, 100)}`);
+    }
     await pveApi.destroyVm(tempVmid);
 }
 
