@@ -11,6 +11,8 @@ const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindin
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
+const { checkRateLimit } = require('../middleware/rate-limiter');
+const { withTransaction } = require('../utils/with-transaction');
 const osSwitchUtils = require('../utils/os-switch-utils');
 const { generateOrderNo } = require('../utils/order-utils');
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
