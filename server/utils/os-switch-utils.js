@@ -150,20 +150,42 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
     const storageType = await getStorageType(storage);
 
     if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
-        // 块设备类：使用 pvesm move_volume（PVE 内置命令，自动处理）
-        const cmd = `pvesm move_volume ${safeStorage} ${sourceVolumeId} ${safeVmid}`;
-        const result = await runSsh(cmd);
-        // 从输出中提取新的 volume ID
-        // 常见输出格式: "volume 'nvme2T:101/vm-101-disk-0.raw' was moved"
-        // 或: "moving disk /dev/pve/vm-104-disk-0 to nvme2T..."
-        const m = result.match(/volume\s+'([^']+)'/);
-        if (m) return m[1];
-        // 尝试另一种输出格式：在输出中找 storage:数字/vm-数字-disk-数字 模式
-        const fallbackM = result.match(new RegExp(safeStorage.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':\\d+/vm-\\d+-disk-\\d+(?:\\.\\w+)?'));
-        if (fallbackM) return fallbackM[0];
-        // 最后 fallback：手动构造（move_volume 已成功，只是输出格式不匹配）
-        logger.info(`[os-switch] pvesm move_volume 输出未匹配标准格式，使用 fallback。输出: ${result.substring(0, 200)}`);
-        return `${safeStorage}:${safeVmid}/vm-${safeVmid}-disk-0.raw`;
+        // 块设备类：pvesm move_volume 可能在 PVE 9.x 中不可用或语法不同，
+        // 改用 pvesm alloc + dd 方案
+        // 1. 获取源卷大小（从 pvesm list 输出中解析）
+        const listCmd = `pvesm list ${safeStorage} 2>/dev/null | awk -v vol="${sourceVolumeId}" '$1 == vol {print $2}'`;
+        const sizeStr = (await runSsh(listCmd)).trim();
+        // 去掉单位（G/M/T），转为 GB
+        let sizeGb = 0;
+        const sm = sizeStr.match(/(\d+)([GMTP])?/i);
+        if (sm) {
+            const val = parseInt(sm[1]);
+            const unit = (sm[2] || 'G').toUpperCase();
+            sizeGb = unit === 'T' ? val * 1024 : unit === 'M' ? Math.ceil(val / 1024) : val;
+        }
+        if (sizeGb <= 0) {
+            // 尝试从 pvesm path 获取文件大小作为 fallback
+            const pathCmd = `pvesm path ${sourceVolumeId}`;
+            const srcPath = (await runSsh(pathCmd)).trim();
+            const statCmd = `stat -c%s '${srcPath}' 2>/dev/null`;
+            const bytes = (await runSsh(statCmd)).trim();
+            sizeGb = Math.ceil(parseInt(bytes) / (1024 * 1024 * 1024)) || 20;
+        }
+
+        // 2. 分配目标卷
+        const targetVolName = `vm-${safeVmid}-disk-0.raw`;
+        await runSsh(`pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
+
+        // 3. dd 复制数据（获取源设备和目标设备的物理路径）
+        const sourceDev = (await runSsh(`pvesm path ${sourceVolumeId}`)).trim();
+        const targetDev = (await runSsh(`pvesm path ${safeStorage}:${safeVmid}/${targetVolName}`)).trim();
+        await runSsh(`dd if='${sourceDev}' of='${targetDev}' bs=4M iflag=count_bytes count=${sizeGb}G status=none`);
+
+        // 4. 从临时 VM 解绑并释放旧卷
+        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
+        await diskUtils._internal.destroySystemDisk(sourceVolumeId);
+
+        return `${safeStorage}:${safeVmid}/${targetVolName}`;
     } else {
         // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
         // 先获取源文件物理路径（如 /mnt/pve/nvme1Tbak/images/104/vm-104-disk-0.raw）
