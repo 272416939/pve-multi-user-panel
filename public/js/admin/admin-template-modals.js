@@ -1151,6 +1151,12 @@
                             <div class="modal-body">
                                 <div class="row g-3">
                                     <div class="col-md-6"><label class="form-label">模板名称</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.name"></div>
+                                    <div class="col-md-6"><label class="form-label">模板 VM</label>
+                                        <select class="form-select" v-model="templatePage.vmTemplateForm.value.template_vmid">
+                                            <option value="">请选择 PVE 模板 VM</option>
+                                            <option v-for="v in templatePage.pveTemplateVms.value" :key="v.vmid" :value="v.vmid">{{ v.name || 'VM ' + v.vmid }} ({{ v.vmid }})</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-4"><label class="form-label">系统盘容量(GB)</label><input class="form-control" type="number" v-model.number="templatePage.vmTemplateForm.value.disk_size" min="5" max="500"></div>
                                     <div class="col-md-4"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.cores"></div>
                                     <div class="col-md-4"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.memory"></div>
