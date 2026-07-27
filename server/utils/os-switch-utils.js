@@ -194,8 +194,8 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         }
         logger.info(`[os-switch] 计算源卷大小: ${sizeGb}G`);
 
-        // 2. 分配目标卷
-        const targetVolName = `vm-${safeVmid}-disk-0.raw`;
+        // 2. 分配目标卷（LVM 存储的卷名不带扩展名）
+        const targetVolName = `vm-${safeVmid}-disk-0`;
         logger.info(`[os-switch] pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
         await runSsh(`pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
 
@@ -211,34 +211,34 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         await diskUtils._internal.destroySystemDisk(sourceVolumeId);
 
         return `${safeStorage}:${safeVmid}/${targetVolName}`;
-    } else {
-        // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
-        // 先获取源文件物理路径（如 /mnt/pve/nvme1Tbak/images/104/vm-104-disk-0.raw）
-        const sourcePathCmd = `pvesm path ${sourceVolumeId}`;
-        const sourcePath = (await runSsh(sourcePathCmd)).trim();
-
-        // 获取扩展名
-        const ext = sourcePath.includes('.') ? sourcePath.split('.').pop() : 'raw';
-        const targetFileName = `vm-${safeVmid}-disk-0.${ext}`;
-
-        // 用 pvesm path 查询目标目录：构造一个临时 volumeid 来获取目录路径
-        const dummyVolId = `${safeStorage}:${safeVmid}/${targetFileName}`;
-        const targetPathCmd = `pvesm path ${dummyVolId}`;
-        const targetPathResult = (await runSsh(targetPathCmd)).trim();
-
-        // 目标目录 = 目标路径去掉文件名部分
-        const targetDir = targetPathResult.substring(0, targetPathResult.lastIndexOf('/'));
-        const targetPath = `${targetDir}/${targetFileName}`;
-
-        // 创建目标目录 + mv 文件
-        await runSsh(`mkdir -p '${targetDir}' && mv '${sourcePath}' '${targetPath}'`);
-
-        // 从临时 VM 解绑旧卷（文件已被 mv，卷引用已失效）
-        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
-
-        // 返回新的 volume ID
-        return `${safeStorage}:${safeVmid}/${targetFileName}`;
     }
+
+    // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
+    // 先获取源文件物理路径（如 /mnt/pve/nvme1Tbak/images/104/vm-104-disk-0.raw）
+    const sourcePathCmd = `pvesm path ${sourceVolumeId}`;
+    const sourcePath = (await runSsh(sourcePathCmd)).trim();
+
+    // 获取扩展名
+    const ext = sourcePath.includes('.') ? sourcePath.split('.').pop() : 'raw';
+    const targetFileName = `vm-${safeVmid}-disk-0.${ext}`;
+
+    // 用 pvesm path 查询目标目录：构造一个临时 volumeid 来获取目录路径
+    const dummyVolId = `${safeStorage}:${safeVmid}/${targetFileName}`;
+    const targetPathCmd = `pvesm path ${dummyVolId}`;
+    const targetPathResult = (await runSsh(targetPathCmd)).trim();
+
+    // 目标目录 = 目标路径去掉文件名部分
+    const targetDir = targetPathResult.substring(0, targetPathResult.lastIndexOf('/'));
+    const targetPath = `${targetDir}/${targetFileName}`;
+
+    // 创建目标目录 + mv 文件
+    await runSsh(`mkdir -p '${targetDir}' && mv '${sourcePath}' '${targetPath}'`);
+
+    // 从临时 VM 解绑旧卷（文件已被 mv，卷引用已失效）
+    await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
+
+    // 返回新的 volume ID
+    return `${safeStorage}:${safeVmid}/${targetFileName}`;
 }
 
 // 2.7 清理临时 VM（unlink 系统盘 + destroy，磁盘已被移走所以安全）
