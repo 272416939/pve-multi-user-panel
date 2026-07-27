@@ -44,12 +44,42 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
         if (ostype.startsWith('l')) {
             osType = 'linux';
             osVersion = ostype.substring(1) || '';
-        } else if (ostype === 'w10' || ostype === 'w11') {
+        } else if (ostype === 'w10') {
             osType = 'windows';
-            osVersion = ostype === 'w11' ? '11' : '10';
-        } else if (ostype === 'w2k19' || ostype === 'w2k22') {
+            osVersion = '10';
+        } else if (ostype === 'w11') {
             osType = 'windows';
-            osVersion = 'server';
+            osVersion = '11';
+        } else if (ostype === 'win7') {
+            osType = 'windows';
+            osVersion = '7';
+        } else if (ostype === 'win8' || ostype === 'wvista') {
+            osType = 'windows';
+            osVersion = ostype === 'win8' ? '8' : 'vista';
+        } else if (ostype === 'wxp') {
+            osType = 'windows';
+            osVersion = 'xp';
+        } else if (ostype === 'w2k') {
+            osType = 'windows';
+            osVersion = '2000';
+        } else if (ostype === 'w2k3') {
+            osType = 'windows';
+            osVersion = 'server 2003';
+        } else if (ostype === 'w2k8') {
+            osType = 'windows';
+            osVersion = 'server 2008';
+        } else if (ostype === 'w2k12') {
+            osType = 'windows';
+            osVersion = 'server 2012';
+        } else if (ostype === 'w2k16') {
+            osType = 'windows';
+            osVersion = 'server 2016';
+        } else if (ostype === 'w2k19') {
+            osType = 'windows';
+            osVersion = 'server 2019';
+        } else if (ostype === 'w2k22') {
+            osType = 'windows';
+            osVersion = 'server 2022';
         } else if (ostype === 'solaris') {
             osType = 'solaris';
         } else if (ostype === 'other') {
