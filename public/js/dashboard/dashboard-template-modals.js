@@ -900,18 +900,24 @@
                 </ul>
             </div>
             <div class="mb-3">
-                <label class="form-label">选择目标系统</label>
+                <label class="form-label fw-bold">选择目标系统</label>
                 <div class="row g-2">
                     <div class="col-md-6" v-for="t in osSwitchList" :key="t.id">
-                        <div class="card cursor-pointer" :class="osSwitchSelectedId === t.id ? 'border-primary' : ''" @click="osSwitchSelectedId = t.id" style="cursor:pointer;transition:all .2s">
-                            <div class="card-body py-2 px-3">
-                                <div class="fw-bold">{{ t.name }}</div>
-                                <div class="small text-muted">{{ t.os_type }} {{ t.os_version }} · {{ t.description ? t.description.substring(0,30) : '' }}</div>
+                        <div class="card border" :class="osSwitchSelectedId === t.id ? 'border-primary shadow' : ''" @click="osSwitchSelectedId = t.id" style="cursor:pointer;transition:all .2s ease;">
+                            <div class="card-body py-3 px-3">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="rounded-circle border d-inline-flex align-items-center justify-content-center" :class="osSwitchSelectedId === t.id ? 'border-primary' : 'border-secondary'" style="width:18px;height:18px;flex-shrink:0;">
+                                        <span v-if="osSwitchSelectedId === t.id" class="rounded-circle bg-primary" style="width:10px;height:10px;"></span>
+                                    </span>
+                                    <div class="fw-bold">{{ t.name }}</div>
+                                </div>
+                                <div class="small text-muted ms-4">{{ t.os_type }} {{ t.os_version }}</div>
+                                <div class="small text-muted ms-4" v-if="t.description">{{ t.description.substring(0,40) }}</div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div v-if="osSwitchList.length === 0" class="text-muted small">暂无可切换的系统</div>
+                <div v-if="osSwitchList.length === 0" class="text-muted small py-3 text-center">暂无可切换的系统</div>
             </div>
             <div class="current-os text-muted small mb-2" v-if="osSwitchCurrentName">
                 当前系统：{{ osSwitchCurrentName }}
