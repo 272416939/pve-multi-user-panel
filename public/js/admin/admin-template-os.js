@@ -60,27 +60,15 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">OS 类型</label>
-                            <select class="form-select" v-model="osTemplatePage.formData.os_type">
-                                <option value="">请选择</option>
-                                <option value="debian">Debian</option>
-                                <option value="ubuntu">Ubuntu</option>
-                                <option value="centos">CentOS</option>
-                                <option value="windows">Windows</option>
-                                <option value="arch">Arch Linux</option>
-                                <option value="alpine">Alpine</option>
-                                <option value="other">其他</option>
-                            </select>
+                            <input class="form-control" v-model="osTemplatePage.formData.os_type" readonly>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">OS 版本</label>
-                            <input class="form-control" v-model="osTemplatePage.formData.os_version">
+                            <input class="form-control" v-model="osTemplatePage.formData.os_version" readonly>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">架构</label>
-                            <select class="form-select" v-model="osTemplatePage.formData.arch">
-                                <option value="x86_64">x86_64</option>
-                                <option value="aarch64">aarch64</option>
-                            </select>
+                            <input class="form-control" v-model="osTemplatePage.formData.arch" readonly>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">目标存储</label>
