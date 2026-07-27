@@ -2582,14 +2582,17 @@ module.exports = {
     vmOsSwitchLogs: {
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO vm_os_switch_logs (vm_id, user_id, from_os_template_id, to_os_template_id, from_template_vmid, to_template_vmid, old_system_volume_id, new_system_volume_id, data_disks_snapshot, status, amount_charged, order_no)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vm_os_switch_logs (vm_id, user_id, from_os_template_id, to_os_template_id, from_template_vmid, to_template_vmid, old_system_volume_id, new_system_volume_id, data_disks_snapshot, old_system_params, old_mac_address, new_mac_address, mac_sync_result, error_message, status, amount_charged, order_no)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     parseInt(data.vm_id), parseInt(data.user_id),
                     data.from_os_template_id || null, parseInt(data.to_os_template_id),
                     data.from_template_vmid || null, parseInt(data.to_template_vmid),
                     data.old_system_volume_id || '', data.new_system_volume_id || '',
-                    data.data_disks_snapshot || '[]', data.status || 'pending',
+                    data.data_disks_snapshot || '[]', data.old_system_params || '',
+                    data.old_mac_address || '', data.new_mac_address || '',
+                    data.mac_sync_result || '{}', data.error_message || '',
+                    data.status || 'pending',
                     parseFloat(data.amount_charged) || 0, data.order_no || ''
                 ]
             );
