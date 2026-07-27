@@ -9,11 +9,16 @@ const logger = require('./logger');
 
 // ==================== 内部工具函数 ====================
 
-// SSH 命令执行（复用 disk-utils 的 SSH 工具）
+// SSH 命令执行（复用 disk-utils 的 SSH 工具，检查退出码）
 async function runSsh(cmd) {
     const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
     const sshConfig = await getPveSshConfig();
-    return execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 60000);
+    const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 60000);
+    if (result.code !== 0) {
+        const errDetail = (result.stderr || result.stdout || '').trim();
+        throw new Error(`SSH 命令执行失败 [exit ${result.code}]: ${cmd}\n${errDetail}`);
+    }
+    return result.stdout.trim();
 }
 
 // 生成随机密码
@@ -122,8 +127,11 @@ async function cloneOsTemplateDisk(templateVmid, targetStorage) {
         throw new Error(`克隆后无法找到临时 VM ${tempVmid} 的系统盘`);
     }
 
+    // 从临时 VM config 读取真实的 bus 类型（不一定是 scsi）
+    const realBus = tempConfig[`scsi0`] ? 'scsi' : tempConfig[`sata0`] ? 'sata' : tempConfig[`virtio0`] ? 'virtio' : 'scsi';
+
     // 从临时 VM unlink 系统盘（卷保留）
-    await diskUtils._internal.unbindSystemDisk(tempVmid, 'scsi');
+    await diskUtils._internal.unbindSystemDisk(tempVmid, realBus);
     // 删除临时 VM（卷已 unlink，不会被删除）
     await pveApi.destroyVm(tempVmid);
     return { tempVmid, systemVolumeId: actualVolumeId };
@@ -134,11 +142,19 @@ async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId) {
     const safeVmid = diskUtils.validateParam('vmid', vmid);
     const bus = oldSysDisk.bus;
 
-    // 3.1 卸载原系统盘配置（仅删除 qm config，不删卷）
-    await runSsh(`qm set ${safeVmid} --delete ${bus}0`);
+    // 3.1 使用 qm unlink 卸载原系统盘配置（比 qm set --delete 更可靠，不留划线状态）
+    await runSsh(`qm unlink ${safeVmid} --idlist ${bus}0`);
 
-    // 3.2 释放原系统盘卷
-    await diskUtils._internal.destroySystemDisk(oldSysDisk.volume_id);
+    // 3.2 检查旧卷是否仍存在，如果存在才释放
+    try {
+        const checkCmd = `pvesm list $(echo ${oldSysDisk.volume_id} | cut -d: -f1) 2>/dev/null | grep -F '${oldSysDisk.volume_id.split(':')[1]}'`;
+        const checkResult = await runSsh(checkCmd);
+        if (checkResult) {
+            await diskUtils._internal.destroySystemDisk(oldSysDisk.volume_id);
+        }
+    } catch (e) {
+        // 卷不存在或查询失败则跳过释放（可能已被前一次切换清理）
+    }
 
     // 3.3 挂载新系统盘（剥离 size= 参数）
     const mountParams = oldSysDisk.params_without_size || oldSysDisk.params || '';

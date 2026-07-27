@@ -385,7 +385,18 @@ const _internal = {
       throw new Error('invalid volume prefix');
     }
     var cmd = 'pvesm free ' + volumeId;
-    await runSshCommand(cmd);
+    // 使用 execSSH 直接调用以便对"卷不存在"做容错
+    var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
+    var cfg = await getPveSshConfig();
+    var result = await execSSH(cfg.host, cfg.username, cfg.password, cmd);
+    if (result.code !== 0) {
+      var errMsg = (result.stderr || result.stdout || '').toLowerCase();
+      // 卷不存在视为已清理，不抛异常
+      if (errMsg.indexOf('does not exist') !== -1 || errMsg.indexOf('not exist') !== -1 || errMsg.indexOf('no such') !== -1) {
+        return;
+      }
+      throw new Error('释放磁盘失败: ' + volumeId + ' - ' + (result.stderr || result.stdout || ''));
+    }
   }
 };
 
