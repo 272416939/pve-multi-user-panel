@@ -65,8 +65,10 @@
         $.closeOsSwitchModal();
         // 开始轮询状态
         startOsSwitchPoll(vm, res.switch_log_id);
+      } else if (res && res.error) {
+        alert(res.error);
       } else {
-        alert((res && res.error) || '切换失败');
+        alert('切换失败');
       }
     } catch (e) {
       alert('请求失败');
