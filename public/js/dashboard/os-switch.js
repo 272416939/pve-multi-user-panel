@@ -61,15 +61,15 @@
         body: JSON.stringify({ os_template_id: $.osSwitchSelectedId.value })
       });
       if (res && res.success) {
-        pvToast.success('系统切换已开始，请稍候');
+        alert('系统切换已开始，请稍候');
         $.closeOsSwitchModal();
         // 开始轮询状态
         startOsSwitchPoll(vm, res.switch_log_id);
       } else {
-        pvToast.error((res && res.error) || '切换失败');
+        alert((res && res.error) || '切换失败');
       }
     } catch (e) {
-      pvToast.error('请求失败');
+      alert('请求失败');
     } finally {
       $.osSwitchSubmitting.value = false;
     }
@@ -83,7 +83,7 @@
         if (res && res.status) {
           if (res.status === 'success') {
             clearInterval(pollInterval);
-            pvToast.success('系统切换成功！');
+            alert('系统切换成功！');
             // 刷新 VM 列表
             if (typeof $.loadUserVms === 'function') {
               $.loadUserVms();
@@ -92,10 +92,10 @@
             }
           } else if (res.status === 'failed') {
             clearInterval(pollInterval);
-            pvToast.error('系统切换失败，请查看通知');
+            alert('系统切换失败，请查看通知');
           } else if (res.status === 'rolled_back') {
             clearInterval(pollInterval);
-            pvToast.error('系统切换已回滚，请查看通知');
+            alert('系统切换已回滚，请查看通知');
           }
         }
       } catch (e) {
