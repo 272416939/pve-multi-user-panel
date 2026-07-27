@@ -911,7 +911,7 @@
                 <label class="form-label fw-bold" style="color:var(--bs-primary)">选择目标系统</label>
                 <div class="row g-2">
                     <div class="col-md-6" v-for="t in osSwitchList" :key="t.id">
-                        <div class="card" :class="osSwitchSelectedId === t.id ? 'os-switch-card-selected' : 'os-switch-card'" @click="osSwitchSelectedId = t.id">
+                        <div class="card" :class="osSwitchSelectedId === t.id ? 'os-switch-card-selected' : 'os-switch-card'" @click="osSwitchSelectedId = t.id" style="cursor:pointer;transition:all .2s ease;">
                             <div class="card-body py-3 px-3">
                                 <div class="d-flex align-items-center gap-2 mb-1">
                                     <span class="os-switch-radio" :class="osSwitchSelectedId === t.id ? 'os-switch-radio-active' : ''">
