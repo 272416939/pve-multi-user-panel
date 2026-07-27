@@ -37,25 +37,13 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
             }
         }
 
-        // 从 ostype 映射到 os_type
+        // 从 ostype 映射到 os_type（PVE 所有 ostype 覆盖）
         const ostype = config.ostype || '';
         let osType = '';
         let osVersion = '';
         if (ostype.startsWith('l')) {
             osType = 'linux';
             osVersion = ostype.substring(1) || '';
-        } else if (ostype === 'w10') {
-            osType = 'windows';
-            osVersion = '10';
-        } else if (ostype === 'w11') {
-            osType = 'windows';
-            osVersion = '11';
-        } else if (ostype === 'win7') {
-            osType = 'windows';
-            osVersion = '7';
-        } else if (ostype === 'win8' || ostype === 'wvista') {
-            osType = 'windows';
-            osVersion = ostype === 'win8' ? '8' : 'vista';
         } else if (ostype === 'wxp') {
             osType = 'windows';
             osVersion = 'xp';
@@ -68,6 +56,21 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
         } else if (ostype === 'w2k8') {
             osType = 'windows';
             osVersion = 'server 2008';
+        } else if (ostype === 'wvista') {
+            osType = 'windows';
+            osVersion = 'vista';
+        } else if (ostype === 'win7') {
+            osType = 'windows';
+            osVersion = '7';
+        } else if (ostype === 'win8') {
+            osType = 'windows';
+            osVersion = '8';
+        } else if (ostype === 'w10') {
+            osType = 'windows';
+            osVersion = '10';
+        } else if (ostype === 'w11') {
+            osType = 'windows';
+            osVersion = '11';
         } else if (ostype === 'w2k12') {
             osType = 'windows';
             osVersion = 'server 2012';
@@ -84,6 +87,9 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
             osType = 'solaris';
         } else if (ostype === 'other') {
             osType = 'other';
+        } else if (ostype) {
+            // 未知的 ostype，直接保留原始值
+            osType = ostype;
         }
 
         // 从 config 解析 name 用作模板名称
