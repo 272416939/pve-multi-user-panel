@@ -154,8 +154,16 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         const cmd = `pvesm move_volume ${safeStorage} ${sourceVolumeId} ${safeVmid}`;
         const result = await runSsh(cmd);
         // 从输出中提取新的 volume ID
+        // 常见输出格式: "volume 'nvme2T:101/vm-101-disk-0.raw' was moved"
+        // 或: "moving disk /dev/pve/vm-104-disk-0 to nvme2T..."
         const m = result.match(/volume\s+'([^']+)'/);
-        return m ? m[1] : `${safeStorage}:${safeVmid}/vm-${safeVmid}-disk-0.raw`;
+        if (m) return m[1];
+        // 尝试另一种输出格式：在输出中找 storage:数字/vm-数字-disk-数字 模式
+        const fallbackM = result.match(new RegExp(safeStorage.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ':\\d+/vm-\\d+-disk-\\d+(?:\\.\\w+)?'));
+        if (fallbackM) return fallbackM[0];
+        // 最后 fallback：手动构造（move_volume 已成功，只是输出格式不匹配）
+        logger.info(`[os-switch] pvesm move_volume 输出未匹配标准格式，使用 fallback。输出: ${result.substring(0, 200)}`);
+        return `${safeStorage}:${safeVmid}/vm-${safeVmid}-disk-0.raw`;
     } else {
         // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
         // 先获取源文件物理路径（如 /mnt/pve/nvme1Tbak/images/104/vm-104-disk-0.raw）
@@ -357,7 +365,10 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         await updateLogStage(logId, 'replace_sys');
 
         // Stage 5: 替换目标 VM 系统盘（卸载旧系统盘配置 + 释放旧卷 + 挂载新盘）
-        await replaceSystemDisk(vmid, systemDisk, movedVolumeId);
+        // 注意：使用模板的 bus 类型（cloneResult.bus）而非目标 VM 原 bus 类型，
+        //       因为模板镜像可能针对特定总线（如 scsi）做了驱动配置
+        const newSysDisk = { ...systemDisk, bus: cloneResult.bus };
+        await replaceSystemDisk(vmid, newSysDisk, movedVolumeId);
         await updateLogStage(logId, 'cleanup_temp');
 
         // Stage 5.5: 清理临时 VM（此时磁盘已被移走，destroy 安全）
