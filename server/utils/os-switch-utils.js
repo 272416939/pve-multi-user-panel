@@ -203,7 +203,14 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         const sourceDev = (await runSsh(`pvesm path ${sourceVolumeId}`)).trim();
         const targetDev = (await runSsh(`pvesm path ${safeStorage}:${safeVmid}/${targetVolName}`)).trim();
         logger.info(`[os-switch] dd if='${sourceDev}' of='${targetDev}' bs=4M count=${sizeGb}G`);
-        await runSshWithTimeout(`dd if='${sourceDev}' of='${targetDev}' bs=4M iflag=count_bytes count=${sizeGb}G status=none`, 600000);
+        try {
+            await runSshWithTimeout(`dd if='${sourceDev}' of='${targetDev}' bs=4M status=none`, 600000);
+        } catch (ddErr) {
+            // dd 失败时清理已分配的游离卷
+            logger.error(`[os-switch] dd 复制失败: ${ddErr.message}`);
+            await diskUtils._internal.destroySystemDisk(`${safeStorage}:${safeVmid}/${targetVolName}`);
+            throw ddErr;
+        }
 
         logger.info(`[os-switch] dd 完成，清理临时 VM 卷`);
         // 从临时 VM 解绑并释放旧卷
@@ -251,6 +258,11 @@ async function cleanupTempVm(tempVmid, bus) {
 async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId) {
     const safeVmid = diskUtils.validateParam('vmid', vmid);
     const bus = oldSysDisk.bus;
+    // 确保 newVolumeId 是一个有效的 volume ID 格式
+    const cleanVolId = newVolumeId && typeof newVolumeId === 'string' ? newVolumeId.trim() : '';
+    if (!cleanVolId) {
+        throw new Error('新系统盘 volume ID 为空');
+    }
 
     // 3.1 使用 qm unlink 卸载原系统盘配置（比 qm set --delete 更可靠，不留划线状态）
     await runSsh(`qm unlink ${safeVmid} --idlist ${bus}0`);
@@ -268,18 +280,18 @@ async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId) {
 
     // 3.3 挂载新系统盘（剥离 size= 参数）
     const mountParams = oldSysDisk.params_without_size || oldSysDisk.params || '';
-    const newDiskConfig = mountParams ? `${newVolumeId},${mountParams}` : newVolumeId;
+    const newDiskConfig = mountParams ? `${cleanVolId},${mountParams}` : cleanVolId;
     await runSsh(`qm set ${safeVmid} --${bus}0 ${newDiskConfig}`);
 
-    // 3.4 扩容到原 VM 系统盘容量（PVE 只能扩容不能缩容，取原容量确保不缩水）
-    const targetSizeGb = oldSysDisk.size_gb || 0;
-    if (targetSizeGb > 0) {
-        await runSsh(`qm resize ${safeVmid} ${bus}0 ${targetSizeGb}G`);
+    // 3.4 扩容到目标的 VM 系统盘容量 或 模板 disk_size
+const targetSizeGb = oldSysDisk.size_gb || 0;
+	    if (targetSizeGb > 0) {
+	        await runSsh(`qm resize ${safeVmid} ${bus}0 ${targetSizeGb}G`);
 
-        // 3.5 补回 size= 元数据
-        const finalParams = mountParams ? `${mountParams},size=${targetSizeGb}G` : `size=${targetSizeGb}G`;
-        await runSsh(`qm set ${safeVmid} --${bus}0 ${newVolumeId},${finalParams}`);
-    }
+	        // 3.5 补回 size= 元数据
+	        const finalParams = mountParams ? `${mountParams},size=${targetSizeGb}G` : `size=${targetSizeGb}G`;
+	        await runSsh(`qm set ${safeVmid} --${bus}0 ${cleanVolId},${finalParams}`);
+	    }
 }
 
 // 4. 重新挂载数据盘
