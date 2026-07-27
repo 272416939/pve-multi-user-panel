@@ -713,6 +713,13 @@ async function migrateSchema() {
     await safeAlter('vms', 'last_os_switch_at', 'DATETIME DEFAULT NULL');
     await safeAlter('vms', 'os_switch_pve_upid', "VARCHAR(200) DEFAULT ''");
     await safeAlter('vm_packages', 'default_os_template_id', 'INT DEFAULT NULL');
+    // os_templates 表迁移：新增 ostype 列（兼容旧表）
+    try {
+        await execute("ALTER TABLE os_templates ADD COLUMN ostype VARCHAR(20) NOT NULL DEFAULT '' AFTER os_version");
+        console.log('[db] 迁移: os_templates.ostype 列已添加');
+    } catch (e) {
+        if (!e.message.toLowerCase().includes('duplicate')) console.error('[db] 迁移 os_templates.ostype 失败:', e.message);
+    }
     await safeAlter('vm_templates', 'target_storage', "VARCHAR(100) NOT NULL DEFAULT 'local-lvm'");
     await safeAlter('vm_templates', 'clone_mode', "VARCHAR(20) NOT NULL DEFAULT 'full'");
     await safeAlter('vm_templates', 'cpu_affinity', "VARCHAR(255) NOT NULL DEFAULT ''");
