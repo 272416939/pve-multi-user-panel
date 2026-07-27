@@ -959,8 +959,8 @@ res.json({ message: '虚拟机已销毁' });
                 }
             }
         } catch (e) { /* ignore */ }
-        const requiredGb = Math.max(oldSysDiskSizeGb, osTemplate.system_disk_size);
-        await osSwitchUtils.checkTargetStorageCapacity(osTemplate.target_storage, requiredGb);
+        // 容量按原 VM 系统盘大小校验
+        await osSwitchUtils.checkTargetStorageCapacity(osTemplate.target_storage, oldSysDiskSizeGb || 20);
 
         let orderNo = '';
         let amountCharged = 0;

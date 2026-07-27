@@ -116,7 +116,7 @@ async function cloneOsTemplateDisk(templateVmid, targetStorage) {
 }
 
 // 3. 替换目标 VM 系统盘
-async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId, templateSizeGb) {
+async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId) {
     const safeVmid = diskUtils.validateParam('vmid', vmid);
     const bus = oldSysDisk.bus;
 
@@ -131,8 +131,8 @@ async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId, templateSizeGb) 
     const newDiskConfig = mountParams ? `${newVolumeId},${mountParams}` : newVolumeId;
     await runSsh(`qm set ${safeVmid} --${bus}0 ${newDiskConfig}`);
 
-    // 3.4 扩容到绝对目标容量（PVE 只能扩容不能缩容）
-    const targetSizeGb = Math.max(oldSysDisk.size_gb || 0, templateSizeGb || 0);
+    // 3.4 扩容到原 VM 系统盘容量（PVE 只能扩容不能缩容，取原容量确保不缩水）
+    const targetSizeGb = oldSysDisk.size_gb || 0;
     if (targetSizeGb > 0) {
         await runSsh(`qm resize ${safeVmid} ${bus}0 ${targetSizeGb}G`);
 
@@ -259,8 +259,8 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         ctx.newVolumeId = cloneResult.systemVolumeId;
         await updateLogStage(logId, 'replace_sys');
 
-        // Stage 4: 替换系统盘
-        await replaceSystemDisk(vmid, systemDisk, cloneResult.systemVolumeId, osTemplate.system_disk_size);
+        // Stage 4: 替换系统盘（容量按原 VM 系统盘容量）
+        await replaceSystemDisk(vmid, systemDisk, cloneResult.systemVolumeId);
         await updateLogStage(logId, 'reattach_data');
 
         // Stage 5: 重挂载数据盘
@@ -270,6 +270,12 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         // Stage 6: 更新 cloud-init
         const ciResult = await updateCloudInit(vmid, osTemplate.ciuser);
         ctx.ciResult = ciResult;
+
+        // Stage 6.5: 更新 VM ostype 与模板一致
+        if (osTemplate.ostype) {
+            await pveApi.updateVmConfig(vmid, { ostype: osTemplate.ostype });
+        }
+
         await updateLogStage(logId, 'start');
 
         // Stage 7: 启动 VM

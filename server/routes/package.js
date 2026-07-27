@@ -592,7 +592,6 @@ router.get('/vm-packages/:id/available-os-templates', authMiddleware, async (req
                     os_type: t.os_type,
                     os_version: t.os_version,
                     ostype: t.ostype,
-                    system_disk_size: t.system_disk_size,
                     switch_price: t.switch_price,
                     description: t.description
                 };

@@ -12,19 +12,19 @@ window.__admin.osTemplatePage = (function () {
     const pveTemplateVms = ref([]);       // PVE 模板 VM 列表（下拉选择用）
     const pveConfigLoading = ref(false);  // 加载 PVE 模板配置中
     const formData = Vue.reactive({
-        name: '', template_vmid: '', os_type: '', os_version: '', arch: 'x86_64',
-        system_disk_size: 20, target_storage: 'local-lvm', ciuser: '',
+        name: '', template_vmid: '', os_type: '', os_version: '', ostype: '', arch: 'x86_64',
+        target_storage: 'local-lvm', ciuser: '',
         description: '', switch_price: 0, icon: '', sort_order: 0,
         allowed_package_ids: '', enabled: 1, status: 'active'
     });
     const saving = ref(false);
     let editId = null;
+    const allStorages = ref([]);  // PVE 存储列表（目标存储下拉用）
 
     // 加载 PVE 模板 VM 列表（仅 template=1）
     async function loadPveTemplates() {
         try {
             var data = await api('/pve/vms?template_only=1');
-            // api() 返回的可能是 {available, assigned} 格式，也可能是数组
             if (data && data.available) {
                 pveTemplateVms.value = (data.available || []).concat(data.assigned || []);
             } else if (Array.isArray(data)) {
@@ -40,6 +40,17 @@ window.__admin.osTemplatePage = (function () {
         }
     }
 
+    // 加载 PVE 存储列表
+    async function loadAllStorages() {
+        try {
+            var data = await api('/admin/storages/all');
+            allStorages.value = Array.isArray(data) ? data : (data && data.data ? data.data : []);
+        } catch (e) {
+            console.error('加载存储列表失败', e);
+            allStorages.value = [];
+        }
+    }
+
     // 选择 PVE 模板后自动填充字段
     async function onTemplateVmidChange(newVmid) {
         if (!newVmid) return;
@@ -48,14 +59,13 @@ window.__admin.osTemplatePage = (function () {
             var res = await api('/admin/pve-template-config/' + newVmid);
             if (res && res.success && res.data) {
                 var d = res.data;
-                // 自动填充字段（保留用户已手动修改的 name，仅首次填充）
                 if (!editId) {
                     formData.name = d.name || '';
                 }
                 formData.os_type = d.os_type || '';
                 formData.os_version = d.os_version || '';
+                formData.ostype = d.ostype || '';
                 formData.arch = d.arch || 'x86_64';
-                formData.system_disk_size = d.system_disk_size || 20;
                 formData.target_storage = d.target_storage || 'local-lvm';
                 formData.ciuser = d.ciuser || '';
             }
@@ -77,6 +87,7 @@ window.__admin.osTemplatePage = (function () {
 
     function openForm(row) {
         loadPveTemplates();
+        loadAllStorages();
         if (row) {
             Object.assign(formData, row);
             editId = row.id;
@@ -84,7 +95,6 @@ window.__admin.osTemplatePage = (function () {
             Object.keys(formData).forEach(k => {
                 if (k === 'enabled') formData[k] = 1;
                 else if (k === 'status') formData[k] = 'active';
-                else if (k === 'system_disk_size') formData[k] = 20;
                 else if (k === 'switch_price') formData[k] = 0;
                 else if (k === 'target_storage') formData[k] = 'local-lvm';
                 else if (k === 'arch') formData[k] = 'x86_64';
@@ -141,5 +151,5 @@ window.__admin.osTemplatePage = (function () {
         }
     }
 
-    return { osTemplates, formVisible, formData, saving, editId, pveTemplateVms, pveConfigLoading, load, openForm, closeForm, save, deleteRow, onTemplateVmidChange, loadPveTemplates };
+    return { osTemplates, formVisible, formData, saving, editId, pveTemplateVms, pveConfigLoading, allStorages, load, openForm, closeForm, save, deleteRow, onTemplateVmidChange, loadPveTemplates, loadAllStorages };
 })();

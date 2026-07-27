@@ -605,8 +605,8 @@ async function initDb() {
         template_vmid INT NOT NULL DEFAULT 0,
         os_type VARCHAR(50) NOT NULL DEFAULT '',
         os_version VARCHAR(50) NOT NULL DEFAULT '',
+        ostype VARCHAR(20) NOT NULL DEFAULT '',
         arch VARCHAR(20) NOT NULL DEFAULT 'x86_64',
-        system_disk_size INT NOT NULL DEFAULT 20,
         target_storage VARCHAR(100) NOT NULL DEFAULT 'local-lvm',
         ciuser VARCHAR(100) NOT NULL DEFAULT '',
         description TEXT NOT NULL,
@@ -2534,12 +2534,12 @@ module.exports = {
         getByTemplateVmid: (vmid) => queryAll('SELECT * FROM os_templates WHERE template_vmid = ?', [parseInt(vmid)]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO os_templates (name, template_vmid, os_type, os_version, arch, system_disk_size, target_storage, ciuser, description, switch_price, icon, sort_order, allowed_package_ids, enabled, status)
+                `INSERT INTO os_templates (name, template_vmid, os_type, os_version, ostype, arch, target_storage, ciuser, description, switch_price, icon, sort_order, allowed_package_ids, enabled, status)
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', parseInt(data.template_vmid) || 0,
                     data.os_type || '', data.os_version || '',
-                    data.arch || 'x86_64', parseInt(data.system_disk_size) || 20,
+                    data.ostype || '', data.arch || 'x86_64',
                     data.target_storage || 'local-lvm', data.ciuser || '',
                     data.description || '', parseFloat(data.switch_price) || 0,
                     data.icon || '', parseInt(data.sort_order) || 0,
@@ -2550,7 +2550,7 @@ module.exports = {
             return queryOne('SELECT * FROM os_templates WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_vmid', 'os_type', 'os_version', 'arch', 'system_disk_size', 'target_storage', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
+            const allowedColumns = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

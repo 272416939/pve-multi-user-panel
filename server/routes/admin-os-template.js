@@ -86,7 +86,6 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
                 os_version: osVersion,
                 ostype: ostype,
                 arch: arch,
-                system_disk_size: systemDiskSize,
                 target_storage: targetStorage,
                 ciuser: ciuser
             }
@@ -142,17 +141,13 @@ router.post('/admin/os-templates', async (req, res) => {
         if (isNaN(switchPrice) || switchPrice < 0 || switchPrice > 9999) {
             return res.status(400).json({ error: '无效的切换价格（0-9999）' });
         }
-        const diskSize = parseInt(data.system_disk_size);
-        if (!Number.isInteger(diskSize) || diskSize < 5 || diskSize > 500) {
-            return res.status(400).json({ error: '系统盘容量必须在 5-500 GB 之间' });
-        }
         const id = await db.osTemplates.create({
             name: String(data.name).slice(0, 255),
             template_vmid: templateVmid,
             os_type: String(data.os_type || '').slice(0, 50),
             os_version: String(data.os_version || '').slice(0, 50),
+            ostype: String(data.ostype || '').slice(0, 20),
             arch: ['x86_64', 'aarch64'].includes(data.arch) ? data.arch : 'x86_64',
-            system_disk_size: diskSize,
             target_storage: String(data.target_storage || 'local-lvm').slice(0, 100),
             ciuser: String(data.ciuser || '').slice(0, 100),
             description: String(data.description || '').slice(0, 5000),
@@ -177,7 +172,7 @@ router.put('/admin/os-templates/:id', async (req, res) => {
         const existing = await db.osTemplates.getById(id);
         if (!existing) return res.status(404).json({ error: '模板不存在' });
 
-        const allowedFields = ['name', 'template_vmid', 'os_type', 'os_version', 'arch', 'system_disk_size', 'target_storage', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
+        const allowedFields = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
         const updates = {};
         for (const key of allowedFields) {
             if (req.body[key] !== undefined) {
@@ -188,12 +183,6 @@ router.put('/admin/os-templates/:id', async (req, res) => {
             const vmid = parseInt(updates.template_vmid);
             if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
                 return res.status(400).json({ error: '无效的模板 VMID' });
-            }
-        }
-        if (updates.system_disk_size !== undefined) {
-            const ds = parseInt(updates.system_disk_size);
-            if (!Number.isInteger(ds) || ds < 5 || ds > 500) {
-                return res.status(400).json({ error: '系统盘容量必须在 5-500 GB 之间' });
             }
         }
         if (updates.switch_price !== undefined) {
