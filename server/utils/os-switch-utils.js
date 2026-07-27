@@ -229,6 +229,9 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
 
         // 2. 分配目标卷（LVM 存储的卷名不带扩展名）
         const targetVolName = `vm-${safeVmid}-disk-0`;
+        // LVM 存储的 volume ID 格式: storage:vm-<vmid>-disk-<n>（不含 vmid/ 目录前缀）
+        // DIR 存储的 volume ID 格式: storage:<vmid>/vm-<vmid>-disk-<n>.<ext>
+        const targetVolumeId = `${safeStorage}:${targetVolName}`;
         logger.info(`[os-switch] pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
         await runSsh(`pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
 
@@ -236,10 +239,10 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         // 获取源卷和目标卷的物理设备路径
         // 对游离卷 pvesm path 可能返回空，改用 lvs 直接查找
         const sourceDev = await getLvmDevicePath(sourceVolumeId, safeStorage);
-        const targetDev = await getLvmDevicePath(`${safeStorage}:${safeVmid}/${targetVolName}`, safeStorage);
+        const targetDev = await getLvmDevicePath(targetVolumeId, safeStorage);
         logger.info(`[os-switch] dd 源设备: '${sourceDev}'，目标设备: '${targetDev}'`);
         if (!sourceDev || !targetDev) {
-            await diskUtils._internal.destroySystemDisk(`${safeStorage}:${safeVmid}/${targetVolName}`);
+            await diskUtils._internal.destroySystemDisk(targetVolumeId);
             throw new Error(`无法获取 LVM 设备路径 (源: ${sourceDev}, 目标: ${targetDev})`);
         }
         try {
@@ -247,7 +250,7 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         } catch (ddErr) {
             // dd 失败时清理已分配的游离卷
             logger.error(`[os-switch] dd 复制失败: ${ddErr.message}`);
-            await diskUtils._internal.destroySystemDisk(`${safeStorage}:${safeVmid}/${targetVolName}`);
+            await diskUtils._internal.destroySystemDisk(targetVolumeId);
             throw ddErr;
         }
 
@@ -256,7 +259,7 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
         await diskUtils._internal.destroySystemDisk(sourceVolumeId);
 
-        return `${safeStorage}:${safeVmid}/${targetVolName}`;
+        return targetVolumeId;
     }
 
     // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
