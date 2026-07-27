@@ -164,8 +164,8 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
     if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
         logger.info(`[os-switch] LVM存储 ${safeStorage}，开始 pvesm alloc + dd 复制`);
 
-        // 1. 获取源卷大小（从 pvesm list 输出中解析）
-        const listCmd = `pvesm list ${safeStorage} 2>/dev/null | awk -v vol="${sourceVolumeId}" '$1 == vol {print $2}'`;
+        // 1. 获取源卷大小（从 pvesm list 输出中解析，列顺序: Volid Format Type Size VMID）
+        const listCmd = `pvesm list ${safeStorage} 2>/dev/null | awk -v vol="${sourceVolumeId}" '$1 == vol {print $4}'`;
         const listOutput = await runSsh(listCmd);
         const sizeStr = listOutput.trim();
         logger.info(`[os-switch] pvesm list 获取源卷大小: '${sizeStr}' (volume: ${sourceVolumeId})`);
