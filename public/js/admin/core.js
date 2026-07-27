@@ -887,7 +887,7 @@ $.initDetailCharts = function() {
                 await $.loadData();
                 await $.loadMacGroups();
                 // Auto-expand submenu based on current section
-                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance', 'disk-settings'];
+                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os'];
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
                         var section = $.activeSection.value;
@@ -922,6 +922,9 @@ $.initDetailCharts = function() {
                                 window.packagePage.loadVmPackages();
                                 window.packagePage.loadVmPackageGroups();
                             }
+                        }
+                        if (section === 'templates-os' && window.__admin.osTemplatePage) {
+                            window.__admin.osTemplatePage.load();
                         }
                     }, 100);
                 }
