@@ -435,7 +435,8 @@ async function performOsSwitch(vmid, osTemplate, logId) {
             if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
                 logger.info(`[os-switch] LVM: 使用 PVE move_disk 将临时 VM 的磁盘转移到目标 VM`);
                 // 先 unlink 目标 VM 旧系统盘 + 释放旧卷（保留 params 以便后续设置 QOS/size）
-                await runSsh(`qm unlink ${vmid} --idlist ${newSysDisk.bus}0`);
+                // 注意！必须用 systemDisk.bus（旧盘总线），而非 newSysDisk.bus（模板总线）
+                await runSsh(`qm unlink ${vmid} --idlist ${systemDisk.bus}0`);
                 try {
                     const checkCmd = `pvesm list $(echo ${systemDisk.volume_id} | cut -d: -f1) 2>/dev/null | grep -F '${systemDisk.volume_id.split(':')[1]}'`;
                     const checkResult = await runSsh(checkCmd);
