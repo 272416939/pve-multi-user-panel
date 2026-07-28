@@ -493,7 +493,7 @@ async function performOsSwitch(vmid, osTemplate, logId) {
                 }
 
                 // 设置引导顺序为新系统盘
-                await runSsh(`qm set ${vmid} --boot order=${newSysDisk.bus}0;net0`);
+                await runSsh(`qm set ${vmid} --boot 'order=${newSysDisk.bus}0;net0'`);
                 logger.info(`[os-switch] 设置引导顺序: ${newSysDisk.bus}0;net0`);
             }
         } else {
