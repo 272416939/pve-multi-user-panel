@@ -195,30 +195,22 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
     const storageType = await getStorageType(storage);
 
 	if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
-	    logger.info(`[os-switch] LVM存储 ${safeStorage}，使用 lvrename 重命名逻辑卷`);
+	    logger.info(`[os-switch] LVM存储 ${safeStorage}，直接挂载不重命名`);
 
-	    // 从 volumeId 中提取 LV 名（如 nvme2T:vm-103-disk-0 -> vm-103-disk-0）
-	    const parts = sourceVolumeId.split(':');
-	    const oldLvName = parts[1] || '';
-	    if (!oldLvName || !/^vm-\d+-disk-\d+$/.test(oldLvName)) {
-	        throw new Error(`无效的源卷名: ${oldLvName}`);
-	    }
-	    const newLvName = `vm-${safeVmid}-disk-0`;
-	    const targetVolumeId = `${safeStorage}:${newLvName}`;
+	    // LVM 卷不重命名，直接使用原始 volume ID（如 nvme2T:vm-103-disk-0）
+	    // PVE 存储索引中记录的是原始卷名，挂载时使用这个名称
+	    // 后续在 performOsSwitch 成功后统一重命名
 
-	    // lvrename 在同一卷组内重命名逻辑卷（瞬间完成，无数据拷贝）
-	    await runSsh(`lvrename ${safeStorage}/${oldLvName} ${safeStorage}/${newLvName}`);
-	    logger.info(`[os-switch] lvrename ${safeStorage}/${oldLvName} -> ${safeStorage}/${newLvName} 成功`);
-
-	    // 从临时 VM 解绑（PVE 配置中旧 volumeId 已失效，修改 VM 配置即可）
+	    // 从临时 VM 解绑（PVE 配置中移除旧卷引用）
 	    try {
 	        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
 	        logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
 	    } catch (e) {
-	        logger.info(`[os-switch] 临时 VM unlink 失败（可能卷名已变更）: ${e.message.substring(0, 100)}`);
+	        logger.info(`[os-switch] 临时 VM unlink 失败: ${e.message.substring(0, 100)}`);
 	    }
 
-	    return targetVolumeId;
+	    // 返回原始 volume ID（不重命名）
+	    return sourceVolumeId;
 	}
 
     // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
@@ -473,10 +465,30 @@ async function performOsSwitch(vmid, osTemplate, logId) {
                 mac_sync_performed: 0,
                 mac_sync_status: 'not_needed',
                 mac_sync_result: JSON.stringify({ reason: 'MAC 未变化，无需同步' })
-            });
-        }
+	        });
+	        }
 
-        return { success: true, ...ctx };
+	        // Stage 10: 如果目标存储为 LVM/LVMthin，在切换成功后重命名逻辑卷以匹配目标 VMID
+	        if (systemDisk && osTemplate.target_storage) {
+	            const stType = await getStorageType(osTemplate.target_storage);
+	            if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(stType)) {
+	                const origId = cloneResult.systemVolumeId;
+	                const parts = origId.split(':');
+	                const oldLv = parts[1] || '';
+	                const newLv = `vm-${vmid}-disk-0`;
+	                if (oldLv && oldLv !== newLv) {
+	                    try {
+	                        await runSsh(`lvrename ${osTemplate.target_storage}/${oldLv} ${osTemplate.target_storage}/${newLv}`);
+	                        logger.info(`[os-switch] 切换后 lvrename ${oldLv} -> ${newLv}`);
+	                        ctx.newVolumeId = `${osTemplate.target_storage}:${newLv}`;
+	                    } catch (e) {
+	                        logger.info(`[os-switch] 切换后 lvrename 失败（不影响运行）: ${e.message.substring(0, 100)}`);
+	                    }
+	                }
+	            }
+	        }
+
+	        return { success: true, ...ctx };
     } catch (error) {
         await rollbackOsSwitch(vmid, ctx, logId, error);
         throw error;
