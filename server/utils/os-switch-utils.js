@@ -21,6 +21,17 @@ async function runSsh(cmd) {
     return result.stdout.trim();
 }
 
+// 过滤 QOS 参数，剔除总线特有参数（如 iothread 在 sata 上不被支持）
+// 保留通用限速参数和 ssd 标志
+function filterQosParams(rawParams) {
+    if (!rawParams) return '';
+    const allowed = new Set(['mbps_rd', 'mbps_rd_max', 'mbps_wr', 'mbps_wr_max', 'iops_rd', 'iops_rd_max', 'iops_wr', 'iops_wr_max', 'ssd']);
+    return rawParams.split(',').filter(p => {
+        const key = p.split('=')[0];
+        return allowed.has(key);
+    }).join(',');
+}
+
 // 生成随机密码
 function generateRandomPassword() {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
@@ -194,20 +205,20 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
 
     const storageType = await getStorageType(storage);
 
-	if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
-	    logger.info(`[os-switch] LVM存储 ${safeStorage}，unlink 临时 VM 的磁盘，准备 move_disk`);
+    if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
+    logger.info(`[os-switch] LVM存储 ${safeStorage}，unlink 临时 VM 的磁盘，准备 move_disk`);
 
-	    // 从临时 VM 解绑系统盘（使卷变为 unused）
-	    try {
-	        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
-	        logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
-	    } catch (e) {
-	        logger.info(`[os-switch] 临时 VM unlink 失败: ${e.message.substring(0, 100)}`);
-	    }
+    // 从临时 VM 解绑系统盘（使卷变为 unused）
+    try {
+    await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
+    logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
+    } catch (e) {
+    logger.info(`[os-switch] 临时 VM unlink 失败: ${e.message.substring(0, 100)}`);
+    }
 
-	    // 返回原始卷 ID（供后续 move_disk 使用）
-	    return { targetVolumeId: null, sourceVolumeId: sourceVolumeId, storageType: 'lvm' };
-	}
+    // 返回原始卷 ID（供后续 move_disk 使用）
+    return { targetVolumeId: null, sourceVolumeId: sourceVolumeId, storageType: 'lvm' };
+    }
 
     // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
     // 先获取源文件物理路径（如 /mnt/pve/nvme1Tbak/images/104/vm-104-disk-0.raw）
@@ -279,13 +290,13 @@ async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId) {
 
     // 3.4 扩容到目标的 VM 系统盘容量 或 模板 disk_size
 const targetSizeGb = oldSysDisk.size_gb || 0;
-	    if (targetSizeGb > 0) {
-	        await runSsh(`qm resize ${safeVmid} ${bus}0 ${targetSizeGb}G`);
+    if (targetSizeGb > 0) {
+    await runSsh(`qm resize ${safeVmid} ${bus}0 ${targetSizeGb}G`);
 
-	        // 3.5 补回 size= 元数据
-	        const finalParams = mountParams ? `${mountParams},size=${targetSizeGb}G` : `size=${targetSizeGb}G`;
-	        await runSsh(`qm set ${safeVmid} --${bus}0 ${cleanVolId},${finalParams}`);
-	    }
+    // 3.5 补回 size= 元数据
+    const finalParams = mountParams ? `${mountParams},size=${targetSizeGb}G` : `size=${targetSizeGb}G`;
+    await runSsh(`qm set ${safeVmid} --${bus}0 ${cleanVolId},${finalParams}`);
+    }
 }
 
 // 4. 重新挂载数据盘
@@ -418,7 +429,7 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         // Stage 5: 替换目标 VM 系统盘
         const newSysDisk = { ...systemDisk, bus: cloneResult.bus };
 
-        if (typeof moveResult === 'object' && moveResult.storageType === 'lvm') {
+                        if (typeof moveResult === 'object' && moveResult.storageType === 'lvm') {
             // LVM 路径：先用 PVE move_disk API 转移磁盘，再清理旧盘
             const storageType = await getStorageType(osTemplate.target_storage);
             if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
@@ -431,54 +442,60 @@ async function performOsSwitch(vmid, osTemplate, logId) {
                     if (checkResult) {
                         await diskUtils._internal.destroySystemDisk(systemDisk.volume_id);
                     }
-	        } catch (e) { /* ignore */ }
+                } catch (e) { /* ignore */ }
 
-	                // 使用 PVE move_disk API 将临时 VM 的 unused 磁盘转移给目标 VM
-	                const upid = await pveApi.moveDisk(cloneResult.tempVmid, 'unused0', vmid, `${newSysDisk.bus}0`);
-	                // 等待任务完成
-	                await pveApi.waitForTask(upid, 300000);
-	                // 获取目标 VM 配置，提取新挂载的卷 ID
-	                const targetConfig = await pveApi.getVmConfig(vmid);
-	                const raw = targetConfig[`${newSysDisk.bus}0`] || '';
-	                const newVolumeId = raw.split(',')[0] || '';
-	                ctx.newVolumeId = newVolumeId;
-	                logger.info(`[os-switch] move_disk 完成，新卷 ID: ${ctx.newVolumeId}`);
+                // 使用 PVE move_disk API 将临时 VM 的 unused 磁盘转移给目标 VM
+                const upid = await pveApi.moveDisk(cloneResult.tempVmid, 'unused0', vmid, `${newSysDisk.bus}0`);
+                // 等待任务完成
+                await pveApi.waitForTask(upid, 300000);
+                // 获取目标 VM 配置，提取新挂载的卷 ID
+                const targetConfig = await pveApi.getVmConfig(vmid);
+                const raw = targetConfig[`${newSysDisk.bus}0`] || '';
+                const newVolumeId = raw.split(',')[0] || '';
+                ctx.newVolumeId = newVolumeId;
+                logger.info(`[os-switch] move_disk 完成，新卷 ID: ${ctx.newVolumeId}`);
 
-	                // 恢复 QOS 参数（限速、ssd 等）
-	                if (systemDisk && systemDisk.params_without_size) {
-	                    const qosConfig = `${newVolumeId},${systemDisk.params_without_size}`;
-	                    await runSsh(`qm set ${vmid} --${newSysDisk.bus}0 ${qosConfig}`);
-	                    logger.info(`[os-switch] 恢复 QOS 参数: ${systemDisk.params_without_size}`);
-	                }
+                // 恢复 QOS 参数（限速、ssd 等，过滤掉 iothread 等总线特有参数）
+                if (systemDisk && systemDisk.params_without_size) {
+                    const filteredQos = filterQosParams(systemDisk.params_without_size);
+                    if (filteredQos) {
+                        const qosConfig = `${newVolumeId},${filteredQos}`;
+                        await runSsh(`qm set ${vmid} --${newSysDisk.bus}0 ${qosConfig}`);
+                        logger.info(`[os-switch] 恢复 QOS 参数: ${filteredQos}`);
+                    } else {
+                        logger.info(`[os-switch] QOS 参数已全部过滤，无需恢复`);
+                    }
+                }
 
-	                // 扩容到目标 VM 原系统盘容量
-	                const targetSizeGb = systemDisk ? (systemDisk.size_gb || 0) : 0;
-	                if (targetSizeGb > 0) {
-	                    await runSsh(`qm resize ${vmid} ${newSysDisk.bus}0 ${targetSizeGb}G`);
-	                    const finalParams = systemDisk.params_without_size
-	                        ? `${systemDisk.params_without_size},size=${targetSizeGb}G`
-	                        : `size=${targetSizeGb}G`;
-	                    await runSsh(`qm set ${vmid} --${newSysDisk.bus}0 ${newVolumeId},${finalParams}`);
-	                    logger.info(`[os-switch] 扩容到 ${targetSizeGb}G`);
-	                }
+                // 扩容到目标 VM 原系统盘容量
+                const targetSizeGb = systemDisk ? (systemDisk.size_gb || 0) : 0;
+                if (targetSizeGb > 0) {
+                    await runSsh(`qm resize ${vmid} ${newSysDisk.bus}0 ${targetSizeGb}G`);
+                    const filteredQos = systemDisk.params_without_size ? filterQosParams(systemDisk.params_without_size) : '';
+                    const finalParams = filteredQos
+                        ? `${filteredQos},size=${targetSizeGb}G`
+                        : `size=${targetSizeGb}G`;
+                    await runSsh(`qm set ${vmid} --${newSysDisk.bus}0 ${newVolumeId},${finalParams}`);
+                    logger.info(`[os-switch] 扩容到 ${targetSizeGb}G`);
+                }
 
-	                // 清理临时 VM
-	                await cleanupTempVm(cloneResult.tempVmid, cloneResult.bus);
+                // 清理临时 VM
+                await cleanupTempVm(cloneResult.tempVmid, cloneResult.bus);
 
-	                // 清理旧系统盘残留（unlink 后还剩余 unused 引用）
-	                const curConfig = await pveApi.getVmConfig(vmid);
-	                for (const key of Object.keys(curConfig)) {
-	                    if (key.startsWith('unused')) {
-	                        try {
-	                            await runSsh(`qm unlink ${vmid} --idlist ${key} 2>/dev/null`);
-	                        } catch (e) { /* ignore */ }
-	                    }
-	                }
+                // 清理旧系统盘残留（unlink 后还剩余 unused 引用）
+                const curConfig = await pveApi.getVmConfig(vmid);
+                for (const key of Object.keys(curConfig)) {
+                    if (key.startsWith('unused')) {
+                        try {
+                            await runSsh(`qm unlink ${vmid} --idlist ${key} 2>/dev/null`);
+                        } catch (e) { /* ignore */ }
+                    }
+                }
 
-	                // 设置引导顺序为新系统盘
-	                await runSsh(`qm set ${vmid} --boot order=${newSysDisk.bus}0;net0`);
-	                logger.info(`[os-switch] 设置引导顺序: ${newSysDisk.bus}0;net0`);
-	            }
+                // 设置引导顺序为新系统盘
+                await runSsh(`qm set ${vmid} --boot order=${newSysDisk.bus}0;net0`);
+                logger.info(`[os-switch] 设置引导顺序: ${newSysDisk.bus}0;net0`);
+            }
         } else {
             // DIR 路径：moveResult 是新的 volume ID
             const movedVolumeId = typeof moveResult === 'string' ? moveResult : '';
@@ -525,10 +542,10 @@ async function performOsSwitch(vmid, osTemplate, logId) {
                 mac_sync_performed: 0,
                 mac_sync_status: 'not_needed',
                 mac_sync_result: JSON.stringify({ reason: 'MAC 未变化，无需同步' })
-	        });
-	        }
+    });
+    }
 
-	        return { success: true, ...ctx };
+    return { success: true, ...ctx };
     } catch (error) {
         await rollbackOsSwitch(vmid, ctx, logId, error);
         throw error;
