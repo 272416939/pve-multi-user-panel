@@ -293,6 +293,24 @@ class PveApi {
     return response.data.data;
   }
 
+  // 在 VM 之间移动磁盘（PVE API: move_disk）
+  // 自动处理 LV 重命名和存储索引更新
+  async moveDisk(sourceVmid, disk, targetVmid, targetDisk) {
+    if (!this.node) {
+      await this.detectNode();
+    }
+    const searchParams = new URLSearchParams();
+    searchParams.append('disk', String(disk));
+    searchParams.append('target-vmid', String(targetVmid));
+    searchParams.append('target-disk', String(targetDisk));
+    const response = await this.axiosInstance.post(
+      `${this.host}/api2/json/nodes/${this.node}/qemu/${sourceVmid}/move_disk`,
+      searchParams.toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 300000 }
+    );
+    return response.data.data;
+  }
+
   async waitForTask(upid, timeout = 300000) {
     const pollInterval = 2000;
     const startTime = Date.now();

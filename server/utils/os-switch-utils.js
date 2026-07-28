@@ -195,12 +195,9 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
     const storageType = await getStorageType(storage);
 
 	if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
-	    logger.info(`[os-switch] LVM存储 ${safeStorage}，unlink 后直接返回原始卷ID`);
+	    logger.info(`[os-switch] LVM存储 ${safeStorage}，unlink 临时 VM 的磁盘，准备 move_disk`);
 
-	    // PVE 的 LVM 卷名 `vm-<vmid>-disk-<n>` 只是命名规范，
-	    // 卷名中的 VMID 不必匹配实际 VM，可直接用原始卷 ID 挂载到目标 VM
-
-	    // 从临时 VM 解绑（清除配置引用）
+	    // 从临时 VM 解绑系统盘（使卷变为 unused）
 	    try {
 	        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
 	        logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
@@ -208,8 +205,8 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
 	        logger.info(`[os-switch] 临时 VM unlink 失败: ${e.message.substring(0, 100)}`);
 	    }
 
-	    // 直接返回原始 volume ID（不重命名）
-	    return sourceVolumeId;
+	    // 返回原始卷 ID（供后续 move_disk 使用）
+	    return { targetVolumeId: null, sourceVolumeId: sourceVolumeId, storageType: 'lvm' };
 	}
 
     // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
@@ -410,25 +407,55 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         await updateLogStage(logId, 'move_volume');
 
         // Stage 4: 根据存储类型将磁盘从临时 VM 移动到目标 VM
-        const movedVolumeId = await moveDiskToTarget(
+        const moveResult = await moveDiskToTarget(
             osTemplate.target_storage,
             cloneResult.systemVolumeId,
             vmid,
             cloneResult.bus,
             cloneResult.tempVmid
         );
-        ctx.newVolumeId = movedVolumeId;
-        await updateLogStage(logId, 'replace_sys');
 
-        // Stage 5: 替换目标 VM 系统盘（卸载旧系统盘配置 + 释放旧卷 + 挂载新盘）
-        // 注意：使用模板的 bus 类型（cloneResult.bus）而非目标 VM 原 bus 类型，
-        //       因为模板镜像可能针对特定总线（如 scsi）做了驱动配置
+        // Stage 5: 替换目标 VM 系统盘
         const newSysDisk = { ...systemDisk, bus: cloneResult.bus };
-        await replaceSystemDisk(vmid, newSysDisk, movedVolumeId);
-        await updateLogStage(logId, 'cleanup_temp');
 
-        // Stage 5.5: 清理临时 VM（此时磁盘已被移走，destroy 安全）
-        await cleanupTempVm(cloneResult.tempVmid, cloneResult.bus);
+        if (typeof moveResult === 'object' && moveResult.storageType === 'lvm') {
+            // LVM 路径：先用 PVE move_disk API 转移磁盘，再清理旧盘
+            const storageType = await getStorageType(osTemplate.target_storage);
+            if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
+                logger.info(`[os-switch] LVM: 使用 PVE move_disk 将临时 VM 的磁盘转移到目标 VM`);
+                // 先 unlink 目标 VM 旧系统盘 + 释放旧卷
+                await runSsh(`qm unlink ${vmid} --idlist ${newSysDisk.bus}0`);
+                try {
+                    const checkCmd = `pvesm list $(echo ${systemDisk.volume_id} | cut -d: -f1) 2>/dev/null | grep -F '${systemDisk.volume_id.split(':')[1]}'`;
+                    const checkResult = await runSsh(checkCmd);
+                    if (checkResult) {
+                        await diskUtils._internal.destroySystemDisk(systemDisk.volume_id);
+                    }
+                } catch (e) { /* ignore */ }
+
+                // 使用 PVE move_disk API 将临时 VM 的 unused 磁盘转移给目标 VM
+                const upid = await pveApi.moveDisk(cloneResult.tempVmid, 'unused0', vmid, `${newSysDisk.bus}0`);
+                // 等待任务完成
+                await pveApi.waitForTask(upid, 300000);
+                // 获取目标 VM 配置，提取新挂载的卷 ID
+                const targetConfig = await pveApi.getVmConfig(vmid);
+                const raw = targetConfig[`${newSysDisk.bus}0`] || '';
+                ctx.newVolumeId = raw.split(',')[0] || '';
+                logger.info(`[os-switch] move_disk 完成，新卷 ID: ${ctx.newVolumeId}`);
+                // 确保清理临时 VM
+                await cleanupTempVm(cloneResult.tempVmid, cloneResult.bus);
+            }
+        } else {
+            // DIR 路径：moveResult 是新的 volume ID
+            const movedVolumeId = typeof moveResult === 'string' ? moveResult : '';
+            ctx.newVolumeId = movedVolumeId;
+            await updateLogStage(logId, 'replace_sys');
+            await replaceSystemDisk(vmid, systemDisk, movedVolumeId);
+            await updateLogStage(logId, 'cleanup_temp');
+
+            // 清理临时 VM
+            await cleanupTempVm(cloneResult.tempVmid, cloneResult.bus);
+        }
         await updateLogStage(logId, 'reattach_data');
 
         // Stage 6: 重挂载数据盘
