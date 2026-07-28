@@ -195,18 +195,12 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
     const storageType = await getStorageType(storage);
 
 	if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
-	    logger.info(`[os-switch] LVM存储 ${safeStorage}，unlink + lvrename`);
+	    logger.info(`[os-switch] LVM存储 ${safeStorage}，unlink 后直接返回原始卷ID`);
 
-	    // 从 volumeId 中提取 LV 名（如 nvme2T:vm-103-disk-0 -> vm-103-disk-0）
-	    const parts = sourceVolumeId.split(':');
-	    const oldLvName = parts[1] || '';
-	    if (!oldLvName || !/^vm-\d+-disk-\d+$/.test(oldLvName)) {
-	        throw new Error(`无效的源卷名: ${oldLvName}`);
-	    }
-	    const newLvName = `vm-${safeVmid}-disk-0`;
-	    const targetVolumeId = `${safeStorage}:${newLvName}`;
+	    // PVE 的 LVM 卷名 `vm-<vmid>-disk-<n>` 只是命名规范，
+	    // 卷名中的 VMID 不必匹配实际 VM，可直接用原始卷 ID 挂载到目标 VM
 
-	    // 1. 从临时 VM 解绑（此时卷变为 unused）
+	    // 从临时 VM 解绑（清除配置引用）
 	    try {
 	        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
 	        logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
@@ -214,11 +208,8 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
 	        logger.info(`[os-switch] 临时 VM unlink 失败: ${e.message.substring(0, 100)}`);
 	    }
 
-	    // 2. lvrename 重命名逻辑卷（unlink 后卷已释放，重命名安全）
-	    await runSsh(`lvrename ${safeStorage}/${oldLvName} ${safeStorage}/${newLvName}`);
-	    logger.info(`[os-switch] lvrename ${safeStorage}/${oldLvName} -> ${safeStorage}/${newLvName} 成功`);
-
-	    return targetVolumeId;
+	    // 直接返回原始 volume ID（不重命名）
+	    return sourceVolumeId;
 	}
 
     // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
