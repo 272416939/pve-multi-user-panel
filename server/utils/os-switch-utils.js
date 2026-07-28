@@ -194,83 +194,32 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
 
     const storageType = await getStorageType(storage);
 
-    if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
-        logger.info(`[os-switch] LVM存储 ${safeStorage}，开始 pvesm alloc + dd 复制`);
+	if (['lvm', 'lvmthin', 'zfs', 'zfspool'].includes(storageType)) {
+	    logger.info(`[os-switch] LVM存储 ${safeStorage}，使用 lvrename 重命名逻辑卷`);
 
-        // 1. 获取源卷大小（从 pvesm list 输出中解析，列顺序: Volid Format Type Size VMID）
-        const listCmd = `pvesm list ${safeStorage} 2>/dev/null | awk -v vol="${sourceVolumeId}" '$1 == vol {print $4}'`;
-        const listOutput = await runSsh(listCmd);
-        const sizeStr = listOutput.trim();
-        logger.info(`[os-switch] pvesm list 获取源卷大小: '${sizeStr}' (volume: ${sourceVolumeId})`);
-        let sizeGb = 0;
-        // pvesm list 输出的 Size 列是字节数（如 85899345920），或带单位（如 80G）
-        const sm = sizeStr.match(/(\d+)([GMTPB])?/i);
-        if (sm) {
-            const val = parseInt(sm[1]);
-            const unit = (sm[2] || '').toUpperCase();
-            if (unit === 'T') {
-                sizeGb = val * 1024;
-            } else if (unit === 'G') {
-                sizeGb = val;
-            } else {
-                // 无单位或 M/B，视为字节
-                sizeGb = Math.ceil(val / (1024 * 1024 * 1024));
-            }
-        }
-        if (sizeGb <= 0) {
-            logger.info(`[os-switch] pvesm list 未获取到大小，尝试 stat fallback`);
-            const pathCmd = `pvesm path ${sourceVolumeId}`;
-            const srcPath = (await runSsh(pathCmd)).trim();
-            const statCmd = `stat -c%s '${srcPath}' 2>/dev/null`;
-            const bytes = (await runSsh(statCmd)).trim();
-            sizeGb = Math.ceil(parseInt(bytes) / (1024 * 1024 * 1024)) || 20;
-        }
-        logger.info(`[os-switch] 计算源卷大小: ${sizeGb}G`);
+	    // 从 volumeId 中提取 LV 名（如 nvme2T:vm-103-disk-0 -> vm-103-disk-0）
+	    const parts = sourceVolumeId.split(':');
+	    const oldLvName = parts[1] || '';
+	    if (!oldLvName || !/^vm-\d+-disk-\d+$/.test(oldLvName)) {
+	        throw new Error(`无效的源卷名: ${oldLvName}`);
+	    }
+	    const newLvName = `vm-${safeVmid}-disk-0`;
+	    const targetVolumeId = `${safeStorage}:${newLvName}`;
 
-        // 2. 分配目标卷（LVM 存储的卷名不带扩展名）
-        const targetVolName = `vm-${safeVmid}-disk-0`;
-        // LVM 存储的 volume ID 格式: storage:vm-<vmid>-disk-<n>（不含 vmid/ 目录前缀）
-        // DIR 存储的 volume ID 格式: storage:<vmid>/vm-<vmid>-disk-<n>.<ext>
-        const targetVolumeId = `${safeStorage}:${targetVolName}`;
-        logger.info(`[os-switch] pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
-        await runSsh(`pvesm alloc ${safeStorage} ${safeVmid} ${targetVolName} ${sizeGb}G`);
+	    // lvrename 在同一卷组内重命名逻辑卷（瞬间完成，无数据拷贝）
+	    await runSsh(`lvrename ${safeStorage}/${oldLvName} ${safeStorage}/${newLvName}`);
+	    logger.info(`[os-switch] lvrename ${safeStorage}/${oldLvName} -> ${safeStorage}/${newLvName} 成功`);
 
-        // 3. dd 复制数据（超时 10 分钟）
-        // 获取源卷和目标卷的物理设备路径
-        // 对游离卷 pvesm path 可能返回空，改用 lvs 直接查找
-        const sourceDev = await getLvmDevicePath(sourceVolumeId, safeStorage);
-        const targetDev = await getLvmDevicePath(targetVolumeId, safeStorage);
-        logger.info(`[os-switch] dd 源设备: '${sourceDev}'，目标设备: '${targetDev}'`);
-        if (!sourceDev || !targetDev) {
-            await diskUtils._internal.destroySystemDisk(targetVolumeId);
-            throw new Error(`无法获取 LVM 设备路径 (源: ${sourceDev}, 目标: ${targetDev})`);
-        }
-        try {
-            await runSshWithTimeout(`dd if='${sourceDev}' of='${targetDev}' bs=4M status=none`, 600000);
-        } catch (ddErr) {
-            // dd 失败时清理已分配的游离卷
-            logger.error(`[os-switch] dd 复制失败: ${ddErr.message}`);
-            await diskUtils._internal.destroySystemDisk(targetVolumeId);
-            throw ddErr;
-        }
+	    // 从临时 VM 解绑（PVE 配置中旧 volumeId 已失效，修改 VM 配置即可）
+	    try {
+	        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
+	        logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
+	    } catch (e) {
+	        logger.info(`[os-switch] 临时 VM unlink 失败（可能卷名已变更）: ${e.message.substring(0, 100)}`);
+	    }
 
-        logger.info(`[os-switch] dd 完成，清理临时 VM 卷`);
-        // 从临时 VM 解绑并释放旧卷（失败不阻断主流程，后续 cleanupTempVm 会兜底）
-        try {
-            await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
-            logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
-        } catch (e) {
-            logger.info(`[os-switch] 临时 VM unlink 失败（可能已解绑）: ${e.message.substring(0, 100)}`);
-        }
-        try {
-            await diskUtils._internal.destroySystemDisk(sourceVolumeId);
-            logger.info(`[os-switch] 源卷 ${sourceVolumeId} 已释放`);
-        } catch (e) {
-            logger.info(`[os-switch] 源卷释放失败（可能已释放或被引用）: ${e.message.substring(0, 100)}`);
-        }
-
-        return targetVolumeId;
-    }
+	    return targetVolumeId;
+	}
 
     // 文件系统类（dir/btrfs/nfs/cephfs等）：在文件系统层面 mv
     // 先获取源文件物理路径（如 /mnt/pve/nvme1Tbak/images/104/vm-104-disk-0.raw）
