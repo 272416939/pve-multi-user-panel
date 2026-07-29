@@ -411,8 +411,9 @@ async function performOsSwitch(vmid, osTemplate, logId) {
 
         // 使用 PVE move_disk API 将临时 VM 的 unused 磁盘转移给目标 VM
         logger.info(`[os-switch] 使用 PVE move_disk 将临时 VM 的磁盘转移到目标 VM`);
-        // 优先使用模板中指定的 disk_format，否则从源卷 ID 推断
-        const sourceFormat = osTemplate.disk_format || diskUtils.inferDiskFormat(cloneResult.systemVolumeId) || undefined;
+        // 仅文件系统类存储（dir/btrfs/nfs/cephfs）需传 format，LVM/ZFS 不需要
+        const needFormat = ['dir', 'btrfs', 'nfs', 'cephfs'].includes(moveResult.storageType);
+        const sourceFormat = needFormat ? (osTemplate.disk_format || diskUtils.inferDiskFormat(cloneResult.systemVolumeId) || undefined) : undefined;
         const upid = await pveApi.moveDisk(cloneResult.tempVmid, 'unused0', vmid, `${newSysDisk.bus}0`, sourceFormat);
         // 等待任务完成
         await pveApi.waitForTask(upid, 300000);
