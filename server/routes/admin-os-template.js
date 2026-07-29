@@ -208,7 +208,7 @@ router.put('/admin/os-templates/:id', async (req, res) => {
         const existing = await db.osTemplates.getById(id);
         if (!existing) return res.status(404).json({ error: '模板不存在' });
 
-        const allowedFields = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
+        const allowedFields = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
         const updates = {};
         for (const key of allowedFields) {
             if (req.body[key] !== undefined) {

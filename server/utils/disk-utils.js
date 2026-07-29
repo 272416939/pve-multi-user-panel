@@ -400,19 +400,20 @@ const _internal = {
   }
 };
 
-	module.exports = {
-	  validateParam,
-	  validateVolumeId,
-	  createDisk,
-	  bindDisk,
-	  unbindDisk,
-	  resizeDisk,
-	  destroyDisk,
-	  getSystemDiskBus,
-	  getAvailableDevNumber,
-	  checkStorageCapacity,
-	  calcDiskAmount,
-	  calcRenewAmount,
-	  calcResizeAmount,
-	  _internal,
-	};
+module.exports = {
+		  validateParam,
+		  validateVolumeId,
+		  createDisk,
+		  bindDisk,
+		  unbindDisk,
+		  resizeDisk,
+		  destroyDisk,
+		  getSystemDiskBus,
+		  getAvailableDevNumber,
+		  checkStorageCapacity,
+		  calcDiskAmount,
+		  calcRenewAmount,
+		  calcResizeAmount,
+		  inferDiskFormat,
+		  _internal,
+		};
