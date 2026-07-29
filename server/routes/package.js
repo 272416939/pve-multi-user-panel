@@ -101,29 +101,26 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         if (!template) return res.status(404).json({ error: '关联模板不存在' });
         if (template.status !== 'active') return res.status(400).json({ error: '关联模板已停用' });
 
-        // v1.3 新增：解析 OS 模板 ID（前端订购弹窗传入）
+        // 新购必须选择 OS 模板
         var osTemplateId = parseInt(req.body.os_template_id) || 0;
-        var osTemplate = null;
-        if (osTemplateId > 0) {
-            osTemplate = await db.osTemplates.getById(osTemplateId);
-            if (!osTemplate || osTemplate.status !== 'active') {
-                return res.status(400).json({ error: 'OS 模板不存在或已下架' });
+        if (osTemplateId <= 0) {
+            return res.status(400).json({ error: '请选择系统模板' });
+        }
+        var osTemplate = await db.osTemplates.getById(osTemplateId);
+        if (!osTemplate || osTemplate.status !== 'active') {
+            return res.status(400).json({ error: 'OS 模板不存在或已下架' });
+        }
+        // 校验 allowed_package_ids 约束
+        if (osTemplate.allowed_package_ids && osTemplate.allowed_package_ids.length > 0) {
+            var allowedIds = osTemplate.allowed_package_ids.split(',').map(function(s) { return parseInt(s.trim()); }).filter(Number.isInteger);
+            if (allowedIds.length > 0 && allowedIds.indexOf(pkg.id) === -1) {
+                return res.status(400).json({ error: '该系统模板不适用于当前套餐' });
             }
-            // 校验 allowed_package_ids 约束
-            if (osTemplate.allowed_package_ids && osTemplate.allowed_package_ids.length > 0) {
-                var allowedIds = osTemplate.allowed_package_ids.split(',').map(function(s) { return parseInt(s.trim()); }).filter(Number.isInteger);
-                if (allowedIds.length > 0 && allowedIds.indexOf(pkg.id) === -1) {
-                    return res.status(400).json({ error: '该系统模板不适用于当前套餐' });
-                }
-            }
-        } else if (pkg.default_os_template_id) {
-            // 前端未选，使用套餐默认
-            osTemplate = await db.osTemplates.getById(pkg.default_os_template_id);
         }
 
-        // 克隆源：优先用 OS 模板，回退到套餐模板
-        var cloneSourceVmid = osTemplate ? osTemplate.template_vmid : template.template_vmid;
-        var finalTargetStorage = osTemplate ? osTemplate.target_storage : template.target_storage;
+        // 克隆源：使用 OS 模板
+        var cloneSourceVmid = osTemplate.template_vmid;
+        var finalTargetStorage = osTemplate.target_storage || null;
 
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
@@ -227,19 +224,13 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                 }
             }
 
-            // v1.3 新增：如果选择了 OS 模板，使用 OS 模板的 ciuser 和 ostype
-            if (osTemplate) {
-                if (osTemplate.ciuser) {
-                    vmUpdateCfg.ciuser = osTemplate.ciuser;
-                    vmUpdateCfg.cipassword = generateRandomPassword();
-                }
-                // 写入 ostype（如 l26=Linux 6.x, w10=Windows 10）
-                if (osTemplate.ostype) {
-                    vmUpdateCfg.ostype = osTemplate.ostype;
-                }
-            } else if (template.ciuser) {
-                vmUpdateCfg.ciuser = template.ciuser;
+            // 使用 OS 模板的 ciuser 和 ostype
+            if (osTemplate.ciuser) {
+                vmUpdateCfg.ciuser = osTemplate.ciuser;
                 vmUpdateCfg.cipassword = generateRandomPassword();
+            }
+            if (osTemplate.ostype) {
+                vmUpdateCfg.ostype = osTemplate.ostype;
             }
             await pveApi.updateVmConfig(newVmid, vmUpdateCfg);
 
@@ -322,13 +313,12 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             }
         } catch (e) { console.error('[package] VM 邮件发送失败', e); }
 
-        // Cloud-init 密码通知：优先使用 OS 模板的 ciuser，回退到套餐模板
-        var notifyCiuser = (osTemplate && osTemplate.ciuser) ? osTemplate.ciuser : template.ciuser;
-        if (notifyCiuser && vmUpdateCfg.cipassword) {
+        // Cloud-init 密码通知
+        if (osTemplate.ciuser && vmUpdateCfg.cipassword) {
             try {
                 await db.messages.create({
                     uid: userId, title: '服务器账号信息',
-                    content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + notifyCiuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。',
+                    content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + osTemplate.ciuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。',
                     type: 2, send_type: 1
                 });
             } catch (e) { console.error('[package] VM 密码通知发送失败', e); }
@@ -338,7 +328,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                     var ciEmailHtml = createEmailTemplate('服务器账号信息',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
-                        '<p style="margin-bottom: 4px;">账号：' + notifyCiuser + '</p>' +
+                        '<p style="margin-bottom: 4px;">账号：' + osTemplate.ciuser + '</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + vmUpdateCfg.cipassword + '</p>' +
                         '</div><div class="divider"></div>' +
                         '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'

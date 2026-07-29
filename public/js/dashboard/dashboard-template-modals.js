@@ -821,7 +821,7 @@
                     <option :value="0" v-if="orderOsTemplates.length > 0">默认（{{ orderPackage.default_os_template_name || '系统推荐' }}）</option>
                     <option :value="0" v-else>不指定（开通后可在「切换系统」中变更）</option>
                     <option v-for="t in orderOsTemplates" :key="t.id" :value="t.id">
-                        {{ t.name }} ({{ t.os_type }} {{ t.os_version }})
+                        {{ t.name }}
                     </option>
                 </select>
                 <div class="form-text text-muted" v-if="orderOsLoading">加载中...</div>
@@ -925,7 +925,7 @@
                                     </span>
                                     <div class="fw-bold" :style="{color: osSwitchSelectedId === t.id ? 'var(--bs-primary)' : 'var(--text-primary)'}">{{ t.name }}</div>
                                 </div>
-                                <div class="small" style="margin-left:30px;color:var(--text-secondary)">{{ t.os_type }} {{ t.os_version }}</div>
+                                <div class="small" style="margin-left:30px;color:var(--text-secondary)">{{ t.description ? t.description.substring(0,40) : '' }}</div>
                                 <div class="small" style="margin-left:30px;color:var(--text-secondary)" v-if="t.description">{{ t.description.substring(0,40) }}</div>
                             </div>
                         </div>
