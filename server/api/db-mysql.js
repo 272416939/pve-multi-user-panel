@@ -1055,8 +1055,8 @@ module.exports = {
         getByVmid: (vmid) => queryOne('SELECT * FROM vms WHERE vm_id = ?', [parseInt(vmid)]),
         create: async (vm) => {
             const [result] = await execute(
-                `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, current_os_template_id, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     vm.vm_id,
                     vm.user_id,
@@ -1068,6 +1068,7 @@ module.exports = {
                     vm.quarterly_discount || '',
                     vm.yearly_discount || '',
                     vm.pve_upid || '',
+                    vm.current_os_template_id || null,
                     mysqlNow()
                 ]
             );
