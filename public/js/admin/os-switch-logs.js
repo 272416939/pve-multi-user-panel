@@ -158,7 +158,7 @@ window.__admin.osSwitchLogsPage = (function () {
         list: list, total: total, page: page, filters: filters,
         selectedIds: selectedIds, detail: detail,
         get totalPages() { return getTotalPages(); },
-        allSelected: isAllSelected(),
+        allSelected: isAllSelected,
         load: load, resetFilters: resetFilters, goPage: goPage,
         toggleAll: toggleAll, toggleOne: toggleOne,
         showDetail: showDetail,
