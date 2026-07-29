@@ -3,7 +3,7 @@
     window.__adminTemplateParts.push(`
     <!-- 系统切换日志 -->
     <div v-if="activeSection === 'os-switch-logs'">
-        <div class="admin-card">
+        <div class="admin-card" v-if="osSwitchLogsPage">
             <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <h3 class="mb-0">系统切换日志</h3>
                 <div class="d-flex gap-2">
@@ -31,7 +31,7 @@
                 <table class="table table-hover align-middle table-align-center">
                     <thead class="table-light">
                         <tr>
-                            <th style="width:40px"><input type="checkbox" @change="osSwitchLogsPage.toggleAll($event)" :checked="osSwitchLogsPage.allSelected"></th>
+                            <th style="width:40px"><input type="checkbox" @change="osSwitchLogsPage.toggleAll($event)" :checked="osSwitchLogsPage.isAllSelected()"></th>
                             <th>ID</th>
                             <th>VMID</th>
                             <th>用户</th>

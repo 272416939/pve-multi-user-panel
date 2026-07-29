@@ -75,7 +75,8 @@ window.__admin.osSwitchLogsPage = (function () {
             selectedIds.value.push(id);
         }
     }
-    function get allSelected() {
+
+    function isAllSelected() {
         return list.value.length > 0 && selectedIds.value.length === list.value.length;
     }
 
@@ -157,7 +158,7 @@ window.__admin.osSwitchLogsPage = (function () {
         list: list, total: total, page: page, filters: filters,
         selectedIds: selectedIds, detail: detail,
         get totalPages() { return getTotalPages(); },
-        get allSelected() { return allSelected; },
+        allSelected: isAllSelected(),
         load: load, resetFilters: resetFilters, goPage: goPage,
         toggleAll: toggleAll, toggleOne: toggleOne,
         showDetail: showDetail,
