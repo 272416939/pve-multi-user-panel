@@ -2628,9 +2628,13 @@ module.exports = {
         getListWithPaging: (filters) => {
             const { page = 1, limit = 20, status, vm_id, user_id, before_date } = filters;
             const offset = (Math.min(page, 1000) - 1) * Math.min(limit, 200);
-            let sql = `SELECT l.*, u.username
+            let sql = `SELECT l.*, u.username,
+                              from_t.name AS from_os_template_name,
+                              to_t.name AS to_os_template_name
                        FROM vm_os_switch_logs l
                        LEFT JOIN users u ON l.user_id = u.id
+                       LEFT JOIN os_templates from_t ON l.from_os_template_id = from_t.id
+                       LEFT JOIN os_templates to_t ON l.to_os_template_id = to_t.id
                        WHERE 1=1`;
             const params = [];
             if (status) { sql += ' AND l.status = ?'; params.push(status); }

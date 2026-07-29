@@ -50,8 +50,8 @@
                             <td>{{ row.id }}</td>
                             <td>{{ row.vm_id }}</td>
                             <td>{{ row.username || row.user_id }}</td>
-                            <td class="text-muted small">{{ row.from_os_template_id || '-' }}</td>
-                            <td>{{ row.to_os_template_id }}</td>
+                            <td class="text-muted small">{{ row.from_os_template_name || row.from_os_template_id || '-' }}</td>
+                            <td>{{ row.to_os_template_name || row.to_os_template_id }}</td>
                             <td>
                                 <span :class="'badge ' + {
                                     success: 'bg-success',
