@@ -116,12 +116,12 @@
                             <div><span :class="'badge ' + (osSwitchLogsPage.detail.status === 'success' ? 'bg-success' : osSwitchLogsPage.detail.status === 'failed' ? 'bg-danger' : 'bg-secondary')">{{ osSwitchLogsPage.detail.status }}</span></div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-muted small">来源系统模板 ID</label>
-                            <div>{{ osSwitchLogsPage.detail.from_os_template_id || '-' }}</div>
+                            <label class="form-label text-muted small">来源系统模板</label>
+                            <div>{{ osSwitchLogsPage.detail.from_os_template_name || osSwitchLogsPage.detail.from_os_template_id || '-' }}</div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label text-muted small">目标系统模板 ID</label>
-                            <div>{{ osSwitchLogsPage.detail.to_os_template_id }}</div>
+                            <label class="form-label text-muted small">目标系统模板</label>
+                            <div>{{ osSwitchLogsPage.detail.to_os_template_name || osSwitchLogsPage.detail.to_os_template_id }}</div>
                         </div>
                         <div class="col-12"><hr></div>
                         <div class="col-md-6">
