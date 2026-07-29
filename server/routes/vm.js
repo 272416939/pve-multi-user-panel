@@ -1007,11 +1007,6 @@ try {
             user_id: req.user.id,
             from_os_template_id: vm.current_os_template_id || null,
             to_os_template_id: osTemplateId,
-            from_template_vmid: null,
-            to_template_vmid: osTemplate.template_vmid,
-            old_system_volume_id: '',
-            new_system_volume_id: '',
-            data_disks_snapshot: '[]',
             status: 'running',
             amount_charged: amountCharged,
             order_no: orderNo
@@ -1024,7 +1019,6 @@ try {
                 await db.vmOsSwitchLogs.update(switchLog.id, {
                     status: 'success',
                     new_system_volume_id: result.newVolumeId || '',
-                    data_disks_snapshot: JSON.stringify(result.dataDisks || []),
                     finished_at: new Date()
                 });
                 await db.vms.update(vm.id, {
@@ -1115,8 +1109,8 @@ try {
         const logs = await db.vmOsSwitchLogs.getByVmidWithPaging(vmid, page, limit);
         const total = await db.vmOsSwitchLogs.countByVmid(vmid);
         const safeLogs = logs.map(l => {
-            const { error_message, mac_sync_result, ...safe } = l;
-            return { ...safe, error_message: '', mac_sync_result: '' };
+            const { error_message, ...safe } = l;
+            return { ...safe, error_message: error_message || '' };
         });
         res.json({ success: true, data: safeLogs, total, page, limit });
     });
@@ -1128,8 +1122,8 @@ try {
         const logs = await db.vmOsSwitchLogs.getByUserId(req.user.id, page, limit);
         const total = await db.vmOsSwitchLogs.countByUserId(req.user.id);
         const safeLogs = logs.map(l => {
-            const { error_message, mac_sync_result, ...safe } = l;
-            return { ...safe, error_message: '', mac_sync_result: '' };
+            const { error_message, ...safe } = l;
+            return { ...safe, error_message: error_message || '' };
         });
         res.json({ success: true, data: safeLogs, total, page, limit });
     });

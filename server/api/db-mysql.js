@@ -622,29 +622,18 @@ async function initDb() {
     )`);
 
     // 创建系统切换日志表（vm_os_switch_logs）
+    await execute(`DROP TABLE IF EXISTS vm_os_switch_logs`);
     await execute(`
-    CREATE TABLE IF NOT EXISTS vm_os_switch_logs (
+    CREATE TABLE vm_os_switch_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,
         vm_id INT NOT NULL,
         user_id INT NOT NULL,
         from_os_template_id INT DEFAULT NULL,
         to_os_template_id INT NOT NULL,
-        from_template_vmid INT DEFAULT NULL,
-        to_template_vmid INT NOT NULL,
-        old_system_volume_id VARCHAR(255) DEFAULT '',
         new_system_volume_id VARCHAR(255) DEFAULT '',
-        data_disks_snapshot TEXT NOT NULL,
-        old_system_bus VARCHAR(20) DEFAULT '',
-        old_system_params TEXT NOT NULL,
-        old_mac_address VARCHAR(50) DEFAULT '',
-        new_mac_address VARCHAR(50) DEFAULT '',
-        mac_sync_performed TINYINT(1) NOT NULL DEFAULT 0,
-        mac_sync_result TEXT NOT NULL,
-        mac_sync_status VARCHAR(20) NOT NULL DEFAULT '',
         status VARCHAR(20) NOT NULL DEFAULT 'pending',
         fail_stage VARCHAR(50) DEFAULT '',
-        error_message TEXT NOT NULL,
-        rollback_performed TINYINT(1) NOT NULL DEFAULT 0,
+        error_message TEXT DEFAULT NULL,
         admin_intervention_required TINYINT(1) NOT NULL DEFAULT 0,
         amount_charged DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         order_no VARCHAR(64) DEFAULT '',
@@ -2586,16 +2575,12 @@ module.exports = {
     vmOsSwitchLogs: {
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO vm_os_switch_logs (vm_id, user_id, from_os_template_id, to_os_template_id, from_template_vmid, to_template_vmid, old_system_volume_id, new_system_volume_id, data_disks_snapshot, old_system_params, old_mac_address, new_mac_address, mac_sync_result, error_message, status, amount_charged, order_no)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vm_os_switch_logs (vm_id, user_id, from_os_template_id, to_os_template_id, new_system_volume_id, status, amount_charged, order_no)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     parseInt(data.vm_id), parseInt(data.user_id),
                     data.from_os_template_id || null, parseInt(data.to_os_template_id),
-                    data.from_template_vmid || null, parseInt(data.to_template_vmid),
-                    data.old_system_volume_id || '', data.new_system_volume_id || '',
-                    data.data_disks_snapshot || '[]', data.old_system_params || '',
-                    data.old_mac_address || '', data.new_mac_address || '',
-                    data.mac_sync_result || '{}', data.error_message || '',
+                    data.new_system_volume_id || '',
                     data.status || 'pending',
                     parseFloat(data.amount_charged) || 0, data.order_no || ''
                 ]
@@ -2608,7 +2593,7 @@ module.exports = {
         getRunningByVmid: (vmid) => queryOne("SELECT * FROM vm_os_switch_logs WHERE vm_id = ? AND status IN ('pending', 'running') ORDER BY id DESC LIMIT 1", [parseInt(vmid)]),
         getStaleRunning: (beforeTime) => queryAll("SELECT * FROM vm_os_switch_logs WHERE status = 'running' AND started_at < ?", [beforeTime]),
         update: async (id, updates) => {
-            const allowedColumns = ['status', 'fail_stage', 'error_message', 'rollback_performed', 'admin_intervention_required', 'new_system_volume_id', 'data_disks_snapshot', 'finished_at', 'mac_sync_performed', 'mac_sync_status', 'mac_sync_result', 'old_mac_address', 'new_mac_address'];
+            const allowedColumns = ['status', 'fail_stage', 'error_message', 'admin_intervention_required', 'new_system_volume_id', 'finished_at'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

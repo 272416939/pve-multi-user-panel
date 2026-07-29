@@ -326,15 +326,7 @@ async function verifyAndSyncMac(vmid, oldMac, logId) {
     const okCount = Object.values(syncResult).filter(v => v.ok).length;
     const syncStatus = okCount === 3 ? 'success' : okCount > 0 ? 'partial' : 'failed';
 
-    // 写入日志
-    await db.vmOsSwitchLogs.update(logId, {
-        mac_sync_performed: 1,
-        mac_sync_status: syncStatus,
-        mac_sync_result: JSON.stringify(syncResult),
-        old_mac_address: oldMac,
-        new_mac_address: newMac
-    });
-
+    // MAC 同步结果（不再写入日志 detail，仅用于返回值）
     return { synced: syncStatus !== 'failed', syncStatus, ...syncResult };
 }
 
@@ -358,7 +350,6 @@ async function markAdminIntervention(logId, reason) {
 async function markRolledBack(logId, error) {
     await db.vmOsSwitchLogs.update(logId, {
         status: 'rolled_back',
-        rollback_performed: 1,
         error_message: error.message || String(error),
         finished_at: new Date()
     });
@@ -496,12 +487,8 @@ async function performOsSwitch(vmid, osTemplate, logId) {
                 console.warn(`[os-switch] MAC 同步不完整: VM ${vmid}, 状态: ${macSyncResult.syncStatus}`);
             }
         } else {
-            await db.vmOsSwitchLogs.update(logId, {
-                mac_sync_performed: 0,
-                mac_sync_status: 'not_needed',
-                mac_sync_result: JSON.stringify({ reason: 'MAC 未变化，无需同步' })
-                });
-            }
+            // MAC 未变化，无需记录
+        }
 
             return { success: true, ...ctx };
     } catch (error) {
