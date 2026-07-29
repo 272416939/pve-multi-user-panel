@@ -295,7 +295,8 @@ class PveApi {
 
   // 在 VM 之间移动磁盘（PVE API: move_disk）
   // 自动处理 LV 重命名和存储索引更新
-  async moveDisk(sourceVmid, disk, targetVmid, targetDisk) {
+  // format: 可选，DIR 存储跨存储时 PVE 需知道源磁盘格式（如 raw/qcow2）
+  async moveDisk(sourceVmid, disk, targetVmid, targetDisk, format) {
     if (!this.node) {
       await this.detectNode();
     }
@@ -303,6 +304,9 @@ class PveApi {
     searchParams.append('disk', String(disk));
     searchParams.append('target-vmid', String(targetVmid));
     searchParams.append('target-disk', String(targetDisk));
+    if (format) {
+      searchParams.append('format', format);
+    }
     const response = await this.axiosInstance.post(
       `${this.host}/api2/json/nodes/${this.node}/qemu/${sourceVmid}/move_disk`,
       searchParams.toString(),
