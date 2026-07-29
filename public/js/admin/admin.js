@@ -713,4 +713,128 @@
     };
 
     $.searchOrders = function() { $.loadOrders(1); };
+
+    // ==================== 系统切换日志 ====================
+    $.osSwitchLogList = Vue.ref([]);
+    $.osSwitchLogTotal = Vue.ref(0);
+    $.osSwitchLogPage = Vue.ref(1);
+    $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '' });
+    $.osSwitchLogSelected = Vue.reactive([]);
+    $.osSwitchLogDetail = Vue.ref(null);
+    const OS_SWITCH_LOG_LIMIT = 20;
+
+    $.loadOsSwitchLogs = async function(page) {
+        page = page || 1;
+        $.osSwitchLogPage.value = page;
+        try {
+            var params = '?page=' + page + '&limit=' + OS_SWITCH_LOG_LIMIT;
+            if ($.osSwitchLogFilter.status) params += '&status=' + encodeURIComponent($.osSwitchLogFilter.status);
+            if ($.osSwitchLogFilter.vm_id) params += '&vm_id=' + encodeURIComponent($.osSwitchLogFilter.vm_id);
+            if ($.osSwitchLogFilter.user_id) params += '&user_id=' + encodeURIComponent($.osSwitchLogFilter.user_id);
+            var res = await api('/admin/os-switch-logs' + params);
+            if (res && res.success) {
+                $.osSwitchLogList.value = res.data || [];
+                $.osSwitchLogTotal.value = res.total || 0;
+                $.osSwitchLogSelected.value = [];
+            } else {
+                $.osSwitchLogList.value = [];
+                $.osSwitchLogTotal.value = 0;
+            }
+        } catch (e) {
+            console.error('[os-switch-logs] 加载失败', e);
+            $.osSwitchLogList.value = [];
+            $.osSwitchLogTotal.value = 0;
+        }
+    };
+
+    $.resetOsSwitchLogFilter = function() {
+        $.osSwitchLogFilter.status = '';
+        $.osSwitchLogFilter.vm_id = '';
+        $.osSwitchLogFilter.user_id = '';
+        $.loadOsSwitchLogs(1);
+    };
+
+    // 全选/取消
+    $.toggleAllOsSwitchLog = function(e) {
+        if (e.target.checked) {
+            $.osSwitchLogSelected.value = $.osSwitchLogList.value.map(function(r) { return r.id; });
+        } else {
+            $.osSwitchLogSelected.value = [];
+        }
+    };
+    $.toggleOneOsSwitchLog = function(id) {
+        var idx = $.osSwitchLogSelected.value.indexOf(id);
+        if (idx > -1) {
+            $.osSwitchLogSelected.value.splice(idx, 1);
+        } else {
+            $.osSwitchLogSelected.value.push(id);
+        }
+    };
+    $.isAllOsSwitchLogSelected = function() {
+        return $.osSwitchLogList.value.length > 0 && $.osSwitchLogSelected.value.length === $.osSwitchLogList.value.length;
+    };
+
+    $.showOsSwitchLogDetail = function(row) {
+        $.osSwitchLogDetail.value = row;
+        var el = document.getElementById('osSwitchLogDetailModal');
+        if (el) {
+            var modal = new bootstrap.Modal(el);
+            modal.show();
+        }
+    };
+
+    $.deleteOsSwitchLog = async function(id) {
+        if (!confirm('确认删除日志 #' + id + '？')) return;
+        try {
+            var res = await api('/admin/os-switch-logs/' + id, { method: 'DELETE' });
+            if (res && res.success) {
+                $.loadOsSwitchLogs($.osSwitchLogPage.value);
+            } else {
+                alert(res.error || '删除失败');
+            }
+        } catch (e) {
+            alert('删除请求失败');
+        }
+    };
+
+    $.batchDeleteOsSwitchLog = async function() {
+        var ids = $.osSwitchLogSelected.value;
+        if (ids.length === 0) { alert('请先选择要删除的日志'); return; }
+        if (!confirm('确认删除选中的 ' + ids.length + ' 条日志？')) return;
+        try {
+            var res = await api('/admin/os-switch-logs/batch-delete', {
+                method: 'POST',
+                body: JSON.stringify({ ids: ids })
+            });
+            if (res && res.success) {
+                alert(res.message || '已删除');
+                $.osSwitchLogSelected.value = [];
+                $.loadOsSwitchLogs($.osSwitchLogPage.value);
+            } else {
+                alert(res.error || '批量删除失败');
+            }
+        } catch (e) {
+            alert('请求失败');
+        }
+    };
+
+    $.clearAllOsSwitchLog = async function() {
+        if (!confirm('⚠️ 高危操作！确认清空所有切换日志（运行中和需介入的日志将被保留）？')) return;
+        var confirmStr = prompt('请输入 CLEAR_ALL_OS_SWITCH_LOGS 确认清空：');
+        if (confirmStr !== 'CLEAR_ALL_OS_SWITCH_LOGS') { alert('确认串不正确'); return; }
+        try {
+            var res = await api('/admin/os-switch-logs/clear', {
+                method: 'POST',
+                body: JSON.stringify({ confirm: confirmStr })
+            });
+            if (res && res.success) {
+                alert(res.message || '已清空');
+                $.loadOsSwitchLogs(1);
+            } else {
+                alert(res.error || '清空失败');
+            }
+        } catch (e) {
+            alert('请求失败');
+        }
+    };
 })();

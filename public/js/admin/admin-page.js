@@ -91,27 +91,12 @@ var App = {
         if (!$.osTemplatePage.formData) $.osTemplatePage.formData = Vue.reactive({ name: '', template_vmid: '', os_type: '', os_version: '', ostype: '', arch: 'x86_64', target_storage: 'local-lvm', ciuser: '', description: '', switch_price: 0, icon: '', sort_order: 0, allowed_package_ids: '', enabled: 1, status: 'active' });
         if (!$.osTemplatePage.saving) $.osTemplatePage.saving = Vue.ref(false);
         // OS 切换日志兜底初始化
-        if (!$.osSwitchLogsPage || !$.osSwitchLogsPage.list) {
-            $.osSwitchLogsPage = window.__admin.osSwitchLogsPage = {
-                list: Vue.ref([]),
-                total: Vue.ref(0),
-                page: Vue.ref(1),
-                filters: Vue.reactive({ status: '', vm_id: '', user_id: '' }),
-                selectedIds: Vue.reactive([]),
-                detail: Vue.ref(null),
-                load: () => {},
-                resetFilters: () => {},
-                goPage: () => {},
-                toggleAll: () => {},
-                toggleOne: () => {},
-                allSelected: () => false,
-                get totalPages() { return 1; },
-                showDetail: () => {},
-                deleteRow: () => {},
-                batchDelete: () => {},
-                clearAll: () => {}
-            };
-        }
+        if (!$.osSwitchLogList) $.osSwitchLogList = Vue.ref([]);
+        if (!$.osSwitchLogTotal) $.osSwitchLogTotal = Vue.ref(0);
+        if (!$.osSwitchLogPage) $.osSwitchLogPage = Vue.ref(1);
+        if (!$.osSwitchLogFilter) $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '' });
+        if (!$.osSwitchLogSelected) $.osSwitchLogSelected = Vue.reactive([]);
+        if (!$.osSwitchLogDetail) $.osSwitchLogDetail = Vue.ref(null);
         if (!$.activeTabDisk) $.activeTabDisk = Vue.ref(localStorage.getItem('admin_activeTabDisk') || 'storage-groups');
         $.initCore();
         $.initVm();

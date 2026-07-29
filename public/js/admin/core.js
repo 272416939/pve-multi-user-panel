@@ -214,7 +214,7 @@ watch($.user, function(u) {
         } else if (page === 'os-switch-logs') {
             section = 'os-switch-logs';
             subId = 'logs-os-switch';
-            if (window.__admin.osSwitchLogsPage) window.__admin.osSwitchLogsPage.load();
+            $.loadOsSwitchLogs(1);
         }
         if (!section) return;
         $.switchSection(section);
