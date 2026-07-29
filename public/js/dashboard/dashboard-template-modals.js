@@ -818,8 +818,7 @@
             <div class="mb-3" v-if="orderType === 'vm'">
                 <label class="form-label">操作系统</label>
                 <select class="form-select" v-model="orderForm.os_template_id" :disabled="orderOsLoading">
-                    <option :value="0" v-if="orderOsTemplates.length > 0">默认（{{ orderPackage.default_os_template_name || '系统推荐' }}）</option>
-                    <option :value="0" v-else>不指定（开通后可在「切换系统」中变更）</option>
+                    <option value="" disabled selected>请选择系统</option>
                     <option v-for="t in orderOsTemplates" :key="t.id" :value="t.id">
                         {{ t.name }}
                     </option>
@@ -827,9 +826,6 @@
                 <div class="form-text text-muted" v-if="orderOsLoading">加载中...</div>
                 <div class="form-text text-muted" v-else-if="orderOsTemplates.length === 0">
                     该套餐暂无可选系统，将使用默认模板开通，开通后可切换
-                </div>
-                <div class="form-text text-muted" v-else>
-                    选择系统后将影响磁盘容量和初始系统，<strong>不影响价格</strong>
                 </div>
             </div>
             <div class="mb-3">
