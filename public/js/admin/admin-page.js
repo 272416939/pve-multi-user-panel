@@ -90,6 +90,16 @@ var App = {
         if (!$.osTemplatePage.allStorages) $.osTemplatePage.allStorages = Vue.ref([]);
         if (!$.osTemplatePage.formData) $.osTemplatePage.formData = Vue.reactive({ name: '', template_vmid: '', os_type: '', os_version: '', ostype: '', arch: 'x86_64', target_storage: 'local-lvm', ciuser: '', description: '', switch_price: 0, icon: '', sort_order: 0, allowed_package_ids: '', enabled: 1, status: 'active' });
         if (!$.osTemplatePage.saving) $.osTemplatePage.saving = Vue.ref(false);
+        // OS 切换日志兜底初始化
+        if (!$.osSwitchLogsPage) $.osSwitchLogsPage = {};
+        if (!$.osSwitchLogsPage.list) $.osSwitchLogsPage.list = Vue.ref([]);
+        if (!$.osSwitchLogsPage.total) $.osSwitchLogsPage.total = Vue.ref(0);
+        if (!$.osSwitchLogsPage.page) $.osSwitchLogsPage.page = Vue.ref(1);
+        if (!$.osSwitchLogsPage.filters) $.osSwitchLogsPage.filters = Vue.reactive({ status: '', vm_id: '', user_id: '' });
+        if (!$.osSwitchLogsPage.selectedIds) $.osSwitchLogsPage.selectedIds = Vue.reactive([]);
+        if (!$.osSwitchLogsPage.detail) $.osSwitchLogsPage.detail = Vue.ref(null);
+        if (!$.osSwitchLogsPage.load) $.osSwitchLogsPage.load = () => {};
+        if (!$.osSwitchLogsPage.allSelected) $.osSwitchLogsPage.allSelected = () => false;
         if (!$.activeTabDisk) $.activeTabDisk = Vue.ref(localStorage.getItem('admin_activeTabDisk') || 'storage-groups');
         $.initCore();
         $.initVm();
