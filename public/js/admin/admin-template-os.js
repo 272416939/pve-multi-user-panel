@@ -4,8 +4,8 @@
     <!-- OS 模板管理 -->
     <div v-if="activeSection === 'templates-os'">
         <div class="admin-card">
-            <div class="card-header">
-                <h3>可切换系统模板</h3>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="mb-0">可切换系统模板</h3>
                 <pv-button variant="primary" @click="osTemplatePage.openForm()">新增模板</pv-button>
             </div>
             <div class="table-responsive">

@@ -211,6 +211,10 @@ watch($.user, function(u) {
             section = 'templates-os';
             subId = 'templates-os';
             if (window.__admin.osTemplatePage) window.__admin.osTemplatePage.load();
+        } else if (page === 'os-switch-logs') {
+            section = 'os-switch-logs';
+            subId = 'logs-os-switch';
+            if (window.__admin.osSwitchLogsPage) window.__admin.osSwitchLogsPage.load();
         }
         if (!section) return;
         $.switchSection(section);
