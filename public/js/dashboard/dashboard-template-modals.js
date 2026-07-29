@@ -818,7 +818,7 @@
             <div class="mb-3" v-if="orderType === 'vm'">
                 <label class="form-label">操作系统</label>
                 <select class="form-select" v-model="orderForm.os_template_id" :disabled="orderOsLoading">
-                    <option value="" disabled selected>请选择系统</option>
+                    <option :value="0">请选择系统</option>
                     <option v-for="t in orderOsTemplates" :key="t.id" :value="t.id">
                         {{ t.name }}
                     </option>
