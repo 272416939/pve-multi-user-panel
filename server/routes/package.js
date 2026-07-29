@@ -322,12 +322,13 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             }
         } catch (e) { console.error('[package] VM 邮件发送失败', e); }
 
-        // Cloud-init 密码通知
-        if (template.ciuser && vmUpdateCfg.cipassword) {
+        // Cloud-init 密码通知：优先使用 OS 模板的 ciuser，回退到套餐模板
+        var notifyCiuser = (osTemplate && osTemplate.ciuser) ? osTemplate.ciuser : template.ciuser;
+        if (notifyCiuser && vmUpdateCfg.cipassword) {
             try {
                 await db.messages.create({
                     uid: userId, title: '服务器账号信息',
-                    content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + template.ciuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。',
+                    content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + notifyCiuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。',
                     type: 2, send_type: 1
                 });
             } catch (e) { console.error('[package] VM 密码通知发送失败', e); }
@@ -337,7 +338,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                     var ciEmailHtml = createEmailTemplate('服务器账号信息',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
-                        '<p style="margin-bottom: 4px;">账号：' + template.ciuser + '</p>' +
+                        '<p style="margin-bottom: 4px;">账号：' + notifyCiuser + '</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + vmUpdateCfg.cipassword + '</p>' +
                         '</div><div class="divider"></div>' +
                         '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'

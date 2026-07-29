@@ -69,39 +69,7 @@ async function sendDiskReminderEmail(user, disk, stage) {
   }
 }
 
-// ==================== 优雅关机 + 等待 ====================
-
-async function gracefulShutdownVm(vmid, timeout) {
-  try {
-    var status = await pveApi.getVmStatus(vmid);
-    if (status.status !== 'running') return true;
-
-    // 优雅关机
-    await pveApi.shutdownVm(vmid);
-
-    // 等待关机完成（轮询，超时强制断电兜底）
-    var startWait = Date.now();
-    var timeoutMs = (timeout || 300) * 1000;
-    while (Date.now() - startWait < timeoutMs) {
-      await new Promise(function(r) { setTimeout(r, 5000); });
-      try {
-        var s = await pveApi.getVmStatus(vmid);
-        if (s.status === 'stopped') return true;
-      } catch (e) {}
-    }
-
-    // 超时强制断电
-    logger.warn('[disk-expiry] VM ' + vmid + ' 优雅关机超时，强制断电');
-    await pveApi.stopVm(vmid);
-    await new Promise(function(r) { setTimeout(r, 3000); });
-    return true;
-  } catch (e) {
-    logger.error('[disk-expiry] 关机 VM ' + vmid + ' 失败:', e.message);
-    return false;
-  }
-}
-
-// ==================== 分离磁盘（qm set --delete） ====================
+// ==================== 分离磁盘（qm unlink） ====================
 
 async function detachDiskFromVm(disk) {
   try {
@@ -194,13 +162,12 @@ async function checkExpiredDisks() {
     // 获取生命周期配置
     var config = await db.diskLifecycleConfig.get();
     if (!config) {
-      config = { warn_days: 7, grace_days: 3, retention_days: 15, shutdown_timeout: 300 };
+      config = { warn_days: 7, grace_days: 3, retention_days: 15 };
     }
 
     var warnDays = config.warn_days || 7;
     var graceDays = config.grace_days || 3;
     var retentionDays = config.retention_days || 15;
-    var shutdownTimeout = config.shutdown_timeout || 300;
     var now = new Date();
     var today = todayStr();
 

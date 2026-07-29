@@ -125,11 +125,6 @@
               <div class="form-text">到期后缓冲</div>
             </div>
             <div class="col-md-4">
-              <label class="form-label">优雅关机超时（秒）</label>
-              <input class="form-control" type="number" v-model.number="diskPage.lifecycleForm.value.shutdown_timeout" min="0">
-              <div class="form-text">超时强制断电</div>
-            </div>
-            <div class="col-md-4">
               <label class="form-label">保留期时长</label>
               <input class="form-control" type="number" v-model.number="diskPage.lifecycleForm.value.retention_days" min="0">
               <div class="form-text">逾期自动销毁</div>

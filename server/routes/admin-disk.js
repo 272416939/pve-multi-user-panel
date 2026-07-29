@@ -328,7 +328,6 @@ router.put('/lifecycle-config', authMiddleware, adminMiddleware, async (req, res
       warn_frequency: ['daily', 'twice_daily'].indexOf(req.body.warn_frequency) !== -1 ? req.body.warn_frequency : 'daily',
       grace_days: parseInt(req.body.grace_days) || 3,
       grace_frequency: ['daily', 'twice_daily'].indexOf(req.body.grace_frequency) !== -1 ? req.body.grace_frequency : 'twice_daily',
-      shutdown_timeout: parseInt(req.body.shutdown_timeout) || 300,
       retention_days: parseInt(req.body.retention_days) || 15,
       auto_renew_days: parseInt(req.body.auto_renew_days) || 1
     };
