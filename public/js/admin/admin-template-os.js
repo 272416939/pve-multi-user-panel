@@ -12,7 +12,7 @@
                 <table class="table table-hover align-middle table-align-center">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th><th>名称</th><th>OS 类型</th><th>版本</th><th>PVE 模板 VMID</th><th>目标存储</th><th>切换价格</th><th>状态</th><th>操作</th>
+                            <th>ID</th><th>名称</th><th>OS 类型</th><th>版本</th><th>PVE 模板 VMID</th><th>目标存储</th><th>磁盘格式</th><th>切换价格</th><th>状态</th><th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -23,6 +23,7 @@
                             <td>{{ t.os_version }}</td>
                             <td>{{ t.template_vmid }}</td>
                             <td>{{ t.target_storage }}</td>
+                            <td>{{ t.disk_format || '自动' }}</td>
                             <td>{{ t.switch_price }}</td>
                             <td><span :class="t.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ t.status === 'active' ? '启用' : (t.status === 'maintenance' ? '维护' : '已弃用') }}</span></td>
                             <td>
@@ -33,7 +34,7 @@
                             </td>
                         </tr>
                         <tr v-if="(osTemplatePage?.osTemplates?.value || []).length === 0">
-                            <td colspan="9" class="text-center text-muted">暂无系统模板</td>
+                            <td colspan="10" class="text-center text-muted">暂无系统模板</td>
                         </tr>
                     </tbody>
                 </table>
@@ -76,6 +77,16 @@
                                 <option value="">请选择目标存储</option>
                                 <option v-for="s in osTemplatePage.allStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }}{{ s.maxdisk ? ' (' + (s.maxdisk/1073741824).toFixed(0) + 'GB)' : '' }}</option>
                             </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">目标磁盘格式</label>
+                            <select class="form-select" v-model="osTemplatePage.formData.disk_format">
+                                <option value="">自动（同源盘格式）</option>
+                                <option value="raw">raw</option>
+                                <option value="qcow2">qcow2</option>
+                                <option value="vmdk">vmdk</option>
+                            </select>
+                            <div class="form-text text-muted">跨存储切换时强制转换的磁盘格式，留空则使用源盘格式</div>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">切换价格(元)</label>

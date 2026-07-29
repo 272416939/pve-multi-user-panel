@@ -13,7 +13,7 @@ window.__admin.osTemplatePage = (function () {
     const pveConfigLoading = ref(false);  // 加载 PVE 模板配置中
     const formData = Vue.reactive({
         name: '', template_vmid: '', os_type: '', os_version: '', ostype: '', arch: 'x86_64',
-        target_storage: 'local-lvm', ciuser: '',
+        target_storage: 'local-lvm', disk_format: '', ciuser: '',
         description: '', switch_price: 0, icon: '', sort_order: 0,
         allowed_package_ids: '', enabled: 1, status: 'active'
     });

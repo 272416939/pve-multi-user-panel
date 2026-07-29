@@ -792,6 +792,9 @@ async function migrateSchema() {
     await safeAlter('lxc_templates', 'ip6_addr', "TEXT NOT NULL");
     await safeAlter('lxc_templates', 'ip4_addr', "TEXT NOT NULL");
 
+    // os_templates 表迁移：新增 disk_format 列（目标磁盘格式，如 raw/qcow2/vmdk）
+    await safeAlter('os_templates', 'disk_format', "VARCHAR(20) NOT NULL DEFAULT '' AFTER target_storage");
+
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {
         const orphaned = await queryAll("SELECT id, pve_upid FROM backups WHERE vm_id = 0 AND ct_id IS NULL AND type = 'vm'");
@@ -2541,13 +2544,14 @@ module.exports = {
         getByTemplateVmid: (vmid) => queryAll('SELECT * FROM os_templates WHERE template_vmid = ?', [parseInt(vmid)]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO os_templates (name, template_vmid, os_type, os_version, ostype, arch, target_storage, ciuser, description, switch_price, icon, sort_order, allowed_package_ids, enabled, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO os_templates (name, template_vmid, os_type, os_version, ostype, arch, target_storage, disk_format, ciuser, description, switch_price, icon, sort_order, allowed_package_ids, enabled, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', parseInt(data.template_vmid) || 0,
                     data.os_type || '', data.os_version || '',
                     data.ostype || '', data.arch || 'x86_64',
-                    data.target_storage || 'local-lvm', data.ciuser || '',
+                    data.target_storage || 'local-lvm', data.disk_format || '',
+                    data.ciuser || '',
                     data.description || '', parseFloat(data.switch_price) || 0,
                     data.icon || '', parseInt(data.sort_order) || 0,
                     data.allowed_package_ids || '', data.enabled === false ? 0 : 1,
@@ -2557,7 +2561,7 @@ module.exports = {
             return queryOne('SELECT * FROM os_templates WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
+            const allowedColumns = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }

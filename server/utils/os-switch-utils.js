@@ -411,9 +411,9 @@ async function performOsSwitch(vmid, osTemplate, logId) {
 
         // 使用 PVE move_disk API 将临时 VM 的 unused 磁盘转移给目标 VM
         logger.info(`[os-switch] 使用 PVE move_disk 将临时 VM 的磁盘转移到目标 VM`);
-        // 从源卷 ID 推断格式（DIR 存储跨存储拷贝时需传入 format，如 raw/qcow2）
-        const sourceFormat = diskUtils.inferDiskFormat(cloneResult.systemVolumeId);
-        const upid = await pveApi.moveDisk(cloneResult.tempVmid, 'unused0', vmid, `${newSysDisk.bus}0`, sourceFormat || undefined);
+        // 优先使用模板中指定的 disk_format，否则从源卷 ID 推断
+        const sourceFormat = osTemplate.disk_format || diskUtils.inferDiskFormat(cloneResult.systemVolumeId) || undefined;
+        const upid = await pveApi.moveDisk(cloneResult.tempVmid, 'unused0', vmid, `${newSysDisk.bus}0`, sourceFormat);
         // 等待任务完成
         await pveApi.waitForTask(upid, 300000);
         // 获取目标 VM 配置，提取新挂载的卷 ID
