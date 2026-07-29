@@ -63,8 +63,8 @@
                                 <span v-if="row.admin_intervention_required" class="badge bg-danger ms-1">需介入</span>
                             </td>
                             <td>{{ row.amount_charged > 0 ? '¥' + row.amount_charged : '-' }}</td>
-                            <td class="small">{{ row.started_at ? formatTime(row.started_at) : '-' }}</td>
-                            <td class="small">{{ row.finished_at ? formatTime(row.finished_at) : '-' }}</td>
+                            <td class="small">{{ row.started_at ? formatDate(row.started_at) : '-' }}</td>
+                            <td class="small">{{ row.finished_at ? formatDate(row.finished_at) : '-' }}</td>
                             <td>
                                 <div class="d-flex gap-1">
                                     <pv-button size="sm" @click="osSwitchLogsPage.showDetail(row)">详情</pv-button>
@@ -154,11 +154,11 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-muted small">开始时间</label>
-                            <div>{{ formatTime(osSwitchLogsPage.detail.started_at) }}</div>
+                            <div>{{ formatDate(osSwitchLogsPage.detail.started_at) }}</div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-muted small">完成时间</label>
-                            <div>{{ osSwitchLogsPage.detail.finished_at ? formatTime(osSwitchLogsPage.detail.finished_at) : '-' }}</div>
+                            <div>{{ osSwitchLogsPage.detail.finished_at ? formatDate(osSwitchLogsPage.detail.finished_at) : '-' }}</div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-muted small">是否需要管理员介入</label>
