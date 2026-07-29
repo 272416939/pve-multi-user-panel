@@ -10,7 +10,7 @@ window.__admin.osSwitchLogsPage = (function () {
     var page = ref(1);
     var limit = 20;
     var filters = Vue.reactive({ status: '', vm_id: '', user_id: '' });
-    var selectedIds = ref([]);
+    var selectedIds = Vue.reactive([]);
     var detail = ref(null);
 
     function getTotalPages() {
