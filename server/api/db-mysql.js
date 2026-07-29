@@ -621,9 +621,8 @@ async function initDb() {
     )`);
 
     // 创建系统切换日志表（vm_os_switch_logs）
-    await execute(`DROP TABLE IF EXISTS vm_os_switch_logs`);
     await execute(`
-    CREATE TABLE vm_os_switch_logs (
+    CREATE TABLE IF NOT EXISTS vm_os_switch_logs (
         id INT AUTO_INCREMENT PRIMARY KEY,
         vm_id INT NOT NULL,
         user_id INT NOT NULL,
@@ -642,13 +641,6 @@ async function initDb() {
         INDEX idx_vm_os_switch_logs_user (user_id),
         INDEX idx_vm_os_switch_logs_status (status)
     )`);
-    // 迁移：删除 amount_charged 列
-    try {
-        await execute("ALTER TABLE vm_os_switch_logs DROP COLUMN amount_charged");
-        console.log('[db] 迁移: vm_os_switch_logs.amount_charged 已删除');
-    } catch (e) {
-        if (!e.message.toLowerCase().includes('check') && !e.message.toLowerCase().includes('unknown')) console.error('[db] 迁移 vm_os_switch_logs.amount_charged 失败:', e.message);
-    }
 
     // 初始化默认配置
     await initDefaultConfig();
@@ -707,13 +699,6 @@ async function migrateSchema() {
     await safeAlter('vms', 'last_os_switch_at', 'DATETIME DEFAULT NULL');
     await safeAlter('vms', 'os_switch_pve_upid', "VARCHAR(200) DEFAULT ''");
     await safeAlter('vm_packages', 'default_os_template_id', 'INT DEFAULT NULL');
-    // 迁移：删除 os_templates.switch_price 列（不再收费）
-    try {
-        await execute("ALTER TABLE os_templates DROP COLUMN switch_price");
-        console.log('[db] 迁移: os_templates.switch_price 已删除');
-    } catch (e) {
-        if (!e.message.toLowerCase().includes('check') && !e.message.toLowerCase().includes('unknown')) console.error('[db] 迁移 os_templates.switch_price 失败:', e.message);
-    }
     // os_templates 表迁移：新增 ostype 列（兼容旧表）
     try {
         await execute("ALTER TABLE os_templates ADD COLUMN ostype VARCHAR(20) NOT NULL DEFAULT '' AFTER os_version");
