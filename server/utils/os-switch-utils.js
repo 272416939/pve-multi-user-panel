@@ -462,14 +462,14 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         await reattachDataDisks(vmid, dataDisks);
         await updateLogStage(logId, 'cloudinit');
 
-        // Stage 7: 更新 cloud-init
-        const ciResult = await updateCloudInit(vmid, osTemplate.ciuser);
-        ctx.ciResult = ciResult;
-
-        // Stage 7.5: 更新 VM ostype 与模板一致
+        // Stage 7: 先更新 VM ostype 与模板一致（影响 cloud-init ISO 生成）
         if (osTemplate.ostype) {
             await pveApi.updateVmConfig(vmid, { ostype: osTemplate.ostype });
         }
+
+        // Stage 8: 再更新 cloud-init（此时 ostype 已正确）
+        const ciResult = await updateCloudInit(vmid, osTemplate.ciuser);
+        ctx.ciResult = ciResult;
 
         await updateLogStage(logId, 'start');
 
