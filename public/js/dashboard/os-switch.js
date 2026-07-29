@@ -43,12 +43,6 @@
     $.osSwitchModalVisible.value = false;
   };
 
-  // 监听选择变化更新当前名称
-  watch($.osSwitchSelectedId, function(newId) {
-    var t = ($.osSwitchList.value || []).find(function(x) { return x.id === newId; });
-    $.osSwitchCurrentName.value = t ? t.name : '';
-  });
-
   $.submitOsSwitch = async function() {
     var vm = $.osSwitchTargetVm.value;
     if (!vm) return;

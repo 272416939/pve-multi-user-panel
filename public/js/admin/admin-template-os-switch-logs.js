@@ -133,7 +133,7 @@
                             <div class="small">{{ osSwitchLogDetail.order_no }}</div>
                         </div>
                         <div class="col-12" v-if="osSwitchLogDetail.fail_stage">
-                            <label class="form-label text-muted small">失败阶段</label>
+                            <label class="form-label text-muted small">最后阶段</label>
                             <div>{{ osSwitchLogDetail.fail_stage }}</div>
                         </div>
                         <div class="col-12" v-if="osSwitchLogDetail.error_message">
