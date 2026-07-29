@@ -31,7 +31,7 @@
                 <table class="table table-hover align-middle table-align-center">
                     <thead class="table-light">
                         <tr>
-                            <th style="width:40px"><input type="checkbox" @change="osSwitchLogsPage.toggleAll($event)" :checked="osSwitchLogsPage.isAllSelected()"></th>
+                            <th style="width:40px"><input type="checkbox" @change="osSwitchLogsPage.toggleAll($event)" :checked="osSwitchLogsPage.allSelected()"></th>
                             <th>ID</th>
                             <th>VMID</th>
                             <th>用户</th>
