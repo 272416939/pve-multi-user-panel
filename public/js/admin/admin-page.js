@@ -88,7 +88,7 @@ var App = {
         if (!$.osTemplatePage.pveTemplateVms) $.osTemplatePage.pveTemplateVms = Vue.ref([]);
         if (!$.osTemplatePage.pveConfigLoading) $.osTemplatePage.pveConfigLoading = Vue.ref(false);
         if (!$.osTemplatePage.allStorages) $.osTemplatePage.allStorages = Vue.ref([]);
-        if (!$.osTemplatePage.formData) $.osTemplatePage.formData = Vue.reactive({ name: '', template_vmid: '', os_type: '', os_version: '', ostype: '', arch: 'x86_64', target_storage: 'local-lvm', ciuser: '', description: '', switch_price: 0, icon: '', sort_order: 0, allowed_package_ids: '', enabled: 1, status: 'active' });
+        if (!$.osTemplatePage.formData) $.osTemplatePage.formData = Vue.reactive({ name: '', template_vmid: '', os_type: '', os_version: '', ostype: '', arch: 'x86_64', target_storage: 'local-lvm', ciuser: '', description: '', icon: '', sort_order: 0, allowed_package_ids: '', enabled: 1, status: 'active' });
         if (!$.osTemplatePage.saving) $.osTemplatePage.saving = Vue.ref(false);
         // OS 切换日志兜底初始化
         if (!$.osSwitchLogList) $.osSwitchLogList = Vue.ref([]);

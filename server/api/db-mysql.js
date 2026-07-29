@@ -609,7 +609,6 @@ async function initDb() {
         target_storage VARCHAR(100) NOT NULL DEFAULT 'local-lvm',
         ciuser VARCHAR(100) NOT NULL DEFAULT '',
         description TEXT NOT NULL,
-        switch_price DECIMAL(10,2) NOT NULL DEFAULT 0.00,
         icon VARCHAR(100) NOT NULL DEFAULT '',
         sort_order INT NOT NULL DEFAULT 0,
         allowed_package_ids VARCHAR(500) NOT NULL DEFAULT '',
@@ -643,6 +642,13 @@ async function initDb() {
         INDEX idx_vm_os_switch_logs_user (user_id),
         INDEX idx_vm_os_switch_logs_status (status)
     )`);
+    // 迁移：删除 amount_charged 列
+    try {
+        await execute("ALTER TABLE vm_os_switch_logs DROP COLUMN amount_charged");
+        console.log('[db] 迁移: vm_os_switch_logs.amount_charged 已删除');
+    } catch (e) {
+        if (!e.message.toLowerCase().includes('check') && !e.message.toLowerCase().includes('unknown')) console.error('[db] 迁移 vm_os_switch_logs.amount_charged 失败:', e.message);
+    }
 
     // 初始化默认配置
     await initDefaultConfig();
@@ -701,6 +707,13 @@ async function migrateSchema() {
     await safeAlter('vms', 'last_os_switch_at', 'DATETIME DEFAULT NULL');
     await safeAlter('vms', 'os_switch_pve_upid', "VARCHAR(200) DEFAULT ''");
     await safeAlter('vm_packages', 'default_os_template_id', 'INT DEFAULT NULL');
+    // 迁移：删除 os_templates.switch_price 列（不再收费）
+    try {
+        await execute("ALTER TABLE os_templates DROP COLUMN switch_price");
+        console.log('[db] 迁移: os_templates.switch_price 已删除');
+    } catch (e) {
+        if (!e.message.toLowerCase().includes('check') && !e.message.toLowerCase().includes('unknown')) console.error('[db] 迁移 os_templates.switch_price 失败:', e.message);
+    }
     // os_templates 表迁移：新增 ostype 列（兼容旧表）
     try {
         await execute("ALTER TABLE os_templates ADD COLUMN ostype VARCHAR(20) NOT NULL DEFAULT '' AFTER os_version");
@@ -2533,15 +2546,14 @@ module.exports = {
         getByTemplateVmid: (vmid) => queryAll('SELECT * FROM os_templates WHERE template_vmid = ?', [parseInt(vmid)]),
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO os_templates (name, template_vmid, os_type, os_version, ostype, arch, target_storage, disk_format, ciuser, description, switch_price, icon, sort_order, allowed_package_ids, enabled, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+`INSERT INTO os_templates (name, template_vmid, os_type, os_version, ostype, arch, target_storage, disk_format, ciuser, description, icon, sort_order, allowed_package_ids, enabled, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.name || '', parseInt(data.template_vmid) || 0,
                     data.os_type || '', data.os_version || '',
                     data.ostype || '', data.arch || 'x86_64',
                     data.target_storage || 'local-lvm', data.disk_format || '',
-                    data.ciuser || '',
-                    data.description || '', parseFloat(data.switch_price) || 0,
+                    data.ciuser || '', data.description || '',
                     data.icon || '', parseInt(data.sort_order) || 0,
                     data.allowed_package_ids || '', data.enabled === false ? 0 : 1,
                     data.status || 'active'
@@ -2550,7 +2562,7 @@ module.exports = {
             return queryOne('SELECT * FROM os_templates WHERE id = ?', [result.insertId]);
         },
         update: async (id, updates) => {
-            const allowedColumns = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
+            const allowedColumns = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -2575,14 +2587,13 @@ module.exports = {
     vmOsSwitchLogs: {
         create: async (data) => {
             const [result] = await execute(
-                `INSERT INTO vm_os_switch_logs (vm_id, user_id, from_os_template_id, to_os_template_id, new_system_volume_id, status, amount_charged, order_no)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vm_os_switch_logs (vm_id, user_id, from_os_template_id, to_os_template_id, new_system_volume_id, status, order_no)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
                     parseInt(data.vm_id), parseInt(data.user_id),
                     data.from_os_template_id || null, parseInt(data.to_os_template_id),
                     data.new_system_volume_id || '',
-                    data.status || 'pending',
-                    parseFloat(data.amount_charged) || 0, data.order_no || ''
+                    data.status || 'pending', data.order_no || ''
                 ]
             );
             return queryOne('SELECT * FROM vm_os_switch_logs WHERE id = ?', [result.insertId]);

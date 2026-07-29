@@ -10,7 +10,6 @@
   $.osSwitchSelectedId = ref(null);
   $.osSwitchConfirm = ref(false);
   $.osSwitchSubmitting = ref(false);
-  $.osSwitchPrice = ref(0);
   $.osSwitchCurrentName = ref('');
   $.osSwitchTargetVm = ref(null);
 
@@ -19,7 +18,6 @@
     $.osSwitchTargetVm.value = vm;
     $.osSwitchSelectedId.value = null;
     $.osSwitchConfirm.value = false;
-    $.osSwitchPrice.value = 0;
     try {
       var res = await api('/vm/' + vm.vm_id + '/switchable-os');
       if (res && res.success) {
@@ -45,10 +43,10 @@
     $.osSwitchModalVisible.value = false;
   };
 
-  // 监听选择变化更新价格
+  // 监听选择变化更新当前名称
   watch($.osSwitchSelectedId, function(newId) {
     var t = ($.osSwitchList.value || []).find(function(x) { return x.id === newId; });
-    $.osSwitchPrice.value = t ? parseFloat(t.switch_price || '0') : 0;
+    $.osSwitchCurrentName.value = t ? t.name : '';
   });
 
   $.submitOsSwitch = async function() {

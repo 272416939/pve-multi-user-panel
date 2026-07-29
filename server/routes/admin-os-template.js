@@ -173,10 +173,6 @@ router.post('/admin/os-templates', async (req, res) => {
         if (!vms.find(v => v.vmid === templateVmid)) {
             return res.status(400).json({ error: '指定的 VMID 在 PVE 中不是模板' });
         }
-        const switchPrice = parseFloat(data.switch_price);
-        if (isNaN(switchPrice) || switchPrice < 0 || switchPrice > 9999) {
-            return res.status(400).json({ error: '无效的切换价格（0-9999）' });
-        }
         const id = await db.osTemplates.create({
             name: String(data.name).slice(0, 255),
             template_vmid: templateVmid,
@@ -187,7 +183,6 @@ router.post('/admin/os-templates', async (req, res) => {
             target_storage: String(data.target_storage || 'local-lvm').slice(0, 100),
             ciuser: String(data.ciuser || '').slice(0, 100),
             description: String(data.description || '').slice(0, 5000),
-            switch_price: switchPrice,
             icon: String(data.icon || '').slice(0, 100),
             sort_order: parseInt(data.sort_order) || 0,
             allowed_package_ids: String(data.allowed_package_ids || '').slice(0, 500),
@@ -208,7 +203,7 @@ router.put('/admin/os-templates/:id', async (req, res) => {
         const existing = await db.osTemplates.getById(id);
         if (!existing) return res.status(404).json({ error: '模板不存在' });
 
-        const allowedFields = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'switch_price', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
+        const allowedFields = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
         const updates = {};
         for (const key of allowedFields) {
             if (req.body[key] !== undefined) {
@@ -219,12 +214,6 @@ router.put('/admin/os-templates/:id', async (req, res) => {
             const vmid = parseInt(updates.template_vmid);
             if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
                 return res.status(400).json({ error: '无效的模板 VMID' });
-            }
-        }
-        if (updates.switch_price !== undefined) {
-            const sp = parseFloat(updates.switch_price);
-            if (isNaN(sp) || sp < 0 || sp > 9999) {
-                return res.status(400).json({ error: '无效的切换价格' });
             }
         }
         const result = await db.osTemplates.update(id, updates);

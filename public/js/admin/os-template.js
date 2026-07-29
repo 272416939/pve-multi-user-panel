@@ -14,7 +14,7 @@ window.__admin.osTemplatePage = (function () {
     const formData = Vue.reactive({
         name: '', template_vmid: '', os_type: '', os_version: '', ostype: '', arch: 'x86_64',
         target_storage: 'local-lvm', disk_format: '', ciuser: '',
-        description: '', switch_price: 0, icon: '', sort_order: 0,
+        description: '', icon: '', sort_order: 0,
         allowed_package_ids: '', enabled: 1, status: 'active'
     });
     const saving = ref(false);
@@ -62,9 +62,8 @@ window.__admin.osTemplatePage = (function () {
                 if (!editId) {
                     formData.name = d.name || '';
                 }
-                formData.os_type = d.os_type || '';
-                formData.os_version = d.os_version || '';
-                formData.ostype = d.ostype || '';
+        formData.os_type = d.os_type || '';
+        formData.os_version = d.os_version || '';
                 formData.arch = d.arch || 'x86_64';
                 formData.target_storage = d.target_storage || 'local-lvm';
                 formData.ciuser = d.ciuser || '';
@@ -95,7 +94,6 @@ window.__admin.osTemplatePage = (function () {
             Object.keys(formData).forEach(k => {
                 if (k === 'enabled') formData[k] = 1;
                 else if (k === 'status') formData[k] = 'active';
-                else if (k === 'switch_price') formData[k] = 0;
                 else if (k === 'target_storage') formData[k] = 'local-lvm';
                 else if (k === 'arch') formData[k] = 'x86_64';
                 else if (k === 'sort_order') formData[k] = 0;

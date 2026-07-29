@@ -46,7 +46,6 @@
                                 <th>来源系统</th>
                                 <th>目标系统</th>
                                 <th>状态</th>
-                                <th>金额</th>
                                 <th>时间</th>
                                 <th>操作</th>
                             </tr>
@@ -67,7 +66,6 @@
                                     }[row.status] || 'bg-secondary'">{{ {success:'成功',failed:'失败',running:'切换中',pending:'等待中',rolled_back:'已回滚'}[row.status] || row.status }}</span>
                                     <span v-if="row.admin_intervention_required" class="badge bg-danger ms-1">需介入</span>
                                 </td>
-                                <td>{{ row.amount_charged > 0 ? '¥' + row.amount_charged : '-' }}</td>
                                 <td class="small">{{ row.started_at ? formatDate(row.started_at) : '-' }}</td>
                                 <td>
                                     <div class="d-flex gap-1">
@@ -77,7 +75,7 @@
                                 </td>
                             </tr>
                             <tr v-if="!osSwitchLogList || osSwitchLogList.length === 0">
-                                <td colspan="10" class="text-center text-muted py-3">暂无切换日志</td>
+                                <td colspan="9" class="text-center text-muted py-3">暂无切换日志</td>
                             </tr>
                         </tbody>
                     </table>
@@ -129,10 +127,6 @@
                         <div class="col-md-6" v-if="osSwitchLogDetail.new_system_volume_id">
                             <label class="form-label text-muted small">新系统盘</label>
                             <div class="small">{{ osSwitchLogDetail.new_system_volume_id }}</div>
-                        </div>
-                        <div class="col-md-6" v-if="osSwitchLogDetail.amount_charged > 0">
-                            <label class="form-label text-muted small">切换金额</label>
-                            <div>¥{{ osSwitchLogDetail.amount_charged }}</div>
                         </div>
                         <div class="col-md-6" v-if="osSwitchLogDetail.order_no">
                             <label class="form-label text-muted small">订单号</label>

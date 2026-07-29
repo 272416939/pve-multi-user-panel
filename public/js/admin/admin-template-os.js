@@ -12,7 +12,7 @@
                 <table class="table table-hover align-middle table-align-center">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th><th>名称</th><th>OS 类型</th><th>版本</th><th>PVE 模板 VMID</th><th>目标存储</th><th>磁盘格式</th><th>切换价格</th><th>状态</th><th>操作</th>
+                            <th>ID</th><th>名称</th><th>OS 类型</th><th>版本</th><th>PVE 模板 VMID</th><th>目标存储</th><th>磁盘格式</th><th>状态</th><th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -24,7 +24,6 @@
                             <td>{{ t.template_vmid }}</td>
                             <td>{{ t.target_storage }}</td>
                             <td>{{ t.disk_format || '自动' }}</td>
-                            <td>{{ t.switch_price }}</td>
                             <td><span :class="t.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ t.status === 'active' ? '启用' : (t.status === 'maintenance' ? '维护' : '已弃用') }}</span></td>
                             <td>
                                 <div class="d-flex gap-2">
@@ -34,7 +33,7 @@
                             </td>
                         </tr>
                         <tr v-if="(osTemplatePage?.osTemplates?.value || []).length === 0">
-                            <td colspan="10" class="text-center text-muted">暂无系统模板</td>
+                            <td colspan="9" class="text-center text-muted">暂无系统模板</td>
                         </tr>
                     </tbody>
                 </table>
@@ -87,10 +86,6 @@
                                 <option value="vmdk">vmdk</option>
                             </select>
                             <div class="form-text text-muted">跨存储切换时强制转换的磁盘格式，留空则使用源盘格式</div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">切换价格(元)</label>
-                            <input class="form-control" type="number" step="0.01" v-model="osTemplatePage.formData.switch_price" min="0">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">cloud-init 用户</label>

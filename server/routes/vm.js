@@ -977,30 +977,6 @@ try {
         await osSwitchUtils.checkTargetStorageCapacity(osTemplate.target_storage, oldSysDiskSizeGb || 20);
 
         let orderNo = '';
-        let amountCharged = 0;
-        if (parseFloat(osTemplate.switch_price) > 0 && !isAdmin) {
-            const totalAmount = parseFloat(osTemplate.switch_price);
-            orderNo = generateOrderNo('os');
-            try {
-                await withTransaction(async (conn) => {
-                    const [userRows] = await conn.execute('SELECT balance FROM users WHERE id = ?', [req.user.id]);
-                    const balance = parseFloat(userRows[0]?.balance || '0');
-                    if (balance < totalAmount) throw new Error('余额不足');
-                    await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, req.user.id]);
-                    await conn.execute(
-                        'INSERT INTO orders (order_no, user_id, type, period, period_count, amount, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())',
-                        [orderNo, req.user.id, 'os_switch', 'month', 1, totalAmount, 'pending']
-                    );
-                    await conn.execute(
-                        'INSERT INTO transaction_records (user_id, order_no, trade_type, amount, balance_before, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())',
-                        [req.user.id, orderNo, 'expense', totalAmount, balance, balance - totalAmount]
-                    );
-                });
-                amountCharged = totalAmount;
-            } catch (e) {
-                return res.status(400).json({ error: e.message === '余额不足' ? '余额不足' : safeError(e) });
-            }
-        }
 
         const switchLog = await db.vmOsSwitchLogs.create({
             vm_id: vmid,
@@ -1008,7 +984,6 @@ try {
             from_os_template_id: vm.current_os_template_id || null,
             to_os_template_id: osTemplateId,
             status: 'running',
-            amount_charged: amountCharged,
             order_no: orderNo
         });
         await db.vms.update(vm.id, { os_switch_pve_upid: 'os-switch-' + switchLog.id });
@@ -1026,9 +1001,6 @@ try {
                     last_os_switch_at: new Date(),
                     os_switch_pve_upid: ''
                 });
-                if (orderNo) {
-                    await db.orders.updateStatus(orderNo, 'completed');
-                }
                 await db.messages.create({
                     uid: vm.user_id,
                     title: '系统切换成功',
@@ -1042,25 +1014,11 @@ try {
                     finished_at: new Date()
                 });
                 await db.vms.update(vm.id, { os_switch_pve_upid: '' });
-                if (orderNo && amountCharged > 0) {
-                    try {
-                        await withTransaction(async (conn) => {
-                            await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [amountCharged, req.user.id]);
-                            await conn.execute(
-                                'INSERT INTO transaction_records (user_id, order_no, trade_type, amount, created_at) VALUES (?, ?, ?, ?, NOW())',
-                                [req.user.id, orderNo, 'os_switch_refund', amountCharged]
-                            );
-                            await conn.execute("UPDATE orders SET status = ? WHERE order_no = ?", ['refunded', orderNo]);
-                        });
-                    } catch (refundErr) {
-                        console.error('[os-switch] 退款失败:', refundErr.message);
-                    }
-                }
                 try {
                     await db.messages.create({
                         uid: vm.user_id,
                         title: '系统切换失败',
-                        content: '您的虚拟机 ' + (vm.name || 'VM ' + vmid) + ' 切换系统失败' + (amountCharged > 0 ? '，已自动退款。' : '。') + '\n数据盘未受影响。请稍后重试或联系管理员。',
+                        content: '您的虚拟机 ' + (vm.name || 'VM ' + vmid) + ' 切换系统失败。\n数据盘未受影响。请稍后重试或联系管理员。',
                         type: 2, send_type: 1
                     });
                 } catch (msgErr) {

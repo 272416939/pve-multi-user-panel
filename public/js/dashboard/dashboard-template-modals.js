@@ -892,7 +892,6 @@
                     <li>数据盘会自动卸载并重新挂载，<strong style="color:var(--bs-success);">数据不会丢失</strong></li>
                     <li>切换过程约 3-10 分钟，期间虚拟机将停机</li>
                     <li>切换完成后将获得新的初始密码</li>
-                    <li v-if="osSwitchPrice > 0">本次切换将扣费 <strong style="color:var(--bs-danger);">¥{{ osSwitchPrice }}</strong></li>
                 </ul>
             </div>
             <div class="mb-3">
