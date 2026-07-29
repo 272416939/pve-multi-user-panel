@@ -49,7 +49,7 @@
                             <td><input type="checkbox" :checked="osSwitchLogsPage.selectedIds.includes(row.id)" @change="osSwitchLogsPage.toggleOne(row.id)"></td>
                             <td>{{ row.id }}</td>
                             <td>{{ row.vm_id }}</td>
-                            <td>{{ row.user_id }}</td>
+                            <td>{{ row.username || row.user_id }}</td>
                             <td class="text-muted small">{{ row.from_os_template_id || '-' }}</td>
                             <td>{{ row.to_os_template_id }}</td>
                             <td>

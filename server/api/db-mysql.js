@@ -2628,13 +2628,16 @@ module.exports = {
         getListWithPaging: (filters) => {
             const { page = 1, limit = 20, status, vm_id, user_id, before_date } = filters;
             const offset = (Math.min(page, 1000) - 1) * Math.min(limit, 200);
-            let sql = 'SELECT * FROM vm_os_switch_logs WHERE 1=1';
+            let sql = `SELECT l.*, u.username
+                       FROM vm_os_switch_logs l
+                       LEFT JOIN users u ON l.user_id = u.id
+                       WHERE 1=1`;
             const params = [];
-            if (status) { sql += ' AND status = ?'; params.push(status); }
-            if (vm_id) { sql += ' AND vm_id = ?'; params.push(parseInt(vm_id)); }
-            if (user_id) { sql += ' AND user_id = ?'; params.push(parseInt(user_id)); }
-            if (before_date) { sql += ' AND started_at < ?'; params.push(before_date); }
-            sql += ' ORDER BY id DESC LIMIT ? OFFSET ?';
+            if (status) { sql += ' AND l.status = ?'; params.push(status); }
+            if (vm_id) { sql += ' AND l.vm_id = ?'; params.push(parseInt(vm_id)); }
+            if (user_id) { sql += ' AND l.user_id = ?'; params.push(parseInt(user_id)); }
+            if (before_date) { sql += ' AND l.started_at < ?'; params.push(before_date); }
+            sql += ' ORDER BY l.id DESC LIMIT ? OFFSET ?';
             params.push(parseInt(limit), offset);
             return queryAll(sql, params);
         },
