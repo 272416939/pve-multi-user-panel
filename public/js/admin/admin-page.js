@@ -100,6 +100,7 @@ var App = {
         if (!$.osSwitchLogsPage.detail) $.osSwitchLogsPage.detail = Vue.ref(null);
         if (!$.osSwitchLogsPage.load) $.osSwitchLogsPage.load = () => {};
         if (!$.osSwitchLogsPage.allSelected) $.osSwitchLogsPage.allSelected = () => false;
+        if (!$.osSwitchLogsPage.totalPages) $.osSwitchLogsPage.totalPages = 1;
         if (!$.activeTabDisk) $.activeTabDisk = Vue.ref(localStorage.getItem('admin_activeTabDisk') || 'storage-groups');
         $.initCore();
         $.initVm();
