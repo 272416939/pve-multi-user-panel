@@ -6,6 +6,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const dbg = require('../utils/debug');
 const { startLxcBackupPolling, sendLxcRestoreNotification, startBackupPolling, startRestorePolling } = require('../services/backup-polling');
 const { safeError } = require('../utils/safe-error');
+const { takeDiskSnapshot } = require('../services/disk-audit');
 router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
@@ -457,6 +458,16 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
             return res.status(409).json({ error: '该虚拟机有正在进行的备份或恢复任务，请等待完成后再试' });
         }
         const restore = await db.restoreTasks.create({ vm_id: vmid, user_id: req.user.id, backup_id: backupId });
+        // 恢复前快照：记录当前 VM 磁盘配置和活跃数据盘，用于恢复后对账
+        try {
+            const preSnapshot = await takeDiskSnapshot(vmid, req.user.id);
+            // 存入 restore_tasks 供轮询完成回调使用
+            const pool = require('../api/db').getPool();
+            await pool.execute('UPDATE restore_tasks SET pre_snapshot = ? WHERE id = ?', [JSON.stringify(preSnapshot), restore.id]);
+        } catch (snapErr) {
+            // 快照失败不阻塞恢复，仅记日志
+            console.error('[恢复] VM ' + vmid + ' 磁盘快照失败:', snapErr.message);
+        }
         try {
             const result = await pveApi.restoreBackup(vmid, backup.filename);
             const upid = result.data || result;

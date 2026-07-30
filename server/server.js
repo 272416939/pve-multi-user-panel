@@ -429,30 +429,53 @@ httpServer.listen(PORT, async () => {
         process.exit(1);
     }
 
-    // 从 DB 加载 Redis 配置，写入 process.env 后初始化连接
-    try {
-        var redisConfig = await db.config.getRedis();
-        if (redisConfig && redisConfig.host) {
-            process.env.REDIS_HOST = redisConfig.host;
-            process.env.REDIS_PORT = String(redisConfig.port || 6379);
-            process.env.REDIS_PASSWORD = redisConfig.password || '';
-            process.env.REDIS_DB = String(redisConfig.db || 0);
-            process.env.REDIS_PREFIX = redisConfig.prefix || 'pve:';
-        } else {
-            // 未配置 Redis 地址，确保 REDIS_HOST 不存在（disable Redis）
-            delete process.env.REDIS_HOST;
-        }
-        const redisModule = require('./api/redis');
-        redisModule.resetClient(); // 断开旧连接（如有），强制下次 getRedisClient 重新连接
-        const redisClient = redisModule.getRedisClient();
-        app.locals.redis = redisClient;
-        if (!redisClient) {
-            console.log('[redis] 未配置 Redis，使用进程内存模式');
-        }
-    } catch (e) {
-        console.warn('[redis] 初始化异常:', e.message);
-        app.locals.redis = null;
-    }
+	    // 从 DB 加载 Redis 配置，写入 process.env 后初始化连接
+	    try {
+	        var redisConfig = await db.config.getRedis();
+	        if (redisConfig && redisConfig.host) {
+	            process.env.REDIS_HOST = redisConfig.host;
+	            process.env.REDIS_PORT = String(redisConfig.port || 6379);
+	            process.env.REDIS_PASSWORD = redisConfig.password || '';
+	            process.env.REDIS_DB = String(redisConfig.db || 0);
+	            process.env.REDIS_PREFIX = redisConfig.prefix || 'pve:';
+	        } else {
+	            // 未配置 Redis 地址，确保 REDIS_HOST 不存在（disable Redis）
+	            delete process.env.REDIS_HOST;
+	        }
+	        const redisModule = require('./api/redis');
+	        redisModule.resetClient(); // 断开旧连接（如有），强制下次 getRedisClient 重新连接
+	        const redisClient = redisModule.getRedisClient();
+	        app.locals.redis = redisClient;
+	        if (!redisClient) {
+	            console.log('[redis] 未配置 Redis，使用进程内存模式');
+	        }
+	    } catch (e) {
+	        console.warn('[redis] 初始化异常:', e.message);
+	        app.locals.redis = null;
+	    }
+
+	    // 初始化存量 VM 磁盘快照（用于恢复后对账基线）
+	    try {
+	        const diskAudit = require('./services/disk-audit');
+	        const vms = await db.vms.getAll();
+	        var snapped = 0;
+	        var failed = 0;
+	        for (var vi = 0; vi < vms.length; vi++) {
+	            var vm = vms[vi];
+	            try {
+	                await diskAudit.takeDiskSnapshot(vm.vm_id, vm.user_id);
+	                snapped++;
+	            } catch (snapErr) {
+	                // VM 可能已被删除或节点不可达，跳过
+	                failed++;
+	            }
+	        }
+	        if (vms.length > 0) {
+	            console.log('[盘初始化] VM 磁盘快照完成: ' + snapped + ' 成功, ' + failed + ' 跳过');
+	        }
+	    } catch (initErr) {
+	        console.warn('[盘初始化] 存量 VM 快照失败（不影响启动）:', initErr.message);
+	    }
 
     // 启动时预编译所有 EJS 模板，避免首个用户访问时等待编译
     try {

@@ -583,20 +583,35 @@ async function initDb() {
         INDEX idx_disks_legacy (is_legacy)
     )`);
 
-    // 创建磁盘生命周期配置表
-    await execute(`
-    CREATE TABLE IF NOT EXISTS disk_lifecycle_config (
-        id INT PRIMARY KEY DEFAULT 1,
-        warn_days INT DEFAULT 7,
-        warn_frequency VARCHAR(20) DEFAULT 'daily',
-        grace_days INT DEFAULT 3,
-        grace_frequency VARCHAR(20) DEFAULT 'twice_daily',
-        retention_days INT DEFAULT 15,
-        auto_renew_days INT DEFAULT 1,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )`);
+	    // 创建磁盘生命周期配置表
+	    await execute(`
+	    CREATE TABLE IF NOT EXISTS disk_lifecycle_config (
+	        id INT PRIMARY KEY DEFAULT 1,
+	        warn_days INT DEFAULT 7,
+	        warn_frequency VARCHAR(20) DEFAULT 'daily',
+	        grace_days INT DEFAULT 3,
+	        grace_frequency VARCHAR(20) DEFAULT 'twice_daily',
+	        retention_days INT DEFAULT 15,
+	        auto_renew_days INT DEFAULT 1,
+	        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+	    )`);
 
-    // 创建可切换系统模板表（os_templates）
+	    // 创建 VM 磁盘快照表（用于恢复后对账，防止幽灵盘）
+	    await execute(`
+	    CREATE TABLE IF NOT EXISTS vm_disk_snapshots (
+	        vm_id          INT NOT NULL,
+	        user_id        INT NOT NULL,
+	        disk_snapshot  JSON NOT NULL,
+	        created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+	        updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	        PRIMARY KEY (vm_id),
+	        INDEX idx_user (user_id)
+	    )`);
+
+	    // 给 restore_tasks 添加 pre_snapshot 列（用于恢复前后对账）
+	    try { await execute("ALTER TABLE restore_tasks ADD COLUMN pre_snapshot JSON DEFAULT NULL"); } catch (_) {}
+
+	    // 创建可切换系统模板表（os_templates）
     await execute(`
     CREATE TABLE IF NOT EXISTS os_templates (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -2486,8 +2501,10 @@ module.exports = {
             return execute(`UPDATE disks SET ${fields.join(', ')} WHERE id = ?`, values);
         },
         // 硬删除：仅允许删除已销毁状态的磁盘记录（清理已销毁的磁盘记录用）
-        hardDelete: (id) => execute('DELETE FROM disks WHERE id = ? AND status = ?', [parseInt(id), 'destroyed']),
-        getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)"),
+	        hardDelete: (id) => execute('DELETE FROM disks WHERE id = ? AND status = ?', [parseInt(id), 'destroyed']),
+	        // 更新磁盘 volume_id（恢复后同槽位换了新卷时使用）
+	        updateVolumeId: (id, volumeId) => execute('UPDATE disks SET volume_id = ?, updated_at = ? WHERE id = ?', [volumeId, mysqlNow(), parseInt(id)]),
+	        getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)"),
         // 更新绑定到指定 VMID 的 legacy 磁盘的 user_id（VM 换绑时同步）
         updateUserId: (vmid, userId) => execute('UPDATE disks SET user_id = ?, updated_at = ? WHERE bind_vmid = ? AND is_legacy = 1', [parseInt(userId), mysqlNow(), parseInt(vmid)])
     },
@@ -2678,15 +2695,33 @@ module.exports = {
             const result = await execute(sql, params);
             return { deleted: result.affectedRows, skipped_running: skipped.c };
         },
-        clearAllExceptRunningAndIntervention: async () => {
-            const result = await execute("DELETE FROM vm_os_switch_logs WHERE status != 'running' AND admin_intervention_required = 0");
-            const skippedRunning = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE status = 'running'");
-            const skippedIntervention = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE admin_intervention_required = 1");
-            return {
-                deleted: result.affectedRows,
-                skipped_running: skippedRunning.c,
-                skipped_intervention: skippedIntervention.c
-            };
-        }
-    }
-};
+	        clearAllExceptRunningAndIntervention: async () => {
+	            const result = await execute("DELETE FROM vm_os_switch_logs WHERE status != 'running' AND admin_intervention_required = 0");
+	            const skippedRunning = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE status = 'running'");
+	            const skippedIntervention = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE admin_intervention_required = 1");
+	            return {
+	                deleted: result.affectedRows,
+	                skipped_running: skippedRunning.c,
+	                skipped_intervention: skippedIntervention.c
+	            };
+	        }
+	    },
+
+	    // VM 磁盘快照（恢复前后对账，防止幽灵盘）
+	    vmDiskSnapshots: {
+	        upsert: (vmId, userId, diskSnapshot) => execute(
+	            `REPLACE INTO vm_disk_snapshots (vm_id, user_id, disk_snapshot)
+	             VALUES (?, ?, ?)`,
+	            [parseInt(vmId), parseInt(userId), JSON.stringify(diskSnapshot)]
+	        ),
+	        getByVmId: (vmId) => queryOne(
+	            'SELECT * FROM vm_disk_snapshots WHERE vm_id = ?',
+	            [parseInt(vmId)]
+	        ),
+	        getAll: () => queryAll('SELECT * FROM vm_disk_snapshots'),
+	        delete: (vmId) => execute(
+	            'DELETE FROM vm_disk_snapshots WHERE vm_id = ?',
+	            [parseInt(vmId)]
+	        ),
+	    }
+	};

@@ -2,6 +2,7 @@ const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { pushToUser } = require('../websocket/push-proxy');
+const { takeDiskSnapshot, auditAfterRestore } = require('./disk-audit');
 
 const lxcBackupPollingMap = new Map();
 
@@ -338,7 +339,15 @@ function startRestorePolling(taskId, upid) {
                 backupPollIntervals.delete(key);
                 const restore = await db.restoreTasks.getById(taskId);
                 await db.restoreTasks.complete(taskId);
-                if (restore) sendRestoreNotification(restore.user_id, restore.vm_id, 'completed');
+                if (restore) {
+                    sendRestoreNotification(restore.user_id, restore.vm_id, 'completed');
+                    // 恢复完成后做磁盘对账（防止幽灵盘 + 修复丢失的数据盘）
+                    try {
+                        await auditAfterRestore(restore.vm_id, restore.user_id, restore.pre_snapshot);
+                    } catch (auditErr) {
+                        console.error('[恢复审计] VM ' + restore.vm_id + ' 对账失败:', auditErr.message);
+                    }
+                }
             } else if (task.status === 'stopped') {
                 clearInterval(interval);
                 backupPollIntervals.delete(key);

@@ -367,6 +367,57 @@ function calcResizeAmount(oldSizeGb, newSizeGb, pricePerGb, expireTime) {
 
 // ==================== 系统切换内部函数（仅供 os-switch-utils.js 使用） ====================
 // 绕过 dev=0 检查，仅通过 Node.js 进程内 require 访问，不暴露给 HTTP 路由层
+
+/**
+ * 从 PVE VM config 中提取所有磁盘 volume_id
+ * @param {object} config - PVE getVmConfig 返回的配置
+ * @returns {object} { all: [volume_id, ...], system: [volume_id, ...], data: [volume_id, ...] }
+ */
+function getVmDiskVolumes(config) {
+  if (!config || typeof config !== 'object') return { all: [], system: [], data: [] };
+  var all = [];
+  var system = [];
+  var data = [];
+  // PVE 磁盘设备命名规范：scsi0-30, sata0-30, virtio0-30, ide0-3
+  var busList = ['scsi', 'sata', 'virtio', 'ide'];
+  for (var b = 0; b < busList.length; b++) {
+    var bus = busList[b];
+    for (var d = 0; d <= 30; d++) {
+      var key = bus + d;
+      var val = config[key];
+      if (!val || typeof val !== 'string') continue;
+      // 值格式如 "local-lvm:vm-100-disk-0,size=32G" 或 "local:100/vm-100-disk-0.qcow2,size=20G"
+      // 先按逗号分割取第一段（volume_id 部分）
+      var volPart = val.split(',')[0];
+      if (!volPart) continue;
+      // 补全 volume_id（DIR 存储可能不含 storage: 前缀，但 PVE config 中通常完整）
+      // 如果已经包含冒号则为完整 volume_id
+      if (volPart.indexOf(':') === -1) continue; // 非标准格式跳过
+      all.push(volPart);
+      // 系统盘判定：device=0 的盘即为系统盘
+      if (d === 0) {
+        system.push(volPart);
+      } else {
+        data.push(volPart);
+      }
+    }
+  }
+  return { all: all, system: system, data: data };
+}
+
+/**
+ * 判断 volume_id 是否是系统盘（*-disk-0）
+ * @param {string} volumeId
+ * @returns {boolean}
+ */
+function isSystemDiskVol(volumeId) {
+  if (!volumeId || typeof volumeId !== 'string') return false;
+  var parts = volumeId.split(':');
+  var volName = parts[1] || '';
+  var lastSeg = volName.split('/').pop() || volName;
+  return /disk-0(\.(raw|qcow2|vmdk|subvol))?$/.test(lastSeg);
+}
+
 const _internal = {
   unbindSystemDisk: async (vmid, bus) => {
     var safeVmid = validateParam('vmid', vmid);
@@ -401,19 +452,21 @@ const _internal = {
 };
 
 module.exports = {
-		  validateParam,
-		  validateVolumeId,
-		  createDisk,
-		  bindDisk,
-		  unbindDisk,
-		  resizeDisk,
-		  destroyDisk,
-		  getSystemDiskBus,
-		  getAvailableDevNumber,
-		  checkStorageCapacity,
-		  calcDiskAmount,
-		  calcRenewAmount,
-		  calcResizeAmount,
-		  inferDiskFormat,
-		  _internal,
-		};
+			  validateParam,
+			  validateVolumeId,
+			  createDisk,
+			  bindDisk,
+			  unbindDisk,
+			  resizeDisk,
+			  destroyDisk,
+			  getSystemDiskBus,
+			  getAvailableDevNumber,
+			  checkStorageCapacity,
+			  calcDiskAmount,
+			  calcRenewAmount,
+			  calcResizeAmount,
+			  inferDiskFormat,
+			  getVmDiskVolumes,
+			  isSystemDiskVol,
+			  _internal,
+			};
