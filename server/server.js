@@ -170,6 +170,24 @@ app.use('/images', express.static(path.join(__dirname, '../images'), {
 app.get('/api/version', authMiddleware, (req, res) => {
     res.json({ version: pkg.version });
 });
+
+// 全局缓存版本号（用于 CSS/JS 缓存控制，启动时加载，运行时通过中间件注入到 EJS locals）
+// 此处先设默认值，启动后监听回调中会重新加载
+app.locals.cacheVersion = '1';
+try {
+    var _cacheVerPath = path.join(__dirname, '../public/cache-version.json');
+    if (fs.existsSync(_cacheVerPath)) {
+        var _cacheVerData = fs.readFileSync(_cacheVerPath, 'utf8');
+        var _cacheVerParsed = JSON.parse(_cacheVerData);
+        if (_cacheVerParsed && _cacheVerParsed.v) app.locals.cacheVersion = String(_cacheVerParsed.v);
+    }
+} catch (_) {}
+// 注入到所有 EJS 模板的 res.locals（_with: false 模式下模板需通过 locals.xxx 访问）
+app.use(function(req, res, next) {
+    res.locals.cacheVersion = app.locals.cacheVersion;
+    next();
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', version: pkg.version, timestamp: new Date().toISOString() });
 });
@@ -437,19 +455,9 @@ httpServer.listen(PORT, async () => {
 		    } catch (e) {
 		        console.warn('[redis] 初始化异常:', e.message);
 		        app.locals.redis = null;
-		    }
+	}
 
-		    // 加载缓存版本号（用于 CSS/JS 缓存控制）
-		    try {
-		        var cacheVerPath = path.join(__dirname, '../public/cache-version.json');
-		        var cacheVerData = fs.readFileSync(cacheVerPath, 'utf8');
-		        var cacheVerParsed = JSON.parse(cacheVerData);
-		        app.locals.cacheVersion = cacheVerParsed && cacheVerParsed.v ? String(cacheVerParsed.v) : '1';
-		    } catch (cvErr) {
-		        app.locals.cacheVersion = '1';
-		    }
-
-		    // 初始化存量 VM 磁盘快照（用于恢复后对账基线）
+			    // 初始化存量 VM 磁盘快照（用于恢复后对账基线）
 		    try {
 		        const diskAudit = require('./services/disk-audit');
 		        const vms = await db.vms.getAll();
