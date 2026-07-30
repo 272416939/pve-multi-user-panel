@@ -12,6 +12,7 @@ var { deductBalance, generateOrderNo } = require('../utils/order-utils');
 var { safeError } = require('../utils/safe-error');
 var db = require('../api/db');
 var diskUtils = require('../utils/disk-utils');
+var { takeDiskSnapshot } = require('../services/disk-audit');
 
 var VALID_PERIODS = ['month', 'quarter', 'year'];
 
@@ -314,10 +315,15 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
         ['bound', vm.vm_id, result.bus, result.dev, disk.id, lockedDisk.status]
       );
 
-      return result;
-    });
+	    return result;
+	    });
 
-    res.json({ success: true, bus: bindResult.bus, dev: bindResult.dev });
+	    // 异步更新快照（不阻塞响应）
+	    takeDiskSnapshot(vm.vm_id, req.user.id).catch(function(err) {
+	      console.error('[盘审计] bind 后快照更新失败:', err.message);
+	    });
+
+	    res.json({ success: true, bus: bindResult.bus, dev: bindResult.dev });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
   }
@@ -361,6 +367,13 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
         ['free', disk.id, 'bound']
       );
     });
+
+    // 异步更新快照（不阻塞响应）
+    if (disk.bind_vmid) {
+      takeDiskSnapshot(disk.bind_vmid, req.user.id).catch(function(err) {
+        console.error('[盘审计] unbind 后快照更新失败:', err.message);
+      });
+    }
 
     res.json({ success: true });
   } catch (e) {

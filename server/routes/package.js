@@ -13,6 +13,7 @@ var crypto = require('crypto');
 var cacheStore = require('../utils/cache-store');
 var { checkRateLimit } = require('../middleware/rate-limiter');
 var { withTransaction } = require('../utils/with-transaction');
+var { takeDiskSnapshot } = require('../services/disk-audit');
 const { safeError } = require('../utils/safe-error');
 const { formatLocalDate } = require('../utils/date');
 const diskUtils = require('../utils/disk-utils');
@@ -344,6 +345,11 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         } catch (startErr) { console.error('[package] VM 自动开机失败:', startErr.message); }
 
         res.json({ message: 'VM 开通成功', id: newVm.id, _provisioning: !!(newVm.pve_upid && newVm.pve_upid !== ''), name: randomName, vmid: newVmid, order_no: orderNo });
+
+        // 异步更新磁盘快照（不阻塞响应）
+        takeDiskSnapshot(newVmid, userId).catch(function(err) {
+          console.error('[盘审计] 用户订购后快照创建失败:', err.message);
+        });
     } catch (e) {
         console.error('[package] 用户订购 VM 失败:', e.message);
         logPveError(e);
@@ -820,6 +826,11 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         } catch (startErr) { console.error('[package] VM 自动开机失败:', startErr.message); }
 
         res.json({ message: 'VM 开通成功', vm: newVm, name: randomName, vmid: newVmid });
+
+        // 异步更新磁盘快照（不阻塞响应）
+        takeDiskSnapshot(newVmid, userId).catch(function(err) {
+          console.error('[盘审计] 套餐开通后快照创建失败:', err.message);
+        });
     } catch (e) {
         console.error('[package] VM 套餐开通失败:', e.message);
         res.status(500).json({ error: safeError(e) });

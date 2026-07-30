@@ -15,6 +15,7 @@ const { checkRateLimit } = require('../middleware/rate-limiter');
 const { withTransaction } = require('../utils/with-transaction');
 const osSwitchUtils = require('../utils/os-switch-utils');
 const { generateOrderNo } = require('../utils/order-utils');
+const { takeDiskSnapshot } = require('../services/disk-audit');
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -286,8 +287,14 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         console.error(`虚拟机 ${vm_id} 自动开机失败:`, startError.message);
     }
     
-    res.json(newVm);
-    } catch (e) {
+	    res.json(newVm);
+
+	    // 异步更新磁盘快照（不阻塞响应）
+	    takeDiskSnapshot(parsedVmId, parsedUserId).catch(function(err) {
+	      console.error('[盘审计] VM 分配后快照创建失败:', err.message);
+	    });
+
+	    } catch (e) {
         console.error('[vm] 操作失败:', e.message);
         res.status(500).json({ error: safeError(e) });
     }
@@ -1007,6 +1014,12 @@ try {
                     content: '您的虚拟机 ' + (vm.name || 'VM ' + vmid) + ' 已成功切换到 ' + osTemplate.name + '。\n登录账号：' + (result.ciResult?.ciuser || '未配置') + '\n新密码：' + (result.ciResult?.password || '') + '\n请尽快登录并修改密码。',
                     type: 2, send_type: 1
                 });
+                // 系统切换后更新磁盘快照
+                try {
+                    await takeDiskSnapshot(vmid, vm.user_id);
+                } catch (snapErr) {
+                    console.error('[盘审计] os-switch 后快照更新失败:', snapErr.message);
+                }
             } catch (error) {
                 await db.vmOsSwitchLogs.update(switchLog.id, {
                     status: 'failed',
