@@ -143,11 +143,8 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
         delete slotMap[slotKey];
       } else {
         // === 未知槽位 → 幽灵盘 ===
-        // 再次安全检查：确认不是系统盘
-        if (diskUtils.isSystemDiskVol(volPart)) {
-          console.log('[盘审计]   ［跳过系统盘］' + slotKey + ' = ' + volPart);
-          continue;
-        }
+        // 注意：此处不通过 volume 名判断系统盘（*-disk-0 可能是数据盘卷名）
+        // 系统盘已由 dev=0 排除，dev>=1 的槽位无论卷名都是数据盘
         console.log('[盘审计]   ［幽灵盘］' + slotKey + ' = ' + volPart + ' → 即将销毁');
         // 幽灵盘处理：先摘除再从 PVE 销毁
         // 注意：pvesm free 要求卷不能被 VM 占用，必须先 detach
