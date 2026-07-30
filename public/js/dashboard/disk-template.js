@@ -159,8 +159,8 @@
           <div class="d-flex align-items-center gap-2">
             <button class="btn btn-sm btn-outline-secondary" @click="diskPurchaseForm.quantity = Math.max(1, (diskPurchaseForm.quantity || 1) - 1); calcDiskPrice()">-</button>
             <span class="fw-bold" style="width:40px;text-align:center">{{ diskPurchaseForm.quantity }}</span>
-            <button class="btn btn-sm btn-outline-secondary" @click="diskPurchaseForm.quantity = Math.min(100, (diskPurchaseForm.quantity || 1) + 1); calcDiskPrice()">+</button>
-            <span class="text-muted small ms-2">块</span>
+            <button class="btn btn-sm btn-outline-secondary" @click="if ((diskPurchaseForm.quantity || 1) < 10) { diskPurchaseForm.quantity = (diskPurchaseForm.quantity || 1) + 1; calcDiskPrice() }" :disabled="(diskPurchaseForm.quantity || 1) >= 10">+</button>
+            <span class="text-muted small ms-2">块（单次最多 10 块）</span>
           </div>
         </div>
         <div class="mb-3">

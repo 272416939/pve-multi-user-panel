@@ -110,7 +110,10 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     var capacityGb = parseInt(req.body.capacity_gb);
     var period = req.body.period;
     var periodCount = parseInt(req.body.period_count) || 1;
-    var quantity = Math.min(parseInt(req.body.quantity) || 1, 10); // 最多 10 块
+    var quantity = parseInt(req.body.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) {
+      return res.status(400).json({ error: '购买数量必须为 1-10' });
+    }
     var autoRenew = req.body.auto_renew ? 1 : 0;
     var diskName = (req.body.disk_name || '').toString().trim();
     // 长度限制：最多 30 字符（适配导入磁盘名称如 imported-108-scsi1）
@@ -135,69 +138,75 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: '容量超出规格范围（' + spec.min_size_gb + '-' + spec.max_size_gb + ' GiB）' });
     }
 
-    // 计算总价（服务端计算，防篡改）
-    var totalAmount = diskUtils.calcDiskAmount(spec, capacityGb, period, periodCount) * quantity;
+	// 计算单盘价格和总价
+	  var singleAmount = diskUtils.calcDiskAmount(spec, capacityGb, period, periodCount);
+	  var totalAmount = singleAmount * quantity;
 
-    // 扣款金额校验
-    if (totalAmount <= 0) return res.status(400).json({ error: '金额必须大于0' });
+	  // 扣款金额校验
+	  if (totalAmount <= 0) return res.status(400).json({ error: '金额必须大于0' });
 
-    // 余额检查
-    var user = await db.users.getById(req.user.id);
-    var balanceBefore = parseFloat(user.balance || '0');
-    if (balanceBefore < totalAmount) {
-      return res.status(400).json({ error: '余额不足，需要 ' + totalAmount + ' 元' });
-    }
+	  // 余额检查
+	  var user = await db.users.getById(req.user.id);
+	  var balanceBefore = parseFloat(user.balance || '0');
+	  if (balanceBefore < totalAmount) {
+	    return res.status(400).json({ error: '余额不足，需要 ' + totalAmount + ' 元' });
+	  }
 
-    // 存储池容量检查
-    await diskUtils.checkStorageCapacity(spec.storage_pool, capacityGb * quantity);
+	  // 存储池容量检查
+	  await diskUtils.checkStorageCapacity(spec.storage_pool, capacityGb * quantity);
 
-// 计算到期时间
-  var now = new Date();
-  var months = period === 'year' ? 12 : period === 'quarter' ? 3 : 1;
-  var expireTime = new Date(now.getTime() + months * periodCount * 30 * 24 * 60 * 60 * 1000);
+	// 计算到期时间
+	  var now = new Date();
+	  var months = period === 'year' ? 12 : period === 'quarter' ? 3 : 1;
+	  var expireTime = new Date(now.getTime() + months * periodCount * 30 * 24 * 60 * 60 * 1000);
 
-  // 生成订单号
-  var orderNo = generateOrderNo('disk');
-  var createdDiskIds = [];
-  var createdDiskVolumeIds = [];
-  var dbNow = db.now();
+	  var createdDiskIds = [];
+	  var createdDiskVolumeIds = [];
+	  var createdOrderNos = [];
+	  var dbNow = db.now();
 
-  // 事务一：扣款 + 创建订单 + 创建流水 + 写入台账（不调 PVE）
-  await withTransaction(async (conn) => {
-    // 原子扣款
-    await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, req.user.id]);
-    var balanceAfter = balanceBefore - totalAmount;
+	  // 为每块磁盘生成名称（循环外先算好所有磁盘名称）
+	  var diskNames = [];
+	  for (var ni = 0; ni < quantity; ni++) {
+	    diskNames.push(diskName || ('数据盘-' + crypto.randomBytes(2).toString('hex')));
+	  }
 
-    // 创建订单（type='disk'，resource_name 格式：新购 xxGiB）
-    await conn.execute(
-      'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [orderNo, req.user.id, 'disk', specId, 0, period, periodCount, totalAmount, 0, 0, capacityGb * quantity, '新购 ' + (capacityGb * quantity) + 'GiB', '', 'pending']
-    );
+	  // 事务一：扣款 + 创建订单 + 创建流水 + 写入台账（不调 PVE）
+	  await withTransaction(async (conn) => {
+	    // 原子扣款（一次总扣）
+	    await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, req.user.id]);
+	    var balanceAfter = balanceBefore - totalAmount;
 
-    // 创建流水记录
-    await conn.execute(
-      'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.id, orderNo, dbNow, 'balance', 'disk_purchase', totalAmount, period, periodCount, balanceBefore, balanceAfter, 'disk', null, '', '', dbNow]
-    );
+	    // 逐块磁盘：创建独立订单 + 流水 + 台账
+	    for (var i = 0; i < quantity; i++) {
+	      var orderNo = generateOrderNo('disk');
+	      createdOrderNos.push(orderNo);
+	      var thisDiskName = diskNames[i];
+	      var volId = spec.storage_pool + ':pending-' + orderNo;
 
-    // 逐个写入磁盘台账（先不调 PVE）
-    for (var i = 0; i < quantity; i++) {
-      var volId = spec.storage_pool + ':pending-' + orderNo + '-' + i;
-      await conn.execute(
-        `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, disk_format, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [volId, diskName || ('数据盘-' + crypto.randomBytes(2).toString('hex')), specId, req.user.id, spec.storage_group_id, spec.storage_pool, spec.disk_type, spec.disk_format || null, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null]
-      );
-      // 获取 insertId
-      var [insertResult] = await conn.execute('SELECT LAST_INSERT_ID() as id');
-      var newDiskId = insertResult[0].id;
-      createdDiskIds.push(newDiskId);
-      // 回填订单 resource_id（单块磁盘场景，多块磁盘用首块 ID 关联）
-      if (i === 0) {
-        await conn.execute('UPDATE orders SET resource_id = ? WHERE order_no = ?', [String(newDiskId), orderNo]);
-      }
-    }
-  });
+	      // 写入磁盘台账
+	      await conn.execute(
+	        `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, disk_format, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
+	         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	        [volId, thisDiskName, specId, req.user.id, spec.storage_group_id, spec.storage_pool, spec.disk_type, spec.disk_format || null, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null]
+	      );
+	      var [insertResult] = await conn.execute('SELECT LAST_INSERT_ID() as id');
+	      var newDiskId = insertResult[0].id;
+	      createdDiskIds.push(newDiskId);
+
+	      // 创建独立订单（resource_name 含磁盘名称，便于对账）
+	      await conn.execute(
+	        'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+	        [orderNo, req.user.id, 'disk', specId, 0, period, periodCount, singleAmount, 0, 0, capacityGb, '新购 ' + capacityGb + 'GiB [' + thisDiskName + ']', String(newDiskId), 'pending']
+	      );
+
+	      // 创建独立流水
+	      await conn.execute(
+	        'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+	        [req.user.id, orderNo, dbNow, 'balance', 'disk_purchase', singleAmount, period, periodCount, balanceBefore, balanceAfter, 'disk', String(newDiskId), '', '', dbNow]
+	      );
+	    }
+	  });
 
   // 事务外：逐个调用 PVE 创建磁盘
   var pveSuccess = true;
@@ -227,34 +236,39 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     }
   }
 
-  if (pveSuccess) {
-    // 全部成功 => 更新订单状态
-    await db.orders.updateStatus(orderNo, 'completed');
-    res.json({ success: true, order_no: orderNo, amount: totalAmount, disks: quantity });
-  } else {
-    // 失败 => 退款 + 清理台账 + 订单标记 refunded
-    try {
-      // 退款
-      var refundUser = await db.users.incrementBalance(req.user.id, totalAmount);
-      var refundBalanceAfter = parseFloat(refundUser.balance || '0');
-      // 删除失败磁盘的台账记录
-      var pool2 = require('../api/db').getPool();
-      for (var k = 0; k < createdDiskIds.length; k++) {
-        try { await pool2.execute('DELETE FROM disks WHERE id = ?', [createdDiskIds[k]]); } catch (e) {}
-      }
-      // 退款流水
-      var refundOrderNo = generateOrderNo('refund');
-      await pool2.execute(
-        'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [req.user.id, refundOrderNo, dbNow, 'balance_refund', 'refund', totalAmount, period, periodCount, balanceBefore, refundBalanceAfter, 'disk', null, orderNo, '', dbNow]
-      );
-      // 更新订单状态
-      await db.orders.updateStatus(orderNo, 'refunded');
-    } catch (rollbackError) {
-      console.error('[disk purchase] 退款处理失败:', rollbackError.message);
-    }
-    res.status(500).json({ error: '创建磁盘失败，已退款，请稍后重试' });
-  }
+	  if (pveSuccess) {
+	    // 全部成功 => 更新所有订单为 completed
+	    for (var oi = 0; oi < createdOrderNos.length; oi++) {
+	      await db.orders.updateStatus(createdOrderNos[oi], 'completed');
+	    }
+	    var firstOrderNo = createdOrderNos[0] || '';
+	    res.json({ success: true, order_no: firstOrderNo, orders: createdOrderNos.length, amount: singleAmount, total_amount: totalAmount, disks: quantity });
+	  } else {
+	    // 失败 => 退款 + 清理台账 + 订单标记 refunded
+	    try {
+	      // 退款
+	      var refundUser = await db.users.incrementBalance(req.user.id, totalAmount);
+	      var refundBalanceAfter = parseFloat(refundUser.balance || '0');
+	      // 删除失败磁盘的台账记录
+	      var pool2 = require('../api/db').getPool();
+	      for (var k = 0; k < createdDiskIds.length; k++) {
+	        try { await pool2.execute('DELETE FROM disks WHERE id = ?', [createdDiskIds[k]]); } catch (e) {}
+	      }
+	      // 退款流水（统一记录一笔）
+	      var refundOrderNo = generateOrderNo('refund');
+	      await pool2.execute(
+	        'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+	        [req.user.id, refundOrderNo, dbNow, 'balance_refund', 'refund', totalAmount, period, periodCount, balanceBefore, refundBalanceAfter, 'disk', null, createdOrderNos[0] || '', '', dbNow]
+	      );
+	      // 所有订单标记 refunded
+	      for (var ri = 0; ri < createdOrderNos.length; ri++) {
+	        try { await db.orders.updateStatus(createdOrderNos[ri], 'refunded'); } catch (e) {}
+	      }
+	    } catch (rollbackError) {
+	      console.error('[disk purchase] 退款处理失败:', rollbackError.message);
+	    }
+	    res.status(500).json({ error: '创建磁盘失败，已退款，请稍后重试' });
+	  }
   } catch (e) {
     console.error('[disk purchase] 失败:', e);
     res.status(500).json({ error: safeError(e) });
