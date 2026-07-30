@@ -348,7 +348,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         // 异步更新磁盘快照（不阻塞响应）
         takeDiskSnapshot(newVmid, userId).catch(function(err) {
-          console.error('[盘审计] 用户订购后快照创建失败:', err.message);
+          console.error('[快照] 用户订购后快照创建失败:', err.message);
         });
     } catch (e) {
         console.error('[package] 用户订购 VM 失败:', e.message);
@@ -829,7 +829,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
 
         // 异步更新磁盘快照（不阻塞响应）
         takeDiskSnapshot(newVmid, userId).catch(function(err) {
-          console.error('[盘审计] 套餐开通后快照创建失败:', err.message);
+          console.error('[快照] 套餐开通后快照创建失败:', err.message);
         });
     } catch (e) {
         console.error('[package] VM 套餐开通失败:', e.message);

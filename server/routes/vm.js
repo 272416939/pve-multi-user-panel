@@ -290,12 +290,12 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     
 	    res.json(newVm);
 
-	    // 异步更新磁盘快照（不阻塞响应）
-	    takeDiskSnapshot(parsedVmId, parsedUserId).catch(function(err) {
-	      console.error('[盘审计] VM 分配后快照创建失败:', err.message);
-	    });
+		    // 异步更新磁盘快照（不阻塞响应）
+		    takeDiskSnapshot(parsedVmId, parsedUserId).catch(function(err) {
+		      console.error('[快照] VM ' + parsedVmId + ' 分配后快照创建失败:', err.message);
+		    });
 
-	    // 异步导入存量数据盘（不阻塞响应）
+		    // 异步导入存量数据盘（不阻塞响应）
 	    importDisksForVm(parsedVmId, parsedUserId).catch(function(err) {
 	      console.error('[vm] VM 分配后导入存量数据盘失败:', err.message);
 	    });
@@ -452,6 +452,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     try {
         if (vm && vm.vm_id) {
             await db.vmDiskSnapshots.delete(vm.vm_id);
+            console.log('[快照] VM ' + vm.vm_id + ' 磁盘快照已清理（移除分配）');
         }
     } catch (e) { console.error('清理磁盘快照失败:', e.message); }
     await db.vms.delete(vmId);
@@ -921,6 +922,7 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             // 清理磁盘快照
             try {
                 await db.vmDiskSnapshots.delete(vmid);
+                console.log('[快照] VM ' + vmid + ' 磁盘快照已清理（销毁）');
             } catch (e) { console.error('清理磁盘快照失败:', e.message); }
             await db.vms.delete(vm.id);
         }
@@ -1034,7 +1036,7 @@ try {
                 try {
                     await takeDiskSnapshot(vmid, vm.user_id);
                 } catch (snapErr) {
-                    console.error('[盘审计] os-switch 后快照更新失败:', snapErr.message);
+                    console.error('[快照] os-switch 后快照更新失败:', snapErr.message);
                 }
             } catch (error) {
                 await db.vmOsSwitchLogs.update(switchLog.id, {

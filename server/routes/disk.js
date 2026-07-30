@@ -320,7 +320,7 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
 
 	    // 异步更新快照（不阻塞响应）
 	    takeDiskSnapshot(vm.vm_id, req.user.id).catch(function(err) {
-	      console.error('[盘审计] bind 后快照更新失败:', err.message);
+	      console.error('[快照] bind 后快照更新失败:', err.message);
 	    });
 
 	    res.json({ success: true, bus: bindResult.bus, dev: bindResult.dev });
@@ -371,7 +371,7 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
     // 异步更新快照（不阻塞响应）
     if (disk.bind_vmid) {
       takeDiskSnapshot(disk.bind_vmid, req.user.id).catch(function(err) {
-        console.error('[盘审计] unbind 后快照更新失败:', err.message);
+        console.error('[快照] unbind 后快照更新失败:', err.message);
       });
     }
 

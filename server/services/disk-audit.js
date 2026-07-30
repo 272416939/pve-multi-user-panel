@@ -54,6 +54,7 @@ async function takeDiskSnapshot(vmId, userId) {
 
   // 写入持久化快照（供后续审计追溯）
   await db.vmDiskSnapshots.upsert(vmId, userId, snapshot);
+  console.log('[快照] VM ' + vmId + ' 磁盘快照已更新（系统盘 ' + volumes.system.length + ', 数据盘 ' + volumes.data.length + '）');
   return snapshot;
 }
 
