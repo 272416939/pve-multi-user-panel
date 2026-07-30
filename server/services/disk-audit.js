@@ -71,6 +71,11 @@ async function takeDiskSnapshot(vmId, userId) {
  * @param {string|object|null} preSnapshotRaw - 恢复前快照（仅审计追溯）
  */
 async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
+  console.log('[盘审计] === 开始对账 VM ' + vmId + '（用户 ' + userId + '）===');
+
+  // 等 1 秒让 PVE 刷新配置缓存
+  await new Promise(function(resolve) { setTimeout(resolve, 1000); });
+
   // 1. 获取恢复后 PVE 配置
   var afterConfig;
   try {
@@ -79,6 +84,19 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
     console.error('[盘审计] 获取恢复后 VM ' + vmId + ' 配置失败:', e.message);
     return;
   }
+
+  // 打印 PVE 配置中所有磁盘槽位用于调试
+  var debugSlots = [];
+  var busList = ['scsi', 'sata', 'virtio'];
+  for (var tb = 0; tb < busList.length; tb++) {
+    for (var td = 0; td <= 30; td++) {
+      var tk = busList[tb] + td;
+      if (afterConfig[tk]) {
+        debugSlots.push(tk + '=' + afterConfig[tk].substring(0, 80));
+      }
+    }
+  }
+  console.log('[盘审计] PVE 恢复后配置磁盘槽位:', debugSlots.join(', '));
 
   // 2. 获取当前绑定到此 VM 的所有磁盘（含 legacy）
   var allBoundDisks = await db.disks.getByBindVmid(vmId);
@@ -111,6 +129,7 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
       if (slotMap[slotKey]) {
         // === 已知槽位 ===
         var knownDisk = slotMap[slotKey];
+        console.log('[盘审计]   ［已知槽位］' + slotKey + ' = ' + volPart + '（台账ID ' + knownDisk.id + ', legacy=' + knownDisk.is_legacy + '）');
         if (!knownDisk.is_legacy && knownDisk.volume_id !== volPart) {
           // 付费数据盘：volume_id 变了，更新台账
           try {
@@ -125,11 +144,29 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
       } else {
         // === 未知槽位 → 幽灵盘 ===
         // 再次安全检查：确认不是系统盘
-        if (diskUtils.isSystemDiskVol(volPart)) continue;
-        // 防止并发竞态：刚挂载的新盘已被 DB 记录但不在本次查询中？不可能，因为我们是最新查询
-        // 销毁幽灵盘
+        if (diskUtils.isSystemDiskVol(volPart)) {
+          console.log('[盘审计]   ［跳过系统盘］' + slotKey + ' = ' + volPart);
+          continue;
+        }
+        console.log('[盘审计]   ［幽灵盘］' + slotKey + ' = ' + volPart + ' → 即将销毁');
+        // 幽灵盘处理：先摘除再从 PVE 销毁
+        // 注意：pvesm free 要求卷不能被 VM 占用，必须先 detach
         try {
-          console.warn('[盘审计] 发现幽灵盘 ' + volPart + '（槽位 ' + slotKey + ', VM ' + vmId + ', 用户 ' + userId + '），执行销毁');
+          // 先尝试 pvesm free（适合卷已被 detach 的情况）
+          // 如果 PVE restore 时直接挂载了该卷，需要先 detach
+          var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
+          var sshCfg = await getPveSshConfig();
+
+          // 第一步：从 VM 配置摘除
+          var detachCmd = 'qm set ' + vmId + ' --delete ' + slotKey;
+          var detachResult = await execSSH(sshCfg.host, sshCfg.username, sshCfg.password, detachCmd);
+          if (detachResult.code !== 0) {
+            console.log('[盘审计] qm set --delete ' + slotKey + ' 结果: ' + (detachResult.stderr || detachResult.stdout || ''));
+          } else {
+            console.log('[盘审计] 已从 VM ' + vmId + ' 摘除槽位 ' + slotKey);
+          }
+
+          // 第二步：销毁卷
           await diskUtils.destroyDisk(volPart);
           console.log('[盘审计] 幽灵盘 ' + volPart + ' 已销毁');
         } catch (e) {
@@ -138,6 +175,8 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
       }
     }
   }
+
+  console.log('[盘审计] === 对账完成（VM ' + vmId + ', 待确认丢失槽位: ' + Object.keys(slotMap).length + '）===');
 
   // 5. 处理丢失的数据盘：槽位在 slotMap 中但 PVE 中已不存在
   var lostSlots = Object.keys(slotMap);
