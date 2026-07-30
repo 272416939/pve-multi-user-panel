@@ -454,28 +454,28 @@ httpServer.listen(PORT, async () => {
 	        app.locals.redis = null;
 	    }
 
-	    // 初始化存量 VM 磁盘快照（用于恢复后对账基线）
-	    try {
-	        const diskAudit = require('./services/disk-audit');
-	        const vms = await db.vms.getAll();
-	        var snapped = 0;
-	        var failed = 0;
-	        for (var vi = 0; vi < vms.length; vi++) {
-	            var vm = vms[vi];
-	            try {
-	                await diskAudit.takeDiskSnapshot(vm.vm_id, vm.user_id);
-	                snapped++;
-	            } catch (snapErr) {
-	                // VM 可能已被删除或节点不可达，跳过
-	                failed++;
-	            }
-	        }
-	        if (vms.length > 0) {
-	            console.log('[盘初始化] VM 磁盘快照完成: ' + snapped + ' 成功, ' + failed + ' 跳过');
-	        }
-	    } catch (initErr) {
-	        console.warn('[盘初始化] 存量 VM 快照失败（不影响启动）:', initErr.message);
-	    }
+		    // 初始化存量 VM 磁盘快照（用于恢复后对账基线）
+		    try {
+		        const diskAudit = require('./services/disk-audit');
+		        const vms = await db.vms.getAll();
+		        var snapped = 0;
+		        var failed = 0;
+		        for (var vi = 0; vi < vms.length; vi++) {
+		            var vm = vms[vi];
+		            try {
+		                await diskAudit.takeDiskSnapshot(vm.vm_id, vm.user_id);
+		                snapped++;
+		            } catch (snapErr) {
+		                // VM 可能已被删除或节点不可达，跳过
+		                failed++;
+		            }
+		        }
+		        if (vms.length > 0) {
+		            console.log('[快照基线] 已为 ' + snapped + ' 台 VM 建立磁盘快照基线' + (failed ? '（' + failed + ' 台跳过）' : ''));
+		        }
+		    } catch (initErr) {
+		        console.warn('[快照基线] 初始化失败（不影响启动）:', initErr.message);
+		    }
 
     // 启动时预编译所有 EJS 模板，避免首个用户访问时等待编译
     try {
