@@ -370,6 +370,10 @@ function calcResizeAmount(oldSizeGb, newSizeGb, pricePerGb, expireTime) {
 
 /**
  * 从 PVE VM config 中提取所有磁盘 volume_id
+ * 精确区分系统盘、数据盘和 CD-ROM：
+ * - 系统盘：dev=0 且不是 CD-ROM（ide 总线 dev=0 也可能是光驱，需额外判断）
+ * - CD-ROM：media=cdrom 或无 volume_id（仅挂载 ISO 镜像）
+ * - 数据盘：不是系统盘也不是 CD-ROM 的磁盘
  * @param {object} config - PVE getVmConfig 返回的配置
  * @returns {object} { all: [volume_id, ...], system: [volume_id, ...], data: [volume_id, ...] }
  */
@@ -382,17 +386,36 @@ function getVmDiskVolumes(config) {
   var busList = ['scsi', 'sata', 'virtio', 'ide'];
   for (var b = 0; b < busList.length; b++) {
     var bus = busList[b];
-    for (var d = 0; d <= 30; d++) {
+    var maxDev = bus === 'ide' ? 3 : 30;
+    for (var d = 0; d <= maxDev; d++) {
       var key = bus + d;
       var val = config[key];
       if (!val || typeof val !== 'string') continue;
-      // 值格式如 "local-lvm:vm-100-disk-0,size=32G" 或 "local:100/vm-100-disk-0.qcow2,size=20G"
-      // 先按逗号分割取第一段（volume_id 部分）
-      var volPart = val.split(',')[0];
+
+      // 值格式如 "local-lvm:vm-100-disk-0,size=32G" 或 "media=cdrom" 或 "local:iso/debian.iso,media=cdrom"
+      var parts = val.split(',');
+      var volPart = parts[0];
       if (!volPart) continue;
-      // 补全 volume_id（DIR 存储可能不含 storage: 前缀，但 PVE config 中通常完整）
+
+      // 判断是否为 CD-ROM：media=cdrom 或 挂载的是 ISO 文件（非磁盘卷）
+      var isCdrom = false;
+      for (var p = 0; p < parts.length; p++) {
+        if (parts[p] === 'media=cdrom') {
+          isCdrom = true;
+          break;
+        }
+      }
+      // 如果 volume_id 部分以 .iso 结尾，也视为光驱
+      if (volPart.toLowerCase().indexOf('.iso') > -1) {
+        isCdrom = true;
+      }
+
+      // 跳过 CD-ROM（光驱不参与快照对账）
+      if (isCdrom) continue;
+
       // 如果已经包含冒号则为完整 volume_id
       if (volPart.indexOf(':') === -1) continue; // 非标准格式跳过
+
       all.push(volPart);
       // 系统盘判定：device=0 的盘即为系统盘
       if (d === 0) {
