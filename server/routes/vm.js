@@ -16,6 +16,7 @@ const { withTransaction } = require('../utils/with-transaction');
 const osSwitchUtils = require('../utils/os-switch-utils');
 const { generateOrderNo } = require('../utils/order-utils');
 const { takeDiskSnapshot } = require('../services/disk-audit');
+const { importDisksForVm } = require('../services/disk-expiry-check');
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -292,6 +293,11 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
 	    // 异步更新磁盘快照（不阻塞响应）
 	    takeDiskSnapshot(parsedVmId, parsedUserId).catch(function(err) {
 	      console.error('[盘审计] VM 分配后快照创建失败:', err.message);
+	    });
+
+	    // 异步导入存量数据盘（不阻塞响应）
+	    importDisksForVm(parsedVmId, parsedUserId).catch(function(err) {
+	      console.error('[vm] VM 分配后导入存量数据盘失败:', err.message);
 	    });
 
 	    } catch (e) {

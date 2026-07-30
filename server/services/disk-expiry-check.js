@@ -320,6 +320,122 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
 
 // ==================== 存量虚拟机数据盘导入（文档 4.5） ====================
 
+/**
+ * 导入单台 VM 的存量数据盘（幂等，用于 VM 分配后自动导入）
+ * 只扫描非 0 设备号的数据盘，跳过已存在的 volume_id
+ * @param {number} vmId - VM ID
+ * @param {number} userId - 用户 ID
+ * @returns {object} { imported: number, skipped: number }
+ */
+async function importDisksForVm(vmId, userId) {
+  var imported = 0;
+  var skipped = 0;
+  try {
+    var allSpecs = await db.diskSpecs.getAll();
+    var allGroups = await db.storageGroups.getAll();
+    var config = await pveApi.getVmConfig(vmId);
+    if (!config) return { imported: 0, skipped: 0 };
+
+    for (var dev = 1; dev <= 30; dev++) {
+      var buses = ['scsi', 'sata', 'virtio'];
+      for (var b = 0; b < buses.length; b++) {
+        var bus = buses[b];
+        var key = bus + dev;
+        var diskLine = config[key];
+        if (!diskLine) continue;
+
+        var parts = diskLine.split(',');
+        var volId = parts[0];
+        if (!volId || volId.indexOf(':') === -1) continue;
+
+        // 幂等：已存在的记录跳过
+        var existing = await db.disks.getByVolumeId(volId);
+        if (existing) { skipped++; continue; }
+
+        // 解析容量
+        var capacityGb = 0;
+        for (var p = 1; p < parts.length; p++) {
+          if (parts[p].indexOf('size=') === 0) {
+            var sizeStr = parts[p].substring(5);
+            if (sizeStr.indexOf('G') > -1) {
+              capacityGb = parseInt(sizeStr) || 0;
+            } else if (sizeStr.indexOf('M') > -1) {
+              capacityGb = Math.floor((parseInt(sizeStr) || 0) / 1024);
+            }
+            break;
+          }
+        }
+        if (capacityGb === 0) continue;
+
+        // 自动匹配规格
+        var volParts = volId.split(':');
+        var storagePool = volParts[0];
+        var matchedSpec = null;
+        for (var s = 0; s < allSpecs.length; s++) {
+          if (allSpecs[s].storage_pool === storagePool && capacityGb >= allSpecs[s].min_size_gb && capacityGb <= allSpecs[s].max_size_gb) {
+            matchedSpec = allSpecs[s];
+            break;
+          }
+        }
+
+        // 匹配存储分组
+        var matchedGroup = null;
+        for (var g = 0; g < allGroups.length; g++) {
+          if (matchedSpec && allGroups[g].id === matchedSpec.storage_group_id) {
+            matchedGroup = allGroups[g];
+            break;
+          }
+        }
+
+        var diskName = 'imported-' + vmId + '-' + bus + dev;
+        var diskType = matchedSpec ? matchedSpec.disk_type : 'NVME';
+        var groupId = matchedGroup ? matchedGroup.id : (allGroups.length > 0 ? allGroups[0].id : 1);
+
+        await db.disks.create({
+          volume_id: volId,
+          disk_name: diskName,
+          spec_id: matchedSpec ? matchedSpec.id : null,
+          user_id: userId,
+          storage_group_id: groupId,
+          storage_pool: storagePool,
+          disk_type: diskType,
+          disk_format: null,
+          capacity_gb: capacityGb,
+          status: 'bound',
+          price_per_gb: 0,
+          quarterly_discount: 0,
+          yearly_discount: 0,
+          auto_renew: 0,
+          is_legacy: 1,
+          expire_time: null,
+          mbps_rd: matchedSpec ? matchedSpec.mbps_rd : null,
+          mbps_rd_max: matchedSpec ? matchedSpec.mbps_rd_max : null,
+          mbps_wr: matchedSpec ? matchedSpec.mbps_wr : null,
+          mbps_wr_max: matchedSpec ? matchedSpec.mbps_wr_max : null,
+          iops_rd: matchedSpec ? matchedSpec.iops_rd : null,
+          iops_rd_max: matchedSpec ? matchedSpec.iops_rd_max : null,
+          iops_wr: matchedSpec ? matchedSpec.iops_wr : null,
+          iops_wr_max: matchedSpec ? matchedSpec.iops_wr_max : null
+        });
+
+        // 更新绑定信息（新创建的记录没有 bind 字段，需要补充）
+        var newDisk = await db.disks.getByVolumeId(volId);
+        if (newDisk && (!newDisk.bind_bus || !newDisk.bind_dev)) {
+          await db.disks.bind(newDisk.id, vmId, bus, dev);
+        }
+
+        imported++;
+      }
+    }
+  } catch (e) {
+    logger.error('[disk-import-vm] 导入 VM ' + vmId + ' 数据盘失败:', e.message);
+  }
+  if (imported > 0) {
+    logger.info('[disk-import-vm] VM ' + vmId + ' 导入 ' + imported + ' 块数据盘' + (skipped > 0 ? '（跳过 ' + skipped + '）' : ''));
+  }
+  return { imported: imported, skipped: skipped };
+}
+
 async function importExistingDisks() {
   try {
     // ===== 第一步：清理 PVE 中已不存在的孤立磁盘记录（仅清理 legacy 磁盘） =====
@@ -561,5 +677,6 @@ async function importExistingDisks() {
 module.exports = {
   checkExpiredDisks,
   checkStorageCapacityAlert,
-  importExistingDisks
+  importExistingDisks,
+  importDisksForVm
 };
