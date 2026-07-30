@@ -159,19 +159,6 @@ app.use(express.static(path.join(__dirname, '../public'), {
         }
     }
 }));
-// 自动注入JS缓存版本号：HTML中 ?v=xxx 统一替换为当前 package.json 版本
-app.use((req, res, next) => {
-    const isEjsPage = ['/admin', '/dashboard', '/user-center', '/login'].includes(req.path);
-    if (!req.path.endsWith('.html') && !isEjsPage) return next();
-    const origSend = res.send.bind(res);
-    res.send = function (body) {
-        if (typeof body === 'string' && body.includes('<script')) {
-            body = body.replace(/\?v=[^"'\s]*/g, '?v=' + pkg.version);
-        }
-        return origSend(body);
-    };
-    next();
-});
 app.use('/images', express.static(path.join(__dirname, '../images'), {
     setHeaders: (res) => {
         res.removeHeader('Expires');
@@ -183,8 +170,6 @@ app.use('/images', express.static(path.join(__dirname, '../images'), {
 app.get('/api/version', authMiddleware, (req, res) => {
     res.json({ version: pkg.version });
 });
-
-// 健康检查端点（供负载均衡器/K8s 探测，无需认证）
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', version: pkg.version, timestamp: new Date().toISOString() });
 });
@@ -449,10 +434,20 @@ httpServer.listen(PORT, async () => {
 	        if (!redisClient) {
 	            console.log('[redis] 未配置 Redis，使用进程内存模式');
 	        }
-	    } catch (e) {
-	        console.warn('[redis] 初始化异常:', e.message);
-	        app.locals.redis = null;
-	    }
+		    } catch (e) {
+		        console.warn('[redis] 初始化异常:', e.message);
+		        app.locals.redis = null;
+		    }
+
+		    // 加载缓存版本号（用于 CSS/JS 缓存控制）
+		    try {
+		        var cacheVerPath = path.join(__dirname, '../public/cache-version.json');
+		        var cacheVerData = fs.readFileSync(cacheVerPath, 'utf8');
+		        var cacheVerParsed = JSON.parse(cacheVerData);
+		        app.locals.cacheVersion = cacheVerParsed && cacheVerParsed.v ? String(cacheVerParsed.v) : '1';
+		    } catch (cvErr) {
+		        app.locals.cacheVersion = '1';
+		    }
 
 		    // 初始化存量 VM 磁盘快照（用于恢复后对账基线）
 		    try {
