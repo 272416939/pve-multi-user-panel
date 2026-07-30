@@ -64,8 +64,9 @@ function validateParam(name, value) {
   throw new Error('参数 ' + name + ' 校验规则异常');
 }
 
-// ==================== 系统盘防护 ====================
-// 参照文档 7.5 节：永不触碰系统盘 vm-*-disk-0，三层过滤
+// ==================== 卷名安全校验 ====================
+// 系统盘保护在总线/设备号层（validateBusDev 禁止 dev=0），卷名本身不决定是否系统盘
+// PVE 恢复后 volume_id 可能为 vm-<target>-disk-0（编号从 0 开始），这仍然是数据盘
 function validateVolumeId(volumeId) {
   // 第一层：正则白名单
   validateParam('volumeId', volumeId);
@@ -78,10 +79,6 @@ function validateVolumeId(volumeId) {
   // 允许 vm- 前缀（PVE 命名规范）、disk-pool- 前缀或 imported- 前缀（存量导入）
   if (lastSeg.indexOf('vm-') !== 0 && lastSeg.indexOf('disk-pool-') !== 0 && lastSeg.indexOf('imported-') !== 0) {
     throw new Error('不允许操作非数据盘卷（仅允许 disk-pool- 或 imported- 前缀）');
-  }
-  // 第三层：禁止操作系统盘（兼容 .raw/.qcow2/.vmdk/.subvol 扩展名）
-  if (/disk-0(\.(raw|qcow2|vmdk|subvol))?$/.test(lastSeg)) {
-    throw new Error('禁止操作系统盘');
   }
   return volumeId;
 }

@@ -131,10 +131,18 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
         var knownDisk = slotMap[slotKey];
         console.log('[盘审计]   ［已知槽位］' + slotKey + ' = ' + volPart + '（台账ID ' + knownDisk.id + ', legacy=' + knownDisk.is_legacy + '）');
         if (!knownDisk.is_legacy && knownDisk.volume_id !== volPart) {
-          // 付费数据盘：volume_id 变了，更新台账
+          // 付费数据盘：volume_id 变了，更新台账并释放旧卷
+          var oldVolId = knownDisk.volume_id;
           try {
             await db.disks.updateVolumeId(knownDisk.id, volPart);
-            console.log('[盘审计] 数据盘 ' + knownDisk.id + ' volume_id 已更新: ' + knownDisk.volume_id + ' -> ' + volPart);
+            console.log('[盘审计] 数据盘 ' + knownDisk.id + ' volume_id 已更新: ' + oldVolId + ' -> ' + volPart);
+            // 释放旧卷（PVE 恢复后旧卷仍残留在存储池，不释放会变成孤儿）
+            try {
+              await diskUtils._internal.destroySystemDisk(oldVolId);
+              console.log('[盘审计] 旧卷 ' + oldVolId + ' 已释放');
+            } catch (oldErr) {
+              console.error('[盘审计] 释放旧卷 ' + oldVolId + ' 失败:', oldErr.message);
+            }
           } catch (e) {
             console.error('[盘审计] 更新数据盘 ' + knownDisk.id + ' volume_id 失败:', e.message);
           }
