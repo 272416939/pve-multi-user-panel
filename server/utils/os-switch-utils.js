@@ -490,7 +490,6 @@ async function checkTargetStorageCapacity(targetStorage, requiredGb) {
 module.exports = {
     parseDataDisks,
     parseSystemDisk,
-    detachAllDataDisks,
     cloneOsTemplateDisk,
     getStorageType,
     moveDiskToTarget,
