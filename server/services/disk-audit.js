@@ -146,15 +146,14 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
         // 注意：此处不通过 volume 名判断系统盘（*-disk-0 可能是数据盘卷名）
         // 系统盘已由 dev=0 排除，dev>=1 的槽位无论卷名都是数据盘
         console.log('[盘审计]   ［幽灵盘］' + slotKey + ' = ' + volPart + ' → 即将销毁');
-        // 幽灵盘处理：先摘除再从 PVE 销毁
-        // 注意：pvesm free 要求卷不能被 VM 占用，必须先 detach
+        // 幽灵盘处理：先 detach 再销毁
+        // 注意：不能用 diskUtils.destroyDisk（会经过 validateVolumeId 拦截 disk-0 卷名）
+        // 此处用 _internal.destroySystemDisk 的宽松校验路径
         try {
-          // 先尝试 pvesm free（适合卷已被 detach 的情况）
-          // 如果 PVE restore 时直接挂载了该卷，需要先 detach
           var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
           var sshCfg = await getPveSshConfig();
 
-          // 第一步：从 VM 配置摘除
+          // 第一步：从 VM 配置 detach
           var detachCmd = 'qm set ' + vmId + ' --delete ' + slotKey;
           var detachResult = await execSSH(sshCfg.host, sshCfg.username, sshCfg.password, detachCmd);
           if (detachResult.code !== 0) {
@@ -163,8 +162,8 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
             console.log('[盘审计] 已从 VM ' + vmId + ' 摘除槽位 ' + slotKey);
           }
 
-          // 第二步：销毁卷
-          await diskUtils.destroyDisk(volPart);
+          // 第二步：使用 _internal.destroySystemDisk 销毁卷（宽松校验，不拦截 disk-0 卷名）
+          await diskUtils._internal.destroySystemDisk(volPart);
           console.log('[盘审计] 幽灵盘 ' + volPart + ' 已销毁');
         } catch (e) {
           console.error('[盘审计] 销毁幽灵盘 ' + volPart + ' 失败:', e.message);
