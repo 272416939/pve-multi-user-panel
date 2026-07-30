@@ -889,7 +889,7 @@
                 <strong style="color:var(--bs-warning-text-emphasis, #664d00);font-size:15px;">⚠️ 重要提示：</strong>
                 <ul class="mb-0 mt-1" style="color:var(--text-primary);line-height:1.8;">
                     <li>切换系统将<strong style="color:var(--bs-danger);">清除系统盘所有数据</strong>，请提前备份重要文件</li>
-                    <li>数据盘会自动卸载并重新挂载，<strong style="color:var(--bs-success);">数据不会丢失</strong></li>
+                    <li>数据盘不受影响，<strong style="color:var(--bs-success);">数据不会丢失</strong></li>
                     <li>切换过程约 3-10 分钟，期间虚拟机将停机</li>
                     <li>切换完成后将获得新的初始密码</li>
                 </ul>

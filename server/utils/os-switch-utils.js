@@ -104,16 +104,6 @@ function parseSystemDisk(config) {
     return null;
 }
 
-// 1. 卸载所有数据盘（保留卷）
-async function detachAllDataDisks(vmid, dataDisks) {
-    const results = [];
-    for (const disk of dataDisks) {
-        await diskUtils.unbindDisk(vmid, disk.bus, disk.dev);
-        results.push({ ...disk, detached: true });
-    }
-    return results;
-}
-
 // 2. 克隆模板系统盘到临时 VMID（仅取 disk-0）
 // 注意：不在此销毁临时 VM，而是返回 tempVmid 由调用方在 move_volume 后销毁
 async function cloneOsTemplateDisk(templateVmid, targetStorage) {
@@ -268,14 +258,7 @@ const targetSizeGb = oldSysDisk.size_gb || 0;
             }
 }
 
-// 4. 重新挂载数据盘
-async function reattachDataDisks(vmid, dataDisks) {
-    for (const disk of dataDisks) {
-        await diskUtils.bindDisk(vmid, disk.volume_id, disk.bus, disk.dev, disk.qos);
-    }
-}
-
-// 5. 更新 cloud-init 配置
+// 4. 更新 cloud-init 配置
 async function updateCloudInit(vmid, ciuser) {
     const newPassword = generateRandomPassword();
     const cfg = {};
@@ -365,13 +348,8 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         ctx.dataDisks = dataDisks;
         ctx.oldSystemDisk = systemDisk;
         ctx.oldMac = systemDisk ? extractMacFromNet0((await pveApi.getVmConfig(vmid)).net0) : '';
-        await updateLogStage(logId, 'detach_data');
 
-        // Stage 2: 卸载数据盘
-        await detachAllDataDisks(vmid, dataDisks);
-        await updateLogStage(logId, 'clone_template');
-
-        // Stage 3: 克隆模板系统盘到临时 VM（不销毁）
+        // Stage 2: 克隆模板系统盘到临时 VM（不销毁）
         const cloneResult = await cloneOsTemplateDisk(osTemplate.template_vmid, osTemplate.target_storage);
         ctx.tempVmid = cloneResult.tempVmid;
         ctx.tempBus = cloneResult.bus;
@@ -456,13 +434,9 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         await runSsh(`qm set ${vmid} --boot 'order=${newSysDisk.bus}0;net0'`);
         logger.info(`[os-switch] 设置引导顺序: ${newSysDisk.bus}0;net0`);
 
-        await updateLogStage(logId, 'reattach_data');
-
-        // Stage 6: 重挂载数据盘
-        await reattachDataDisks(vmid, dataDisks);
         await updateLogStage(logId, 'cloudinit');
 
-        // Stage 7: 先更新 VM ostype 与模板一致（影响 cloud-init ISO 生成）
+        // Stage 6: 先更新 VM ostype 与模板一致（影响 cloud-init ISO 生成）
         if (osTemplate.ostype) {
             await pveApi.updateVmConfig(vmid, { ostype: osTemplate.ostype });
         }
@@ -499,15 +473,6 @@ async function performOsSwitch(vmid, osTemplate, logId) {
 
 // 回滚（尽力而为）
 async function rollbackOsSwitch(vmid, ctx, logId, originalError) {
-    if (ctx.dataDisks && ctx.dataDisks.length > 0) {
-        for (const disk of ctx.dataDisks) {
-            try {
-                await diskUtils.bindDisk(vmid, disk.volume_id, disk.bus, disk.dev, disk.qos);
-            } catch (e) {
-                await markAdminIntervention(logId, `数据盘回滚失败: ${disk.volume_id} - ${e.message}`);
-            }
-        }
-    }
     await markRolledBack(logId, originalError);
 }
 
@@ -531,7 +496,6 @@ module.exports = {
     moveDiskToTarget,
     cleanupTempVm,
     replaceSystemDisk,
-    reattachDataDisks,
     updateCloudInit,
     verifyAndSyncMac,
     performOsSwitch,
