@@ -146,25 +146,37 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
         // 注意：此处不通过 volume 名判断系统盘（*-disk-0 可能是数据盘卷名）
         // 系统盘已由 dev=0 排除，dev>=1 的槽位无论卷名都是数据盘
         console.log('[盘审计]   ［幽灵盘］' + slotKey + ' = ' + volPart + ' → 即将销毁');
-        // 幽灵盘处理：先 detach 再销毁
-        // 注意：不能用 diskUtils.destroyDisk（会经过 validateVolumeId 拦截 disk-0 卷名）
-        // 此处用 _internal.destroySystemDisk 的宽松校验路径
+        // 幽灵盘处理：先 detach 再销毁，最后清理 unused 残留
+        // 注意：qm set --delete 或 qm unlink 后 PVE 会生成 unused0 配置行，
+        //       pvesm free 后 unused 行仍残留，需额外清理
         try {
           var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
           var sshCfg = await getPveSshConfig();
 
-          // 第一步：从 VM 配置 detach
-          var detachCmd = 'qm set ' + vmId + ' --delete ' + slotKey;
-          var detachResult = await execSSH(sshCfg.host, sshCfg.username, sshCfg.password, detachCmd);
-          if (detachResult.code !== 0) {
-            console.log('[盘审计] qm set --delete ' + slotKey + ' 结果: ' + (detachResult.stderr || detachResult.stdout || ''));
+          // 第一步：用 qm unlink 彻底 detach（比 qm set --delete 更干净）
+          var unlinkCmd = 'qm unlink ' + vmId + ' --idlist ' + slotKey;
+          var unlinkResult = await execSSH(sshCfg.host, sshCfg.username, sshCfg.password, unlinkCmd);
+          if (unlinkResult.code !== 0) {
+            console.log('[盘审计] qm unlink ' + slotKey + ' 结果: ' + (unlinkResult.stderr || unlinkResult.stdout || ''));
           } else {
             console.log('[盘审计] 已从 VM ' + vmId + ' 摘除槽位 ' + slotKey);
           }
 
-          // 第二步：使用 _internal.destroySystemDisk 销毁卷（宽松校验，不拦截 disk-0 卷名）
+          // 第二步：销毁卷（宽松校验路径，不拦截 disk-0 卷名）
           await diskUtils._internal.destroySystemDisk(volPart);
           console.log('[盘审计] 幽灵盘 ' + volPart + ' 已销毁');
+
+          // 第三步：清理 PVE 可能留下的 unused0~unused9 残留配置行
+          // qm unlink 后 PVE 会生成 unused0=hdd5:200/vm-200-disk-0.qcow2，
+          // 即使卷已 pvesm free 释放，unused 行仍会残留
+          for (var ui = 0; ui <= 9; ui++) {
+            var unusedKey = 'unused' + ui;
+            var cleanCmd = 'qm set ' + vmId + ' --delete ' + unusedKey;
+            var cleanResult = await execSSH(sshCfg.host, sshCfg.username, sshCfg.password, cleanCmd);
+            if (cleanResult.code === 0) {
+              console.log('[盘审计] 已清理残留配置 ' + unusedKey);
+            }
+          }
         } catch (e) {
           console.error('[盘审计] 销毁幽灵盘 ' + volPart + ' 失败:', e.message);
         }
