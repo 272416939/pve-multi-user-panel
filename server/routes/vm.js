@@ -448,6 +448,12 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
             await db.disks.deleteByBindVmid(vm.vm_id);
         }
     } catch (e) { console.error('清理 legacy 磁盘记录失败:', e.message); }
+    // 清理磁盘快照
+    try {
+        if (vm && vm.vm_id) {
+            await db.vmDiskSnapshots.delete(vm.vm_id);
+        }
+    } catch (e) { console.error('清理磁盘快照失败:', e.message); }
     await db.vms.delete(vmId);
     // 发送移除通知
     if (removedVmInfo) {
@@ -912,6 +918,10 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             try {
                 await db.getPool().execute('DELETE FROM disks WHERE bind_vmid = ?', [vmid]);
             } catch (e) { console.error('清理磁盘记录失败:', e.message); }
+            // 清理磁盘快照
+            try {
+                await db.vmDiskSnapshots.delete(vmid);
+            } catch (e) { console.error('清理磁盘快照失败:', e.message); }
             await db.vms.delete(vm.id);
         }
 
