@@ -1,5 +1,120 @@
 # Changelog
 
+## [2.33.0] - 2026-08-01
+
+### ⚠️ 重要升级提示
+
+本次为大版本功能更新，包含数据库 schema 变更（新增 `os_templates`、`vm_os_switch_logs`、`vm_disk_snapshots` 等表）。升级后首次启动会自动执行迁移，请确保数据库用户有 `ALTER`/`CREATE` 权限。
+
+### Added（9 个 feat）
+- **feat(os-switch): 系统切换功能完整实现**
+  - 用户可自助切换 VM 操作系统（Windows/Linux 全系列）
+  - 基于 PVE `move_disk` API 统一 LVM/DIR 路径，无需关机
+  - 数据盘不受影响，切换过程自动处理 QOS 参数恢复和容量扩容
+  - 速率限制每分钟 5 次
+- **feat(admin): 系统切换日志页面**
+  - Admin 后台查看所有用户系统切换记录
+  - 支持状态/VMID/用户 ID 筛选、分页（20 条/页）、批量删除、清空全部、详情弹窗
+- **feat(os-template): OS 模板管理**
+  - PVE 模板 VMID 下拉选择 + 自动填充配置字段
+  - 新增 `disk_format` 目标磁盘格式配置
+  - OS 类型/版本/架构自动从 PVE 读取，禁止手动编辑
+- **feat(notification): 用户邮件通知设置功能**
+  - 用户可自定义接收哪些类型的邮件通知
+- **feat(notification): 统一订单号格式 + 扣款/退款邮件通知补齐**
+  - 所有订单号统一为 24 位格式（前缀 2 位 + 时间戳 14 位含秒 + 随机数 8 位）
+  - 购买/扩容/续费/销毁/开通失败退款等 10 处场景补齐邮件通知
+  - 邮件内容含余额变动前/后、订单号、退款单号
+- **feat(admin): 分配 VM 时自动导入存量数据盘**
+  - 管理员分配 VM 时自动扫描并导入 PVE 中已存在的数据盘
+- **feat(backup): 恢复后磁盘对账审计，防止销毁退款后从备份恢复白嫖数据盘**
+  - 新增 `vm_disk_snapshots` 表记录恢复前快照
+  - 恢复后按设备槽位（`bind_bus + bind_dev`）对账
+  - 已知槽位 volume_id 变更则更新台账 + 回收旧卷
+  - 未知槽位（DB 无记录）视为幽灵盘，先 detach 再 destroy
+- **feat(security): 销毁 VM 增加数据盘检查 + 错误信息脱敏**
+  - 销毁 VM 前检查是否有挂载的数据盘，防止误删
+- **feat: 引入 cache-version.json 统一管理前端静态资源缓存**
+  - 前端 JS/CSS 缓存版本号从硬编码改为读取 `cache-version.json`
+
+### Changed（8 refactor + 2 cleanup + 7 chore）
+- refactor(os-switch): 跳过数据盘卸载/重挂载，DIR/LVM 统一 `move_disk` API
+- refactor(os-switch): 删除切换价格功能
+- refactor: 删除废弃的优雅关机相关代码
+- refactor(admin): 彻底重构系统切换日志，按 admin.js 标准模式重写
+- refactor(vm-template): VM 套餐模板表单去掉模板 VM/OS 类型/ciuser，新增系统盘容量
+- chore: 统一日志工具，所有控制台输出带时间戳和前缀
+- chore: 统一磁盘快照相关日志前缀为 `[快照]`
+- chore(disk-import): 调试日志改为 DEBUG 模式才输出
+- chore(log): disk-expiry-check 日志精简，日常只输出必要信息
+
+### Fixed（104 个 fix，按主题归类）
+
+**系统切换修复（20+ 个）**：
+- fix(os-switch): QOS 参数总线兼容（`filterQosParams` 剔除 `iothread` 等）
+- fix(os-switch): boot order 参数中的分号被 shell 解析为命令分隔符
+- fix(os-switch): 旧系统盘 unlink 使用原总线而非模板总线
+- fix(os-switch): LVM 多轮修复（lvrename / pvesm alloc+dd / move_disk API 演进）
+- fix(os-switch): 先更新 ostype 再设置 cloud-init，修复首次切换 Windows 密码无效
+- fix(os-switch): 仅 DIR 类存储传 format 参数，LVM/ZFS 不传
+- fix(os-switch): 速率限制改为每分钟 5 次
+
+**备份恢复磁盘审计修复（10+ 个）**：
+- fix(backup): 恢复后磁盘对账审计，防止白嫖数据盘
+- fix: 幽灵盘先 detach 再销毁，补充对账全链路日志
+- fix: 幽灵盘不通过卷名判断系统盘，仅依赖槽位（`dev>=1`）
+- fix: 精确区分 CD-ROM 和磁盘，IDE0 光驱不再计入系统盘
+- fix: 移除 `validateVolumeId` 的 disk-0 拦截 + 恢复后释放旧卷
+- fix: 幽灵盘销毁绕过 `validateVolumeId` 的 disk-0 拦截
+
+**后台管理 Bug 修复（10+ 个）**：
+- fix(admin): 用户列表排序不稳定 + 用户选择抽风（全量接口与分页竞态）
+- fix(admin): 自动更新同版本误报（改用 `git merge-base --is-ancestor` 判断方向）
+- fix(admin): 模板管理/功能日志刷新后父菜单不展开
+- fix(admin): os-switch-logs 页面多项修复（分页/全选/详情/时间格式）
+- fix: 邮件主题/模板去除 "PVE 面板" 硬编码，改用 `getSiteName()`
+- fix: dashboard CSP 字体/DOMPurify 未定义 + 加载 marked 和 dompurify
+- fix(csp): connect-src 放行 jsDelivr CDN 资源 map 拉取
+
+**订单/钱包修复**：
+- fix(wallet): 订单状态查询兼容 22 位时间戳订单号
+- fix(wallet): 服务器续费订单号统一为 DD 格式
+- fix(order): 新购 VM 根据套餐模板 disk_size 扩容系统盘到目标容量
+
+**通知设置修复**：
+- fix(notification): 修复 cdk.js/lxc.js 邮件块嵌套结构错误
+- fix(notification): 子项分隔线适配明暗模式，资源开通默认折叠
+- fix(vm): 修复移除通知邮件代码块缩进层级错误
+
+**数据库修复**：
+- fix(db): `vm_os_switch_logs` CREATE 缺少 TEXT NOT NULL 字段默认值
+- fix(db): `allowed_package_ids` TEXT->VARCHAR(500) 兼容 MySQL 5.7
+- fix(db): 新购 VM 时写入 `current_os_template_id`
+- fix(db): 添加 `os_templates.ostype` 列迁移
+
+**安全修复**：
+- fix(security): 全量修复安全审计报告 V3 的 19 项安全问题
+- fix(pve-template-config): 扩展 Windows ostype 映射覆盖所有版本
+
+**其他修复**：
+- fix(disk): 批量购买数量上限 10 + 每盘独立订单含磁盘名称
+- fix(disk): DIR 存储卷名/格式冲突全面修复（4 个提交）
+- fix(disk-import): 孤立磁盘清理逻辑 4 次迭代修复（含严重误删正常磁盘台账）
+- fix(unbind): `qm unlink` busy 错误后自动重试一次
+- fix(disk-ui): legacy 磁盘到期时间/剩余天数统一显示「随VM」
+- fix(ui): 新购弹窗下拉框默认显示「请选择系统」
+- fix(ui): 切换系统卡片增加选中高亮 + 暗模式适配
+
+### Security
+- 🔒 备份恢复数据盘白嫖漏洞修复（攻击路径：购买->挂载->备份->销毁退款->恢复白嫖）
+- 🔒 销毁 VM 增加数据盘检查 + 错误信息脱敏
+- 🔒 安全审计报告 V3 全量修复（19 项安全问题）
+
+### Notes
+- 数据库自动迁移：升级后首次启动自动创建新表和字段，无需手动执行 SQL
+- OS 模板配置：需在 Admin 后台「系统模板」页面配置可切换的 OS 模板（关联 PVE 模板 VMID）
+- 系统切换功能依赖 PVE `move_disk` API，确保 PVE 用户有对应存储的权限
+
 ## [2.32.3] - 2026-07-19
 
 ### ⚠️ 重要：本次升级必须使用手动更新
