@@ -131,7 +131,9 @@ app.use((req, res, next) => {
     }
     // XSS-4 修复：script-src 使用 nonce 替代 unsafe-inline
     // SEC-005/011: CDN 由 jsd.owoser.cn 换回官方 cdn.jsdelivr.net
-    // V3-12 修复：connect-src 收敛为同源 + ws/wss（前端全部为同源 /api 与同源 WebSocket，无跨域 HTTPS 请求）
+    // V3-12 修复：connect-src 收敛为同源 + ws/wss + 前端依赖的 jsDelivr CDN
+    // 注：jsDelivr 已列入 script-src/style-src，加入 connect-src 是为了放行 CDN 资源的
+    //     source map（.map）拉取（浏览器按 sourceMappingURL 自动 fetch），不扩大实际攻击面
     // 注：unsafe-eval 必须保留 —— 前端 Vue 3 使用 template:'#appTemplate' 运行时模板编译（依赖 new Function），
     //     移除会导致页面白屏；后续若改为 render 函数/单文件组件预编译可安全移除
     res.setHeader('Content-Security-Policy', [
@@ -140,7 +142,7 @@ app.use((req, res, next) => {
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.loli.net",
         "font-src 'self' https://gstatic.loli.net https://cdn.jsdelivr.net",
         "img-src 'self' data: blob: https:",
-        "connect-src 'self' ws: wss:",
+        "connect-src 'self' ws: wss: https://cdn.jsdelivr.net",
         "frame-ancestors 'self'",
         "object-src 'none'",
         "base-uri 'self'",
