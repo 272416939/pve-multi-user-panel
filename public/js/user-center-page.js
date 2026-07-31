@@ -82,6 +82,146 @@ const App = {
         const rechargeIsMobile = ref(false);     // 是否手机端
         let rechargePollingTimer = null;
 
+        // ===== 通知设置相关 =====
+        const notifSettings = ref({
+            email_notifications_enabled: 1,
+            notify_vm_provisioned: 1,
+            notify_lxc_provisioned: 1,
+            notify_account_password: 1,
+            notify_vm_refund: 1,
+            notify_lxc_refund: 1,
+            notify_disk_purchase: 1,
+            notify_disk_resize: 1,
+            notify_disk_renewal: 1,
+            notify_disk_refund: 1,
+            notify_disk_destroy_refund: 1,
+            notify_recharge: 1,
+            notify_renewal: 1,
+            notify_expiry_reminder: 1,
+            notify_expiry_alert: 1,
+            notify_backup_result: 1
+        });
+        const notifGroups = ref([
+            {
+                key: 'provision',
+                label: '资源开通',
+                svg: '<path d="M2 3h20v11H2z"/><polyline points="12 17 12 20"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="7" y1="8" x2="17" y2="8"/>',
+                expanded: false,
+                items: [
+                    { key: 'notify_vm_provisioned', label: '虚拟机开通成功' },
+                    { key: 'notify_lxc_provisioned', label: '容器开通成功' },
+                    { key: 'notify_account_password', label: '服务器账号密码' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'refund',
+                label: '资源退款',
+                svg: '<path d="M9 14l-4-4 4-4"/><path d="M5 10h11a4 4 0 0 1 0 8h-1"/>',
+                expanded: false,
+                items: [
+                    { key: 'notify_vm_refund', label: '虚拟机开通失败退款' },
+                    { key: 'notify_lxc_refund', label: '容器开通失败退款' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'disk',
+                label: '硬盘管理',
+                svg: '<line x1="3" y1="12" x2="21" y2="12"/><path d="M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z"/><circle cx="7" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="12" r="1" fill="currentColor" stroke="none"/>',
+                expanded: false,
+                items: [
+                    { key: 'notify_disk_purchase', label: '硬盘购买成功' },
+                    { key: 'notify_disk_resize', label: '硬盘扩容成功' },
+                    { key: 'notify_disk_renewal', label: '硬盘续费成功' },
+                    { key: 'notify_disk_refund', label: '硬盘购买/扩容退款' },
+                    { key: 'notify_disk_destroy_refund', label: '硬盘销毁退款' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'wallet',
+                label: '充值续费',
+                svg: '<rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/>',
+                expanded: false,
+                items: [
+                    { key: 'notify_recharge', label: '充值到账通知' },
+                    { key: 'notify_renewal', label: '余额续费成功' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'expiry',
+                label: '到期提醒',
+                svg: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+                expanded: false,
+                items: [
+                    { key: 'notify_expiry_reminder', label: '到期前提醒' },
+                    { key: 'notify_expiry_alert', label: '已到期通知' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'backup',
+                label: '备份恢复',
+                svg: '<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>',
+                expanded: false,
+                items: [
+                    { key: 'notify_backup_result', label: '备份/恢复结果' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            }
+        ]);
+
+        const loadNotifSettings = async () => {
+            try {
+                const data = await api('/user/notification-settings');
+                if (data) {
+                    for (const key of Object.keys(notifSettings.value)) {
+                        if (data[key] !== undefined) {
+                            notifSettings.value[key] = data[key];
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('加载通知设置失败', e);
+            }
+        };
+
+        const toggleNotifSetting = async (field, value) => {
+            notifSettings.value[field] = value ? 1 : 0;
+            try {
+                await api('/user/notification-settings', {
+                    method: 'PUT',
+                    body: JSON.stringify({ [field]: value ? 1 : 0 })
+                });
+                // 找到对应的标签用于 toast 提示
+                let label = '';
+                if (field === 'email_notifications_enabled') {
+                    label = '邮件通知';
+                } else {
+                    for (const group of notifGroups.value) {
+                        const item = group.items.find(i => i.key === field);
+                        if (item) { label = item.label; break; }
+                    }
+                }
+                showToast(label + (value ? '已开启' : '已关闭'), 'success');
+            } catch (e) {
+                // 回滚
+                notifSettings.value[field] = value ? 0 : 1;
+                showToast('保存失败：' + e.message, 'error');
+            }
+        };
+
+        // Toast 提示
+        const toastMessage = ref('');
+        const toastType = ref('success');
+        const showToast = (msg, type = 'success') => {
+            toastMessage.value = msg;
+            toastType.value = type;
+            setTimeout(() => { toastMessage.value = ''; }, 2500);
+        };
+
         const parseMarkdown = (text) => {
             if (!text) return '';
             try {
@@ -645,6 +785,7 @@ const App = {
             // 根据tab懒加载数据
             if (tab === 'memos') await loadMemos();
             if (tab === 'messages') await loadMessages();
+            if (tab === 'notifications') await loadNotifSettings();
             if (tab === 'security') { await loadDevices(); await loadTwofaStatus(); }
             // 钱包/订单数据在切换 tab 时重新拉取（watch 也会触发，这里显式调用避免竞态）
             if (tab === 'wallet-transactions') await loadTx(1);
@@ -1300,7 +1441,9 @@ const App = {
             submitRecharge, loadTx, copyOrderNo, loadMyOrders,
             rechargePendingOrderNo, rechargePendingAmount, rechargeResultType, rechargeResultTitle, rechargeResultAmount,
             rechargeQrLoading, rechargePayUrl, rechargeIsMobile,
-            pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay, checkPayStatus
+            pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay, checkPayStatus,
+            notifSettings, notifGroups, loadNotifSettings, toggleNotifSetting,
+            toastMessage, toastType, showToast
         };
     }
 };

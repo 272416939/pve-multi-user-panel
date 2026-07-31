@@ -6,11 +6,17 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 const { getStatusCache } = require('../websocket/push-proxy');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
-const { safeError } = require('../utils/safe-error');
+const { safeError, sanitizeErrorMsg } = require('../utils/safe-error');
+const { checkRateLimit } = require('../middleware/rate-limiter');
+const { withTransaction } = require('../utils/with-transaction');
+const osSwitchUtils = require('../utils/os-switch-utils');
+const { generateOrderNo } = require('../utils/order-utils');
+const { takeDiskSnapshot } = require('../services/disk-audit');
+const { importDisksForVm } = require('../services/disk-expiry-check');
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -55,6 +61,10 @@ router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.get('/user/vms', authMiddleware, async (req, res) => {
     try {
+        // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
+        var listRate = await checkRateLimit('ratelimit:user-vms:' + req.user.id, 10, 60000);
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         let userVms;
         if (req.user.role === 'admin') {
             // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
@@ -241,33 +251,38 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
 
     const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
-        try {
-            const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
-            const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
-            const emailContent = `
-                <p>您好 <strong>${assignedUser.username}</strong>，</p>
-                <div class="info-box" style="border-left-color: #48bb78;">
-                    <p style="margin-bottom: 8px; font-size: 16px;">
-                        🎉 您的虚拟机已开通！
-                    </p>
-                </div>
-                <div class="info-box">
-                    <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
-                    <p style="margin-bottom: 4px;">名称：${name || 'VM ' + vm_id}</p>
-                    <p style="margin-bottom: 4px;">VMID：${vm_id}</p>
-                    <p style="margin-bottom: 4px;">到期时间：${expiryStr}</p>
-                    ${priceStr}
-                </div>
-                <div class="divider"></div>
-                <p>您可以前往「我的虚拟机」页面开始使用。如有问题请联系管理员。</p>
-            `;
-            await sendEmail(
-                assignedUser.email,
-                '虚拟机已开通 - PVE 管理面板',
-                createEmailTemplate('虚拟机开通通知', emailContent)
-            );
-        } catch (emailError) {
-            console.error(`发送 VM 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
+        if (await shouldSendEmail(assignedUser.id, 'notify_vm_provisioned')) {
+            try {
+                const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
+                const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
+                const emailContent = `
+                    <p>您好 <strong>${assignedUser.username}</strong>，</p>
+                    <div class="info-box" style="border-left-color: #48bb78;">
+                        <p style="margin-bottom: 8px; font-size: 16px;">
+                            🎉 您的虚拟机已开通！
+                        </p>
+                    </div>
+                    <div class="info-box">
+                        <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
+                        <p style="margin-bottom: 4px;">名称：${name || 'VM ' + vm_id}</p>
+                        <p style="margin-bottom: 4px;">VMID：${vm_id}</p>
+                        <p style="margin-bottom: 4px;">到期时间：${expiryStr}</p>
+                        ${priceStr}
+                    </div>
+                    <div class="divider"></div>
+                    <p>您可以前往「我的虚拟机」页面开始使用。如有问题请联系管理员。</p>
+                `;
+                const vmSiteName = await getSiteName();
+                if (await shouldSendEmail(assignedUser.id, 'notify_vm_provisioned')) {
+                    await sendEmail(
+                        assignedUser.email,
+                        '虚拟机已开通 - ' + vmSiteName,
+                        createEmailTemplate('虚拟机开通通知', emailContent, vmSiteName)
+                    );
+                }
+            } catch (emailError) {
+                console.error(`发送 VM 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
+            }
         }
     }
     
@@ -282,8 +297,19 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         console.error(`虚拟机 ${vm_id} 自动开机失败:`, startError.message);
     }
     
-    res.json(newVm);
-    } catch (e) {
+	    res.json(newVm);
+
+		    // 异步更新磁盘快照（不阻塞响应）
+		    takeDiskSnapshot(parsedVmId, parsedUserId).catch(function(err) {
+		      console.error('[快照] VM ' + parsedVmId + ' 分配后快照创建失败:', err.message);
+		    });
+
+		    // 异步导入存量数据盘（不阻塞响应）
+	    importDisksForVm(parsedVmId, parsedUserId).catch(function(err) {
+	      console.error('[vm] VM 分配后导入存量数据盘失败:', err.message);
+	    });
+
+	    } catch (e) {
         console.error('[vm] 操作失败:', e.message);
         res.status(500).json({ error: safeError(e) });
     }
@@ -431,6 +457,13 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
             await db.disks.deleteByBindVmid(vm.vm_id);
         }
     } catch (e) { console.error('清理 legacy 磁盘记录失败:', e.message); }
+    // 清理磁盘快照
+    try {
+        if (vm && vm.vm_id) {
+            await db.vmDiskSnapshots.delete(vm.vm_id);
+            console.log('[快照] VM ' + vm.vm_id + ' 磁盘快照已清理（移除分配）');
+        }
+    } catch (e) { console.error('清理磁盘快照失败:', e.message); }
     await db.vms.delete(vmId);
     // 发送移除通知
     if (removedVmInfo) {
@@ -448,29 +481,34 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     if (removedVmInfo) {
         const removedUser = await db.users.getById(removedVmInfo.user_id);
         if (removedUser && removedUser.email && removedUser.emailVerified) {
-            try {
-                const emailContent = `
-                    <p>您好 <strong>${removedUser.username}</strong>，</p>
-                    <div class="warning-box">
-                        <p style="margin-bottom: 8px; font-size: 16px;">
-                            ⚠️ 您的虚拟机已被移除
-                        </p>
-                    </div>
-                    <div class="info-box">
-                        <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
-                        <p style="margin-bottom: 4px;">名称：${removedVmInfo.name || 'VM ' + removedVmInfo.vm_id}</p>
-                        <p style="margin-bottom: 4px;">VMID：${removedVmInfo.vm_id}</p>
-                    </div>
-                    <div class="divider"></div>
-                    <p>如果对此操作有疑问，请联系管理员。</p>
-                `;
-                await sendEmail(
-                    removedUser.email,
-                    '虚拟机已被移除 - PVE 管理面板',
-                    createEmailTemplate('虚拟机移除通知', emailContent)
-                );
-            } catch (emailError) {
-                console.error(`发送 VM 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
+            if (await shouldSendEmail(removedVmInfo.user_id, 'notify_vm_provisioned')) {
+                try {
+                    const emailContent = `
+                        <p>您好 <strong>${removedUser.username}</strong>，</p>
+                        <div class="warning-box">
+                            <p style="margin-bottom: 8px; font-size: 16px;">
+                                ⚠️ 您的虚拟机已被移除
+                            </p>
+                        </div>
+                        <div class="info-box">
+                            <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
+                            <p style="margin-bottom: 4px;">名称：${removedVmInfo.name || 'VM ' + removedVmInfo.vm_id}</p>
+                            <p style="margin-bottom: 4px;">VMID：${removedVmInfo.vm_id}</p>
+                        </div>
+                        <div class="divider"></div>
+                        <p>如果对此操作有疑问，请联系管理员。</p>
+                    `;
+                    const vmSiteName2 = await getSiteName();
+                    if (await shouldSendEmail(removedUser.id, 'notify_vm_provisioned')) {
+                        await sendEmail(
+                            removedUser.email,
+                            '虚拟机已被移除 - ' + vmSiteName2,
+                            createEmailTemplate('虚拟机移除通知', emailContent, vmSiteName2)
+                        );
+                    }
+                } catch (emailError) {
+                    console.error(`发送 VM 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
+                }
             }
         }
     }
@@ -653,6 +691,10 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
 
 router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
     try {
+        // V3-08 修复：状态查询端点限速（30次/分钟，前端正常轮询远低于该值）
+        var statusRate = await checkRateLimit('ratelimit:vm-status:' + req.user.id, 30, 60000);
+        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         const vmid = parseInt(req.params.vmid);
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
@@ -850,6 +892,11 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                 if (status && status.status === 'running') {
                     return res.status(400).json({ error: '虚拟机正在运行，请先关机后再销毁' });
                 }
+                // V3-14 修复：销毁前记录审计（含 vmid 与 force）
+                try {
+                    const { auditLog } = require('../utils/audit-log');
+                    await auditLog({ userId: req.user.id, username: req.user.username, action: 'vm.destroy', resourceType: 'vm', resourceId: vmid, details: { force }, req });
+                } catch (_) {}
             } catch (e) {
                 console.warn(`[vm] 查询 ${vmid} 状态失败（继续执行销毁）:`, e.message);
             }
@@ -879,28 +926,250 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                     }
                 } catch (e) { console.error('VM MAC分组删除失败:', e.message); }
             }
-            // 清理绑定在当前 VM 上的 legacy 磁盘台账记录（不操作 PVE 磁盘本身）
+            // 检查该 VM 上是否有挂载的活跃数据盘（非 legacy）
             try {
-                await db.disks.deleteByBindVmid(vm.vm_id);
-            } catch (e) { console.error('清理 legacy 磁盘记录失败:', e.message); }
+                var boundDisks = await db.disks.getByBindVmid(vmid);
+                var activeDisks = boundDisks.filter(function(d) {
+                    return d.status === 'bound' && !d.is_legacy;
+                });
+                if (activeDisks.length > 0) {
+                    return res.status(400).json({
+                        error: '该虚拟机下挂载了 ' + activeDisks.length + ' 个数据盘，请先卸载再销毁虚拟机'
+                    });
+                }
+            } catch (e) { console.error('[vm] 查询数据盘失败:', e.message); }
+            // 清理绑定在该 VM 上的所有磁盘台账记录（PVE 销毁时磁盘已被一并清理）
+            try {
+                await db.getPool().execute('DELETE FROM disks WHERE bind_vmid = ?', [vmid]);
+            } catch (e) { console.error('清理磁盘记录失败:', e.message); }
+            // 清理磁盘快照
+            try {
+                await db.vmDiskSnapshots.delete(vmid);
+                console.log('[快照] VM ' + vmid + ' 磁盘快照已清理（销毁）');
+            } catch (e) { console.error('清理磁盘快照失败:', e.message); }
             await db.vms.delete(vm.id);
         }
 
-        try {
+try {
             await pveApi.destroyVm(vmid);
             console.log(`[vm] PVE 虚拟机 ${vmid} 已销毁`);
         } catch (e) {
             console.error(`[vm] PVE 销毁 ${vmid} 失败:`, e.message);
-            return res.status(500).json({ error: 'PVE 销毁虚拟机失败：' + safeError(e) });
+            return res.status(500).json({ error: safeError(e, 'PVE 操作失败') });
         }
 
-        res.json({ message: '虚拟机已销毁' });
-    } catch (error) {
-        console.error('销毁虚拟机失败:', error);
-        res.status(500).json({ error: safeError(error) });
-    }
-});
+	res.json({ message: '虚拟机已销毁' });
+        } catch (error) {
+            console.error('销毁虚拟机失败:', error);
+            res.status(500).json({ error: safeError(error, '系统运行错误，请联系管理人员') });
+        }
+    });
 
+    // ==================== 系统切换端点（v1.3） ====================
 
-module.exports = router;
+    // POST /vm/:vmid/switch-os — 用户切换系统
+    router.post('/vm/:vmid/switch-os', authMiddleware, async (req, res) => {
+        const vmid = parseInt(req.params.vmid);
+        const rateLimit = await checkRateLimit('ratelimit:os-switch:' + req.user.id, 5, 60000);
+        if (!rateLimit.allowed) {
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        }
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+            return res.status(400).json({ error: '无效的 VMID' });
+        }
+        const vm = await db.vms.getByVmid(vmid);
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        const isAdmin = req.user.role === 'admin';
+        if (vm.user_id !== req.user.id && !isAdmin) {
+            return res.status(403).json({ error: '无权限操作' });
+        }
+        if (vm.expiration_date && new Date(vm.expiration_date) < new Date() && !isAdmin) {
+            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+        }
+        const runningSwitch = await db.vmOsSwitchLogs.getRunningByVmid(vmid);
+        if (runningSwitch) {
+            return res.status(409).json({ error: '该虚拟机正在切换系统中，请稍候' });
+        }
+        const osTemplateId = parseInt(req.body.os_template_id);
+        if (!Number.isInteger(osTemplateId) || osTemplateId < 1) {
+            return res.status(400).json({ error: '无效的 OS 模板 ID' });
+        }
+        const osTemplate = await db.osTemplates.getById(osTemplateId);
+        if (!osTemplate || !osTemplate.enabled || osTemplate.status !== 'active') {
+            return res.status(400).json({ error: 'OS 模板不存在或已下架' });
+        }
+        if (osTemplate.allowed_package_ids) {
+            const allowedIds = osTemplate.allowed_package_ids.split(',').map(s => parseInt(s.trim())).filter(Number.isInteger);
+            if (allowedIds.length > 0 && vm.package_id && !allowedIds.includes(vm.package_id)) {
+                return res.status(403).json({ error: '当前套餐不允许切换到该系统' });
+            }
+        }
+        const vmStatus = await pveApi.getVmStatus(vmid);
+        if (vmStatus.status !== 'stopped') {
+            return res.status(400).json({ error: '请先关机后再切换系统' });
+        }
+        let oldSysDiskSizeGb = 0;
+        try {
+            const oldConfig = await pveApi.getVmConfig(vmid);
+            for (const bus of ['scsi', 'sata', 'virtio']) {
+                const raw = String(oldConfig[bus + '0'] || '');
+                const m = raw.match(/size=(\d+)([GM])/i);
+                if (m) {
+                    const v = parseInt(m[1]);
+                    oldSysDiskSizeGb = m[2].toUpperCase() === 'M' ? Math.ceil(v / 1024) : v;
+                    break;
+                }
+            }
+        } catch (e) { /* ignore */ }
+        // 容量按原 VM 系统盘大小校验
+        await osSwitchUtils.checkTargetStorageCapacity(osTemplate.target_storage, oldSysDiskSizeGb || 20);
+
+        let orderNo = '';
+
+        const switchLog = await db.vmOsSwitchLogs.create({
+            vm_id: vmid,
+            user_id: req.user.id,
+            from_os_template_id: vm.current_os_template_id || null,
+            to_os_template_id: osTemplateId,
+            status: 'running',
+            order_no: orderNo
+        });
+        await db.vms.update(vm.id, { os_switch_pve_upid: 'os-switch-' + switchLog.id });
+
+        (async () => {
+            try {
+                const result = await osSwitchUtils.performOsSwitch(vmid, osTemplate, switchLog.id);
+                await db.vmOsSwitchLogs.update(switchLog.id, {
+                    status: 'success',
+                    new_system_volume_id: result.newVolumeId || '',
+                    finished_at: new Date()
+                });
+                await db.vms.update(vm.id, {
+                    current_os_template_id: osTemplateId,
+                    last_os_switch_at: new Date(),
+                    os_switch_pve_upid: ''
+                });
+                await db.messages.create({
+                    uid: vm.user_id,
+                    title: '系统切换成功',
+                    content: '您的虚拟机 ' + (vm.name || 'VM ' + vmid) + ' 已成功切换到 ' + osTemplate.name + '。\n登录账号：' + (result.ciResult?.ciuser || '未配置') + '\n新密码：' + (result.ciResult?.password || '') + '\n请尽快登录并修改密码。',
+                    type: 2, send_type: 1
+                });
+                // 系统切换后更新磁盘快照
+                try {
+                    await takeDiskSnapshot(vmid, vm.user_id);
+                } catch (snapErr) {
+                    console.error('[快照] os-switch 后快照更新失败:', snapErr.message);
+                }
+            } catch (error) {
+                await db.vmOsSwitchLogs.update(switchLog.id, {
+                    status: 'failed',
+                    error_message: error.message || String(error),
+                    finished_at: new Date()
+                });
+                await db.vms.update(vm.id, { os_switch_pve_upid: '' });
+                try {
+                    await db.messages.create({
+                        uid: vm.user_id,
+                        title: '系统切换失败',
+                        content: '您的虚拟机 ' + (vm.name || 'VM ' + vmid) + ' 切换系统失败。\n数据盘未受影响。请稍后重试或联系管理员。',
+                        type: 2, send_type: 1
+                    });
+                } catch (msgErr) {
+                    console.error('[os-switch] 失败通知发送失败:', msgErr.message);
+                }
+            }
+        })();
+
+        res.json({
+            success: true,
+            message: '系统切换已开始，请稍候',
+            switch_log_id: switchLog.id,
+            vmid: vmid
+        });
+    });
+
+    // GET /vm/:vmid/switch-os/status — 查询切换进度
+    router.get('/vm/:vmid/switch-os/status', authMiddleware, async (req, res) => {
+        const vmid = parseInt(req.params.vmid);
+        const rateLimit = await checkRateLimit('ratelimit:os-switch-status:' + req.user.id, 30, 60000);
+        if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁' });
+        const vm = await db.vms.getByVmid(vmid);
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        const log = await db.vmOsSwitchLogs.getRunningByVmid(vmid);
+        if (!log) return res.json({ status: 'idle' });
+        res.json({
+            status: log.status,
+            fail_stage: log.fail_stage || '',
+            admin_intervention_required: !!log.admin_intervention_required
+        });
+    });
+
+    // GET /vm/:vmid/switch-os/logs — 查询单 VM 切换日志（翻页，脱敏）
+    router.get('/vm/:vmid/switch-os/logs', authMiddleware, async (req, res) => {
+        const vmid = parseInt(req.params.vmid);
+        const vm = await db.vms.getByVmid(vmid);
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        const page = Math.min(parseInt(req.query.page) || 1, 1000);
+        const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+        const logs = await db.vmOsSwitchLogs.getByVmidWithPaging(vmid, page, limit);
+        const total = await db.vmOsSwitchLogs.countByVmid(vmid);
+        // V3-07 修复：error_message 对非管理员脱敏（剔除命令/路径/URL/IP），管理员保留原文便于排障
+        const isAdmin = req.user.role === 'admin';
+        const safeLogs = logs.map(l => {
+            const { error_message, ...safe } = l;
+            if (!error_message) return { ...safe, error_message: '' };
+            const msg = isAdmin ? error_message : sanitizeErrorMsg(error_message);
+            return { ...safe, error_message: msg };
+        });
+        res.json({ success: true, data: safeLogs, total, page, limit });
+    });
+
+    // GET /vm/switch-os/logs — 查询当前用户所有切换日志（翻页，脱敏）
+    router.get('/vm/switch-os/logs', authMiddleware, async (req, res) => {
+        const page = Math.min(parseInt(req.query.page) || 1, 1000);
+        const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+        const logs = await db.vmOsSwitchLogs.getByUserId(req.user.id, page, limit);
+        const total = await db.vmOsSwitchLogs.countByUserId(req.user.id);
+        // V3-07 修复：error_message 对普通用户脱敏
+        const safeLogs = logs.map(l => {
+            const { error_message, ...safe } = l;
+            if (!error_message) return { ...safe, error_message: '' };
+            const msg = req.user.role === 'admin' ? error_message : sanitizeErrorMsg(error_message);
+            return { ...safe, error_message: msg };
+        });
+        res.json({ success: true, data: safeLogs, total, page, limit });
+    });
+
+    // GET /vm/:vmid/switchable-os — 获取可切换 OS 列表
+    router.get('/vm/:vmid/switchable-os', authMiddleware, async (req, res) => {
+        const vmid = parseInt(req.params.vmid);
+        const vm = await db.vms.getByVmid(vmid);
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
+            return res.status(403).json({ error: '无权限' });
+        }
+        const allOsTemplates = await db.osTemplates.getEnabled();
+        let filtered = allOsTemplates;
+        if (vm.package_id) {
+            filtered = allOsTemplates.filter(t => {
+                if (!t.allowed_package_ids) return true;
+                const allowed = t.allowed_package_ids.split(',').map(s => parseInt(s.trim())).filter(Number.isInteger);
+                return allowed.length === 0 || allowed.includes(vm.package_id);
+            });
+        }
+        res.json({
+            success: true,
+            current_os_template_id: vm.current_os_template_id,
+            data: filtered
+        });
+    });
+
+    module.exports = router;
 

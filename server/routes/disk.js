@@ -8,10 +8,12 @@ var router = express.Router();
 var { authMiddleware } = require('../middleware/auth');
 var { checkRateLimit } = require('../middleware/rate-limiter');
 var { withTransaction } = require('../utils/with-transaction');
+var { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 var { deductBalance, generateOrderNo } = require('../utils/order-utils');
 var { safeError } = require('../utils/safe-error');
 var db = require('../api/db');
 var diskUtils = require('../utils/disk-utils');
+var { takeDiskSnapshot } = require('../services/disk-audit');
 
 var VALID_PERIODS = ['month', 'quarter', 'year'];
 
@@ -109,7 +111,10 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     var capacityGb = parseInt(req.body.capacity_gb);
     var period = req.body.period;
     var periodCount = parseInt(req.body.period_count) || 1;
-    var quantity = Math.min(parseInt(req.body.quantity) || 1, 10); // 最多 10 块
+    var quantity = parseInt(req.body.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) {
+      return res.status(400).json({ error: '购买数量必须为 1-10' });
+    }
     var autoRenew = req.body.auto_renew ? 1 : 0;
     var diskName = (req.body.disk_name || '').toString().trim();
     // 长度限制：最多 30 字符（适配导入磁盘名称如 imported-108-scsi1）
@@ -134,69 +139,75 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: '容量超出规格范围（' + spec.min_size_gb + '-' + spec.max_size_gb + ' GiB）' });
     }
 
-    // 计算总价（服务端计算，防篡改）
-    var totalAmount = diskUtils.calcDiskAmount(spec, capacityGb, period, periodCount) * quantity;
+	// 计算单盘价格和总价
+	  var singleAmount = diskUtils.calcDiskAmount(spec, capacityGb, period, periodCount);
+	  var totalAmount = singleAmount * quantity;
 
-    // 扣款金额校验
-    if (totalAmount <= 0) return res.status(400).json({ error: '金额必须大于0' });
+	  // 扣款金额校验
+	  if (totalAmount <= 0) return res.status(400).json({ error: '金额必须大于0' });
 
-    // 余额检查
-    var user = await db.users.getById(req.user.id);
-    var balanceBefore = parseFloat(user.balance || '0');
-    if (balanceBefore < totalAmount) {
-      return res.status(400).json({ error: '余额不足，需要 ' + totalAmount + ' 元' });
-    }
+	  // 余额检查
+	  var user = await db.users.getById(req.user.id);
+	  var balanceBefore = parseFloat(user.balance || '0');
+	  if (balanceBefore < totalAmount) {
+	    return res.status(400).json({ error: '余额不足，需要 ' + totalAmount + ' 元' });
+	  }
 
-    // 存储池容量检查
-    await diskUtils.checkStorageCapacity(spec.storage_pool, capacityGb * quantity);
+	  // 存储池容量检查
+	  await diskUtils.checkStorageCapacity(spec.storage_pool, capacityGb * quantity);
 
-// 计算到期时间
-  var now = new Date();
-  var months = period === 'year' ? 12 : period === 'quarter' ? 3 : 1;
-  var expireTime = new Date(now.getTime() + months * periodCount * 30 * 24 * 60 * 60 * 1000);
+	// 计算到期时间
+	  var now = new Date();
+	  var months = period === 'year' ? 12 : period === 'quarter' ? 3 : 1;
+	  var expireTime = new Date(now.getTime() + months * periodCount * 30 * 24 * 60 * 60 * 1000);
 
-  // 生成订单号
-  var orderNo = generateOrderNo('disk');
-  var createdDiskIds = [];
-  var createdDiskVolumeIds = [];
-  var dbNow = db.now();
+	  var createdDiskIds = [];
+	  var createdDiskVolumeIds = [];
+	  var createdOrderNos = [];
+	  var dbNow = db.now();
 
-  // 事务一：扣款 + 创建订单 + 创建流水 + 写入台账（不调 PVE）
-  await withTransaction(async (conn) => {
-    // 原子扣款
-    await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, req.user.id]);
-    var balanceAfter = balanceBefore - totalAmount;
+	  // 为每块磁盘生成名称（循环外先算好所有磁盘名称）
+	  var diskNames = [];
+	  for (var ni = 0; ni < quantity; ni++) {
+	    diskNames.push(diskName || ('数据盘-' + crypto.randomBytes(2).toString('hex')));
+	  }
 
-    // 创建订单（type='disk'，resource_name 格式：新购 xxGiB）
-    await conn.execute(
-      'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [orderNo, req.user.id, 'disk', specId, 0, period, periodCount, totalAmount, 0, 0, capacityGb * quantity, '新购 ' + (capacityGb * quantity) + 'GiB', '', 'pending']
-    );
+	  // 事务一：扣款 + 创建订单 + 创建流水 + 写入台账（不调 PVE）
+	  await withTransaction(async (conn) => {
+	    // 原子扣款（一次总扣）
+	    await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, req.user.id]);
+	    var balanceAfter = balanceBefore - totalAmount;
 
-    // 创建流水记录
-    await conn.execute(
-      'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.id, orderNo, dbNow, 'balance', 'disk_purchase', totalAmount, period, periodCount, balanceBefore, balanceAfter, 'disk', null, '', '', dbNow]
-    );
+	    // 逐块磁盘：创建独立订单 + 流水 + 台账
+	    for (var i = 0; i < quantity; i++) {
+	      var orderNo = generateOrderNo('disk');
+	      createdOrderNos.push(orderNo);
+	      var thisDiskName = diskNames[i];
+	      var volId = spec.storage_pool + ':pending-' + orderNo;
 
-    // 逐个写入磁盘台账（先不调 PVE）
-    for (var i = 0; i < quantity; i++) {
-      var volId = spec.storage_pool + ':pending-' + orderNo + '-' + i;
-      await conn.execute(
-        `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, disk_format, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [volId, diskName || ('数据盘-' + crypto.randomBytes(2).toString('hex')), specId, req.user.id, spec.storage_group_id, spec.storage_pool, spec.disk_type, spec.disk_format || null, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null]
-      );
-      // 获取 insertId
-      var [insertResult] = await conn.execute('SELECT LAST_INSERT_ID() as id');
-      var newDiskId = insertResult[0].id;
-      createdDiskIds.push(newDiskId);
-      // 回填订单 resource_id（单块磁盘场景，多块磁盘用首块 ID 关联）
-      if (i === 0) {
-        await conn.execute('UPDATE orders SET resource_id = ? WHERE order_no = ?', [String(newDiskId), orderNo]);
-      }
-    }
-  });
+	      // 写入磁盘台账
+	      await conn.execute(
+	        `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, disk_format, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
+	         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+	        [volId, thisDiskName, specId, req.user.id, spec.storage_group_id, spec.storage_pool, spec.disk_type, spec.disk_format || null, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null]
+	      );
+	      var [insertResult] = await conn.execute('SELECT LAST_INSERT_ID() as id');
+	      var newDiskId = insertResult[0].id;
+	      createdDiskIds.push(newDiskId);
+
+	      // 创建独立订单（resource_name 含磁盘名称，便于对账）
+	      await conn.execute(
+	        'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+	        [orderNo, req.user.id, 'disk', specId, 0, period, periodCount, singleAmount, 0, 0, capacityGb, '新购 ' + capacityGb + 'GiB [' + thisDiskName + ']', String(newDiskId), 'pending']
+	      );
+
+	      // 创建独立流水
+	      await conn.execute(
+	        'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+	        [req.user.id, orderNo, dbNow, 'balance', 'disk_purchase', singleAmount, period, periodCount, balanceBefore, balanceAfter, 'disk', String(newDiskId), '', '', dbNow]
+	      );
+	    }
+	  });
 
   // 事务外：逐个调用 PVE 创建磁盘
   var pveSuccess = true;
@@ -226,34 +237,85 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     }
   }
 
-  if (pveSuccess) {
-    // 全部成功 => 更新订单状态
-    await db.orders.updateStatus(orderNo, 'completed');
-    res.json({ success: true, order_no: orderNo, amount: totalAmount, disks: quantity });
-  } else {
-    // 失败 => 退款 + 清理台账 + 订单标记 refunded
-    try {
-      // 退款
-      var refundUser = await db.users.incrementBalance(req.user.id, totalAmount);
-      var refundBalanceAfter = parseFloat(refundUser.balance || '0');
-      // 删除失败磁盘的台账记录
-      var pool2 = require('../api/db').getPool();
-      for (var k = 0; k < createdDiskIds.length; k++) {
-        try { await pool2.execute('DELETE FROM disks WHERE id = ?', [createdDiskIds[k]]); } catch (e) {}
-      }
-      // 退款流水
-      var refundOrderNo = generateOrderNo('refund');
-      await pool2.execute(
-        'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [req.user.id, refundOrderNo, dbNow, 'balance_refund', 'refund', totalAmount, period, periodCount, balanceBefore, refundBalanceAfter, 'disk', null, orderNo, '', dbNow]
-      );
-      // 更新订单状态
-      await db.orders.updateStatus(orderNo, 'refunded');
-    } catch (rollbackError) {
-      console.error('[disk purchase] 退款处理失败:', rollbackError.message);
-    }
-    res.status(500).json({ error: '创建磁盘失败，已退款，请稍后重试' });
-  }
+	  if (pveSuccess) {
+	    // 全部成功 => 更新所有订单为 completed
+	    for (var oi = 0; oi < createdOrderNos.length; oi++) {
+	      await db.orders.updateStatus(createdOrderNos[oi], 'completed');
+	    }
+	    var firstOrderNo = createdOrderNos[0] || '';
+	    // 邮件通知：硬盘购买成功
+	    try {
+	      var purchaseUser = await db.users.getById(req.user.id);
+	      if (purchaseUser && purchaseUser.email && purchaseUser.emailVerified && purchaseUser.email.includes('@')) {
+	        var siteName = await getSiteName();
+	        var diskNamesStr = diskNames.join('、');
+	        var periodLabel = period === 'year' ? periodCount + '年' : period === 'quarter' ? periodCount + '季' : periodCount + '个月';
+	        var newBalance = (balanceBefore - totalAmount).toFixed(2);
+	        var emailHtml = createEmailTemplate('硬盘购买成功',
+	          '<p>您的数据盘已购买成功！</p>' +
+	          '<div class="info-box">' +
+	          '<p style="margin-bottom: 4px;">💾 硬盘名称：<strong>' + diskNamesStr + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">📐 容量：<strong>' + capacityGb + ' GiB × ' + quantity + ' 块</strong></p>' +
+	          '<p style="margin-bottom: 4px;">📅 计费周期：<strong>' + periodLabel + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">💸 实付金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">📋 订单编号：<strong>' + firstOrderNo + '</strong></p>' +
+	          '<p>⏰ 购买时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+	          '</div>' +
+	          '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
+	        if (await shouldSendEmail(req.user.id, 'notify_disk_purchase')) {
+	          await sendEmail(purchaseUser.email, '硬盘购买成功 - ' + siteName, emailHtml);
+	        }
+	      }
+	    } catch (emailErr) { console.error('[disk purchase] 邮件发送失败:', emailErr.message); }
+	    res.json({ success: true, order_no: firstOrderNo, orders: createdOrderNos.length, amount: singleAmount, total_amount: totalAmount, disks: quantity });
+	  } else {
+	    // 失败 => 退款 + 清理台账 + 订单标记 refunded
+	    try {
+	      // 退款
+	      var refundUser = await db.users.incrementBalance(req.user.id, totalAmount);
+	      var refundBalanceAfter = parseFloat(refundUser.balance || '0');
+	      // 删除失败磁盘的台账记录
+	      var pool2 = require('../api/db').getPool();
+	      for (var k = 0; k < createdDiskIds.length; k++) {
+	        try { await pool2.execute('DELETE FROM disks WHERE id = ?', [createdDiskIds[k]]); } catch (e) {}
+	      }
+	      // 退款流水（统一记录一笔）
+	      var refundOrderNo = generateOrderNo('refund');
+	      await pool2.execute(
+	        'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+	        [req.user.id, refundOrderNo, dbNow, 'balance_refund', 'refund', totalAmount, period, periodCount, balanceBefore, refundBalanceAfter, 'disk', null, createdOrderNos[0] || '', '', dbNow]
+	      );
+	      // 所有订单标记 refunded
+	      for (var ri = 0; ri < createdOrderNos.length; ri++) {
+	        try { await db.orders.updateStatus(createdOrderNos[ri], 'refunded'); } catch (e) {}
+	      }
+	    } catch (rollbackError) {
+	      console.error('[disk purchase] 退款处理失败:', rollbackError.message);
+	    }
+	    // 邮件通知：硬盘购买失败退款
+	    try {
+	      var failUser = await db.users.getById(req.user.id);
+	      if (failUser && failUser.email && failUser.emailVerified && failUser.email.includes('@')) {
+	        var siteName = await getSiteName();
+	        var newBalance = (balanceBefore - totalAmount + totalAmount).toFixed(2);
+	        var emailHtml = createEmailTemplate('硬盘购买失败 - 已退款',
+	          '<p>非常抱歉，您购买的数据盘创建失败，款项已原路退回。</p>' +
+	          '<div class="warning-box">' +
+	          '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + (createdOrderNos[0] || '') + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + (typeof refundOrderNo !== 'undefined' ? refundOrderNo : '') + '</strong></p>' +
+	          '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+	          '</div>' +
+	          '<p>如有疑问请联系客服。</p>', siteName);
+	        if (await shouldSendEmail(req.user.id, 'notify_disk_refund')) {
+	          await sendEmail(failUser.email, '硬盘购买失败已退款 - ' + siteName, emailHtml);
+	        }
+	      }
+	    } catch (emailErr) { console.error('[disk purchase] 退款邮件发送失败:', emailErr.message); }
+	    res.status(500).json({ error: '创建磁盘失败，已退款，请稍后重试' });
+	  }
   } catch (e) {
     console.error('[disk purchase] 失败:', e);
     res.status(500).json({ error: safeError(e) });
@@ -314,10 +376,15 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
         ['bound', vm.vm_id, result.bus, result.dev, disk.id, lockedDisk.status]
       );
 
-      return result;
-    });
+	    return result;
+	    });
 
-    res.json({ success: true, bus: bindResult.bus, dev: bindResult.dev });
+	    // 异步更新快照（不阻塞响应）
+	    takeDiskSnapshot(vm.vm_id, req.user.id).catch(function(err) {
+	      console.error('[快照] bind 后快照更新失败:', err.message);
+	    });
+
+	    res.json({ success: true, bus: bindResult.bus, dev: bindResult.dev });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
   }
@@ -361,6 +428,13 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
         ['free', disk.id, 'bound']
       );
     });
+
+    // 异步更新快照（不阻塞响应）
+    if (disk.bind_vmid) {
+      takeDiskSnapshot(disk.bind_vmid, req.user.id).catch(function(err) {
+        console.error('[快照] unbind 后快照更新失败:', err.message);
+      });
+    }
 
     res.json({ success: true });
   } catch (e) {
@@ -485,11 +559,55 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
         // 订单标记 refunded
         await conn.execute('UPDATE orders SET status = ? WHERE order_no = ?', ['refunded', resizeOrderNo]);
       });
+      // 邮件通知：硬盘扩容失败退款
+      try {
+        var resizeFailUser = await db.users.getById(req.user.id);
+        if (resizeFailUser && resizeFailUser.email && resizeFailUser.emailVerified && resizeFailUser.email.includes('@')) {
+          var siteName = await getSiteName();
+          var newBalance = (balanceBefore - resizeAmount + resizeAmount).toFixed(2);
+          var emailHtml = createEmailTemplate('硬盘扩容失败 - 已退款',
+            '<p>非常抱歉，您硬盘扩容操作失败，款项已原路退回。</p>' +
+            '<div class="warning-box">' +
+            '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + resizeAmount.toFixed(2) + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + resizeOrderNo + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+            '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+            '</div>' +
+            '<p>如有疑问请联系客服。</p>', siteName);
+          if (await shouldSendEmail(req.user.id, 'notify_disk_refund')) {
+            await sendEmail(resizeFailUser.email, '硬盘扩容失败已退款 - ' + siteName, emailHtml);
+          }
+        }
+      } catch (emailErr) { console.error('[disk resize] 退款邮件发送失败:', emailErr.message); }
       return res.status(500).json({ error: 'PVE 扩容失败，已退款' });
     }
 
     // 订单标记完成
     await db.orders.updateStatus(resizeOrderNo, 'completed');
+
+    // 邮件通知：硬盘扩容成功
+    try {
+      var resizeUser = await db.users.getById(req.user.id);
+      if (resizeUser && resizeUser.email && resizeUser.emailVerified && resizeUser.email.includes('@')) {
+        var siteName = await getSiteName();
+        var newBalance = (balanceBefore - resizeAmount).toFixed(2);
+        var emailHtml = createEmailTemplate('硬盘扩容成功',
+          '<p>您的数据盘已扩容成功！</p>' +
+          '<div class="info-box">' +
+          '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">📐 扩容：<strong>' + disk.capacity_gb + ' GiB → ' + newSize + ' GiB</strong></p>' +
+          '<p style="margin-bottom: 4px;">💸 扩容费用：<strong>¥' + resizeAmount.toFixed(2) + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">📋 订单编号：<strong>' + resizeOrderNo + '</strong></p>' +
+          '<p>⏰ 扩容时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+          '</div>' +
+          '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
+        if (await shouldSendEmail(req.user.id, 'notify_disk_resize')) {
+          await sendEmail(resizeUser.email, '硬盘扩容成功 - ' + siteName, emailHtml);
+        }
+      }
+    } catch (emailErr) { console.error('[disk resize] 邮件发送失败:', emailErr.message); }
 
     res.json({ success: true, new_capacity: newSize, amount: resizeAmount });
   } catch (e) {
@@ -596,6 +714,12 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       if (lockedDisk.status === 'bound') throw new Error('请先卸载磁盘再销毁');
       if (lockedDisk.status === 'destroyed') throw new Error('磁盘已销毁');
 
+      // V3-14 修复：销毁前审计（用户在事务内销毁）
+      try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'disk.destroy', resourceType: 'disk', resourceId: disk.id, details: { volume_id: lockedDisk.volume_id, refund_amount: refundAmount }, req });
+      } catch (_) {}
+
       // 执行 PVE 销毁
       await diskUtils.destroyDisk(lockedDisk.volume_id);
 
@@ -654,6 +778,30 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
         ['destroyed', disk.id, 'destroyed']
       );
     });
+
+    // 邮件通知：硬盘销毁退款（仅退款金额>0时发送）
+    if (refundAmount > 0) {
+      try {
+        var destroyUser = await db.users.getById(req.user.id);
+        if (destroyUser && destroyUser.email && destroyUser.emailVerified && destroyUser.email.includes('@')) {
+          var siteName = await getSiteName();
+          var balanceBeforeDestroy = parseFloat(destroyUser.balance || '0');
+          var emailHtml = createEmailTemplate('硬盘销毁退款',
+            '<p>您的数据盘已销毁，退款已到账。</p>' +
+            '<div class="info-box">' +
+            '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">📝 退款说明：<strong>' + refundDesc + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceBeforeDestroy - refundAmount).toFixed(2) + ' → ¥' + balanceBeforeDestroy.toFixed(2) + '</strong></p>' +
+            '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+            '</div>' +
+            '<p>如有疑问请联系客服。</p>', siteName);
+          if (await shouldSendEmail(req.user.id, 'notify_disk_destroy_refund')) {
+            await sendEmail(destroyUser.email, '硬盘销毁退款 - ' + siteName, emailHtml);
+          }
+        }
+      } catch (emailErr) { console.error('[disk destroy] 退款邮件发送失败:', emailErr.message); }
+    }
 
     res.json({ success: true, refund: refundAmount > 0, refund_amount: refundAmount, refund_desc: refundDesc });
   } catch (e) {
@@ -722,6 +870,32 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
       if (disk.status === 'bound') newStatus = 'bound';
       await conn.execute('UPDATE disks SET expire_time = ?, status = ?, updated_at = NOW() WHERE id = ?', [newExpire, newStatus, disk.id]);
     });
+
+    // 邮件通知：硬盘续费成功
+    try {
+      var renewUser = await db.users.getById(req.user.id);
+      if (renewUser && renewUser.email && renewUser.emailVerified && renewUser.email.includes('@')) {
+        var siteName = await getSiteName();
+        var periodLabel = period === 'year' ? periodCount + '年' : period === 'quarter' ? periodCount + '季' : periodCount + '个月';
+        var expiryDisplay = newExpire ? new Date(newExpire).toLocaleString('zh-CN') : '永久有效';
+        var newBalance = (balanceBefore - amount).toFixed(2);
+        var emailHtml = createEmailTemplate('硬盘续费成功',
+          '<p>您的数据盘已续费成功！</p>' +
+          '<div class="info-box">' +
+          '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">📅 续费详情：<strong>' + periodLabel + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">⏳ 到期时间：<strong>' + expiryDisplay + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">💸 实付金额：<strong>¥' + amount.toFixed(2) + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">📋 订单编号：<strong>' + orderNo + '</strong></p>' +
+          '<p>⏰ 续费时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+          '</div>' +
+          '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
+        if (await shouldSendEmail(req.user.id, 'notify_disk_renewal')) {
+          await sendEmail(renewUser.email, '硬盘续费成功 - ' + siteName, emailHtml);
+        }
+      }
+    } catch (emailErr) { console.error('[disk renew] 邮件发送失败:', emailErr.message); }
 
     res.json({ success: true, amount: amount, new_expire: newExpire });
   } catch (e) {

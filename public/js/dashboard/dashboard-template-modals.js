@@ -254,8 +254,10 @@
                                         </td>
                                         <td class="small">{{ b.storage }}</td>
                                         <td>
-                                            <pv-button v-if="b.status === 'completed'" @click="restoreBackup(b)" title="恢复此备份" variant="outline" size="sm">恢复</pv-button>
-                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline-danger" size="sm">删除</pv-button>
+                                            <div class="d-flex gap-1">
+                                                <pv-button v-if="b.status === 'completed'" @click="restoreBackup(b)" title="恢复此备份" variant="outline" size="sm">恢复</pv-button>
+                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline-danger" size="sm">删除</pv-button>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -814,6 +816,20 @@
         <div class="modal-header"><h5 class="modal-title">确认订购</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="mb-3"><strong>{{ orderPackage.name }}</strong></div>
+            <!-- v1.3 新增：操作系统选择（仅 VM 套餐显示） -->
+            <div class="mb-3" v-if="orderType === 'vm'">
+                <label class="form-label">操作系统</label>
+                <select class="form-select" v-model="orderForm.os_template_id" :disabled="orderOsLoading">
+                    <option :value="0">请选择系统</option>
+                    <option v-for="t in orderOsTemplates" :key="t.id" :value="t.id">
+                        {{ t.name }}
+                    </option>
+                </select>
+                <div class="form-text text-muted" v-if="orderOsLoading">加载中...</div>
+                <div class="form-text text-muted" v-else-if="orderOsTemplates.length === 0">
+                    该套餐暂无可选系统，将使用默认模板开通，开通后可切换
+                </div>
+            </div>
             <div class="mb-3">
                 <label class="form-label">计费周期</label>
                 <div class="order-period-display">
@@ -862,6 +878,71 @@
             </div>
         </div>
     </div>
+</div>
+</Teleport>
+
+<!-- 切换系统弹窗 -->
+<Teleport to="body">
+<div class="modal fade" id="osSwitchModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content" style="background:var(--bg-modal)">
+        <div class="modal-header"><h5 class="modal-title">切换操作系统</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-body">
+            <div class="alert alert-warning" style="border:1px solid var(--bs-warning-border-subtle, #ffc107);background:color-mix(in srgb, var(--bs-warning) 15%, var(--bg-card, #fff));">
+                <strong style="color:var(--bs-warning-text-emphasis, #664d00);font-size:15px;">⚠️ 重要提示：</strong>
+                <ul class="mb-0 mt-1" style="color:var(--text-primary);line-height:1.8;">
+                    <li>切换系统将<strong style="color:var(--bs-danger);">清除系统盘所有数据</strong>，请提前备份重要文件</li>
+                    <li>数据盘不受影响，<strong style="color:var(--bs-success);">数据不会丢失</strong></li>
+                    <li>切换过程约 3-10 分钟，期间虚拟机将停机</li>
+                    <li>切换完成后将获得新的初始密码</li>
+                </ul>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold" style="color:var(--bs-primary)">选择目标系统</label>
+                <div class="row g-2">
+                    <div class="col-md-6" v-for="t in osSwitchList" :key="t.id">
+                        <div class="card border" @click="osSwitchSelectedId = t.id"
+                          :style="{
+                            cursor:'pointer',
+                            transition:'all .25s ease',
+                            borderColor: osSwitchSelectedId === t.id ? 'var(--bs-primary)' : 'var(--border-color, #dee2e6)',
+                            background: osSwitchSelectedId === t.id ? 'color-mix(in srgb, var(--bs-primary) 8%, var(--bg-card, #fff))' : 'var(--bg-card, #fff)',
+                            boxShadow: osSwitchSelectedId === t.id ? '0 2px 12px rgba(var(--bs-primary-rgb),0.25)' : 'none'
+                          }">
+                            <div class="card-body py-3 px-3">
+                                <div class="d-flex align-items-center gap-2 mb-1">
+                                    <span class="d-inline-flex align-items-center justify-content-center rounded-circle"
+                                      :style="{
+                                        width:'20px', height:'20px', flexShrink:0,
+                                        border:'2px solid',
+                                        borderColor: osSwitchSelectedId === t.id ? 'var(--bs-primary)' : 'var(--border-color, #adb5bd)',
+                                        transition:'all .2s ease'
+                                      }">
+                                        <span v-if="osSwitchSelectedId === t.id" class="rounded-circle d-block"
+                                          :style="{width:'10px', height:'10px', background:'var(--bs-primary)'}"></span>
+                                    </span>
+                                    <div class="fw-bold" :style="{color: osSwitchSelectedId === t.id ? 'var(--bs-primary)' : 'var(--text-primary)'}">{{ t.name }}</div>
+                                </div>
+                                <div class="small" style="margin-left:30px;color:var(--text-secondary)">{{ t.description ? t.description.substring(0,40) : '' }}</div>
+                                <div class="small" style="margin-left:30px;color:var(--text-secondary)" v-if="t.description">{{ t.description.substring(0,40) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="osSwitchList.length === 0" class="text-muted small py-3 text-center">暂无可切换的系统</div>
+            </div>
+            <div class="current-os text-muted small mb-2" v-if="osSwitchCurrentName">
+                当前系统：{{ osSwitchCurrentName }}
+            </div>
+            <div class="form-check" v-if="osSwitchSelectedId">
+                <input class="form-check-input" type="checkbox" id="osSwitchConfirm" v-model="osSwitchConfirm">
+                <label class="form-check-label" for="osSwitchConfirm">我已知晓切换将清除系统盘数据，并已备份重要文件</label>
+            </div>
+        </div>
+        <div class="modal-footer d-flex gap-2">
+            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+            <pv-button type="button" variant="danger" :disabled="!osSwitchConfirm || osSwitchSubmitting" :loading="osSwitchSubmitting" @click="submitOsSwitch()">确认切换系统</pv-button>
+        </div>
+    </div></div>
 </div>
 </Teleport>
 

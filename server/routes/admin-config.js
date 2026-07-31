@@ -154,7 +154,9 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
         // GitHub API 默认按标签时间戳排序（不可靠），需拉取多条后手动按 published_at 排序
         if (source === 'gitee') {
             response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=20&sort=created&direction=desc`, { timeout: 10000 });
-            response.data = Array.isArray(response.data) ? response.data[0] : response.data;
+            // Gitee 按创建时间返回，仍手动按 created_at/published_at 降序取最新，避免误取旧版本 release
+            const giteeReleases = (Array.isArray(response.data) ? response.data : []).sort((a, b) => new Date(b.published_at || b.created_at) - new Date(a.published_at || a.created_at));
+            response.data = giteeReleases[0] || null;
         } else {
             const [releasesRes, preReleasesRes] = await Promise.allSettled([
                 axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=20`, { timeout: 10000 }),
@@ -193,7 +195,8 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
             fallbackNote = '（GitHub 不可达，已回退到 Gitee）';
             try {
                 response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=20&sort=created&direction=desc`, { timeout: 10000 });
-                response.data = Array.isArray(response.data) ? response.data[0] : response.data;
+                const giteeReleases = (Array.isArray(response.data) ? response.data : []).sort((a, b) => new Date(b.published_at || b.created_at) - new Date(a.published_at || a.created_at));
+                response.data = giteeReleases[0] || null;
             } catch (e2) {
                 return res.json({
                     current_version: pkg.version,
@@ -267,31 +270,46 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
         const hasUpdate = compareVer(current, latest) === 1;
 
         // 同版本号检测：版本相同但 commit 不同时也提示可更新
+        // 注意必须判断先后方向：只有远程 release commit 领先本地（不是本地 HEAD 祖先）才提示；
+        // 若本地已包含该 release commit（本地比 release 更新），版本一致时不应再提示
         let sameVersionDifferentCommit = false;
         if (!hasUpdate && pkg.version === tag) {
             var projectRoot = path.join(__dirname, '..', '..');
             var currentCommit = getCurrentCommit(projectRoot);
+            var remoteCommit = null;
             if (currentCommit && response.data.target_commitish) {
-                sameVersionDifferentCommit = currentCommit !== response.data.target_commitish;
+                remoteCommit = response.data.target_commitish;
             } else if (currentCommit && response.data.tag_name) {
                 // 通过 tag 名称获取远程 commit（SEC-007: 改用 execFileSync 数组形式防注入）
                 try {
-                    var remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
+                    remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
                         cwd: projectRoot, timeout: 5000, stdio: 'pipe'
                     }).toString().trim();
-                    sameVersionDifferentCommit = currentCommit !== remoteCommit;
                 } catch (e) {
                     // 本地可能没有该 tag，尝试 fetch
                     try {
                         execFileSync('git', ['fetch', 'origin', 'tag', response.data.tag_name, '--no-tags'], {
                             cwd: projectRoot, timeout: 15000, stdio: 'pipe'
                         });
-                        var remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
+                        remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
                             cwd: projectRoot, timeout: 5000, stdio: 'pipe'
                         }).toString().trim();
-                        sameVersionDifferentCommit = currentCommit !== remoteCommit;
                     } catch (e2) {
                         // 无法获取远程 commit，忽略
+                    }
+                }
+            }
+            if (currentCommit && remoteCommit) {
+                // commit 不同时，仅当远程 release commit 不是本地 HEAD 的祖先（远程确实领先本地）才提示
+                if (currentCommit !== remoteCommit) {
+                    try {
+                        execFileSync('git', ['merge-base', '--is-ancestor', remoteCommit, 'HEAD'], {
+                            cwd: projectRoot, timeout: 5000, stdio: 'pipe'
+                        });
+                        // 远程 commit 是本地祖先 → 本地已包含该 release，视为已是最新
+                    } catch (e) {
+                        // 不是祖先 → 远程存在本地没有的提交，提示可更新
+                        sameVersionDifferentCommit = true;
                     }
                 }
             }
@@ -393,13 +411,48 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             usedFallback = true;
         }
 
+        // V3-15 修复：reset 前创建可回滚备份（git 分支引用 + 工作区快照）
+        // 更新失败或异常时可通过 .update-backup 目录 + .update-backup/HEAD 恢复到原状态
+        let backupCreated = false;
+        try {
+            const backupDir = path.join(projectRoot, '.update-backup');
+            if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+            // 记录当前 HEAD 分支引用（含 stash 状态），供回滚脚本使用
+            const currentHead = execSync('git rev-parse HEAD', { cwd: projectRoot, timeout: 5000, stdio: 'pipe' }).toString().trim();
+            const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectRoot, timeout: 5000, stdio: 'pipe' }).toString().trim();
+            fs.writeFileSync(path.join(backupDir, 'HEAD'), currentHead + '\n', 'utf8');
+            fs.writeFileSync(path.join(backupDir, 'BRANCH'), currentBranch + '\n', 'utf8');
+            // 未提交改动备份为 patch（git diff HEAD 输出）
+            try {
+                const diff = execSync('git diff HEAD', { cwd: projectRoot, timeout: 15000, stdio: 'pipe', encoding: 'utf-8' });
+                fs.writeFileSync(path.join(backupDir, 'working.patch'), diff, 'utf8');
+            } catch (diffErr) {
+                // 无未提交改动时 diff 输出为空，忽略
+                fs.writeFileSync(path.join(backupDir, 'working.patch'), '', 'utf8');
+            }
+            backupCreated = true;
+            console.log('[系统更新] 已创建回滚备份:', backupDir, 'HEAD=' + currentHead);
+        } catch (backupErr) {
+            console.error('[系统更新] 创建回滚备份失败（继续更新）:', backupErr.message);
+        }
+
         // reset 到 FETCH_HEAD（git fetch <url> <branch> 后最新提交在 FETCH_HEAD）
         try {
             execSync(`git -c safe.directory=${safeGitDir} reset --hard FETCH_HEAD`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
         } catch (error) {
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
             console.error('[系统更新] git reset 失败:', stderr);
-            return res.status(500).json({ error: '更新失败: git reset 失败，请检查仓库状态' });
+            // V3-15：reset 失败时尝试回滚到备份 HEAD
+            if (backupCreated) {
+                try {
+                    const head = fs.readFileSync(path.join(projectRoot, '.update-backup', 'HEAD'), 'utf8').trim();
+                    execSync(`git -c safe.directory=${safeGitDir} reset --hard ${head}`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
+                    console.log('[系统更新] 已回滚到备份 HEAD:', head);
+                } catch (rollbackErr) {
+                    console.error('[系统更新] 回滚失败，请手动恢复:', rollbackErr.message);
+                }
+            }
+            return res.status(500).json({ error: '更新失败: git reset 失败，已尝试回滚，请检查仓库状态' });
         }
         try {
             execSync('npm install --production', { cwd: projectRoot, timeout: 120000, stdio: 'pipe' });

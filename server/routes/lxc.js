@@ -6,12 +6,13 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 const { getStatusCache } = require('../websocket/push-proxy');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp } = require('../services/dhcp');
 const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
+const { checkRateLimit } = require('../middleware/rate-limiter');
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
 router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -52,6 +53,10 @@ router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.get('/user/lxc', authMiddleware, async (req, res) => {
     try {
+        // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
+        const listRate = await checkRateLimit('ratelimit:user-lxc:' + req.user.id, 10, 60000);
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         let userCts;
         if (req.user.role === 'admin') {
             // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
@@ -211,33 +216,38 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 
     const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
-        try {
-            const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
-            const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
-            const emailContent = `
-                <p>您好 <strong>${assignedUser.username}</strong>，</p>
-                <div class="info-box" style="border-left-color: #48bb78;">
-                    <p style="margin-bottom: 8px; font-size: 16px;">
-                        🎉 您的 LXC 容器已开通！
-                    </p>
-                </div>
-                <div class="info-box">
-                    <p style="margin-bottom: 8px;"><strong>容器信息：</strong></p>
-                    <p style="margin-bottom: 4px;">名称：${name || 'CT ' + ct_id}</p>
-                    <p style="margin-bottom: 4px;">CT ID：${ct_id}</p>
-                    <p style="margin-bottom: 4px;">到期时间：${expiryStr}</p>
-                    ${priceStr}
-                </div>
-                <div class="divider"></div>
-                <p>您可以前往「我的 LXC 容器」页面开始使用。如有问题请联系管理员。</p>
-            `;
-            await sendEmail(
-                assignedUser.email,
-                'LXC 容器已开通 - PVE 管理面板',
-                createEmailTemplate('容器开通通知', emailContent)
-            );
-        } catch (emailError) {
-            console.error(`发送 LXC 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
+        if (await shouldSendEmail(assignedUser.id, 'notify_lxc_provisioned')) {
+            try {
+                const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
+                const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
+                const emailContent = `
+                    <p>您好 <strong>${assignedUser.username}</strong>，</p>
+                    <div class="info-box" style="border-left-color: #48bb78;">
+                        <p style="margin-bottom: 8px; font-size: 16px;">
+                            🎉 您的 LXC 容器已开通！
+                        </p>
+                    </div>
+                    <div class="info-box">
+                        <p style="margin-bottom: 8px;"><strong>容器信息：</strong></p>
+                        <p style="margin-bottom: 4px;">名称：${name || 'CT ' + ct_id}</p>
+                        <p style="margin-bottom: 4px;">CT ID：${ct_id}</p>
+                        <p style="margin-bottom: 4px;">到期时间：${expiryStr}</p>
+                        ${priceStr}
+                    </div>
+                    <div class="divider"></div>
+                    <p>您可以前往「我的 LXC 容器」页面开始使用。如有问题请联系管理员。</p>
+                `;
+                const lxcSiteName = await getSiteName();
+                if (await shouldSendEmail(assignedUser.id, 'notify_lxc_provisioned')) {
+                    await sendEmail(
+                        assignedUser.email,
+                        'LXC 容器已开通 - ' + lxcSiteName,
+                        createEmailTemplate('容器开通通知', emailContent, lxcSiteName)
+                    );
+                }
+            } catch (emailError) {
+                console.error(`发送 LXC 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
+            }
         }
     }
  
@@ -434,29 +444,34 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
     if (removedCtInfo) {
         const removedUser = await db.users.getById(removedCtInfo.user_id);
         if (removedUser && removedUser.email && removedUser.emailVerified) {
-            try {
-                const emailContent = `
-                    <p>您好 <strong>${removedUser.username}</strong>，</p>
-                    <div class="warning-box">
-                        <p style="margin-bottom: 8px; font-size: 16px;">
-                            ⚠️ 您的 LXC 容器已被移除
-                        </p>
-                    </div>
-                    <div class="info-box">
-                        <p style="margin-bottom: 8px;"><strong>容器信息：</strong></p>
-                        <p style="margin-bottom: 4px;">名称：${removedCtInfo.name || 'CT ' + removedCtInfo.ct_id}</p>
-                        <p style="margin-bottom: 4px;">CT ID：${removedCtInfo.ct_id}</p>
-                    </div>
-                    <div class="divider"></div>
-                    <p>如果对此操作有疑问，请联系管理员。</p>
-                `;
-                await sendEmail(
-                    removedUser.email,
-                    'LXC 容器已被移除 - PVE 管理面板',
-                    createEmailTemplate('容器移除通知', emailContent)
-                );
-            } catch (emailError) {
-                console.error(`发送 LXC 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
+            if (await shouldSendEmail(removedCtInfo.user_id, 'notify_lxc_provisioned')) {
+                try {
+                    const emailContent = `
+                        <p>您好 <strong>${removedUser.username}</strong>，</p>
+                        <div class="warning-box">
+                            <p style="margin-bottom: 8px; font-size: 16px;">
+                                ⚠️ 您的 LXC 容器已被移除
+                            </p>
+                        </div>
+                        <div class="info-box">
+                            <p style="margin-bottom: 8px;"><strong>容器信息：</strong></p>
+                            <p style="margin-bottom: 4px;">名称：${removedCtInfo.name || 'CT ' + removedCtInfo.ct_id}</p>
+                            <p style="margin-bottom: 4px;">CT ID：${removedCtInfo.ct_id}</p>
+                        </div>
+                        <div class="divider"></div>
+                        <p>如果对此操作有疑问，请联系管理员。</p>
+                    `;
+                    const lxcSiteName2 = await getSiteName();
+                    if (await shouldSendEmail(removedUser.id, 'notify_lxc_provisioned')) {
+                        await sendEmail(
+                            removedUser.email,
+                            'LXC 容器已被移除 - ' + lxcSiteName2,
+                            createEmailTemplate('容器移除通知', emailContent, lxcSiteName2)
+                        );
+                    }
+                } catch (emailError) {
+                    console.error(`发送 LXC 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
+                }
             }
         }
     }
@@ -680,6 +695,10 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
 
 router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
     try {
+        // V3-08 修复：状态查询端点限速（30次/分钟）
+        const statusRate = await checkRateLimit('ratelimit:lxc-status:' + req.user.id, 30, 60000);
+        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         const vmid = parseInt(req.params.vmid);
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
@@ -826,7 +845,9 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
             30000
         );
         if (code !== 0) {
-            return res.status(500).json({ error: '密码重置失败: ' + (stderr || 'lxc-attach 命令执行出错') });
+            // V3-06 修复：不回显 SSH stderr（防内部信息泄露），详情仅记服务端日志
+            console.error(`[lxc] 重置密码失败（vmid=${vmid}）:`, stderr || 'lxc-attach 命令执行出错');
+            return res.status(500).json({ error: '密码重置失败，请稍后重试' });
         }
         res.json({ message: '密码重置成功' });
     } catch (error) {

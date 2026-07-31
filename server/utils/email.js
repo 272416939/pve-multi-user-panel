@@ -1,6 +1,16 @@
 const nodemailer = require('nodemailer');
 const db = require('../api/db');
 
+// 统一获取站点名称（管理端可自定义），供邮件主题/模板头部使用，避免硬编码面板名
+async function getSiteName() {
+    try {
+        var name = await db.config.get('site:name');
+        return name || '云服务控制台';
+    } catch (e) {
+        return '云服务控制台';
+    }
+}
+
 function createEmailTemplate(title, content, siteName) {
     return `
         <!DOCTYPE html>
@@ -109,7 +119,7 @@ function createEmailTemplate(title, content, siteName) {
         <body>
             <div class="email-container">
                 <div class="email-header">
-                    <h1>${siteName || 'PVE 多用户控制面板'}</h1>
+                    <h1>${siteName || '云服务控制台'}</h1>
                     <p>${title}</p>
                 </div>
                 <div class="email-content">
@@ -176,4 +186,26 @@ async function sendEmail(to, subject, html) {
     }
 }
 
-module.exports = { createEmailTemplate, sendEmail };
+/**
+ * 检查用户是否允许接收某类邮件通知
+ * @param {number} userId - 用户ID
+ * @param {string} category - 通知类别（如 notify_vm_provisioned）
+ * @returns {boolean} 是否允许发送
+ */
+async function shouldSendEmail(userId, category) {
+    try {
+        if (!userId || !category) return true;
+        var settings = await db.userSettings.getByUserId(userId);
+        // 总开关关闭 → 不发送
+        if (settings.email_notifications_enabled === 0) return false;
+        // 对应类别开关关闭 → 不发送
+        if (settings[category] === 0) return false;
+        return true;
+    } catch (e) {
+        // 查询失败时默认允许发送（不影响主流程）
+        console.error('[email] shouldSendEmail 查询失败:', e.message);
+        return true;
+    }
+}
+
+module.exports = { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail };

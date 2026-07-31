@@ -43,7 +43,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // MISC-1 修复：仅信任一层代理（防止 req.ip 伪造绕过限速）
-app.set('trust proxy', 1);
+// V3-05 修复：仅当显式配置 TRUST_PROXY=true（存在前置可信反向代理）时才启用 trust proxy，
+// 否则不信任任何 X-Forwarded-For，杜绝攻击者伪造 IP 绕过全部 req.ip 限速
+if (process.env.TRUST_PROXY === 'true') {
+    app.set('trust proxy', 1);
+} else {
+    app.set('trust proxy', false);
+}
 // MISC-9 修复：禁用 X-Powered-By 头，不暴露框架信息
 app.disable('x-powered-by');
 
@@ -123,15 +129,20 @@ app.use((req, res, next) => {
     if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
-    // XSS-4 修复：script-src 使用 nonce 替代 unsafe-inline（保留 unsafe-eval 供 Vue 运行时模板编译）
+    // XSS-4 修复：script-src 使用 nonce 替代 unsafe-inline
     // SEC-005/011: CDN 由 jsd.owoser.cn 换回官方 cdn.jsdelivr.net
+    // V3-12 修复：connect-src 收敛为同源 + ws/wss + 前端依赖的 jsDelivr CDN
+    // 注：jsDelivr 已列入 script-src/style-src，加入 connect-src 是为了放行 CDN 资源的
+    //     source map（.map）拉取（浏览器按 sourceMappingURL 自动 fetch），不扩大实际攻击面
+    // 注：unsafe-eval 必须保留 —— 前端 Vue 3 使用 template:'#appTemplate' 运行时模板编译（依赖 new Function），
+    //     移除会导致页面白屏；后续若改为 render 函数/单文件组件预编译可安全移除
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
         "script-src 'self' 'nonce-" + cspNonce + "' 'unsafe-eval' https://cdn.jsdelivr.net",
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.loli.net",
-        "font-src 'self' https://gstatic.loli.net",
+        "font-src 'self' https://gstatic.loli.net https://cdn.jsdelivr.net",
         "img-src 'self' data: blob: https:",
-        "connect-src 'self' ws: wss: https:",
+        "connect-src 'self' ws: wss: https://cdn.jsdelivr.net",
         "frame-ancestors 'self'",
         "object-src 'none'",
         "base-uri 'self'",
@@ -159,19 +170,6 @@ app.use(express.static(path.join(__dirname, '../public'), {
         }
     }
 }));
-// 自动注入JS缓存版本号：HTML中 ?v=xxx 统一替换为当前 package.json 版本
-app.use((req, res, next) => {
-    const isEjsPage = ['/admin', '/dashboard', '/user-center', '/login'].includes(req.path);
-    if (!req.path.endsWith('.html') && !isEjsPage) return next();
-    const origSend = res.send.bind(res);
-    res.send = function (body) {
-        if (typeof body === 'string' && body.includes('<script')) {
-            body = body.replace(/\?v=[^"'\s]*/g, '?v=' + pkg.version);
-        }
-        return origSend(body);
-    };
-    next();
-});
 app.use('/images', express.static(path.join(__dirname, '../images'), {
     setHeaders: (res) => {
         res.removeHeader('Expires');
@@ -184,7 +182,23 @@ app.get('/api/version', authMiddleware, (req, res) => {
     res.json({ version: pkg.version });
 });
 
-// 健康检查端点（供负载均衡器/K8s 探测，无需认证）
+// 全局缓存版本号（用于 CSS/JS 缓存控制，启动时加载，运行时通过中间件注入到 EJS locals）
+// 此处先设默认值，启动后监听回调中会重新加载
+app.locals.cacheVersion = '1';
+try {
+    var _cacheVerPath = path.join(__dirname, '../public/cache-version.json');
+    if (fs.existsSync(_cacheVerPath)) {
+        var _cacheVerData = fs.readFileSync(_cacheVerPath, 'utf8');
+        var _cacheVerParsed = JSON.parse(_cacheVerData);
+        if (_cacheVerParsed && _cacheVerParsed.v) app.locals.cacheVersion = String(_cacheVerParsed.v);
+    }
+} catch (_) {}
+// 注入到所有 EJS 模板的 res.locals（_with: false 模式下模板需通过 locals.xxx 访问）
+app.use(function(req, res, next) {
+    res.locals.cacheVersion = app.locals.cacheVersion;
+    next();
+});
+
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', version: pkg.version, timestamp: new Date().toISOString() });
 });
@@ -243,6 +257,8 @@ app.use('/api', require('./routes/template'));
 app.use('/api', require('./routes/package'));
 app.use('/api', require('./routes/disk'));
 app.use('/api', require('./routes/admin-disk'));
+app.use('/api', require('./routes/admin-os-template'));
+app.use('/api', require('./routes/user-settings'));
 
 const vncProxy = require('./websocket/vnc-proxy');
 const terminalProxy = require('./websocket/terminal-proxy');
@@ -406,9 +422,17 @@ app.get('*', (req, res) => {
 
 // 全局错误处理：确保 API 返回 JSON 而非 HTML
 app.use((err, req, res, next) => {
-    console.error('[error]', err.message || err);
+    // V3-16 修复：服务端错误日志脱敏（剔除路径/URL/IP），避免敏感信息写入日志
+    var sanitizedErrMsg = '';
+    try {
+        const { sanitizeErrorMsg } = require('./utils/safe-error');
+        sanitizedErrMsg = sanitizeErrorMsg(err.message || String(err));
+    } catch (e) {
+        sanitizedErrMsg = err.message || String(err);
+    }
+    console.error('[error]', sanitizedErrMsg);
     if (req.path.startsWith('/api/')) {
-        var errMsg = (process.env.DEBUG === 'true') ? (err.message || '服务器内部错误') : '服务器内部错误';
+        var errMsg = (process.env.DEBUG === 'true') ? sanitizedErrMsg : '服务器内部错误';
         return res.status(err.status || 500).json({ error: errMsg });
     }
     res.status(500).send('服务器内部错误');
@@ -428,30 +452,53 @@ httpServer.listen(PORT, async () => {
         process.exit(1);
     }
 
-    // 从 DB 加载 Redis 配置，写入 process.env 后初始化连接
-    try {
-        var redisConfig = await db.config.getRedis();
-        if (redisConfig && redisConfig.host) {
-            process.env.REDIS_HOST = redisConfig.host;
-            process.env.REDIS_PORT = String(redisConfig.port || 6379);
-            process.env.REDIS_PASSWORD = redisConfig.password || '';
-            process.env.REDIS_DB = String(redisConfig.db || 0);
-            process.env.REDIS_PREFIX = redisConfig.prefix || 'pve:';
-        } else {
-            // 未配置 Redis 地址，确保 REDIS_HOST 不存在（disable Redis）
-            delete process.env.REDIS_HOST;
-        }
-        const redisModule = require('./api/redis');
-        redisModule.resetClient(); // 断开旧连接（如有），强制下次 getRedisClient 重新连接
-        const redisClient = redisModule.getRedisClient();
-        app.locals.redis = redisClient;
-        if (!redisClient) {
-            console.log('[redis] 未配置 Redis，使用进程内存模式');
-        }
-    } catch (e) {
-        console.warn('[redis] 初始化异常:', e.message);
-        app.locals.redis = null;
-    }
+	    // 从 DB 加载 Redis 配置，写入 process.env 后初始化连接
+	    try {
+	        var redisConfig = await db.config.getRedis();
+	        if (redisConfig && redisConfig.host) {
+	            process.env.REDIS_HOST = redisConfig.host;
+	            process.env.REDIS_PORT = String(redisConfig.port || 6379);
+	            process.env.REDIS_PASSWORD = redisConfig.password || '';
+	            process.env.REDIS_DB = String(redisConfig.db || 0);
+	            process.env.REDIS_PREFIX = redisConfig.prefix || 'pve:';
+	        } else {
+	            // 未配置 Redis 地址，确保 REDIS_HOST 不存在（disable Redis）
+	            delete process.env.REDIS_HOST;
+	        }
+	        const redisModule = require('./api/redis');
+	        redisModule.resetClient(); // 断开旧连接（如有），强制下次 getRedisClient 重新连接
+	        const redisClient = redisModule.getRedisClient();
+	        app.locals.redis = redisClient;
+	        if (!redisClient) {
+	            console.log('[redis] 未配置 Redis，使用进程内存模式');
+	        }
+		    } catch (e) {
+		        console.warn('[redis] 初始化异常:', e.message);
+		        app.locals.redis = null;
+	}
+
+			    // 初始化存量 VM 磁盘快照（用于恢复后对账基线）
+		    try {
+		        const diskAudit = require('./services/disk-audit');
+		        const vms = await db.vms.getAll();
+		        var snapped = 0;
+		        var failed = 0;
+		        for (var vi = 0; vi < vms.length; vi++) {
+		            var vm = vms[vi];
+		            try {
+		                await diskAudit.takeDiskSnapshot(vm.vm_id, vm.user_id);
+		                snapped++;
+		            } catch (snapErr) {
+		                // VM 可能已被删除或节点不可达，跳过
+		                failed++;
+		            }
+		        }
+		        if (vms.length > 0) {
+		            console.log('[快照基线] 已为 ' + snapped + ' 台 VM 建立磁盘快照基线' + (failed ? '（' + failed + ' 台跳过）' : ''));
+		        }
+		    } catch (initErr) {
+		        console.warn('[快照基线] 初始化失败（不影响启动）:', initErr.message);
+		    }
 
     // 启动时预编译所有 EJS 模板，避免首个用户访问时等待编译
     try {

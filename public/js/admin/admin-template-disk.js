@@ -125,11 +125,6 @@
               <div class="form-text">到期后缓冲</div>
             </div>
             <div class="col-md-4">
-              <label class="form-label">优雅关机超时（秒）</label>
-              <input class="form-control" type="number" v-model.number="diskPage.lifecycleForm.value.shutdown_timeout" min="0">
-              <div class="form-text">超时强制断电</div>
-            </div>
-            <div class="col-md-4">
               <label class="form-label">保留期时长</label>
               <input class="form-control" type="number" v-model.number="diskPage.lifecycleForm.value.retention_days" min="0">
               <div class="form-text">逾期自动销毁</div>
@@ -209,8 +204,8 @@
               <td>{{ disk.capacity_gb }} GiB</td>
               <td><span :class="diskPage.getDiskStatusClass(disk.status)">{{ diskPage.getDiskStatusText(disk.status) }}</span></td>
               <td>{{ disk.bind_vmid ? 'VM-' + disk.bind_vmid : '-' }}</td>
-              <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.formatDate(disk.expire_time) : '-') }}</td>
-              <td>{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? diskPage.daysUntilExpire(disk.expire_time) : '-') }}</td>
+              <td>{{ disk.status === 'destroyed' ? '0' : (disk.is_legacy ? '随VM' : (disk.expire_time ? diskPage.formatDate(disk.expire_time) : '-')) }}</td>
+              <td>{{ disk.status === 'destroyed' ? '0' : (disk.is_legacy ? '随VM' : (disk.expire_time ? diskPage.daysUntilExpire(disk.expire_time) : '-')) }}</td>
               <td>
                 <div class="table-actions">
                   <button v-if="disk.status !== 'destroyed'" class="table-btn btn-primary" @click="diskPage.openEditDiskForm(disk)">编辑</button>

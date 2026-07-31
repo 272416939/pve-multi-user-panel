@@ -374,3 +374,92 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     .message-title { font-size: 13px; }
     .message-preview { font-size: 11px; -webkit-line-clamp: 1; }
 }
+
+/* ===== 通知设置 ===== */
+.notification-master-switch {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+.notification-master-bg {
+    /* 明暗主题适配：使用项目主题变量，不依赖 Bootstrap 的 --bs-* 变量 */
+    background: var(--bg-input);
+    transition: background-color 0.3s ease;
+}
+.notification-group {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.notification-group-header {
+    cursor: pointer;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    transition: background-color 0.2s ease, border-color 0.3s ease;
+}
+.notification-group-header:hover {
+    background: var(--bg-hover);
+}
+.notification-group-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+.notification-group-icon svg {
+    display: block;
+}
+.notification-chevron {
+    color: var(--text-muted);
+}
+.notification-group-items {
+    border-top: 1px solid var(--border-color);
+}
+.notification-item-row {
+    border-bottom: 1px solid var(--border-color);
+}
+.notification-item-row:last-child {
+    border-bottom: none;
+}
+.transition-transform {
+    transition: transform 0.2s ease;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Toast 提示 */
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 9999;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    pointer-events: none;
+}
+.toast-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+}
+.toast-error {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #fff;
+}
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+    opacity: 0;
+    transform: translateY(-10px);
+}

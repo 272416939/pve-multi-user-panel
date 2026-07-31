@@ -177,7 +177,7 @@
                                     <p>成功生成 <strong>{{ cdkResult.length }}</strong> 个 CDK 兑换码</p>
                                     <p v-if="cdkResultBatchId" class="text-muted small">批次号: {{ cdkResultBatchId }}</p>
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3 d-flex gap-2">
                                     <pv-button @click="exportCdkCsv(cdkResultBatchId)" size="sm">
 
                                         导出此批次 CSV
@@ -236,7 +236,7 @@
                                     <div class="mb-3">
                                         <label class="form-label">分配给</label>
                                         <select class="form-select" v-model="editVmForm.user_id">
-                                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
+                                            <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.username }}</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
@@ -822,7 +822,7 @@
                                     <div class="mb-3">
                                         <label class="form-label">分配给</label>
                                         <select class="form-select" v-model="editLxcForm.user_id">
-                                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
+                                            <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.username }}</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
@@ -1151,14 +1151,9 @@
                             <div class="modal-body">
                                 <div class="row g-3">
                                     <div class="col-md-6"><label class="form-label">模板名称</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.name"></div>
-                                    <div class="col-md-6"><label class="form-label">模板 VM</label>
-                                        <select class="form-select" v-model="templatePage.vmTemplateForm.value.template_vmid">
-                                            <option value="">请选择 PVE 模板 VM</option>
-                                            <option v-for="v in templatePage.pveTemplateVms.value" :key="v.vmid" :value="v.vmid">{{ v.name || 'VM ' + v.vmid }} ({{ v.vmid }})</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.cores"></div>
-                                    <div class="col-md-6"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.memory"></div>
+                                    <div class="col-md-6"><label class="form-label">系统盘容量(GB)</label><input class="form-control" type="number" v-model.number="templatePage.vmTemplateForm.value.disk_size" min="5" max="500"></div>
+                                    <div class="col-md-4"><label class="form-label">CPU (核)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.cores"></div>
+                                    <div class="col-md-4"><label class="form-label">内存 (MB)</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.memory"></div>
                                     <div class="col-md-6"><label class="form-label">目标存储</label>
                                         <select class="form-select" v-model="templatePage.vmTemplateForm.value.target_storage">
                                             <option value="">请选择存储池</option>
@@ -1176,8 +1171,6 @@
                                         <input class="form-control" v-model="templatePage.vmTemplateForm.value.cpu_affinity" placeholder="如 0-11, 留空不绑定">
                                     </div>
                                     <div class="col-md-6"><label class="form-label">网卡型号</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.network_model"></div>
-                                    <div class="col-md-6"><label class="form-label">操作系统类型</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.os_type"></div>
-                                    <div class="col-md-6"><label class="form-label">Cloud-init 用户</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.ciuser" placeholder="如 root"></div>
                                     <div class="col-md-6"><label class="form-label">状态</label><select class="form-select" v-model="templatePage.vmTemplateForm.value.status"><option value="active">启用</option><option value="inactive">停用</option></select></div>
                                     <div class="col-md-6"><label class="form-label">MAC分组</label>
                                         <select class="form-select" v-model="templatePage.vmTemplateForm.value.mac_group_id">
@@ -1455,8 +1448,10 @@
                                                     <td>{{ (rule.protocol || '').toUpperCase() }}</td>
                                                     <td><span :class="rule.enabled ? 'text-success' : 'text-muted'">{{ rule.enabled ? '启用' : '禁用' }}</span></td>
                                                     <td>
-                                                        <pv-button @click="openDeviceEditModal(rule)" variant="outline" size="sm">编辑</pv-button>
-                                                        <pv-button @click="deleteDeviceRule(rule)" variant="outline-danger" size="sm">删除</pv-button>
+                                                        <div class="d-flex gap-1">
+                                                            <pv-button @click="openDeviceEditModal(rule)" variant="outline" size="sm">编辑</pv-button>
+                                                            <pv-button @click="deleteDeviceRule(rule)" variant="outline-danger" size="sm">删除</pv-button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             </tbody>

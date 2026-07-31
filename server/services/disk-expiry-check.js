@@ -4,7 +4,7 @@
 
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
-var { createEmailTemplate, sendEmail } = require('../utils/email');
+var { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 var { getRedisClient } = require('../api/redis');
 var logger = require('../utils/logger');
@@ -57,51 +57,17 @@ async function sendDiskReminderEmail(user, disk, stage) {
       content = '<p>您的数据盘 <strong>' + (disk.disk_name || disk.volume_id) + '</strong>（' + disk.capacity_gb + ' GiB）已到期分离，进入保留期。</p>';
       content += '<p>保留期内续费可重新挂载，逾期将自动销毁。</p>';
     }
-    var siteName = 'PVE 管理面板';
-    try {
-      var cfg = await db.config.get('site:name');
-      if (cfg) siteName = cfg;
-    } catch (e) {}
+    var siteName = await getSiteName();
     var html = createEmailTemplate('硬盘到期提醒', content, siteName);
-    await sendEmail(user.email, subject, html);
+    if (await shouldSendEmail(user.id, 'notify_expiry_reminder')) {
+        await sendEmail(user.email, subject, html);
+    }
   } catch (e) {
     logger.error('[disk-expiry] 发送提醒邮件失败:', e.message);
   }
 }
 
-// ==================== 优雅关机 + 等待 ====================
-
-async function gracefulShutdownVm(vmid, timeout) {
-  try {
-    var status = await pveApi.getVmStatus(vmid);
-    if (status.status !== 'running') return true;
-
-    // 优雅关机
-    await pveApi.shutdownVm(vmid);
-
-    // 等待关机完成（轮询，超时强制断电兜底）
-    var startWait = Date.now();
-    var timeoutMs = (timeout || 300) * 1000;
-    while (Date.now() - startWait < timeoutMs) {
-      await new Promise(function(r) { setTimeout(r, 5000); });
-      try {
-        var s = await pveApi.getVmStatus(vmid);
-        if (s.status === 'stopped') return true;
-      } catch (e) {}
-    }
-
-    // 超时强制断电
-    logger.warn('[disk-expiry] VM ' + vmid + ' 优雅关机超时，强制断电');
-    await pveApi.stopVm(vmid);
-    await new Promise(function(r) { setTimeout(r, 3000); });
-    return true;
-  } catch (e) {
-    logger.error('[disk-expiry] 关机 VM ' + vmid + ' 失败:', e.message);
-    return false;
-  }
-}
-
-// ==================== 分离磁盘（qm set --delete） ====================
+// ==================== 分离磁盘（qm unlink） ====================
 
 async function detachDiskFromVm(disk) {
   try {
@@ -194,13 +160,12 @@ async function checkExpiredDisks() {
     // 获取生命周期配置
     var config = await db.diskLifecycleConfig.get();
     if (!config) {
-      config = { warn_days: 7, grace_days: 3, retention_days: 15, shutdown_timeout: 300 };
+      config = { warn_days: 7, grace_days: 3, retention_days: 15 };
     }
 
     var warnDays = config.warn_days || 7;
     var graceDays = config.grace_days || 3;
     var retentionDays = config.retention_days || 15;
-    var shutdownTimeout = config.shutdown_timeout || 300;
     var now = new Date();
     var today = todayStr();
 
@@ -335,8 +300,7 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
     content += '<p><strong>已用容量 / 总容量：</strong>' + usedTb + ' TiB / ' + totalTb + ' TiB</p>';
     content += '<p style="color:#dc3545;"><strong>请及时扩容存储池或清理闲置磁盘。</strong></p>';
 
-    var siteName = 'PVE 管理面板';
-    try { var cfg = await db.config.get('site:name'); if (cfg) siteName = cfg; } catch (e) {}
+    var siteName = await getSiteName();
     var html = createEmailTemplate('存储容量告警', content, siteName);
 
     for (var i = 0; i < admins.rows.length; i++) {
@@ -352,6 +316,122 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
 }
 
 // ==================== 存量虚拟机数据盘导入（文档 4.5） ====================
+
+/**
+ * 导入单台 VM 的存量数据盘（幂等，用于 VM 分配后自动导入）
+ * 只扫描非 0 设备号的数据盘，跳过已存在的 volume_id
+ * @param {number} vmId - VM ID
+ * @param {number} userId - 用户 ID
+ * @returns {object} { imported: number, skipped: number }
+ */
+async function importDisksForVm(vmId, userId) {
+  var imported = 0;
+  var skipped = 0;
+  try {
+    var allSpecs = await db.diskSpecs.getAll();
+    var allGroups = await db.storageGroups.getAll();
+    var config = await pveApi.getVmConfig(vmId);
+    if (!config) return { imported: 0, skipped: 0 };
+
+    for (var dev = 1; dev <= 30; dev++) {
+      var buses = ['scsi', 'sata', 'virtio'];
+      for (var b = 0; b < buses.length; b++) {
+        var bus = buses[b];
+        var key = bus + dev;
+        var diskLine = config[key];
+        if (!diskLine) continue;
+
+        var parts = diskLine.split(',');
+        var volId = parts[0];
+        if (!volId || volId.indexOf(':') === -1) continue;
+
+        // 幂等：已存在的记录跳过
+        var existing = await db.disks.getByVolumeId(volId);
+        if (existing) { skipped++; continue; }
+
+        // 解析容量
+        var capacityGb = 0;
+        for (var p = 1; p < parts.length; p++) {
+          if (parts[p].indexOf('size=') === 0) {
+            var sizeStr = parts[p].substring(5);
+            if (sizeStr.indexOf('G') > -1) {
+              capacityGb = parseInt(sizeStr) || 0;
+            } else if (sizeStr.indexOf('M') > -1) {
+              capacityGb = Math.floor((parseInt(sizeStr) || 0) / 1024);
+            }
+            break;
+          }
+        }
+        if (capacityGb === 0) continue;
+
+        // 自动匹配规格
+        var volParts = volId.split(':');
+        var storagePool = volParts[0];
+        var matchedSpec = null;
+        for (var s = 0; s < allSpecs.length; s++) {
+          if (allSpecs[s].storage_pool === storagePool && capacityGb >= allSpecs[s].min_size_gb && capacityGb <= allSpecs[s].max_size_gb) {
+            matchedSpec = allSpecs[s];
+            break;
+          }
+        }
+
+        // 匹配存储分组
+        var matchedGroup = null;
+        for (var g = 0; g < allGroups.length; g++) {
+          if (matchedSpec && allGroups[g].id === matchedSpec.storage_group_id) {
+            matchedGroup = allGroups[g];
+            break;
+          }
+        }
+
+        var diskName = 'imported-' + vmId + '-' + bus + dev;
+        var diskType = matchedSpec ? matchedSpec.disk_type : 'NVME';
+        var groupId = matchedGroup ? matchedGroup.id : (allGroups.length > 0 ? allGroups[0].id : 1);
+
+        await db.disks.create({
+          volume_id: volId,
+          disk_name: diskName,
+          spec_id: matchedSpec ? matchedSpec.id : null,
+          user_id: userId,
+          storage_group_id: groupId,
+          storage_pool: storagePool,
+          disk_type: diskType,
+          disk_format: null,
+          capacity_gb: capacityGb,
+          status: 'bound',
+          price_per_gb: 0,
+          quarterly_discount: 0,
+          yearly_discount: 0,
+          auto_renew: 0,
+          is_legacy: 1,
+          expire_time: null,
+          mbps_rd: matchedSpec ? matchedSpec.mbps_rd : null,
+          mbps_rd_max: matchedSpec ? matchedSpec.mbps_rd_max : null,
+          mbps_wr: matchedSpec ? matchedSpec.mbps_wr : null,
+          mbps_wr_max: matchedSpec ? matchedSpec.mbps_wr_max : null,
+          iops_rd: matchedSpec ? matchedSpec.iops_rd : null,
+          iops_rd_max: matchedSpec ? matchedSpec.iops_rd_max : null,
+          iops_wr: matchedSpec ? matchedSpec.iops_wr : null,
+          iops_wr_max: matchedSpec ? matchedSpec.iops_wr_max : null
+        });
+
+        // 更新绑定信息（新创建的记录没有 bind 字段，需要补充）
+        var newDisk = await db.disks.getByVolumeId(volId);
+        if (newDisk && (!newDisk.bind_bus || !newDisk.bind_dev)) {
+          await db.disks.bind(newDisk.id, vmId, bus, dev);
+        }
+
+        imported++;
+      }
+    }
+  } catch (e) {
+    logger.error('[disk-import-vm] 导入 VM ' + vmId + ' 数据盘失败:', e.message);
+  }
+  if (imported > 0) {
+    logger.info('[disk-import-vm] VM ' + vmId + ' 导入 ' + imported + ' 块数据盘' + (skipped > 0 ? '（跳过 ' + skipped + '）' : ''));
+  }
+  return { imported: imported, skipped: skipped };
+}
 
 async function importExistingDisks() {
   try {
@@ -594,5 +674,6 @@ async function importExistingDisks() {
 module.exports = {
   checkExpiredDisks,
   checkStorageCapacityAlert,
-  importExistingDisks
+  importExistingDisks,
+  importDisksForVm
 };

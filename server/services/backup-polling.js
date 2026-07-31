@@ -1,7 +1,8 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { createEmailTemplate, sendEmail, shouldSendEmail } = require('../utils/email');
 const { pushToUser } = require('../websocket/push-proxy');
+const { takeDiskSnapshot, auditAfterRestore } = require('./disk-audit');
 
 const lxcBackupPollingMap = new Map();
 
@@ -83,7 +84,9 @@ async function sendLxcBackupNotification(vmid, backupId, status) {
 
         if (user.email && user.emailVerified) {
             try {
-                await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
+                if (await shouldSendEmail(user.id, 'notify_backup_result')) {
+                    await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
+                }
             } catch (e) {
                 console.error('LXC 备份通知邮件发送失败:', e.message);
             }
@@ -153,7 +156,9 @@ async function sendLxcRestoreNotification(vmid, taskId, status) {
 
         if (user.email && user.emailVerified) {
             try {
-                await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
+                if (await shouldSendEmail(user.id, 'notify_backup_result')) {
+                    await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
+                }
             } catch (e) {
                 console.error('LXC 恢复通知邮件发送失败:', e.message);
             }
@@ -224,7 +229,9 @@ async function sendBackupNotification(userId, vmId, status, filename) {
     }
     if (user.email && user.emailVerified) {
         try {
-            await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
+            if (await shouldSendEmail(user.id, 'notify_backup_result')) {
+                await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
+            }
         } catch (e) {
             console.error('备份通知邮件发送失败:', e.message);
         }
@@ -321,7 +328,9 @@ async function sendRestoreNotification(userId, vmId, statusMsg) {
     } catch (e) { console.error('恢复通知站内信发送失败:', e.message); }
     if (user.email && user.emailVerified) {
         try {
-            await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
+            if (await shouldSendEmail(user.id, 'notify_backup_result')) {
+                await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
+            }
         } catch (e) { console.error('恢复通知邮件发送失败:', e.message); }
     }
 }
@@ -338,7 +347,15 @@ function startRestorePolling(taskId, upid) {
                 backupPollIntervals.delete(key);
                 const restore = await db.restoreTasks.getById(taskId);
                 await db.restoreTasks.complete(taskId);
-                if (restore) sendRestoreNotification(restore.user_id, restore.vm_id, 'completed');
+                if (restore) {
+                    sendRestoreNotification(restore.user_id, restore.vm_id, 'completed');
+                    // 恢复完成后做磁盘对账（防止幽灵盘 + 修复丢失的数据盘）
+                    try {
+                        await auditAfterRestore(restore.vm_id, restore.user_id, restore.pre_snapshot);
+                    } catch (auditErr) {
+                        console.error('[恢复审计] VM ' + restore.vm_id + ' 对账失败:', auditErr.message);
+                    }
+                }
             } else if (task.status === 'stopped') {
                 clearInterval(interval);
                 backupPollIntervals.delete(key);

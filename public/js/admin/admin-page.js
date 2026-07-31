@@ -81,7 +81,22 @@ var App = {
         if (!$.diskPage.showQosSection) $.diskPage.showQosSection = Vue.ref(false);
         if (!$.diskPage.diskSpecForm) $.diskPage.diskSpecForm = Vue.ref({ name: '', disk_type: 'NVME', storage_group_id: '', enabled: true, min_size_gb: 10, max_size_gb: 2000, price_per_gb: 0.8, quarterly_discount: 0, yearly_discount: 0, storage_pool: '', mbps_rd: '', mbps_rd_max: '', mbps_wr: '', mbps_wr_max: '', iops_rd: '', iops_rd_max: '', iops_wr: '', iops_wr_max: '', description: '' });
         if (!$.diskPage.editingLifecycle) $.diskPage.editingLifecycle = Vue.ref(false);
-        if (!$.diskPage.lifecycleForm) $.diskPage.lifecycleForm = Vue.ref({ warn_days: 7, warn_frequency: 'daily', grace_days: 3, grace_frequency: 'twice_daily', shutdown_timeout: 300, retention_days: 15, auto_renew_days: 1 });
+        if (!$.diskPage.lifecycleForm) $.diskPage.lifecycleForm = Vue.ref({ warn_days: 7, warn_frequency: 'daily', grace_days: 3, grace_frequency: 'twice_daily', retention_days: 15, auto_renew_days: 1 });
+        // OS 模板兜底初始化
+        if (!$.osTemplatePage) $.osTemplatePage = {};
+        if (!$.osTemplatePage.osTemplates) $.osTemplatePage.osTemplates = Vue.ref([]);
+        if (!$.osTemplatePage.pveTemplateVms) $.osTemplatePage.pveTemplateVms = Vue.ref([]);
+        if (!$.osTemplatePage.pveConfigLoading) $.osTemplatePage.pveConfigLoading = Vue.ref(false);
+        if (!$.osTemplatePage.allStorages) $.osTemplatePage.allStorages = Vue.ref([]);
+        if (!$.osTemplatePage.formData) $.osTemplatePage.formData = Vue.reactive({ name: '', template_vmid: '', os_type: '', os_version: '', ostype: '', arch: 'x86_64', target_storage: 'local-lvm', ciuser: '', description: '', icon: '', sort_order: 0, allowed_package_ids: '', enabled: 1, status: 'active' });
+        if (!$.osTemplatePage.saving) $.osTemplatePage.saving = Vue.ref(false);
+        // OS 切换日志兜底初始化
+        if (!$.osSwitchLogList) $.osSwitchLogList = Vue.ref([]);
+        if (!$.osSwitchLogTotal) $.osSwitchLogTotal = Vue.ref(0);
+        if (!$.osSwitchLogPage) $.osSwitchLogPage = Vue.ref(1);
+        if (!$.osSwitchLogFilter) $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '' });
+        if (!$.osSwitchLogSelected) $.osSwitchLogSelected = Vue.reactive([]);
+        if (!$.osSwitchLogDetail) $.osSwitchLogDetail = Vue.ref(null);
         if (!$.activeTabDisk) $.activeTabDisk = Vue.ref(localStorage.getItem('admin_activeTabDisk') || 'storage-groups');
         $.initCore();
         $.initVm();

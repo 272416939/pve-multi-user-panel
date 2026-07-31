@@ -63,8 +63,8 @@
             <td class="text-center">{{ disk.capacity_gb }} GiB</td>
             <td class="text-center"><span :class="getDiskStatusClass(disk.status)">{{ getDiskStatusText(disk.status) }}</span></td>
             <td class="text-center">{{ disk.bind_vmid ? 'VM-' + disk.bind_vmid : '-' }}</td>
-            <td class="text-center" :class="disk.status === 'destroyed' ? '' : getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? formatDate(disk.expire_time) : '-') }}</td>
-            <td class="text-center" :class="disk.status === 'destroyed' ? '' : getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.expire_time ? daysUntilExpire(disk.expire_time) : '-') }}</td>
+            <td class="text-center" :class="disk.status === 'destroyed' || disk.is_legacy ? '' : getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.is_legacy ? '随VM' : (disk.expire_time ? formatDate(disk.expire_time) : '-')) }}</td>
+            <td class="text-center" :class="disk.status === 'destroyed' || disk.is_legacy ? '' : getExpiryColor(disk.expire_time)">{{ disk.status === 'destroyed' ? '0' : (disk.is_legacy ? '随VM' : (disk.expire_time ? daysUntilExpire(disk.expire_time) : '-')) }}</td>
             <td class="text-center">
               <div v-if="disk.status !== 'destroyed' && !disk.is_legacy" class="disk-auto-renew-switch">
                 <input class="form-check-input" type="checkbox" role="switch" :checked="disk.auto_renew === 1" @change="toggleDiskAutoRenew(disk, $event.target.checked)">
@@ -159,8 +159,8 @@
           <div class="d-flex align-items-center gap-2">
             <button class="btn btn-sm btn-outline-secondary" @click="diskPurchaseForm.quantity = Math.max(1, (diskPurchaseForm.quantity || 1) - 1); calcDiskPrice()">-</button>
             <span class="fw-bold" style="width:40px;text-align:center">{{ diskPurchaseForm.quantity }}</span>
-            <button class="btn btn-sm btn-outline-secondary" @click="diskPurchaseForm.quantity = Math.min(100, (diskPurchaseForm.quantity || 1) + 1); calcDiskPrice()">+</button>
-            <span class="text-muted small ms-2">块</span>
+            <button class="btn btn-sm btn-outline-secondary" @click="if ((diskPurchaseForm.quantity || 1) < 10) { diskPurchaseForm.quantity = (diskPurchaseForm.quantity || 1) + 1; calcDiskPrice() }" :disabled="(diskPurchaseForm.quantity || 1) >= 10">+</button>
+            <span class="text-muted small ms-2">块（单次最多 10 块）</span>
           </div>
         </div>
         <div class="mb-3">

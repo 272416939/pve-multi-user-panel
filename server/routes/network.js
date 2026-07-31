@@ -361,6 +361,18 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         if (effectiveType === 'vm' && !effectiveVmId) return res.status(400).json({ error: 'VM 类型必须指定虚拟机' });
         if (effectiveType === 'lxc' && !effectiveCtId) return res.status(400).json({ error: 'LXC 类型必须指定容器' });
 
+        // V3-03 修复：目标资源归属校验（与 POST 端点一致，防止普通用户将转发指向他人资源）
+        if (req.user.role !== 'admin') {
+            if (effectiveVmId) {
+                const ownedVm = (await db.vms.getByUserId(req.user.id)).some(v => v.vm_id == effectiveVmId);
+                if (!ownedVm) return res.status(403).json({ error: '无权为此虚拟机创建转发规则' });
+            }
+            if (effectiveCtId) {
+                const ownedCt = (await db.lxcContainers.getByUserId(req.user.id)).some(c => c.ct_id == effectiveCtId);
+                if (!ownedCt) return res.status(403).json({ error: '无权为此容器创建转发规则' });
+            }
+        }
+
         if (external_port) {
             const config = {
                 port_range_start: parseInt(await db.config.get('forward:port_range_start')) || 50000,

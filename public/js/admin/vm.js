@@ -145,7 +145,7 @@
             expiration_date: formatDateTimeLocal(vm.expiration_date),
             renewal_price: vm.renewal_price || '',
             renewal_period: vm.renewal_period || 'month',
-            user_id: vm.user_id || null,
+            user_id: vm.user_id != null ? String(vm.user_id) : '',
             backup_storage: vm.backup_storage || '',
             mac_group_id: vm.ikuai_mac_group_id || '',
             status: vm.status || null
@@ -155,6 +155,15 @@
 
     $.updateVm = async function() {
         try {
+            // 类型统一：下拉选项为字符串，提交前转回数字；空串表示"无主"
+            var uid = $.editVmForm.value.user_id;
+            if (uid !== '' && uid !== null && uid !== undefined) {
+                var parsed = Number(uid);
+                if (isNaN(parsed)) return alert('请选择有效的用户');
+                uid = parsed;
+            } else {
+                uid = null;
+            }
             var expDate = toLocalDateTimeStr($.editVmForm.value.expiration_date);
             await api('/user/vms/' + $.editVmForm.value.id, {
                 method: 'PUT',
@@ -163,7 +172,7 @@
                     expiration_date: expDate,
                     renewal_price: $.editVmForm.value.renewal_price,
                     renewal_period: $.editVmForm.value.renewal_period || 'month',
-                    user_id: $.editVmForm.value.user_id,
+                    user_id: uid,
                     backup_storage: $.editVmForm.value.backup_storage || null,
                     mac_group_id: $.editVmForm.value.mac_group_id || null
                 })

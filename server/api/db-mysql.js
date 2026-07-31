@@ -583,19 +583,125 @@ async function initDb() {
         INDEX idx_disks_legacy (is_legacy)
     )`);
 
-    // 创建磁盘生命周期配置表
+	    // 创建磁盘生命周期配置表
+	    await execute(`
+	    CREATE TABLE IF NOT EXISTS disk_lifecycle_config (
+	        id INT PRIMARY KEY DEFAULT 1,
+	        warn_days INT DEFAULT 7,
+	        warn_frequency VARCHAR(20) DEFAULT 'daily',
+	        grace_days INT DEFAULT 3,
+	        grace_frequency VARCHAR(20) DEFAULT 'twice_daily',
+	        retention_days INT DEFAULT 15,
+	        auto_renew_days INT DEFAULT 1,
+	        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+	    )`);
+
+	    // 创建 VM 磁盘快照表（用于恢复后对账，防止幽灵盘）
+	    await execute(`
+	    CREATE TABLE IF NOT EXISTS vm_disk_snapshots (
+	        vm_id          INT NOT NULL,
+	        user_id        INT NOT NULL,
+	        disk_snapshot  JSON NOT NULL,
+	        created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
+	        updated_at     DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+	        PRIMARY KEY (vm_id),
+	        INDEX idx_user (user_id)
+	    )`);
+
+	    // 给 restore_tasks 添加 pre_snapshot 列（用于恢复前后对账）
+	    try { await execute("ALTER TABLE restore_tasks ADD COLUMN pre_snapshot JSON DEFAULT NULL"); } catch (_) {}
+
+	    // 创建可切换系统模板表（os_templates）
     await execute(`
-    CREATE TABLE IF NOT EXISTS disk_lifecycle_config (
-        id INT PRIMARY KEY DEFAULT 1,
-        warn_days INT DEFAULT 7,
-        warn_frequency VARCHAR(20) DEFAULT 'daily',
-        grace_days INT DEFAULT 3,
-        grace_frequency VARCHAR(20) DEFAULT 'twice_daily',
-        shutdown_timeout INT DEFAULT 300,
-        retention_days INT DEFAULT 15,
-        auto_renew_days INT DEFAULT 1,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    CREATE TABLE IF NOT EXISTS os_templates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL DEFAULT '',
+        template_vmid INT NOT NULL DEFAULT 0,
+        os_type VARCHAR(50) NOT NULL DEFAULT '',
+        os_version VARCHAR(50) NOT NULL DEFAULT '',
+        ostype VARCHAR(20) NOT NULL DEFAULT '',
+        arch VARCHAR(20) NOT NULL DEFAULT 'x86_64',
+        target_storage VARCHAR(100) NOT NULL DEFAULT 'local-lvm',
+        ciuser VARCHAR(100) NOT NULL DEFAULT '',
+        description TEXT NOT NULL,
+        icon VARCHAR(100) NOT NULL DEFAULT '',
+        sort_order INT NOT NULL DEFAULT 0,
+        allowed_package_ids VARCHAR(500) NOT NULL DEFAULT '',
+        enabled TINYINT(1) NOT NULL DEFAULT 1,
+        status VARCHAR(20) NOT NULL DEFAULT 'active',
+        created_at DATETIME NOT NULL DEFAULT NOW(),
+        updated_at DATETIME NOT NULL DEFAULT NOW(),
+        INDEX idx_os_templates_enabled (enabled),
+        INDEX idx_os_templates_vmid (template_vmid)
     )`);
+
+    // 创建系统切换日志表（vm_os_switch_logs）
+    await execute(`
+    CREATE TABLE IF NOT EXISTS vm_os_switch_logs (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        vm_id INT NOT NULL,
+        user_id INT NOT NULL,
+        from_os_template_id INT DEFAULT NULL,
+        to_os_template_id INT NOT NULL,
+        new_system_volume_id VARCHAR(255) DEFAULT '',
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        fail_stage VARCHAR(50) DEFAULT '',
+        error_message TEXT DEFAULT NULL,
+        admin_intervention_required TINYINT(1) NOT NULL DEFAULT 0,
+        amount_charged DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+        order_no VARCHAR(64) DEFAULT '',
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        finished_at DATETIME DEFAULT NULL,
+        INDEX idx_vm_os_switch_logs_vmid (vm_id),
+        INDEX idx_vm_os_switch_logs_user (user_id),
+        INDEX idx_vm_os_switch_logs_status (status)
+    )`);
+
+    // V3-14 修复：敏感操作审计日志表
+    await execute(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL DEFAULT 0,
+            username VARCHAR(64) DEFAULT '',
+            action VARCHAR(64) NOT NULL,
+            resource_type VARCHAR(32) DEFAULT '',
+            resource_id VARCHAR(64) DEFAULT '',
+            ip VARCHAR(64) DEFAULT '',
+            user_agent VARCHAR(500) DEFAULT '',
+            details TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_audit_user (user_id),
+            INDEX idx_audit_action (action),
+            INDEX idx_audit_created (created_at)
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 创建用户通知设置表
+    await execute(`
+        CREATE TABLE IF NOT EXISTS user_settings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL UNIQUE,
+            email_notifications_enabled INT DEFAULT 1,
+            notify_vm_provisioned INT DEFAULT 1,
+            notify_lxc_provisioned INT DEFAULT 1,
+            notify_account_password INT DEFAULT 1,
+            notify_vm_refund INT DEFAULT 1,
+            notify_lxc_refund INT DEFAULT 1,
+            notify_disk_purchase INT DEFAULT 1,
+            notify_disk_resize INT DEFAULT 1,
+            notify_disk_renewal INT DEFAULT 1,
+            notify_disk_refund INT DEFAULT 1,
+            notify_disk_destroy_refund INT DEFAULT 1,
+            notify_recharge INT DEFAULT 1,
+            notify_renewal INT DEFAULT 1,
+            notify_expiry_reminder INT DEFAULT 1,
+            notify_expiry_alert INT DEFAULT 1,
+            notify_backup_result INT DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_user_settings_user (user_id)
+        )
+    `);
 
     // 初始化默认配置
     await initDefaultConfig();
@@ -650,6 +756,17 @@ async function migrateSchema() {
     await safeAlter('transaction_records', 'trade_no', 'VARCHAR(200) DEFAULT NULL');
     await safeAlter('transaction_records', 'api_trade_no', 'VARCHAR(200) DEFAULT NULL');
 
+    await safeAlter('vms', 'current_os_template_id', 'INT DEFAULT NULL');
+    await safeAlter('vms', 'last_os_switch_at', 'DATETIME DEFAULT NULL');
+    await safeAlter('vms', 'os_switch_pve_upid', "VARCHAR(200) DEFAULT ''");
+    await safeAlter('vm_packages', 'default_os_template_id', 'INT DEFAULT NULL');
+    // os_templates 表迁移：新增 ostype 列（兼容旧表）
+    try {
+        await execute("ALTER TABLE os_templates ADD COLUMN ostype VARCHAR(20) NOT NULL DEFAULT '' AFTER os_version");
+        console.log('[db] 迁移: os_templates.ostype 列已添加');
+    } catch (e) {
+        if (!e.message.toLowerCase().includes('duplicate')) console.error('[db] 迁移 os_templates.ostype 失败:', e.message);
+    }
     await safeAlter('vm_templates', 'target_storage', "VARCHAR(100) NOT NULL DEFAULT 'local-lvm'");
     await safeAlter('vm_templates', 'clone_mode', "VARCHAR(20) NOT NULL DEFAULT 'full'");
     await safeAlter('vm_templates', 'cpu_affinity', "VARCHAR(255) NOT NULL DEFAULT ''");
@@ -721,6 +838,9 @@ async function migrateSchema() {
     await safeAlter('lxc_templates', 'ip6_mode', "VARCHAR(20) NOT NULL DEFAULT 'dhcp'");
     await safeAlter('lxc_templates', 'ip6_addr', "TEXT NOT NULL");
     await safeAlter('lxc_templates', 'ip4_addr', "TEXT NOT NULL");
+
+    // os_templates 表迁移：新增 disk_format 列（目标磁盘格式，如 raw/qcow2/vmdk）
+    await safeAlter('os_templates', 'disk_format', "VARCHAR(20) NOT NULL DEFAULT '' AFTER target_storage");
 
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {
@@ -900,9 +1020,30 @@ module.exports = {
     now: mysqlNow,
     today: mysqlToday,
 
+    // V3-14 修复：敏感操作审计日志
+    auditLogs: {
+        create: async (data) => {
+            const [result] = await execute(
+                'INSERT INTO audit_logs (user_id, username, action, resource_type, resource_id, ip, user_agent, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    parseInt(data.user_id) || 0,
+                    String(data.username || ''),
+                    String(data.action || ''),
+                    String(data.resource_type || ''),
+                    String(data.resource_id || ''),
+                    String(data.ip || ''),
+                    String(data.user_agent || ''),
+                    data.details ? JSON.stringify(data.details) : null,
+                    mysqlNow()
+                ]
+            );
+            return result.insertId;
+        }
+    },
+
     // 用户操作
     users: {
-        getAll: () => queryAll('SELECT * FROM users'),
+        getAll: () => queryAll('SELECT * FROM users ORDER BY id ASC'),
         getPaginated: async (params) => {
             var page = parseInt(params.page) || 1;
             var limit = Math.min(parseInt(params.limit) || 20, 200);
@@ -983,8 +1124,8 @@ module.exports = {
         getByVmid: (vmid) => queryOne('SELECT * FROM vms WHERE vm_id = ?', [parseInt(vmid)]),
         create: async (vm) => {
             const [result] = await execute(
-                `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, created_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, current_os_template_id, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     vm.vm_id,
                     vm.user_id,
@@ -996,6 +1137,7 @@ module.exports = {
                     vm.quarterly_discount || '',
                     vm.yearly_discount || '',
                     vm.pve_upid || '',
+                    vm.current_os_template_id || null,
                     mysqlNow()
                 ]
             );
@@ -1003,7 +1145,8 @@ module.exports = {
         },
         update: async (id, updates) => {
             const allowedColumns = ['name', 'vm_id', 'user_id', 'expiration_date',
-                'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'backup_storage', 'reminderSent', 'lastReminderDate', 'shutdown_reason'];
+                'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'backup_storage', 'reminderSent', 'lastReminderDate', 'shutdown_reason',
+                'current_os_template_id', 'last_os_switch_at', 'os_switch_pve_upid'];
             for (const key of Object.keys(updates)) {
                 if (!allowedColumns.includes(key)) delete updates[key];
             }
@@ -1927,6 +2070,11 @@ module.exports = {
             return queryOne('SELECT * FROM port_forwards WHERE id = ?', [id]);
         },
         delete: (id) => execute('DELETE FROM port_forwards WHERE id = ?', [id]),
+        // 按 VMID 更新 MAC 地址（系统切换时使用）
+        updateMacByVmid: (vmid, newMac) => execute(
+            "UPDATE port_forwards SET mac = ? WHERE type = 'vm' AND vm_id = ?",
+            [newMac, parseInt(vmid)]
+        ),
         deleteByDevice: (type, deviceId) => {
             if (type === 'vm') return execute(
                 "DELETE FROM port_forwards WHERE type = 'vm' AND vm_id = ?",
@@ -2420,8 +2568,10 @@ module.exports = {
             return execute(`UPDATE disks SET ${fields.join(', ')} WHERE id = ?`, values);
         },
         // 硬删除：仅允许删除已销毁状态的磁盘记录（清理已销毁的磁盘记录用）
-        hardDelete: (id) => execute('DELETE FROM disks WHERE id = ? AND status = ?', [parseInt(id), 'destroyed']),
-        getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)"),
+	        hardDelete: (id) => execute('DELETE FROM disks WHERE id = ? AND status = ?', [parseInt(id), 'destroyed']),
+	        // 更新磁盘 volume_id（恢复后同槽位换了新卷时使用）
+	        updateVolumeId: (id, volumeId) => execute('UPDATE disks SET volume_id = ?, updated_at = ? WHERE id = ?', [volumeId, mysqlNow(), parseInt(id)]),
+	        getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)"),
         // 更新绑定到指定 VMID 的 legacy 磁盘的 user_id（VM 换绑时同步）
         updateUserId: (vmid, userId) => execute('UPDATE disks SET user_id = ?, updated_at = ? WHERE bind_vmid = ? AND is_legacy = 1', [parseInt(userId), mysqlNow(), parseInt(vmid)])
     },
@@ -2432,7 +2582,7 @@ module.exports = {
         upsert: async (data) => {
             var existing = await queryOne('SELECT id FROM disk_lifecycle_config WHERE id = 1');
             if (existing) {
-                const allowedColumns = ['warn_days', 'warn_frequency', 'grace_days', 'grace_frequency', 'shutdown_timeout', 'retention_days', 'auto_renew_days'];
+                const allowedColumns = ['warn_days', 'warn_frequency', 'grace_days', 'grace_frequency', 'retention_days', 'auto_renew_days'];
                 const fields = [];
                 const values = [];
                 for (const key of Object.keys(data)) {
@@ -2447,11 +2597,284 @@ module.exports = {
                 await execute(`UPDATE disk_lifecycle_config SET ${fields.join(', ')} WHERE id = 1`, values);
             } else {
                 await execute(
-                    'INSERT INTO disk_lifecycle_config (id, warn_days, warn_frequency, grace_days, grace_frequency, shutdown_timeout, retention_days, auto_renew_days) VALUES (1,?,?,?,?,?,?,?)',
-                    [parseInt(data.warn_days) || 7, data.warn_frequency || 'daily', parseInt(data.grace_days) || 3, data.grace_frequency || 'twice_daily', parseInt(data.shutdown_timeout) || 300, parseInt(data.retention_days) || 15, parseInt(data.auto_renew_days) || 1]
+                    'INSERT INTO disk_lifecycle_config (id, warn_days, warn_frequency, grace_days, grace_frequency, retention_days, auto_renew_days) VALUES (1,?,?,?,?,?,?)',
+                    [parseInt(data.warn_days) || 7, data.warn_frequency || 'daily', parseInt(data.grace_days) || 3, data.grace_frequency || 'twice_daily', parseInt(data.retention_days) || 15, parseInt(data.auto_renew_days) || 1]
                 );
             }
             return queryOne('SELECT * FROM disk_lifecycle_config WHERE id = 1');
         }
-    }
-};
+    },
+
+    // ==================== 系统切换 ====================
+
+    // 可切换系统模板（os_templates）
+    osTemplates: {
+        getAll: () => queryAll('SELECT * FROM os_templates ORDER BY sort_order DESC, id DESC'),
+        getById: (id) => queryOne('SELECT * FROM os_templates WHERE id = ?', [parseInt(id)]),
+        getEnabled: () => queryAll("SELECT * FROM os_templates WHERE enabled = 1 AND status = 'active' ORDER BY sort_order DESC, id DESC"),
+        getByTemplateVmid: (vmid) => queryAll('SELECT * FROM os_templates WHERE template_vmid = ?', [parseInt(vmid)]),
+        create: async (data) => {
+            const [result] = await execute(
+`INSERT INTO os_templates (name, template_vmid, os_type, os_version, ostype, arch, target_storage, disk_format, ciuser, description, icon, sort_order, allowed_package_ids, enabled, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    data.name || '', parseInt(data.template_vmid) || 0,
+                    data.os_type || '', data.os_version || '',
+                    data.ostype || '', data.arch || 'x86_64',
+                    data.target_storage || 'local-lvm', data.disk_format || '',
+                    data.ciuser || '', data.description || '',
+                    data.icon || '', parseInt(data.sort_order) || 0,
+                    data.allowed_package_ids || '', data.enabled === false ? 0 : 1,
+                    data.status || 'active'
+                ]
+            );
+            return queryOne('SELECT * FROM os_templates WHERE id = ?', [result.insertId]);
+        },
+        update: async (id, updates) => {
+            const allowedColumns = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            if (Object.keys(updates).length === 0) return;
+            const fields = [];
+            const values = [];
+            for (const [key, value] of Object.entries(updates)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+            fields.push('updated_at = ?');
+            values.push(mysqlNow());
+            values.push(parseInt(id));
+            await execute(`UPDATE os_templates SET ${fields.join(', ')} WHERE id = ?`, values);
+            return queryOne('SELECT * FROM os_templates WHERE id = ?', [parseInt(id)]);
+        },
+        delete: (id) => execute('DELETE FROM os_templates WHERE id = ?', [parseInt(id)]),
+        countByTemplateVmid: (vmid) => queryOne('SELECT COUNT(*) AS c FROM os_templates WHERE template_vmid = ? AND enabled = 1', [parseInt(vmid)])
+    },
+
+    // 系统切换日志（vm_os_switch_logs）
+    vmOsSwitchLogs: {
+        create: async (data) => {
+            const [result] = await execute(
+                `INSERT INTO vm_os_switch_logs (vm_id, user_id, from_os_template_id, to_os_template_id, new_system_volume_id, status, order_no)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    parseInt(data.vm_id), parseInt(data.user_id),
+                    data.from_os_template_id || null, parseInt(data.to_os_template_id),
+                    data.new_system_volume_id || '',
+                    data.status || 'pending', data.order_no || ''
+                ]
+            );
+            return queryOne('SELECT * FROM vm_os_switch_logs WHERE id = ?', [result.insertId]);
+        },
+        getById: (id) => queryOne('SELECT * FROM vm_os_switch_logs WHERE id = ?', [parseInt(id)]),
+        getByVmid: (vmid) => queryAll('SELECT * FROM vm_os_switch_logs WHERE vm_id = ? ORDER BY id DESC LIMIT 20', [parseInt(vmid)]),
+        getByOrderNo: (orderNo) => queryOne('SELECT * FROM vm_os_switch_logs WHERE order_no = ?', [orderNo]),
+        getRunningByVmid: (vmid) => queryOne("SELECT * FROM vm_os_switch_logs WHERE vm_id = ? AND status IN ('pending', 'running') ORDER BY id DESC LIMIT 1", [parseInt(vmid)]),
+        getStaleRunning: (beforeTime) => queryAll("SELECT * FROM vm_os_switch_logs WHERE status = 'running' AND started_at < ?", [beforeTime]),
+        update: async (id, updates) => {
+            const allowedColumns = ['status', 'fail_stage', 'error_message', 'admin_intervention_required', 'new_system_volume_id', 'finished_at'];
+            for (const key of Object.keys(updates)) {
+                if (!allowedColumns.includes(key)) delete updates[key];
+            }
+            if (Object.keys(updates).length === 0) return;
+            const fields = [];
+            const values = [];
+            for (const [key, value] of Object.entries(updates)) {
+                fields.push(`${key} = ?`);
+                values.push(value);
+            }
+            values.push(parseInt(id));
+            await execute(`UPDATE vm_os_switch_logs SET ${fields.join(', ')} WHERE id = ?`, values);
+            return queryOne('SELECT * FROM vm_os_switch_logs WHERE id = ?', [parseInt(id)]);
+        },
+        countTodayByUser: (userId) => queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE user_id = ? AND DATE(started_at) = CURDATE()", [parseInt(userId)]),
+        // 管理端翻页
+        getListWithPaging: (filters) => {
+            const { page = 1, limit = 20, status, vm_id, user_id, before_date } = filters;
+            const offset = (Math.min(page, 1000) - 1) * Math.min(limit, 200);
+            let sql = `SELECT l.*, u.username,
+                              from_t.name AS from_os_template_name,
+                              to_t.name AS to_os_template_name
+                       FROM vm_os_switch_logs l
+                       LEFT JOIN users u ON l.user_id = u.id
+                       LEFT JOIN os_templates from_t ON l.from_os_template_id = from_t.id
+                       LEFT JOIN os_templates to_t ON l.to_os_template_id = to_t.id
+                       WHERE 1=1`;
+            const params = [];
+            if (status) { sql += ' AND l.status = ?'; params.push(status); }
+            if (vm_id) { sql += ' AND l.vm_id = ?'; params.push(parseInt(vm_id)); }
+            if (user_id) { sql += ' AND l.user_id = ?'; params.push(parseInt(user_id)); }
+            if (before_date) { sql += ' AND l.started_at < ?'; params.push(before_date); }
+            sql += ' ORDER BY l.id DESC LIMIT ? OFFSET ?';
+            params.push(parseInt(limit), offset);
+            return queryAll(sql, params);
+        },
+        countWithFilters: (filters) => {
+            const { status, vm_id, user_id, before_date } = filters;
+            let sql = 'SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE 1=1';
+            const params = [];
+            if (status) { sql += ' AND status = ?'; params.push(status); }
+            if (vm_id) { sql += ' AND vm_id = ?'; params.push(parseInt(vm_id)); }
+            if (user_id) { sql += ' AND user_id = ?'; params.push(parseInt(user_id)); }
+            if (before_date) { sql += ' AND started_at < ?'; params.push(before_date); }
+            return queryOne(sql, params);
+        },
+        // 用户端翻页
+        getByUserId: (userId, page = 1, limit = 10) => {
+            const offset = (Math.min(page, 1000) - 1) * Math.min(limit, 50);
+            return queryAll('SELECT * FROM vm_os_switch_logs WHERE user_id = ? ORDER BY id DESC LIMIT ? OFFSET ?', [parseInt(userId), parseInt(limit), offset]);
+        },
+        countByUserId: (userId) => queryOne('SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE user_id = ?', [parseInt(userId)]),
+        getByVmidWithPaging: (vmid, page = 1, limit = 10) => {
+            const offset = (Math.min(page, 1000) - 1) * Math.min(limit, 50);
+            return queryAll('SELECT * FROM vm_os_switch_logs WHERE vm_id = ? ORDER BY id DESC LIMIT ? OFFSET ?', [parseInt(vmid), parseInt(limit), offset]);
+        },
+        countByVmid: (vmid) => queryOne('SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE vm_id = ?', [parseInt(vmid)]),
+        // 删除方法（含安全保护）
+        deleteById: async (id) => {
+            const log = await queryOne("SELECT status, admin_intervention_required FROM vm_os_switch_logs WHERE id = ?", [parseInt(id)]);
+            if (!log) return { deleted: 0 };
+            if (log.status === 'running') {
+                const err = new Error('运行中的日志禁止删除');
+                err.code = 'LOG_RUNNING';
+                throw err;
+            }
+            const result = await execute("DELETE FROM vm_os_switch_logs WHERE id = ? AND status != 'running'", [parseInt(id)]);
+            return { deleted: result.affectedRows };
+        },
+        batchDelete: async (criteria) => {
+            const { ids, status, vm_id, user_id, before_date } = criteria;
+            let sql = "DELETE FROM vm_os_switch_logs WHERE status != 'running'";
+            const params = ['running'];
+            if (ids && Array.isArray(ids) && ids.length > 0) {
+                sql += ' AND id IN (' + ids.map(() => '?').join(',') + ')';
+                params.push(...ids.map(id => parseInt(id)));
+            } else {
+                if (status) { sql += ' AND status = ?'; params.push(status); }
+                if (vm_id) { sql += ' AND vm_id = ?'; params.push(parseInt(vm_id)); }
+                if (user_id) { sql += ' AND user_id = ?'; params.push(parseInt(user_id)); }
+                if (before_date) { sql += ' AND started_at < ?'; params.push(before_date); }
+            }
+            const skipped = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE status = 'running'" +
+                (ids && ids.length ? ' AND id IN (' + ids.map(() => '?').join(',') + ')' : ''),
+                ids && ids.length ? ['running', ...ids.map(id => parseInt(id))] : ['running']);
+            const result = await execute(sql, params);
+            return { deleted: result.affectedRows, skipped_running: skipped.c };
+        },
+	        clearAllExceptRunningAndIntervention: async () => {
+	            const result = await execute("DELETE FROM vm_os_switch_logs WHERE status != 'running' AND admin_intervention_required = 0");
+	            const skippedRunning = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE status = 'running'");
+	            const skippedIntervention = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE admin_intervention_required = 1");
+	            return {
+	                deleted: result.affectedRows,
+	                skipped_running: skippedRunning.c,
+	                skipped_intervention: skippedIntervention.c
+	            };
+	        }
+	    },
+
+	    // VM 磁盘快照（恢复前后对账，防止幽灵盘）
+	    vmDiskSnapshots: {
+	        upsert: (vmId, userId, diskSnapshot) => execute(
+	            `REPLACE INTO vm_disk_snapshots (vm_id, user_id, disk_snapshot)
+	             VALUES (?, ?, ?)`,
+	            [parseInt(vmId), parseInt(userId), JSON.stringify(diskSnapshot)]
+	        ),
+	        getByVmId: (vmId) => queryOne(
+	            'SELECT * FROM vm_disk_snapshots WHERE vm_id = ?',
+	            [parseInt(vmId)]
+	        ),
+	        getAll: () => queryAll('SELECT * FROM vm_disk_snapshots'),
+	        delete: (vmId) => execute(
+	            'DELETE FROM vm_disk_snapshots WHERE vm_id = ?',
+	            [parseInt(vmId)]
+	        ),
+	    },
+
+	    // 用户通知设置
+	    userSettings: {
+	        // 默认通知设置（全部开启）
+	        DEFAULTS: {
+	            email_notifications_enabled: 1,
+	            notify_vm_provisioned: 1,
+	            notify_lxc_provisioned: 1,
+	            notify_account_password: 1,
+	            notify_vm_refund: 1,
+	            notify_lxc_refund: 1,
+	            notify_disk_purchase: 1,
+	            notify_disk_resize: 1,
+	            notify_disk_renewal: 1,
+	            notify_disk_refund: 1,
+	            notify_disk_destroy_refund: 1,
+	            notify_recharge: 1,
+	            notify_renewal: 1,
+	            notify_expiry_reminder: 1,
+	            notify_expiry_alert: 1,
+	            notify_backup_result: 1
+	        },
+	        // 允许更新的字段白名单
+        ALLOWED_FIELDS: [
+            'email_notifications_enabled',
+            'notify_vm_provisioned', 'notify_lxc_provisioned', 'notify_account_password',
+            'notify_vm_refund', 'notify_lxc_refund',
+            'notify_disk_purchase', 'notify_disk_resize', 'notify_disk_renewal',
+            'notify_disk_refund', 'notify_disk_destroy_refund',
+            'notify_recharge', 'notify_renewal',
+            'notify_expiry_reminder', 'notify_expiry_alert',
+            'notify_backup_result'
+        ],
+        getByUserId: async (userId) => {
+            var row = await queryOne('SELECT * FROM user_settings WHERE user_id = ?', [parseInt(userId)]);
+            if (!row) {
+                // 不存在则返回默认值
+                return Object.assign({ user_id: parseInt(userId) }, module.exports.userSettings.DEFAULTS);
+            }
+            return row;
+        },
+        getField: async (userId, fieldName) => {
+            if (!module.exports.userSettings.ALLOWED_FIELDS.includes(fieldName)) return 1;
+            var row = await queryOne('SELECT `' + fieldName + '` FROM user_settings WHERE user_id = ?', [parseInt(userId)]);
+            if (!row) return 1; // 默认开启
+            return row[fieldName] !== undefined ? row[fieldName] : 1;
+        },
+        upsert: async (userId, fields) => {
+            // 白名单过滤
+            var safeFields = {};
+            for (var key of Object.keys(fields)) {
+                if (module.exports.userSettings.ALLOWED_FIELDS.includes(key)) {
+                    // 值校验：只能是 0 或 1
+                    safeFields[key] = fields[key] ? 1 : 0;
+                }
+            }
+            if (Object.keys(safeFields).length === 0) return module.exports.userSettings.getByUserId(userId);
+
+            var existing = await queryOne('SELECT id FROM user_settings WHERE user_id = ?', [parseInt(userId)]);
+            if (existing) {
+                // UPDATE
+                var setClauses = [];
+                var values = [];
+                for (var [k, v] of Object.entries(safeFields)) {
+                    setClauses.push('`' + k + '` = ?');
+                    values.push(v);
+                }
+                setClauses.push('updated_at = ?');
+                values.push(mysqlNow());
+                values.push(parseInt(userId));
+                await execute('UPDATE user_settings SET ' + setClauses.join(', ') + ' WHERE user_id = ?', values);
+            } else {
+                // INSERT
+                var columns = ['user_id'];
+                var placeholders = ['?'];
+                var insertValues = [parseInt(userId)];
+                for (var [k2, v2] of Object.entries(safeFields)) {
+                    columns.push('`' + k2 + '`');
+                    placeholders.push('?');
+                    insertValues.push(v2);
+                }
+                await execute('INSERT INTO user_settings (' + columns.join(', ') + ') VALUES (' + placeholders.join(', ') + ')', insertValues);
+            }
+            return module.exports.userSettings.getByUserId(userId);
+        }
+	    }
+	};

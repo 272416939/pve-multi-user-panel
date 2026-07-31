@@ -64,8 +64,9 @@ function validateParam(name, value) {
   throw new Error('参数 ' + name + ' 校验规则异常');
 }
 
-// ==================== 系统盘防护 ====================
-// 参照文档 7.5 节：永不触碰系统盘 vm-*-disk-0，三层过滤
+// ==================== 卷名安全校验 ====================
+// 系统盘保护在总线/设备号层（validateBusDev 禁止 dev=0），卷名本身不决定是否系统盘
+// PVE 恢复后 volume_id 可能为 vm-<target>-disk-0（编号从 0 开始），这仍然是数据盘
 function validateVolumeId(volumeId) {
   // 第一层：正则白名单
   validateParam('volumeId', volumeId);
@@ -78,10 +79,6 @@ function validateVolumeId(volumeId) {
   // 允许 vm- 前缀（PVE 命名规范）、disk-pool- 前缀或 imported- 前缀（存量导入）
   if (lastSeg.indexOf('vm-') !== 0 && lastSeg.indexOf('disk-pool-') !== 0 && lastSeg.indexOf('imported-') !== 0) {
     throw new Error('不允许操作非数据盘卷（仅允许 disk-pool- 或 imported- 前缀）');
-  }
-  // 第三层：禁止操作系统盘（兼容 .raw/.qcow2/.vmdk/.subvol 扩展名）
-  if (/disk-0(\.(raw|qcow2|vmdk|subvol))?$/.test(lastSeg)) {
-    throw new Error('禁止操作系统盘');
   }
   return volumeId;
 }
@@ -365,18 +362,131 @@ function calcResizeAmount(oldSizeGb, newSizeGb, pricePerGb, expireTime) {
   return parseFloat(amount.toFixed(2));
 }
 
-module.exports = {
-  validateParam,
-  validateVolumeId,
-  createDisk,
-  bindDisk,
-  unbindDisk,
-  resizeDisk,
-  destroyDisk,
-  getSystemDiskBus,
-  getAvailableDevNumber,
-  checkStorageCapacity,
-  calcDiskAmount,
-  calcRenewAmount,
-  calcResizeAmount,
+// ==================== 系统切换内部函数（仅供 os-switch-utils.js 使用） ====================
+// 绕过 dev=0 检查，仅通过 Node.js 进程内 require 访问，不暴露给 HTTP 路由层
+
+/**
+ * 从 PVE VM config 中提取所有磁盘 volume_id
+ * 精确区分系统盘、数据盘和 CD-ROM：
+ * - 系统盘：dev=0 且不是 CD-ROM（ide 总线 dev=0 也可能是光驱，需额外判断）
+ * - CD-ROM：media=cdrom 或无 volume_id（仅挂载 ISO 镜像）
+ * - 数据盘：不是系统盘也不是 CD-ROM 的磁盘
+ * @param {object} config - PVE getVmConfig 返回的配置
+ * @returns {object} { all: [volume_id, ...], system: [volume_id, ...], data: [volume_id, ...] }
+ */
+function getVmDiskVolumes(config) {
+  if (!config || typeof config !== 'object') return { all: [], system: [], data: [] };
+  var all = [];
+  var system = [];
+  var data = [];
+  // PVE 磁盘设备命名规范：scsi0-30, sata0-30, virtio0-30, ide0-3
+  var busList = ['scsi', 'sata', 'virtio', 'ide'];
+  for (var b = 0; b < busList.length; b++) {
+    var bus = busList[b];
+    var maxDev = bus === 'ide' ? 3 : 30;
+    for (var d = 0; d <= maxDev; d++) {
+      var key = bus + d;
+      var val = config[key];
+      if (!val || typeof val !== 'string') continue;
+
+      // 值格式如 "local-lvm:vm-100-disk-0,size=32G" 或 "media=cdrom" 或 "local:iso/debian.iso,media=cdrom"
+      var parts = val.split(',');
+      var volPart = parts[0];
+      if (!volPart) continue;
+
+      // 判断是否为 CD-ROM：media=cdrom 或 挂载的是 ISO 文件（非磁盘卷）
+      var isCdrom = false;
+      for (var p = 0; p < parts.length; p++) {
+        if (parts[p] === 'media=cdrom') {
+          isCdrom = true;
+          break;
+        }
+      }
+      // 如果 volume_id 部分以 .iso 结尾，也视为光驱
+      if (volPart.toLowerCase().indexOf('.iso') > -1) {
+        isCdrom = true;
+      }
+
+      // 跳过 CD-ROM（光驱不参与快照对账）
+      if (isCdrom) continue;
+
+      // 如果已经包含冒号则为完整 volume_id
+      if (volPart.indexOf(':') === -1) continue; // 非标准格式跳过
+
+      all.push(volPart);
+      // 系统盘判定：device=0 的盘即为系统盘
+      if (d === 0) {
+        system.push(volPart);
+      } else {
+        data.push(volPart);
+      }
+    }
+  }
+  return { all: all, system: system, data: data };
+}
+
+/**
+ * 判断 volume_id 是否是系统盘（*-disk-0）
+ * @param {string} volumeId
+ * @returns {boolean}
+ */
+function isSystemDiskVol(volumeId) {
+  if (!volumeId || typeof volumeId !== 'string') return false;
+  var parts = volumeId.split(':');
+  var volName = parts[1] || '';
+  var lastSeg = volName.split('/').pop() || volName;
+  return /disk-0(\.(raw|qcow2|vmdk|subvol))?$/.test(lastSeg);
+}
+
+const _internal = {
+  unbindSystemDisk: async (vmid, bus) => {
+    var safeVmid = validateParam('vmid', vmid);
+    if (!['scsi', 'sata', 'virtio'].includes(bus)) throw new Error('invalid bus');
+    var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + bus + '0';
+    await runSshCommand(cmd);
+  },
+  destroySystemDisk: async (volumeId) => {
+    if (!/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_./\-]+$/.test(volumeId)) {
+      throw new Error('invalid volume id');
+    }
+    var parts = volumeId.split(':');
+    var volName = parts[1] || '';
+    var lastSeg = volName.split('/').pop() || volName;
+    if (!/^(vm-|disk-pool-|imported-)/.test(lastSeg)) {
+      throw new Error('invalid volume prefix');
+    }
+    var cmd = 'pvesm free ' + volumeId;
+    // 使用 execSSH 直接调用以便对"卷不存在"做容错
+    var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
+    var cfg = await getPveSshConfig();
+    var result = await execSSH(cfg.host, cfg.username, cfg.password, cmd);
+    if (result.code !== 0) {
+      var errMsg = (result.stderr || result.stdout || '').toLowerCase();
+      // 卷不存在视为已清理，不抛异常
+      if (errMsg.indexOf('does not exist') !== -1 || errMsg.indexOf('not exist') !== -1 || errMsg.indexOf('no such') !== -1) {
+        return;
+      }
+      throw new Error('释放磁盘失败: ' + volumeId + ' - ' + (result.stderr || result.stdout || ''));
+    }
+  }
 };
+
+module.exports = {
+			  validateParam,
+			  validateVolumeId,
+			  createDisk,
+			  bindDisk,
+			  unbindDisk,
+			  resizeDisk,
+			  destroyDisk,
+			  getSystemDiskBus,
+			  getAvailableDevNumber,
+			  checkStorageCapacity,
+			  calcDiskAmount,
+			  calcRenewAmount,
+			  calcResizeAmount,
+			  inferDiskFormat,
+			  getVmDiskVolumes,
+			  isSystemDiskVol,
+			  _internal,
+			};

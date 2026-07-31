@@ -6,6 +6,7 @@ const { syncPortForwardsFromIkuai } = require('../services/ikuai-sync');
 const ikuaiApi = require('../api/ikuai-api');
 const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
+const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const redis = require('../api/redis').getRedisClient();
 
 // PERF-25: 分布式锁，防止多实例重复执行到期检查
@@ -105,6 +106,27 @@ async function recoverProvisioningTasks() {
                                 type: 1, is_read: 0, send_type: 1
                             });
                         } catch (e) { console.error('[recovery] 失败通知发送失败', e); }
+                        // 邮件通知：开通失败退款
+                        try {
+                            var recoverUser = await db.users.getById(record.user_id);
+                            if (recoverUser && recoverUser.email && recoverUser.emailVerified && recoverUser.email.includes('@')) {
+                                var siteName = await getSiteName();
+                                var resourceLabel = type === 'vm' ? '虚拟机' : '容器';
+                                var refundOrderNoForEmail = generateOrderNo('refund');
+                                var emailHtml = createEmailTemplate(resourceLabel + '开通失败 - 已退款',
+                                    '<p>非常抱歉，您订购的' + resourceLabel + ' <strong>' + (record.name || '') + '</strong> 开通失败，款项已原路退回。</p>' +
+                                    '<div class="warning-box">' +
+                                    '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
+                                    '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + (matchedOrder ? matchedOrder.order_no : '') + '</strong></p>' +
+                                    '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                                    '</div>' +
+                                    '<p>如有疑问请联系客服。</p>', siteName);
+                                var refundCategory = type === 'vm' ? 'notify_vm_refund' : 'notify_lxc_refund';
+                                if (await shouldSendEmail(recoverUser.id, refundCategory)) {
+                                    await sendEmail(recoverUser.email, resourceLabel + '开通失败已退款 - ' + siteName, emailHtml);
+                                }
+                            }
+                        } catch (emailErr) { console.error('[recovery] 退款邮件发送失败:', emailErr.message); }
                     } catch (e) { console.error('[recovery] ' + type + ' ' + record.id + ' 退款处理失败:', e.message); }
                 }
             } else {
@@ -123,6 +145,64 @@ async function recoverProvisioningTasks() {
     }
 
     console.log('[recovery] 开通中记录恢复完成');
+}
+
+// v1.3 新增：系统切换崩溃恢复
+// 扫描 status='running' 且 started_at < NOW() - 30min 的切换记录
+async function recoverOsSwitchTasks() {
+    var db = require('../api/db');
+    var pveApi = require('../api/pve-api');
+
+    var staleLogs = [];
+    try {
+        var beforeTime = new Date(Date.now() - 30 * 60 * 1000);
+        staleLogs = await db.vmOsSwitchLogs.getStaleRunning(beforeTime);
+    } catch (e) {
+        console.error('[recovery] 查询过期切换记录失败:', e.message);
+        return;
+    }
+
+    if (staleLogs.length === 0) return;
+    console.log('[recovery] 发现 ' + staleLogs.length + ' 条过期切换记录，开始恢复...');
+
+    for (var i = 0; i < staleLogs.length; i++) {
+        var log = staleLogs[i];
+        try {
+            var vmStatus = await pveApi.getVmStatus(log.vm_id);
+            var config = await pveApi.getVmConfig(log.vm_id);
+            var tmpl = await db.osTemplates.getById(log.to_os_template_id);
+
+            // 简单判定：VM running 且 ciuser 匹配
+            if (vmStatus.status === 'running' && tmpl && config.ciuser === tmpl.ciuser) {
+                await db.vmOsSwitchLogs.update(log.id, {
+                    status: 'success',
+                    finished_at: new Date(),
+                    error_message: 'recovered by startup check (assumed success)'
+                });
+                var vm = await db.vms.getByVmid(log.vm_id);
+                if (vm) {
+                    await db.vms.update(vm.id, {
+                        current_os_template_id: log.to_os_template_id,
+                        last_os_switch_at: new Date(),
+                        os_switch_pve_upid: ''
+                    });
+                }
+                console.log('[recovery] 系统切换记录 ' + log.id + ' 恢复为 success');
+            } else {
+                await db.vmOsSwitchLogs.update(log.id, {
+                    status: 'failed',
+                    admin_intervention_required: 1,
+                    finished_at: new Date(),
+                    error_message: 'startup recovery: VM state inconsistent'
+                });
+                var vm2 = await db.vms.getByVmid(log.vm_id);
+                if (vm2) await db.vms.update(vm2.id, { os_switch_pve_upid: '' });
+                console.log('[recovery] 系统切换记录 ' + log.id + ' 标记为 failed（需管理员介入）');
+            }
+        } catch (e) {
+            console.error('[recovery] 恢复系统切换记录 ' + log.id + ' 失败:', e.message);
+        }
+    }
 }
 
 function initScheduledTasks() {
@@ -178,6 +258,12 @@ function initScheduledTasks() {
         } catch (e) {
             console.error('[recovery] 开通中记录恢复异常:', e.message);
         }
+        // v1.3 新增：系统切换崩溃恢复
+        try {
+            await recoverOsSwitchTasks();
+        } catch (e) {
+            console.error('[recovery] 系统切换恢复异常:', e.message);
+        }
     }, 10000);
 
     loadSentRemindersFromDb();
@@ -190,4 +276,4 @@ function initScheduledTasks() {
     checkStorageCapacityAlert();
 }
 
-module.exports = { initScheduledTasks, recoverProvisioningTasks };
+module.exports = { initScheduledTasks, recoverProvisioningTasks, recoverOsSwitchTasks };

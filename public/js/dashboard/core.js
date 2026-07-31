@@ -68,12 +68,15 @@
     $.vmPackages = ref([]);
     $.lxcPackages = ref([]);
     $.activeTabOrder = ref('vm');
-    $.orderForm = ref({ period: 'month', quantity: 1, mac_group_id: '' });
+    $.orderForm = ref({ period: 'month', quantity: 1, mac_group_id: '', os_template_id: 0 });
     $.orderPackage = ref({});
     $.orderType = ref('vm');
     $.orderLoading = ref(false);
     $.pkgSelectedPeriod = ref({});  // { packageId: 'month'/'quarter'/'year' }
     $.vmGroupedPackages = ref([]);  // [{ group_name, group_id, packages: [] }]
+    // v1.3 新增：OS 模板选择状态
+    $.orderOsTemplates = ref([]);       // 当前套餐可选的 OS 模板列表
+    $.orderOsLoading = ref(false);      // 加载 OS 模板时的 loading
     $.lxcGroupedPackages = ref([]);
 
     $.orderTotal = computed(function() {
@@ -172,9 +175,18 @@
     $.parseMarkdown = function(text) {
         if (!text) return '';
         try {
-            return DOMPurify.sanitize(marked.parse(text));
+            var d = window.DOMPurify || window.purify || DOMPurify;
+            var m = window.marked || marked;
+            return d.sanitize(m.parse(text));
         } catch (e) {
-            return DOMPurify.sanitize(String(text));
+            // V3-01 修复：库异常时也不允许裸输出未净化 HTML
+            // 1) 优先尝试 DOMPurify 单独净化
+            try {
+                var fallback = window.DOMPurify || window.purify || DOMPurify;
+                if (fallback) return fallback.sanitize(String(text));
+            } catch (e2) {}
+            // 2) 兜底：剔除全部 HTML 标签并转义残余尖括号
+            return String(text).replace(/<[^>]*>/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
     };
 
@@ -1023,17 +1035,45 @@
     $.openOrderModal = function(pkg, type, selectedPeriod) {
         $.orderPackage.value = pkg;
         $.orderType.value = type;
-        $.orderForm.value = { period: selectedPeriod || 'month', quantity: 1 };
+        $.orderForm.value = { period: selectedPeriod || 'month', quantity: 1, os_template_id: 0, mac_group_id: '' };
+        // v1.3 新增：仅 VM 套餐才加载 OS 模板
+        if (type === 'vm') {
+            $.orderOsTemplates.value = [];
+            $.orderOsLoading.value = true;
+        }
         // 刷新余额显示
         $.loadWalletBalance();
         // 用 nextTick 确保 Vue 完成 DOM 更新后再显示 Modal
         Vue.nextTick(function() { $.bsModalShow('orderModal'); });
+
+        // v1.3 新增：异步拉取可选 OS 模板（不阻塞弹窗显示）
+        if (type === 'vm') {
+            (async function() {
+                try {
+                    var res = await api('/vm-packages/' + pkg.id + '/available-os-templates');
+                    if (res && res.success) {
+                        $.orderOsTemplates.value = res.data || [];
+                        if (res.default_id) {
+                            $.orderForm.value.os_template_id = res.default_id;
+                        }
+                    }
+                } catch (e) {
+                    console.error('加载可选系统模板失败', e);
+                } finally {
+                    $.orderOsLoading.value = false;
+                }
+            })();
+        }
     };
     
     $.confirmOrder = async function() {
         var type = $.orderType.value;
         var pkg = $.orderPackage.value;
         var orderForm = { period: $.orderForm.value.period, period_count: parseInt($.orderForm.value.quantity) || 1 };
+        // v1.3 新增：仅 VM 传递 os_template_id
+        if (type === 'vm') {
+            orderForm.os_template_id = parseInt($.orderForm.value.os_template_id) || 0;
+        }
 
         // 立即创建占位记录，显示"开通中"状态
         var placeholderId = 'provisioning_' + Date.now();

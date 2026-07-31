@@ -6,15 +6,17 @@ var pveApi = require('../api/pve-api');
 var ikuaiApi = require('../api/ikuai-api');
 var { generateVmName, generateLxcName } = require('../utils/random-name');
 var { createDhcpStaticBinding, removeDhcpStaticBinding } = require('../services/dhcp');
-var { createEmailTemplate, sendEmail } = require('../utils/email');
+var { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 var { calculateAmount, deductBalance, setVmAffinity, generateOrderNo } = require('../utils/order-utils');
 var { execSSHWithStdin } = require('../api/ssh-exec');
 var crypto = require('crypto');
 var cacheStore = require('../utils/cache-store');
 var { checkRateLimit } = require('../middleware/rate-limiter');
 var { withTransaction } = require('../utils/with-transaction');
+var { takeDiskSnapshot } = require('../services/disk-audit');
 const { safeError } = require('../utils/safe-error');
 const { formatLocalDate } = require('../utils/date');
+const diskUtils = require('../utils/disk-utils');
 
 var VALID_PERIODS = ['month', 'quarter', 'year'];
 
@@ -100,6 +102,27 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         if (!template) return res.status(404).json({ error: '关联模板不存在' });
         if (template.status !== 'active') return res.status(400).json({ error: '关联模板已停用' });
 
+        // 新购必须选择 OS 模板
+        var osTemplateId = parseInt(req.body.os_template_id) || 0;
+        if (osTemplateId <= 0) {
+            return res.status(400).json({ error: '请选择系统模板' });
+        }
+        var osTemplate = await db.osTemplates.getById(osTemplateId);
+        if (!osTemplate || osTemplate.status !== 'active') {
+            return res.status(400).json({ error: 'OS 模板不存在或已下架' });
+        }
+        // 校验 allowed_package_ids 约束
+        if (osTemplate.allowed_package_ids && osTemplate.allowed_package_ids.length > 0) {
+            var allowedIds = osTemplate.allowed_package_ids.split(',').map(function(s) { return parseInt(s.trim()); }).filter(Number.isInteger);
+            if (allowedIds.length > 0 && allowedIds.indexOf(pkg.id) === -1) {
+                return res.status(400).json({ error: '该系统模板不适用于当前套餐' });
+            }
+        }
+
+        // 克隆源：使用 OS 模板
+        var cloneSourceVmid = osTemplate.template_vmid;
+        var finalTargetStorage = osTemplate.target_storage || null;
+
         var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
         var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
@@ -134,9 +157,9 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         // 检查模板 VM 状态，full clone 需要模板处于停止状态
         try {
-            var tmplStatus = await pveApi.getVmStatus(template.template_vmid);
+            var tmplStatus = await pveApi.getVmStatus(cloneSourceVmid);
             if (tmplStatus && tmplStatus.status === 'running') {
-                console.error('[package] 模板 VM ' + template.template_vmid + ' 正在运行，无法进行 full clone');
+                console.error('[package] 模板 VM ' + cloneSourceVmid + ' 正在运行，无法进行 full clone');
                 return res.status(400).json({ error: '模板虚拟机正在运行，请先停止后再订购' });
             }
         } catch (statusErr) {
@@ -145,10 +168,10 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
 
         var newVm = null;
         try {
-            var upid = await pveApi.cloneVm(template.template_vmid, newVmid, {
+            var upid = await pveApi.cloneVm(cloneSourceVmid, newVmid, {
                 name: randomName,
-                storage: template.target_storage || undefined,
-                clone_mode: template.clone_mode || 'full'
+                storage: finalTargetStorage || undefined,
+                clone_mode: 'full'
             });
 
             // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪
@@ -160,7 +183,8 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                 monthly_price: String(pkg.monthly_price || ''),
                 quarterly_discount: String(pkg.quarterly_discount || ''),
                 yearly_discount: String(pkg.yearly_discount || ''),
-                pve_upid: upid
+                pve_upid: upid,
+                current_os_template_id: osTemplate ? osTemplate.id : null
             });
 
             // 等待 clone 任务完成
@@ -170,9 +194,44 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             newVm = await db.vms.update(newVm.id, { pve_upid: '' });
 
             var vmUpdateCfg = { cores: template.cores, memory: template.memory };
-            if (template.ciuser) {
-                vmUpdateCfg.ciuser = template.ciuser;
+
+            // 扩容系统盘到套餐模板设定的目标容量
+            if (template.disk_size && template.disk_size > 0) {
+                try {
+                    var systemBus = await diskUtils.getSystemDiskBus(newVmid);
+                    var resizeCmd = systemBus + '0';
+                    // 先获取当前系统盘实际容量，只大不小
+                    var oldConfig = await pveApi.getVmConfig(newVmid);
+                    var oldSizeGb = 0;
+                    var _buses = ['scsi', 'sata', 'virtio'];
+                    for (var _i = 0; _i < _buses.length; _i++) {
+                        var _raw = String(oldConfig[_buses[_i] + '0'] || '');
+                        var _m = _raw.match(/size=(\d+)([GM])/i);
+                        if (_m) {
+                            oldSizeGb = _m[2].toUpperCase() === 'M' ? Math.ceil(parseInt(_m[1]) / 1024) : parseInt(_m[1]);
+                            break;
+                        }
+                    }
+                    var targetSizeGb = Math.max(oldSizeGb, parseInt(template.disk_size));
+                    if (targetSizeGb > oldSizeGb) {
+                        var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
+                        var sshConfig = await getPveSshConfig();
+                        await execSSH(sshConfig.host, sshConfig.username, sshConfig.password,
+                            'qm resize ' + newVmid + ' ' + resizeCmd + ' ' + targetSizeGb + 'G', 60000);
+                        console.log('[package] VM ' + newVmid + ' 系统盘已扩容到 ' + targetSizeGb + 'G');
+                    }
+                } catch (resizeErr) {
+                    console.error('[package] 系统盘扩容失败:', resizeErr.message);
+                }
+            }
+
+            // 使用 OS 模板的 ciuser 和 ostype
+            if (osTemplate.ciuser) {
+                vmUpdateCfg.ciuser = osTemplate.ciuser;
                 vmUpdateCfg.cipassword = generateRandomPassword();
+            }
+            if (osTemplate.ostype) {
+                vmUpdateCfg.ostype = osTemplate.ostype;
             }
             await pveApi.updateVmConfig(newVmid, vmUpdateCfg);
 
@@ -222,6 +281,26 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                     type: 1, is_read: 0, send_type: 1
                 });
             } catch (e) { console.error('[package] VM 开通失败通知发送失败', e); }
+            // 邮件通知：虚拟机开通失败退款
+            try {
+                var failUser = await db.users.getById(userId);
+                if (failUser && failUser.email && failUser.emailVerified && failUser.email.includes('@')) {
+                    var siteName = await getSiteName();
+                    var emailHtml = createEmailTemplate('虚拟机开通失败 - 已退款',
+                        '<p>非常抱歉，您订购的虚拟机 <strong>' + randomName + '</strong> 开通失败，款项已原路退回。</p>' +
+                        '<div class="warning-box">' +
+                        '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceAfterRefund - totalAmount).toFixed(2) + ' → ¥' + balanceAfterRefund.toFixed(2) + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + orderNo + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+                        '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                        '</div>' +
+                        '<p>如有疑问请联系客服。</p>', siteName);
+                    if (await shouldSendEmail(userId, 'notify_vm_refund')) {
+                        await sendEmail(failUser.email, '虚拟机开通失败已退款 - ' + siteName, emailHtml);
+                    }
+                }
+            } catch (emailErr) { console.error('[package] VM 退款邮件发送失败:', emailErr.message); }
             throw provErr;
         }
 
@@ -247,35 +326,41 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         } catch (e) { console.error('[package] VM 消息发送失败', e); }
         try {
             var user = await db.users.getById(userId);
-            if (user && user.email && user.emailVerified) {
-                var emailHtml = createEmailTemplate('服务器开通成功',
-                    '<p>您的新服务器已开通成功！</p><p>类型：虚拟机</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
-                );
-                await sendEmail(user.email, '服务器开通成功', emailHtml);
-            }
-        } catch (e) { console.error('[package] VM 邮件发送失败', e); }
+                if (user && user.email && user.emailVerified) {
+                    var emailHtml = createEmailTemplate('服务器开通成功',
+                        '<p>您的新服务器已开通成功！</p><p>类型：虚拟机</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
+                    );
+                    if (await shouldSendEmail(userId, 'notify_vm_provisioned')) {
+                        await sendEmail(user.email, '服务器开通成功', emailHtml);
+                    }
+                }
+            } catch (e) { console.error('[package] VM 邮件发送失败', e); }
 
-        // Cloud-init 密码通知
-        if (template.ciuser && vmUpdateCfg.cipassword) {
+            // Cloud-init 密码通知
+        if (osTemplate.ciuser && vmUpdateCfg.cipassword) {
             try {
                 await db.messages.create({
                     uid: userId, title: '服务器账号信息',
-                    content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + template.ciuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。',
+                    content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + osTemplate.ciuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。',
                     type: 2, send_type: 1
                 });
             } catch (e) { console.error('[package] VM 密码通知发送失败', e); }
             try {
                 var ciUser = await db.users.getById(userId);
                 if (ciUser && ciUser.email && ciUser.emailVerified) {
+                    var pkgSiteName = await getSiteName();
                     var ciEmailHtml = createEmailTemplate('服务器账号信息',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
-                        '<p style="margin-bottom: 4px;">账号：' + template.ciuser + '</p>' +
+                        '<p style="margin-bottom: 4px;">账号：' + osTemplate.ciuser + '</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + vmUpdateCfg.cipassword + '</p>' +
                         '</div><div class="divider"></div>' +
-                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
+                        pkgSiteName
                     );
-                    await sendEmail(ciUser.email, '服务器账号信息 - PVE 管理面板', ciEmailHtml);
+                    if (await shouldSendEmail(userId, 'notify_account_password')) {
+                        await sendEmail(ciUser.email, '服务器账号信息 - ' + pkgSiteName, ciEmailHtml);
+                    }
                 }
             } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
         }
@@ -286,6 +371,11 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         } catch (startErr) { console.error('[package] VM 自动开机失败:', startErr.message); }
 
         res.json({ message: 'VM 开通成功', id: newVm.id, _provisioning: !!(newVm.pve_upid && newVm.pve_upid !== ''), name: randomName, vmid: newVmid, order_no: orderNo });
+
+        // 异步更新磁盘快照（不阻塞响应）
+        takeDiskSnapshot(newVmid, userId).catch(function(err) {
+          console.error('[快照] 用户订购后快照创建失败:', err.message);
+        });
     } catch (e) {
         console.error('[package] 用户订购 VM 失败:', e.message);
         logPveError(e);
@@ -448,6 +538,26 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
                     type: 1, is_read: 0, send_type: 1
                 });
             } catch (e) { console.error('[package] LXC 开通失败通知发送失败', e); }
+            // 邮件通知：容器开通失败退款
+            try {
+                var failUser = await db.users.getById(userId);
+                if (failUser && failUser.email && failUser.emailVerified && failUser.email.includes('@')) {
+                    var siteName = await getSiteName();
+                    var emailHtml = createEmailTemplate('容器开通失败 - 已退款',
+                        '<p>非常抱歉，您订购的容器 <strong>' + randomName + '</strong> 开通失败，款项已原路退回。</p>' +
+                        '<div class="warning-box">' +
+                        '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceAfterRefund - totalAmount).toFixed(2) + ' → ¥' + balanceAfterRefund.toFixed(2) + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + orderNo + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+                        '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                        '</div>' +
+                        '<p>如有疑问请联系客服。</p>', siteName);
+                    if (await shouldSendEmail(userId, 'notify_lxc_refund')) {
+                        await sendEmail(failUser.email, '容器开通失败已退款 - ' + siteName, emailHtml);
+                    }
+                }
+            } catch (emailErr) { console.error('[package] LXC 退款邮件发送失败:', emailErr.message); }
             throw provErr;
         }
 
@@ -477,7 +587,9 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
                 var emailHtml = createEmailTemplate('容器开通成功',
                     '<p>您的新容器已开通成功！</p><p>类型：LXC 容器</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
                 );
-                await sendEmail(user.email, '容器开通成功', emailHtml);
+                if (await shouldSendEmail(userId, 'notify_lxc_provisioned')) {
+                    await sendEmail(user.email, '容器开通成功', emailHtml);
+                }
             }
         } catch (e) { console.error('[package] LXC 邮件发送失败', e); }
 
@@ -515,15 +627,19 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             try {
                 var pwdUser = await db.users.getById(userId);
                 if (pwdUser && pwdUser.email && pwdUser.emailVerified) {
+                    var pkgSiteName2 = await getSiteName();
                     var pwdEmailHtml = createEmailTemplate('容器 root 密码',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的容器 ' + randomName + ' 已开通</strong></p>' +
                         '<p style="margin-bottom: 4px;">Root 账号：root</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + lxcPassword + '</p>' +
                         '</div><div class="divider"></div>' +
-                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
+                        pkgSiteName2
                     );
-                    await sendEmail(pwdUser.email, '容器 root 密码 - PVE 管理面板', pwdEmailHtml);
+                    if (await shouldSendEmail(userId, 'notify_account_password')) {
+                        await sendEmail(pwdUser.email, '容器 root 密码 - ' + pkgSiteName2, pwdEmailHtml);
+                    }
                 }
             } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
         }
@@ -532,6 +648,37 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
     } catch (e) {
         console.error('[package] 用户订购 LXC 失败:', e.message);
         logPveError(e);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+// ===== v1.3 新增：获取套餐可选的 OS 模板列表 =====
+router.get('/vm-packages/:id/available-os-templates', authMiddleware, async (req, res) => {
+    try {
+        var pkg = await db.vmPackages.getById(req.params.id);
+        if (!pkg) return res.status(404).json({ error: '套餐不存在' });
+
+        var allTemplates = await db.osTemplates.getEnabled();
+        var available = allTemplates.filter(function(t) {
+            if (!t.allowed_package_ids || t.allowed_package_ids.length === 0) return true;
+            return t.allowed_package_ids.indexOf(pkg.id) !== -1;
+        });
+
+        res.json({
+            success: true,
+            data: available.map(function(t) {
+                return {
+                    id: t.id,
+                    name: t.name,
+                    os_type: t.os_type,
+                    os_version: t.os_version,
+                    ostype: t.ostype,
+                    description: t.description
+                };
+            }),
+            default_id: pkg.default_os_template_id || null
+        });
+    } catch (e) {
         res.status(500).json({ error: safeError(e) });
     }
 });
@@ -696,7 +843,9 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
                     '<p>订单号：' + orderNo + '</p>' +
                     '<p>到期时间：' + (expDate || '无') + '</p>'
                 );
-                await sendEmail(user.email, '服务器开通成功', emailHtml);
+                if (await shouldSendEmail(userId, 'notify_vm_provisioned')) {
+                    await sendEmail(user.email, '服务器开通成功', emailHtml);
+                }
             }
         } catch (e) { console.error('[package] VM 邮件发送失败', e); }
 
@@ -712,15 +861,19 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
             try {
                 var adminCiUser = await db.users.getById(userId);
                 if (adminCiUser && adminCiUser.email && adminCiUser.emailVerified) {
+                    var pkgSiteName3 = await getSiteName();
                     var adminCiHtml = createEmailTemplate('服务器账号信息',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
                         '<p style="margin-bottom: 4px;">账号：' + template.ciuser + '</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + adminVmCfg.cipassword + '</p>' +
                         '</div><div class="divider"></div>' +
-                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
+                        pkgSiteName3
                     );
-                    await sendEmail(adminCiUser.email, '服务器账号信息 - PVE 管理面板', adminCiHtml);
+                    if (await shouldSendEmail(userId, 'notify_account_password')) {
+                        await sendEmail(adminCiUser.email, '服务器账号信息 - ' + pkgSiteName3, adminCiHtml);
+                    }
                 }
             } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
         }
@@ -731,6 +884,11 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         } catch (startErr) { console.error('[package] VM 自动开机失败:', startErr.message); }
 
         res.json({ message: 'VM 开通成功', vm: newVm, name: randomName, vmid: newVmid });
+
+        // 异步更新磁盘快照（不阻塞响应）
+        takeDiskSnapshot(newVmid, userId).catch(function(err) {
+          console.error('[快照] 套餐开通后快照创建失败:', err.message);
+        });
     } catch (e) {
         console.error('[package] VM 套餐开通失败:', e.message);
         res.status(500).json({ error: safeError(e) });
@@ -906,7 +1064,9 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
                     '<p>订单号：' + orderNo + '</p>' +
                     '<p>到期时间：' + (expDate || '无') + '</p>'
                 );
-                await sendEmail(user.email, '服务器开通成功', emailHtml);
+                if (await shouldSendEmail(userId, 'notify_lxc_provisioned')) {
+                    await sendEmail(user.email, '服务器开通成功', emailHtml);
+                }
             }
         } catch (e) { console.error('[package] LXC 邮件发送失败', e); }
 
@@ -944,15 +1104,19 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
             try {
                 var adminPwdUser = await db.users.getById(userId);
                 if (adminPwdUser && adminPwdUser.email && adminPwdUser.emailVerified) {
+                    var pkgSiteName4 = await getSiteName();
                     var adminPwdEmailHtml = createEmailTemplate('容器 root 密码',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的容器 ' + randomName + ' 已开通</strong></p>' +
                         '<p style="margin-bottom: 4px;">Root 账号：root</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + adminLxcPwd + '</p>' +
                         '</div><div class="divider"></div>' +
-                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
+                        pkgSiteName4
                     );
-                    await sendEmail(adminPwdUser.email, '容器 root 密码 - PVE 管理面板', adminPwdEmailHtml);
+                    if (await shouldSendEmail(userId, 'notify_account_password')) {
+                        await sendEmail(adminPwdUser.email, '容器 root 密码 - ' + pkgSiteName4, adminPwdEmailHtml);
+                    }
                 }
             } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
         }
