@@ -10,7 +10,7 @@ const { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email'
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
-const { safeError } = require('../utils/safe-error');
+const { safeError, sanitizeErrorMsg } = require('../utils/safe-error');
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const { withTransaction } = require('../utils/with-transaction');
 const osSwitchUtils = require('../utils/os-switch-utils');
@@ -61,6 +61,10 @@ router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.get('/user/vms', authMiddleware, async (req, res) => {
     try {
+        // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
+        var listRate = await checkRateLimit('ratelimit:user-vms:' + req.user.id, 10, 60000);
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         let userVms;
         if (req.user.role === 'admin') {
             // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
@@ -679,6 +683,10 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
 
 router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
     try {
+        // V3-08 修复：状态查询端点限速（30次/分钟，前端正常轮询远低于该值）
+        var statusRate = await checkRateLimit('ratelimit:vm-status:' + req.user.id, 30, 60000);
+        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         const vmid = parseInt(req.params.vmid);
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
@@ -876,6 +884,11 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                 if (status && status.status === 'running') {
                     return res.status(400).json({ error: '虚拟机正在运行，请先关机后再销毁' });
                 }
+                // V3-14 修复：销毁前记录审计（含 vmid 与 force）
+                try {
+                    const { auditLog } = require('../utils/audit-log');
+                    await auditLog({ userId: req.user.id, username: req.user.username, action: 'vm.destroy', resourceType: 'vm', resourceId: vmid, details: { force }, req });
+                } catch (_) {}
             } catch (e) {
                 console.warn(`[vm] 查询 ${vmid} 状态失败（继续执行销毁）:`, e.message);
             }
@@ -1099,9 +1112,13 @@ try {
         const limit = Math.min(parseInt(req.query.limit) || 10, 50);
         const logs = await db.vmOsSwitchLogs.getByVmidWithPaging(vmid, page, limit);
         const total = await db.vmOsSwitchLogs.countByVmid(vmid);
+        // V3-07 修复：error_message 对非管理员脱敏（剔除命令/路径/URL/IP），管理员保留原文便于排障
+        const isAdmin = req.user.role === 'admin';
         const safeLogs = logs.map(l => {
             const { error_message, ...safe } = l;
-            return { ...safe, error_message: error_message || '' };
+            if (!error_message) return { ...safe, error_message: '' };
+            const msg = isAdmin ? error_message : sanitizeErrorMsg(error_message);
+            return { ...safe, error_message: msg };
         });
         res.json({ success: true, data: safeLogs, total, page, limit });
     });
@@ -1112,9 +1129,12 @@ try {
         const limit = Math.min(parseInt(req.query.limit) || 10, 50);
         const logs = await db.vmOsSwitchLogs.getByUserId(req.user.id, page, limit);
         const total = await db.vmOsSwitchLogs.countByUserId(req.user.id);
+        // V3-07 修复：error_message 对普通用户脱敏
         const safeLogs = logs.map(l => {
             const { error_message, ...safe } = l;
-            return { ...safe, error_message: error_message || '' };
+            if (!error_message) return { ...safe, error_message: '' };
+            const msg = req.user.role === 'admin' ? error_message : sanitizeErrorMsg(error_message);
+            return { ...safe, error_message: msg };
         });
         res.json({ success: true, data: safeLogs, total, page, limit });
     });

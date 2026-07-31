@@ -11,8 +11,15 @@ const { JWT_SECRET } = require('./token');
 if (!JWT_SECRET) {
     console.error('🚨 [crypto-utils] JWT_SECRET 为空，敏感配置加密将不可用！');
 }
-// 从 JWT_SECRET 派生固定密钥（PBKDF2 100k 轮），与 JWT 签名同源但经 PBKDF2 隔离
-const ENCRYPTION_KEY = crypto.pbkdf2Sync(JWT_SECRET, 'pve-panel-encryption-salt', 100000, 32, 'sha256');
+// V3-13 修复：支持独立加密密钥 ENCRYPTION_KEY（与 JWT 签名密钥分离，JWT 泄露不影响库内密文）
+// 未配置时回退到从 JWT_SECRET 派生（PBKDF2 100k 轮），并输出告警建议配置独立密钥
+const ENCRYPTION_KEY_SOURCE = process.env.ENCRYPTION_KEY || JWT_SECRET;
+if (!process.env.ENCRYPTION_KEY) {
+    console.warn('⚠️ [crypto-utils] 未设置独立加密密钥 ENCRYPTION_KEY，当前从 JWT_SECRET 派生加密密钥；' +
+        'JWT_SECRET 泄露将导致数据库内 PVE 凭据可解密，生产环境强烈建议设置 ENCRYPTION_KEY');
+}
+// 从密钥源派生固定加密密钥（PBKDF2 100k 轮），与 JWT 签名隔离
+const ENCRYPTION_KEY = crypto.pbkdf2Sync(ENCRYPTION_KEY_SOURCE, 'pve-panel-encryption-salt', 100000, 32, 'sha256');
 const ALGORITHM = 'aes-256-gcm';
 
 /**

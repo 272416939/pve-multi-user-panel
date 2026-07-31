@@ -12,6 +12,7 @@ const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = requir
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
+const { checkRateLimit } = require('../middleware/rate-limiter');
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
 router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -52,6 +53,10 @@ router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.get('/user/lxc', authMiddleware, async (req, res) => {
     try {
+        // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
+        const listRate = await checkRateLimit('ratelimit:user-lxc:' + req.user.id, 10, 60000);
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         let userCts;
         if (req.user.role === 'admin') {
             // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
@@ -682,6 +687,10 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
 
 router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
     try {
+        // V3-08 修复：状态查询端点限速（30次/分钟）
+        const statusRate = await checkRateLimit('ratelimit:lxc-status:' + req.user.id, 30, 60000);
+        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         const vmid = parseInt(req.params.vmid);
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
@@ -828,7 +837,9 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
             30000
         );
         if (code !== 0) {
-            return res.status(500).json({ error: '密码重置失败: ' + (stderr || 'lxc-attach 命令执行出错') });
+            // V3-06 修复：不回显 SSH stderr（防内部信息泄露），详情仅记服务端日志
+            console.error(`[lxc] 重置密码失败（vmid=${vmid}）:`, stderr || 'lxc-attach 命令执行出错');
+            return res.status(500).json({ error: '密码重置失败，请稍后重试' });
         }
         res.json({ message: '密码重置成功' });
     } catch (error) {

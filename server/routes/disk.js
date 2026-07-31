@@ -623,6 +623,12 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       if (lockedDisk.status === 'bound') throw new Error('请先卸载磁盘再销毁');
       if (lockedDisk.status === 'destroyed') throw new Error('磁盘已销毁');
 
+      // V3-14 修复：销毁前审计（用户在事务内销毁）
+      try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'disk.destroy', resourceType: 'disk', resourceId: disk.id, details: { volume_id: lockedDisk.volume_id, refund_amount: refundAmount }, req });
+      } catch (_) {}
+
       // 执行 PVE 销毁
       await diskUtils.destroyDisk(lockedDisk.volume_id);
 

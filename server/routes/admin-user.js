@@ -108,6 +108,13 @@ router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) =>
         return res.status(400).json({ error: '不能删除自己的账号' });
     }
 
+    // V3-14 修复：删除用户审计
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        const targetUser = await db.users.getById(userId);
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.user.delete', resourceType: 'user', resourceId: userId, details: { target_username: targetUser ? targetUser.username : '' }, req });
+    } catch (_) {}
+
     // ARCH-11: 级联删除放入事务，保证原子性
     await withTransaction(async (conn) => {
         await conn.execute('DELETE FROM vms WHERE user_id = ?', [userId]);

@@ -657,6 +657,25 @@ async function initDb() {
         INDEX idx_vm_os_switch_logs_status (status)
     )`);
 
+    // V3-14 修复：敏感操作审计日志表
+    await execute(`
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL DEFAULT 0,
+            username VARCHAR(64) DEFAULT '',
+            action VARCHAR(64) NOT NULL,
+            resource_type VARCHAR(32) DEFAULT '',
+            resource_id VARCHAR(64) DEFAULT '',
+            ip VARCHAR(64) DEFAULT '',
+            user_agent VARCHAR(500) DEFAULT '',
+            details TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_audit_user (user_id),
+            INDEX idx_audit_action (action),
+            INDEX idx_audit_created (created_at)
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
     // 初始化默认配置
     await initDefaultConfig();
 
@@ -973,6 +992,27 @@ module.exports = {
     // 时间工具函数（统一本地时间 YYYY-MM-DD HH:MM:SS）
     now: mysqlNow,
     today: mysqlToday,
+
+    // V3-14 修复：敏感操作审计日志
+    auditLogs: {
+        create: async (data) => {
+            const [result] = await execute(
+                'INSERT INTO audit_logs (user_id, username, action, resource_type, resource_id, ip, user_agent, details, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    parseInt(data.user_id) || 0,
+                    String(data.username || ''),
+                    String(data.action || ''),
+                    String(data.resource_type || ''),
+                    String(data.resource_id || ''),
+                    String(data.ip || ''),
+                    String(data.user_agent || ''),
+                    data.details ? JSON.stringify(data.details) : null,
+                    mysqlNow()
+                ]
+            );
+            return result.insertId;
+        }
+    },
 
     // 用户操作
     users: {

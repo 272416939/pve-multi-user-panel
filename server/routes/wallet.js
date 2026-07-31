@@ -239,7 +239,8 @@ router.all('/wallet/notify', async (req, res) => {
         var md5Key = await db.config.get('pay:md5_key');
         var v2PublicKey = await db.config.get('pay:v2_public_key');
         var v2Enabled = (await db.config.get('pay:v2_enabled') || '0') === '1';
-        
+
+        // 兼容 MD5：优先 V2 RSA 验签，未配置 V2 时回退 MD5（生产建议配置 V2）
         var valid = false;
         if (v2Enabled && v2PublicKey) {
             var { rsaVerify, buildSignStr } = require('../sdk/pay/sign');
@@ -357,9 +358,11 @@ router.get('/wallet/return', async (req, res) => {
 
         var md5Key = await db.config.get('pay:md5_key');
         var v2PublicKey = await db.config.get('pay:v2_public_key');
+        var v2Enabled = (await db.config.get('pay:v2_enabled') || '0') === '1';
 
+        // 兼容 MD5：优先 V2 RSA，未配置 V2 时回退 MD5
         var valid = false;
-        if (params.sign_type === 'RSA' && v2PublicKey) {
+        if (params.sign_type === 'RSA' && v2Enabled && v2PublicKey) {
             var { rsaVerify, buildSignStr } = require('../sdk/pay/sign');
             var signStr = buildSignStr(params);
             valid = rsaVerify(signStr, params.sign, v2PublicKey);
@@ -489,9 +492,9 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
         var txRecord = await db.transactionRecords.getByOrderNo(orderNo);
 
         if (txRecord) {
-            // 已支付 — 校验订单归属
+            // V3-11 修复：非本人订单统一返回 pending，与「订单不存在」无差异，杜绝状态枚举
             if (txRecord.user_id !== req.user.id) {
-                return res.status(403).json({ error: '无权查询此订单' });
+                return res.json({ status: 'pending' });
             }
             // 查询用户最新余额
             var user = await db.users.getById(req.user.id);

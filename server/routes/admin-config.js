@@ -411,13 +411,48 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
             usedFallback = true;
         }
 
+        // V3-15 修复：reset 前创建可回滚备份（git 分支引用 + 工作区快照）
+        // 更新失败或异常时可通过 .update-backup 目录 + .update-backup/HEAD 恢复到原状态
+        let backupCreated = false;
+        try {
+            const backupDir = path.join(projectRoot, '.update-backup');
+            if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+            // 记录当前 HEAD 分支引用（含 stash 状态），供回滚脚本使用
+            const currentHead = execSync('git rev-parse HEAD', { cwd: projectRoot, timeout: 5000, stdio: 'pipe' }).toString().trim();
+            const currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd: projectRoot, timeout: 5000, stdio: 'pipe' }).toString().trim();
+            fs.writeFileSync(path.join(backupDir, 'HEAD'), currentHead + '\n', 'utf8');
+            fs.writeFileSync(path.join(backupDir, 'BRANCH'), currentBranch + '\n', 'utf8');
+            // 未提交改动备份为 patch（git diff HEAD 输出）
+            try {
+                const diff = execSync('git diff HEAD', { cwd: projectRoot, timeout: 15000, stdio: 'pipe', encoding: 'utf-8' });
+                fs.writeFileSync(path.join(backupDir, 'working.patch'), diff, 'utf8');
+            } catch (diffErr) {
+                // 无未提交改动时 diff 输出为空，忽略
+                fs.writeFileSync(path.join(backupDir, 'working.patch'), '', 'utf8');
+            }
+            backupCreated = true;
+            console.log('[系统更新] 已创建回滚备份:', backupDir, 'HEAD=' + currentHead);
+        } catch (backupErr) {
+            console.error('[系统更新] 创建回滚备份失败（继续更新）:', backupErr.message);
+        }
+
         // reset 到 FETCH_HEAD（git fetch <url> <branch> 后最新提交在 FETCH_HEAD）
         try {
             execSync(`git -c safe.directory=${safeGitDir} reset --hard FETCH_HEAD`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
         } catch (error) {
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
             console.error('[系统更新] git reset 失败:', stderr);
-            return res.status(500).json({ error: '更新失败: git reset 失败，请检查仓库状态' });
+            // V3-15：reset 失败时尝试回滚到备份 HEAD
+            if (backupCreated) {
+                try {
+                    const head = fs.readFileSync(path.join(projectRoot, '.update-backup', 'HEAD'), 'utf8').trim();
+                    execSync(`git -c safe.directory=${safeGitDir} reset --hard ${head}`, { cwd: projectRoot, timeout: 60000, stdio: 'pipe' });
+                    console.log('[系统更新] 已回滚到备份 HEAD:', head);
+                } catch (rollbackErr) {
+                    console.error('[系统更新] 回滚失败，请手动恢复:', rollbackErr.message);
+                }
+            }
+            return res.status(500).json({ error: '更新失败: git reset 失败，已尝试回滚，请检查仓库状态' });
         }
         try {
             execSync('npm install --production', { cwd: projectRoot, timeout: 120000, stdio: 'pipe' });

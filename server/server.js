@@ -43,7 +43,13 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // MISC-1 修复：仅信任一层代理（防止 req.ip 伪造绕过限速）
-app.set('trust proxy', 1);
+// V3-05 修复：仅当显式配置 TRUST_PROXY=true（存在前置可信反向代理）时才启用 trust proxy，
+// 否则不信任任何 X-Forwarded-For，杜绝攻击者伪造 IP 绕过全部 req.ip 限速
+if (process.env.TRUST_PROXY === 'true') {
+    app.set('trust proxy', 1);
+} else {
+    app.set('trust proxy', false);
+}
 // MISC-9 修复：禁用 X-Powered-By 头，不暴露框架信息
 app.disable('x-powered-by');
 
@@ -123,15 +129,18 @@ app.use((req, res, next) => {
     if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     }
-    // XSS-4 修复：script-src 使用 nonce 替代 unsafe-inline（保留 unsafe-eval 供 Vue 运行时模板编译）
+    // XSS-4 修复：script-src 使用 nonce 替代 unsafe-inline
     // SEC-005/011: CDN 由 jsd.owoser.cn 换回官方 cdn.jsdelivr.net
+    // V3-12 修复：connect-src 收敛为同源 + ws/wss（前端全部为同源 /api 与同源 WebSocket，无跨域 HTTPS 请求）
+    // 注：unsafe-eval 必须保留 —— 前端 Vue 3 使用 template:'#appTemplate' 运行时模板编译（依赖 new Function），
+    //     移除会导致页面白屏；后续若改为 render 函数/单文件组件预编译可安全移除
     res.setHeader('Content-Security-Policy', [
         "default-src 'self'",
         "script-src 'self' 'nonce-" + cspNonce + "' 'unsafe-eval' https://cdn.jsdelivr.net",
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.loli.net",
         "font-src 'self' https://gstatic.loli.net https://cdn.jsdelivr.net",
         "img-src 'self' data: blob: https:",
-        "connect-src 'self' ws: wss: https:",
+        "connect-src 'self' ws: wss:",
         "frame-ancestors 'self'",
         "object-src 'none'",
         "base-uri 'self'",
@@ -410,9 +419,17 @@ app.get('*', (req, res) => {
 
 // 全局错误处理：确保 API 返回 JSON 而非 HTML
 app.use((err, req, res, next) => {
-    console.error('[error]', err.message || err);
+    // V3-16 修复：服务端错误日志脱敏（剔除路径/URL/IP），避免敏感信息写入日志
+    var sanitizedErrMsg = '';
+    try {
+        const { sanitizeErrorMsg } = require('./utils/safe-error');
+        sanitizedErrMsg = sanitizeErrorMsg(err.message || String(err));
+    } catch (e) {
+        sanitizedErrMsg = err.message || String(err);
+    }
+    console.error('[error]', sanitizedErrMsg);
     if (req.path.startsWith('/api/')) {
-        var errMsg = (process.env.DEBUG === 'true') ? (err.message || '服务器内部错误') : '服务器内部错误';
+        var errMsg = (process.env.DEBUG === 'true') ? sanitizedErrMsg : '服务器内部错误';
         return res.status(err.status || 500).json({ error: errMsg });
     }
     res.status(500).send('服务器内部错误');

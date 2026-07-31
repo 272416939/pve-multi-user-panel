@@ -4,12 +4,16 @@ const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const dbg = require('../utils/debug');
+const { checkRateLimit } = require('../middleware/rate-limiter');
 const { startLxcBackupPolling, sendLxcRestoreNotification, startBackupPolling, startRestorePolling } = require('../services/backup-polling');
 const { safeError } = require('../utils/safe-error');
 const { takeDiskSnapshot } = require('../services/disk-audit');
 router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        // V3-08 修复：列表类端点限速
+        const listRate = await checkRateLimit('ratelimit:lxc-backups:' + req.user.id, 30, 60000);
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
  
@@ -39,6 +43,10 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         const { notes, storage: reqStorage } = req.body;
+
+        // V3-09 修复：备份操作用户级限速（5次/分钟）
+        const opRate = await checkRateLimit('ratelimit:backup-op:' + req.user.id, 5, 60000);
+        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试' });
  
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
@@ -82,7 +90,11 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         }
  
         // 获取存储位置：优先使用前端传入的存储，否则使用全局默认
+        // V3-02 修复：storage 参数必须白名单校验（防存储名注入/指向任意 PVE 存储）
         const storage = reqStorage || lxcCfg.default_storage || cfg.default_storage || 'local';
+        if (!/^[a-zA-Z0-9_-]+$/.test(storage)) {
+            return res.status(400).json({ error: '无效的存储名称' });
+        }
  
         // 获取容器的 rootfs 存储位置，用于恢复时指定
         let rootfsStorage = '';
@@ -162,6 +174,9 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
     try {
         const vmid = parseInt(req.params.vmid);
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的容器 ID' });
+        // V3-09 修复：恢复操作用户级限速（5次/分钟）
+        const restoreRate = await checkRateLimit('ratelimit:restore-op:' + req.user.id, 5, 60000);
+        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试' });
         const backupId = parseInt(req.params.id);
  
         const allCts = await db.lxcContainers.getAll();
@@ -262,6 +277,9 @@ router.put('/admin/backup-config', authMiddleware, adminMiddleware, async (req, 
 
 router.get('/vm/:vmid/backups', authMiddleware, async (req, res) => {
     try {
+        // V3-08 修复：列表类端点限速
+        const listRate = await checkRateLimit('ratelimit:vm-backups:' + req.user.id, 30, 60000);
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const owned = userVms.some(v => v.vm_id == req.params.vmid);
@@ -282,6 +300,9 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
+        // V3-09 修复：备份操作用户级限速（5次/分钟）
+        const opRate = await checkRateLimit('ratelimit:backup-op:' + req.user.id, 5, 60000);
+        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const owned = userVms.some(v => v.vm_id == vmid);
@@ -433,6 +454,9 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
     try {
         const vmid = parseInt(req.params.vmid);
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
+        // V3-09 修复：恢复操作用户级限速（5次/分钟）
+        const restoreRate = await checkRateLimit('ratelimit:restore-op:' + req.user.id, 5, 60000);
+        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试' });
         const backupId = req.params.id;
         const backup = await db.backups.getById(backupId);
         if (!backup) return res.status(404).json({ error: '备份不存在' });

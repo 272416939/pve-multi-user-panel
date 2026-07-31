@@ -179,7 +179,14 @@
             var m = window.marked || marked;
             return d.sanitize(m.parse(text));
         } catch (e) {
-            return String(text);
+            // V3-01 修复：库异常时也不允许裸输出未净化 HTML
+            // 1) 优先尝试 DOMPurify 单独净化
+            try {
+                var fallback = window.DOMPurify || window.purify || DOMPurify;
+                if (fallback) return fallback.sanitize(String(text));
+            } catch (e2) {}
+            // 2) 兜底：剔除全部 HTML 标签并转义残余尖括号
+            return String(text).replace(/<[^>]*>/g, '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         }
     };
 

@@ -106,6 +106,11 @@ if (passwordMatch && needsUpgrade(user.password)) {
     const token = generateAccessToken(user, record.id);
 
     const safeUser = sanitizeUser(user);
+    // V3-14 修复：登录成功审计
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: user.id, username: user.username, action: 'user.login', details: { device: deviceName }, req });
+    } catch (_) {}
     // P1-C2 修复：如果用户需要强制改密，在响应中标记
     if (user.must_change_password) {
         return res.json({ token, refreshToken, user: safeUser, must_change_password: true });
