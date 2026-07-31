@@ -5,7 +5,7 @@ var express = require('express');
 var router = express.Router();
 var { authMiddleware, adminMiddleware } = require('../middleware/auth');
 var { safeError } = require('../utils/safe-error');
-var { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
+var { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 var cacheStore = require('../utils/cache-store');
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
@@ -609,19 +609,23 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
       try {
         var destroyUser = await db.users.getById(disk.user_id);
         if (destroyUser && destroyUser.email && destroyUser.emailVerified && destroyUser.email.includes('@')) {
-          var siteName = await getSiteName();
-          var balanceBeforeDestroy = parseFloat(destroyUser.balance || '0');
-          var emailHtml = createEmailTemplate('硬盘已被管理员销毁 - 退款到账',
-            '<p>您的数据盘已被管理员销毁，退款已到账。</p>' +
-            '<div class="warning-box">' +
-            '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
-            '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
-            '<p style="margin-bottom: 4px;">📝 退款说明：<strong>' + refundDesc + '</strong></p>' +
-            '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceBeforeDestroy - refundAmount).toFixed(2) + ' → ¥' + balanceBeforeDestroy.toFixed(2) + '</strong></p>' +
-            '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
-            '</div>' +
-            '<p>如有疑问请联系管理员。</p>', siteName);
-          await sendEmail(destroyUser.email, '硬盘已被管理员销毁 - ' + siteName, emailHtml);
+          if (await shouldSendEmail(disk.user_id, 'notify_disk_destroy_refund')) {
+            var siteName = await getSiteName();
+            var balanceBeforeDestroy = parseFloat(destroyUser.balance || '0');
+            var emailHtml = createEmailTemplate('硬盘已被管理员销毁 - 退款到账',
+              '<p>您的数据盘已被管理员销毁，退款已到账。</p>' +
+              '<div class="warning-box">' +
+              '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+              '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
+              '<p style="margin-bottom: 4px;">📝 退款说明：<strong>' + refundDesc + '</strong></p>' +
+              '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceBeforeDestroy - refundAmount).toFixed(2) + ' → ¥' + balanceBeforeDestroy.toFixed(2) + '</strong></p>' +
+              '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+              '</div>' +
+              '<p>如有疑问请联系管理员。</p>', siteName);
+            if (await shouldSendEmail(disk.user_id, 'notify_disk_destroy_refund')) {
+                await sendEmail(destroyUser.email, '硬盘已被管理员销毁 - ' + siteName, emailHtml);
+            }
+          }
         }
       } catch (emailErr) { console.error('[admin disk destroy] 退款邮件发送失败:', emailErr.message); }
     }

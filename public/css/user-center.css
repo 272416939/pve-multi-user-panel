@@ -374,3 +374,63 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     .message-title { font-size: 13px; }
     .message-preview { font-size: 11px; -webkit-line-clamp: 1; }
 }
+
+/* ===== 通知设置 ===== */
+.notification-master-switch {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+.notification-group {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.notification-group-header {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+.notification-group-header:hover {
+    background: var(--bg-hover) !important;
+}
+.notification-group-items {
+    border-top: 1px solid var(--border-color);
+}
+.transition-transform {
+    transition: transform 0.2s ease;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.cursor-pointer {
+    cursor: pointer;
+}
+
+/* Toast 提示 */
+.toast-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 9999;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    pointer-events: none;
+}
+.toast-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff;
+}
+.toast-error {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #fff;
+}
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+    opacity: 0;
+    transform: translateY(-10px);
+}

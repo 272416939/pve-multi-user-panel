@@ -6,7 +6,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 const { getStatusCache } = require('../websocket/push-proxy');
-const { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
+const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
@@ -251,34 +251,38 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
 
     const assignedUser = await db.users.getById(parseInt(user_id));
     if (assignedUser && assignedUser.email && assignedUser.emailVerified) {
-        try {
-            const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
-            const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
-            const emailContent = `
-                <p>您好 <strong>${assignedUser.username}</strong>，</p>
-                <div class="info-box" style="border-left-color: #48bb78;">
-                    <p style="margin-bottom: 8px; font-size: 16px;">
-                        🎉 您的虚拟机已开通！
-                    </p>
-                </div>
-                <div class="info-box">
-                    <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
-                    <p style="margin-bottom: 4px;">名称：${name || 'VM ' + vm_id}</p>
-                    <p style="margin-bottom: 4px;">VMID：${vm_id}</p>
-                    <p style="margin-bottom: 4px;">到期时间：${expiryStr}</p>
-                    ${priceStr}
-                </div>
-                <div class="divider"></div>
-                <p>您可以前往「我的虚拟机」页面开始使用。如有问题请联系管理员。</p>
-            `;
-            const vmSiteName = await getSiteName();
-            await sendEmail(
-                assignedUser.email,
-                '虚拟机已开通 - ' + vmSiteName,
-                createEmailTemplate('虚拟机开通通知', emailContent, vmSiteName)
-            );
-        } catch (emailError) {
-            console.error(`发送 VM 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
+        if (await shouldSendEmail(assignedUser.id, 'notify_vm_provisioned')) {
+            try {
+                const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
+                const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
+                const emailContent = `
+                    <p>您好 <strong>${assignedUser.username}</strong>，</p>
+                    <div class="info-box" style="border-left-color: #48bb78;">
+                        <p style="margin-bottom: 8px; font-size: 16px;">
+                            🎉 您的虚拟机已开通！
+                        </p>
+                    </div>
+                    <div class="info-box">
+                        <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
+                        <p style="margin-bottom: 4px;">名称：${name || 'VM ' + vm_id}</p>
+                        <p style="margin-bottom: 4px;">VMID：${vm_id}</p>
+                        <p style="margin-bottom: 4px;">到期时间：${expiryStr}</p>
+                        ${priceStr}
+                    </div>
+                    <div class="divider"></div>
+                    <p>您可以前往「我的虚拟机」页面开始使用。如有问题请联系管理员。</p>
+                `;
+                const vmSiteName = await getSiteName();
+                if (await shouldSendEmail(assignedUser.id, 'notify_vm_provisioned')) {
+                    await sendEmail(
+                        assignedUser.email,
+                        '虚拟机已开通 - ' + vmSiteName,
+                        createEmailTemplate('虚拟机开通通知', emailContent, vmSiteName)
+                    );
+                }
+            } catch (emailError) {
+                console.error(`发送 VM 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
+            }
         }
     }
     
@@ -477,30 +481,33 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     if (removedVmInfo) {
         const removedUser = await db.users.getById(removedVmInfo.user_id);
         if (removedUser && removedUser.email && removedUser.emailVerified) {
-            try {
-                const emailContent = `
-                    <p>您好 <strong>${removedUser.username}</strong>，</p>
-                    <div class="warning-box">
-                        <p style="margin-bottom: 8px; font-size: 16px;">
-                            ⚠️ 您的虚拟机已被移除
-                        </p>
-                    </div>
-                    <div class="info-box">
-                        <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
-                        <p style="margin-bottom: 4px;">名称：${removedVmInfo.name || 'VM ' + removedVmInfo.vm_id}</p>
-                        <p style="margin-bottom: 4px;">VMID：${removedVmInfo.vm_id}</p>
-                    </div>
-                    <div class="divider"></div>
-                    <p>如果对此操作有疑问，请联系管理员。</p>
-                `;
-                const vmSiteName2 = await getSiteName();
-                await sendEmail(
-                    removedUser.email,
-                    '虚拟机已被移除 - ' + vmSiteName2,
-                    createEmailTemplate('虚拟机移除通知', emailContent, vmSiteName2)
-                );
-            } catch (emailError) {
-                console.error(`发送 VM 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
+            if (await shouldSendEmail(removedVmInfo.user_id, 'notify_vm_provisioned')) {
+                try {
+                    const emailContent = `
+                        <p>您好 <strong>${removedUser.username}</strong>，</p>
+                        <div class="warning-box">
+                            <p style="margin-bottom: 8px; font-size: 16px;">
+                                ⚠️ 您的虚拟机已被移除
+                            </p>
+                        </div>
+                        <div class="info-box">
+                            <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
+                            <p style="margin-bottom: 4px;">名称：${removedVmInfo.name || 'VM ' + removedVmInfo.vm_id}</p>
+                            <p style="margin-bottom: 4px;">VMID：${removedVmInfo.vm_id}</p>
+                        </div>
+                        <div class="divider"></div>
+                        <p>如果对此操作有疑问，请联系管理员。</p>
+                    `;
+                    const vmSiteName2 = await getSiteName();
+                    if (await shouldSendEmail(removedUser.id, 'notify_vm_provisioned')) {
+                        await sendEmail(
+                            removedUser.email,
+                            '虚拟机已被移除 - ' + vmSiteName2,
+                            createEmailTemplate('虚拟机移除通知', emailContent, vmSiteName2)
+                        );
+                    }
+                } catch (emailError) {
+                    console.error(`发送 VM 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
             }
         }
     }

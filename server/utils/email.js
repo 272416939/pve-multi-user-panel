@@ -186,4 +186,26 @@ async function sendEmail(to, subject, html) {
     }
 }
 
-module.exports = { createEmailTemplate, sendEmail, getSiteName };
+/**
+ * 检查用户是否允许接收某类邮件通知
+ * @param {number} userId - 用户ID
+ * @param {string} category - 通知类别（如 notify_vm_provisioned）
+ * @returns {boolean} 是否允许发送
+ */
+async function shouldSendEmail(userId, category) {
+    try {
+        if (!userId || !category) return true;
+        var settings = await db.userSettings.getByUserId(userId);
+        // 总开关关闭 → 不发送
+        if (settings.email_notifications_enabled === 0) return false;
+        // 对应类别开关关闭 → 不发送
+        if (settings[category] === 0) return false;
+        return true;
+    } catch (e) {
+        // 查询失败时默认允许发送（不影响主流程）
+        console.error('[email] shouldSendEmail 查询失败:', e.message);
+        return true;
+    }
+}
+
+module.exports = { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail };

@@ -23,6 +23,10 @@
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><span class="nav-text">消息</span>
                     <span v-if="unreadCount > 0" class="nav-badge">{{ unreadCount }}</span>
                 </a>
+                <a class="nav-item" :class="{ active: activeSubTab === 'notifications' }"
+                   @click.prevent="switchSubTab('notifications')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span><span class="nav-text">通知设置</span>
+                </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'security' }"
                    @click.prevent="switchSubTab('security')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><span class="nav-text">安全</span>
@@ -166,6 +170,63 @@
                                 </div>
                                 <div class="message-title">{{ msg.title }}</div>
                                 <div class="message-preview">{{ trimContent(msg.content) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 通知设置 -->
+            <div v-if="activeSubTab === 'notifications'">
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <div class="card">
+                            <div class="card-body">
+                                <h5 class="mb-3">📧 邮件通知设置</h5>
+                                <p class="text-muted mb-4">自定义哪些邮件通知需要发送给您。此设置仅影响邮件通知，站内信始终发送。</p>
+
+                                <!-- 总开关 -->
+                                <div class="notification-master-switch mb-4">
+                                    <div class="d-flex justify-content-between align-items-center p-3 rounded" style="background: var(--bs-primary-bg-subtle, #f0f7ff);">
+                                        <div>
+                                            <div class="fw-bold">邮件通知总开关</div>
+                                            <small class="text-muted">关闭后所有邮件通知将停止发送</small>
+                                        </div>
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" id="emailMasterSwitch"
+                                                   :checked="notifSettings.email_notifications_enabled"
+                                                   @change="toggleNotifSetting('email_notifications_enabled', $event.target.checked)">
+                                            <label class="form-check-label" for="emailMasterSwitch">
+                                                {{ notifSettings.email_notifications_enabled ? '开启' : '关闭' }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 通知分类 -->
+                                <div v-for="group in notifGroups" :key="group.key" class="notification-group mb-3">
+                                    <div class="notification-group-header d-flex justify-content-between align-items-center p-2 rounded cursor-pointer"
+                                         @click="group.expanded = !group.expanded" style="background: var(--bs-tertiary-bg, #f8f9fa);">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span>{{ group.icon }}</span>
+                                            <span class="fw-bold">{{ group.label }}</span>
+                                            <small class="text-muted">（{{ group.enabledCount }}/{{ group.items.length }}项已开启）</small>
+                                        </div>
+                                        <span class="transition-transform" :style="{ transform: group.expanded ? 'rotate(90deg)' : 'rotate(0deg)' }">▶</span>
+                                    </div>
+                                    <div v-show="group.expanded" class="notification-group-items mt-2">
+                                        <div v-for="item in group.items" :key="item.key" class="d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                            <span :class="{ 'text-muted': !notifSettings.email_notifications_enabled }">{{ item.label }}</span>
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input" type="checkbox"
+                                                       :id="'notif_' + item.key"
+                                                       :checked="notifSettings[item.key]"
+                                                       :disabled="!notifSettings.email_notifications_enabled"
+                                                       @change="toggleNotifSetting(item.key, $event.target.checked)">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -653,6 +714,13 @@
                     </div>
                 </div>
             </Teleport>
+
+            <!-- Toast 提示 -->
+            <transition name="toast-fade">
+                <div v-if="toastMessage" class="toast-notification" :class="'toast-' + toastType">
+                    {{ toastMessage }}
+                </div>
+            </transition>
 
             <div class="text-center py-4 mt-4 text-muted small">
                 <div>PVE 管理面板 <span id="appVersion"></span></div>

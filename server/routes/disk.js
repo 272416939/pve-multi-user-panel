@@ -8,7 +8,7 @@ var router = express.Router();
 var { authMiddleware } = require('../middleware/auth');
 var { checkRateLimit } = require('../middleware/rate-limiter');
 var { withTransaction } = require('../utils/with-transaction');
-var { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
+var { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 var { deductBalance, generateOrderNo } = require('../utils/order-utils');
 var { safeError } = require('../utils/safe-error');
 var db = require('../api/db');
@@ -263,7 +263,9 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
 	          '<p>⏰ 购买时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
 	          '</div>' +
 	          '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
-	        await sendEmail(purchaseUser.email, '硬盘购买成功 - ' + siteName, emailHtml);
+	        if (await shouldSendEmail(req.user.id, 'notify_disk_purchase')) {
+	          await sendEmail(purchaseUser.email, '硬盘购买成功 - ' + siteName, emailHtml);
+	        }
 	      }
 	    } catch (emailErr) { console.error('[disk purchase] 邮件发送失败:', emailErr.message); }
 	    res.json({ success: true, order_no: firstOrderNo, orders: createdOrderNos.length, amount: singleAmount, total_amount: totalAmount, disks: quantity });
@@ -307,7 +309,9 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
 	          '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
 	          '</div>' +
 	          '<p>如有疑问请联系客服。</p>', siteName);
-	        await sendEmail(failUser.email, '硬盘购买失败已退款 - ' + siteName, emailHtml);
+	        if (await shouldSendEmail(req.user.id, 'notify_disk_refund')) {
+	          await sendEmail(failUser.email, '硬盘购买失败已退款 - ' + siteName, emailHtml);
+	        }
 	      }
 	    } catch (emailErr) { console.error('[disk purchase] 退款邮件发送失败:', emailErr.message); }
 	    res.status(500).json({ error: '创建磁盘失败，已退款，请稍后重试' });
@@ -571,7 +575,9 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
             '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
             '</div>' +
             '<p>如有疑问请联系客服。</p>', siteName);
-          await sendEmail(resizeFailUser.email, '硬盘扩容失败已退款 - ' + siteName, emailHtml);
+          if (await shouldSendEmail(req.user.id, 'notify_disk_refund')) {
+            await sendEmail(resizeFailUser.email, '硬盘扩容失败已退款 - ' + siteName, emailHtml);
+          }
         }
       } catch (emailErr) { console.error('[disk resize] 退款邮件发送失败:', emailErr.message); }
       return res.status(500).json({ error: 'PVE 扩容失败，已退款' });
@@ -597,7 +603,9 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
           '<p>⏰ 扩容时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
           '</div>' +
           '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
-        await sendEmail(resizeUser.email, '硬盘扩容成功 - ' + siteName, emailHtml);
+        if (await shouldSendEmail(req.user.id, 'notify_disk_resize')) {
+          await sendEmail(resizeUser.email, '硬盘扩容成功 - ' + siteName, emailHtml);
+        }
       }
     } catch (emailErr) { console.error('[disk resize] 邮件发送失败:', emailErr.message); }
 
@@ -788,7 +796,9 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
             '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
             '</div>' +
             '<p>如有疑问请联系客服。</p>', siteName);
-          await sendEmail(destroyUser.email, '硬盘销毁退款 - ' + siteName, emailHtml);
+          if (await shouldSendEmail(req.user.id, 'notify_disk_destroy_refund')) {
+            await sendEmail(destroyUser.email, '硬盘销毁退款 - ' + siteName, emailHtml);
+          }
         }
       } catch (emailErr) { console.error('[disk destroy] 退款邮件发送失败:', emailErr.message); }
     }
@@ -881,7 +891,9 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
           '<p>⏰ 续费时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
           '</div>' +
           '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
-        await sendEmail(renewUser.email, '硬盘续费成功 - ' + siteName, emailHtml);
+        if (await shouldSendEmail(req.user.id, 'notify_disk_renewal')) {
+          await sendEmail(renewUser.email, '硬盘续费成功 - ' + siteName, emailHtml);
+        }
       }
     } catch (emailErr) { console.error('[disk renew] 邮件发送失败:', emailErr.message); }
 

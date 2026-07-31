@@ -4,7 +4,7 @@
 
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
-var { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
+var { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 var { getRedisClient } = require('../api/redis');
 var logger = require('../utils/logger');
@@ -59,7 +59,9 @@ async function sendDiskReminderEmail(user, disk, stage) {
     }
     var siteName = await getSiteName();
     var html = createEmailTemplate('硬盘到期提醒', content, siteName);
-    await sendEmail(user.email, subject, html);
+    if (await shouldSendEmail(user.id, 'notify_expiry_reminder')) {
+        await sendEmail(user.email, subject, html);
+    }
   } catch (e) {
     logger.error('[disk-expiry] 发送提醒邮件失败:', e.message);
   }

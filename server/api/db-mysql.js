@@ -676,6 +676,33 @@ async function initDb() {
         ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // 创建用户通知设置表
+    await execute(`
+        CREATE TABLE IF NOT EXISTS user_settings (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL UNIQUE,
+            email_notifications_enabled INT DEFAULT 1,
+            notify_vm_provisioned INT DEFAULT 1,
+            notify_lxc_provisioned INT DEFAULT 1,
+            notify_account_password INT DEFAULT 1,
+            notify_vm_refund INT DEFAULT 1,
+            notify_lxc_refund INT DEFAULT 1,
+            notify_disk_purchase INT DEFAULT 1,
+            notify_disk_resize INT DEFAULT 1,
+            notify_disk_renewal INT DEFAULT 1,
+            notify_disk_refund INT DEFAULT 1,
+            notify_disk_destroy_refund INT DEFAULT 1,
+            notify_recharge INT DEFAULT 1,
+            notify_renewal INT DEFAULT 1,
+            notify_expiry_reminder INT DEFAULT 1,
+            notify_expiry_alert INT DEFAULT 1,
+            notify_backup_result INT DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_user_settings_user (user_id)
+        )
+    `);
+
     // 初始化默认配置
     await initDefaultConfig();
 
@@ -2763,5 +2790,91 @@ module.exports = {
 	            'DELETE FROM vm_disk_snapshots WHERE vm_id = ?',
 	            [parseInt(vmId)]
 	        ),
+	    },
+
+	    // 用户通知设置
+	    userSettings: {
+	        // 默认通知设置（全部开启）
+	        DEFAULTS: {
+	            email_notifications_enabled: 1,
+	            notify_vm_provisioned: 1,
+	            notify_lxc_provisioned: 1,
+	            notify_account_password: 1,
+	            notify_vm_refund: 1,
+	            notify_lxc_refund: 1,
+	            notify_disk_purchase: 1,
+	            notify_disk_resize: 1,
+	            notify_disk_renewal: 1,
+	            notify_disk_refund: 1,
+	            notify_disk_destroy_refund: 1,
+	            notify_recharge: 1,
+	            notify_renewal: 1,
+	            notify_expiry_reminder: 1,
+	            notify_expiry_alert: 1,
+	            notify_backup_result: 1
+	        },
+	        // 允许更新的字段白名单
+        ALLOWED_FIELDS: [
+            'email_notifications_enabled',
+            'notify_vm_provisioned', 'notify_lxc_provisioned', 'notify_account_password',
+            'notify_vm_refund', 'notify_lxc_refund',
+            'notify_disk_purchase', 'notify_disk_resize', 'notify_disk_renewal',
+            'notify_disk_refund', 'notify_disk_destroy_refund',
+            'notify_recharge', 'notify_renewal',
+            'notify_expiry_reminder', 'notify_expiry_alert',
+            'notify_backup_result'
+        ],
+        getByUserId: async (userId) => {
+            var row = await queryOne('SELECT * FROM user_settings WHERE user_id = ?', [parseInt(userId)]);
+            if (!row) {
+                // 不存在则返回默认值
+                return Object.assign({ user_id: parseInt(userId) }, module.exports.userSettings.DEFAULTS);
+            }
+            return row;
+        },
+        getField: async (userId, fieldName) => {
+            if (!module.exports.userSettings.ALLOWED_FIELDS.includes(fieldName)) return 1;
+            var row = await queryOne('SELECT `' + fieldName + '` FROM user_settings WHERE user_id = ?', [parseInt(userId)]);
+            if (!row) return 1; // 默认开启
+            return row[fieldName] !== undefined ? row[fieldName] : 1;
+        },
+        upsert: async (userId, fields) => {
+            // 白名单过滤
+            var safeFields = {};
+            for (var key of Object.keys(fields)) {
+                if (module.exports.userSettings.ALLOWED_FIELDS.includes(key)) {
+                    // 值校验：只能是 0 或 1
+                    safeFields[key] = fields[key] ? 1 : 0;
+                }
+            }
+            if (Object.keys(safeFields).length === 0) return module.exports.userSettings.getByUserId(userId);
+
+            var existing = await queryOne('SELECT id FROM user_settings WHERE user_id = ?', [parseInt(userId)]);
+            if (existing) {
+                // UPDATE
+                var setClauses = [];
+                var values = [];
+                for (var [k, v] of Object.entries(safeFields)) {
+                    setClauses.push('`' + k + '` = ?');
+                    values.push(v);
+                }
+                setClauses.push('updated_at = ?');
+                values.push(mysqlNow());
+                values.push(parseInt(userId));
+                await execute('UPDATE user_settings SET ' + setClauses.join(', ') + ' WHERE user_id = ?', values);
+            } else {
+                // INSERT
+                var columns = ['user_id'];
+                var placeholders = ['?'];
+                var insertValues = [parseInt(userId)];
+                for (var [k2, v2] of Object.entries(safeFields)) {
+                    columns.push('`' + k2 + '`');
+                    placeholders.push('?');
+                    insertValues.push(v2);
+                }
+                await execute('INSERT INTO user_settings (' + columns.join(', ') + ') VALUES (' + placeholders.join(', ') + ')', insertValues);
+            }
+            return module.exports.userSettings.getByUserId(userId);
+        }
 	    }
 	};

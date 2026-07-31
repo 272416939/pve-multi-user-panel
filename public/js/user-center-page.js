@@ -82,6 +82,128 @@ const App = {
         const rechargeIsMobile = ref(false);     // 是否手机端
         let rechargePollingTimer = null;
 
+        // ===== 通知设置相关 =====
+        const notifSettings = ref({
+            email_notifications_enabled: 1,
+            notify_vm_provisioned: 1,
+            notify_lxc_provisioned: 1,
+            notify_account_password: 1,
+            notify_vm_refund: 1,
+            notify_lxc_refund: 1,
+            notify_disk_purchase: 1,
+            notify_disk_resize: 1,
+            notify_disk_renewal: 1,
+            notify_disk_refund: 1,
+            notify_disk_destroy_refund: 1,
+            notify_recharge: 1,
+            notify_renewal: 1,
+            notify_expiry_reminder: 1,
+            notify_expiry_alert: 1,
+            notify_backup_result: 1
+        });
+        const notifGroups = ref([
+            {
+                key: 'provision', icon: '🖥️', label: '资源开通', expanded: true,
+                items: [
+                    { key: 'notify_vm_provisioned', label: '虚拟机开通成功' },
+                    { key: 'notify_lxc_provisioned', label: '容器开通成功' },
+                    { key: 'notify_account_password', label: '服务器账号密码' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'refund', icon: '💰', label: '资源退款', expanded: false,
+                items: [
+                    { key: 'notify_vm_refund', label: '虚拟机开通失败退款' },
+                    { key: 'notify_lxc_refund', label: '容器开通失败退款' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'disk', icon: '💾', label: '硬盘管理', expanded: false,
+                items: [
+                    { key: 'notify_disk_purchase', label: '硬盘购买成功' },
+                    { key: 'notify_disk_resize', label: '硬盘扩容成功' },
+                    { key: 'notify_disk_renewal', label: '硬盘续费成功' },
+                    { key: 'notify_disk_refund', label: '硬盘购买/扩容退款' },
+                    { key: 'notify_disk_destroy_refund', label: '硬盘销毁退款' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'wallet', icon: '💳', label: '充值续费', expanded: false,
+                items: [
+                    { key: 'notify_recharge', label: '充值到账通知' },
+                    { key: 'notify_renewal', label: '余额续费成功' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'expiry', icon: '⏰', label: '到期提醒', expanded: false,
+                items: [
+                    { key: 'notify_expiry_reminder', label: '到期前提醒' },
+                    { key: 'notify_expiry_alert', label: '已到期通知' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            },
+            {
+                key: 'backup', icon: '📦', label: '备份恢复', expanded: false,
+                items: [
+                    { key: 'notify_backup_result', label: '备份/恢复结果' }
+                ],
+                get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
+            }
+        ]);
+
+        const loadNotifSettings = async () => {
+            try {
+                const data = await api('/user/notification-settings');
+                if (data) {
+                    for (const key of Object.keys(notifSettings.value)) {
+                        if (data[key] !== undefined) {
+                            notifSettings.value[key] = data[key];
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('加载通知设置失败', e);
+            }
+        };
+
+        const toggleNotifSetting = async (field, value) => {
+            notifSettings.value[field] = value ? 1 : 0;
+            try {
+                await api('/user/notification-settings', {
+                    method: 'PUT',
+                    body: JSON.stringify({ [field]: value ? 1 : 0 })
+                });
+                // 找到对应的标签用于 toast 提示
+                let label = '';
+                if (field === 'email_notifications_enabled') {
+                    label = '邮件通知';
+                } else {
+                    for (const group of notifGroups.value) {
+                        const item = group.items.find(i => i.key === field);
+                        if (item) { label = item.label; break; }
+                    }
+                }
+                showToast(label + (value ? '已开启' : '已关闭'), 'success');
+            } catch (e) {
+                // 回滚
+                notifSettings.value[field] = value ? 0 : 1;
+                showToast('保存失败：' + e.message, 'error');
+            }
+        };
+
+        // Toast 提示
+        const toastMessage = ref('');
+        const toastType = ref('success');
+        const showToast = (msg, type = 'success') => {
+            toastMessage.value = msg;
+            toastType.value = type;
+            setTimeout(() => { toastMessage.value = ''; }, 2500);
+        };
+
         const parseMarkdown = (text) => {
             if (!text) return '';
             try {
@@ -645,6 +767,7 @@ const App = {
             // 根据tab懒加载数据
             if (tab === 'memos') await loadMemos();
             if (tab === 'messages') await loadMessages();
+            if (tab === 'notifications') await loadNotifSettings();
             if (tab === 'security') { await loadDevices(); await loadTwofaStatus(); }
             // 钱包/订单数据在切换 tab 时重新拉取（watch 也会触发，这里显式调用避免竞态）
             if (tab === 'wallet-transactions') await loadTx(1);
@@ -1300,7 +1423,9 @@ const App = {
             submitRecharge, loadTx, copyOrderNo, loadMyOrders,
             rechargePendingOrderNo, rechargePendingAmount, rechargeResultType, rechargeResultTitle, rechargeResultAmount,
             rechargeQrLoading, rechargePayUrl, rechargeIsMobile,
-            pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay, checkPayStatus
+            pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay, checkPayStatus,
+            notifSettings, notifGroups, loadNotifSettings, toggleNotifSetting,
+            toastMessage, toastType, showToast
         };
     }
 };

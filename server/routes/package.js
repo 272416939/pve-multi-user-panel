@@ -6,7 +6,7 @@ var pveApi = require('../api/pve-api');
 var ikuaiApi = require('../api/ikuai-api');
 var { generateVmName, generateLxcName } = require('../utils/random-name');
 var { createDhcpStaticBinding, removeDhcpStaticBinding } = require('../services/dhcp');
-var { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
+var { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 var { calculateAmount, deductBalance, setVmAffinity, generateOrderNo } = require('../utils/order-utils');
 var { execSSHWithStdin } = require('../api/ssh-exec');
 var crypto = require('crypto');
@@ -296,7 +296,9 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                         '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                         '</div>' +
                         '<p>如有疑问请联系客服。</p>', siteName);
-                    await sendEmail(failUser.email, '虚拟机开通失败已退款 - ' + siteName, emailHtml);
+                    if (await shouldSendEmail(userId, 'notify_vm_refund')) {
+                        await sendEmail(failUser.email, '虚拟机开通失败已退款 - ' + siteName, emailHtml);
+                    }
                 }
             } catch (emailErr) { console.error('[package] VM 退款邮件发送失败:', emailErr.message); }
             throw provErr;
@@ -324,15 +326,17 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         } catch (e) { console.error('[package] VM 消息发送失败', e); }
         try {
             var user = await db.users.getById(userId);
-            if (user && user.email && user.emailVerified) {
-                var emailHtml = createEmailTemplate('服务器开通成功',
-                    '<p>您的新服务器已开通成功！</p><p>类型：虚拟机</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
-                );
-                await sendEmail(user.email, '服务器开通成功', emailHtml);
-            }
-        } catch (e) { console.error('[package] VM 邮件发送失败', e); }
+                if (user && user.email && user.emailVerified) {
+                    var emailHtml = createEmailTemplate('服务器开通成功',
+                        '<p>您的新服务器已开通成功！</p><p>类型：虚拟机</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
+                    );
+                    if (await shouldSendEmail(userId, 'notify_vm_provisioned')) {
+                        await sendEmail(user.email, '服务器开通成功', emailHtml);
+                    }
+                }
+            } catch (e) { console.error('[package] VM 邮件发送失败', e); }
 
-        // Cloud-init 密码通知
+            // Cloud-init 密码通知
         if (osTemplate.ciuser && vmUpdateCfg.cipassword) {
             try {
                 await db.messages.create({
@@ -354,7 +358,9 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                         '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
                         pkgSiteName
                     );
-                    await sendEmail(ciUser.email, '服务器账号信息 - ' + pkgSiteName, ciEmailHtml);
+                    if (await shouldSendEmail(userId, 'notify_account_password')) {
+                        await sendEmail(ciUser.email, '服务器账号信息 - ' + pkgSiteName, ciEmailHtml);
+                    }
                 }
             } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
         }
@@ -547,7 +553,9 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
                         '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                         '</div>' +
                         '<p>如有疑问请联系客服。</p>', siteName);
-                    await sendEmail(failUser.email, '容器开通失败已退款 - ' + siteName, emailHtml);
+                    if (await shouldSendEmail(userId, 'notify_lxc_refund')) {
+                        await sendEmail(failUser.email, '容器开通失败已退款 - ' + siteName, emailHtml);
+                    }
                 }
             } catch (emailErr) { console.error('[package] LXC 退款邮件发送失败:', emailErr.message); }
             throw provErr;
@@ -579,7 +587,9 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
                 var emailHtml = createEmailTemplate('容器开通成功',
                     '<p>您的新容器已开通成功！</p><p>类型：LXC 容器</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
                 );
-                await sendEmail(user.email, '容器开通成功', emailHtml);
+                if (await shouldSendEmail(userId, 'notify_lxc_provisioned')) {
+                    await sendEmail(user.email, '容器开通成功', emailHtml);
+                }
             }
         } catch (e) { console.error('[package] LXC 邮件发送失败', e); }
 
@@ -627,7 +637,9 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
                         '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
                         pkgSiteName2
                     );
-                    await sendEmail(pwdUser.email, '容器 root 密码 - ' + pkgSiteName2, pwdEmailHtml);
+                    if (await shouldSendEmail(userId, 'notify_account_password')) {
+                        await sendEmail(pwdUser.email, '容器 root 密码 - ' + pkgSiteName2, pwdEmailHtml);
+                    }
                 }
             } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
         }
@@ -831,7 +843,9 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
                     '<p>订单号：' + orderNo + '</p>' +
                     '<p>到期时间：' + (expDate || '无') + '</p>'
                 );
-                await sendEmail(user.email, '服务器开通成功', emailHtml);
+                if (await shouldSendEmail(userId, 'notify_vm_provisioned')) {
+                    await sendEmail(user.email, '服务器开通成功', emailHtml);
+                }
             }
         } catch (e) { console.error('[package] VM 邮件发送失败', e); }
 
@@ -857,7 +871,9 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
                         '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
                         pkgSiteName3
                     );
-                    await sendEmail(adminCiUser.email, '服务器账号信息 - ' + pkgSiteName3, adminCiHtml);
+                    if (await shouldSendEmail(userId, 'notify_account_password')) {
+                        await sendEmail(adminCiUser.email, '服务器账号信息 - ' + pkgSiteName3, adminCiHtml);
+                    }
                 }
             } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
         }
@@ -1048,7 +1064,9 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
                     '<p>订单号：' + orderNo + '</p>' +
                     '<p>到期时间：' + (expDate || '无') + '</p>'
                 );
-                await sendEmail(user.email, '服务器开通成功', emailHtml);
+                if (await shouldSendEmail(userId, 'notify_lxc_provisioned')) {
+                    await sendEmail(user.email, '服务器开通成功', emailHtml);
+                }
             }
         } catch (e) { console.error('[package] LXC 邮件发送失败', e); }
 
@@ -1096,7 +1114,9 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
                         '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
                         pkgSiteName4
                     );
-                    await sendEmail(adminPwdUser.email, '容器 root 密码 - ' + pkgSiteName4, adminPwdEmailHtml);
+                    if (await shouldSendEmail(userId, 'notify_account_password')) {
+                        await sendEmail(adminPwdUser.email, '容器 root 密码 - ' + pkgSiteName4, adminPwdEmailHtml);
+                    }
                 }
             } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
         }

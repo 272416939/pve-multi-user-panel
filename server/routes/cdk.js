@@ -5,7 +5,7 @@ const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { generateUniqueCdkCode } = require('../utils/cdk-generator');
 const getSiteUrl = require('../utils/site-url');
-const { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
+const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const { safeError } = require('../utils/safe-error');
 const { formatLocalDate } = require('../utils/date');
 
@@ -126,31 +126,35 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
  
                 // 发送邮件通知
                 if (user.email && user.emailVerified) {
-                    try {
-                        const emailContent = `
-                            <p>您好 <strong>${user.username}</strong>，</p>
-                            <div class="info-box" style="border-left-color: #48bb78;">
-                                <p style="margin-bottom: 8px; font-size: 16px;">
-                                    ${userCount > 1 ? `为您生成了 ${userCount} 张 CDK 兑换码` : '为您生成了一张 CDK 兑换码'}
-                                </p>
-                            </div>
-                            <div class="info-box">
-                                <p style="margin-bottom: 8px;"><strong>CDK 详情：</strong></p>
-                                <p style="margin-bottom: 4px;">续费时长：${durationStr}</p>
-                                <p style="margin-bottom: 4px;">有效期至：${expiryStr}</p>
-                                ${userCount <= 5 ? `<p style="margin-bottom: 4px;">兑换码：<br>${cdkList.map(c => c.code).join('<br>')}</p>` : ''}
-                            </div>
-                            <div class="divider"></div>
-                            <p>请前往「我的虚拟机」页面点击「CDK 兑换」输入兑换码进行续费。</p>
-                        `;
-                        const subjectSiteName = await getSiteName();
-                        await sendEmail(
-                            user.email,
-                            '您收到 CDK 兑换码 - ' + subjectSiteName,
-                            createEmailTemplate('CDK 兑换码通知', emailContent, subjectSiteName)
-                        );
-                    } catch (emailError) {
-                        console.error(`发送 CDK 分配邮件给 ${user.username} 失败:`, emailError.message);
+                    if (await shouldSendEmail(parsedUid, 'notify_recharge')) {
+                        try {
+                            const emailContent = `
+                                <p>您好 <strong>${user.username}</strong>，</p>
+                                <div class="info-box" style="border-left-color: #48bb78;">
+                                    <p style="margin-bottom: 8px; font-size: 16px;">
+                                        ${userCount > 1 ? `为您生成了 ${userCount} 张 CDK 兑换码` : '为您生成了一张 CDK 兑换码'}
+                                    </p>
+                                </div>
+                                <div class="info-box">
+                                    <p style="margin-bottom: 8px;"><strong>CDK 详情：</strong></p>
+                                    <p style="margin-bottom: 4px;">续费时长：${durationStr}</p>
+                                    <p style="margin-bottom: 4px;">有效期至：${expiryStr}</p>
+                                    ${userCount <= 5 ? `<p style="margin-bottom: 4px;">兑换码：<br>${cdkList.map(c => c.code).join('<br>')}</p>` : ''}
+                                </div>
+                                <div class="divider"></div>
+                                <p>请前往「我的虚拟机」页面点击「CDK 兑换」输入兑换码进行续费。</p>
+                            `;
+                            const subjectSiteName = await getSiteName();
+                            if (await shouldSendEmail(user.id, 'notify_recharge')) {
+                                await sendEmail(
+                                    user.email,
+                                    '您收到 CDK 兑换码 - ' + subjectSiteName,
+                                    createEmailTemplate('CDK 兑换码通知', emailContent, subjectSiteName)
+                                );
+                            }
+                        } catch (emailError) {
+                            console.error(`发送 CDK 分配邮件给 ${user.username} 失败:`, emailError.message);
+                        }
                     }
                 }
             }
@@ -378,28 +382,32 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             // 发送通知
             const redeemer = await db.users.getById(req.user.id);
             if (redeemer && redeemer.email && redeemer.emailVerified) {
-                try {
-                    const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
-                    const emailContent = `
-                        <p>您好 <strong>${redeemer.username}</strong>，</p>
-                        <div class="info-box" style="border-left-color: #48bb78;">
-                            <p style="margin-bottom: 8px; font-size: 16px;">
-                                ✅ CDK 续费成功！
-                            </p>
-                        </div>
-                        <div class="info-box">
-                            <p style="margin-bottom: 8px;"><strong>续费详情：</strong></p>
-                            <p style="margin-bottom: 4px;">LXC 容器：${targetName}（CT ${ct.ct_id}）</p>
-                            <p style="margin-bottom: 4px;">续费时长：${durationStr}</p>
-                            ${renewalPrice ? `<p style="margin-bottom: 4px;">续费价格：${renewalPrice}</p>` : ''}
-                            <p style="margin-bottom: 0;">新到期时间：${newExpirationDate.toLocaleString('zh-CN')}</p>
-                        </div>
-                        <p>祝您使用愉快！如有问题请联系管理员。</p>
-                    `;
-                    const subjectSiteName2 = await getSiteName();
-                    await sendEmail(redeemer.email, 'CDK 续费成功 - ' + subjectSiteName2, createEmailTemplate('续费成功通知', emailContent, subjectSiteName2));
-                } catch (emailError) {
-                    console.error('发送 CDK 续费成功邮件失败:', emailError.message);
+                if (await shouldSendEmail(redeemer.id, 'notify_recharge')) {
+                    try {
+                        const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
+                        const emailContent = `
+                            <p>您好 <strong>${redeemer.username}</strong>，</p>
+                            <div class="info-box" style="border-left-color: #48bb78;">
+                                <p style="margin-bottom: 8px; font-size: 16px;">
+                                    ✅ CDK 续费成功！
+                                </p>
+                            </div>
+                            <div class="info-box">
+                                <p style="margin-bottom: 8px;"><strong>续费详情：</strong></p>
+                                <p style="margin-bottom: 4px;">LXC 容器：${targetName}（CT ${ct.ct_id}）</p>
+                                <p style="margin-bottom: 4px;">续费时长：${durationStr}</p>
+                                ${renewalPrice ? `<p style="margin-bottom: 4px;">续费价格：${renewalPrice}</p>` : ''}
+                                <p style="margin-bottom: 0;">新到期时间：${newExpirationDate.toLocaleString('zh-CN')}</p>
+                            </div>
+                            <p>祝您使用愉快！如有问题请联系管理员。</p>
+                        `;
+                        const subjectSiteName2 = await getSiteName();
+                        if (await shouldSendEmail(redeemer.id, 'notify_recharge')) {
+                            await sendEmail(redeemer.email, 'CDK 续费成功 - ' + subjectSiteName2, createEmailTemplate('续费成功通知', emailContent, subjectSiteName2));
+                        }
+                    } catch (emailError) {
+                        console.error('发送 CDK 续费成功邮件失败:', emailError.message);
+                    }
                 }
             }
  
@@ -456,30 +464,33 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             // 发送续费成功邮件和站内信
             const redeemer = await db.users.getById(req.user.id);
             if (redeemer && redeemer.email && redeemer.emailVerified) {
-                try {
-                    const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
-                    const emailContent = `
-                        <p>您好 <strong>${redeemer.username}</strong>，</p>
-                        <div class="info-box" style="border-left-color: #48bb78;">
-                            <p style="margin-bottom: 8px; font-size: 16px;">
-                                ✅ CDK 续费成功！
-                            </p>
-                        </div>
-                        <div class="info-box">
-                            <p style="margin-bottom: 8px;"><strong>续费详情：</strong></p>
-                            <p style="margin-bottom: 4px;">虚拟机：${targetName}（VMID: ${vm.vm_id}）</p>
-                            <p style="margin-bottom: 4px;">续费时长：${durationStr}</p>
-                            ${renewalPrice ? `<p style="margin-bottom: 4px;">续费价格：${renewalPrice}</p>` : ''}
-                            <p style="margin-bottom: 0;">新到期时间：${newExpirationDate.toLocaleString('zh-CN')}</p>
-                        </div>
-                        <p>祝您使用愉快！如有问题请联系管理员。</p>
-                    `;
-                    const subjectSiteName3 = await getSiteName();
-                    await sendEmail(
-                        redeemer.email,
-                        'CDK 续费成功 - ' + subjectSiteName3,
-                        createEmailTemplate('续费成功通知', emailContent, subjectSiteName3)
-                    );
+                if (await shouldSendEmail(redeemer.id, 'notify_recharge')) {
+                    try {
+                        const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
+                        const emailContent = `
+                            <p>您好 <strong>${redeemer.username}</strong>，</p>
+                            <div class="info-box" style="border-left-color: #48bb78;">
+                                <p style="margin-bottom: 8px; font-size: 16px;">
+                                    ✅ CDK 续费成功！
+                                </p>
+                            </div>
+                            <div class="info-box">
+                                <p style="margin-bottom: 8px;"><strong>续费详情：</strong></p>
+                                <p style="margin-bottom: 4px;">虚拟机：${targetName}（VMID: ${vm.vm_id}）</p>
+                                <p style="margin-bottom: 4px;">续费时长：${durationStr}</p>
+                                ${renewalPrice ? `<p style="margin-bottom: 4px;">续费价格：${renewalPrice}</p>` : ''}
+                                <p style="margin-bottom: 0;">新到期时间：${newExpirationDate.toLocaleString('zh-CN')}</p>
+                            </div>
+                            <p>祝您使用愉快！如有问题请联系管理员。</p>
+                        `;
+                        const subjectSiteName3 = await getSiteName();
+                        if (await shouldSendEmail(redeemer.id, 'notify_recharge')) {
+                            await sendEmail(
+                                redeemer.email,
+                                'CDK 续费成功 - ' + subjectSiteName3,
+                            createEmailTemplate('续费成功通知', emailContent, subjectSiteName3)
+                        );
+                        }
                     dbg(`已向 ${redeemer.username} 发送 CDK 续费成功邮件（VM ${vm.vm_id}）`);
                 } catch (emailError) {
                     console.error('发送 CDK 续费成功邮件失败:', emailError.message);

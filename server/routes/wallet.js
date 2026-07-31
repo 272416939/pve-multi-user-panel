@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createPayClient, generateOrderId } = require('../sdk/pay');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const dbg = require('../utils/debug');
 const { getPeriodMonths, calculateAmount, generateOrderNo } = require('../utils/order-utils');
 const pveApi = require('../api/pve-api');
@@ -320,22 +320,26 @@ router.all('/wallet/notify', async (req, res) => {
 
         try {
             if (user.email && user.emailVerified && user.email.includes('@')) {
-                var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
-                var rechargeHtml = createEmailTemplate('充值到账通知',
-                    `<p>您好，您已成功 <strong>充值 ¥${amount.toFixed(2)}</strong>。</p>
-                    <div class="info-box">
-                        <p style="margin-bottom: 4px;">💰 充值金额：<strong>¥${amount.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">💳 当前余额：<strong>¥${balanceAfter.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">📋 订单编号：<strong>${params.out_trade_no}</strong></p>
-                        <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
-                    </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`, siteName);
-                await sendEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);
+                if (await shouldSendEmail(userId, 'notify_recharge')) {
+                    var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
+                    var rechargeHtml = createEmailTemplate('充值到账通知',
+                        `<p>您好，您已成功 <strong>充值 ¥${amount.toFixed(2)}</strong>。</p>
+                        <div class="info-box">
+                            <p style="margin-bottom: 4px;">💰 充值金额：<strong>¥${amount.toFixed(2)}</strong></p>
+                            <p style="margin-bottom: 4px;">💳 当前余额：<strong>¥${balanceAfter.toFixed(2)}</strong></p>
+                            <p style="margin-bottom: 4px;">📋 订单编号：<strong>${params.out_trade_no}</strong></p>
+                            <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
+                        </div>
+                        <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`, siteName);
+                    if (await shouldSendEmail(user.id, 'notify_recharge')) {
+                        await sendEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);
+                    }
+                }
             }
         } catch (e) {
             console.error('[钱包] 邮件发送失败:', e.message);
         }
-        
+
         res.send('success');
     } catch (e) {
         console.error('[钱包] 回调处理失败:', e.message);
@@ -438,17 +442,21 @@ router.get('/wallet/return', async (req, res) => {
 
         try {
             if (user.email && user.emailVerified && user.email.includes('@')) {
-                var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
-                var rechargeHtml = createEmailTemplate('充值到账通知',
-                    `<p>您好，您已成功 <strong>充值 ¥${amount.toFixed(2)}</strong>。</p>
-                    <div class="info-box">
-                        <p style="margin-bottom: 4px;">💰 充值金额：<strong>¥${amount.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">💳 当前余额：<strong>¥${balanceAfter.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">📋 订单编号：<strong>${params.out_trade_no}</strong></p>
-                        <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
-                    </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`, siteName);
-                await sendEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);
+                if (await shouldSendEmail(userId, 'notify_recharge')) {
+                    var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
+                    var rechargeHtml = createEmailTemplate('充值到账通知',
+                        `<p>您好，您已成功 <strong>充值 ¥${amount.toFixed(2)}</strong>。</p>
+                        <div class="info-box">
+                            <p style="margin-bottom: 4px;">💰 充值金额：<strong>¥${amount.toFixed(2)}</strong></p>
+                            <p style="margin-bottom: 4px;">💳 当前余额：<strong>¥${balanceAfter.toFixed(2)}</strong></p>
+                            <p style="margin-bottom: 4px;">📋 订单编号：<strong>${params.out_trade_no}</strong></p>
+                            <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
+                        </div>
+                        <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`, siteName);
+                    if (await shouldSendEmail(user.id, 'notify_recharge')) {
+                        await sendEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);
+                    }
+                }
             }
         } catch (e) {
             console.error('[钱包] 邮件发送失败:', e.message);
@@ -654,20 +662,24 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         
         try {
             if (user.email && user.emailVerified && user.email.includes('@')) {
-                var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
-                var renewHtml = createEmailTemplate('资源续费成功',
-                    `<p>您好，您的 <strong>${resourceTypeLabel}「${resourceName}」</strong> 已续费成功。</p>
-                    <div class="info-box">
-                        <p style="margin-bottom: 4px;">📌 资源名称：<strong>${resourceName}</strong></p>
-                        <p style="margin-bottom: 4px;">📅 续费详情：<strong>${periodStr}</strong></p>
-                        <p style="margin-bottom: 4px;">⏳ 到期时间：<strong>${expiryDisplay}</strong></p>
-                        <p style="margin-bottom: 4px;">💸 实付金额：<strong>¥${totalPrice.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">💳 余额变动：<strong>¥${balance.toFixed(2)} → ¥${newBalance}</strong></p>
-                        <p style="margin-bottom: 4px;">📋 订单编号：<strong>${orderNo}</strong></p>
-                        <p>⏰ 续费时间：${new Date().toLocaleString('zh-CN')}</p>
-                    </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/">控制面板</a> 查看资源详情。</p>`, siteName);
-                await sendEmail(user.email, '资源续费成功 - ' + siteName, renewHtml);
+                if (await shouldSendEmail(userId, 'notify_renewal')) {
+                    var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
+                    var renewHtml = createEmailTemplate('资源续费成功',
+                        `<p>您好，您的 <strong>${resourceTypeLabel}「${resourceName}」</strong> 已续费成功。</p>
+                        <div class="info-box">
+                            <p style="margin-bottom: 4px;">📌 资源名称：<strong>${resourceName}</strong></p>
+                            <p style="margin-bottom: 4px;">📅 续费详情：<strong>${periodStr}</strong></p>
+                            <p style="margin-bottom: 4px;">⏳ 到期时间：<strong>${expiryDisplay}</strong></p>
+                            <p style="margin-bottom: 4px;">💸 实付金额：<strong>¥${totalPrice.toFixed(2)}</strong></p>
+                            <p style="margin-bottom: 4px;">💳 余额变动：<strong>¥${balance.toFixed(2)} → ¥${newBalance}</strong></p>
+                            <p style="margin-bottom: 4px;">📋 订单编号：<strong>${orderNo}</strong></p>
+                            <p>⏰ 续费时间：${new Date().toLocaleString('zh-CN')}</p>
+                        </div>
+                        <p>前往 <a href="${process.env.SITE_URL || ''}/">控制面板</a> 查看资源详情。</p>`, siteName);
+                    if (await shouldSendEmail(userId, 'notify_renewal')) {
+                        await sendEmail(user.email, '资源续费成功 - ' + siteName, renewHtml);
+                    }
+                }
             }
         } catch (e) {
             console.error('[钱包] 续费邮件发送失败:', e.message);

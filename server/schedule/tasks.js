@@ -6,7 +6,7 @@ const { syncPortForwardsFromIkuai } = require('../services/ikuai-sync');
 const ikuaiApi = require('../api/ikuai-api');
 const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
-const { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
+const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const redis = require('../api/redis').getRedisClient();
 
 // PERF-25: 分布式锁，防止多实例重复执行到期检查
@@ -121,7 +121,10 @@ async function recoverProvisioningTasks() {
                                     '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                                     '</div>' +
                                     '<p>如有疑问请联系客服。</p>', siteName);
-                                await sendEmail(recoverUser.email, resourceLabel + '开通失败已退款 - ' + siteName, emailHtml);
+                                var refundCategory = type === 'vm' ? 'notify_vm_refund' : 'notify_lxc_refund';
+                                if (await shouldSendEmail(recoverUser.id, refundCategory)) {
+                                    await sendEmail(recoverUser.email, resourceLabel + '开通失败已退款 - ' + siteName, emailHtml);
+                                }
                             }
                         } catch (emailErr) { console.error('[recovery] 退款邮件发送失败:', emailErr.message); }
                     } catch (e) { console.error('[recovery] ' + type + ' ' + record.id + ' 退款处理失败:', e.message); }
