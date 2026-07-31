@@ -6,7 +6,7 @@ var pveApi = require('../api/pve-api');
 var ikuaiApi = require('../api/ikuai-api');
 var { generateVmName, generateLxcName } = require('../utils/random-name');
 var { createDhcpStaticBinding, removeDhcpStaticBinding } = require('../services/dhcp');
-var { createEmailTemplate, sendEmail } = require('../utils/email');
+var { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
 var { calculateAmount, deductBalance, setVmAffinity, generateOrderNo } = require('../utils/order-utils');
 var { execSSHWithStdin } = require('../api/ssh-exec');
 var crypto = require('crypto');
@@ -326,15 +326,17 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             try {
                 var ciUser = await db.users.getById(userId);
                 if (ciUser && ciUser.email && ciUser.emailVerified) {
+                    var pkgSiteName = await getSiteName();
                     var ciEmailHtml = createEmailTemplate('服务器账号信息',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
                         '<p style="margin-bottom: 4px;">账号：' + osTemplate.ciuser + '</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + vmUpdateCfg.cipassword + '</p>' +
                         '</div><div class="divider"></div>' +
-                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
+                        pkgSiteName
                     );
-                    await sendEmail(ciUser.email, '服务器账号信息 - PVE 管理面板', ciEmailHtml);
+                    await sendEmail(ciUser.email, '服务器账号信息 - ' + pkgSiteName, ciEmailHtml);
                 }
             } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
         }
@@ -579,15 +581,17 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             try {
                 var pwdUser = await db.users.getById(userId);
                 if (pwdUser && pwdUser.email && pwdUser.emailVerified) {
+                    var pkgSiteName2 = await getSiteName();
                     var pwdEmailHtml = createEmailTemplate('容器 root 密码',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的容器 ' + randomName + ' 已开通</strong></p>' +
                         '<p style="margin-bottom: 4px;">Root 账号：root</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + lxcPassword + '</p>' +
                         '</div><div class="divider"></div>' +
-                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
+                        pkgSiteName2
                     );
-                    await sendEmail(pwdUser.email, '容器 root 密码 - PVE 管理面板', pwdEmailHtml);
+                    await sendEmail(pwdUser.email, '容器 root 密码 - ' + pkgSiteName2, pwdEmailHtml);
                 }
             } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
         }
@@ -807,15 +811,17 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
             try {
                 var adminCiUser = await db.users.getById(userId);
                 if (adminCiUser && adminCiUser.email && adminCiUser.emailVerified) {
+                    var pkgSiteName3 = await getSiteName();
                     var adminCiHtml = createEmailTemplate('服务器账号信息',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
                         '<p style="margin-bottom: 4px;">账号：' + template.ciuser + '</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + adminVmCfg.cipassword + '</p>' +
                         '</div><div class="divider"></div>' +
-                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
+                        pkgSiteName3
                     );
-                    await sendEmail(adminCiUser.email, '服务器账号信息 - PVE 管理面板', adminCiHtml);
+                    await sendEmail(adminCiUser.email, '服务器账号信息 - ' + pkgSiteName3, adminCiHtml);
                 }
             } catch (e) { console.error('[package] VM 密码邮件发送失败', e); }
         }
@@ -1044,15 +1050,17 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
             try {
                 var adminPwdUser = await db.users.getById(userId);
                 if (adminPwdUser && adminPwdUser.email && adminPwdUser.emailVerified) {
+                    var pkgSiteName4 = await getSiteName();
                     var adminPwdEmailHtml = createEmailTemplate('容器 root 密码',
                         '<div class="info-box" style="border-left-color: #667eea;">' +
                         '<p style="margin-bottom: 8px;"><strong>您的容器 ' + randomName + ' 已开通</strong></p>' +
                         '<p style="margin-bottom: 4px;">Root 账号：root</p>' +
                         '<p style="margin-bottom: 4px;">密码：' + adminLxcPwd + '</p>' +
                         '</div><div class="divider"></div>' +
-                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>'
+                        '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
+                        pkgSiteName4
                     );
-                    await sendEmail(adminPwdUser.email, '容器 root 密码 - PVE 管理面板', adminPwdEmailHtml);
+                    await sendEmail(adminPwdUser.email, '容器 root 密码 - ' + pkgSiteName4, adminPwdEmailHtml);
                 }
             } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
         }

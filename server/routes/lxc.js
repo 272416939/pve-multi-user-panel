@@ -6,7 +6,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 const { getStatusCache } = require('../websocket/push-proxy');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp } = require('../services/dhcp');
 const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
 const dbg = require('../utils/debug');
@@ -231,10 +231,11 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
                 <div class="divider"></div>
                 <p>您可以前往「我的 LXC 容器」页面开始使用。如有问题请联系管理员。</p>
             `;
+            const lxcSiteName = await getSiteName();
             await sendEmail(
                 assignedUser.email,
-                'LXC 容器已开通 - PVE 管理面板',
-                createEmailTemplate('容器开通通知', emailContent)
+                'LXC 容器已开通 - ' + lxcSiteName,
+                createEmailTemplate('容器开通通知', emailContent, lxcSiteName)
             );
         } catch (emailError) {
             console.error(`发送 LXC 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
@@ -450,10 +451,11 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
                     <div class="divider"></div>
                     <p>如果对此操作有疑问，请联系管理员。</p>
                 `;
+                const lxcSiteName2 = await getSiteName();
                 await sendEmail(
                     removedUser.email,
-                    'LXC 容器已被移除 - PVE 管理面板',
-                    createEmailTemplate('容器移除通知', emailContent)
+                    'LXC 容器已被移除 - ' + lxcSiteName2,
+                    createEmailTemplate('容器移除通知', emailContent, lxcSiteName2)
                 );
             } catch (emailError) {
                 console.error(`发送 LXC 移除邮件给 ${removedUser.username} 失败:`, emailError.message);

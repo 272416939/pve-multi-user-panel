@@ -4,7 +4,7 @@
 
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
-var { createEmailTemplate, sendEmail } = require('../utils/email');
+var { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
 var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 var { getRedisClient } = require('../api/redis');
 var logger = require('../utils/logger');
@@ -57,11 +57,7 @@ async function sendDiskReminderEmail(user, disk, stage) {
       content = '<p>您的数据盘 <strong>' + (disk.disk_name || disk.volume_id) + '</strong>（' + disk.capacity_gb + ' GiB）已到期分离，进入保留期。</p>';
       content += '<p>保留期内续费可重新挂载，逾期将自动销毁。</p>';
     }
-    var siteName = 'PVE 管理面板';
-    try {
-      var cfg = await db.config.get('site:name');
-      if (cfg) siteName = cfg;
-    } catch (e) {}
+    var siteName = await getSiteName();
     var html = createEmailTemplate('硬盘到期提醒', content, siteName);
     await sendEmail(user.email, subject, html);
   } catch (e) {
@@ -302,8 +298,7 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
     content += '<p><strong>已用容量 / 总容量：</strong>' + usedTb + ' TiB / ' + totalTb + ' TiB</p>';
     content += '<p style="color:#dc3545;"><strong>请及时扩容存储池或清理闲置磁盘。</strong></p>';
 
-    var siteName = 'PVE 管理面板';
-    try { var cfg = await db.config.get('site:name'); if (cfg) siteName = cfg; } catch (e) {}
+    var siteName = await getSiteName();
     var html = createEmailTemplate('存储容量告警', content, siteName);
 
     for (var i = 0; i < admins.rows.length; i++) {

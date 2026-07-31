@@ -6,7 +6,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 const { getStatusCache } = require('../websocket/push-proxy');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
@@ -267,10 +267,11 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
                 <div class="divider"></div>
                 <p>您可以前往「我的虚拟机」页面开始使用。如有问题请联系管理员。</p>
             `;
+            const vmSiteName = await getSiteName();
             await sendEmail(
                 assignedUser.email,
-                '虚拟机已开通 - PVE 管理面板',
-                createEmailTemplate('虚拟机开通通知', emailContent)
+                '虚拟机已开通 - ' + vmSiteName,
+                createEmailTemplate('虚拟机开通通知', emailContent, vmSiteName)
             );
         } catch (emailError) {
             console.error(`发送 VM 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
@@ -488,10 +489,11 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
                     <div class="divider"></div>
                     <p>如果对此操作有疑问，请联系管理员。</p>
                 `;
+                const vmSiteName2 = await getSiteName();
                 await sendEmail(
                     removedUser.email,
-                    '虚拟机已被移除 - PVE 管理面板',
-                    createEmailTemplate('虚拟机移除通知', emailContent)
+                    '虚拟机已被移除 - ' + vmSiteName2,
+                    createEmailTemplate('虚拟机移除通知', emailContent, vmSiteName2)
                 );
             } catch (emailError) {
                 console.error(`发送 VM 移除邮件给 ${removedUser.username} 失败:`, emailError.message);

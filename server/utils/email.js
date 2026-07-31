@@ -1,6 +1,16 @@
 const nodemailer = require('nodemailer');
 const db = require('../api/db');
 
+// 统一获取站点名称（管理端可自定义），供邮件主题/模板头部使用，避免硬编码面板名
+async function getSiteName() {
+    try {
+        var name = await db.config.get('site:name');
+        return name || '云服务控制台';
+    } catch (e) {
+        return '云服务控制台';
+    }
+}
+
 function createEmailTemplate(title, content, siteName) {
     return `
         <!DOCTYPE html>
@@ -109,7 +119,7 @@ function createEmailTemplate(title, content, siteName) {
         <body>
             <div class="email-container">
                 <div class="email-header">
-                    <h1>${siteName || 'PVE 多用户控制面板'}</h1>
+                    <h1>${siteName || '云服务控制台'}</h1>
                     <p>${title}</p>
                 </div>
                 <div class="email-content">
@@ -176,4 +186,4 @@ async function sendEmail(to, subject, html) {
     }
 }
 
-module.exports = { createEmailTemplate, sendEmail };
+module.exports = { createEmailTemplate, sendEmail, getSiteName };
