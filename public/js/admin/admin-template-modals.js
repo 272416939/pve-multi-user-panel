@@ -177,7 +177,7 @@
                                     <p>成功生成 <strong>{{ cdkResult.length }}</strong> 个 CDK 兑换码</p>
                                     <p v-if="cdkResultBatchId" class="text-muted small">批次号: {{ cdkResultBatchId }}</p>
                                 </div>
-                                <div class="mb-3">
+                                <div class="mb-3 d-flex gap-2">
                                     <pv-button @click="exportCdkCsv(cdkResultBatchId)" size="sm">
 
                                         导出此批次 CSV
@@ -236,7 +236,7 @@
                                     <div class="mb-3">
                                         <label class="form-label">分配给</label>
                                         <select class="form-select" v-model="editVmForm.user_id">
-                                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
+                                            <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.username }}</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
@@ -822,7 +822,7 @@
                                     <div class="mb-3">
                                         <label class="form-label">分配给</label>
                                         <select class="form-select" v-model="editLxcForm.user_id">
-                                            <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
+                                            <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.username }}</option>
                                         </select>
                                     </div>
                                     <div class="mb-3">
@@ -1448,8 +1448,10 @@
                                                     <td>{{ (rule.protocol || '').toUpperCase() }}</td>
                                                     <td><span :class="rule.enabled ? 'text-success' : 'text-muted'">{{ rule.enabled ? '启用' : '禁用' }}</span></td>
                                                     <td>
-                                                        <pv-button @click="openDeviceEditModal(rule)" variant="outline" size="sm">编辑</pv-button>
-                                                        <pv-button @click="deleteDeviceRule(rule)" variant="outline-danger" size="sm">删除</pv-button>
+                                                        <div class="d-flex gap-1">
+                                                            <pv-button @click="openDeviceEditModal(rule)" variant="outline" size="sm">编辑</pv-button>
+                                                            <pv-button @click="deleteDeviceRule(rule)" variant="outline-danger" size="sm">删除</pv-button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             </tbody>

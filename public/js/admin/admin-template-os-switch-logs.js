@@ -30,9 +30,9 @@
                     <div class="col-auto">
                         <input class="form-control form-control-sm" style="width:100px" v-model="osSwitchLogFilter.user_id" placeholder="用户ID" type="number">
                     </div>
-                    <div class="col-auto">
+                    <div class="col-auto d-flex gap-2">
                         <pv-button size="sm" @click="loadOsSwitchLogs(1)">筛选</pv-button>
-                        <pv-button size="sm" variant="outline" @click="resetOsSwitchLogFilter()" class="ms-1">重置</pv-button>
+                        <pv-button size="sm" variant="outline" @click="resetOsSwitchLogFilter()">重置</pv-button>
                     </div>
                 </div>
                 <div class="table-responsive">

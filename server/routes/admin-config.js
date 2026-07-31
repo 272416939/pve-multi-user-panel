@@ -154,7 +154,9 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
         // GitHub API 默认按标签时间戳排序（不可靠），需拉取多条后手动按 published_at 排序
         if (source === 'gitee') {
             response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=20&sort=created&direction=desc`, { timeout: 10000 });
-            response.data = Array.isArray(response.data) ? response.data[0] : response.data;
+            // Gitee 按创建时间返回，仍手动按 created_at/published_at 降序取最新，避免误取旧版本 release
+            const giteeReleases = (Array.isArray(response.data) ? response.data : []).sort((a, b) => new Date(b.published_at || b.created_at) - new Date(a.published_at || a.created_at));
+            response.data = giteeReleases[0] || null;
         } else {
             const [releasesRes, preReleasesRes] = await Promise.allSettled([
                 axios.get(`https://api.github.com/repos/${githubRepo}/releases?per_page=20`, { timeout: 10000 }),
@@ -193,7 +195,8 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
             fallbackNote = '（GitHub 不可达，已回退到 Gitee）';
             try {
                 response = await axios.get(`https://gitee.com/api/v5/repos/${giteeRepo}/releases?per_page=20&sort=created&direction=desc`, { timeout: 10000 });
-                response.data = Array.isArray(response.data) ? response.data[0] : response.data;
+                const giteeReleases = (Array.isArray(response.data) ? response.data : []).sort((a, b) => new Date(b.published_at || b.created_at) - new Date(a.published_at || a.created_at));
+                response.data = giteeReleases[0] || null;
             } catch (e2) {
                 return res.json({
                     current_version: pkg.version,
@@ -267,31 +270,46 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
         const hasUpdate = compareVer(current, latest) === 1;
 
         // 同版本号检测：版本相同但 commit 不同时也提示可更新
+        // 注意必须判断先后方向：只有远程 release commit 领先本地（不是本地 HEAD 祖先）才提示；
+        // 若本地已包含该 release commit（本地比 release 更新），版本一致时不应再提示
         let sameVersionDifferentCommit = false;
         if (!hasUpdate && pkg.version === tag) {
             var projectRoot = path.join(__dirname, '..', '..');
             var currentCommit = getCurrentCommit(projectRoot);
+            var remoteCommit = null;
             if (currentCommit && response.data.target_commitish) {
-                sameVersionDifferentCommit = currentCommit !== response.data.target_commitish;
+                remoteCommit = response.data.target_commitish;
             } else if (currentCommit && response.data.tag_name) {
                 // 通过 tag 名称获取远程 commit（SEC-007: 改用 execFileSync 数组形式防注入）
                 try {
-                    var remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
+                    remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
                         cwd: projectRoot, timeout: 5000, stdio: 'pipe'
                     }).toString().trim();
-                    sameVersionDifferentCommit = currentCommit !== remoteCommit;
                 } catch (e) {
                     // 本地可能没有该 tag，尝试 fetch
                     try {
                         execFileSync('git', ['fetch', 'origin', 'tag', response.data.tag_name, '--no-tags'], {
                             cwd: projectRoot, timeout: 15000, stdio: 'pipe'
                         });
-                        var remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
+                        remoteCommit = execFileSync('git', ['rev-parse', 'refs/tags/' + response.data.tag_name], {
                             cwd: projectRoot, timeout: 5000, stdio: 'pipe'
                         }).toString().trim();
-                        sameVersionDifferentCommit = currentCommit !== remoteCommit;
                     } catch (e2) {
                         // 无法获取远程 commit，忽略
+                    }
+                }
+            }
+            if (currentCommit && remoteCommit) {
+                // commit 不同时，仅当远程 release commit 不是本地 HEAD 的祖先（远程确实领先本地）才提示
+                if (currentCommit !== remoteCommit) {
+                    try {
+                        execFileSync('git', ['merge-base', '--is-ancestor', remoteCommit, 'HEAD'], {
+                            cwd: projectRoot, timeout: 5000, stdio: 'pipe'
+                        });
+                        // 远程 commit 是本地祖先 → 本地已包含该 release，视为已是最新
+                    } catch (e) {
+                        // 不是祖先 → 远程存在本地没有的提交，提示可更新
+                        sameVersionDifferentCommit = true;
                     }
                 }
             }

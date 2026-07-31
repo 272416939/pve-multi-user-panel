@@ -219,7 +219,9 @@ watch($.user, function(u) {
         if (!section) return;
         $.switchSection(section);
         $.expandedSections.value[section] = true;
-        var el = document.getElementById('submenu-' + section);
+        // section 与父菜单 id 可能不同（templates-os → submenu-templates / os-switch-logs → submenu-logs）
+        var menuKey = section === 'templates-os' ? 'templates' : (section === 'os-switch-logs' ? 'logs' : section);
+        var el = document.getElementById('submenu-' + menuKey);
         if (el) el.classList.add('open');
         var parent = el ? el.previousElementSibling : null;
         if (parent) parent.classList.add('expanded');
@@ -271,7 +273,9 @@ watch($.user, function(u) {
 
         $.loading.value = true;
         try {
-            $.users.value = await api('/users');
+            // 用户列表统一走 loadUsers 分页接口（id 降序），避免与全量接口双顺序竞态覆盖
+            var lastUserPage = $.userPage.value;
+            await $.loadUsers(lastUserPage);
             $.cdkList.value = await api('/admin/cdk/list');
             var smtpData = await api('/admin/smtp');
             $.smtpConfig.value = smtpData;
@@ -656,6 +660,16 @@ watch($.user, function(u) {
     // ===== 二级菜单 =====
     $.expandedSections = ref({});
 
+    // 打开某个 section 对应的父菜单（自动映射 section → 父菜单 id）
+    $.openSubmenu = function(section, submenuId) {
+        var menuKey = submenuId || section;
+        $.expandedSections.value[section] = true;
+        var el = document.getElementById('submenu-' + menuKey);
+        if (el) el.classList.add('open');
+        var parent = el ? el.previousElementSibling : null;
+        if (parent) parent.classList.add('expanded');
+    };
+
     $.toggleSubmenu = function(section) {
         $.expandedSections.value[section] = !$.expandedSections.value[section];
         var el = document.getElementById('submenu-' + section);
@@ -671,11 +685,7 @@ watch($.user, function(u) {
         } else if (section === 'lxc') {
             $.activeTabLxc.value = tab;
         }
-        $.expandedSections.value[section] = true;
-        var el = document.getElementById('submenu-' + section);
-        if (el) el.classList.add('open');
-        var parent = el ? el.previousElementSibling : null;
-        if (parent) parent.classList.add('expanded');
+        $.openSubmenu(section);
         document.querySelectorAll('.nav-submenu .nav-item').forEach(function(item) {
             item.classList.remove('active');
         });
@@ -891,11 +901,13 @@ $.initDetailCharts = function() {
                 await $.loadData();
                 await $.loadMacGroups();
                 // Auto-expand submenu based on current section
-                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os'];
+                // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates / os-switch-logs → submenu-logs）
+                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'os-switch-logs'];
+                var submenuIdMap = { 'templates-os': 'templates', 'os-switch-logs': 'logs' };
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
                         var section = $.activeSection.value;
-                        $.toggleSubmenu(section);
+                        $.openSubmenu(section, submenuIdMap[section]);
                         var tabVar = {
                             vms: $.activeTabVm, lxc: $.activeTabLxc,
                             manage: $.activeTab, settings: $.activeTab,
@@ -905,6 +917,12 @@ $.initDetailCharts = function() {
                         if (tabVar) {
                             var target = document.querySelector('[data-subsection="' + section + '-' + tabVar.value + '"]');
                             if (target) target.classList.add('active');
+                        }
+                        // templates-os / os-switch-logs 的 tabVar 不在上方映射中，单独高亮子项
+                        var subIdMap2 = { 'templates-os': 'templates-os', 'os-switch-logs': 'logs-os-switch' }[section];
+                        if (subIdMap2) {
+                            var t2 = document.querySelector('[data-subsection="' + subIdMap2 + '"]');
+                            if (t2) t2.classList.add('active');
                         }
                         if (section === 'templates' && window.templatePage) {
                             if (tabVar && tabVar.value === 'lxc') {
@@ -929,6 +947,9 @@ $.initDetailCharts = function() {
                         }
                         if (section === 'templates-os' && window.__admin.osTemplatePage) {
                             window.__admin.osTemplatePage.load();
+                        }
+                        if (section === 'os-switch-logs') {
+                            $.loadOsSwitchLogs(1);
                         }
                     }, 100);
                 }

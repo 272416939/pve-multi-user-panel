@@ -130,13 +130,17 @@
 
     // ==================== 函数 ====================
     // 用户管理
+    // 请求序号保护：并发加载时仅采纳最后一次请求的结果，避免旧响应覆盖新列表
+    $.userLoadSeq = 0;
     $.loadUsers = async function(page) {
+        var seq = ++$.userLoadSeq;
         $.userPage.value = page || 1;
         try {
             var params = { page: $.userPage.value, limit: 20 };
             if ($.userFilter.value.keyword) params.keyword = $.userFilter.value.keyword;
             if ($.userFilter.value.role) params.role = $.userFilter.value.role;
             var res = await api('/users?' + new URLSearchParams(params));
+            if (seq !== $.userLoadSeq) return; // 已有更新的请求，丢弃本次结果
             if (Array.isArray(res)) {
                 $.users.value = res;
                 $.userTotal.value = res.length;
@@ -145,6 +149,7 @@
                 $.userTotal.value = res.total || 0;
             }
         } catch (e) {
+            if (seq !== $.userLoadSeq) return;
             console.error('加载用户失败', e);
         }
     };
@@ -176,6 +181,7 @@
     };
 
     $.editUser = function(u) {
+        // 快照锁定当前用户数据，避免编辑期间列表刷新覆盖表单
         $.editUserForm.value = {
             id: u.id,
             username: u.username,

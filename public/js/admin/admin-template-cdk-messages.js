@@ -33,7 +33,7 @@
                                         <div class="col-md-7 col-lg-8">
                                             <label class="form-label text-muted small mb-1">续费时长</label>
                                             <div class="d-flex gap-2 flex-wrap align-items-center">
-                                                <div class="btn-group" role="group">
+                                                <div class="btn-group" role="group" style="gap:4px">
                                                     <pv-button type="button" :class="cdkForm.duration_days === 7 ? 'btn-glass-active' : 'btn-glass-inactive'" @click="cdkForm.duration_days = 7" size="sm">7天</pv-button>
                                                     <pv-button type="button" :class="cdkForm.duration_days === 30 ? 'btn-glass-active' : 'btn-glass-inactive'" @click="cdkForm.duration_days = 30" size="sm">30天</pv-button>
                                                     <pv-button type="button" :class="cdkForm.duration_days === 90 ? 'btn-glass-active' : 'btn-glass-inactive'" @click="cdkForm.duration_days = 90" size="sm">90天</pv-button>

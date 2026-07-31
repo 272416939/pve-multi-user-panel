@@ -254,8 +254,10 @@
                                         </td>
                                         <td class="small">{{ b.storage }}</td>
                                         <td>
-                                            <pv-button v-if="b.status === 'completed'" @click="restoreBackup(b)" title="恢复此备份" variant="outline" size="sm">恢复</pv-button>
-                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline-danger" size="sm">删除</pv-button>
+                                            <div class="d-flex gap-1">
+                                                <pv-button v-if="b.status === 'completed'" @click="restoreBackup(b)" title="恢复此备份" variant="outline" size="sm">恢复</pv-button>
+                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline-danger" size="sm">删除</pv-button>
+                                            </div>
                                         </td>
                                     </tr>
                                 </tbody>

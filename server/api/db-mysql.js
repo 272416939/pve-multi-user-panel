@@ -976,7 +976,7 @@ module.exports = {
 
     // 用户操作
     users: {
-        getAll: () => queryAll('SELECT * FROM users'),
+        getAll: () => queryAll('SELECT * FROM users ORDER BY id ASC'),
         getPaginated: async (params) => {
             var page = parseInt(params.page) || 1;
             var limit = Math.min(parseInt(params.limit) || 20, 200);

@@ -115,7 +115,7 @@
                                     <div class="card-body d-flex flex-column">
                                         <div class="d-flex justify-content-between align-items-start mb-2">
                                             <h6 class="mb-0">{{ memo.title || '无标题' }}</h6>
-                                            <div class="btn-group btn-group-sm">
+                                            <div class="btn-group btn-group-sm" style="gap:4px">
                                                 <pv-button variant="secondary" @click="editMemo(memo)">编辑</pv-button>
                                                 <pv-button variant="danger" @click="deleteMemo(memo.id)">删除</pv-button>
                                             </div>
@@ -140,7 +140,7 @@
                                 <pv-button variant="danger" size="sm" @click="clearAllMessages">清空已读</pv-button>
                             </div>
                         </div>
-                        <ul class="nav nav-pills mb-3">
+                        <ul class="nav nav-pills mb-3" style="gap:4px">
                             <li class="nav-item"><pv-button :class="{ active: msgType === 'all' }" @click="msgType = 'all'; loadMessages()">全部</pv-button></li>
                             <li class="nav-item"><pv-button :class="{ active: msgType === '1' }" @click="msgType = '1'; loadMessages()">系统公告</pv-button></li>
                             <li class="nav-item"><pv-button :class="{ active: msgType === '2' }" @click="msgType = '2'; loadMessages()">业务通知</pv-button></li>

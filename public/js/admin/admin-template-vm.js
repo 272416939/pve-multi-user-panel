@@ -175,7 +175,7 @@
                                             <label class="form-label">用户</label>
                                             <select class="form-select" v-model="assignForm.user_id" required>
                                                 <option value="">请选择</option>
-                                                <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
+                                                <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.username }}</option>
                                             </select>
                                         </div>
                                         <div class="col-md-3 mb-3">

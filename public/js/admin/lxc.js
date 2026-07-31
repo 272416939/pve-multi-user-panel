@@ -160,6 +160,15 @@
     $.updateLxc = async function() {
         var f = $.editLxcForm.value;
         try {
+            // 类型统一：下拉选项为字符串，提交前转回数字；空串表示"无主"
+            var uid = f.user_id;
+            if (uid !== '' && uid !== null && uid !== undefined) {
+                var parsed = Number(uid);
+                if (isNaN(parsed)) return alert('请选择有效的用户');
+                uid = parsed;
+            } else {
+                uid = null;
+            }
             var expDate = toLocalDateTimeStr(f.expiration_date);
             await api('/user/lxc/' + f.id, {
                 method: 'PUT',
@@ -168,7 +177,7 @@
                     expiration_date: expDate,
                     renewal_price: f.renewal_price,
                     renewal_period: f.renewal_period || 'month',
-                    user_id: f.user_id,
+                    user_id: uid,
                     mac_group_id: f.mac_group_id || null
                 })
             });
@@ -375,7 +384,7 @@
             expiration_date: formatDateTimeLocal(ct.expiration_date),
             renewal_price: ct.renewal_price || '',
             renewal_period: ct.renewal_period || 'month',
-            user_id: ct.user_id || null,
+            user_id: ct.user_id != null ? String(ct.user_id) : '',
             mac_group_id: ct.ikuai_mac_group_id || '',
             status: ct.status || null
         };
