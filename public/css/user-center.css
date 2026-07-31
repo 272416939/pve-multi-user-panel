@@ -380,6 +380,11 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     border: 1px solid var(--border-color);
     border-radius: 12px;
 }
+.notification-master-bg {
+    /* 明暗主题适配：使用项目主题变量，不依赖 Bootstrap 的 --bs-* 变量 */
+    background: var(--bg-input);
+    transition: background-color 0.3s ease;
+}
 .notification-group {
     border: 1px solid var(--border-color);
     border-radius: 10px;
@@ -387,10 +392,28 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
 }
 .notification-group-header {
     cursor: pointer;
-    transition: background-color 0.2s ease;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    transition: background-color 0.2s ease, border-color 0.3s ease;
 }
 .notification-group-header:hover {
-    background: var(--bg-hover) !important;
+    background: var(--bg-hover);
+}
+.notification-group-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+.notification-group-icon svg {
+    display: block;
+}
+.notification-chevron {
+    color: var(--text-muted);
 }
 .notification-group-items {
     border-top: 1px solid var(--border-color);

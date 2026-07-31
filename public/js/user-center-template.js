@@ -182,12 +182,15 @@
                     <div class="col-md-8">
                         <div class="card">
                             <div class="card-body">
-                                <h5 class="mb-3">📧 邮件通知设置</h5>
+                                <h5 class="mb-3 d-flex align-items-center gap-2">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                                    邮件通知设置
+                                </h5>
                                 <p class="text-muted mb-4">自定义哪些邮件通知需要发送给您。此设置仅影响邮件通知，站内信始终发送。</p>
 
                                 <!-- 总开关 -->
                                 <div class="notification-master-switch mb-4">
-                                    <div class="d-flex justify-content-between align-items-center p-3 rounded" style="background: var(--bs-primary-bg-subtle, #f0f7ff);">
+                                    <div class="d-flex justify-content-between align-items-center p-3 rounded notification-master-bg">
                                         <div>
                                             <div class="fw-bold">邮件通知总开关</div>
                                             <small class="text-muted">关闭后所有邮件通知将停止发送</small>
@@ -206,13 +209,15 @@
                                 <!-- 通知分类 -->
                                 <div v-for="group in notifGroups" :key="group.key" class="notification-group mb-3">
                                     <div class="notification-group-header d-flex justify-content-between align-items-center p-2 rounded cursor-pointer"
-                                         @click="group.expanded = !group.expanded" style="background: var(--bs-tertiary-bg, #f8f9fa);">
+                                         @click="group.expanded = !group.expanded">
                                         <div class="d-flex align-items-center gap-2">
-                                            <span>{{ group.icon }}</span>
+                                            <span class="notification-group-icon">
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="group.svg"></svg>
+                                            </span>
                                             <span class="fw-bold">{{ group.label }}</span>
                                             <small class="text-muted">（{{ group.enabledCount }}/{{ group.items.length }}项已开启）</small>
                                         </div>
-                                        <span class="transition-transform" :style="{ transform: group.expanded ? 'rotate(90deg)' : 'rotate(0deg)' }">▶</span>
+                                        <svg class="notification-chevron transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: group.expanded ? 'rotate(90deg)' : 'rotate(0deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
                                     </div>
                                     <div v-show="group.expanded" class="notification-group-items mt-2">
                                         <div v-for="item in group.items" :key="item.key" class="d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
