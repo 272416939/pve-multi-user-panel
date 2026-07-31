@@ -508,6 +508,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
                     }
                 } catch (emailError) {
                     console.error(`发送 VM 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
+                }
             }
         }
     }
