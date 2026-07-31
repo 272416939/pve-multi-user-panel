@@ -476,8 +476,8 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
     try {
         var orderNo = req.params.order_no;
 
-        // 订单号格式校验：ZFB/WX 前缀 + 12位时间 + 8位随机数字
-        if (!/^(ZFB|WX)[0-9]{20}$/.test(orderNo)) {
+        // 订单号格式校验：ZFB/WX 前缀 + 14位时间戳 + 8位随机数字（兼容旧 12 位时间戳的 20 位数字）
+        if (!/^(ZFB|WX)[0-9]{20,22}$/.test(orderNo)) {
             return res.status(400).json({ error: '无效的订单号格式' });
         }
 
