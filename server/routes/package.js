@@ -281,6 +281,24 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
                     type: 1, is_read: 0, send_type: 1
                 });
             } catch (e) { console.error('[package] VM 开通失败通知发送失败', e); }
+            // 邮件通知：虚拟机开通失败退款
+            try {
+                var failUser = await db.users.getById(userId);
+                if (failUser && failUser.email && failUser.emailVerified && failUser.email.includes('@')) {
+                    var siteName = await getSiteName();
+                    var emailHtml = createEmailTemplate('虚拟机开通失败 - 已退款',
+                        '<p>非常抱歉，您订购的虚拟机 <strong>' + randomName + '</strong> 开通失败，款项已原路退回。</p>' +
+                        '<div class="warning-box">' +
+                        '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceAfterRefund - totalAmount).toFixed(2) + ' → ¥' + balanceAfterRefund.toFixed(2) + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + orderNo + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+                        '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                        '</div>' +
+                        '<p>如有疑问请联系客服。</p>', siteName);
+                    await sendEmail(failUser.email, '虚拟机开通失败已退款 - ' + siteName, emailHtml);
+                }
+            } catch (emailErr) { console.error('[package] VM 退款邮件发送失败:', emailErr.message); }
             throw provErr;
         }
 
@@ -514,6 +532,24 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
                     type: 1, is_read: 0, send_type: 1
                 });
             } catch (e) { console.error('[package] LXC 开通失败通知发送失败', e); }
+            // 邮件通知：容器开通失败退款
+            try {
+                var failUser = await db.users.getById(userId);
+                if (failUser && failUser.email && failUser.emailVerified && failUser.email.includes('@')) {
+                    var siteName = await getSiteName();
+                    var emailHtml = createEmailTemplate('容器开通失败 - 已退款',
+                        '<p>非常抱歉，您订购的容器 <strong>' + randomName + '</strong> 开通失败，款项已原路退回。</p>' +
+                        '<div class="warning-box">' +
+                        '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceAfterRefund - totalAmount).toFixed(2) + ' → ¥' + balanceAfterRefund.toFixed(2) + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + orderNo + '</strong></p>' +
+                        '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+                        '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                        '</div>' +
+                        '<p>如有疑问请联系客服。</p>', siteName);
+                    await sendEmail(failUser.email, '容器开通失败已退款 - ' + siteName, emailHtml);
+                }
+            } catch (emailErr) { console.error('[package] LXC 退款邮件发送失败:', emailErr.message); }
             throw provErr;
         }
 

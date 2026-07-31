@@ -8,6 +8,7 @@ var router = express.Router();
 var { authMiddleware } = require('../middleware/auth');
 var { checkRateLimit } = require('../middleware/rate-limiter');
 var { withTransaction } = require('../utils/with-transaction');
+var { createEmailTemplate, sendEmail, getSiteName } = require('../utils/email');
 var { deductBalance, generateOrderNo } = require('../utils/order-utils');
 var { safeError } = require('../utils/safe-error');
 var db = require('../api/db');
@@ -242,6 +243,29 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
 	      await db.orders.updateStatus(createdOrderNos[oi], 'completed');
 	    }
 	    var firstOrderNo = createdOrderNos[0] || '';
+	    // 邮件通知：硬盘购买成功
+	    try {
+	      var purchaseUser = await db.users.getById(req.user.id);
+	      if (purchaseUser && purchaseUser.email && purchaseUser.emailVerified && purchaseUser.email.includes('@')) {
+	        var siteName = await getSiteName();
+	        var diskNamesStr = diskNames.join('、');
+	        var periodLabel = period === 'year' ? periodCount + '年' : period === 'quarter' ? periodCount + '季' : periodCount + '个月';
+	        var newBalance = (balanceBefore - totalAmount).toFixed(2);
+	        var emailHtml = createEmailTemplate('硬盘购买成功',
+	          '<p>您的数据盘已购买成功！</p>' +
+	          '<div class="info-box">' +
+	          '<p style="margin-bottom: 4px;">💾 硬盘名称：<strong>' + diskNamesStr + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">📐 容量：<strong>' + capacityGb + ' GiB × ' + quantity + ' 块</strong></p>' +
+	          '<p style="margin-bottom: 4px;">📅 计费周期：<strong>' + periodLabel + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">💸 实付金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">📋 订单编号：<strong>' + firstOrderNo + '</strong></p>' +
+	          '<p>⏰ 购买时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+	          '</div>' +
+	          '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
+	        await sendEmail(purchaseUser.email, '硬盘购买成功 - ' + siteName, emailHtml);
+	      }
+	    } catch (emailErr) { console.error('[disk purchase] 邮件发送失败:', emailErr.message); }
 	    res.json({ success: true, order_no: firstOrderNo, orders: createdOrderNos.length, amount: singleAmount, total_amount: totalAmount, disks: quantity });
 	  } else {
 	    // 失败 => 退款 + 清理台账 + 订单标记 refunded
@@ -267,6 +291,25 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
 	    } catch (rollbackError) {
 	      console.error('[disk purchase] 退款处理失败:', rollbackError.message);
 	    }
+	    // 邮件通知：硬盘购买失败退款
+	    try {
+	      var failUser = await db.users.getById(req.user.id);
+	      if (failUser && failUser.email && failUser.emailVerified && failUser.email.includes('@')) {
+	        var siteName = await getSiteName();
+	        var newBalance = (balanceBefore - totalAmount + totalAmount).toFixed(2);
+	        var emailHtml = createEmailTemplate('硬盘购买失败 - 已退款',
+	          '<p>非常抱歉，您购买的数据盘创建失败，款项已原路退回。</p>' +
+	          '<div class="warning-box">' +
+	          '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + (createdOrderNos[0] || '') + '</strong></p>' +
+	          '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + (typeof refundOrderNo !== 'undefined' ? refundOrderNo : '') + '</strong></p>' +
+	          '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+	          '</div>' +
+	          '<p>如有疑问请联系客服。</p>', siteName);
+	        await sendEmail(failUser.email, '硬盘购买失败已退款 - ' + siteName, emailHtml);
+	      }
+	    } catch (emailErr) { console.error('[disk purchase] 退款邮件发送失败:', emailErr.message); }
 	    res.status(500).json({ error: '创建磁盘失败，已退款，请稍后重试' });
 	  }
   } catch (e) {
@@ -512,11 +555,51 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
         // 订单标记 refunded
         await conn.execute('UPDATE orders SET status = ? WHERE order_no = ?', ['refunded', resizeOrderNo]);
       });
+      // 邮件通知：硬盘扩容失败退款
+      try {
+        var resizeFailUser = await db.users.getById(req.user.id);
+        if (resizeFailUser && resizeFailUser.email && resizeFailUser.emailVerified && resizeFailUser.email.includes('@')) {
+          var siteName = await getSiteName();
+          var newBalance = (balanceBefore - resizeAmount + resizeAmount).toFixed(2);
+          var emailHtml = createEmailTemplate('硬盘扩容失败 - 已退款',
+            '<p>非常抱歉，您硬盘扩容操作失败，款项已原路退回。</p>' +
+            '<div class="warning-box">' +
+            '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + resizeAmount.toFixed(2) + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + resizeOrderNo + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+            '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+            '</div>' +
+            '<p>如有疑问请联系客服。</p>', siteName);
+          await sendEmail(resizeFailUser.email, '硬盘扩容失败已退款 - ' + siteName, emailHtml);
+        }
+      } catch (emailErr) { console.error('[disk resize] 退款邮件发送失败:', emailErr.message); }
       return res.status(500).json({ error: 'PVE 扩容失败，已退款' });
     }
 
     // 订单标记完成
     await db.orders.updateStatus(resizeOrderNo, 'completed');
+
+    // 邮件通知：硬盘扩容成功
+    try {
+      var resizeUser = await db.users.getById(req.user.id);
+      if (resizeUser && resizeUser.email && resizeUser.emailVerified && resizeUser.email.includes('@')) {
+        var siteName = await getSiteName();
+        var newBalance = (balanceBefore - resizeAmount).toFixed(2);
+        var emailHtml = createEmailTemplate('硬盘扩容成功',
+          '<p>您的数据盘已扩容成功！</p>' +
+          '<div class="info-box">' +
+          '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">📐 扩容：<strong>' + disk.capacity_gb + ' GiB → ' + newSize + ' GiB</strong></p>' +
+          '<p style="margin-bottom: 4px;">💸 扩容费用：<strong>¥' + resizeAmount.toFixed(2) + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">📋 订单编号：<strong>' + resizeOrderNo + '</strong></p>' +
+          '<p>⏰ 扩容时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+          '</div>' +
+          '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
+        await sendEmail(resizeUser.email, '硬盘扩容成功 - ' + siteName, emailHtml);
+      }
+    } catch (emailErr) { console.error('[disk resize] 邮件发送失败:', emailErr.message); }
 
     res.json({ success: true, new_capacity: newSize, amount: resizeAmount });
   } catch (e) {
@@ -688,6 +771,28 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       );
     });
 
+    // 邮件通知：硬盘销毁退款（仅退款金额>0时发送）
+    if (refundAmount > 0) {
+      try {
+        var destroyUser = await db.users.getById(req.user.id);
+        if (destroyUser && destroyUser.email && destroyUser.emailVerified && destroyUser.email.includes('@')) {
+          var siteName = await getSiteName();
+          var balanceBeforeDestroy = parseFloat(destroyUser.balance || '0');
+          var emailHtml = createEmailTemplate('硬盘销毁退款',
+            '<p>您的数据盘已销毁，退款已到账。</p>' +
+            '<div class="info-box">' +
+            '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">📝 退款说明：<strong>' + refundDesc + '</strong></p>' +
+            '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceBeforeDestroy - refundAmount).toFixed(2) + ' → ¥' + balanceBeforeDestroy.toFixed(2) + '</strong></p>' +
+            '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+            '</div>' +
+            '<p>如有疑问请联系客服。</p>', siteName);
+          await sendEmail(destroyUser.email, '硬盘销毁退款 - ' + siteName, emailHtml);
+        }
+      } catch (emailErr) { console.error('[disk destroy] 退款邮件发送失败:', emailErr.message); }
+    }
+
     res.json({ success: true, refund: refundAmount > 0, refund_amount: refundAmount, refund_desc: refundDesc });
   } catch (e) {
     console.error('[disk destroy] 失败:', e);
@@ -755,6 +860,30 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
       if (disk.status === 'bound') newStatus = 'bound';
       await conn.execute('UPDATE disks SET expire_time = ?, status = ?, updated_at = NOW() WHERE id = ?', [newExpire, newStatus, disk.id]);
     });
+
+    // 邮件通知：硬盘续费成功
+    try {
+      var renewUser = await db.users.getById(req.user.id);
+      if (renewUser && renewUser.email && renewUser.emailVerified && renewUser.email.includes('@')) {
+        var siteName = await getSiteName();
+        var periodLabel = period === 'year' ? periodCount + '年' : period === 'quarter' ? periodCount + '季' : periodCount + '个月';
+        var expiryDisplay = newExpire ? new Date(newExpire).toLocaleString('zh-CN') : '永久有效';
+        var newBalance = (balanceBefore - amount).toFixed(2);
+        var emailHtml = createEmailTemplate('硬盘续费成功',
+          '<p>您的数据盘已续费成功！</p>' +
+          '<div class="info-box">' +
+          '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">📅 续费详情：<strong>' + periodLabel + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">⏳ 到期时间：<strong>' + expiryDisplay + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">💸 实付金额：<strong>¥' + amount.toFixed(2) + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+          '<p style="margin-bottom: 4px;">📋 订单编号：<strong>' + orderNo + '</strong></p>' +
+          '<p>⏰ 续费时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+          '</div>' +
+          '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
+        await sendEmail(renewUser.email, '硬盘续费成功 - ' + siteName, emailHtml);
+      }
+    } catch (emailErr) { console.error('[disk renew] 邮件发送失败:', emailErr.message); }
 
     res.json({ success: true, amount: amount, new_expire: newExpire });
   } catch (e) {
