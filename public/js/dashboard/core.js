@@ -175,9 +175,11 @@
     $.parseMarkdown = function(text) {
         if (!text) return '';
         try {
-            return DOMPurify.sanitize(marked.parse(text));
+            var d = window.DOMPurify || window.purify || DOMPurify;
+            var m = window.marked || marked;
+            return d.sanitize(m.parse(text));
         } catch (e) {
-            return DOMPurify.sanitize(String(text));
+            return String(text);
         }
     };
 
