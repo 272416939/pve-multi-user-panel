@@ -484,19 +484,17 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
                             <p>祝您使用愉快！如有问题请联系管理员。</p>
                         `;
                         const subjectSiteName3 = await getSiteName();
-                        if (await shouldSendEmail(redeemer.id, 'notify_recharge')) {
-                            await sendEmail(
-                                redeemer.email,
-                                'CDK 续费成功 - ' + subjectSiteName3,
+                        await sendEmail(
+                            redeemer.email,
+                            'CDK 续费成功 - ' + subjectSiteName3,
                             createEmailTemplate('续费成功通知', emailContent, subjectSiteName3)
                         );
-                        }
-                    dbg(`已向 ${redeemer.username} 发送 CDK 续费成功邮件（VM ${vm.vm_id}）`);
-                } catch (emailError) {
+                    } catch (emailError) {
                     console.error('发送 CDK 续费成功邮件失败:', emailError.message);
                 }
             }
- 
+            }
+
             try {
                 const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
                 await db.messages.create({

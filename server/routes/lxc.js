@@ -471,6 +471,7 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
                     }
                 } catch (emailError) {
                     console.error(`发送 LXC 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
+                }
             }
         }
     }
