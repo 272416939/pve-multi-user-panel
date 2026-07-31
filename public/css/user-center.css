@@ -418,6 +418,12 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
 .notification-group-items {
     border-top: 1px solid var(--border-color);
 }
+.notification-item-row {
+    border-bottom: 1px solid var(--border-color);
+}
+.notification-item-row:last-child {
+    border-bottom: none;
+}
 .transition-transform {
     transition: transform 0.2s ease;
     font-size: 12px;

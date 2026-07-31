@@ -220,7 +220,7 @@
                                         <svg class="notification-chevron transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: group.expanded ? 'rotate(90deg)' : 'rotate(0deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
                                     </div>
                                     <div v-show="group.expanded" class="notification-group-items mt-2">
-                                        <div v-for="item in group.items" :key="item.key" class="d-flex justify-content-between align-items-center py-2 px-3 border-bottom">
+                                        <div v-for="item in group.items" :key="item.key" class="d-flex justify-content-between align-items-center py-2 px-3 notification-item-row">
                                             <span :class="{ 'text-muted': !notifSettings.email_notifications_enabled }">{{ item.label }}</span>
                                             <div class="form-check form-switch mb-0">
                                                 <input class="form-check-input" type="checkbox"

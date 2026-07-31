@@ -106,7 +106,7 @@ const App = {
                 key: 'provision',
                 label: '资源开通',
                 svg: '<path d="M2 3h20v11H2z"/><polyline points="12 17 12 20"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="7" y1="8" x2="17" y2="8"/>',
-                expanded: true,
+                expanded: false,
                 items: [
                     { key: 'notify_vm_provisioned', label: '虚拟机开通成功' },
                     { key: 'notify_lxc_provisioned', label: '容器开通成功' },
