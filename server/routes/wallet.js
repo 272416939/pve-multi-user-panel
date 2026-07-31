@@ -3,7 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-const { createPayClient, generateOrderId } = require('../sdk/pay');
+const { createPayClient } = require('../sdk/pay');
 const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const dbg = require('../utils/debug');
 const { getPeriodMonths, calculateAmount, generateOrderNo } = require('../utils/order-utils');
@@ -599,7 +599,8 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
         var newExpiration = formatLocalDate(oldExpiration);
         
         var newBalance = (balance - totalPrice).toFixed(2);
-        var orderNo = generateOrderId('RENEWAL');
+        // 订单号统一：续费类与开通/扩容一致使用 DD 前缀 + 14位时间戳 + 8位随机数（24位）
+        var orderNo = generateOrderNo('renewal');
         // ARCH-10: 扣款+更新到期时间+流水记录三步放入事务，保证原子性
         await withTransaction(async (conn) => {
             // 1. 扣款（原子扣减）
