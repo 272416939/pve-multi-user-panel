@@ -429,9 +429,10 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
       var holdingResult = await diskUtils.unbindDisk(lockedDisk.bind_vmid, lockedDisk.bind_bus, lockedDisk.bind_dev, lockedDisk.holding_vmid);
 
       // 条件更新（WHERE status = 'bound'，防止并发）
+      // volume_id 同步更新为 move_disk 重命名后的新值（若读取失败则沿用旧值，挂载时会自愈）
       await conn.execute(
-        'UPDATE disks SET status = ?, bind_vmid = NULL, bind_bus = NULL, bind_dev = NULL, holding_vmid = ?, holding_slot = ?, updated_at = NOW() WHERE id = ? AND status = ?',
-        ['free', holdingResult.holdingVmid, holdingResult.holdingSlot, disk.id, 'bound']
+        'UPDATE disks SET status = ?, bind_vmid = NULL, bind_bus = NULL, bind_dev = NULL, holding_vmid = ?, holding_slot = ?, volume_id = ?, updated_at = NOW() WHERE id = ? AND status = ?',
+        ['free', holdingResult.holdingVmid, holdingResult.holdingSlot, holdingResult.volume_id || lockedDisk.volume_id, disk.id, 'bound']
       );
     });
 

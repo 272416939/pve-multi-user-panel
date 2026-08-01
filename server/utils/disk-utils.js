@@ -291,7 +291,7 @@ async function unbindDisk(vmid, bus, dev, holdingVmid) {
   logger.info('[unbindDisk] 磁盘已从 VM ' + safeVmid + ' 转移到中转 VM ' + targetHoldingVmid + ' 槽位 ' + freeSlot);
 
   // moveDisk 后 PVE 会重命名卷（vm-<userVM>-disk-N → vm-<holding>-disk-N），需返回新 volume_id
-  var newVolumeId = volumeId;
+  var newVolumeId = null;
   try {
     var holdingConfig = await pveApi.getVmConfig(targetHoldingVmid);
     if (holdingConfig && holdingConfig[freeSlot]) {
