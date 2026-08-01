@@ -390,10 +390,11 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
 	    });
 
 	    res.json({ success: true, bus: bindResult.bus, dev: bindResult.dev });
-  } catch (e) {
-    res.status(500).json({ error: safeError(e) });
-  }
-});
+	  } catch (e) {
+	    console.error('[disk bind] 挂载失败:', e.stack || e.message);
+	    res.status(500).json({ error: safeError(e) });
+	  }
+	});
 
 // 卸载磁盘
 router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req, res) => {
@@ -451,6 +452,7 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
 
     res.json({ success: true });
   } catch (e) {
+    console.error('[disk unbind] 卸载失败:', e.stack || e.message);
     res.status(500).json({ error: safeError(e) });
   }
 });

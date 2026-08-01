@@ -89,7 +89,19 @@ async function moveDiskToHolding(sourceVmid, sourceDisk, holdingVmid, targetSlot
     throw new Error('无效的目标槽位: ' + targetSlot);
   }
   var upid = await pveApi.moveDisk(sourceVmid, sourceDisk, holdingVmid, targetSlot);
-  await pveApi.waitForTask(upid, 300000);
+  try {
+    await pveApi.waitForTask(upid, 300000);
+  } catch (e) {
+    // 任务等待失败：如果目标槽位实际已存在，说明 move 已完成，容错
+    var verify = null;
+    try {
+      verify = await pveApi.getVmConfig(holdingVmid);
+    } catch (_) {}
+    if (!(verify && verify[targetSlot])) {
+      throw e;
+    }
+    console.log('[holding-vm] move_disk 任务状态异常但目标槽位已存在，视为完成: ' + targetSlot);
+  }
   return targetSlot;
 }
 
@@ -108,7 +120,19 @@ async function moveDiskFromHolding(holdingVmid, sourceSlot, targetVmid, targetSl
     throw new Error('无效的目标槽位: ' + targetSlot);
   }
   var upid = await pveApi.moveDisk(holdingVmid, sourceSlot, targetVmid, targetSlot);
-  await pveApi.waitForTask(upid, 300000);
+  try {
+    await pveApi.waitForTask(upid, 300000);
+  } catch (e) {
+    // 任务等待失败：如果目标 VM 槽位实际已存在，说明 move 已完成，容错
+    var verify = null;
+    try {
+      verify = await pveApi.getVmConfig(targetVmid);
+    } catch (_) {}
+    if (!(verify && verify[targetSlot])) {
+      throw e;
+    }
+    console.log('[holding-vm] move_disk 任务状态异常但目标槽位已存在，视为完成: ' + targetSlot);
+  }
   return targetSlot;
 }
 

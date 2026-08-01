@@ -170,9 +170,15 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams, holdingVmid, holdin
     var holdingService = require('../services/holding-vm');
     await holdingService.moveDiskFromHolding(holdingVmid, holdingSlot, vmid, bus + dev);
     // moveDisk 后 volume_id 会变（PVE 重命名），返回新 volume_id 由调用方更新台账
-    var newConfig = await pveApi.getVmConfig(vmid);
-    var newVolPart = newConfig[bus + dev] ? newConfig[bus + dev].split(',')[0] : '';
-    return { bus: bus, dev: parseInt(dev), volume_id: newVolPart || volumeId, moved: true };
+    var newVolumeId = volumeId;
+    try {
+      var newConfig = await pveApi.getVmConfig(vmid);
+      var newVolPart = newConfig[bus + dev] ? newConfig[bus + dev].split(',')[0] : '';
+      if (newVolPart) newVolumeId = newVolPart;
+    } catch (e) {
+      logger.debug('[bindDisk] moveDisk 后读取新 volume_id 失败，沿用旧值:', e.message);
+    }
+    return { bus: bus, dev: parseInt(dev), volume_id: newVolumeId, moved: true };
   }
 
   var safeVmid = validateParam('vmid', vmid);
