@@ -1,5 +1,37 @@
 # Changelog
 
+## [2.33.1] - 2026-08-01
+
+### Added（2 个 feat）
+- **feat(disk): 卸载数据盘转移到中转 VM 托管，防止用户 VM 销毁连带删除**
+  - 新增 `server/services/holding-vm.js` 中转 VM 托管服务
+  - 卸载的数据盘不再以 unused 状态留在用户 VM，而是转移到中转 VM（VMID 9999）托管
+  - 防止用户销毁 VM 时 PVE 连带删除 unused 卷文件
+- **feat(admin-disk): 存储分组徽标显示规格名 + 数据盘管理显示 PVE 路径**
+  - 存储分组卡片显示关联的规格名称徽标
+  - 数据盘管理列表增加 PVE 路径列
+
+### Fixed（8 个 fix）
+- **fix: 幽灵盘检测增加跨 VM 归属校验，防止误杀已迁移数据盘**
+  - 审计时校验磁盘卷是否归属于当前 VM，避免已迁移到其他 VM 的数据盘被误判为幽灵盘销毁
+- **fix: 卸载磁盘保留 unused 引用，禁止清理导致卷文件被销毁**
+  - 修复卸载后清理 unused 配置导致 PVE 销毁卷文件的问题
+- **fix: 卸载磁盘后清理 PVE unused 残留配置**
+  - 卸载转移到中转 VM 后清理原 VM 的 unused 残留配置项
+- **fix(disk): move_disk 任务等待容错 + 挂载失败日志**
+  - `move_disk` 任务等待增加容错处理，挂载失败时输出详细日志
+- **fix(disk): 挂载自愈，卷已被 move_disk 重命名时从中转 VM 找回**
+  - 挂载时检测卷是否已被 `move_disk` 重命名，从中转 VM 配置中找回正确 volume_id
+- **fix(disk): unbindDisk volumeId 未定义 + 卸载后同步更新 volume_id**
+  - 修复 `unbindDisk` 中 volumeId 未定义导致卸载失败
+  - 卸载后同步更新台账中的 volume_id
+- **fix(admin): 原生 confirm/prompt 全部改为系统主题弹窗**
+  - Admin 后台所有原生 `confirm()` / `prompt()` 替换为与系统主题一致的弹窗组件
+
+### Security
+- 🔒 幽灵盘检测跨 VM 归属校验，防止误杀已迁移数据盘（严重）
+- 🔒 卸载数据盘转移到中转 VM 托管，防止用户 VM 销毁连带删除数据盘卷
+
 ## [2.33.0] - 2026-08-01
 
 ### ⚠️ 重要升级提示
