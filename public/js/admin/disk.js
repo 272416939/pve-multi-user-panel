@@ -109,7 +109,7 @@
         hint += '\n删除分组后，这些规格将失去分组关联！';
       }
     }
-    if (!confirm('确定删除存储分组「' + (group ? group.name : '') + '」？' + hint)) return;
+    if (!(await customConfirm('确定删除存储分组「' + (group ? group.name : '') + '」？' + hint))) return;
     try {
       var res = await authFetch('/api/storage-groups/' + id, { method: 'DELETE' });
       var data = await res.json();
@@ -348,7 +348,9 @@
   };
 
   $.diskPage.deleteDiskSpec = async function(id) {
-    if (!confirm('确定删除该规格？')) return;
+    var spec = ($.diskPage.diskSpecs.value || []).find(function(s) { return s.id === id; });
+    var name = spec ? (spec.disk_type + '|' + spec.name) : '';
+    if (!(await customConfirm('确定删除硬盘规格「' + name + '」？'))) return;
     try {
       var res = await authFetch('/api/disk-specs/' + id, { method: 'DELETE' });
       var data = await res.json();

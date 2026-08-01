@@ -790,7 +790,7 @@
     };
 
     $.deleteOsSwitchLog = async function(id) {
-        if (!confirm('确认删除日志 #' + id + '？')) return;
+        if (!(await window.customConfirm('确认删除日志 #' + id + '？'))) return;
         try {
             var res = await api('/admin/os-switch-logs/' + id, { method: 'DELETE' });
             if (res && res.success) {
@@ -806,7 +806,7 @@
     $.batchDeleteOsSwitchLog = async function() {
         var ids = $.osSwitchLogSelected.value;
         if (ids.length === 0) { alert('请先选择要删除的日志'); return; }
-        if (!confirm('确认删除选中的 ' + ids.length + ' 条日志？')) return;
+        if (!(await window.customConfirm('确认删除选中的 ' + ids.length + ' 条日志？'))) return;
         try {
             var res = await api('/admin/os-switch-logs/batch-delete', {
                 method: 'POST',
@@ -825,8 +825,8 @@
     };
 
     $.clearAllOsSwitchLog = async function() {
-        if (!confirm('⚠️ 高危操作！确认清空所有切换日志（运行中和需介入的日志将被保留）？')) return;
-        var confirmStr = prompt('请输入 CLEAR_ALL_OS_SWITCH_LOGS 确认清空：');
+        if (!(await window.customConfirm('⚠️ 高危操作！确认清空所有切换日志（运行中和需介入的日志将被保留）？'))) return;
+        var confirmStr = await window.customPrompt('请输入 CLEAR_ALL_OS_SWITCH_LOGS 确认清空：');
         if (confirmStr !== 'CLEAR_ALL_OS_SWITCH_LOGS') { alert('确认串不正确'); return; }
         try {
             var res = await api('/admin/os-switch-logs/clear', {
