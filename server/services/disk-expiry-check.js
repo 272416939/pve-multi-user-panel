@@ -108,22 +108,9 @@ async function detachDiskFromVm(disk) {
       }
     }
 
-    // 清理 unused0~unused9 残留（qm unlink 会把卷转为 unused 状态，需显式删除引用）
-    try {
-      var cfgAfter = await pveApi.getVmConfig(safeVmid);
-      for (var ui2 = 0; ui2 <= 9; ui2++) {
-        var unusedKey2 = 'unused' + ui2;
-        if (cfgAfter && cfgAfter[unusedKey2]) {
-          var cleanCmd2 = 'qm set ' + safeVmid + ' --delete ' + unusedKey2;
-          await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cleanCmd2);
-          logger.debug('[disk-expiry] 已清理残留配置 ' + unusedKey2);
-        }
-      }
-    } catch (cleanErr2) {
-      logger.debug('[disk-expiry] 清理 unused 残留失败:', cleanErr2.message);
-    }
-
     // 更新台账：状态 -> expired（到期分离游离态）
+    // 注意：分离只做 qm unlink，保留 unused 引用（卷文件保留，可续费后重新挂载）。
+    //       切勿用 qm set --delete unusedN 清理——那会直接销毁卷文件！
     await db.disks.updateStatus(disk.id, 'expired');
     await db.disks.unbind(disk.id);
     logger.info('[disk-expiry] 磁盘 ' + disk.id + ' 已从 VM ' + safeVmid + ' 分离');

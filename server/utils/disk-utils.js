@@ -188,7 +188,8 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
 // qm unlink 优于 qm set --delete：不留划线状态（Linux VM 完全清理）
 // Windows VM 可能首次报 "virtioscsi busy"，但 guest 内磁盘已被移除，
 // 此时自动重试一次即可成功从 PVE 配置移除（无需用户手动到 PVE 点还原）
-// 注意：qm unlink 后 PVE 会残留 unused0=<volume_id> 配置，需用 qm set --delete unusedN 清理
+// 注意：卸载只做 qm unlink，保留 unused 引用（卷文件保留，可重新挂载）。
+//       切勿用 qm set --delete unusedN 清理——那会直接销毁卷文件！
 async function unbindDisk(vmid, bus, dev) {
   var safeVmid = validateParam('vmid', vmid);
   var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
@@ -213,22 +214,6 @@ async function unbindDisk(vmid, bus, dev) {
     } else {
       throw e;
     }
-  }
-
-  // 清理 unused0~unused9 残留（qm unlink 会把卷转为 unused 状态，需显式删除引用）
-  try {
-    var config = await pveApi.getVmConfig(safeVmid);
-    for (var i = 0; i <= 9; i++) {
-      var unusedKey = 'unused' + i;
-      if (config && config[unusedKey]) {
-        var cleanCmd = 'qm set ' + safeVmid + ' --delete ' + unusedKey;
-        await runSshCommand(cleanCmd);
-        logger.debug('[unbindDisk] 已清理残留配置 ' + unusedKey);
-      }
-    }
-  } catch (cleanErr) {
-    // 清理残留失败不阻塞卸载成功
-    logger.debug('[unbindDisk] 清理 unused 残留失败:', cleanErr.message);
   }
 }
 
