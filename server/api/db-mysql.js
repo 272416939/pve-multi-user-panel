@@ -2526,8 +2526,10 @@ module.exports = {
         getByUserId: (userId) => queryAll('SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name FROM disks d LEFT JOIN users u ON d.user_id = u.id LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id LEFT JOIN disk_specs ds ON d.spec_id = ds.id WHERE d.user_id = ? ORDER BY d.id DESC', [parseInt(userId)]),
         getAll: () => queryAll('SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name FROM disks d LEFT JOIN users u ON d.user_id = u.id LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id LEFT JOIN disk_specs ds ON d.spec_id = ds.id ORDER BY d.id DESC'),
         getByVolumeId: (volId) => queryOne('SELECT * FROM disks WHERE volume_id = ?', [volId]),
-        // 查询绑定到指定 VMID 的所有磁盘
-        getByBindVmid: (vmid) => queryAll('SELECT * FROM disks WHERE bind_vmid = ?', [parseInt(vmid)]),
+// 查询绑定到指定 VMID 的所有磁盘
+	        getByBindVmid: (vmid) => queryAll('SELECT * FROM disks WHERE bind_vmid = ?', [parseInt(vmid)]),
+	        // 查询该 volume_id 是否被任何非 destroyed 的 disk 记录引用（用于跨 VM 归属校验）
+	        existsActiveByVolumeId: (volId) => queryOne("SELECT id FROM disks WHERE volume_id = ? AND status != 'destroyed' LIMIT 1", [volId]),
         // 删除绑定到指定 VMID 的 legacy 磁盘记录（不操作 PVE，VM 移除/销毁时调用）
         deleteByBindVmid: (vmid) => execute('DELETE FROM disks WHERE bind_vmid = ? AND is_legacy = 1', [parseInt(vmid)]),
         create: async (data) => {
