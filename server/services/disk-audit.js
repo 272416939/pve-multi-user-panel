@@ -66,6 +66,10 @@ async function takeDiskSnapshot(vmId, userId) {
  *   但设备槽位（scsi1/scsi2/virtio1...）保持不变。
  *   用槽位匹配已购数据盘，而非 volume_id。
  *
+ * 安全约束：
+ * - 幽灵盘处理前必须校验该 volume_id 是否已被其他 VM 使用（跨 VM 迁移场景）
+ * - 如果该 volume_id 存在于 DB 中且状态非 destroyed，说明是已迁移到其他 VM 的数据盘，不能销毁
+ *
  * @param {number} vmId - VM ID
  * @param {number} userId - 用户 ID
  * @param {string|object|null} preSnapshotRaw - 恢复前快照（仅审计追溯）
@@ -154,6 +158,18 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
         // 注意：此处不通过 volume 名判断系统盘（*-disk-0 可能是数据盘卷名）
         // 系统盘已由 dev=0 排除，dev>=1 的槽位无论卷名都是数据盘
         console.log('[盘审计]   ［幽灵盘］' + slotKey + ' = ' + volPart + ' → 即将销毁');
+        // 安全校验：检查该 volume_id 是否已被其他 VM 使用（跨 VM 迁移场景）
+        // 如果用户把盘从 VM200 卸载后挂载到 VM101，VM200 恢复时该 volume_id 仍存在于 DB，
+        // 且绑定到了 VM101，此时不能销毁——必须跳过
+        var activeRef = null;
+        try {
+          activeRef = await db.disks.existsActiveByVolumeId(volPart);
+        } catch (e) {}
+        if (activeRef && activeRef.id) {
+          console.log('[盘审计]   ［跳过］幽灵盘 ' + volPart + ' 已被其他 VM 使用（台账ID ' + activeRef.id + '），跳过销毁');
+          continue;
+        }
+
         // 幽灵盘处理：先 detach 再销毁，最后清理 unused 残留
         // 注意：qm set --delete 或 qm unlink 后 PVE 会生成 unused0 配置行，
         //       pvesm free 后 unused 行仍残留，需额外清理
