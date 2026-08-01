@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.33.2] - 2026-08-01
+
+### Fixed
+- **fix(dashboard): 移除无样式无驱动的半成品状态栏，消除左上角裸露的「就绪」文字**
+  - **问题**：Dashboard 每个页面左上角显示裸露的 `<span id="statusText">就绪</span>` 文字
+  - **根因**：提交 `dd6d62b`（引入 cache-version.json）在 `dashboard.ejs` 中残留了一个 `.status-bar` 区块（含 `wsStatus`、`statusText`、`lastUpdate`、`cpuLoad` 等元素），但全项目无对应 CSS 定义和 JS 驱动逻辑，属于半成品残留
+  - **修复**：删除 `views/pages/dashboard.ejs` 中 `<main>` 内的整个 `<div class="status-bar">...</div>` 区块（13 行）
+  - 确认 JS 中无悬空引用，删除对功能零影响
+
 ## [2.33.1] - 2026-08-01
 
 ### Added（2 个 feat）
