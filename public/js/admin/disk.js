@@ -100,7 +100,16 @@
   };
 
   $.diskPage.deleteStorageGroup = async function(id) {
-    if (!confirm('确定删除该存储分组？')) return;
+    var group = ($.diskPage.storageGroups.value || []).find(function(g) { return g.id === id; });
+    var specs = ($.diskPage.diskSpecs.value || []).filter(function(s) { return s.storage_group_id === id; });
+    var hint = '';
+    if (group) {
+      if (specs.length > 0) {
+        hint = '\n\n⚠ 该分组下已绑定 ' + specs.length + ' 个硬盘规格：' + specs.map(function(s) { return s.disk_type + '|' + s.name; }).join('、');
+        hint += '\n删除分组后，这些规格将失去分组关联！';
+      }
+    }
+    if (!confirm('确定删除存储分组「' + (group ? group.name : '') + '」？' + hint)) return;
     try {
       var res = await authFetch('/api/storage-groups/' + id, { method: 'DELETE' });
       var data = await res.json();

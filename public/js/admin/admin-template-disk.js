@@ -36,7 +36,7 @@
             </div>
             <p class="text-muted small mb-2">已绑定硬盘类型：</p>
             <div>
-              <span class="badge bg-info me-1" v-for="spec in diskPage.diskSpecs.value.filter(s => s.storage_group_id === g.id)" :key="spec.id">{{ spec.disk_type }}</span>
+              <span class="badge bg-info me-1" v-for="spec in diskPage.diskSpecs.value.filter(s => s.storage_group_id === g.id)" :key="spec.id">{{ spec.disk_type }}|{{ spec.name }}</span>
               <span v-if="diskPage.diskSpecs.value.filter(s => s.storage_group_id === g.id).length === 0" class="text-muted small">暂无</span>
             </div>
             <div class="mt-3 d-flex gap-2">
@@ -181,6 +181,7 @@
               <th>ID</th>
               <th>用户</th>
               <th>名称</th>
+              <th>PVE硬盘路径</th>
               <th>存储分组</th>
               <th>规格</th>
               <th>类型</th>
@@ -198,7 +199,7 @@
               <td>{{ disk.id }}</td>
               <td>{{ disk.username || '-' }}</td>
               <td>{{ disk.disk_name || '-' }}<span v-if="disk.is_legacy" class="text-muted small ms-1">(随VM)</span></td>
-              <td>{{ disk.group_name || '-' }}</td>
+              <td><code class="small" style="word-break:break-all;white-space:normal">{{ disk.volume_id }}</code></td>
               <td>{{ disk.spec_name || '-' }}</td>
               <td>{{ disk.disk_type }}</td>
               <td>{{ disk.capacity_gb }} GiB</td>
@@ -216,7 +217,7 @@
               </td>
             </tr>
             <tr v-if="!diskPage.allDisks.value || diskPage.allDisks.value.length === 0">
-              <td colspan="13" class="text-center text-muted py-4">暂无数据盘</td>
+              <td colspan="14" class="text-center text-muted py-4">暂无数据盘</td>
             </tr>
           </tbody>
         </table>
