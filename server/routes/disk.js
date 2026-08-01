@@ -368,12 +368,17 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
       };
 
       // 执行 PVE 挂载
-      var result = await diskUtils.bindDisk(vm.vm_id, lockedDisk.volume_id, bus, dev, qosParams);
+      // 如果磁盘托管在中转 VM 上（holding_vmid/holding_slot 有值），走 moveDisk 转移；
+      // 否则为游离卷，直接 qm set 挂载
+      var result = await diskUtils.bindDisk(
+        vm.vm_id, lockedDisk.volume_id, bus, dev, qosParams,
+        lockedDisk.holding_vmid, lockedDisk.holding_slot
+      );
 
       // 条件更新（WHERE status = 原状态，双重保障防并发）
       await conn.execute(
-        'UPDATE disks SET status = ?, bind_vmid = ?, bind_bus = ?, bind_dev = ?, updated_at = NOW() WHERE id = ? AND status = ?',
-        ['bound', vm.vm_id, result.bus, result.dev, disk.id, lockedDisk.status]
+        'UPDATE disks SET status = ?, bind_vmid = ?, bind_bus = ?, bind_dev = ?, holding_vmid = NULL, holding_slot = NULL, volume_id = ?, updated_at = NOW() WHERE id = ? AND status = ?',
+        ['bound', vm.vm_id, result.bus, result.dev, result.volume_id || lockedDisk.volume_id, disk.id, lockedDisk.status]
       );
 
 	    return result;
@@ -385,10 +390,11 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
 	    });
 
 	    res.json({ success: true, bus: bindResult.bus, dev: bindResult.dev });
-  } catch (e) {
-    res.status(500).json({ error: safeError(e) });
-  }
-});
+	  } catch (e) {
+	    console.error('[disk bind] 挂载失败:', e.stack || e.message);
+	    res.status(500).json({ error: safeError(e) });
+	  }
+	});
 
 // 卸载磁盘
 router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req, res) => {
@@ -419,13 +425,14 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
         throw new Error('磁盘状态已变更，可能被其他操作处理中');
       }
 
-      // 执行 PVE 卸载
-      await diskUtils.unbindDisk(lockedDisk.bind_vmid, lockedDisk.bind_bus, lockedDisk.bind_dev);
+      // 执行 PVE 卸载（qm unlink + moveDisk 到中转 VM 托管）
+      var holdingResult = await diskUtils.unbindDisk(lockedDisk.bind_vmid, lockedDisk.bind_bus, lockedDisk.bind_dev, lockedDisk.holding_vmid);
 
       // 条件更新（WHERE status = 'bound'，防止并发）
+      // volume_id 同步更新为 move_disk 重命名后的新值（若读取失败则沿用旧值，挂载时会自愈）
       await conn.execute(
-        'UPDATE disks SET status = ?, bind_vmid = NULL, bind_bus = NULL, bind_dev = NULL, updated_at = NOW() WHERE id = ? AND status = ?',
-        ['free', disk.id, 'bound']
+        'UPDATE disks SET status = ?, bind_vmid = NULL, bind_bus = NULL, bind_dev = NULL, holding_vmid = ?, holding_slot = ?, volume_id = ?, updated_at = NOW() WHERE id = ? AND status = ?',
+        ['free', holdingResult.holdingVmid, holdingResult.holdingSlot, holdingResult.volume_id || lockedDisk.volume_id, disk.id, 'bound']
       );
     });
 
@@ -436,8 +443,17 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
       });
     }
 
+    // 异步更新中转 VM 快照
+    var holdingService = require('../services/holding-vm');
+    holdingService.getHoldingVmid().then(function(hvmid) {
+      takeDiskSnapshot(hvmid, 0).catch(function(err) {
+        console.error('[快照] 中转 VM 快照更新失败:', err.message);
+      });
+    });
+
     res.json({ success: true });
   } catch (e) {
+    console.error('[disk unbind] 卸载失败:', e.stack || e.message);
     res.status(500).json({ error: safeError(e) });
   }
 });

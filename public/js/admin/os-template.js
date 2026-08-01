@@ -139,7 +139,7 @@ window.__admin.osTemplatePage = (function () {
     }
 
     async function deleteRow(row) {
-        if (!confirm('确认删除系统模板「' + row.name + '」？')) return;
+        if (!(await window.customConfirm('确认删除系统模板「' + row.name + '」？'))) return;
         const res = await api('/admin/os-templates/' + row.id, { method: 'DELETE' });
         if (res.success) {
             await load();
