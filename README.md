@@ -188,21 +188,32 @@ npm run dev
 |------|------|------|
 | `PORT` | 面板服务端口 | `3002` |
 | `SITE_URL` | 外部访问域名（反向代理必填） | `https://your-domain.com` |
-| `JWT_SECRET` | JWT 签名密钥（生产环境请修改） | — |
-| `NODE_ENV` | 运行环境，留空自动设为 `production` | `production` |
-| `DEBUG` | 调试日志开关 | `false` |
+| `JWT_SECRET` | JWT 签名密钥（生产环境请修改） | - |
+| `NODE_ENV` | 运行环境，留空自动设为 `production`（开发时设 `development` 关闭模板缓存） | `production` |
+| `DEBUG` | 调试日志开关，开启后输出详细日志 | `false` |
+| `TZ` | 服务器时区 | `Asia/Shanghai` |
+| `DEFAULT_ADMIN_PASSWORD` | 默认管理员密码（留空则首次启动随机生成 16 位强密码并控制台显示一次） | - |
+| `ALLOWED_ORIGINS` | CORS 额外白名单（逗号分隔） | `https://example.com,https://api.example.com` |
+| `GITHUB_REPO` | GitHub 仓库地址（自动更新检查，海外回退） | `272416939/pve-multi-user-panel` |
+| `GITEE_REPO` | Gitee 仓库地址（自动更新检查，国内优先） | `Allen0528/pve-multi-user-panel` |
+| `ENCRYPTION_KEY` | 独立加密密钥（AES-256-GCM 加密库内 PVE SSH 密码/Token/SMTP 密码，与 JWT_SECRET 分离） | `openssl rand -hex 32` |
+| `TRUST_PROXY` | 反向代理信任（存在可信 Nginx/宝塔等前置代理时设 `true`，用于真实 IP 限速） | `false` |
 > **PVE 节点配置**（API 地址、Token、SSH 连接）已迁移到面板内管理，首次部署后在 **管理后台 > 系统设置 > PVE节点设置** 中配置。Token 和 SSH 密码使用 AES-256-GCM 加密存储。
+>
+> **⚠️ ENCRYPTION_KEY 注意事项**：一旦设置并写入加密数据后不可随意更换，否则历史密文无法解密。即使 JWT_SECRET 泄露，库内密文也无法解密。
 
 ### 数据库配置（必填）
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `MYSQL_HOST` | MySQL 服务器地址 | — |
+| `MYSQL_HOST` | MySQL 服务器地址 | - |
 | `MYSQL_PORT` | MySQL 端口 | `3306` |
-| `MYSQL_USER` | MySQL 用户名 | — |
-| `MYSQL_PASSWORD` | MySQL 密码 | — |
-| `MYSQL_DATABASE` | MySQL 数据库名 | — |
+| `MYSQL_USER` | MySQL 用户名 | - |
+| `MYSQL_PASSWORD` | MySQL 密码 | - |
+| `MYSQL_DATABASE` | MySQL 数据库名 | - |
 | `MYSQL_CONNECTION_LIMIT` | 连接池最大连接数 | `10` |
+| `MYSQL_QUEUE_LIMIT` | 排队上限（`0` = 无限制） | `0` |
+| `MYSQL_ACQUIRE_TIMEOUT_MS` | 获取连接超时（毫秒） | `60000` |
 
 > **注意:** 系统仅支持 MySQL 5.7+，启动时自动建表和迁移字段。字符集统一为 utf8mb4，完美支持 emoji。
 
