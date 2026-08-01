@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.32.3-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.33.1-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -54,7 +54,7 @@
 | # | 功能 | 说明 |
 |---|------|------|
 | 14 | **虚拟机快照管理** | 创建/回滚/删除，配置全局限制（每 VM 上限、每日次数） |
-| 15 | **虚拟机备份恢复** | PVE 停止模式 + zstd 压缩，异步轮询进度 |
+| 15 | **虚拟机备份恢复** | PVE 停止模式 + zstd 压缩，异步轮询进度，恢复后自动磁盘对账审计 |
 | 16 | **CDK 兑换码系统** | 批量生成、CSV 导出、指定用户分配、自动通知 |
 | 17 | **DHCP 静态绑定** | VM/LXC 分配时自动创建，解绑销毁自动删除 |
 | 18 | **端口转发管理** | ikuai 自动同步，随机端口、冲突检查 |
@@ -64,7 +64,7 @@
 | # | 功能 | 说明 |
 |---|------|------|
 | 20 | **站内消息系统** | 系统公告、续费提醒、客服私聊，未读角标 WS 实时推送 |
-| 21 | **SMTP 邮件** | 到期提醒、续费通知、CDK 兑换成功邮件 |
+| 21 | **SMTP 邮件** | 到期提醒、续费通知、CDK 兑换成功、扣款/退款通知邮件 |
 | 22 | **到期提醒** | 自定义多个提醒时间点，持久化不重复发送 |
 
 ### 🎨 界面 & 体验
@@ -95,16 +95,30 @@
 | 37 | **备份进度 WS 推送** | 备份/恢复完成后 pushToUser 实时通知，消灭 10s 前端轮询 |
 | 38 | **PVE 状态复用** | GET /user/vms 和 /user/lxc 优先命中 pushStatus 缓存，PVE API 调用减半 |
 
+### 🔄 自选系统功能（v2.33.0 新增）
+| # | 功能 | 说明 |
+|---|------|------|
+| 39 | **自选操作系统** | 新购 VM 时必选 OS 模板（Windows/Linux 全系列），支持 PVE 模板 VMID 下拉 + 自动填充配置 |
+| 40 | **在线系统切换** | 用户自助切换 VM 操作系统，基于 PVE move_disk API 统一 LVM/DIR 路径，数据盘不受影响 |
+| 41 | **系统切换日志** | Admin 后台查看所有用户系统切换记录，支持筛选/分页/批量删除/详情查看 |
+| 42 | **OS 模板管理** | 管理可切换系统模板（模板 VMID、磁盘格式、ostype、cloud-init 配置） |
+
+### 📬 邮件通知增强（v2.33.0 新增）
+| # | 功能 | 说明 |
+|---|------|------|
+| 43 | **扣款/退款邮件通知** | 购买/扩容/续费/销毁/开通失败退款等场景补齐邮件通知，含余额变动和订单号 |
+| 44 | **用户邮件通知设置** | 用户可自定义接收哪些类型的邮件通知 |
+
 ### 💾 数据盘管理（v2.32.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 45 | **数据盘购买** | 用户自助购买 NVME/SATA/HDD/U2 数据盘，挂载到 VM |
+| 45 | **数据盘购买** | 用户自助购买 NVME/SATA/HDD/U2 数据盘，挂载到 VM，支持批量购买（上限 10）+ 磁盘格式选择 + DIR 存储支持 |
 | 46 | **数据盘续费** | 独立计费周期（月/季/年），自动续费开关 |
 | 47 | **数据盘扩容** | 随时扩容，按新容量价差收费，扩容部分独立计费 |
 | 48 | **数据盘挂载/卸载** | 统一使用 SCSI 总线（支持热插拔，VM 运行中即可挂载/卸载），自动注入 QoS 限速参数 |
 | 49 | **存量磁盘导入** | 管理员手动扫描 PVE 中未管理的存量数据盘并导入台账 |
 | 50 | **Legacy 磁盘标识** | 导入的存量磁盘标记为 `legacy`，随 VM 计费，不独立续费 |
-| 51 | **数据盘管理（Admin）** | 管理后台查看/编辑/销毁所有用户数据盘，支持存储分组和规格管理 |
+| 51 | **数据盘管理（Admin）** | 管理后台查看/编辑/销毁所有用户数据盘，支持存储分组和规格管理；备份恢复后自动磁盘对账审计（防白嫖） |
 
 ### 🗄️ 基础设施（v1.8.0 新增）
 | # | 功能 | 说明 |
@@ -174,21 +188,32 @@ npm run dev
 |------|------|------|
 | `PORT` | 面板服务端口 | `3002` |
 | `SITE_URL` | 外部访问域名（反向代理必填） | `https://your-domain.com` |
-| `JWT_SECRET` | JWT 签名密钥（生产环境请修改） | — |
-| `NODE_ENV` | 运行环境，留空自动设为 `production` | `production` |
-| `DEBUG` | 调试日志开关 | `false` |
+| `JWT_SECRET` | JWT 签名密钥（生产环境请修改） | - |
+| `NODE_ENV` | 运行环境，留空自动设为 `production`（开发时设 `development` 关闭模板缓存） | `production` |
+| `DEBUG` | 调试日志开关，开启后输出详细日志 | `false` |
+| `TZ` | 服务器时区 | `Asia/Shanghai` |
+| `DEFAULT_ADMIN_PASSWORD` | 默认管理员密码（留空则首次启动随机生成 16 位强密码并控制台显示一次） | - |
+| `ALLOWED_ORIGINS` | CORS 额外白名单（逗号分隔） | `https://example.com,https://api.example.com` |
+| `GITHUB_REPO` | GitHub 仓库地址（自动更新检查，海外回退） | `272416939/pve-multi-user-panel` |
+| `GITEE_REPO` | Gitee 仓库地址（自动更新检查，国内优先） | `Allen0528/pve-multi-user-panel` |
+| `ENCRYPTION_KEY` | 独立加密密钥（AES-256-GCM 加密库内 PVE SSH 密码/Token/SMTP 密码，与 JWT_SECRET 分离） | `openssl rand -hex 32` |
+| `TRUST_PROXY` | 反向代理信任（存在可信 Nginx/宝塔等前置代理时设 `true`，用于真实 IP 限速） | `false` |
 > **PVE 节点配置**（API 地址、Token、SSH 连接）已迁移到面板内管理，首次部署后在 **管理后台 > 系统设置 > PVE节点设置** 中配置。Token 和 SSH 密码使用 AES-256-GCM 加密存储。
+>
+> **⚠️ ENCRYPTION_KEY 注意事项**：一旦设置并写入加密数据后不可随意更换，否则历史密文无法解密。即使 JWT_SECRET 泄露，库内密文也无法解密。
 
 ### 数据库配置（必填）
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `MYSQL_HOST` | MySQL 服务器地址 | — |
+| `MYSQL_HOST` | MySQL 服务器地址 | - |
 | `MYSQL_PORT` | MySQL 端口 | `3306` |
-| `MYSQL_USER` | MySQL 用户名 | — |
-| `MYSQL_PASSWORD` | MySQL 密码 | — |
-| `MYSQL_DATABASE` | MySQL 数据库名 | — |
+| `MYSQL_USER` | MySQL 用户名 | - |
+| `MYSQL_PASSWORD` | MySQL 密码 | - |
+| `MYSQL_DATABASE` | MySQL 数据库名 | - |
 | `MYSQL_CONNECTION_LIMIT` | 连接池最大连接数 | `10` |
+| `MYSQL_QUEUE_LIMIT` | 排队上限（`0` = 无限制） | `0` |
+| `MYSQL_ACQUIRE_TIMEOUT_MS` | 获取连接超时（毫秒） | `60000` |
 
 > **注意:** 系统仅支持 MySQL 5.7+，启动时自动建表和迁移字段。字符集统一为 utf8mb4，完美支持 emoji。
 
@@ -671,6 +696,8 @@ MYSQL_DATABASE=pve_panel
 ## 🔄 手动更新
 
 当「系统更新」功能无法使用时，SSH 进入项目目录手动更新。根据目标版本选择对应流程：
+
+> ⚠️ **v2.33.0 升级提示**：本次为大版本功能更新，包含数据库 schema 变更（新增 `os_templates`、`vm_os_switch_logs`、`vm_disk_snapshots` 等表）。升级后首次启动会自动执行迁移，请确保数据库用户有 `ALTER`/`CREATE` 权限。
 
 ### 正式版（main 分支）
 
