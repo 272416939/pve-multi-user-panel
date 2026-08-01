@@ -161,7 +161,20 @@ function inferDiskFormat(volumeId) {
 }
 
 // 挂载磁盘到 VM（注入限速参数）- qm set <vmid> --<bus><dev> <vol>,qos...
-async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
+// 支持两种模式：
+//  1. 游离卷直接挂载（disk 未托管在中转 VM 上）：qm set 直接挂载
+//  2. 中转托管盘：调用 holding-vm.moveDiskFromHolding 从 9999 转移到目标 VM
+async function bindDisk(vmid, volumeId, bus, dev, qosParams, holdingVmid, holdingSlot) {
+  // 如果磁盘托管在中转 VM 上，先 moveDisk 到目标 VM
+  if (holdingVmid && holdingSlot) {
+    var holdingService = require('../services/holding-vm');
+    await holdingService.moveDiskFromHolding(holdingVmid, holdingSlot, vmid, bus + dev);
+    // moveDisk 后 volume_id 会变（PVE 重命名），返回新 volume_id 由调用方更新台账
+    var newConfig = await pveApi.getVmConfig(vmid);
+    var newVolPart = newConfig[bus + dev] ? newConfig[bus + dev].split(',')[0] : '';
+    return { bus: bus, dev: parseInt(dev), volume_id: newVolPart || volumeId, moved: true };
+  }
+
   var safeVmid = validateParam('vmid', vmid);
   var safeVol = validateVolumeId(volumeId);
   var busDev = validateBusDev(bus, dev); // 校验并拼接，禁止系统盘位置
@@ -181,16 +194,13 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams) {
 
   var cmd = 'qm set ' + safeVmid + ' --' + busDev + ' ' + diskConfig;
   await runSshCommand(cmd);
-  return { bus: bus, dev: parseInt(dev) };
+  return { bus: bus, dev: parseInt(dev), volume_id: volumeId, moved: false };
 }
 
-// 卸载磁盘 - qm unlink <vmid> --idlist <bus><dev>
-// qm unlink 优于 qm set --delete：不留划线状态（Linux VM 完全清理）
-// Windows VM 可能首次报 "virtioscsi busy"，但 guest 内磁盘已被移除，
-// 此时自动重试一次即可成功从 PVE 配置移除（无需用户手动到 PVE 点还原）
-// 注意：卸载只做 qm unlink，保留 unused 引用（卷文件保留，可重新挂载）。
-//       切勿用 qm set --delete unusedN 清理——那会直接销毁卷文件！
-async function unbindDisk(vmid, bus, dev) {
+// 卸载磁盘 - 从用户 VM 转移到中转 VM 托管
+// 流程：qm unlink 摘除槽位 → 变成 unused0 → moveDisk 转移到中转 VM scsiX
+// 中转托管后，用户 VM 销毁不会连带删除数据盘卷
+async function unbindDisk(vmid, bus, dev, holdingVmid) {
   var safeVmid = validateParam('vmid', vmid);
   var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
 
@@ -215,6 +225,48 @@ async function unbindDisk(vmid, bus, dev) {
       throw e;
     }
   }
+
+  // 转移托管：unlink 后卷变为 unused0，moveDisk 到中转 VM
+  // 查找 unused 槽位（unlink 后第一个空闲 unusedN）
+  var unusedSlot = null;
+  try {
+    var cfgAfterUnlink = await pveApi.getVmConfig(safeVmid);
+    for (var ui = 0; ui <= 9; ui++) {
+      if (cfgAfterUnlink['unused' + ui]) {
+        unusedSlot = 'unused' + ui;
+        break;
+      }
+    }
+  } catch (e) {}
+
+  if (!unusedSlot) {
+    logger.debug('[unbindDisk] 未找到 unused 槽位，跳过 moveDisk（卷可能已移除）');
+    return { holdingVmid: null, holdingSlot: null };
+  }
+
+  // 分配到中转 VM 的空闲槽位
+  var holdingService = require('../services/holding-vm');
+  var targetHoldingVmid = holdingVmid || await holdingService.getHoldingVmid();
+  await holdingService.ensureHoldingVm(targetHoldingVmid);
+  var freeSlot = await holdingService.findFreeHoldingSlot(targetHoldingVmid);
+  if (!freeSlot) {
+    // 中转 VM 槽位满（当前单节点场景 30 块足够，暂不自动扩容）
+    throw new Error('中转 VM ' + targetHoldingVmid + ' 槽位已满，请先挂载部分磁盘后再卸载');
+  }
+
+  await holdingService.moveDiskToHolding(safeVmid, unusedSlot, targetHoldingVmid, freeSlot);
+  logger.info('[unbindDisk] 磁盘已从 VM ' + safeVmid + ' 转移到中转 VM ' + targetHoldingVmid + ' 槽位 ' + freeSlot);
+
+  // moveDisk 后 PVE 会重命名卷（vm-<userVM>-disk-N → vm-<holding>-disk-N），需返回新 volume_id
+  var newVolumeId = volumeId;
+  try {
+    var holdingConfig = await pveApi.getVmConfig(targetHoldingVmid);
+    if (holdingConfig && holdingConfig[freeSlot]) {
+      newVolumeId = holdingConfig[freeSlot].split(',')[0];
+    }
+  } catch (e) {}
+
+  return { holdingVmid: targetHoldingVmid, holdingSlot: freeSlot, volume_id: newVolumeId };
 }
 
 // 扩容磁盘 - qm resize <vmid> <bus+dev> <size>

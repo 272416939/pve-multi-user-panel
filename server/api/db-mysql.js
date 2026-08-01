@@ -583,6 +583,10 @@ async function initDb() {
         INDEX idx_disks_legacy (is_legacy)
     )`);
 
+    // 中转 VM 托管字段（游离数据盘托管在常驻中转 VM 上，防止用户 VM 销毁连带删除）
+    try { await execute("ALTER TABLE disks ADD COLUMN holding_vmid INT DEFAULT NULL"); } catch (_) {}
+    try { await execute("ALTER TABLE disks ADD COLUMN holding_slot VARCHAR(10) DEFAULT NULL"); } catch (_) {}
+
 	    // 创建磁盘生命周期配置表
 	    await execute(`
 	    CREATE TABLE IF NOT EXISTS disk_lifecycle_config (
@@ -2548,6 +2552,10 @@ module.exports = {
         markDestroyed: (id) => execute('UPDATE disks SET status = ?, updated_at = ? WHERE id = ?', ['destroyed', mysqlNow(), parseInt(id)]),
         // 切换自动续费开关（0=关闭, 1=开启）
         updateAutoRenew: (id, enabled) => execute('UPDATE disks SET auto_renew = ?, updated_at = ? WHERE id = ?', [enabled ? 1 : 0, mysqlNow(), parseInt(id)]),
+        // 更新中转 VM 托管信息（游离盘托管位置）
+        updateHolding: (id, holdingVmid, holdingSlot) => execute('UPDATE disks SET holding_vmid = ?, holding_slot = ?, updated_at = ? WHERE id = ?', [holdingVmid === null ? null : parseInt(holdingVmid), holdingSlot, mysqlNow(), parseInt(id)]),
+        // 查询指定中转 VM 上已占用的槽位
+        getByHoldingVmid: (holdingVmid) => queryAll('SELECT * FROM disks WHERE holding_vmid = ? AND status != ?', [parseInt(holdingVmid), 'destroyed']),
         // 更新磁盘字段（仅更新提供值的字段）
         update: (id, data) => {
             const fields = [];

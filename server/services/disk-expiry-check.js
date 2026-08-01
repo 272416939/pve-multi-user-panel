@@ -108,9 +108,33 @@ async function detachDiskFromVm(disk) {
       }
     }
 
-    // 更新台账：状态 -> expired（到期分离游离态）
-    // 注意：分离只做 qm unlink，保留 unused 引用（卷文件保留，可续费后重新挂载）。
-    //       切勿用 qm set --delete unusedN 清理——那会直接销毁卷文件！
+    // 转移到中转 VM 托管（到期分离的磁盘不应留在用户 VM 的 unused 引用上）
+    try {
+      var holdingService = require('./holding-vm');
+      var holdingVmid = await holdingService.getHoldingVmid();
+      await holdingService.ensureHoldingVm(holdingVmid);
+      // 查找 unlink 后产生的 unused 槽位
+      var cfgAfter = await pveApi.getVmConfig(safeVmid);
+      var unusedSlot = null;
+      for (var ui3 = 0; ui3 <= 9; ui3++) {
+        if (cfgAfter['unused' + ui3]) { unusedSlot = 'unused' + ui3; break; }
+      }
+      if (unusedSlot) {
+        var freeSlot = await holdingService.findFreeHoldingSlot(holdingVmid);
+        if (freeSlot) {
+          await holdingService.moveDiskToHolding(safeVmid, unusedSlot, holdingVmid, freeSlot);
+          // 更新台账托管信息
+          await db.disks.updateHolding(disk.id, holdingVmid, freeSlot);
+          logger.info('[disk-expiry] 磁盘 ' + disk.id + ' 已到期转移到中转 VM ' + holdingVmid + ' 槽位 ' + freeSlot);
+        } else {
+          logger.warn('[disk-expiry] 中转 VM ' + holdingVmid + ' 槽位已满，磁盘 ' + disk.id + ' 保持 unused 状态');
+        }
+      }
+    } catch (e) {
+      logger.warn('[disk-expiry] 转移到中转 VM 失败（不阻塞到期分离）:', e.message);
+    }
+
+    // 更新台账：状态 -> expired（到期分离）
     await db.disks.updateStatus(disk.id, 'expired');
     await db.disks.unbind(disk.id);
     logger.info('[disk-expiry] 磁盘 ' + disk.id + ' 已从 VM ' + safeVmid + ' 分离');
