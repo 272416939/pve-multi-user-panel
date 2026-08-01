@@ -199,8 +199,35 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams, holdingVmid, holdin
   }
 
   var cmd = 'qm set ' + safeVmid + ' --' + busDev + ' ' + diskConfig;
-  await runSshCommand(cmd);
-  return { bus: bus, dev: parseInt(dev), volume_id: volumeId, moved: false };
+  try {
+    await runSshCommand(cmd);
+    return { bus: bus, dev: parseInt(dev), volume_id: volumeId, moved: false };
+  } catch (err) {
+    // 自愈：直接挂载失败，可能卷已因 move_disk 被重命名（托管在中转 VM）
+    // 尝试在中转 VM 中按「存储前缀 + disk-编号」查找实际卷
+    var errMsg = err && err.message ? String(err.message) : '';
+    if (errMsg.indexOf('does not exist') !== -1 || errMsg.indexOf('not exist') !== -1) {
+      try {
+        var holdingService = require('../services/holding-vm');
+        var found = await holdingService.findVolumeInHolding(volumeId);
+        if (found) {
+          logger.warn('[bindDisk] 卷 ' + volumeId + ' 不在目标 VM，在中转 VM 找到实际卷 ' + found.volume_id + '（槽位 ' + found.holdingSlot + '），改走 moveDisk 转移');
+          await holdingService.moveDiskFromHolding(found.holdingVmid, found.holdingSlot, safeVmid, busDev);
+          // 读取转移后的新 volume_id
+          var newVolAfterMove = volumeId;
+          try {
+            var cfgAfterMove = await pveApi.getVmConfig(safeVmid);
+            var volPartAfter = cfgAfterMove[busDev] ? cfgAfterMove[busDev].split(',')[0] : '';
+            if (volPartAfter) newVolAfterMove = volPartAfter;
+          } catch (_) {}
+          return { bus: bus, dev: parseInt(dev), volume_id: newVolAfterMove, moved: true, holding_cleared: true };
+        }
+      } catch (selfHealErr) {
+        logger.warn('[bindDisk] 自愈查找中转 VM 失败:', selfHealErr.message);
+      }
+    }
+    throw err;
+  }
 }
 
 // 卸载磁盘 - 从用户 VM 转移到中转 VM 托管

@@ -136,6 +136,51 @@ async function moveDiskFromHolding(holdingVmid, sourceSlot, targetVmid, targetSl
   return targetSlot;
 }
 
+/**
+ * 在中转 VM 中查找与给定 volume_id 匹配的实际卷（自愈用）
+ * move_disk 会重命名卷（vm-<旧VM>-disk-<N> → vm-<新VM>-disk-<N>），
+ * 但存储前缀和磁盘编号不变。DB 中 volume_id 可能已过期，
+ * 用「存储前缀 + disk-编号」在中转 VM 中定位实际卷。
+ * @param {string} volumeId - DB 中可能过期的 volume_id
+ * @returns {Promise<object|null>} { holdingVmid, holdingSlot, volume_id } 或 null
+ */
+async function findVolumeInHolding(volumeId) {
+  if (!volumeId || typeof volumeId !== 'string') return null;
+  var holdingVmid = await getHoldingVmid();
+  var config = null;
+  try { config = await pveApi.getVmConfig(holdingVmid); } catch (e) { return null; }
+  if (!config) return null;
+
+  // 解析磁盘编号和存储前缀：hdd5:101/vm-101-disk-0.qcow2 -> idx=0, storage=hdd5
+  var m = String(volumeId).match(/disk-(\d+)(\.(raw|qcow2|vmdk|subvol))?$/);
+  if (!m) return null;
+  var diskIdx = m[1];
+  var storage = String(volumeId).split(':')[0];
+  if (!storage) return null;
+
+  // 扫描中转 VM 的 scsi 槽位（含 unused）
+  for (var dev = 1; dev <= 30; dev++) {
+    var val = config['scsi' + dev];
+    if (!val) continue;
+    var vol = val.split(',')[0];
+    if (!vol) continue;
+    // 存储前缀匹配 + 卷名含 disk-<idx>
+    if (vol.indexOf(storage + ':') === 0 && new RegExp('disk-' + diskIdx + '(\\.|$)').test(vol)) {
+      return { holdingVmid: holdingVmid, holdingSlot: 'scsi' + dev, volume_id: vol };
+    }
+  }
+  // 也检查 unused 槽位
+  for (var ui = 0; ui <= 9; ui++) {
+    var uval = config['unused' + ui];
+    if (!uval) continue;
+    var uvol = String(uval).split(',')[0];
+    if (uvol && uvol.indexOf(storage + ':') === 0 && new RegExp('disk-' + diskIdx + '(\\.|$)').test(uvol)) {
+      return { holdingVmid: holdingVmid, holdingSlot: 'unused' + ui, volume_id: uvol };
+    }
+  }
+  return null;
+}
+
 module.exports = {
   DEFAULT_HOLDING_VMID,
   getHoldingVmid,
@@ -143,4 +188,5 @@ module.exports = {
   findFreeHoldingSlot,
   moveDiskToHolding,
   moveDiskFromHolding,
+  findVolumeInHolding,
 };
