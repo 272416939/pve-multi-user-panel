@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.33.3] - 2026-08-01
+
+### Added
+- **feat(dashboard): 虚拟机/容器新增「备份中/恢复中/切换中」状态徽标并锁定操作按钮**
+  - VM/LXC 列表新增状态徽标：备份中（蓝）、恢复中（紫）、切换中（橙，仅 VM）
+  - 后端 `/user/vms`、`/user/lxc` 返回数据合并注入统一 `_busy` / `busyType` 字段
+  - 判定来源：`backups.status`、`restore_tasks.status`、`vm_os_switch_logs.status`（均取 `pending/running`）
+  - 优先级：切换中 > 备份中/恢复中
+  - 操作按钮锁定：`_busy` 时禁用并提示重启/关机/停止/开机/快照/备份/网络/编辑/续费/重置密码/切换系统/销毁等，保留详情/控制台只读入口
+  - 切换系统确认后自动关闭弹窗并立即刷新列表
+
+### Fixed
+- **fix(dashboard): 备份/恢复创建成功后立即刷新列表**，即时展示「备份中/恢复中」状态
+- **fix(dashboard): 消除备份/恢复/切换完成瞬间的状态闪现**
+  - 服务端按 DB 台账合并进行中状态，避免台账已结束但 PVE 瞬时报 running 的闪现
+- **fix(dashboard): 备份/恢复完成后加宽限窗口，彻底消除关机后首次备份的运行中闪现**
+  - `push-proxy.js` 新增 `markBackupRestoreComplete`，完成时间 5s 宽限期内前端保持「备份中/恢复中」，超窗后才放行真实 PVE 状态
+
 ## [2.33.2] - 2026-08-01
 
 ### Fixed
