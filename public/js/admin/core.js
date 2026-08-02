@@ -971,7 +971,13 @@ $.initDetailCharts = function() {
                             var idField = u.type === 'lxc' ? 'ct_id' : 'vm_id';
                             for (var j = 0; j < list.length; j++) {
                                 if (list[j][idField] === u.vmid) {
+                                    // 备份/恢复/切换进行中时，保留 busyType 徽标（ws 推送的 PVE status 可能滞后）
+                                    var keepBusy = list[j]._busy && list[j].busyType;
                                     list[j].status = u.status;
+                                    if (keepBusy) {
+                                        list[j]._busy = true;
+                                        list[j].busyType = keepBusy;
+                                    }
                                     break;
                                 }
                             }
