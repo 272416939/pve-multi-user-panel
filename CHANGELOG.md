@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.33.4] - 2026-08-02
+
+### Fixed
+- **fix(admin): 修复虚拟机列表状态徽标模板标签嵌套导致的偏移**
+  - **问题**：改写 Admin VM 表格状态徽标时把 `<template v-if>` 直接放进 `<td>` 内部，缺外层 `<td>`，导致徽标向上偏移
+  - **修复**：`public/js/admin/admin-template-vm.js` 补回外层 `<td>` 包裹整个 `<template>` 块（`_provisioning` / `vmBusyClass` / 普通状态三分支）
+  - 缓存版本 v11 -> v12
+
 ## [2.33.3] - 2026-08-01
 
 ### Added
