@@ -1,7 +1,7 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { createEmailTemplate, sendEmail, shouldSendEmail } = require('../utils/email');
-const { pushToUser } = require('../websocket/push-proxy');
+const { pushToUser, markBackupRestoreComplete } = require('../websocket/push-proxy');
 const { takeDiskSnapshot, auditAfterRestore } = require('./disk-audit');
 
 const lxcBackupPollingMap = new Map();
@@ -43,6 +43,7 @@ function startLxcBackupPolling(backupId, upid, vmid) {
                 await db.backups.complete(backupId, filename, size);
                 console.log(`[LXC备份轮询] 备份 ${backupId} 完成`);
 
+                markBackupRestoreComplete(vmid);
                 sendLxcBackupNotification(vmid, backupId, 'completed');
             } else if (task.status === 'stopped' && task.exitstatus !== 'OK') {
                 clearInterval(interval);
@@ -115,6 +116,7 @@ function startLxcRestorePolling(taskId, upid, vmid) {
                 lxcRestorePollingMap.delete(taskId);
                 await db.restoreTasks.complete(taskId);
                 console.log(`[LXC恢复轮询] 恢复 ${taskId} 完成`);
+                markBackupRestoreComplete(vmid);
                 sendLxcRestoreNotification(vmid, taskId, 'completed');
             } else if (task.status === 'stopped' && task.exitstatus !== 'OK') {
                 clearInterval(interval);
@@ -267,7 +269,10 @@ function startBackupPolling(backupId, upid) {
                     }
                 }
                 await db.backups.complete(backupId, filename, size);
-                if (backup) sendBackupNotification(backup.user_id, backup.vm_id, 'completed', filename);
+                if (backup) {
+                    markBackupRestoreComplete(backup.vm_id);
+                    sendBackupNotification(backup.user_id, backup.vm_id, 'completed', filename);
+                }
             } else if (task.status === 'stopped') {
                 clearInterval(interval);
                 backupPollIntervals.delete(backupId);
@@ -348,6 +353,7 @@ function startRestorePolling(taskId, upid) {
                 const restore = await db.restoreTasks.getById(taskId);
                 await db.restoreTasks.complete(taskId);
                 if (restore) {
+                    markBackupRestoreComplete(restore.vm_id);
                     sendRestoreNotification(restore.user_id, restore.vm_id, 'completed');
                     // 恢复完成后做磁盘对账（防止幽灵盘 + 修复丢失的数据盘）
                     try {
@@ -387,5 +393,7 @@ module.exports = {
     startBackupPolling,
     resumeRunningBackups,
     sendRestoreNotification,
-    startRestorePolling
+    startRestorePolling,
+    // 供 push-proxy 标记备份/恢复完成，抑制瞬时 running 闪现
+    markBackupRestoreComplete
 };
