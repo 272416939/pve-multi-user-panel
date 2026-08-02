@@ -112,16 +112,17 @@
                                             <td><span v-if="vm.expiration_date" :class="getExpiryColor(vm.expiration_date)">{{ formatDate(vm.expiration_date) + ' ' + daysUntilExpire(vm.expiration_date) }}</span><span v-else class="text-muted">-</span></td>
                                             <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
                                             <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
-                                            <template v-if="vm._provisioning">
-                                                <span class="tag-pending">开通中</span>
-                                            </template>
-                                            <template v-else-if="vmBusyClass(vm)">
-                                                <span :class="vmBusyClass(vm)">{{ vmBusyText(vm) }}</span>
-                                            </template>
-                                            <template v-else>
-                                                <span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span>
-                                            </template>
-                                        </td>
+                                            <td>
+                                                <template v-if="vm._provisioning">
+                                                    <span class="tag-pending">开通中</span>
+                                                </template>
+                                                <template v-else-if="vmBusyClass(vm)">
+                                                    <span :class="vmBusyClass(vm)">{{ vmBusyText(vm) }}</span>
+                                                </template>
+                                                <template v-else>
+                                                    <span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span>
+                                                </template>
+                                            </td>
                                         <td>
                                             <div v-if="vm._busy" class="table-actions">
                                                 <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
