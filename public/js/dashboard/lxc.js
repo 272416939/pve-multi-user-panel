@@ -513,6 +513,8 @@
             await $.loadLxcBackups($.lxcBackupCtId.value);
             $.bsModalHide('lxcBackupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
+            // 立即刷新容器列表，让「备份中」徽标即时展示并锁定操作按钮
+            await $.loadLxcContainers();
             alert('备份任务已创建，完成后将通过站内信和邮件通知您');
         } catch (e) {
             $.bsModalHide('lxcBackupModal');
@@ -581,6 +583,8 @@
             await $.loadLxcBackups($.lxcBackupCtId.value);
             $.bsModalHide('lxcBackupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
+            // 立即刷新容器列表，让「恢复中」徽标即时展示并锁定操作按钮
+            await $.loadLxcContainers();
             alert('恢复任务已创建，完成后将通过站内信和邮件通知您');
         } catch (e) {
             $.bsModalHide('lxcBackupModal');

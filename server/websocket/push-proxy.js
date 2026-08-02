@@ -15,6 +15,21 @@ const SUBSCRIPTIONS = new Map();
 const MAX_CONNECTIONS = 1000; // 全局连接上限
 const MAX_PER_IP = 20; // 单 IP 连接上限
 
+// 备份/恢复/切换完成后短暂宽限窗口（ms）：此期间 PVE 可能仍报瞬时 running，
+// 若立即放行会闪现运行中。窗口内仍合并为 backup（显示备份中），直到台账落定。
+const COMPLETED_GRACE_MS = 5000;
+// vmid -> 完成时间戳（内存态，仅用于抑制瞬时闪现）
+const recentlyCompleted = new Map();
+function markCompleted(vmid) {
+    recentlyCompleted.set(vmid, Date.now());
+}
+function pruneCompleted() {
+    const now = Date.now();
+    for (const [k, t] of recentlyCompleted) {
+        if (now - t > COMPLETED_GRACE_MS) recentlyCompleted.delete(k);
+    }
+}
+
 function validateTicket(token) {
     try {
         const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
@@ -115,22 +130,85 @@ async function pushStatus() {
         } catch (e) {}
     }
 
+    // 并行查询 DB 台账，合并"进行中"状态到推送，避免 PVE status 与台账竞态造成徽标闪现
+    const busyMap = await computeBusyState(vms, lxcs);
+
     if (statusCache.size === 0) return;
 
     for (const [ws, info] of SUBSCRIPTIONS) {
         const updates = [];
         for (const v of info.vms) {
             const s = statusCache.get('vm:' + v);
-            if (s) updates.push({ vmid: v, type: 'vm', status: s, isDetail: info.detailVms.has(v) });
+            if (s) {
+                const st = Object.assign({}, s);
+                const busy = busyMap.vm.get(v);
+                if (busy) { st.status = busy; }
+                updates.push(Object.assign({ vmid: v, type: 'vm', status: st, isDetail: info.detailVms.has(v) }, busy ? { busy } : {}));
+            }
         }
         for (const l of info.lxcs) {
             const s = statusCache.get('lxc:' + l);
-            if (s) updates.push({ vmid: l, type: 'lxc', status: s, isDetail: info.detailLxcs.has(l) });
+            if (s) {
+                const st = Object.assign({}, s);
+                const busy = busyMap.lxc.get(l);
+                if (busy) { st.status = busy; }
+                updates.push(Object.assign({ vmid: l, type: 'lxc', status: st, isDetail: info.detailLxcs.has(l) }, busy ? { busy } : {}));
+            }
         }
         if (updates.length > 0) {
             send(ws, { type: 'status', updates });
         }
     }
+}
+
+// 汇总 DB 台账的进行中状态，返回 Map：vm -> 'switch'|'backup'|'restore'，lxc -> 'backup'|'restore'
+// 仅在 VM/容器确实有进行中任务时返回（此时 ws 推送的瞬时 PVE status 不可信，避免闪现运行中）
+async function computeBusyState(vms, lxcs) {
+    const db = getDb();
+    const result = { vm: new Map(), lxc: new Map() };
+    try {
+        pruneCompleted();
+        // 备份（含 pending/running）
+        const runningBackups = await db.backups.getRunningBackups();
+        const runningRestores = await db.restoreTasks.getRunning();
+        const backupVms = new Set(), restoreVms = new Set();
+        const backupCts = new Set(), restoreCts = new Set();
+        runningBackups.forEach(b => {
+            if (b.type === 'lxc' && b.ct_id) backupCts.add(b.ct_id);
+            else if (b.vm_id) backupVms.add(b.vm_id);
+        });
+        runningRestores.forEach(t => {
+            if (t.vm_id) restoreVms.add(t.vm_id);
+        });
+
+        for (const v of vms) {
+            let busy = null;
+            try {
+                const sw = await db.vmOsSwitchLogs.getRunningByVmid(v);
+                if (sw) busy = 'switch';
+                else if (backupVms.has(v)) busy = 'backup';
+                else if (restoreVms.has(v)) busy = 'restore';
+            } catch (_) {}
+            // 台账不再进行中，但刚完成不久（可能瞬时报 running）：宽限期内仍按 busy 抑制闪现
+            if (!busy && recentlyCompleted.has(v)) busy = 'backup';
+            if (busy) result.vm.set(v, busy);
+        }
+        for (const l of lxcs) {
+            let busy = null;
+            if (backupCts.has(l)) busy = 'backup';
+            else if (restoreCts.has(l)) busy = 'restore';
+            if (!busy && recentlyCompleted.has(l)) busy = 'backup';
+            if (busy) result.lxc.set(l, busy);
+        }
+    } catch (e) {
+        console.error('[pushStatus] 合并进行中状态失败:', e.message);
+    }
+    return result;
+}
+
+// 标记 backup/restore 完成（供 pushStatus 抑制瞬时 running 闪现）
+function markBackupRestoreComplete(vmid) {
+    markCompleted(vmid);
 }
 
 async function checkResourceOwnership(userId, role, vmid, isLxc) {
@@ -297,6 +375,7 @@ function ensureTimers() {
 module.exports = pushProxy;
 module.exports.pushUnreadCount = pushUnreadCount;
 module.exports.pushToUser = pushToUser;
+module.exports.markBackupRestoreComplete = markBackupRestoreComplete;
 module.exports.getStatusCache = function(key, userId) {
     var cacheKey = userId ? userId + ':' + key : key;
     var e = statusCacheGlobal.get(cacheKey);

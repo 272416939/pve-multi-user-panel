@@ -55,6 +55,12 @@
       if (res && res.success) {
         alert('系统切换已开始，请稍候');
         $.closeOsSwitchModal();
+        // 立即刷新列表，让「切换中」徽标即刻展示并锁定操作按钮
+        if (typeof $.loadData === 'function') {
+          $.loadData();
+        } else if (typeof $.loadUserVms === 'function') {
+          $.loadUserVms();
+        }
         // 开始轮询状态
         startOsSwitchPoll(vm, res.switch_log_id);
       } else if (res && res.error) {

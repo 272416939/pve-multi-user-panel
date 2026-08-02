@@ -458,6 +458,8 @@
             await $.loadBackups(vmid);
             $.bsModalHide('backupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
+            // 立即刷新 VM 列表，让「备份中」徽标即时展示并锁定操作按钮
+            if (typeof $.loadData === 'function') { $.loadData(); }
             alert('备份任务已创建，完成后将通过站内信和邮件通知您');
         } catch (e) {
             $.bsModalHide('backupModal');
@@ -526,6 +528,8 @@
             await $.loadBackups($.backupVmId.value);
             $.bsModalHide('backupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
+            // 立即刷新 VM 列表，让「恢复中」徽标即时展示并锁定操作按钮
+            if (typeof $.loadData === 'function') { $.loadData(); }
             alert('恢复任务已创建，完成后将通过站内信和邮件通知您');
         } catch (e) {
             $.bsModalHide('backupModal');

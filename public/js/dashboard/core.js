@@ -163,6 +163,28 @@
     });
 
     // ===== 工具函数注册到 $（从 shared.js 或 window 全局函数引用） =====
+    // 备份中/恢复中/切换中 徽标样式与文案
+    $.vmBusyClass = function(v) {
+        if (!v || !v._busy || !v.busyType) return '';
+        if (v.busyType === 'switch') return 'tag-switch';
+        if (v.busyType === 'backup') return 'tag-backup';
+        if (v.busyType === 'restore') return 'tag-restore';
+        return '';
+    };
+    $.vmBusyText = function(v) {
+        if (!v || !v._busy || !v.busyType) return '';
+        if (v.busyType === 'switch') return '切换中';
+        if (v.busyType === 'backup') return '备份中';
+        if (v.busyType === 'restore') return '恢复中';
+        return '';
+    };
+    // 操作被锁定时点击统一提示
+    $.vmBusyBlock = function(v) {
+        if (!v || !v._busy || !v.busyType) return;
+        var label = $.vmBusyText(v) || '操作';
+        alert(label + '，请等待完成后再操作');
+        return false;
+    };
     $.formatMemory = formatMemory;
     $.formatBytes = formatBytes;
     $.formatDiskSize = formatDiskSize;
@@ -1358,7 +1380,22 @@
                             var idField = u.type === 'lxc' ? 'ct_id' : 'vm_id';
                             for (var j = 0; j < list.length; j++) {
                                 if (list[j][idField] === u.vmid) {
-                                    list[j].status = u.status;
+                                    // 服务端已按 DB 台账合并进行中状态（busy），
+                                    // 此时 PVE 推来的瞬时 status 不可信，以台账为准，
+                                    // 避免备份/恢复/切换完成瞬间闪现运行中。
+                                    if (u.busy) {
+                                        list[j]._busy = true;
+                                        list[j].busyType = u.busy;
+                                        list[j].status = u.status;
+                                    } else {
+                                        list[j].status = u.status;
+                                        // 备份/恢复/切换进行中时，保留 busyType 徽标（ws status 可能滞后）
+                                        var keepBusy = list[j]._busy && list[j].busyType;
+                                        if (keepBusy) {
+                                            list[j]._busy = true;
+                                            list[j].busyType = keepBusy;
+                                        }
+                                    }
                                     break;
                                 }
                             }

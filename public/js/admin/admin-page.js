@@ -17,6 +17,28 @@ $.getExpiryColor = function(expireTime) {
     if (days <= 7) return 'text-warning';
     return 'text-success';
 };
+// 备份中/恢复中/切换中 徽标样式与文案（Admin 列表服用，数据字段与用户端一致）
+$.vmBusyClass = function(v) {
+    if (!v || !v._busy || !v.busyType) return '';
+    if (v.busyType === 'switch') return 'tag-switch';
+    if (v.busyType === 'backup') return 'tag-backup';
+    if (v.busyType === 'restore') return 'tag-restore';
+    return '';
+};
+$.vmBusyText = function(v) {
+    if (!v || !v._busy || !v.busyType) return '';
+    if (v.busyType === 'switch') return '切换中';
+    if (v.busyType === 'backup') return '备份中';
+    if (v.busyType === 'restore') return '恢复中';
+    return '';
+};
+// 操作被锁定时点击统一提示
+$.vmBusyBlock = function(v) {
+    if (!v || !v._busy || !v.busyType) return;
+    var label = $.vmBusyText(v) || '操作';
+    alert(label + '，请等待完成后再操作');
+    return false;
+};
 
 var App = {
     template: '#appTemplate',
@@ -154,6 +176,9 @@ var app = Vue.createApp(App);
   // 注册全局属性，确保模板任意作用域都能找到
   app.config.globalProperties.daysUntilExpire = $.daysUntilExpire;
   app.config.globalProperties.getExpiryColor = $.getExpiryColor;
+  app.config.globalProperties.vmBusyClass = $.vmBusyClass;
+  app.config.globalProperties.vmBusyText = $.vmBusyText;
+  app.config.globalProperties.vmBusyBlock = $.vmBusyBlock;
 // Global error handler — catch render errors and show on screen
 app.config.errorHandler = function(err, instance, info) {
     console.error('[Vue Error]', err, instance, info);

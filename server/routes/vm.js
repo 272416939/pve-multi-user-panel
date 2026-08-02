@@ -85,6 +85,9 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
             return {
                 ...rest,
                 _provisioning: !!(pve_upid && pve_upid !== ''),
+                // 备份中/恢复中/切换中统一标记（详见下方 computeBusyType）
+                _busy: false,
+                busyType: null,
                 status: null,
                 config: null,
                 isExpired: vm.expiration_date ? new Date(vm.expiration_date) < new Date() : false,
@@ -92,6 +95,26 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
                 error: null
             };
         });
+
+        // 并行汇总三张表的"进行中"状态，映射到每台 VM 的 busyType（优先 切换中 > 备份中/恢复中）
+        try {
+            const switchRes = await Promise.all(vmsWithDetails.map(vm => db.vmOsSwitchLogs.getRunningByVmid(vm.vm_id)));
+            const backupRes = await Promise.all(vmsWithDetails.map(vm => db.backups.getRunningByVmId(vm.vm_id)));
+            const restoreRes = await Promise.all(vmsWithDetails.map(vm => db.restoreTasks.getRunningByVmId(vm.vm_id)));
+            vmsWithDetails.forEach((vm, i) => {
+                let busyType = null;
+                if (switchRes[i]) busyType = 'switch';
+                else if (backupRes[i] && backupRes[i].length > 0) busyType = 'backup';
+                else if (restoreRes[i] && restoreRes[i].length > 0) busyType = 'restore';
+                if (busyType) {
+                    vm._busy = true;
+                    vm.busyType = busyType;
+                }
+            });
+        } catch (busyError) {
+            // busy 状态挂载失败不阻塞列表返回，仅退化为无徽标
+            console.error('获取虚拟机进行中状态失败:', busyError);
+        }
  
         // PERF-05: 并行查询 PVE 状态（分批，每批 10 个），替代串行 for 循环
         const batchSize = 10;

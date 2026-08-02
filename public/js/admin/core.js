@@ -971,7 +971,21 @@ $.initDetailCharts = function() {
                             var idField = u.type === 'lxc' ? 'ct_id' : 'vm_id';
                             for (var j = 0; j < list.length; j++) {
                                 if (list[j][idField] === u.vmid) {
-                                    list[j].status = u.status;
+                                    // 服务端已按 DB 台账合并进行中状态（busy），瞬时 status 不可信，
+                                    // 避免备份/恢复/切换完成瞬间闪现运行中。
+                                    if (u.busy) {
+                                        list[j]._busy = true;
+                                        list[j].busyType = u.busy;
+                                        list[j].status = u.status;
+                                    } else {
+                                        list[j].status = u.status;
+                                        // 备份/恢复/切换进行中时，保留 busyType 徽标（ws status 可能滞后）
+                                        var keepBusy = list[j]._busy && list[j].busyType;
+                                        if (keepBusy) {
+                                            list[j]._busy = true;
+                                            list[j].busyType = keepBusy;
+                                        }
+                                    }
                                     break;
                                 }
                             }

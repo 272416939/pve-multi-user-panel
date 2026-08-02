@@ -1766,6 +1766,16 @@ module.exports = {
         getRunningBackups: () => queryAll(
             "SELECT * FROM backups WHERE status = 'running' OR status = 'pending'"
         ),
+        // 进行中备份 - 按 VM（type='vm'）
+        getRunningByVmId: (vmId) => queryAll(
+            "SELECT * FROM backups WHERE vm_id = ? AND type = 'vm' AND (status = 'running' OR status = 'pending')",
+            [vmId]
+        ),
+        // 进行中备份 - 按容器（type='lxc'）
+        getRunningByCtId: (ctId) => queryAll(
+            "SELECT * FROM backups WHERE ct_id = ? AND type = 'lxc' AND (status = 'running' OR status = 'pending')",
+            [ctId]
+        ),
         getByCtId: (ctId) => queryAll(
             "SELECT * FROM backups WHERE ct_id = ? AND type = 'lxc' ORDER BY created_at DESC",
             [ctId]
