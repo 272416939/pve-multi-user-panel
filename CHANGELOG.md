@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.33.5] - 2026-08-02
+
+### Changed
+- **refactor(db): 拆分 db-mysql.js 为 db-core/schema 与业务域模块**
+  - 原 `server/api/db-mysql.js`（2900 行、40 个顶层导出键）按业务域拆分为 **1 个聚合入口 + 11 个模块**
+  - 新文件布局（`server/api/`）：
+    - `db.js` — 聚合入口，按拆分前导出形状导出，约 30 个消费者零改动
+    - `db-core.js` — 连接池单例、`execute`/`queryOne`/`queryAll`、时间工具
+    - `db-schema.js` — 建表、迁移、默认配置、默认管理员
+    - `db-users.js` / `db-vms.js` / `db-orders.js` / `db-disks.js` / `db-backup.js` / `db-network.js` / `db-messaging.js` / `db-config.js` / `db-billing.js` — 9 个业务域模块
+  - 修复 4 处 `module.exports.xxx` 内部自引用为模块内直调
+  - 删除从未使用的死导入 `CryptoJS`
+  - 导出形状对比：新版 `db.js` vs 旧版 `db-mysql.js`，40 个顶层键及函数集合**零差异**
+  - 验证：`node --check` 全部通过、3 个受影响静态测试 6 passing、全量 mocha 255 passing
+  - 规模：13 文件，+3056/-2901
+
+### Notes
+- 纯重构，无功能变更、无数据库 schema 变更，升级无需额外操作
+
 ## [2.33.4] - 2026-08-02
 
 ### Fixed
