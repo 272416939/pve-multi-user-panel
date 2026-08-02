@@ -71,6 +71,9 @@ var App = {
     // 注册全局属性，确保模板任意作用域都能找到
     app.config.globalProperties.daysUntilExpire = $.daysUntilExpire;
     app.config.globalProperties.getExpiryColor = $.getExpiryColor;
+    app.config.globalProperties.vmBusyClass = $.vmBusyClass;
+    app.config.globalProperties.vmBusyText = $.vmBusyText;
+    app.config.globalProperties.vmBusyBlock = $.vmBusyBlock;
     app.mount('#app');
 
 function toggleSidebar() {

@@ -163,6 +163,28 @@
     });
 
     // ===== 工具函数注册到 $（从 shared.js 或 window 全局函数引用） =====
+    // 备份中/恢复中/切换中 徽标样式与文案
+    $.vmBusyClass = function(v) {
+        if (!v || !v._busy || !v.busyType) return '';
+        if (v.busyType === 'switch') return 'tag-switch';
+        if (v.busyType === 'backup') return 'tag-backup';
+        if (v.busyType === 'restore') return 'tag-restore';
+        return '';
+    };
+    $.vmBusyText = function(v) {
+        if (!v || !v._busy || !v.busyType) return '';
+        if (v.busyType === 'switch') return '切换中';
+        if (v.busyType === 'backup') return '备份中';
+        if (v.busyType === 'restore') return '恢复中';
+        return '';
+    };
+    // 操作被锁定时点击统一提示
+    $.vmBusyBlock = function(v) {
+        if (!v || !v._busy || !v.busyType) return;
+        var label = $.vmBusyText(v) || '操作';
+        alert(label + '，请等待完成后再操作');
+        return false;
+    };
     $.formatMemory = formatMemory;
     $.formatBytes = formatBytes;
     $.formatDiskSize = formatDiskSize;

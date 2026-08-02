@@ -76,6 +76,9 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
             return {
                 ...rest,
                 _provisioning: !!(pve_upid && pve_upid !== ''),
+                // 备份中/恢复中统一标记（LXC 不含切换系统）
+                _busy: false,
+                busyType: null,
                 status: null,
                 config: null,
                 isExpired: ct.expiration_date ? new Date(ct.expiration_date) < new Date() : false,
@@ -83,6 +86,24 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
                 error: null
             };
         });
+
+        // 并行汇总 backups / restore_tasks 的"进行中"状态，映射到每台容器的 busyType（优先 备份中 > 恢复中）
+        try {
+            const backupRes = await Promise.all(ctsWithDetails.map(ct => db.backups.getRunningByCtId(ct.ct_id)));
+            const restoreRes = await Promise.all(ctsWithDetails.map(ct => db.restoreTasks.getRunningByVmId(ct.ct_id)));
+            ctsWithDetails.forEach((ct, i) => {
+                let busyType = null;
+                if (backupRes[i] && backupRes[i].length > 0) busyType = 'backup';
+                else if (restoreRes[i] && restoreRes[i].length > 0) busyType = 'restore';
+                if (busyType) {
+                    ct._busy = true;
+                    ct.busyType = busyType;
+                }
+            });
+        } catch (busyError) {
+            // busy 状态挂载失败不阻塞列表返回，仅退化为无徽标
+            console.error('获取容器进行中状态失败:', busyError);
+        }
  
         // PERF-05: 并行查询 PVE 状态（分批，每批 10 个），替代串行 for 循环
         const batchSize = 10;

@@ -116,6 +116,7 @@
                                 <span class="vm-mobile-card-id">#{{ vm.vm_id }}</span>
                             </div>
                             <span v-if="vm._provisioning" class="tag-pending">开通中</span>
+                            <span v-else-if="vmBusyClass(vm)" :class="vmBusyClass(vm)">{{ vmBusyText(vm) }}</span>
                             <span v-else :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span>
                         </div>
                         <div v-if="!vm._provisioning" class="vm-mobile-card-body">
@@ -142,21 +143,22 @@
                         <div v-if="vm._provisioning" class="text-center text-muted py-2"><small>正在开通中，请稍后刷新</small></div>
                         <div v-else class="vm-mobile-card-actions">
                             <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
-                            <button v-if="vm.status && vm.status.status === 'running'" class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
-                            <button v-if="vm.status && vm.status.status === 'running'" class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
-                            <button v-if="vm.status && vm.status.status === 'running'" class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
-                            <button v-if="!vm.status || vm.status.status !== 'running'" class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
+                            <button class="table-btn" @click="vmBusyBlock(vm) !== false && openVncConsole(vm.vm_id)">控制台</button>
+                            <button v-if="vm.status && vm.status.status === 'running' && !vm._busy" class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
+                            <button v-if="vm.status && vm.status.status === 'running' && !vm._busy" class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
+                            <button v-if="vm.status && vm.status.status === 'running' && !vm._busy" class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
+                            <button v-if="!vm.status || vm.status.status !== 'running'" class="table-btn btn-primary" @click="startVm(vm.vm_id)" :disabled="vm._busy">开机</button>
                             <div class="dropdown-table">
                                 <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                 <ul class="dropdown-menu-table">
-                                    <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
-                                    <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
-                                    <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openSnapshotPanel(vm)">快照</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBackupPanel(vm)">备份</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openDeviceForward(vm, 'vm')">网络</a></li>
                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
-                                    <li><a href="#" @click.prevent="openRenewModal(vm)">续费</a></li>
-                                    <li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
-                                    <li><a href="#" @click.prevent="osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
-                                    <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openRenewModal(vm)">续费</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openVmPasswordReset(vm)">重置密码</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -209,6 +211,9 @@
                                         <template v-if="vm._provisioning">
                                             <span class="tag-pending">开通中</span>
                                         </template>
+                                        <template v-else-if="vmBusyClass(vm)">
+                                            <span :class="vmBusyClass(vm)">{{ vmBusyText(vm) }}</span>
+                                        </template>
                                         <template v-else>
                                             <span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span>
                                         </template>
@@ -219,29 +224,29 @@
                                         </div>
                                         <div v-else class="table-actions">
                                             <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
-                                            <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
+                                            <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running' && !vm._busy">
                                                 <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
                                                 <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
                                                 <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
                                             </div>
                                             <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
-                                                <button class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
+                                                <button class="table-btn btn-primary" @click="vm._busy ? vmBusyBlock(vm) : startVm(vm.vm_id)" :disabled="vm._busy">开机</button>
                                             </div>
                                             <div class="dropdown-table">
                                                 <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                 <ul class="dropdown-menu-table">
-                                                    <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'reboot')">重启</a></li>
-                                                    <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'shutdown')">关机</a></li>
-                                                    <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'stop')" class="text-danger">停止</a></li>
-                                                    <li class="d-md-none" v-if="!vm.status || vm.status.status !== 'running'"><a href="#" @click.prevent="startVm(vm.vm_id)" class="text-success">开机</a></li>
-                                                    <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
-                                                    <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
-                                                    <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
+                                                    <li class="d-md-none" v-if="vm.status && vm.status.status === 'running' && !vm._busy"><a href="#" @click.prevent="requestConfirm(vm.id, 'reboot')">重启</a></li>
+                                                    <li class="d-md-none" v-if="vm.status && vm.status.status === 'running' && !vm._busy"><a href="#" @click.prevent="requestConfirm(vm.id, 'shutdown')">关机</a></li>
+                                                    <li class="d-md-none" v-if="vm.status && vm.status.status === 'running' && !vm._busy"><a href="#" @click.prevent="requestConfirm(vm.id, 'stop')" class="text-danger">停止</a></li>
+                                                    <li class="d-md-none" v-if="!vm.status || vm.status.status !== 'running'"><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : startVm(vm.vm_id)" class="text-success">开机</a></li>
+                                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openSnapshotPanel(vm)">快照</a></li>
+                                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBackupPanel(vm)">备份</a></li>
+                                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openDeviceForward(vm, 'vm')">网络</a></li>
                                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
-                                                    <li><a href="#" @click.prevent="openRenewModal(vm)">续费</a></li>
-<li><a href="#" @click.prevent="openVmPasswordReset(vm)">重置密码</a></li>
-                                    <li><a href="#" @click.prevent="osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
-                                    <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
+                                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openRenewModal(vm)">续费</a></li>
+<li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openVmPasswordReset(vm)">重置密码</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
                                 </ul>
                                             </div>
                                         </div>
@@ -278,6 +283,7 @@
                                 <span class="vm-mobile-card-id">#{{ ct.ct_id }}</span>
                             </div>
                             <span v-if="ct._provisioning" class="tag-pending">开通中</span>
+                            <span v-else-if="vmBusyClass(ct)" :class="vmBusyClass(ct)">{{ vmBusyText(ct) }}</span>
                             <span v-else :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span>
                         </div>
                         <div v-if="!ct._provisioning" class="vm-mobile-card-body">
@@ -304,20 +310,21 @@
                         <div v-if="ct._provisioning" class="text-center text-muted py-2"><small>正在开通中，请稍后刷新</small></div>
                         <div v-else class="vm-mobile-card-actions">
                             <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
-                            <button v-if="ct.status && ct.status.status === 'running'" class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
-                            <button v-if="ct.status && ct.status.status === 'running'" class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
-                            <button v-if="ct.status && ct.status.status === 'running'" class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
-                            <button v-if="!ct.status || ct.status.status !== 'running'" class="table-btn btn-primary" @click="startLxc(ct.ct_id)">启动</button>
+                            <button class="table-btn" @click="vmBusyBlock(ct) !== false && openLxcTerminal(ct.ct_id)">终端</button>
+                            <button v-if="ct.status && ct.status.status === 'running' && !ct._busy" class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
+                            <button v-if="ct.status && ct.status.status === 'running' && !ct._busy" class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
+                            <button v-if="ct.status && ct.status.status === 'running' && !ct._busy" class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
+                            <button v-if="!ct.status || ct.status.status !== 'running'" class="table-btn btn-primary" @click="startLxc(ct.ct_id)" :disabled="ct._busy">启动</button>
                             <div class="dropdown-table">
                                 <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                 <ul class="dropdown-menu-table">
-                                    <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
-                                    <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
-                                    <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
+                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcSnapshotPanel(ct)">快照</a></li>
+                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcBackupPanel(ct)">备份</a></li>
+                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openDeviceForward(ct, 'lxc')">网络</a></li>
                                     <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
-                                    <li><a href="#" @click.prevent="openRenewModal(ct)">续费</a></li>
-                                    <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
-                                    <li><a href="#" @click.prevent="openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
+                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openRenewModal(ct)">续费</a></li>
+                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : editLxc(ct)">编辑</a></li>
+                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -368,6 +375,9 @@
                                         <template v-if="ct._provisioning">
                                             <span class="tag-pending">开通中</span>
                                         </template>
+                                        <template v-else-if="vmBusyClass(ct)">
+                                            <span :class="vmBusyClass(ct)">{{ vmBusyText(ct) }}</span>
+                                        </template>
                                         <template v-else>
                                             <span :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? '运行中' : '已停止' }}</span>
                                         </template>
@@ -378,28 +388,28 @@
                                         </div>
                                         <div v-else class="table-actions">
                                             <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
-                                            <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running'">
+                                            <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running' && !ct._busy">
                                                 <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
                                                 <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
                                                 <button class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
                                             </div>
                                             <div class="btn-group-table" v-if="!ct.status || ct.status.status !== 'running'">
-                                                <button class="table-btn btn-primary" @click="startLxc(ct.ct_id)">启动</button>
+                                                <button class="table-btn btn-primary" @click="ct._busy ? vmBusyBlock(ct) : startLxc(ct.ct_id)" :disabled="ct._busy">启动</button>
                                             </div>
                                             <div class="dropdown-table">
                                                 <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                 <ul class="dropdown-menu-table">
-                                                    <li class="d-md-none" v-if="ct.status && ct.status.status === 'running'"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'reboot')">重启</a></li>
-                                                    <li class="d-md-none" v-if="ct.status && ct.status.status === 'running'"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</a></li>
-                                                    <li class="d-md-none" v-if="ct.status && ct.status.status === 'running'"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'stop')" class="text-danger">停止</a></li>
-                                                    <li class="d-md-none" v-if="!ct.status || ct.status.status !== 'running'"><a href="#" @click.prevent="startLxc(ct.ct_id)" class="text-success">启动</a></li>
-                                                    <li><a href="#" @click.prevent="openLxcSnapshotPanel(ct)">快照</a></li>
-                                                    <li><a href="#" @click.prevent="openLxcBackupPanel(ct)">备份</a></li>
-                                                    <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
+                                                    <li class="d-md-none" v-if="ct.status && ct.status.status === 'running' && !ct._busy"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'reboot')">重启</a></li>
+                                                    <li class="d-md-none" v-if="ct.status && ct.status.status === 'running' && !ct._busy"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</a></li>
+                                                    <li class="d-md-none" v-if="ct.status && ct.status.status === 'running' && !ct._busy"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'stop')" class="text-danger">停止</a></li>
+                                                    <li class="d-md-none" v-if="!ct.status || ct.status.status !== 'running'"><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : startLxc(ct.ct_id)" class="text-success">启动</a></li>
+                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcSnapshotPanel(ct)">快照</a></li>
+                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcBackupPanel(ct)">备份</a></li>
+                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openDeviceForward(ct, 'lxc')">网络</a></li>
                                                     <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
-                                                    <li><a href="#" @click.prevent="openRenewModal(ct)">续费</a></li>
-                                                    <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
-                                                    <li><a href="#" @click.prevent="openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
+                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openRenewModal(ct)">续费</a></li>
+                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : editLxc(ct)">编辑</a></li>
+                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
                                                 </ul>
                                             </div>
                                         </div>
