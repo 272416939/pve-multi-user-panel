@@ -2,8 +2,15 @@
  * Token Store — 验证码/找回密码 token 的统一存储
  * 优先使用 Redis（短期数据高频读写），Redis 不可用时回退到数据库
  */
-const redisClient = require('../api/redis').getRedisClient();
 const db = require('../api/db');
+
+/**
+ * 惰性获取 Redis 客户端（不能在模块加载时捕获——Redis 配置在服务启动后
+ * 才从 DB 加载写入 process.env，模块加载阶段拿到的是 null 且永久失效）
+ */
+function getRedisClient() {
+    return require('../api/redis').getRedisClient();
+}
 
 // ==================== 验证码（注册验证码） ====================
 
@@ -17,6 +24,7 @@ async function setRegisterCode(email, code, ttlSeconds) {
     // 先删除数据库中旧的验证码
     await db.passwordResetTokens.deleteByEmailAndType(email, 'register_code');
 
+    var redisClient = getRedisClient();
     if (redisClient) {
         try {
             await redisClient.set('register_code:' + email, code, 'EX', ttlSeconds);
@@ -43,6 +51,7 @@ async function setRegisterCode(email, code, ttlSeconds) {
  * @returns {Promise<string|null>} 验证码或 null
  */
 async function getRegisterCode(email) {
+    var redisClient = getRedisClient();
     if (redisClient) {
         try {
             var code = await redisClient.get('register_code:' + email);
@@ -64,6 +73,7 @@ async function getRegisterCode(email) {
  * @param {string} email - 邮箱
  */
 async function delRegisterCode(email) {
+    var redisClient = getRedisClient();
     if (redisClient) {
         try { await redisClient.del('register_code:' + email); } catch (e) {}
     }
@@ -82,6 +92,7 @@ async function setResetToken(token, userId, ttlSeconds) {
     // 先删除数据库中旧的 token
     await db.passwordResetTokens.deleteByType(userId, 'password_reset');
 
+    var redisClient = getRedisClient();
     if (redisClient) {
         try {
             await redisClient.set('reset_token:' + token, String(userId), 'EX', ttlSeconds);
@@ -107,6 +118,7 @@ async function setResetToken(token, userId, ttlSeconds) {
  * @returns {Promise<number|null>} 用户 ID 或 null
  */
 async function getResetToken(token) {
+    var redisClient = getRedisClient();
     if (redisClient) {
         try {
             var userId = await redisClient.get('reset_token:' + token);

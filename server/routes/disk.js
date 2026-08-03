@@ -14,6 +14,11 @@ var { safeError } = require('../utils/safe-error');
 var db = require('../api/db');
 var diskUtils = require('../utils/disk-utils');
 var { takeDiskSnapshot } = require('../services/disk-audit');
+var cacheStore = require('../utils/cache-store');
+
+// PERF-07: 复用管理端磁盘规格/存储分组缓存（同一命名空间，管理端写操作 clearDiskCache 同时失效）
+var specCache = cacheStore.create('disk_specs', 300);
+var groupCache = cacheStore.create('storage_groups', 300);
 
 var VALID_PERIODS = ['month', 'quarter', 'year'];
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
@@ -84,8 +89,8 @@ router.get('/disks', authMiddleware, async (req, res) => {
 // 获取购买选项（存储分组 + 启用的规格）
 router.get('/disk-options', authMiddleware, async (req, res) => {
   try {
-    var groups = await db.storageGroups.getAll();
-    var specs = await db.diskSpecs.getAll();
+    var groups = await groupCache.get('all', function() { return db.storageGroups.getAll(); });
+    var specs = await specCache.get('all', function() { return db.diskSpecs.getAll(); });
     // 普通用户只看启用的规格
     if (req.user.role !== 'admin') {
       specs = specs.filter(function(s) { return s.enabled; });

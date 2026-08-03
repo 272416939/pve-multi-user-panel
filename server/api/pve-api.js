@@ -1,7 +1,21 @@
 const axios = require('axios');
 const https = require('https');
 const http = require('http');
+const cacheStore = require('../utils/cache-store');
 require('dotenv').config();
+
+// PERF-06: PVE 只读接口短 TTL 缓存（30s）
+// 存储列表/模板列表/VM 配置等只读数据被表单下拉高频请求，每次实时打 PVE 节点
+// （30s 超时+失败重试）会拖垮所有依赖它的接口。短 TTL 缓存 + 写操作统一清除，
+// 一致性风险仅 30s 窗口，PVE 面板本身也是手动刷新。
+const pveCache = cacheStore.create('pve', 30);
+
+/**
+ * 清空 PVE 只读缓存（所有写操作方法调用，防止读到过期配置/列表）
+ */
+async function clearPveCache() {
+    try { await pveCache.clear(); } catch (e) {}
+}
 
 // 对幂等 GET 请求进行重试（仅对 502/503/504/超时/连接重置 重试）
 async function withRetry(fn, maxRetries = 2) {
@@ -121,24 +135,30 @@ class PveApi {
   }
 
   async getNodes() {
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes`);
-    return response.data.data;
+    return pveCache.get('nodes', async () => {
+      const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes`);
+      return response.data.data;
+    });
   }
 
   async getVms(options) {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    if (!this.node) {
-      throw new Error('未找到可用的 PVE 节点');
-    }
-    const url = `${this.host}/api2/json/nodes/${this.node}/qemu`;
-    const response = await this.axiosInstance.get(url);
-    var vms = response.data.data || [];
-    if (options && options.templateOnly) {
-      vms = vms.filter(function(vm) { return vm.template === 1; });
-    }
-    return vms;
+    var cacheKey = options && options.templateOnly ? 'vms:tpl' : 'vms';
+    var self = this;
+    return pveCache.get(cacheKey, async () => {
+      if (!self.node) {
+        await self.detectNode();
+      }
+      if (!self.node) {
+        throw new Error('未找到可用的 PVE 节点');
+      }
+      const url = `${self.host}/api2/json/nodes/${self.node}/qemu`;
+      const response = await self.axiosInstance.get(url);
+      var vms = response.data.data || [];
+      if (options && options.templateOnly) {
+        vms = vms.filter(function(vm) { return vm.template === 1; });
+      }
+      return vms;
+    });
   }
 
   async getVmStatus(vmid) {
@@ -158,11 +178,14 @@ class PveApi {
   }
 
   async getVmConfig(vmid) {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/config`);
-    return response.data.data;
+    var self = this;
+    return pveCache.get('vmconfig:' + vmid, async () => {
+      if (!self.node) {
+        await self.detectNode();
+      }
+      const response = await self.axiosInstance.get(`${self.host}/api2/json/nodes/${self.node}/qemu/${vmid}/config`);
+      return response.data.data;
+    });
   }
 
   async updateVmConfig(vmid, params) {
@@ -180,6 +203,7 @@ class PveApi {
       searchParams.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
+    clearPveCache();
     return response.data;
   }
 
@@ -188,6 +212,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/status/start`);
+    clearPveCache();
     return response.data;
   }
 
@@ -196,6 +221,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/status/stop`);
+    clearPveCache();
     return response.data;
   }
 
@@ -204,6 +230,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/status/shutdown`);
+    clearPveCache();
     return response.data;
   }
 
@@ -212,6 +239,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/status/reboot`);
+    clearPveCache();
     return response.data;
   }
 
@@ -225,12 +253,15 @@ class PveApi {
   }
 
   async getSnapshots(vmid) {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/snapshot`);
-    const snapshots = response.data.data || [];
-    return snapshots.filter(s => !s.name.startsWith('__') && s.name !== 'current');
+    var self = this;
+    return pveCache.get('snapshots:' + vmid, async () => {
+      if (!self.node) {
+        await self.detectNode();
+      }
+      const response = await self.axiosInstance.get(`${self.host}/api2/json/nodes/${self.node}/qemu/${vmid}/snapshot`);
+      const snapshots = response.data.data || [];
+      return snapshots.filter(s => !s.name.startsWith('__') && s.name !== 'current');
+    });
   }
 
   async createSnapshot(vmid, snapname, description) {
@@ -246,6 +277,7 @@ class PveApi {
       params.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
+    clearPveCache();
     return response.data;
   }
 
@@ -254,6 +286,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/snapshot/${encodeURIComponent(snapname)}/rollback`);
+    clearPveCache();
     return response.data;
   }
 
@@ -262,6 +295,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.delete(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}/snapshot/${encodeURIComponent(snapname)}`);
+    clearPveCache();
     return response.data;
   }
 
@@ -270,6 +304,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.delete(`${this.host}/api2/json/nodes/${this.node}/qemu/${vmid}`);
+    clearPveCache();
     return response.data;
   }
 
@@ -290,6 +325,7 @@ class PveApi {
       searchParams.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 300000 }
     );
+    clearPveCache();
     return response.data.data;
   }
 
@@ -312,6 +348,7 @@ class PveApi {
       searchParams.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 300000 }
     );
+    clearPveCache();
     return response.data.data;
   }
 
@@ -339,30 +376,36 @@ class PveApi {
   }
 
   async getStorageList() {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage`);
-    const storages = response.data.data || [];
-    return storages.filter(s => s.content && s.content.split(',').includes('backup'));
+    return pveCache.get('storages', async () => {
+      if (!this.node) {
+        await this.detectNode();
+      }
+      const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage`);
+      const storages = response.data.data || [];
+      return storages.filter(s => s.content && s.content.split(',').includes('backup'));
+    });
   }
 
   async getAllStorages() {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage`);
-    return response.data.data || [];
+    return pveCache.get('all-storages', async () => {
+      if (!this.node) {
+        await this.detectNode();
+      }
+      const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage`);
+      return response.data.data || [];
+    });
   }
 
   async getLxcStorageList() {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage`);
-    const storages = response.data.data || [];
-    // LXC 容器需要 rootdir 类型的存储
-    return storages.filter(s => !s.content || s.content.split(',').includes('rootdir'));
+    return pveCache.get('lxc-storages', async () => {
+      if (!this.node) {
+        await this.detectNode();
+      }
+      const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage`);
+      const storages = response.data.data || [];
+      // LXC 容器需要 rootdir 类型的存储
+      return storages.filter(s => !s.content || s.content.split(',').includes('rootdir'));
+    });
   }
 
   async createBackup(vmid, storage, mode = 'stop') {
@@ -380,6 +423,7 @@ class PveApi {
       params.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 30000 }
     );
+    clearPveCache();
     return response.data;
   }
 
@@ -407,6 +451,7 @@ class PveApi {
     const volidEncoded = encodeURIComponent(volid);
     try {
       const response = await this.axiosInstance.delete(`${this.host}/api2/json/nodes/${this.node}/storage/${storage}/content/${volidEncoded}`);
+      clearPveCache();
       return response.data;
     } catch (e) {
       if (e.response?.status === 404) {
@@ -439,20 +484,24 @@ class PveApi {
       params.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 60000 }
     );
+    clearPveCache();
     return response.data;
   }
 
   // ==================== LXC 容器相关方法 ====================
 
   async getLxcContainers() {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    if (!this.node) {
-      throw new Error('未找到可用的 PVE 节点');
-    }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/lxc`);
-    return response.data.data || [];
+    var self = this;
+    return pveCache.get('lxc-vms', async () => {
+      if (!self.node) {
+        await self.detectNode();
+      }
+      if (!self.node) {
+        throw new Error('未找到可用的 PVE 节点');
+      }
+      const response = await self.axiosInstance.get(`${self.host}/api2/json/nodes/${self.node}/lxc`);
+      return response.data.data || [];
+    });
   }
 
   async getLxcStatus(vmid) {
@@ -472,11 +521,14 @@ class PveApi {
   }
 
   async getLxcConfig(vmid) {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/config`);
-    return response.data.data;
+    var self = this;
+    return pveCache.get('lxc-config:' + vmid, async () => {
+      if (!self.node) {
+        await self.detectNode();
+      }
+      const response = await self.axiosInstance.get(`${self.host}/api2/json/nodes/${self.node}/lxc/${vmid}/config`);
+      return response.data.data;
+    });
   }
 
   async startLxc(vmid) {
@@ -484,6 +536,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/status/start`);
+    clearPveCache();
     return response.data;
   }
 
@@ -492,6 +545,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/status/stop`);
+    clearPveCache();
     return response.data;
   }
 
@@ -500,6 +554,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/status/shutdown`);
+    clearPveCache();
     return response.data;
   }
 
@@ -508,6 +563,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/status/reboot`);
+    clearPveCache();
     return response.data;
   }
 
@@ -544,6 +600,7 @@ class PveApi {
       searchParams.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 60000 }
     );
+    clearPveCache();
     return response.data;
   }
 
@@ -552,6 +609,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.delete(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}`);
+    clearPveCache();
     return response.data;
   }
 
@@ -570,16 +628,20 @@ class PveApi {
       searchParams.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
+    clearPveCache();
     return response.data;
   }
 
   async getLxcSnapshots(vmid) {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/snapshot`);
-    const snapshots = response.data.data || [];
-    return snapshots.filter(s => !s.name.startsWith('__') && s.name !== 'current');
+    var self = this;
+    return pveCache.get('lxc-snapshots:' + vmid, async () => {
+      if (!self.node) {
+        await self.detectNode();
+      }
+      const response = await self.axiosInstance.get(`${self.host}/api2/json/nodes/${self.node}/lxc/${vmid}/snapshot`);
+      const snapshots = response.data.data || [];
+      return snapshots.filter(s => !s.name.startsWith('__') && s.name !== 'current');
+    });
   }
 
   async createLxcSnapshot(vmid, snapname, description) {
@@ -594,6 +656,7 @@ class PveApi {
       params.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
     );
+    clearPveCache();
     return response.data;
   }
 
@@ -602,6 +665,7 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.post(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/snapshot/${encodeURIComponent(snapname)}/rollback`);
+    clearPveCache();
     return response.data;
   }
 
@@ -610,15 +674,18 @@ class PveApi {
       await this.detectNode();
     }
     const response = await this.axiosInstance.delete(`${this.host}/api2/json/nodes/${this.node}/lxc/${vmid}/snapshot/${encodeURIComponent(snapname)}`);
+    clearPveCache();
     return response.data;
   }
 
   async getTemplates(storage) {
-    if (!this.node) {
-      await this.detectNode();
-    }
-    const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage/${encodeURIComponent(storage)}/content?content=vztmpl`);
-    return response.data.data || [];
+    return pveCache.get('templates:' + storage, async () => {
+      if (!this.node) {
+        await this.detectNode();
+      }
+      const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage/${encodeURIComponent(storage)}/content?content=vztmpl`);
+      return response.data.data || [];
+    });
   }
 
   async getNextAvailableVmid() {
@@ -654,6 +721,7 @@ class PveApi {
       params.toString(),
       { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, timeout: 60000 }
     );
+    clearPveCache();
     return response.data;
   }
 }

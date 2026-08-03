@@ -1407,12 +1407,16 @@
                 $.user.value = userData;
                 var adminLink = document.getElementById('dashboardAdminLink');
                 if (adminLink) adminLink.style.display = userData.role === 'admin' ? '' : 'none';
-                await $.loadNavItems();
-                await $.loadData();
-                await $.loadLxcContainers();
-                // 恢复开通中状态（页面刷新后从 localStorage 恢复占位记录）
+                // PERF-07: 初始化加载并行化（导航/VM 数据/LXC 列表/CNAME 域名相互独立，
+                // 原串行总耗时 = 各接口耗时之和，并行后 ≈ 最慢单个接口）
+                await Promise.all([
+                    $.loadNavItems(),
+                    $.loadData(),
+                    $.loadLxcContainers(),
+                    $.loadCnameDomain()
+                ]);
+                // 恢复开通中状态（依赖 loadData/loadLxcContainers 完成后的列表，需在并行之后）
                 $.restoreProvisioningState();
-                await $.loadCnameDomain();
                 if ($.activeSection.value === 'order') {
                     await $.loadPackages();
                 }

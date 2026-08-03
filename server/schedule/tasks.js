@@ -7,22 +7,46 @@ const ikuaiApi = require('../api/ikuai-api');
 const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
 const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
-const redis = require('../api/redis').getRedisClient();
+const crypto = require('crypto');
+
+// 惰性获取 Redis 客户端（Redis 配置在服务启动后才从 DB 加载，不能模块级捕获）
+function getRedis() {
+    return require('../api/redis').getRedisClient();
+}
+
+// 本实例持有的锁 token 表（释放时比对，防止锁过期后误删他人锁）
+const lockTokens = new Map();
 
 // PERF-25: 分布式锁，防止多实例重复执行到期检查
 async function tryAcquireLock(lockKey, ttl = 300) {
+    var redis = getRedis();
     if (!redis) return true; // 无 Redis 时跳过锁
     try {
-        const result = await redis.set(lockKey, '1', 'EX', ttl, 'NX');
-        return result === 'OK';
+        var token = crypto.randomBytes(16).toString('hex');
+        var result = await redis.set(lockKey, token, 'EX', ttl, 'NX');
+        if (result === 'OK') {
+            lockTokens.set(lockKey, token);
+            return true;
+        }
+        return false;
     } catch (e) {
         return true; // Redis 异常时不阻止执行
     }
 }
 
+// Lua 原子比对删除：仅当锁值仍是本实例写入的 token 时才删除。
+// 避免任务执行超时（锁过期）后，误删其他实例刚获取的锁导致任务重复执行
+const RELEASE_LOCK_LUA = "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
 async function releaseLock(lockKey) {
+    var redis = getRedis();
     if (!redis) return;
-    try { await redis.del(lockKey); } catch (e) {}
+    var token = lockTokens.get(lockKey);
+    if (!token) return;
+    try {
+        await redis.eval(RELEASE_LOCK_LUA, 1, lockKey, token);
+    } catch (e) {}
+    lockTokens.delete(lockKey);
 }
 
 // SEC-05: 启动时恢复因服务器崩溃导致的开通中孤儿记录
