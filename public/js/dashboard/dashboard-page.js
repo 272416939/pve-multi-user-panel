@@ -64,6 +64,7 @@ var App = {
             $.initForward();
             $.initMessage();
             $.initDisk && $.initDisk();
+            $.initLogs && $.initLogs();
             return $;
         }
     };

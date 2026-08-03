@@ -8,6 +8,9 @@ const { checkRateLimit } = require('../middleware/rate-limiter');
 const { startLxcBackupPolling, sendLxcRestoreNotification, startBackupPolling, startRestorePolling } = require('../services/backup-polling');
 const { safeError } = require('../utils/safe-error');
 const { takeDiskSnapshot } = require('../services/disk-audit');
+// 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
+const { auditAction } = require('../utils/audit-log');
+
 router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
@@ -128,7 +131,8 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
  
         // 启动轮询
         startLxcBackupPolling(backupId, upid, vmid);
- 
+
+        await auditAction(req, 'lxc.backup.create', '创建 LXC ' + vmid + ' 备份');
         res.json({ id: backupId, message: '备份任务已提交' });
     } catch (error) {
         console.error('创建 LXC 备份失败:', error.response?.data || error.message);
@@ -163,6 +167,7 @@ router.delete('/lxc/:vmid/backups/:id', authMiddleware, async (req, res) => {
         await db.restoreTasks.deleteByBackupId(backupId);
  
         await db.backups.delete(backupId);
+        await auditAction(req, 'lxc.backup.delete', '删除 LXC ' + (backup.ct_id || req.params.vmid) + ' 备份', { resourceType: 'backup', resourceId: backup.ct_id || req.params.vmid });
         res.json({ message: '备份已删除' });
     } catch (error) {
         console.error('删除备份失败:', error);
@@ -253,7 +258,8 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
                 } catch (_) {}
             }
         })();
- 
+
+        await auditAction(req, 'lxc.backup.restore', '恢复 LXC ' + vmid + ' 备份');
         res.json({ id: restoreRecord.id, message: '恢复任务已提交' });
     } catch (error) {
         console.error('恢复备份失败:', error.response?.data || error.message);
@@ -343,6 +349,7 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
             await db.backups.fail(backup.id, e.response?.data?.message || e.message);
             return res.status(500).json({ error: safeError(e) });
         }
+        await auditAction(req, 'vm.backup.create', '创建 VM ' + vmid + ' 备份');
         res.json({ message: '备份任务已创建', backup_id: backup.id });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -367,6 +374,7 @@ router.delete('/backups/:id', authMiddleware, async (req, res) => {
         }
         await db.restoreTasks.deleteByBackupId(parseInt(req.params.id));
         await db.backups.delete(req.params.id);
+        await auditAction(req, 'vm.backup.delete', '删除 VM ' + (backup.vm_id || '') + ' 备份', { resourceType: 'backup', resourceId: backup.vm_id || '' });
         res.json({ message: '备份已删除' });
     } catch (error) {
         res.status(500).json({ error: '删除备份失败' });
@@ -396,6 +404,12 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
                 if (backup.status === 'running' || backup.status === 'pending') continue;
             }
             deletableIds.push(id);
+            // 操作审计：批量删除逐条记录明细
+            if (backup.type === 'lxc') {
+                await auditAction(req, 'lxc.backup.delete', '删除 LXC ' + (backup.ct_id || '') + ' 备份', { resourceType: 'backup', resourceId: backup.ct_id || '' });
+            } else {
+                await auditAction(req, 'vm.backup.delete', '删除 VM ' + (backup.vm_id || '') + ' 备份', { resourceType: 'backup', resourceId: backup.vm_id || '' });
+            }
             if (backup.filename && backup.status === 'completed') {
                 try {
                     const volid = backup.type === 'lxc' ? `${backup.storage}:backup/${backup.filename}` : backup.filename;
@@ -409,6 +423,11 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
             }
             await db.backups.deleteBatch(deletableIds);
         }
+        // 操作审计：批量写入后即时收敛该用户日志到保留上限（防短暂超限，无需等整点清理）
+        try {
+            var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
+            await db.auditLogs.trimUserOverflow(req.user.id, keepCount);
+        } catch (_) {}
         res.json({ message: `已删除 ${deletableIds.length} 个备份` });
     } catch (error) {
         res.status(500).json({ error: '批量删除失败' });
@@ -501,6 +520,7 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
             await db.restoreTasks.fail(restore.id, e.response?.data?.message || e.message);
             return res.status(500).json({ error: safeError(e) });
         }
+        await auditAction(req, 'vm.backup.restore', '恢复 VM ' + vmid + ' 备份');
         res.json({ message: '恢复任务已创建，完成后将通过站内信和邮件通知您' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });

@@ -13,6 +13,8 @@
     $.activeTab = ref(localStorage.getItem('dashboard_activeTab') || 'vms');
     $.activeTabVm = ref('info');
     $.activeTabLxc = ref('info');
+    // 日志页 tab（操作日志/登陆日志），刷新后保持
+    $.logTab = ref(localStorage.getItem('dashboard_logTab') || 'operation');
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
     $.customConfirmResolve = ref(null);
@@ -67,7 +69,9 @@
     // ===== 套餐订购状态 =====
     $.vmPackages = ref([]);
     $.lxcPackages = ref([]);
-    $.activeTabOrder = ref('vm');
+    // 套餐开通子菜单选中项（VM/LXC），刷新后保持；白名单校验防 localStorage 污染
+    var _savedSubOrder = localStorage.getItem('dashboard_activeTabOrder');
+    $.activeTabOrder = ref((_savedSubOrder === 'vm' || _savedSubOrder === 'lxc') ? _savedSubOrder : 'vm');
     $.orderForm = ref({ period: 'month', quantity: 1, mac_group_id: '', os_template_id: 0 });
     $.orderPackage = ref({});
     $.orderType = ref('vm');
@@ -1321,6 +1325,46 @@
         if (el) el.classList.toggle('open');
         var trigger = el ? el.previousElementSibling : null;
         if (trigger) trigger.classList.toggle('expanded');
+        // 持久化子菜单展开态，刷新后恢复
+        try {
+            var expanded = (localStorage.getItem('dashboard_sidebarExpanded') || '').split(',').filter(Boolean);
+            var idx = expanded.indexOf(id);
+            if (el && el.classList.contains('open')) {
+                if (idx === -1) expanded.push(id);
+            } else if (idx !== -1) {
+                expanded.splice(idx, 1);
+            }
+            localStorage.setItem('dashboard_sidebarExpanded', expanded.join(','));
+        } catch (e) {}
+    };
+
+    // 刷新后恢复侧边栏状态：菜单高亮、order 子项选中、子菜单展开态
+    $.syncSidebarState = function() {
+        var section = $.activeSection.value;
+        document.querySelectorAll('.nav-item[data-section]').forEach(function(el) {
+            el.classList.toggle('active', el.getAttribute('data-section') === section);
+        });
+        var el = document.getElementById('submenu-order');
+        if (section === 'order') {
+            // 恢复子菜单选中项（VM/LXC）
+            var sub = $.activeTabOrder.value;
+            document.querySelectorAll('#submenu-order .nav-item').forEach(function(item) {
+                item.classList.toggle('active', item.getAttribute('data-subsection') === 'order-' + sub);
+            });
+            if (el) el.classList.add('open');
+            var parent = el ? el.previousElementSibling : null;
+            if (parent) parent.classList.add('expanded');
+        } else {
+            // 恢复其他子菜单的展开态（选中态在子菜单内时必然展开，此处只管非选中场景）
+            var expanded = [];
+            try { expanded = (localStorage.getItem('dashboard_sidebarExpanded') || '').split(',').filter(Boolean); } catch (e) {}
+            document.querySelectorAll('.nav-submenu').forEach(function(el2) {
+                var open = expanded.indexOf(el2.id.replace('submenu-', '')) !== -1;
+                el2.classList.toggle('open', open);
+                var trigger = el2.previousElementSibling;
+                if (trigger) trigger.classList.toggle('expanded', open);
+            });
+        }
     };
 
     // 扩展 switchSection 以支持 order
@@ -1341,6 +1385,14 @@
         if (section === 'disk' && $.loadDisks) {
             $.loadDisks();
         }
+        if (section === 'logs') {
+            // 日志页为单菜单，tab 状态由 localStorage 保持，加载当前 tab 数据
+            if ($.logTab.value === 'operation') {
+                if ($.loadOperationLogs) $.loadOperationLogs(1);
+            } else {
+                if ($.loadLoginLogs) $.loadLoginLogs(1);
+            }
+        }
     };
 
     // ===== 生命周期 =====
@@ -1348,6 +1400,8 @@
 
     $.initCore = function() {
         onMounted(async function() {
+            // 恢复侧边栏选中/展开状态（仅同步高亮，不触发数据加载，避免与下方加载逻辑重复）
+            $.syncSidebarState();
             var userData = await authGuard();
             if (userData) {
                 $.user.value = userData;
@@ -1361,6 +1415,14 @@
                 await $.loadCnameDomain();
                 if ($.activeSection.value === 'order') {
                     await $.loadPackages();
+                }
+                if ($.activeSection.value === 'logs') {
+                    // 刷新后加载当前 tab 数据（tab 状态已由 localStorage 恢复）
+                    if ($.logTab.value === 'operation') {
+                        if ($.loadOperationLogs) await $.loadOperationLogs(1);
+                    } else {
+                        if ($.loadLoginLogs) await $.loadLoginLogs(1);
+                    }
                 }
                 $.loadUnreadCount();
                 $.loadWalletBalance();
@@ -1444,11 +1506,32 @@
             }
         });
 
+        // 当前 section 写回 URL query（?section=xxx），刷新后恢复；与 admin 端及导航链接约定一致
+        watch($.activeSection, function(val) {
+            var url = new URL(window.location);
+            url.searchParams.set('section', val);
+            history.replaceState({}, '', url);
+        });
+
+        // 套餐开通子菜单选中项持久化，刷新后恢复
+        watch($.activeTabOrder, function(newTab) {
+            localStorage.setItem('dashboard_activeTabOrder', newTab);
+        });
+
         watch($.activeTab, function(newTab) {
             localStorage.setItem('dashboard_activeTab', newTab);
             if (newTab === 'messages') {
                 $.loadMessages();
                 $.loadUnreadCount();
+            }
+        });
+
+        watch($.logTab, function(newTab) {
+            localStorage.setItem('dashboard_logTab', newTab);
+            if (newTab === 'operation') {
+                if ($.loadOperationLogs) $.loadOperationLogs(1);
+            } else {
+                if ($.loadLoginLogs) $.loadLoginLogs(1);
             }
         });
     };

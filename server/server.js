@@ -259,6 +259,7 @@ app.use('/api', require('./routes/disk'));
 app.use('/api', require('./routes/admin-disk'));
 app.use('/api', require('./routes/admin-os-template'));
 app.use('/api', require('./routes/user-settings'));
+app.use('/api', require('./routes/log'));
 
 const vncProxy = require('./websocket/vnc-proxy');
 const terminalProxy = require('./websocket/terminal-proxy');

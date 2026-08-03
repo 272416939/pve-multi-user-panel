@@ -36,6 +36,9 @@ module.exports = {
     // V3-14 修复：敏感操作审计日志
     auditLogs: dbMessaging.auditLogs,
 
+    // 登录日志（登录成功/失败）
+    loginLogs: dbMessaging.loginLogs,
+
     // 用户操作
     users: dbUsers.users,
 

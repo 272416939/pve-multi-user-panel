@@ -92,6 +92,11 @@ router.put('/messages/read-all', authMiddleware, async (req, res) => {
 router.delete('/messages/:id', authMiddleware, async (req, res) => {
     try {
         await db.messages.delete(parseInt(req.params.id), req.user.id);
+        // 操作审计：删除消息
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'setting.message.delete', details: '删除消息1条', req });
+        } catch (_) {}
         res.json({ message: '消息已删除' });
         await unreadCache.del(String(req.user.id));
         pushUnreadCount();
@@ -102,7 +107,19 @@ router.delete('/messages/:id', authMiddleware, async (req, res) => {
 
 router.delete('/messages', authMiddleware, async (req, res) => {
     try {
+        // 先统计将删除的已读消息条数（操作审计用）
+        let deletedCount = 0;
+        try {
+            const pool = require('../api/db').getPool();
+            const [rows] = await pool.execute('SELECT COUNT(*) AS c FROM messages WHERE (uid = ? OR uid = 0) AND is_read = 1', [req.user.id]);
+            deletedCount = rows && rows[0] ? rows[0].c : 0;
+        } catch (_) {}
         await db.messages.deleteAll(req.user.id);
+        // 操作审计：删除消息 N 条
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'setting.message.delete', details: '删除消息' + deletedCount + '条', req });
+        } catch (_) {}
         res.json({ message: '消息已清空' });
         // 修复：清空消息后失效未读数缓存
         await unreadCache.del(String(req.user.id));

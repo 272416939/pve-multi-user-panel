@@ -194,6 +194,13 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     await db.users.update(userId, updates);
     await userListCache.del('list');
     await invalidateUserActiveCache(userId);
+    // 操作审计：管理员重置用户密码（记录到管理员自己的操作日志）
+    if (password) {
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'password.reset.admin', resourceType: 'user', resourceId: userId, details: '重置用户[' + (user.username || userId) + ']密码', req });
+        } catch (_) {}
+    }
     res.json({ message: '用户更新成功' });
   } catch (e) {
     console.error('[admin] update user error:', e.message);

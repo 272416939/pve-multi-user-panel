@@ -6,7 +6,7 @@
     "scripts": {
         "start": "node server/server.js",
         "dev": "nodemon server/server.js",
-        "test": "mocha --recursive test/**/*.test.js --timeout 10000"
+        "test": "mocha --recursive test/**/*.test.js --timeout 10000 --exit"
     },
     "keywords": [
         "proxmox",

@@ -15,11 +15,14 @@ const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { hashPassword, verifyPassword } = require('../utils/password-hash');
 const cacheStore = require('../utils/cache-store');
-const { getIpLocation } = require('../services/ip-location');
+const { getIpLocation, getIpLocations } = require('../services/ip-location');
 const { invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/safe-error');
 // profileCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
 const profileCache = cacheStore.create('profile', 60);
+// 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
+const { auditAction } = require('../utils/audit-log');
+
 
 router.post('/user/2fa/setup', authMiddleware, async (req, res) => {
     try {
@@ -64,6 +67,7 @@ router.post('/user/2fa/verify', authMiddleware, async (req, res) => {
         await db.twofa.deleteRecoveryCodes(req.user.id);
         await db.twofa.addRecoveryCodes(req.user.id, codes);
 
+        await auditAction(req, 'security.2fa.enable', '启用二次验证');
         res.json({ message: '2FA 已启用', recovery_codes: codes });
     } catch (error) {
         console.error('启用 2FA 失败:', error.message);
@@ -85,6 +89,7 @@ router.post('/user/2fa/disable', authMiddleware, async (req, res) => {
         await db.twofa.disable(req.user.id);
         await db.twofa.deleteRecoveryCodes(req.user.id);
 
+        await auditAction(req, 'security.2fa.disable', '关闭二次验证');
         res.json({ message: '2FA 已禁用' });
     } catch (error) {
         res.status(500).json({ error: '禁用 2FA 失败' });
@@ -114,6 +119,7 @@ router.post('/user/2fa/recovery-codes/regenerate', authMiddleware, async (req, r
         }
         await db.twofa.deleteRecoveryCodes(req.user.id);
         await db.twofa.addRecoveryCodes(req.user.id, newCodes);
+        await auditAction(req, 'security.recovery-codes', '重新生成恢复码');
         res.json({ message: '恢复码已重新生成', recovery_codes: newCodes });
     } catch (error) {
         res.status(500).json({ error: '重新生成恢复码失败' });
@@ -135,16 +141,9 @@ router.post('/admin/user/:id/disable-2fa', authMiddleware, adminMiddleware, asyn
 
 router.get('/user/devices', authMiddleware, async (req, res) => {
     const devices = await db.refreshTokens.getByUserId(req.user.id);
-    // UApiPro IP 归属地：按去重 IP 批量查询（带缓存），失败静默降级为空串
-    const uniqueIps = [...new Set(devices.map(d => d.ip).filter(Boolean))];
-    if (uniqueIps.length > 0) {
-        const results = await Promise.allSettled(uniqueIps.map(ip => getIpLocation(ip)));
-        const locMap = {};
-        uniqueIps.forEach((ip, i) => {
-            if (results[i].status === 'fulfilled') locMap[ip] = results[i].value || '';
-        });
-        devices.forEach(d => { d.ip_location = locMap[d.ip] || ''; });
-    }
+    // UApiPro IP 归属地：批量查询（services/ip-location.js 统一实现，去重+缓存+容错）
+    const locMap = await getIpLocations(devices.map(d => d.ip));
+    devices.forEach(d => { d.ip_location = locMap[d.ip] || ''; });
     res.json(devices);
 });
 
@@ -156,6 +155,9 @@ router.delete('/user/devices/:id', authMiddleware, async (req, res) => {
     }
     await db.refreshTokens.revoke(deviceId);
     await invalidateDeviceCache(deviceId);
+    // 操作审计：手动下线设备（含 IP 归属地）
+    const loc = await getIpLocation(device.ip || '');
+    await auditAction(req, 'security.device.logout', '下线设备[' + (device.device_name || '未知设备') + '] IP:' + (device.ip || '') + (loc ? ' 归属地:' + loc : ''));
     res.json({ message: '设备已下线' });
 });
 
@@ -165,10 +167,12 @@ router.delete('/user/devices', authMiddleware, async (req, res) => {
         const current = await db.refreshTokens.getByToken(refreshToken);
         if (current) {
             await db.refreshTokens.revokeByUserId(req.user.id, current.id);
+            await auditAction(req, 'security.device.logout', '下线其他设备');
             return res.json({ message: '其他设备已下线' });
         }
     }
     await db.refreshTokens.revokeByUserId(req.user.id);
+    await auditAction(req, 'security.device.logout', '下线全部设备');
     res.json({ message: '所有设备已下线' });
 });
 
@@ -245,6 +249,14 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         const updatedUser = await db.users.getById(req.user.id);
         const safeUser = sanitizeUser(updatedUser);
         await profileCache.del(String(req.user.id));
+        // 操作审计：个人资料/简介编辑（含改密）
+        const changed = [];
+        if (username && username !== user.username) changed.push('用户名');
+        if (password) changed.push('登录密码');
+        if (bio !== undefined) changed.push('个人简介');
+        if (changed.length > 0) {
+            await auditAction(req, 'setting.profile', '编辑个人资料：' + changed.join('、'));
+        }
         res.json({ message: '资料更新成功', user: safeUser });
     } catch (error) {
         res.status(500).json({ error: '更新资料失败' });
@@ -270,6 +282,7 @@ router.post('/user/memos', authMiddleware, async (req, res) => {
             content: content || ''
         });
         
+        await auditAction(req, 'setting.memo.create', '编辑备忘录[' + String(title || '无标题').substring(0, 30) + ']');
         res.json(newMemo);
     } catch (error) {
         res.status(500).json({ error: '创建备忘录失败' });
@@ -291,6 +304,7 @@ router.put('/user/memos/:id', authMiddleware, async (req, res) => {
         if (content !== undefined) updates.content = content;
         
         const updatedMemo = await db.memos.update(memoId, updates);
+        await auditAction(req, 'setting.memo.update', '编辑备忘录[' + String(title !== undefined ? title : memo.title || '无标题').substring(0, 30) + ']');
         res.json({ message: '备忘录更新成功', memo: updatedMemo });
     } catch (error) {
         res.status(500).json({ error: '更新备忘录失败' });
@@ -307,6 +321,7 @@ router.delete('/user/memos/:id', authMiddleware, async (req, res) => {
         }
         
         await db.memos.delete(memoId);
+        await auditAction(req, 'setting.memo.delete', '删除备忘录[' + String(memo.title || '无标题').substring(0, 30) + ']');
         res.json({ message: '备忘录删除成功' });
     } catch (error) {
         res.status(500).json({ error: '删除备忘录失败' });

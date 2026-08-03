@@ -13,6 +13,9 @@ const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
 const { checkRateLimit } = require('../middleware/rate-limiter');
+// 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
+const { auditAction } = require('../utils/audit-log');
+
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
 router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -384,6 +387,11 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     }
  
     await db.lxcContainers.update(ctId, updates);
+
+    // 操作审计：LXC 名称编辑
+    if (name !== undefined && name !== ct.name) {
+        await auditAction(req, 'lxc.rename', '编辑 LXC ' + ct.ct_id + ' 名称: ' + (ct.name || '') + ' → ' + name, { resourceType: 'lxc', resourceId: ct.ct_id });
+    }
  
     // 换绑后尝试自动开机
     if (isAdmin && user_id !== undefined && user_id !== ct.user_id) {
@@ -530,6 +538,7 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
         await pveApi.startLxc(vmid);
         // 启动成功后清除关机原因标记
         try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: null }); } catch (_) {}
+        await auditAction(req, 'lxc.start', '开机 LXC ' + vmid);
         res.json({ message: 'LXC 容器启动成功' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -559,6 +568,7 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
         await pveApi.shutdownLxc(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: 'manual' }); } catch (_) {}
+        await auditAction(req, 'lxc.shutdown', '关机 LXC ' + vmid);
         res.json({ message: 'LXC 容器关机命令已发送' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -588,6 +598,7 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
         await pveApi.stopLxc(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: 'manual' }); } catch (_) {}
+        await auditAction(req, 'lxc.stop', '强制停止 LXC ' + vmid);
         res.json({ message: 'LXC 容器已强制停止' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -615,6 +626,7 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
         }
 
         await pveApi.rebootLxc(vmid);
+        await auditAction(req, 'lxc.reboot', '重启 LXC ' + vmid);
         res.json({ message: 'LXC 容器重启命令已发送' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -662,6 +674,7 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         });
 
         const proxyUrl = `/vnc?session=${sessionId}`;
+        await auditAction(req, 'lxc.vnc', '打开 VNC 控制台 LXC ' + vmid);
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC VNC 控制台失败:', error.message);
@@ -707,6 +720,7 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
         });
 
         const proxyUrl = `/terminal?session=${sessionId}`;
+        await auditAction(req, 'lxc.terminal', '打开终端 LXC ' + vmid);
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC 终端失败:', error.message);
@@ -870,6 +884,7 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
             console.error(`[lxc] 重置密码失败（vmid=${vmid}）:`, stderr || 'lxc-attach 命令执行出错');
             return res.status(500).json({ error: '密码重置失败，请稍后重试' });
         }
+        await auditAction(req, 'password.reset.lxc', '重置 LXC ' + vmid + ' 密码');
         res.json({ message: '密码重置成功' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -1102,6 +1117,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
             }
         }
 
+        await auditAction(req, 'lxc.reset-ip', '设置 LXC ' + vmid + ' IP: ' + (newIp || 'DHCP') + '（' + ip_mode + '）');
         res.json({ message: 'IP 重置成功', ip: newIp || 'DHCP', net0: newNet0 });
     } catch (error) {
         console.error('重置 LXC IP 失败:', error.message);
@@ -1156,6 +1172,7 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
  
         // 在 PVE 上销毁
         await pveApi.deleteLxc(vmid);
+        await auditAction(req, 'lxc.destroy', '销毁 LXC ' + vmid);
         res.json({ message: 'LXC 容器已销毁' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });

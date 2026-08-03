@@ -205,6 +205,21 @@ async function recoverOsSwitchTasks() {
     }
 }
 
+// 日志容量清理：每用户保留最新 log:keep_count 条（默认 5000），超限自动循环清理旧日志防写爆数据库
+async function trimLogsKeepLatest() {
+    try {
+        var db = require('../api/db');
+        var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
+        var auditDeleted = await db.auditLogs.trimOverflow(keepCount);
+        var loginDeleted = await db.loginLogs.trimOverflow(keepCount);
+        if (auditDeleted > 0 || loginDeleted > 0) {
+            console.log('[日志清理] 操作日志清理 ' + auditDeleted + ' 条，登录日志清理 ' + loginDeleted + ' 条（每用户保留最新 ' + keepCount + ' 条）');
+        }
+    } catch (e) {
+        console.error('[日志清理] 失败:', e.message);
+    }
+}
+
 function initScheduledTasks() {
     schedule.scheduleJob('*/5 * * * *', async () => {
         if (await tryAcquireLock('lock:expiry-check')) {
@@ -235,6 +250,17 @@ function initScheduledTasks() {
                 await checkStorageCapacityAlert();
             } finally {
                 await releaseLock('lock:disk-storage-alert');
+            }
+        }
+    });
+
+    // 日志容量清理（每小时：每用户保留最新 log:keep_count 条，防写爆数据库）
+    schedule.scheduleJob('0 * * * *', async () => {
+        if (await tryAcquireLock('lock:log-trim')) {
+            try {
+                await trimLogsKeepLatest();
+            } finally {
+                await releaseLock('lock:log-trim');
             }
         }
     });
@@ -274,6 +300,8 @@ function initScheduledTasks() {
     // 磁盘到期巡检 + 存储容量告警（启动时执行一次）
     checkExpiredDisks();
     checkStorageCapacityAlert();
+    // 日志容量清理（启动时执行一次，存量超限数据即刻清理）
+    trimLogsKeepLatest();
 }
 
 module.exports = { initScheduledTasks, recoverProvisioningTasks, recoverOsSwitchTasks };

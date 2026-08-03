@@ -33,4 +33,36 @@ async function auditLog(opts) {
     }
 }
 
-module.exports = { auditLog };
+/**
+ * 统一审计埋点封装（路由层专用，消除各路由文件重复包装函数）：
+ * - 自动从 req.user 取 userId/username
+ * - resourceType 默认取 action 首段（vm.start → 'vm'），可用 opts 覆盖
+ * - resourceId 默认从 req.params.vmid 提取（整数校验），可用 opts 覆盖
+ * - 内置 try/catch，审计失败绝不影响主业务
+ * @param {Object} req
+ * @param {string} action - 域.动作 点分命名，如 'vm.start' / 'network.port.add'
+ * @param {string} details - 中文可读展示文本（含套餐名/容量/金额/IP 归属地等明细）
+ * @param {Object} [opts] - { resourceType, resourceId } 覆盖默认提取
+ */
+async function auditAction(req, action, details, opts) {
+    try {
+        opts = opts || {};
+        var resourceType = opts.resourceType || String(action || '').split('.')[0] || '';
+        var resourceId = (opts.resourceId !== undefined) ? opts.resourceId : '';
+        if (!resourceId && req && req.params) {
+            var vmid = parseInt(req.params.vmid);
+            if (Number.isInteger(vmid)) resourceId = vmid;
+        }
+        await auditLog({
+            userId: (req && req.user) ? req.user.id : 0,
+            username: (req && req.user) ? req.user.username : '',
+            action: action,
+            resourceType: resourceType,
+            resourceId: resourceId,
+            details: details,
+            req: req
+        });
+    } catch (_) {}
+}
+
+module.exports = { auditLog, auditAction };
