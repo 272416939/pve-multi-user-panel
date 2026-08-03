@@ -15,6 +15,8 @@
     $.loginLogFilter = ref({ status: '' });
     $.logKeyword = ref('');
     $.logLoading = ref(false);
+    // 日志保留上限（后端返回，Tips 提示用）
+    $.logKeepCount = ref(0);
     // 分页：每页条数（20/50/100 可选）与跳页输入
     $.logPageSize = ref(parseInt(localStorage.getItem('dashboard_logPageSize')) || 20);
     $.logGoPage = ref('');
@@ -87,6 +89,7 @@
             $.opLogList.value = res.rows || [];
             $.opLogTotal.value = res.total || 0;
             $.opLogPage.value = res.page || 1;
+            if (res.keep_count) $.logKeepCount.value = res.keep_count;
         } catch (e) {
             console.error('加载操作日志失败', e);
         } finally {
@@ -103,6 +106,7 @@
             $.loginLogList.value = res.rows || [];
             $.loginLogTotal.value = res.total || 0;
             $.loginLogPage.value = res.page || 1;
+            if (res.keep_count) $.logKeepCount.value = res.keep_count;
         } catch (e) {
             console.error('加载登录日志失败', e);
         } finally {

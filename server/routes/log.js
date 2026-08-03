@@ -98,7 +98,9 @@ router.get('/logs/operation', authMiddleware, async (req, res) => {
             };
         });
 
-        res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit });
+        // 保留上限（前端 Tips 提示用）
+        var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
+        res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit, keep_count: keepCount });
     } catch (e) {
         console.error('[logs] 操作日志查询失败:', e.message);
         res.status(500).json({ error: safeError(e) });
@@ -138,7 +140,9 @@ router.get('/logs/login', authMiddleware, async (req, res) => {
             };
         });
 
-        res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit });
+        // 保留上限（前端 Tips 提示用）
+        var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
+        res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit, keep_count: keepCount });
     } catch (e) {
         console.error('[logs] 登录日志查询失败:', e.message);
         res.status(500).json({ error: safeError(e) });
