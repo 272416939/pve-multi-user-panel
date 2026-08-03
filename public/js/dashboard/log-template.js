@@ -58,7 +58,7 @@
                             <tr>
                                 <th style="width:120px">用户</th>
                                 <th style="width:130px">操作类型</th>
-                                <th>详情</th>
+                                <th class="text-start">详情</th>
                                 <th style="width:170px">操作时间</th>
                             </tr>
                         </thead>
@@ -66,7 +66,7 @@
                             <tr v-for="row in opLogList" :key="row.id">
                                 <td>{{ row.username || '-' }}</td>
                                 <td>{{ row.category_name }}</td>
-                                <td class="small">{{ row.detail_text }}</td>
+                                <td class="small text-start">{{ row.detail_text }}</td>
                                 <td class="small text-muted">{{ row.created_at }}</td>
                             </tr>
                             <tr v-if="!opLogList || opLogList.length === 0">
@@ -81,7 +81,7 @@
                         <thead>
                             <tr>
                                 <th style="width:230px">IP地址（归属地）</th>
-                                <th>用户代理</th>
+                                <th class="text-start">用户代理</th>
                                 <th style="width:100px">登陆状态</th>
                                 <th style="width:170px">时间</th>
                             </tr>
@@ -89,7 +89,7 @@
                         <tbody>
                             <tr v-for="row in loginLogList" :key="row.id">
                                 <td class="small">{{ row.ip }}<span v-if="row.ip_location">（{{ row.ip_location }}）</span></td>
-                                <td class="small text-muted">{{ row.user_agent }}</td>
+                                <td class="small text-muted text-start">{{ row.user_agent }}</td>
                                 <td><span :class="'badge ' + (row.status === 'success' ? 'bg-success' : 'bg-danger')">{{ row.status === 'success' ? '登录成功' : '登录失败' }}</span></td>
                                 <td class="small text-muted">{{ row.created_at }}</td>
                             </tr>
