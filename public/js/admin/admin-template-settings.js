@@ -478,6 +478,28 @@
                             </div>
                         </div>
 
+                        <!-- 用户日志上限配置 -->
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title mb-3">用户日志上限</h5>
+                                <p class="text-muted small mb-3">每个用户的操作日志与登录日志最多保留的条数，超出后自动清理最早的历史数据（每小时清理一次）。</p>
+                                <form @submit.prevent="saveLogConfig">
+                                    <div class="row mb-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label">保留条数</label>
+                                            <input type="number" class="form-control" v-model.number="logConfigForm.keep_count" min="100" max="100000" placeholder="5000">
+                                            <small class="text-muted">范围 100-100000，默认 5000</small>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-2">
+                                        <pv-button type="submit" variant="glass" :disabled="logConfigSaving">
+                                            {{ logConfigSaving ? '保存中...' : '保存配置' }}
+                                        </pv-button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
                         <!-- 危险操作：清除缓存 -->
                         <div class="card mt-3" style="border-color: rgba(239, 68, 68, 0.3);">
                             <div class="card-header" style="background: rgba(239, 68, 68, 0.05);">

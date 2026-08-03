@@ -281,6 +281,7 @@ watch($.user, function(u) {
             $.smtpConfig.value = smtpData;
             await $.loadPveConfig();
             await $.loadRedisConfig();
+            if ($.loadLogConfig) await $.loadLogConfig();
             await $.loadSnapshotConfig();
             await $.loadStorageList();
             await $.loadBackupConfig();
@@ -1079,6 +1080,7 @@ $.initDetailCharts = function() {
             if (newTab === 'site') {
                 $.loadSiteConfig();
                 $.loadRedisConfig();
+                if ($.loadLogConfig) $.loadLogConfig();
             }
             if (newTab === 'orders') {
                 $.loadOrders(1);

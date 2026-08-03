@@ -866,6 +866,33 @@ router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
     }
 });
 
+// ==================== 用户日志上限配置 ====================
+
+router.get('/admin/log/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
+        res.json({ keep_count: keepCount });
+    } catch (error) {
+        console.error('获取日志配置失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
+router.put('/admin/log/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var keepCount = parseInt(req.body.keep_count);
+        // 上限校验：100-100000，防止误填 0 或超大值导致日志被清空/爆库
+        if (!Number.isInteger(keepCount) || keepCount < 100 || keepCount > 100000) {
+            return res.status(400).json({ error: '用户日志上限须为 100-100000 的整数' });
+        }
+        await db.config.set('log:keep_count', String(keepCount));
+        res.json({ message: '日志配置保存成功' });
+    } catch (error) {
+        console.error('更新日志配置失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
 // ==================== Redis 测试连接 ====================
 
 router.post('/admin/redis/test', authMiddleware, adminMiddleware, async (req, res) => {
