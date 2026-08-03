@@ -15,7 +15,9 @@
     $.loginLogFilter = ref({ status: '' });
     $.logKeyword = ref('');
     $.logLoading = ref(false);
-    $.logPageSize = 20;
+    // 分页：每页条数（20/50/100 可选）与跳页输入
+    $.logPageSize = ref(parseInt(localStorage.getItem('dashboard_logPageSize')) || 20);
+    $.logGoPage = ref('');
 
     // 当前 tab 的分页/总数（模板共用）
     $.currentLogTotal = computed(function() {
@@ -24,13 +26,41 @@
     $.currentLogPage = computed(function() {
         return $.logTab.value === 'operation' ? $.opLogPage.value : $.loginLogPage.value;
     });
+    $.currentLogTotalPages = computed(function() {
+        return Math.ceil($.currentLogTotal.value / $.logPageSize.value) || 1;
+    });
+    // 页码数组（当前页前后 2 页窗口 + 省略号），如 [1, '...', 3, 4, 5, 6, 7, '...', 100]
+    $.logPageNumbers = computed(function() {
+        var totalPages = $.currentLogTotalPages.value;
+        var cur = $.currentLogPage.value;
+        if (totalPages <= 7) {
+            var all = [];
+            for (var i = 1; i <= totalPages; i++) all.push(i);
+            return all;
+        }
+        var pages = {};
+        pages[1] = true;
+        pages[totalPages] = true;
+        for (var p = cur - 2; p <= cur + 2; p++) {
+            if (p >= 1 && p <= totalPages) pages[p] = true;
+        }
+        var sorted = Object.keys(pages).map(Number).sort(function(a, b) { return a - b; });
+        var out = [];
+        var prev = 0;
+        for (var i = 0; i < sorted.length; i++) {
+            if (prev && sorted[i] - prev > 1) out.push('...');
+            out.push(sorted[i]);
+            prev = sorted[i];
+        }
+        return out;
+    });
 
     // 请求序号保护：防止旧响应覆盖新数据
     var opLogLoadSeq = 0;
     var loginLogLoadSeq = 0;
 
     function buildOpParams(page) {
-        var params = { page: page, limit: $.logPageSize };
+        var params = { page: page, limit: $.logPageSize.value };
         var f = $.opLogFilter.value;
         if (f.category) params.category = f.category;
         var kw = $.logKeyword.value.trim();
@@ -39,7 +69,7 @@
     }
 
     function buildLoginParams(page) {
-        var params = { page: page, limit: $.logPageSize };
+        var params = { page: page, limit: $.logPageSize.value };
         var f = $.loginLogFilter.value;
         if (f.status) params.status = f.status;
         var kw = $.logKeyword.value.trim();
@@ -87,6 +117,29 @@
         } else {
             $.loadLoginLogs(page);
         }
+    };
+
+    // 每页条数切换：记住选择并从第 1 页重新加载
+    $.changeLogPageSize = function() {
+        localStorage.setItem('dashboard_logPageSize', $.logPageSize.value);
+        if ($.logTab.value === 'operation') {
+            $.loadOperationLogs(1);
+        } else {
+            $.loadLoginLogs(1);
+        }
+    };
+
+    // 前往指定页（输入页码回车跳转，越界自动收敛）
+    $.goLogPage = function() {
+        var p = parseInt($.logGoPage.value);
+        if (!Number.isInteger(p) || p < 1) {
+            $.logGoPage.value = '';
+            return;
+        }
+        var max = $.currentLogTotalPages.value;
+        if (p > max) p = max;
+        $.logGoPage.value = '';
+        $.loadCurrentLogs(p);
     };
 
     // ===== tab 切换 =====

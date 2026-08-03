@@ -1317,24 +1317,6 @@
         var parent = el ? el.previousElementSibling : null;
         if (parent) parent.classList.add('expanded');
     };
-
-    // 日志子菜单切换（操作日志/登陆日志），点击与刷新路径复用同一加载函数
-    $.switchLogSub = function(tab) {
-        $.switchSection('logs');
-        $.logTab.value = tab;
-        document.querySelectorAll('#submenu-logs .nav-item').forEach(function(item) { item.classList.remove('active'); });
-        var target = document.querySelector('[data-subsection="logs-' + tab + '"]');
-        if (target) target.classList.add('active');
-        var el = document.getElementById('submenu-logs');
-        if (el) el.classList.add('open');
-        var parent = el ? el.previousElementSibling : null;
-        if (parent) parent.classList.add('expanded');
-        if (tab === 'operation') {
-            if ($.loadOperationLogs) $.loadOperationLogs(1);
-        } else {
-            if ($.loadLoginLogs) $.loadLoginLogs(1);
-        }
-    };
     
     $.toggleSubmenu = function(id) {
         var el = document.getElementById('submenu-' + id);
@@ -1362,16 +1344,7 @@
             $.loadDisks();
         }
         if (section === 'logs') {
-            // 进入日志页：展开子菜单并加载当前 tab 数据
-            var submenuEl = document.getElementById('submenu-logs');
-            if (submenuEl) {
-                submenuEl.classList.add('open');
-                var parentEl = submenuEl.previousElementSibling;
-                if (parentEl) parentEl.classList.add('expanded');
-                document.querySelectorAll('#submenu-logs .nav-item').forEach(function(item) { item.classList.remove('active'); });
-                var activeItem = document.querySelector('[data-subsection="logs-' + $.logTab.value + '"]');
-                if (activeItem) activeItem.classList.add('active');
-            }
+            // 日志页为单菜单，tab 状态由 localStorage 保持，加载当前 tab 数据
             if ($.logTab.value === 'operation') {
                 if ($.loadOperationLogs) $.loadOperationLogs(1);
             } else {
@@ -1400,15 +1373,7 @@
                     await $.loadPackages();
                 }
                 if ($.activeSection.value === 'logs') {
-                    // 刷新后恢复日志子菜单展开与高亮
-                    var logsSubmenu = document.getElementById('submenu-logs');
-                    if (logsSubmenu) {
-                        logsSubmenu.classList.add('open');
-                        var logsParent = logsSubmenu.previousElementSibling;
-                        if (logsParent) logsParent.classList.add('expanded');
-                        var logsActiveItem = document.querySelector('[data-subsection="logs-' + $.logTab.value + '"]');
-                        if (logsActiveItem) logsActiveItem.classList.add('active');
-                    }
+                    // 刷新后加载当前 tab 数据（tab 状态已由 localStorage 恢复）
                     if ($.logTab.value === 'operation') {
                         if ($.loadOperationLogs) await $.loadOperationLogs(1);
                     } else {

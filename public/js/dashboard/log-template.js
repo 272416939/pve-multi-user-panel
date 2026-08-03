@@ -99,13 +99,24 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- 分页 -->
-                <div class="d-flex justify-content-between align-items-center mt-3" v-if="currentLogTotal > 0">
+                <!-- 分页：页码按钮 + 省略号 + 每页条数 + 跳页 -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3" v-if="currentLogTotal > 0">
                     <small class="text-muted">共 {{ currentLogTotal }} 条</small>
-                    <div>
-                        <pv-button :disabled="currentLogPage <= 1" @click="loadCurrentLogs(currentLogPage - 1)" variant="outline" size="sm">上一页</pv-button>
-                        <span class="mx-2 text-muted small">{{ currentLogPage }} / {{ Math.ceil(currentLogTotal / logPageSize) || 1 }}</span>
-                        <pv-button :disabled="currentLogPage * logPageSize >= currentLogTotal" @click="loadCurrentLogs(currentLogPage + 1)" variant="outline" size="sm">下一页</pv-button>
+                    <div class="d-flex align-items-center gap-1">
+                        <pv-button variant="outline" size="sm" :disabled="currentLogPage <= 1" @click="loadCurrentLogs(currentLogPage - 1)">&lt;</pv-button>
+                        <template v-for="(p, idx) in logPageNumbers" :key="idx">
+                            <span v-if="p === '...'" class="text-muted small px-1">…</span>
+                            <pv-button v-else size="sm" :variant="p === currentLogPage ? 'primary' : 'outline'" @click="loadCurrentLogs(p)">{{ p }}</pv-button>
+                        </template>
+                        <pv-button variant="outline" size="sm" :disabled="currentLogPage >= currentLogTotalPages" @click="loadCurrentLogs(currentLogPage + 1)">&gt;</pv-button>
+                        <select class="form-select form-select-sm ms-2" style="width:auto" v-model="logPageSize" @change="changeLogPageSize">
+                            <option :value="20">20条/页</option>
+                            <option :value="50">50条/页</option>
+                            <option :value="100">100条/页</option>
+                        </select>
+                        <span class="text-muted small ms-2">前往</span>
+                        <input type="number" class="form-control form-control-sm" style="width:70px" v-model="logGoPage" min="1" :max="currentLogTotalPages" placeholder="页" autocomplete="off" @keyup.enter="goLogPage">
+                        <span class="text-muted small">页</span>
                     </div>
                 </div>
             </div>

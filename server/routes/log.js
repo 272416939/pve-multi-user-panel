@@ -40,6 +40,34 @@ function buildLoginDetailText(obj, location) {
     return parts.join(',');
 }
 
+// 组装操作日志详情展示文本：
+// - user.login 行按「登录成功,帐号:xxx,登录IP:ip>归属地:xxx」格式
+// - 其余行取文本（兼容旧 JSON 记录）
+// - 统一加操作者 IP 归属地前缀：IP(归属地) 详情（列表与导出共用）
+function buildRowDetail(r, locMap) {
+    var detailText = '';
+    if (r.action === 'user.login') {
+        try {
+            var obj = JSON.parse(r.details || '{}');
+            if (obj && typeof obj === 'object') {
+                var rawIp = String(obj.ip || '').replace(/:\d+$/, '');
+                detailText = buildLoginDetailText(obj, locMap[rawIp] || '');
+            } else {
+                detailText = buildDetailText(r.details);
+            }
+        } catch (_) {
+            detailText = buildDetailText(r.details);
+        }
+    } else {
+        detailText = buildDetailText(r.details);
+    }
+    var ipPrefix = '';
+    if (r.ip) {
+        ipPrefix = r.ip + (locMap[r.ip] ? '(' + locMap[r.ip] + ') ' : ' ');
+    }
+    return ipPrefix + detailText;
+}
+
 // ========== 操作日志列表 ==========
 router.get('/logs/operation', authMiddleware, async (req, res) => {
     try {
@@ -58,45 +86,16 @@ router.get('/logs/operation', authMiddleware, async (req, res) => {
             keyword: keyword
         });
 
-        // 归属地批量解析（仅 user.login 行需要）
-        var loginIps = [];
-        for (var i = 0; i < result.rows.length; i++) {
-            var r = result.rows[i];
-            if (r.action === 'user.login') {
-                try {
-                    var obj = JSON.parse(r.details || '{}');
-                    if (obj && typeof obj === 'object' && obj.ip) {
-                        loginIps.push(String(obj.ip).replace(/:\d+$/, ''));
-                    }
-                } catch (_) {}
-            }
-        }
-        var locMap = await getIpLocations(loginIps);
+        // 操作者 IP 归属地批量解析（全部行）
+        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }));
 
         result.rows = result.rows.map(function(r) {
-            var categoryName = AUDIT_CATEGORY_NAMES[actionToCategory(r.action)] || '其他';
-            var detailText = '';
-            if (r.action === 'user.login') {
-                try {
-                    var obj = JSON.parse(r.details || '{}');
-                    if (obj && typeof obj === 'object') {
-                        var rawIp = String(obj.ip || '').replace(/:\d+$/, '');
-                        detailText = buildLoginDetailText(obj, locMap[rawIp] || '');
-                    } else {
-                        detailText = buildDetailText(r.details);
-                    }
-                } catch (_) {
-                    detailText = buildDetailText(r.details);
-                }
-            } else {
-                detailText = buildDetailText(r.details);
-            }
             return {
                 id: r.id,
                 username: r.username,
                 action: r.action,
-                category_name: categoryName,
-                detail_text: detailText,
+                category_name: AUDIT_CATEGORY_NAMES[actionToCategory(r.action)] || '其他',
+                detail_text: buildRowDetail(r, locMap),
                 created_at: r.created_at
             };
         });
@@ -171,44 +170,16 @@ router.get('/logs/operation/export', authMiddleware, async (req, res) => {
         });
         var rows = result.rows;
 
-        // 归属地批量解析（user.login 行）
-        var loginIps = [];
-        for (var i = 0; i < rows.length; i++) {
-            var r = rows[i];
-            if (r.action === 'user.login') {
-                try {
-                    var obj = JSON.parse(r.details || '{}');
-                    if (obj && typeof obj === 'object' && obj.ip) {
-                        loginIps.push(String(obj.ip).replace(/:\d+$/, ''));
-                    }
-                } catch (_) {}
-            }
-        }
-        var locMap = await getIpLocations(loginIps);
+        // 操作者 IP 归属地批量解析（全部行，详情含 IP 归属地前缀）
+        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }));
 
         var csvRows = ['用户,操作类型,详情,操作时间'];
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
-            var detailText = '';
-            if (r.action === 'user.login') {
-                try {
-                    var obj = JSON.parse(r.details || '{}');
-                    if (obj && typeof obj === 'object') {
-                        var rawIp = String(obj.ip || '').replace(/:\d+$/, '');
-                        detailText = buildLoginDetailText(obj, locMap[rawIp] || '');
-                    } else {
-                        detailText = buildDetailText(r.details);
-                    }
-                } catch (_) {
-                    detailText = buildDetailText(r.details);
-                }
-            } else {
-                detailText = buildDetailText(r.details);
-            }
             csvRows.push([
                 csvEscape(r.username),
                 csvEscape(AUDIT_CATEGORY_NAMES[actionToCategory(r.action)] || '其他'),
-                csvEscape(detailText),
+                csvEscape(buildRowDetail(r, locMap)),
                 csvEscape(r.created_at)
             ].join(','));
         }
