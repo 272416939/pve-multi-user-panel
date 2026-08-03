@@ -152,6 +152,15 @@ function csvEscape(v) {
     return '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
 }
 
+// Excel/WPS 打开 CSV 时会把 yyyy-MM-dd HH:mm:ss 自动识别为日期并隐藏秒（默认格式 yyyy/m/d h:mm），
+// 时间字段追加零宽空格(U+200B)强制按文本原样显示，保证秒可见
+const CSV_TIME_SUFFIX = '\u200B';
+
+// 导出时间字段（含秒）+ 零宽空格防 Excel 吞秒
+function csvTime(v) {
+    return v ? String(v) + CSV_TIME_SUFFIX : '';
+}
+
 router.get('/logs/operation/export', authMiddleware, async (req, res) => {
     try {
         var category = (req.query.category || '').trim();
@@ -180,7 +189,7 @@ router.get('/logs/operation/export', authMiddleware, async (req, res) => {
                 csvEscape(r.username),
                 csvEscape(AUDIT_CATEGORY_NAMES[actionToCategory(r.action)] || '其他'),
                 csvEscape(buildRowDetail(r, locMap)),
-                csvEscape(r.created_at)
+                csvEscape(csvTime(r.created_at))
             ].join(','));
         }
         var csv = '\uFEFF' + csvRows.join('\n');
@@ -221,7 +230,7 @@ router.get('/logs/login/export', authMiddleware, async (req, res) => {
                 csvEscape(locMap[r.ip] || ''),
                 csvEscape(r.user_agent),
                 csvEscape(r.status === 'success' ? '登录成功' : '登录失败'),
-                csvEscape(r.created_at)
+                csvEscape(csvTime(r.created_at))
             ].join(','));
         }
         var csv = '\uFEFF' + csvRows.join('\n');
