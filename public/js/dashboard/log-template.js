@@ -66,8 +66,8 @@
                             <tr v-for="row in opLogList" :key="row.id">
                                 <td>{{ row.username || '-' }}</td>
                                 <td>{{ row.category_name }}</td>
-                                <td class="small text-start">{{ row.detail_text }}</td>
-                                <td class="small text-muted">{{ row.created_at }}</td>
+                                <td class="small text-start text-break">{{ row.detail_text }}</td>
+                                <td class="small text-nowrap">{{ row.created_at }}</td>
                             </tr>
                             <tr v-if="!opLogList || opLogList.length === 0">
                                 <td colspan="4" class="text-center text-muted py-3">暂无操作日志</td>
@@ -91,7 +91,7 @@
                                 <td class="small">{{ row.ip }}<span v-if="row.ip_location">（{{ row.ip_location }}）</span></td>
                                 <td class="small text-muted text-start ps-3">{{ row.user_agent }}</td>
                                 <td><span :class="'badge ' + (row.status === 'success' ? 'bg-success' : 'bg-danger')">{{ row.status === 'success' ? '登录成功' : '登录失败' }}</span></td>
-                                <td class="small text-muted">{{ row.created_at }}</td>
+                                <td class="small text-nowrap">{{ row.created_at }}</td>
                             </tr>
                             <tr v-if="!loginLogList || loginLogList.length === 0">
                                 <td colspan="4" class="text-center text-muted py-3">暂无登录日志</td>
