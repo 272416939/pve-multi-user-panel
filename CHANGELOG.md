@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.33.7] - 2026-08-03
+
+### Fixed
+- **fix(auth): 修复登录设备管理登录时间显示偏差（UTC 时区）**
+  - **问题**：「登录设备管理」页显示登录时间慢 8 小时，且 token 提前 8 小时过期、设备列表项提前消失
+  - **根因**：`server/routes/auth.js` 中 4 处写 `refresh_tokens` 表时用 `new Date().toISOString()`（UTC 墙钟时间）存入 MySQL DATETIME，前端 `formatDate` 按浏览器本地时间原样解析，不做时区偏移
+  - **修复**：4 个写入点共 8 处字段改用已有 `formatLocalDateTime()`（取本地墙钟，`YYYY-MM-DD HH:MM:SS`）：
+    - `POST /login`、`POST /login/2fa`、恢复码登录、`POST /auth/refresh`
+  - 新增 `scripts/fix-refresh-token-timezone.js` 旧数据修正脚本（支持 dry-run / `--apply`），历史记录 `created_at`/`expires_at` +8 小时修正
+
+### Notes
+- 已部署的历史错误数据需执行 `node scripts/fix-refresh-token-timezone.js --apply` 修正（新部署无需执行）
+- 端到端验证：真实登录写入时间与本地时间相差 1 秒以内
+
 ## [2.33.6] - 2026-08-02
 
 ### Added
