@@ -13,6 +13,8 @@
     $.activeTab = ref(localStorage.getItem('dashboard_activeTab') || 'vms');
     $.activeTabVm = ref('info');
     $.activeTabLxc = ref('info');
+    // 日志页 tab（操作日志/登陆日志），刷新后保持
+    $.logTab = ref(localStorage.getItem('dashboard_logTab') || 'operation');
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
     $.customConfirmResolve = ref(null);
@@ -1315,6 +1317,24 @@
         var parent = el ? el.previousElementSibling : null;
         if (parent) parent.classList.add('expanded');
     };
+
+    // 日志子菜单切换（操作日志/登陆日志），点击与刷新路径复用同一加载函数
+    $.switchLogSub = function(tab) {
+        $.switchSection('logs');
+        $.logTab.value = tab;
+        document.querySelectorAll('#submenu-logs .nav-item').forEach(function(item) { item.classList.remove('active'); });
+        var target = document.querySelector('[data-subsection="logs-' + tab + '"]');
+        if (target) target.classList.add('active');
+        var el = document.getElementById('submenu-logs');
+        if (el) el.classList.add('open');
+        var parent = el ? el.previousElementSibling : null;
+        if (parent) parent.classList.add('expanded');
+        if (tab === 'operation') {
+            if ($.loadOperationLogs) $.loadOperationLogs(1);
+        } else {
+            if ($.loadLoginLogs) $.loadLoginLogs(1);
+        }
+    };
     
     $.toggleSubmenu = function(id) {
         var el = document.getElementById('submenu-' + id);
@@ -1341,6 +1361,23 @@
         if (section === 'disk' && $.loadDisks) {
             $.loadDisks();
         }
+        if (section === 'logs') {
+            // 进入日志页：展开子菜单并加载当前 tab 数据
+            var submenuEl = document.getElementById('submenu-logs');
+            if (submenuEl) {
+                submenuEl.classList.add('open');
+                var parentEl = submenuEl.previousElementSibling;
+                if (parentEl) parentEl.classList.add('expanded');
+                document.querySelectorAll('#submenu-logs .nav-item').forEach(function(item) { item.classList.remove('active'); });
+                var activeItem = document.querySelector('[data-subsection="logs-' + $.logTab.value + '"]');
+                if (activeItem) activeItem.classList.add('active');
+            }
+            if ($.logTab.value === 'operation') {
+                if ($.loadOperationLogs) $.loadOperationLogs(1);
+            } else {
+                if ($.loadLoginLogs) $.loadLoginLogs(1);
+            }
+        }
     };
 
     // ===== 生命周期 =====
@@ -1361,6 +1398,22 @@
                 await $.loadCnameDomain();
                 if ($.activeSection.value === 'order') {
                     await $.loadPackages();
+                }
+                if ($.activeSection.value === 'logs') {
+                    // 刷新后恢复日志子菜单展开与高亮
+                    var logsSubmenu = document.getElementById('submenu-logs');
+                    if (logsSubmenu) {
+                        logsSubmenu.classList.add('open');
+                        var logsParent = logsSubmenu.previousElementSibling;
+                        if (logsParent) logsParent.classList.add('expanded');
+                        var logsActiveItem = document.querySelector('[data-subsection="logs-' + $.logTab.value + '"]');
+                        if (logsActiveItem) logsActiveItem.classList.add('active');
+                    }
+                    if ($.logTab.value === 'operation') {
+                        if ($.loadOperationLogs) await $.loadOperationLogs(1);
+                    } else {
+                        if ($.loadLoginLogs) await $.loadLoginLogs(1);
+                    }
                 }
                 $.loadUnreadCount();
                 $.loadWalletBalance();
@@ -1449,6 +1502,15 @@
             if (newTab === 'messages') {
                 $.loadMessages();
                 $.loadUnreadCount();
+            }
+        });
+
+        watch($.logTab, function(newTab) {
+            localStorage.setItem('dashboard_logTab', newTab);
+            if (newTab === 'operation') {
+                if ($.loadOperationLogs) $.loadOperationLogs(1);
+            } else {
+                if ($.loadLoginLogs) $.loadLoginLogs(1);
             }
         });
     };

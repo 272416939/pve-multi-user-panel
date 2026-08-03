@@ -370,6 +370,11 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             await pveApi.startVm(newVmid);
         } catch (startErr) { console.error('[package] VM 自动开机失败:', startErr.message); }
 
+        // 操作审计：服务开通（含套餐名称）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: userId, username: req.user.username, action: 'order.vm', resourceType: 'vm', resourceId: newVmid, details: '开通VM套餐[' + (pkg.name || ('套餐' + pkg.id)) + '] 名称' + randomName, req });
+        } catch (_) {}
         res.json({ message: 'VM 开通成功', id: newVm.id, _provisioning: !!(newVm.pve_upid && newVm.pve_upid !== ''), name: randomName, vmid: newVmid, order_no: orderNo });
 
         // 异步更新磁盘快照（不阻塞响应）
@@ -644,6 +649,11 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             } catch (e) { console.error('[package] LXC 密码邮件发送失败', e); }
         }
 
+        // 操作审计：服务开通（含套餐名称）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: userId, username: req.user.username, action: 'order.lxc', resourceType: 'lxc', resourceId: newVmid, details: '开通LXC套餐[' + (pkg.name || ('套餐' + pkg.id)) + '] 名称' + randomName, req });
+        } catch (_) {}
         res.json({ message: 'LXC 开通成功', id: newCt.id, _provisioning: !!(newCt.pve_upid && newCt.pve_upid !== ''), name: randomName, vmid: newVmid, order_no: orderNo });
     } catch (e) {
         console.error('[package] 用户订购 LXC 失败:', e.message);

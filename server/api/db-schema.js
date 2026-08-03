@@ -626,6 +626,23 @@ async function initDb() {
         ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // 登录日志表（登录成功/失败，供 dashboard 日志页展示）
+    await execute(`
+        CREATE TABLE IF NOT EXISTS login_logs (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL DEFAULT 0,
+            username VARCHAR(64) DEFAULT '',
+            ip VARCHAR(64) DEFAULT '',
+            user_agent VARCHAR(500) DEFAULT '',
+            status VARCHAR(16) NOT NULL DEFAULT 'success',
+            details TEXT,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_login_user (user_id),
+            INDEX idx_login_status (status),
+            INDEX idx_login_created (created_at)
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
     // 创建用户通知设置表
     await execute(`
         CREATE TABLE IF NOT EXISTS user_settings (

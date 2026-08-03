@@ -17,6 +17,19 @@ const osSwitchUtils = require('../utils/os-switch-utils');
 const { generateOrderNo } = require('../utils/order-utils');
 const { takeDiskSnapshot } = require('../services/disk-audit');
 const { importDisksForVm } = require('../services/disk-expiry-check');
+
+// 操作审计埋点（异步写入失败不阻断业务）
+async function auditVmAction(req, action, details, resourceId) {
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        var rid = resourceId;
+        if (rid === undefined) {
+            var vmid = parseInt(req.params.vmid);
+            rid = Number.isInteger(vmid) ? vmid : '';
+        }
+        await auditLog({ userId: req.user.id, username: req.user.username, action: action, resourceType: 'vm', resourceId: rid, details: details, req });
+    } catch (_) {}
+}
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -406,6 +419,14 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     }
 
     await db.vms.update(vmId, updates);
+
+    // 操作审计：VM 名称编辑
+    if (name !== undefined && name !== vm.name) {
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'vm.rename', resourceType: 'vm', resourceId: vm.vm_id, details: '编辑 VM ' + vm.vm_id + ' 名称: ' + (vm.name || '') + ' → ' + name, req });
+        } catch (_) {}
+    }
     
     // 管理员延长到期时间后，如果虚拟机之前因到期停机，尝试自动开机
     if (isAdmin && expiration_date !== undefined) {
@@ -569,6 +590,7 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
         await pveApi.startVm(vmid);
         // 启动成功后清除关机原因标记
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: null }); } catch (_) {}
+        await auditVmAction(req, 'vm.start', '开机 VM ' + vmid);
         res.json({ message: '虚拟机启动成功' });
     } catch (error) {
         res.status(500).json({ error: '启动虚拟机失败' });
@@ -598,6 +620,7 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
         await pveApi.shutdownVm(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: 'manual' }); } catch (_) {}
+        await auditVmAction(req, 'vm.shutdown', '关机 VM ' + vmid);
         res.json({ message: '虚拟机关机成功' });
     } catch (error) {
         res.status(500).json({ error: '关闭虚拟机失败' });
@@ -627,6 +650,7 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
         await pveApi.stopVm(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: 'manual' }); } catch (_) {}
+        await auditVmAction(req, 'vm.stop', '强制停止 VM ' + vmid);
         res.json({ message: '虚拟机已强制停止' });
     } catch (error) {
         res.status(500).json({ error: '停止虚拟机失败' });
@@ -654,6 +678,7 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
         }
 
         await pveApi.rebootVm(vmid);
+        await auditVmAction(req, 'vm.reboot', '重启 VM ' + vmid);
         res.json({ message: '虚拟机重启成功' });
     } catch (error) {
         res.status(500).json({ error: '重启虚拟机失败' });
@@ -705,6 +730,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
 
         // 返回代理页面 URL（只暴露 session ID，不含敏感参数）
         const proxyUrl = `/vnc?session=${sessionId}`;
+        await auditVmAction(req, 'vm.vnc', '打开 VNC 控制台 VM ' + vmid);
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 VNC 控制台失败:', error.message);
@@ -777,6 +803,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
             // DHCP模式：删除爱快静态绑定（如果有），VM将自动从爱快获取动态IP
             await removeDhcpStaticBinding('vm', vmid);
             if (vmRecord) await db.vms.update(vmRecord.id, { dhcp_static_ip: '' });
+            await auditVmAction(req, 'vm.reset-ip', 'VM ' + vmid + ' 切换为 DHCP 模式');
             return res.json({ success: true, ip: null, message: '已切换为DHCP模式' });
         }
 
@@ -849,6 +876,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
             }
         }
 
+        await auditVmAction(req, 'vm.reset-ip', '设置 VM ' + vmid + ' 静态IP ' + finalIp);
         res.json({ success: true, ip: finalIp, message: `已设置静态IP ${finalIp}（通过爱快DHCP绑定）` });
     } catch (error) {
         dbg('[vm/reset-ip]', error.message);
@@ -898,6 +926,7 @@ router.post('/vm/:vmid/reset-password', authMiddleware, async (req, res) => {
 
         await pveApi.updateVmConfig(vmid, { cipassword: password });
 
+        await auditVmAction(req, 'password.reset.vm', '重置 VM ' + vmid + ' 密码');
         res.json({ message: '密码重置成功' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -909,17 +938,17 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
         const vmid = parseInt(req.params.vmid);
         const force = req.query.force === '1';
 
+        // V3-14 修复：销毁前记录审计（含 vmid 与 force）
+        try {
+            await auditVmAction(req, 'vm.destroy', '销毁 VM ' + vmid + (force ? '（强制）' : ''));
+        } catch (_) {}
+
         if (!force) {
             try {
                 const status = await pveApi.getVmStatus(vmid);
                 if (status && status.status === 'running') {
                     return res.status(400).json({ error: '虚拟机正在运行，请先关机后再销毁' });
                 }
-                // V3-14 修复：销毁前记录审计（含 vmid 与 force）
-                try {
-                    const { auditLog } = require('../utils/audit-log');
-                    await auditLog({ userId: req.user.id, username: req.user.username, action: 'vm.destroy', resourceType: 'vm', resourceId: vmid, details: { force }, req });
-                } catch (_) {}
             } catch (e) {
                 console.warn(`[vm] 查询 ${vmid} 状态失败（继续执行销毁）:`, e.message);
             }
@@ -1104,6 +1133,7 @@ try {
             }
         })();
 
+        await auditVmAction(req, 'vm.switch-os', 'VM ' + vmid + ' 切换系统为 ' + osTemplate.name);
         res.json({
             success: true,
             message: '系统切换已开始，请稍候',

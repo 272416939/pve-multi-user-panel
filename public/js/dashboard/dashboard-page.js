@@ -64,6 +64,7 @@ var App = {
             $.initForward();
             $.initMessage();
             $.initDisk && $.initDisk();
+            $.initLogs && $.initLogs();
             return $;
         }
     };
@@ -108,8 +109,13 @@ document.querySelectorAll('[data-submenu]').forEach(function(el) {
 document.querySelectorAll('[data-suborder]').forEach(function(el) {
     el.addEventListener('click', function(e) {
         e.preventDefault();
-        if (window.__dashboard && window.__dashboard.switchSubOrder) {
-            window.__dashboard.switchSubOrder(el.getAttribute('data-suborder'));
+        var $d = window.__dashboard;
+        if (!$d) return;
+        // 日志子菜单（#submenu-logs）走 switchLogSub，其余（套餐开通）走 switchSubOrder
+        if (el.closest('#submenu-logs') && $d.switchLogSub) {
+            $d.switchLogSub(el.getAttribute('data-suborder'));
+        } else if ($d.switchSubOrder) {
+            $d.switchSubOrder(el.getAttribute('data-suborder'));
         }
     });
 });

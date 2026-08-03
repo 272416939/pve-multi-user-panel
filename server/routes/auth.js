@@ -29,6 +29,34 @@ async function checkLoginRateLimit(ip, username) {
     return checkRateLimit(key, 5, 60000);
 }
 
+// 登录日志埋点（成功/失败），写入失败不阻断登录流程
+async function writeLoginLog(entry) {
+    try {
+        await db.loginLogs.create({
+            user_id: entry.userId || 0,
+            username: entry.username || '',
+            ip: entry.ip || '',
+            user_agent: entry.ua || '',
+            status: entry.status || 'success',
+            details: entry.details || null
+        });
+    } catch (e) {
+        console.warn('[auth] 登录日志写入失败:', e.message);
+    }
+}
+
+// 登录成功埋点：写登录日志 + 操作审计（details 结构化，展示时拼接归属地）
+async function logLoginSuccess(user, req, deviceName) {
+    const ua = req.headers['user-agent'] || '';
+    const ip = req.ip;
+    const ipWithPort = (req.socket && req.socket.remotePort) ? ip + ':' + req.socket.remotePort : ip;
+    await writeLoginLog({ userId: user.id, username: user.username, ip, ua, status: 'success' });
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: user.id, username: user.username, action: 'user.login', details: { status: 'success', account: user.username, ip: ipWithPort, device: deviceName || ua.substring(0, 100) }, req });
+    } catch (_) {}
+}
+
 router.post('/login', async (req, res) => {
     const { username, password, device_name } = req.body;
     // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
@@ -55,6 +83,7 @@ router.post('/login', async (req, res) => {
     }
 
     if (!user) {
+        await writeLoginLog({ username: username, ip, ua: req.headers['user-agent'] || '', status: 'failed', details: '用户名不存在' });
         return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
     }
 
@@ -70,10 +99,12 @@ if (passwordMatch && needsUpgrade(user.password)) {
 }
 
     if (!passwordMatch) {
+        await writeLoginLog({ userId: user.id, username: user.username, ip, ua: req.headers['user-agent'] || '', status: 'failed', details: '密码错误' });
         return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
     }
 
     if (!user.is_active) {
+        await writeLoginLog({ userId: user.id, username: user.username, ip, ua: req.headers['user-agent'] || '', status: 'failed', details: '账号已被禁用' });
         return res.status(403).json({ error: '账号已被禁用' });
     }
 
@@ -106,11 +137,8 @@ if (passwordMatch && needsUpgrade(user.password)) {
     const token = generateAccessToken(user, record.id);
 
     const safeUser = sanitizeUser(user);
-    // V3-14 修复：登录成功审计
-    try {
-        const { auditLog } = require('../utils/audit-log');
-        await auditLog({ userId: user.id, username: user.username, action: 'user.login', details: { device: deviceName }, req });
-    } catch (_) {}
+    // V3-14 修复：登录成功审计 + 登录日志
+    await logLoginSuccess(user, req, deviceName);
     // P1-C2 修复：如果用户需要强制改密，在响应中标记
     if (user.must_change_password) {
         return res.json({ token, refreshToken, user: safeUser, must_change_password: true });
@@ -187,6 +215,9 @@ router.post('/login/2fa', async (req, res) => {
             });
         }
 
+        // 2FA 验证通过：登录成功埋点
+        await logLoginSuccess(user, req, (req.headers['user-agent'] || '').substring(0, 100));
+
         const token = generateAccessToken(user, record.id);
         const safeUser = sanitizeUser(user);
         if (user.must_change_password) {
@@ -220,6 +251,9 @@ router.post('/login/2fa', async (req, res) => {
                     expires_at: formatLocalDateTime(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
                 });
             }
+            // 恢复码验证通过：登录成功埋点
+            await logLoginSuccess(user, req, (req.headers['user-agent'] || '').substring(0, 100));
+
             const token = generateAccessToken(user, record.id);
             const safeUser = sanitizeUser(user);
             if (user.must_change_password) {
@@ -229,6 +263,7 @@ router.post('/login/2fa', async (req, res) => {
         }
     }
 
+    await writeLoginLog({ userId: user.id, username: user.username, ip: req.ip, ua: req.headers['user-agent'] || '', status: 'failed', details: '2FA验证码错误' });
     return res.status(401).json({ error: '验证码错误' });
 });
 
