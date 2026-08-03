@@ -22,8 +22,8 @@
                         <a class="nav-link" :class="{ active: logTab === 'login' }" href="#" @click.prevent="switchLogTab('login')">登陆日志</a>
                     </li>
                 </ul>
-                <!-- Tips：日志保留上限提示 -->
-                <div class="alert alert-info py-1 px-2 mb-2 small" v-if="logKeepCount > 0">
+                <!-- Tips：日志保留上限提示（红字，深色模式自动加深） -->
+                <div class="py-1 px-2 mb-2 small" style="color: var(--color-danger);" v-if="logKeepCount > 0">
                     <i class="bi bi-info-circle me-1"></i>Tips：日志上限 {{ logKeepCount }} 条，超出自动清理最早的历史数据
                 </div>
                 <!-- 筛选栏 -->
