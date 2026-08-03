@@ -28,6 +28,9 @@
     $.redisConfigSaving = ref(false);
     $.redisTesting = ref(false);
     $.cacheClearing = ref(false);
+    // 用户日志上限配置
+    $.logConfigForm = ref({ keep_count: 5000 });
+    $.logConfigSaving = ref(false);
     $.cdkList = ref([]);
     $.cdkForm = ref({ duration_days: 30, count: 1, expires_at: '' });
     $.cdkResult = ref([]);
@@ -368,6 +371,28 @@
             alert('保存失败: ' + (e.message || '未知错误'));
         }
         $.redisConfigSaving.value = false;
+    };
+
+    // 用户日志上限配置
+    $.loadLogConfig = async function() {
+        try {
+            var config = await api('/admin/log/config');
+            $.logConfigForm.value = { keep_count: config.keep_count || 5000 };
+        } catch (e) {
+            console.warn('日志配置加载失败:', e.message || e);
+        }
+    };
+
+    $.saveLogConfig = async function() {
+        $.logConfigSaving.value = true;
+        try {
+            await api('/admin/log/config', { method: 'PUT', body: $.logConfigForm.value });
+            alert('日志配置保存成功');
+            await $.loadLogConfig();
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        }
+        $.logConfigSaving.value = false;
     };
 
     // Redis 测试连接
