@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.33.6] - 2026-08-02
+
+### Added
+- **feat(uapipro): 集成 UApiPro IP 归属地查询**
+  - 登录设备列表（用户中心）IP 单元格显示归属地：`111.29.236.38（中国移动 中国 海南 五指山）`
+  - 新增 `server/services/ip-location.js`：`normalizeIp`（剥 `::ffff:` 前缀，拒绝内网/回环/CGNAT/域名防 SSRF）、`formatLocation`（region 去连续重复段）、`getIpLocation`（7 天缓存，Redis 优先内存回退，axios 5s 超时，任何异常静默降级）
+  - Admin 系统设置新增「UApiPro」配置页：启用开关 + API Key 输入（AES-256-GCM 加密存储，返回打码）+ 连通性测试（独立限速 10 次/分钟）
+  - `GET /user/devices` 用 `Promise.allSettled` 批量去重查询，失败返回空串不影响主流程
+  - **功能默认关闭**（防误耗第三方额度），需在「系统设置 -> UApiPro」手动开启
+  - 缓存版本 v12 -> v13
+
+### Fixed
+- **fix(uapipro): IP 归属地示例改用虚构数据**，避免真实地址泄露
+
+### Notes
+- UApiPro 接口：`GET https://uapis.cn/api/v1/network/ipinfo`，认证用 `X-API-Key` 请求头（勿放 URL query）
+- 无 Key 可调用（游客免费额度约 1500 积分/月），Key 在 uapis.cn/console 签发
+- 生产环境首次使用需手动开启 UApiPro 开关并验证连通性
+
 ## [2.33.5] - 2026-08-02
 
 ### Changed
