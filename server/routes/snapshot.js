@@ -5,15 +5,9 @@ const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { safeError } = require('../utils/safe-error');
+// 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
+const { auditAction } = require('../utils/audit-log');
 
-// 操作审计埋点（异步写入失败不阻断业务）
-async function auditSnapshotAction(req, action, details) {
-    try {
-        const { auditLog } = require('../utils/audit-log');
-        const vmid = parseInt(req.params.vmid);
-        await auditLog({ userId: req.user.id, username: req.user.username, action: action, resourceType: 'snapshot', resourceId: Number.isInteger(vmid) ? vmid : '', details: details, req });
-    } catch (_) {}
-}
 
 // 快照名称格式：kz- 固定前缀 + 17 位随机 base62，总长 20 字符（符合 C-4 {2,20} 规则）
 // 服务端生成，避免用户自定义名称重复导致 PVE 创建快照失败
@@ -81,7 +75,7 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
         const name = generateSnapshotName();
         await pveApi.createLxcSnapshot(vmid, name, description || '');
         db.snapshotLogs.add(req.user.id, vmid, 'create');
-        await auditSnapshotAction(req, 'lxc.snapshot.create', '创建 LXC ' + vmid + ' 快照');
+        await auditAction(req, 'lxc.snapshot.create', '创建 LXC ' + vmid + ' 快照');
         res.json({ message: '快照创建成功' });
     } catch (error) {
         if (error.response?.status === 500 && error.response?.data?.errors?.snapname) {
@@ -125,7 +119,7 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
 
         await pveApi.rollbackLxcSnapshot(vmid, req.params.snapname);
         db.snapshotLogs.add(req.user.id, vmid, 'restore');
-        await auditSnapshotAction(req, 'lxc.snapshot.rollback', '恢复 LXC ' + vmid + ' 快照');
+        await auditAction(req, 'lxc.snapshot.rollback', '恢复 LXC ' + vmid + ' 快照');
         res.json({ message: '快照恢复成功，请稍后启动容器' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -154,7 +148,7 @@ router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res)
         }
 
         await pveApi.deleteLxcSnapshot(vmid, req.params.snapname);
-        await auditSnapshotAction(req, 'lxc.snapshot.delete', '删除 LXC ' + vmid + ' 快照');
+        await auditAction(req, 'lxc.snapshot.delete', '删除 LXC ' + vmid + ' 快照');
         res.json({ message: '快照已删除' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -225,7 +219,7 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
         const name = generateSnapshotName();
         await pveApi.createSnapshot(vmid, name, description || '');
         db.snapshotLogs.add(req.user.id, vmid, 'create');
-        await auditSnapshotAction(req, 'vm.snapshot.create', '创建 VM ' + vmid + ' 快照');
+        await auditAction(req, 'vm.snapshot.create', '创建 VM ' + vmid + ' 快照');
         res.json({ message: '快照创建成功' });
     } catch (error) {
         if (error.response?.status === 500 && error.response?.data?.errors?.snapname) {
@@ -274,7 +268,7 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
 
         await pveApi.rollbackSnapshot(vmid, req.params.snapname);
         db.snapshotLogs.add(req.user.id, vmid, 'restore');
-        await auditSnapshotAction(req, 'vm.snapshot.rollback', '恢复 VM ' + vmid + ' 快照');
+        await auditAction(req, 'vm.snapshot.rollback', '恢复 VM ' + vmid + ' 快照');
         res.json({ message: '快照恢复成功，请稍后启动虚拟机' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
@@ -304,7 +298,7 @@ router.delete('/vm/:vmid/snapshots/:snapname', authMiddleware, async (req, res) 
         }
 
         await pveApi.deleteSnapshot(vmid, req.params.snapname);
-        await auditSnapshotAction(req, 'vm.snapshot.delete', '删除 VM ' + vmid + ' 快照');
+        await auditAction(req, 'vm.snapshot.delete', '删除 VM ' + vmid + ' 快照');
         res.json({ message: '快照已删除' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });

@@ -16,14 +16,9 @@ var diskUtils = require('../utils/disk-utils');
 var { takeDiskSnapshot } = require('../services/disk-audit');
 
 var VALID_PERIODS = ['month', 'quarter', 'year'];
+// 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
+var { auditAction } = require('../utils/audit-log');
 
-// 操作审计埋点（异步写入失败不阻断业务）
-async function auditDiskAction(req, action, details, resourceId) {
-  try {
-    var { auditLog } = require('../utils/audit-log');
-    await auditLog({ userId: req.user.id, username: req.user.username, action: action, resourceType: 'disk', resourceId: resourceId !== undefined ? resourceId : '', details: details, req });
-  } catch (_) {}
-}
 
 // ==================== 中间件：权限校验 ====================
 
@@ -276,7 +271,7 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
 	        }
 	      }
     } catch (emailErr) { console.error('[disk purchase] 邮件发送失败:', emailErr.message); }
-    await auditDiskAction(req, 'disk.purchase', '购买硬盘[' + diskNames.join('、') + '] ' + capacityGb + 'GiB×' + quantity + ' 金额' + totalAmount + '元');
+    await auditAction(req, 'disk.purchase', '购买硬盘[' + diskNames.join('、') + '] ' + capacityGb + 'GiB×' + quantity + ' 金额' + totalAmount + '元');
     res.json({ success: true, order_no: firstOrderNo, orders: createdOrderNos.length, amount: singleAmount, total_amount: totalAmount, disks: quantity });
 	  } else {
 	    // 失败 => 退款 + 清理台账 + 订单标记 refunded
@@ -398,7 +393,7 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
       console.error('[快照] bind 后快照更新失败:', err.message);
     });
 
-    await auditDiskAction(req, 'disk.bind', '挂载硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + ']到VMID ' + vm.vm_id, disk.id);
+    await auditAction(req, 'disk.bind', '挂载硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + ']到VMID ' + vm.vm_id, { resourceType: 'disk', resourceId: disk.id });
     res.json({ success: true, bus: bindResult.bus, dev: bindResult.dev });
 	  } catch (e) {
 	    console.error('[disk bind] 挂载失败:', e.stack || e.message);
@@ -461,7 +456,7 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
       });
     });
 
-    await auditDiskAction(req, 'disk.unbind', '卸载硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + ']从VMID ' + (disk.bind_vmid || '') + '卸载', disk.id);
+    await auditAction(req, 'disk.unbind', '卸载硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + ']从VMID ' + (disk.bind_vmid || '') + '卸载', { resourceType: 'disk', resourceId: disk.id });
     res.json({ success: true });
   } catch (e) {
     console.error('[disk unbind] 卸载失败:', e.stack || e.message);
@@ -636,7 +631,7 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
       }
     } catch (emailErr) { console.error('[disk resize] 邮件发送失败:', emailErr.message); }
 
-    await auditDiskAction(req, 'disk.resize', '扩容硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + '] ' + disk.capacity_gb + 'GiB→' + newSize + 'GiB', disk.id);
+    await auditAction(req, 'disk.resize', '扩容硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + '] ' + disk.capacity_gb + 'GiB→' + newSize + 'GiB', { resourceType: 'disk', resourceId: disk.id });
     res.json({ success: true, new_capacity: newSize, amount: resizeAmount });
   } catch (e) {
     console.error('[disk resize] 失败:', e);
@@ -743,11 +738,7 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       if (lockedDisk.status === 'destroyed') throw new Error('磁盘已销毁');
 
       // V3-14 修复：销毁前审计（含退款金额，无退款显示"无退款"）
-      try {
-        var { auditLog } = require('../utils/audit-log');
-        var diskDisplayName = disk.disk_name || '数据盘-' + disk.id;
-        await auditLog({ userId: req.user.id, username: req.user.username, action: 'disk.destroy', resourceType: 'disk', resourceId: disk.id, details: '销毁硬盘[' + diskDisplayName + ']' + (refundAmount > 0 ? '退款' + refundAmount + '元' : '无退款'), req });
-      } catch (_) {}
+      await auditAction(req, 'disk.destroy', '销毁硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + ']' + (refundAmount > 0 ? '退款' + refundAmount + '元' : '无退款'), { resourceType: 'disk', resourceId: disk.id });
 
       // 执行 PVE 销毁
       await diskUtils.destroyDisk(lockedDisk.volume_id);
@@ -926,7 +917,7 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
       }
     } catch (emailErr) { console.error('[disk renew] 邮件发送失败:', emailErr.message); }
 
-    await auditDiskAction(req, 'disk.renew', '续费硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + '] ' + periodCount + '个' + period + ' 金额' + amount + '元', disk.id);
+    await auditAction(req, 'disk.renew', '续费硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + '] ' + periodCount + '个' + period + ' 金额' + amount + '元', { resourceType: 'disk', resourceId: disk.id });
     res.json({ success: true, amount: amount, new_expire: newExpire });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -945,7 +936,7 @@ router.post('/disks/:id/auto-renew', authMiddleware, checkDiskOwnership, async (
 
     var enabled = req.body.enabled ? 1 : 0;
     await db.disks.updateAutoRenew(disk.id, enabled);
-    await auditDiskAction(req, 'disk.auto-renew', (enabled ? '打开' : '关闭') + '硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + ']自动续费', disk.id);
+    await auditAction(req, 'disk.auto-renew', (enabled ? '打开' : '关闭') + '硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + ']自动续费', { resourceType: 'disk', resourceId: disk.id });
     res.json({ success: true, auto_renew: enabled });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });

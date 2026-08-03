@@ -150,4 +150,22 @@ async function queryIpLocation(ip) {
     return { ip: normalized, location: location || '' };
 }
 
-module.exports = { getIpLocation, queryIpLocation, normalizeIp };
+/**
+ * 批量获取 IP 归属地（去重 + 并发 + 容错，失败返回空串）
+ * 供列表类接口（日志页/设备列表）使用，避免 N 次串行外呼
+ * @param {string[]} ipList
+ * @returns {Promise<Object>} { ip: location } 映射
+ */
+async function getIpLocations(ipList) {
+    var locMap = {};
+    var unique = Array.from(new Set((ipList || []).filter(Boolean)));
+    if (unique.length > 0) {
+        var results = await Promise.allSettled(unique.map(function(ip) { return getIpLocation(ip); }));
+        unique.forEach(function(ip, i) {
+            if (results[i].status === 'fulfilled') locMap[ip] = results[i].value || '';
+        });
+    }
+    return locMap;
+}
+
+module.exports = { getIpLocation, queryIpLocation, getIpLocations, normalizeIp };

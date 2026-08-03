@@ -2,13 +2,37 @@ const { execute, queryOne, queryAll, mysqlNow } = require('./db-core');
 
 // V3-14 修复：敏感操作审计日志
 // 操作类型分类（dashboard 操作日志筛选，action 前缀约定见下方映射）
+// 单一来源：白名单/中文名/action→分类/分类→SQL 条件全部收敛于此，路由层 require 复用，禁止拷贝
 const AUDIT_CATEGORIES = ['user_login', 'vm_lxc', 'password', 'order', 'disk', 'setting', 'security'];
+
+const AUDIT_CATEGORY_NAMES = {
+    user_login: '用户登陆',
+    vm_lxc: '操作VM/LXC',
+    password: '重置密码',
+    order: '服务开通',
+    disk: '硬盘管理',
+    setting: '功能设置',
+    security: '安全设置'
+};
+
+// action 前缀 → 分类（与 category → SQL 条件映射一一对应）
+function actionToCategory(action) {
+    action = String(action || '');
+    if (action === 'user.login') return 'user_login';
+    if (/^(vm|lxc|backup|snapshot|network)\./.test(action)) return 'vm_lxc';
+    if (/^password\./.test(action)) return 'password';
+    if (/^order\./.test(action)) return 'order';
+    if (/^disk\./.test(action)) return 'disk';
+    if (/^setting\./.test(action)) return 'setting';
+    if (/^security\./.test(action)) return 'security';
+    return '';
+}
 
 // category -> SQL 条件（参数化），返回 [whereSql, args]
 function buildAuditCategoryWhere(category) {
     switch (category) {
         case 'user_login': return ['action = ?', ['user.login']];
-        case 'vm_lxc': return ['(action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ?)', ['vm.%', 'lxc.%', 'backup.%', 'snapshot.%']];
+        case 'vm_lxc': return ['(action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ?)', ['vm.%', 'lxc.%', 'backup.%', 'snapshot.%', 'network.%']];
         case 'password': return ['action LIKE ?', ['password.%']];
         case 'order': return ['action LIKE ?', ['order.%']];
         case 'disk': return ['action LIKE ?', ['disk.%']];
@@ -221,4 +245,4 @@ const messages = {
     }
 };
 
-module.exports = { auditLogs, loginLogs, memos, messages, AUDIT_CATEGORIES };
+module.exports = { auditLogs, loginLogs, memos, messages, AUDIT_CATEGORIES, AUDIT_CATEGORY_NAMES, actionToCategory };

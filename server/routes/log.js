@@ -6,32 +6,9 @@ const db = require('../api/db');
 const { authMiddleware } = require('../middleware/auth');
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
-const { getIpLocation } = require('../services/ip-location');
-
-// 操作类型分类白名单（与 db-messaging.js auditLogs 的筛选映射保持一致）
-const AUDIT_CATEGORIES = ['user_login', 'vm_lxc', 'password', 'order', 'disk', 'setting', 'security'];
-const CATEGORY_NAMES = {
-    user_login: '用户登陆',
-    vm_lxc: '操作VM/LXC',
-    password: '重置密码',
-    order: '服务开通',
-    disk: '硬盘管理',
-    setting: '功能设置',
-    security: '安全设置'
-};
-
-// action 前缀 → 分类（与 db 筛选映射对应）
-function actionToCategory(action) {
-    action = String(action || '');
-    if (action === 'user.login') return 'user_login';
-    if (/^(vm|lxc|backup|snapshot)\./.test(action)) return 'vm_lxc';
-    if (/^password\./.test(action)) return 'password';
-    if (/^order\./.test(action)) return 'order';
-    if (/^disk\./.test(action)) return 'disk';
-    if (/^setting\./.test(action)) return 'setting';
-    if (/^security\./.test(action)) return 'security';
-    return '';
-}
+// 审计分类单一来源：白名单/中文名/action→分类映射均来自 db-messaging.js，禁止本地拷贝
+const { AUDIT_CATEGORIES, AUDIT_CATEGORY_NAMES, actionToCategory } = require('../api/db-messaging');
+const { getIpLocations } = require('../services/ip-location');
 
 // details 兼容三种形态：展示文本 / JSON 对象（旧记录）/ JSON 字符串
 function buildDetailText(details) {
@@ -47,19 +24,6 @@ function buildDetailText(details) {
         } catch (_) { /* 非 JSON，按原文展示 */ }
     }
     return trimmed;
-}
-
-// 批量解析 IP 归属地（去重 + 容错，失败返回空串）
-async function enrichLocations(ipList) {
-    var unique = Array.from(new Set(ipList.filter(Boolean)));
-    var locMap = {};
-    if (unique.length > 0) {
-        var results = await Promise.allSettled(unique.map(function(ip) { return getIpLocation(ip); }));
-        unique.forEach(function(ip, i) {
-            if (results[i].status === 'fulfilled') locMap[ip] = results[i].value || '';
-        });
-    }
-    return locMap;
 }
 
 // 组装 user.login 行详情：登录成功,帐号:xxx,登录IP:ip:port>归属地:xxx
@@ -107,10 +71,10 @@ router.get('/logs/operation', authMiddleware, async (req, res) => {
                 } catch (_) {}
             }
         }
-        var locMap = await enrichLocations(loginIps);
+        var locMap = await getIpLocations(loginIps);
 
         result.rows = result.rows.map(function(r) {
-            var categoryName = CATEGORY_NAMES[actionToCategory(r.action)] || '其他';
+            var categoryName = AUDIT_CATEGORY_NAMES[actionToCategory(r.action)] || '其他';
             var detailText = '';
             if (r.action === 'user.login') {
                 try {
@@ -162,7 +126,7 @@ router.get('/logs/login', authMiddleware, async (req, res) => {
             keyword: keyword
         });
 
-        var locMap = await enrichLocations(result.rows.map(function(r) { return r.ip; }));
+        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }));
 
         result.rows = result.rows.map(function(r) {
             return {
@@ -220,7 +184,7 @@ router.get('/logs/operation/export', authMiddleware, async (req, res) => {
                 } catch (_) {}
             }
         }
-        var locMap = await enrichLocations(loginIps);
+        var locMap = await getIpLocations(loginIps);
 
         var csvRows = ['用户,操作类型,详情,操作时间'];
         for (var i = 0; i < rows.length; i++) {
@@ -243,7 +207,7 @@ router.get('/logs/operation/export', authMiddleware, async (req, res) => {
             }
             csvRows.push([
                 csvEscape(r.username),
-                csvEscape(CATEGORY_NAMES[actionToCategory(r.action)] || '其他'),
+                csvEscape(AUDIT_CATEGORY_NAMES[actionToCategory(r.action)] || '其他'),
                 csvEscape(detailText),
                 csvEscape(r.created_at)
             ].join(','));
@@ -276,7 +240,7 @@ router.get('/logs/login/export', authMiddleware, async (req, res) => {
         });
         var rows = result.rows;
 
-        var locMap = await enrichLocations(rows.map(function(r) { return r.ip; }));
+        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }));
 
         var csvRows = ['IP地址,归属地,用户代理,登陆状态,时间'];
         for (var i = 0; i < rows.length; i++) {

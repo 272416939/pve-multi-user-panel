@@ -9,6 +9,16 @@ const { createDhcpStaticBinding, getWanInterface, getWanInterfaces } = require('
 const dbg = require('../utils/debug');
 const { safeError } = require('../utils/safe-error');
 const { checkRateLimit } = require('../middleware/rate-limiter');
+// 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
+const { auditAction } = require('../utils/audit-log');
+
+// 端口转发审计详情：新增端口[内网]→[外网] + 资源标识（general 无标识）
+function portAuditDetail(action, rule, vmId, ctId) {
+    var detail = action + '端口[' + rule.internal_port + ']→[' + rule.external_port + ']';
+    if (vmId) detail += ' VM ' + vmId;
+    else if (ctId) detail += ' LXC ' + ctId;
+    return detail;
+}
 
 // 解析 ikuai_id 字段，兼容旧格式（纯字符串）和新格式（JSON 数组）
 // 返回 [{interface, id}] 数组
@@ -325,6 +335,7 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             rule.sync_status = 'failed';
             console.error('[端口转发] 同步到 ikuai 失败:', e.message);
         }
+        await auditAction(req, 'network.port.add', portAuditDetail('新增', rule, finalVmId, finalCtId), { resourceType: 'port-forward', resourceId: rule.id });
         res.json(rule);
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -488,6 +499,7 @@ router.delete('/port-forwards/:id', authMiddleware, async (req, res) => {
         }
         if (rule.sync_status === 'orphan') {
             await db.portForwards.delete(id);
+            await auditAction(req, 'network.port.delete', portAuditDetail('删除', rule, rule.vm_id, rule.ct_id), { resourceType: 'port-forward', resourceId: id });
             return res.json({ message: '规则已删除' });
         }
         // 正常规则同步删除（多接口）
@@ -517,6 +529,7 @@ router.delete('/port-forwards/:id', authMiddleware, async (req, res) => {
             console.error('[端口转发] ikuai 删除失败:', e.message);
         }
         await db.portForwards.delete(id);
+        await auditAction(req, 'network.port.delete', portAuditDetail('删除', rule, rule.vm_id, rule.ct_id), { resourceType: 'port-forward', resourceId: id });
         res.json({ message: '规则已删除' });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -545,6 +558,8 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
                     }
                 }
                 await db.portForwards.delete(id);
+                // 操作审计：批量删除逐条记录明细
+                await auditAction(req, 'network.port.delete', portAuditDetail('删除', rule, rule.vm_id, rule.ct_id), { resourceType: 'port-forward', resourceId: id });
                 results.success++;
             } catch (e) {
                 results.failed++;
