@@ -88,8 +88,8 @@ if (passwordMatch && needsUpgrade(user.password)) {
         device_name: deviceName,
         ip,
         user_agent: ua,
-        created_at: new Date().toISOString(),
-        expires_at: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000).toISOString()
+        created_at: formatLocalDateTime(new Date()),
+        expires_at: formatLocalDateTime(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
     });
 
     if (await db.twofa.isEnabled(user.id)) {
@@ -182,8 +182,8 @@ router.post('/login/2fa', async (req, res) => {
                 device_name: deviceName,
                 ip,
                 user_agent: ua,
-                created_at: new Date().toISOString(),
-                expires_at: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000).toISOString()
+                created_at: formatLocalDateTime(new Date()),
+                expires_at: formatLocalDateTime(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
             });
         }
 
@@ -216,8 +216,8 @@ router.post('/login/2fa', async (req, res) => {
                     device_name: deviceName,
                     ip,
                     user_agent: ua,
-                    created_at: new Date().toISOString(),
-                    expires_at: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000).toISOString()
+                    created_at: formatLocalDateTime(new Date()),
+                    expires_at: formatLocalDateTime(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
                 });
             }
             const token = generateAccessToken(user, record.id);
@@ -265,8 +265,8 @@ router.post('/auth/refresh', async (req, res) => {
             token: newRefreshToken,
             ip: req.ip,
             user_agent: req.headers['user-agent'] || '',
-            created_at: new Date().toISOString(),
-            expires_at: expiresAt.toISOString()
+            created_at: formatLocalDateTime(new Date()),
+            expires_at: formatLocalDateTime(expiresAt)
         });
 
         // 用新记录的 id 生成 access token，确保设备校验通过
