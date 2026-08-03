@@ -81,7 +81,7 @@
                         <thead>
                             <tr>
                                 <th style="width:230px">IP地址（归属地）</th>
-                                <th class="text-start">用户代理</th>
+                                <th class="text-start ps-3">用户代理</th>
                                 <th style="width:100px">登陆状态</th>
                                 <th style="width:170px">时间</th>
                             </tr>
@@ -89,7 +89,7 @@
                         <tbody>
                             <tr v-for="row in loginLogList" :key="row.id">
                                 <td class="small">{{ row.ip }}<span v-if="row.ip_location">（{{ row.ip_location }}）</span></td>
-                                <td class="small text-muted text-start">{{ row.user_agent }}</td>
+                                <td class="small text-muted text-start ps-3">{{ row.user_agent }}</td>
                                 <td><span :class="'badge ' + (row.status === 'success' ? 'bg-success' : 'bg-danger')">{{ row.status === 'success' ? '登录成功' : '登录失败' }}</span></td>
                                 <td class="small text-muted">{{ row.created_at }}</td>
                             </tr>
