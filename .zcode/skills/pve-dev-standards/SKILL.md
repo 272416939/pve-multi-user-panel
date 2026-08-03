@@ -1,14 +1,14 @@
 ---
 name: pve-dev-standards
 description: >
-  PVE 管理面板（pve-multi-user-panel）的开发规范，覆盖新增功能、按钮、弹窗、页面、接口、数据库、缓存、模块架构（低耦合高内聚）、SSH/PVE 操作及 Git 提交流程的强制清单。
+  PVE 管理面板（pve-multi-user-panel）的开发规范，覆盖新增功能、按钮、弹窗、页面、接口、数据库、缓存、模块架构（低耦合高内聚）、侧边栏状态保持、SSH/PVE 操作及 Git 提交流程的强制清单。
   当用户要求为该项目"新增功能/按钮/弹窗/页面/接口/字段/路由"，或提到"添加 X 模块""加个弹窗""新建页面""新开一个设置项""重构""拆分模块""模块化""按项目规范开发"等表述时触发——避免新增功能和后续开发重复踩坑。
   安全相关的认证授权/XSS/注入等细节请同时参考 security-checklist 和 pve-security-guard 两份安全技能。
 ---
 
 # PVE 管理面板开发规范
 
-本技能沉淀自本项目多个历史开发会话的真实踩坑记录（Dashboard 状态栏残留、备份恢复数据盘孤立漏洞、Admin 磁盘管理、订单号统一与邮件通知、自选系统优化、后台多项 Bug、db-mysql.js 高耦合拆分、仪表板日志功能、登录时间时区错误、MySQL 初始化失败、UApiPro 集成）。新增任何功能、按钮、弹窗、页面、接口、字段时，在动手前与收尾时各过检一遍，防止已知问题重复发生。
+本技能沉淀自本项目多个历史开发会话的真实踩坑记录（Dashboard 状态栏残留、备份恢复数据盘孤立漏洞、Admin 磁盘管理、订单号统一与邮件通知、自选系统优化、后台多项 Bug、db-mysql.js 高耦合拆分、仪表板日志功能、登录时间时区错误、MySQL 初始化失败、UApiPro 集成、侧边栏刷新状态保持）。新增任何功能、按钮、弹窗、页面、接口、字段时，在动手前与收尾时各过检一遍，防止已知问题重复发生。
 
 ## 一、动手前：先理清涉及面，再写代码
 
@@ -42,10 +42,23 @@ description: >
 4. **侧边栏菜单** — 在 `views/partials/sidebar-admin.ejs` 添加菜单项（含 `has-children` + `data-submenu` + `#submenu-<id>` 结构）；保存后**记住核心关联**：
    - **section 名必须与菜单 DOM id / subsection 映射一致**（如 `templates-os`→`#submenu-templates`）。若不一致，点击路径 OK 但**刷新后父菜单不展开**、`toggleSubmenu` 找不到元素报错。
    - 若新增的是需要刷新后保持展开的子菜单，在 `core.js` 的 `expandSections` 白名单里补上 `<section-name>`，并确保点击路径与刷新路径复用同一加载函数。
-5. **后端 API** — `server/routes/*.js` 新增端点（见第五节）
+   - **刷新后的选中/展开/子标签状态保持，统一按第四节模式实现，禁止自创方案。**
+5. **后端 API** — `server/routes/*.js` 新增端点（见第六节）
 6. **缓存版本号** +1
 
-## 四、新增「按钮/弹窗/下拉/表单」的清单
+## 四、侧边栏与标签状态保持（刷新后状态不丢）
+
+教训来源：「Dashboard 侧边栏刷新状态保持」+「仪表板日志功能」两个会话。刷新后 URL/高亮/内容不一致、直达链接高亮错、子菜单不展开都是历史踩坑。**新增页面、子菜单、子标签时统一按以下模式做状态保持，禁止自创键名/方案**：
+
+1. **顶层 section（当前标签页）用 URL query 维护** — `?section=xxx`（admin 端与 dashboard 端约定一致）；`activeSection` 初始化从 URL 读取，新增 watch 在切换时 `history.replaceState` 写回 URL。直达链接（如 `?section=lxc`）的内容与高亮必须一致，否则刷新/直达时"内容对、高亮错"。
+2. **子菜单选中项用 localStorage + 白名单校验** — 键名 `dashboard_<名称>`（如 `dashboard_activeTabOrder`，取值仅 `'vm'/'lxc'`、默认 `'vm'`）；读取时非法值回退默认，watch 在值变化时写入。
+3. **子菜单展开/收起态用 localStorage** — `dashboard_sidebarExpanded` 存逗号分隔的子菜单 id（如 `"order"`）；`toggleSubmenu` 展开/收起时同步写入。
+4. **初始化统一走 `syncSidebarState()`** — 在 init 的 onMounted 开头调用：按 `activeSection` 同步侧边栏高亮，section 场景恢复子项选中并展开子菜单；**只做 DOM 高亮，不触发数据加载**（数据由各加载函数另行触发），顺带修复"内容对、高亮错"的既有 bug。
+5. **section 内的子标签（tab）用 localStorage 持久化** — 键名如 `dashboard_logTab`（默认 `'operation'`）；进入该 section 或刷新时按保存值自动展开子菜单并高亮 `data-subsection="logs-<tab>"`。
+6. **容错调用约定** — 对可选加载函数一律 `if ($.loadXxx) $.loadXxx(1)` 判空调用；init 链用 `$.initXxx && $.initXxx()`，防止某端页面没挂该函数时报错。
+7. **踩坑提示** — watch 只在值变化时触发：点击项的当前值恰为默认值时 localStorage 不写入属**正常现象**，刷新后默认值行为一致即可，不要误判为 bug 加多余代码；验证状态保持必须覆盖「点击 → 刷新」与「直达链接 → 刷新」两条路径。
+
+## 五、新增「按钮/弹窗/下拉/表单」的清单
 
 1. **按钮间距统一** — 多个按钮并排用 `d-flex gap-2`/`gap-1` 或 `btn-group` 加 `gap:4px`，**不要用 `ms-1` 间距类**（会导致全页面间距不统一）。
 2. **弹窗用项目统一组件** — 确认弹窗用既有 `customConfirm` 体系；`pv-button` 组件；表单弹窗复用 `admin-template-modals.js` / `dashboard-template-modals.js` 现有 modal 结构。
@@ -54,17 +67,17 @@ description: >
 5. **`v-html` 只用于**可控的 markdown 渲染并过 `DOMPurify.sanitize`；普通文本一律 `{{ }}`，禁止 `v-html` 直插用户输入。
 6. **表单值注意类型一致性** — 下拉 `:value` 用 `String(u.id)` 与后端返回的类型对齐，否则刷新时选中项静默变空白；编辑表单保留数据快照（`Object.assign` 快照锁定 / 请求序号保护），防止异步刷新覆盖用户输入。
 
-## 五、新增/修改后端接口的清单
+## 六、新增/修改后端接口的清单
 
 1. **路由文件** — 在 `server/routes/*.js` 增删改端点。
 2. **参数校验** — 所有用户可控参数在拼接/使用前经 `validateParam` + 白名单校验；vmid 用 `Number.isInteger && 100-999999999`；含 PVE 路径参数用 `encodeURIComponent`。
 3. **资源归属** — 操作端点必须校验归属（`user_id` 匹配 + admin 放行）；涉及资金/计费/支付**必须**调 `security-checklist` 的 B/SEC 类规则，**不要**在接口提交后再补。
-4. **新表/新列** — 建表/迁移在 `server/api/db-schema.js` 的 `initDb()` 中新增；业务 DB 函数写进对应业务域文件 `db-<domain>.js` 并在 `db.js` 聚合入口挂导出（见第六节）；**ALTER TABLE / 建表用幂等迁移**（`try { ... } catch (_) {}` 捕获 duplicate/column exists 错误），列、CRUD 字段列表、SQL 白名单三处同步加。**不要用 SQLite 或 sync-mysql**（已移除，仅 MySQL + mysql2/promise）。
-5. **日期格式** — 写入 MySQL 一律 `mysqlNow()` / `formatLocalDate()`，禁止直接 `toISOString()`（详见第七节）。
-6. **正确性验证** — 改完 `node --check 文件名`（JS 语法）能抓出缩进/嵌套错误；逻辑改动后跑项目测试（`--exit`，见第十节；区分历史遗留失败）。
+4. **新表/新列** — 建表/迁移在 `server/api/db-schema.js` 的 `initDb()` 中新增；业务 DB 函数写进对应业务域文件 `db-<domain>.js` 并在 `db.js` 聚合入口挂导出（见第七节）；**ALTER TABLE / 建表用幂等迁移**（`try { ... } catch (_) {}` 捕获 duplicate/column exists 错误），列、CRUD 字段列表、SQL 白名单三处同步加。**不要用 SQLite 或 sync-mysql**（已移除，仅 MySQL + mysql2/promise）。
+5. **日期格式** — 写入 MySQL 一律 `mysqlNow()` / `formatLocalDate()`，禁止直接 `toISOString()`（详见第八节）。
+6. **正确性验证** — 改完 `node --check 文件名`（JS 语法）能抓出缩进/嵌套错误；逻辑改动后跑项目测试（`--exit`，见第十一节；区分历史遗留失败）。
 7. **用户可控 / 待落地细节** — 本次开发规范覆盖功能与流程；安全红线细项（IDOR、命令注入、支付、XSS、CSP、限速、信息泄露）请**必须**再调 `security-checklist` 或 `pve-security-guard` 过检，本技能不重复列举。
 
-## 六、模块架构：低耦合高内聚（强制）
+## 七、模块架构：低耦合高内聚（强制）
 
 本规范直接来自「db-mysql.js 拆分」教训：原模块 2900 行，连接池 + 建表 + 约 200 个业务函数耦合在一个文件，含 4 处 `module.exports` 内部自引用、无独立事务封装，任何小改动都要动巨无霸文件、牵一发动全身。已按业务域拆分为 `db-core` / `db-schema` / `db-<domain>` 系列 + 纯组装入口 `db.js`。后续开发**必须**遵守：
 
@@ -74,7 +87,7 @@ description: >
 4. **事务统一走 `utils/with-transaction.js`** — 需要原子性时 `await withTransaction(async (conn) => { ... })`；**禁止**调用方自己 `pool.getConnection()` 手动 begin/commit/rollback（曾散落多处，回滚遗漏产生脏数据）。
 5. **单一来源原则** — 常量/白名单/映射只定义一次并导出复用，**禁止双份拷贝手动同步**。教训：`AUDIT_CATEGORIES` 已在 `db-messaging.js` 定义并导出，但 `routes/log.js` 又拷贝了一份，新增分类要改两处、漏改即 bug。正确姿势：`const { AUDIT_CATEGORIES } = require('../api/db-messaging')`。
 6. **循环依赖用行内懒加载** — 工具/路由互相 require 成环时，在函数体内 `require(...)`（参考 `utils/audit-log.js` 模式），不要顶层 require。
-7. **建表/迁移集中在 `db-schema.js` 的 `initDb()`** — 业务域文件不散落 DDL；ALTER/建表幂等容错（见第八节），`createDefaultAdmin` 外不再散落 ALTER。
+7. **建表/迁移集中在 `db-schema.js` 的 `initDb()`** — 业务域文件不散落 DDL；ALTER/建表幂等容错（见第九节），`createDefaultAdmin` 外不再散落 ALTER。
 8. **第三方外部 API 必须走 `services/` 封装** — 参考 `services/ip-location.js`（UApiPro 集成）标准姿势：
    - 入参校验（IP 合法性等），拒绝域名/URL 防 SSRF；
    - 响应走 `utils/cache-store.js` 缓存（Redis 优先、内存回退），测试接口强制外呼不走缓存；
@@ -83,7 +96,7 @@ description: >
    - 密钥/凭据 AES-256-GCM 加密存储 + `maskSecret` 掩码回显 + `isMasked` 判断防掩码值回写覆盖真实 Key；
    - 错误只透传第三方响应体，不泄漏本地凭据/堆栈。
 
-## 七、时间与时区（写入 MySQL 的日期一律本地时间）
+## 八、时间与时区（写入 MySQL 的日期一律本地时间）
 
 项目约定：MySQL 连接池 `timezone: '+08:00'` + `dateStrings: true`，DATETIME 字段存本地时间字符串 `YYYY-MM-DD HH:MM:SS`；前端 `formatDate()` 按本地时间原样解析。历史教训：`auth.js` 4 处用 `new Date().toISOString()`（UTC）写入 `refresh_tokens`，导致设备管理页登录时间显示慢 8 小时、`expires_at > NOW()` 判 token 提前 8 小时过期。
 
@@ -92,7 +105,7 @@ description: >
 3. **前端展示不需要改时区逻辑**——后端存对，前端自然显示对；若显示不对先查后端写入，不要在前端加偏移。
 4. 历史脏数据修正：写一次性脚本 `scripts/fix-*.js`（参照 `fix-refresh-token-timezone.js` 先例：修正数据→验证→清理），不进业务代码。
 
-## 八、数据库初始化与迁移
+## 九、数据库初始化与迁移
 
 1. **`initDb()` 建表/迁移每步都要幂等 + try/catch 容错**——原 `CREATE TABLE IF NOT EXISTS` 块无容错，远程 MySQL 网络抖动一次即抛错，`server.js` 直接 `process.exit(1)`（「本地启动 MySQL 初始化失败」根因）。
 2. 首次初始化需建 30+ 张表 + 索引 + 迁移，耗时 13–15s 属正常，别误判卡死。
@@ -100,17 +113,17 @@ description: >
 4. 新增默认配置项：在 `initDb()` 的 `initDefaultConfig()` 里加（幂等，如 `uapipro:enabled` / `uapipro:api_key`），不要另起炉灶。
 5. MCP MySQL 工具**只读**（DDL 被拒）——验证建表/初始化用 `node -e` 调应用层 `db-schema.js` 的 `initDb()` 或 `DESCRIBE`。
 
-## 九、审计埋点（操作日志/登录日志）
+## 十、审计埋点（操作日志/登录日志）
 
 Dashboard 日志功能依赖统一埋点，敏感写操作（登录、改密、订单、磁盘销毁、删除、设置变更）必须埋点：
 
 1. 统一调用 `utils/audit-log.js` 的 `auditLog({ userId, username, action, resourceType, resourceId, details, req })`；`details` 用中文可读字符串（含套餐名/容量/金额/IP 归属地），不用对象。
 2. **整个埋点包在 `try { ... } catch (_) {}` 中**，审计失败绝不影响主业务（audit-log 内部已兜底，调用侧也勿依赖其返回值）。
 3. action 命名约定 `域.动作` 点分命名：`user.login` / `vm.start` / `disk.destroy` / `order.create` / `setting.profile` / `password.reset.admin` / `security.2fa`。
-4. **新增审计分类只改 `db-messaging.js` 的 `AUDIT_CATEGORIES` 一处**（category → SQL 条件映射 + 导出），路由 `require` 复用，禁止拷贝（见第六节单一来源）。
+4. **新增审计分类只改 `db-messaging.js` 的 `AUDIT_CATEGORIES` 一处**（category → SQL 条件映射 + 导出），路由 `require` 复用，禁止拷贝（见第七节单一来源）。
 5. 埋点用行内 `require('../utils/audit-log')` 懒加载，避免路由与工具模块循环依赖。
 
-## 十、测试与验证
+## 十一、测试与验证
 
 1. **`test/` 目录被 `.gitignore` 忽略**——新测试文件不入库、`git status` 不显示，属预期，勿误判未创建。
 2. **`npm test` 用 `--exit`**（package.json 已配），否则 redis/rate-limiter 等残留事件循环句柄会让 mocha 全绿后进程挂起。
@@ -118,7 +131,7 @@ Dashboard 日志功能依赖统一埋点，敏感写操作（登录、改密、�
 4. 全量跑 `npx mocha --recursive "test/**/*.test.js" --exit --timeout 10000`；历史遗留失败与本次改动分开判断。
 5. 排查"挂起/无输出"时把输出落盘文件再看，管道 `| tail` 缓冲会制造无输出假象。
 
-## 十一、PVE / SSH / 计费涉及金钱与资源的红线（数据盘备份恢复专项）
+## 十二、PVE / SSH / 计费涉及金钱与资源的红线（数据盘备份恢复专项）
 
 这些坑直接源自「备份恢复数据盘孤立白嫖漏洞」会话，涉及金钱和底层资源，改动相关代码时必须遵守：
 
@@ -131,7 +144,7 @@ Dashboard 日志功能依赖统一埋点，敏感写操作（登录、改密、�
 7. **并发保护** — 恢复/对账等长流程用事务或行锁，防止「恢复的同时买新盘」等并发场景打架。
 8. **涉及资金/资源的删除操作，前端与后端都要确认再执行**，且删除前先看目标，确认无其他引用。
 
-## 十二、Git 提交流程
+## 十三、Git 提交流程
 
 - **开发完成（含本技能等 `.zcode/skills/` 文件更新）必须「提交 + 双端推送」到 `beta`**，禁止只提交不推送、更禁止只改本地不提交；只有用户明确说「暂不推送」时才停在本地。
 - 日常开发在 **`beta` 分支**，**禁止直接提交 `main`**；`main` 由你显式验证后合并。
@@ -141,12 +154,13 @@ Dashboard 日志功能依赖统一埋点，敏感写操作（登录、改密、�
 - 删除函数时**同步清理 `module.exports`**，否则残留导出导致上线后才二次修复。
 - 用 `universal-git-workflow` 技能执行完整提交流程。
 
-## 十三、提交/收尾前的自查清单
+## 十四、提交/收尾前的自查清单
 
 每完成一次新增/修改，逐项确认：
 
 - [ ] 所有涉及的 JS/CSS/EJS 改动后 `public/cache-version.json` 已 +1，引用带 `?cv=`
 - [ ] 新页面：section 名 = 菜单 DOM id 映射，`expandSections` 白名单已补，点击/刷新路径复用同一加载函数
+- [ ] 侧边栏/标签状态保持：顶层 section 用 URL `?section=`、子菜单选中/展开态用 localStorage（白名单校验 + 默认值回退）、初始化走 `syncSidebarState()`，未自创键名/方案
 - [ ] 按钮间距已用 `d-flex gap-*`，未新增 `ms-1`
 - [ ] 必选下拉占位用 `value=0`，前后端必选逻辑一致
 - [ ] 后端接口：`node --check` 通过，资源归属 + validateParam 校验到位
