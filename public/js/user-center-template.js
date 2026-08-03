@@ -446,7 +446,7 @@
                                                     <span>{{ d.device_name }}</span>
                                                     <span v-if="d.id === currentDeviceId" class="badge bg-info ms-1" style="font-size:10px;">当前</span>
                                                 </td>
-                                                <td class="text-muted small">{{ d.ip }}</td>
+                                                <td class="text-muted small">{{ d.ip }}<span v-if="d.ip_location">（{{ d.ip_location }}）</span></td>
                                                 <td class="text-muted small">{{ formatDate(d.created_at) }}</td>
                                                 <td>
                                                     <pv-button v-if="d.id !== currentDeviceId" variant="danger" size="sm" @click="revokeDevice(d.id)">下线</pv-button>

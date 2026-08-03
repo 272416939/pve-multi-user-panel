@@ -696,7 +696,7 @@ watch($.user, function(u) {
     $.switchAdminTab = function(tab) {
         // Determine which group this tab belongs to
         var manageTabs = ['users', 'cdk', 'messages'];
-        var settingsTabs = ['smtp', 'pve', 'snapshot-backup', 'network', 'pay', 'site'];
+        var settingsTabs = ['smtp', 'pve', 'snapshot-backup', 'network', 'pay', 'site', 'uapipro'];
         var section;
         var submenuId;
 
@@ -732,7 +732,8 @@ watch($.user, function(u) {
             'snapshot-backup': 'settings-snapshot-backup',
             'network': 'settings-network',
             'pay': 'settings-pay',
-            'site': 'settings-site'
+            'site': 'settings-site',
+            'uapipro': 'settings-uapipro'
         };
         var target = document.querySelector('[data-subsection="' + (subMap[tab] || 'admin-' + tab) + '"]');
         if (target) target.classList.add('active');
@@ -1033,6 +1034,9 @@ $.initDetailCharts = function() {
                 if ($.activeTab.value === 'pay') {
                     $.loadPayConfig();
                 }
+                if ($.activeTab.value === 'uapipro') {
+                    $.loadUapiproConfig();
+                }
                 if ($.activeTab.value === 'orders') {
                     $.loadOrders(1);
                 }
@@ -1068,6 +1072,9 @@ $.initDetailCharts = function() {
             }
             if (newTab === 'pay') {
                 $.loadPayConfig();
+            }
+            if (newTab === 'uapipro') {
+                $.loadUapiproConfig();
             }
             if (newTab === 'site') {
                 $.loadSiteConfig();

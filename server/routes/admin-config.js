@@ -11,7 +11,9 @@ const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { loadSentRemindersFromDb, checkExpiredVms, checkExpiredLxc } = require('../services/expiry-check');
 const pkg = require('../../package.json');
 const { safeError } = require('../utils/safe-error');
-const { maskSecret, isMasked } = require('../utils/crypto-utils');
+const { maskSecret, isMasked, encrypt, decrypt } = require('../utils/crypto-utils');
+const { queryIpLocation } = require('../services/ip-location');
+const { checkRateLimit } = require('../middleware/rate-limiter');
 const crypto = require('crypto');
 
 // 获取当前 HEAD commit hash（用于同版本号不同 commit 的判断）
@@ -591,6 +593,55 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
     } catch (e) {
         console.error('[支付配置]', e.message);
         res.status(500).json({ error: safeError(e) });
+    }
+});
+
+// ========== UApiPro IP 归属地配置 ==========
+
+router.get('/admin/uapipro/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var enabled = await db.config.get('uapipro:enabled') === '1';
+        var apiKey = decrypt(await db.config.get('uapipro:api_key') || '');
+        res.json({ enabled, api_key: maskSecret(apiKey) });
+    } catch (e) {
+        console.error('[UApiPro配置]', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+router.put('/admin/uapipro/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var { enabled, api_key } = req.body;
+        if (enabled !== undefined) {
+            await db.config.set('uapipro:enabled', enabled ? '1' : '0');
+        }
+        if (api_key !== undefined && !isMasked(api_key)) {
+            await db.config.set('uapipro:api_key', encrypt(String(api_key).trim()));
+        }
+        res.json({ message: 'UApiPro 配置保存成功' });
+    } catch (e) {
+        console.error('[UApiPro配置]', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+// 测试查询：直接外呼 uapis.cn（不走缓存），验证 API Key / 连通性
+router.post('/admin/uapipro/test', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var rateLimitResult = await checkRateLimit('ratelimit:uapipro-test:' + req.user.id, 10, 60 * 1000);
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ error: '测试过于频繁，请稍后再试' });
+        }
+        var ip = String(req.body.ip || '').trim();
+        if (!ip) return res.status(400).json({ error: '请输入要查询的 IP 地址' });
+        var result = await queryIpLocation(ip);
+        res.json(result);
+    } catch (e) {
+        console.error('[UApiPro测试]', e.message);
+        // 透出第三方接口的错误描述（不含本地凭据），便于管理员排查
+        var errMsg = e.response && e.response.data && e.response.data.message
+            ? e.response.data.message : (e.message || '未知错误');
+        res.status(400).json({ error: '查询失败: ' + errMsg });
     }
 });
 

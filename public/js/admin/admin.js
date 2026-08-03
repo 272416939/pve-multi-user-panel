@@ -616,6 +616,55 @@
         }
     };
 
+    // UApiPro IP 归属地配置
+    $.uapiproConfig = ref({ enabled: false, api_key: '' });
+    $.uapiproSaving = ref(false);
+    $.uapiproTesting = ref(false);
+    $.uapiproTestIp = ref('8.8.8.8');
+    $.uapiproTestResult = ref(null);
+    $.uapiproTestError = ref('');
+
+    $.loadUapiproConfig = async function() {
+        try {
+            var config = await api('/admin/uapipro/config');
+            $.uapiproConfig.value = config;
+        } catch (e) {
+            console.error('加载 UApiPro 配置失败', e);
+        }
+    };
+
+    $.saveUapiproConfig = async function() {
+        $.uapiproSaving.value = true;
+        try {
+            await api('/admin/uapipro/config', { method: 'PUT', body: $.uapiproConfig.value });
+            alert('UApiPro 配置保存成功！');
+            await $.loadUapiproConfig();
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        } finally {
+            $.uapiproSaving.value = false;
+        }
+    };
+
+    $.testUapiproIpQuery = async function() {
+        var ip = ($.uapiproTestIp.value || '').trim();
+        if (!ip) {
+            $.uapiproTestError.value = '请输入要查询的 IP 地址';
+            return;
+        }
+        $.uapiproTesting.value = true;
+        $.uapiproTestError.value = '';
+        $.uapiproTestResult.value = null;
+        try {
+            var result = await api('/admin/uapipro/test', { method: 'POST', body: { ip: ip } });
+            $.uapiproTestResult.value = result;
+        } catch (e) {
+            $.uapiproTestError.value = e.message || '查询失败';
+        } finally {
+            $.uapiproTesting.value = false;
+        }
+    };
+
     // 财务管理 - 交易流水
     $.financeFilter = ref({ start_time: '', end_time: '', pay_method: '', trade_type: '', order_no: '' });
     $.transactionList = ref([]);
