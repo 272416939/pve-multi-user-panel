@@ -423,6 +423,11 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
             }
             await db.backups.deleteBatch(deletableIds);
         }
+        // 操作审计：批量写入后即时收敛该用户日志到保留上限（防短暂超限，无需等整点清理）
+        try {
+            var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
+            await db.auditLogs.trimUserOverflow(req.user.id, keepCount);
+        } catch (_) {}
         res.json({ message: `已删除 ${deletableIds.length} 个备份` });
     } catch (error) {
         res.status(500).json({ error: '批量删除失败' });

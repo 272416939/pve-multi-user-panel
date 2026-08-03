@@ -565,6 +565,11 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
                 results.failed++;
             }
         }
+        // 操作审计：批量写入后即时收敛该用户日志到保留上限（防短暂超限，无需等整点清理）
+        try {
+            var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
+            await db.auditLogs.trimUserOverflow(req.user.id, keepCount);
+        } catch (_) {}
         res.json(results);
     } catch (e) {
         res.status(500).json({ error: safeError(e) });

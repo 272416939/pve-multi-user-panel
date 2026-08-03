@@ -47,16 +47,26 @@ function buildAuditCategoryWhere(category) {
 // 删除更旧的记录——走 user_id 索引，保留最新 keep 条不误删
 // table 仅限本文件内部白名单（audit_logs / login_logs），非用户输入
 const LOG_TRIM_TABLES = ['audit_logs', 'login_logs'];
+
+// 单用户收敛：该用户超过 keep 条时删除更旧记录，返回删除数（不足 keep 条返回 0）
+async function trimUserOverflow(table, userId, keepCount) {
+    if (LOG_TRIM_TABLES.indexOf(table) === -1) return 0;
+    var keep = Math.max(parseInt(keepCount) || 5000, 100);
+    var uid = parseInt(userId);
+    if (!Number.isInteger(uid) || uid < 1) return 0;
+    var cutoff = await queryOne('SELECT id FROM ' + table + ' WHERE user_id = ? ORDER BY id DESC LIMIT 1 OFFSET ?', [uid, keep]);
+    if (!cutoff) return 0;
+    var result = await execute('DELETE FROM ' + table + ' WHERE user_id = ? AND id < ?', [uid, cutoff.id]);
+    return result.affectedRows || 0;
+}
+
 async function trimTableOverflow(table, keepCount) {
     if (LOG_TRIM_TABLES.indexOf(table) === -1) return 0;
     var keep = Math.max(parseInt(keepCount) || 5000, 100);
     var users = await queryAll('SELECT user_id FROM ' + table + ' GROUP BY user_id HAVING COUNT(*) > ?', [keep]);
     var total = 0;
     for (var i = 0; i < users.length; i++) {
-        var cutoff = await queryOne('SELECT id FROM ' + table + ' WHERE user_id = ? ORDER BY id DESC LIMIT 1 OFFSET ?', [users[i].user_id, keep]);
-        if (!cutoff) continue;
-        var result = await execute('DELETE FROM ' + table + ' WHERE user_id = ? AND id < ?', [users[i].user_id, cutoff.id]);
-        total += result.affectedRows || 0;
+        total += await trimUserOverflow(table, users[i].user_id, keep);
     }
     return total;
 }
@@ -110,7 +120,9 @@ const auditLogs = {
     },
     clearByUser: (userId) => execute('DELETE FROM audit_logs WHERE user_id = ?', [userId]),
     // 每用户保留最新 keepCount 条，返回删除总数（供定时任务调用）
-    trimOverflow: (keepCount) => trimTableOverflow('audit_logs', keepCount)
+    trimOverflow: (keepCount) => trimTableOverflow('audit_logs', keepCount),
+    // 单用户即时收敛（供批量操作后调用，瞬时回到保留上限内）
+    trimUserOverflow: (userId, keepCount) => trimUserOverflow('audit_logs', userId, keepCount)
 };
 
 // 登录日志（登录成功/失败）
@@ -155,7 +167,9 @@ const loginLogs = {
     },
     clearByUser: (userId) => execute('DELETE FROM login_logs WHERE user_id = ?', [userId]),
     // 每用户保留最新 keepCount 条，返回删除总数（供定时任务调用）
-    trimOverflow: (keepCount) => trimTableOverflow('login_logs', keepCount)
+    trimOverflow: (keepCount) => trimTableOverflow('login_logs', keepCount),
+    // 单用户即时收敛（供批量操作后调用，瞬时回到保留上限内）
+    trimUserOverflow: (userId, keepCount) => trimUserOverflow('login_logs', userId, keepCount)
 };
 
 // 备忘录操作
