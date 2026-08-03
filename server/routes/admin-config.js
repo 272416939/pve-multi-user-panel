@@ -618,6 +618,8 @@ router.put('/admin/uapipro/config', authMiddleware, adminMiddleware, async (req,
         if (api_key !== undefined && !isMasked(api_key)) {
             await db.config.set('uapipro:api_key', encrypt(String(api_key).trim()));
         }
+        // 失效 ip-location 的启用开关缓存（60s TTL），让新配置立即生效
+        require('../services/ip-location').invalidateEnabledCache();
         res.json({ message: 'UApiPro 配置保存成功' });
     } catch (e) {
         console.error('[UApiPro配置]', e.message);

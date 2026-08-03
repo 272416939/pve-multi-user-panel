@@ -19,6 +19,37 @@ const REQUEST_TIMEOUT = 5000;
 
 const ipCache = cacheStore.create('ip-location', CACHE_TTL_SECONDS);
 
+// uapipro 启用开关缓存（60s TTL）：日志页每行 IP 都调用 getIpLocation，
+// 若每次查 DB 配置，一页 20 行 = 20 次并发 DB 查询，属无谓开销
+const ENABLED_CACHE_TTL = 60 * 1000;
+let enabledCache = null;
+let enabledCacheTime = 0;
+
+/** 读取 uapipro 启用开关（60s 内存缓存，保存配置时调用 invalidateEnabledCache 失效） */
+async function isUapiProEnabled() {
+    var now = Date.now();
+    if (enabledCache !== null && now - enabledCacheTime < ENABLED_CACHE_TTL) {
+        return enabledCache;
+    }
+    try {
+        enabledCache = (await db.config.get('uapipro:enabled')) === '1';
+    } catch (e) {
+        enabledCache = false;
+    }
+    enabledCacheTime = now;
+    return enabledCache;
+}
+
+/** 保存 UApiPro 配置后失效开关缓存（admin-config.js 调用） */
+function invalidateEnabledCache() {
+    enabledCache = null;
+    enabledCacheTime = 0;
+}
+
+// 同一 IP 的进行中外呼（single-flight 去重）：
+// 多个请求同时查询同一 IP 时只外呼一次，其余请求复用其结果，避免并发重复外呼
+const inFlight = new Map();
+
 const IPV4_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 const IPV6_RE = /^[0-9a-fA-F:]+$/;
 
@@ -128,16 +159,34 @@ async function getIpLocation(ip) {
     var normalized = normalizeIp(ip);
     if (!normalized) return '';
     try {
-        var enabled = await db.config.get('uapipro:enabled');
-        if (enabled !== '1') return '';
-        var loc = await ipCache.get(normalized, loadFromUapi);
-        return typeof loc === 'string' ? loc : '';
+        if (!(await isUapiProEnabled())) return '';
+        // 显式 get/set 而非 loader 形式：外呼失败（null）不写缓存，
+        // 避免失败结果被负缓存近 2 天（cache-store 对 null 缓存 TTL/4），API 恢复后立即生效
+        var loc = await ipCache.get(normalized);
+        if (loc !== null) {
+            return typeof loc === 'string' ? loc : '';
+        }
+        // single-flight：同一 IP 已有外呼进行中时直接复用，不重复外呼
+        if (inFlight.has(normalized)) {
+            return inFlight.get(normalized);
+        }
+        var pending = (async () => {
+            var fetched = await loadFromUapi(normalized);
+            if (fetched) {
+                await ipCache.set(normalized, fetched);
+                return fetched;
+            }
+            return '';
+        })().finally(function() {
+            inFlight.delete(normalized);
+        });
+        inFlight.set(normalized, pending);
+        return pending;
     } catch (e) {
         console.error('[IP归属地] 查询失败:', ip, e.message);
         return '';
     }
 }
-
 /**
  * 强制新鲜查询一次（供 admin 测试接口使用，不走缓存、不受启用开关限制）
  * @param {string} ip
@@ -168,4 +217,4 @@ async function getIpLocations(ipList) {
     return locMap;
 }
 
-module.exports = { getIpLocation, queryIpLocation, getIpLocations, normalizeIp };
+module.exports = { getIpLocation, queryIpLocation, getIpLocations, normalizeIp, invalidateEnabledCache };

@@ -3,7 +3,15 @@
  * 提供统一的 get/set/del/clear 接口，自动处理 Redis 不可用场景
  */
 const crypto = require('crypto');
-const redisClient = require('../api/redis').getRedisClient();
+
+/**
+ * 惰性获取 Redis 客户端
+ * 注意：不能在模块加载时调用 getRedisClient() 缓存结果——Redis 配置在服务器启动
+ * 监听回调中才从 DB 加载写入 process.env，模块加载阶段必然拿到 null 且永久失效
+ */
+function getRedisClient() {
+    return require('../api/redis').getRedisClient();
+}
 
 // ==================== 可测试的纯函数 ====================
 
@@ -81,8 +89,9 @@ function stripPrefix(key, prefix) {
 
 // 获取 Redis keyPrefix（ioredis 自动给 set/get/del 加前缀，但 SCAN 不加）
 function getRedisPrefix() {
-    if (redisClient && redisClient.options && redisClient.options.keyPrefix) {
-        return redisClient.options.keyPrefix;
+    var client = getRedisClient();
+    if (client && client.options && client.options.keyPrefix) {
+        return client.options.keyPrefix;
     }
     return '';
 }
@@ -90,12 +99,13 @@ function getRedisPrefix() {
 // SCAN + 批量 DEL：修复 ioredis keyPrefix 双前缀问题
 // 优化：使用 pipeline 批量 DEL，减少 RTT
 async function scanDel(pattern) {
-    if (!redisClient) return;
+    var client = getRedisClient();
+    if (!client) return;
     var prefix = getRedisPrefix();
     var fullPattern = prefix + pattern;
     var cursor = '0';
     do {
-        var reply = await redisClient.scan(cursor, 'MATCH', fullPattern, 'COUNT', 200);
+        var reply = await client.scan(cursor, 'MATCH', fullPattern, 'COUNT', 200);
         cursor = reply[0];
         var keys = reply[1];
         if (keys.length > 0) {
@@ -105,13 +115,13 @@ async function scanDel(pattern) {
             });
             // 使用 pipeline 批量 DEL，减少 RTT
             if (strippedKeys.length > 1) {
-                var pipeline = redisClient.pipeline();
+                var pipeline = client.pipeline();
                 for (var i = 0; i < strippedKeys.length; i++) {
                     pipeline.del(strippedKeys[i]);
                 }
                 await pipeline.exec();
             } else {
-                await redisClient.del(strippedKeys);
+                await client.del(strippedKeys);
             }
         }
     } while (cursor !== '0');
@@ -166,6 +176,7 @@ function create(namespace, ttlSeconds) {
             if (entry) memStore.map.delete(key);
 
             // 2. Redis 缓存
+            var redisClient = getRedisClient();
             if (redisClient) {
                 try {
                     var raw = await redisClient.get(fullKey);
@@ -205,6 +216,7 @@ function create(namespace, ttlSeconds) {
             // 写内存
             memStore.map.set(key, { value: value, ts: Date.now() });
             // 写 Redis
+            var redisClient = getRedisClient();
             if (redisClient) {
                 try {
                     var raw = serialize(value);
@@ -221,6 +233,7 @@ function create(namespace, ttlSeconds) {
         async del(key) {
             var fullKey = namespace + ':' + key;
             memStore.map.delete(key);
+            var redisClient = getRedisClient();
             if (redisClient) {
                 try { await redisClient.del(fullKey); } catch (e) {}
             }

@@ -16,12 +16,15 @@ function getRedis() {
     const redis = new Redis({
         host, port, password, db, keyPrefix: prefix,
         retryStrategy(times) {
-            if (times > 3) {
-                console.warn(`[redis] 连接失败(${safeLog})，已重试${times-1}次，回退到内存模式`);
-                return null;
+            // 持续重连：返回 null 会永久断开且不再重连（Redis 恢复后进程内一直失效）。
+            // 退避上限 30s，仅在前几次失败时告警，避免刷屏
+            if (times <= 3) {
+                console.warn(`[redis] 连接失败(${safeLog})，第 ${times} 次重试...`);
+            } else if (times === 4) {
+                console.warn(`[redis] 持续重连中(${safeLog})，不再逐次告警，恢复后自动继续工作`);
             }
             retryCount = times;
-            return Math.min(times * 1000, 3000);
+            return Math.min(times * 1000, 30000);
         },
         maxRetriesPerRequest: 3,
         lazyConnect: false,
@@ -32,9 +35,7 @@ function getRedis() {
         noDelay: true,
         // 单连接多路复用（ioredis 默认模式，无需连接池）
         // enableOfflineQueue: true（默认）— 离线时排队请求，连接恢复后批量执行
-        enableOfflineQueue: true,
-        // 离线队列上限（防止积压过多请求）
-        offlineQueueMaxItems: 1000
+        enableOfflineQueue: true
     });
 
     redis.on('connect', () => {

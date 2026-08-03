@@ -263,29 +263,35 @@ watch($.user, function(u) {
         if ($.userVms.value.length === 0) {
             $.vmsLoading.value = true;
         }
-        try {
-            $.userVms.value = await api('/user/vms');
-        } catch (e) {
-            console.error('加载虚拟机失败', e);
-        } finally {
-            $.vmsLoading.value = false;
-        }
-
         $.loading.value = true;
         try {
-            // 用户列表统一走 loadUsers 分页接口（id 降序），避免与全量接口双顺序竞态覆盖
+            // PERF-07: 初始化数据相互独立，全部并行加载
+            // 原串行链总耗时 = 各接口耗时之和（含 2 个实时 PVE 调用），并行后 ≈ 最慢单个接口
             var lastUserPage = $.userPage.value;
-            await $.loadUsers(lastUserPage);
-            $.cdkList.value = await api('/admin/cdk/list');
-            var smtpData = await api('/admin/smtp');
-            $.smtpConfig.value = smtpData;
-            await $.loadPveConfig();
-            await $.loadRedisConfig();
-            if ($.loadLogConfig) await $.loadLogConfig();
-            await $.loadSnapshotConfig();
-            await $.loadStorageList();
-            await $.loadBackupConfig();
             await Promise.all([
+                api('/user/vms').then(function(data) {
+                    $.userVms.value = data;
+                }).catch(function(e) {
+                    console.error('加载虚拟机失败', e);
+                }),
+                // 用户列表统一走 loadUsers 分页接口（id 降序），避免与全量接口双顺序竞态覆盖
+                $.loadUsers(lastUserPage),
+                api('/admin/cdk/list').then(function(data) {
+                    $.cdkList.value = data;
+                }).catch(function(e) {
+                    console.error('加载 CDK 列表失败', e);
+                }),
+                api('/admin/smtp').then(function(data) {
+                    $.smtpConfig.value = data;
+                }).catch(function(e) {
+                    console.error('加载 SMTP 配置失败', e);
+                }),
+                $.loadPveConfig(),
+                $.loadRedisConfig(),
+                $.loadLogConfig ? $.loadLogConfig() : Promise.resolve(),
+                $.loadSnapshotConfig(),
+                $.loadStorageList(),
+                $.loadBackupConfig(),
                 $.loadLxcTemplates(),
                 $.loadLxcContainers(),
                 $.loadUserLxcContainers()
@@ -293,6 +299,7 @@ watch($.user, function(u) {
         } catch (e) {
             console.error('加载管理员数据失败', e.message, e.stack);
         } finally {
+            $.vmsLoading.value = false;
             $.loading.value = false;
         }
     };
@@ -898,10 +905,14 @@ $.initDetailCharts = function() {
         onMounted(async function() {
             var hasAccess = await $.loadUserData();
             if (hasAccess) {
-                await $.loadNavItems();
-                await $.loadAssignData();
-                await $.loadData();
-                await $.loadMacGroups();
+                // PERF-07: 初始化加载并行化（导航/VM 分配/业务数据/MAC 分组相互独立，
+                // 原串行需等待最慢接口完成，并行后总耗时 ≈ 最慢单个接口）
+                await Promise.all([
+                    $.loadNavItems(),
+                    $.loadAssignData(),
+                    $.loadData(),
+                    $.loadMacGroups()
+                ]);
                 // Auto-expand submenu based on current section
                 // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates / os-switch-logs → submenu-logs）
                 var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'os-switch-logs'];

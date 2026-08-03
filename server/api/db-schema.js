@@ -846,6 +846,36 @@ async function migrateSchema() {
     await safeAddIndex('orders', 'idx_orders_status', 'status, type, user_id');
     await safeAddIndex('pending_orders', 'idx_pending_orders_status', 'status');
 
+    // PERF-02: 补充高频 WHERE/JOIN 列索引（防御性，数据量增长后生效）
+    await safeAddIndex('memos', 'idx_memos_user_id', 'user_id');
+    await safeAddIndex('users', 'idx_users_role', 'role');
+    await safeAddIndex('backups', 'idx_backups_ct_id', 'ct_id');
+    await safeAddIndex('backups', 'idx_backups_user', 'user_id, type');
+    await safeAddIndex('lxc_containers', 'idx_lxc_pve_upid', 'pve_upid');
+    await safeAddIndex('cdk_codes', 'idx_cdk_is_used', 'is_used');
+    await safeAddIndex('cdk_codes', 'idx_cdk_used_vm_id', 'used_vm_id');
+    await safeAddIndex('cdk_codes', 'idx_cdk_used_ct_id', 'used_ct_id');
+    await safeAddIndex('transaction_records', 'idx_tr_pay_time', 'pay_time');
+    await safeAddIndex('transaction_records', 'idx_tr_trade_type', 'trade_type');
+    await safeAddIndex('transaction_records', 'idx_tr_pay_method', 'pay_method');
+    await safeAddIndex('orders', 'idx_orders_resource_id', 'resource_id');
+    await safeAddIndex('disks', 'idx_disks_storage_group_id', 'storage_group_id');
+    await safeAddIndex('disks', 'idx_disks_spec_id', 'spec_id');
+    await safeAddIndex('disks', 'idx_disks_holding_vmid', 'holding_vmid');
+    await safeAddIndex('disks', 'idx_disks_expire', 'status, expire_time');
+    await safeAddIndex('vm_templates', 'idx_vm_templates_vmid', 'template_vmid');
+    await safeAddIndex('vm_templates', 'idx_vm_templates_status', 'status');
+    // 注：lxc_templates 无 template_vmid 列（标识为 ostemplate），JOIN 走主键 id，无需 vmid 索引
+    await safeAddIndex('lxc_templates', 'idx_lxc_templates_status', 'status');
+    await safeAddIndex('vm_packages', 'idx_vm_packages_group_id', 'group_id');
+    await safeAddIndex('vm_packages', 'idx_vm_packages_template_id', 'template_id');
+    await safeAddIndex('vm_packages', 'idx_vm_packages_status', 'status');
+    await safeAddIndex('lxc_packages', 'idx_lxc_packages_group_id', 'group_id');
+    await safeAddIndex('lxc_packages', 'idx_lxc_packages_template_id', 'template_id');
+    await safeAddIndex('lxc_packages', 'idx_lxc_packages_status', 'status');
+    await safeAddIndex('messages', 'idx_messages_type', 'type');
+    await safeAddIndex('vm_os_switch_logs', 'idx_os_switch_user_started', 'user_id, started_at');
+
     // 注：孤立端口转发规则（vm_id 和 ct_id 均为 NULL）不再自动迁移为 general 类型
     // 如需修改类型，请管理员在端口转发管理界面手动编辑
 }
