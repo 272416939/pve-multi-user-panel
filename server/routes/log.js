@@ -41,26 +41,24 @@ function buildLoginDetailText(obj, location) {
 }
 
 // 组装操作日志详情展示文本：
-// - user.login 行按「登录成功,帐号:xxx,登录IP:ip>归属地:xxx」格式
-// - 其余行取文本（兼容旧 JSON 记录）
-// - 统一加操作者 IP 归属地前缀：IP(归属地) 详情（列表与导出共用）
+// - user.login 行按「登录成功,帐号:xxx,登录IP:ip>归属地:xxx」格式（已含归属地，不再加前缀）
+// - 其余行取文本（兼容旧 JSON 记录）并加操作者 IP 归属地前缀：IP(归属地) 详情
+// - 列表与导出共用
 function buildRowDetail(r, locMap) {
-    var detailText = '';
     if (r.action === 'user.login') {
+        // user.login 详情已含 登录IP:...>归属地:...，加前缀会重复，直接返回
         try {
             var obj = JSON.parse(r.details || '{}');
             if (obj && typeof obj === 'object') {
                 var rawIp = String(obj.ip || '').replace(/:\d+$/, '');
-                detailText = buildLoginDetailText(obj, locMap[rawIp] || '');
-            } else {
-                detailText = buildDetailText(r.details);
+                return buildLoginDetailText(obj, locMap[rawIp] || '');
             }
+            return buildDetailText(r.details);
         } catch (_) {
-            detailText = buildDetailText(r.details);
+            return buildDetailText(r.details);
         }
-    } else {
-        detailText = buildDetailText(r.details);
     }
+    var detailText = buildDetailText(r.details);
     var ipPrefix = '';
     if (r.ip) {
         ipPrefix = r.ip + (locMap[r.ip] ? '(' + locMap[r.ip] + ') ' : ' ');
