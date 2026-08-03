@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.33.9] - 2026-08-03
+
+### Added
+- **feat(admin): 站点设置新增「用户日志上限」配置**
+  - 新增 `GET/PUT /api/admin/log/config`，读写 `log:keep_count` 配置
+  - 校验范围 100–100000，默认 5000，保存即实时生效
+  - 前端站点设置「Redis 缓存配置」下方新增配置卡片
+- **feat(logs): 日志页新增保留上限 Tips 提示**
+  - Tips 展示后端返回的 `logKeepCount` 动态值，提示用户日志保留策略
+
+### Changed
+- style(logs): Tips 提示改用主题红色变量（`--color-danger`），深色模式自动加深
+- docs(skills): 新增侧边栏与标签状态保持规范（刷新后状态不丢）
+- chore: 从 git 移除误提交的 `.zcode` 技能文件，严格遵循 `.gitignore`（`.zcode/` 不入库）
+
 ## [2.33.8] - 2026-08-03
 
 ### Added
