@@ -137,6 +137,7 @@
                     <a class="nav-item" data-subsection="settings-network" href="#" @click.prevent="switchAdminTab('network')"><span class="nav-text">网络管理</span></a>
                     <a class="nav-item" data-subsection="settings-pay" href="#" @click.prevent="switchAdminTab('pay')"><span class="nav-text">支付配置</span></a>
                     <a class="nav-item" data-subsection="settings-site" href="#" @click.prevent="switchAdminTab('site')"><span class="nav-text">站点设置</span></a>
+                    <a class="nav-item" data-subsection="settings-uapipro" href="#" @click.prevent="switchAdminTab('uapipro')"><span class="nav-text">UApiPro</span></a>
                 </div>
 
                 <!-- 功能日志（父菜单，仅admin） -->

@@ -15,6 +15,7 @@ const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { hashPassword, verifyPassword } = require('../utils/password-hash');
 const cacheStore = require('../utils/cache-store');
+const { getIpLocation } = require('../services/ip-location');
 const { invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/safe-error');
 // profileCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
@@ -134,6 +135,16 @@ router.post('/admin/user/:id/disable-2fa', authMiddleware, adminMiddleware, asyn
 
 router.get('/user/devices', authMiddleware, async (req, res) => {
     const devices = await db.refreshTokens.getByUserId(req.user.id);
+    // UApiPro IP 归属地：按去重 IP 批量查询（带缓存），失败静默降级为空串
+    const uniqueIps = [...new Set(devices.map(d => d.ip).filter(Boolean))];
+    if (uniqueIps.length > 0) {
+        const results = await Promise.allSettled(uniqueIps.map(ip => getIpLocation(ip)));
+        const locMap = {};
+        uniqueIps.forEach((ip, i) => {
+            if (results[i].status === 'fulfilled') locMap[ip] = results[i].value || '';
+        });
+        devices.forEach(d => { d.ip_location = locMap[d.ip] || ''; });
+    }
     res.json(devices);
 });
 

@@ -497,6 +497,49 @@
                         </div>
                     </div>
 
+                <!-- UApiPro IP 归属地配置 -->
+                <div v-if="activeSection === 'settings' && activeTab === 'uapipro'">
+                    <div class="module-header">
+                        <h4 class="module-title">UApiPro IP 归属地查询</h4>
+                    </div>
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3">API 配置</h5>
+                            <p class="text-muted small mb-3">使用 uapis.cn 的 IP 归属地查询接口，为登录设备记录等位置显示 IP 归属地（如：203.0.113.42（示例运营商 中国 示例省 示例市））。API Key 将加密存储，留空则使用 uapis.cn 游客免费额度（有调用频率限制）。</p>
+                            <div class="form-check form-switch mb-3">
+                                <input class="form-check-input" type="checkbox" id="uapiproEnabled" v-model="uapiproConfig.enabled">
+                                <label class="form-check-label" for="uapiproEnabled">启用 IP 归属地显示</label>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">API Key</label>
+                                <input type="password" class="form-control" v-model="uapiproConfig.api_key" placeholder="uapis.cn 控制台签发的 API Key，留空则使用游客额度">
+                                <small class="text-muted">可在 uapis.cn/console 免费签发；通过 X-API-Key 请求头传递，请勿将 Key 放入 URL</small>
+                            </div>
+                            <pv-button type="button" variant="glass" @click="saveUapiproConfig" :disabled="uapiproSaving">
+                                {{ uapiproSaving ? '保存中...' : '保存配置' }}
+                            </pv-button>
+                        </div>
+                    </div>
+
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3">IP 查询测试</h5>
+                            <p class="text-muted small mb-3">输入公网 IP 验证归属地查询接口是否可用（直接外呼，不经缓存）。</p>
+                            <div class="d-flex gap-2 align-items-center flex-wrap">
+                                <input type="text" class="form-control" style="max-width:260px;" v-model="uapiproTestIp" placeholder="如: 8.8.8.8">
+                                <pv-button type="button" variant="outline" @click="testUapiproIpQuery" :disabled="uapiproTesting">
+                                    {{ uapiproTesting ? '查询中...' : '测试查询' }}
+                                </pv-button>
+                            </div>
+                            <div v-if="uapiproTestResult" class="mt-3" style="padding:12px;border-radius:8px;background:rgba(56,189,248,0.08);border:1px solid rgba(56,189,248,0.25);">
+                                <div class="small text-muted">查询 IP：{{ uapiproTestResult.ip }}</div>
+                                <div class="mt-1">{{ uapiproTestResult.location || '未查询到归属地信息' }}</div>
+                            </div>
+                            <div v-if="uapiproTestError" class="mt-3 text-danger small">{{ uapiproTestError }}</div>
+                        </div>
+                    </div>
+                </div>
+
                 </div>
                 <!-- end 系统设置区域 -->
 

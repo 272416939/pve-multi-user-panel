@@ -893,6 +893,8 @@ async function initDefaultConfig() {
         'redis:password': '',
         'redis:db': '0',
         'redis:prefix': 'pve:',
+        'uapipro:enabled': '0',
+        'uapipro:api_key': '',
         'disk:temp_vmid': '9999',
     };
 
