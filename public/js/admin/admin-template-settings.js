@@ -505,7 +505,7 @@
                     <div class="card">
                         <div class="card-body">
                             <h5 class="card-title mb-3">API 配置</h5>
-                            <p class="text-muted small mb-3">使用 uapis.cn 的 IP 归属地查询接口，为登录设备记录等位置显示 IP 归属地（如：111.29.236.38（中国移动 中国 海南 五指山））。API Key 将加密存储，留空则使用 uapis.cn 游客免费额度（有调用频率限制）。</p>
+                            <p class="text-muted small mb-3">使用 uapis.cn 的 IP 归属地查询接口，为登录设备记录等位置显示 IP 归属地（如：203.0.113.42（示例运营商 中国 示例省 示例市））。API Key 将加密存储，留空则使用 uapis.cn 游客免费额度（有调用频率限制）。</p>
                             <div class="form-check form-switch mb-3">
                                 <input class="form-check-input" type="checkbox" id="uapiproEnabled" v-model="uapiproConfig.enabled">
                                 <label class="form-check-label" for="uapiproEnabled">启用 IP 归属地显示</label>

@@ -70,7 +70,7 @@ function isPrivateIpv4(parts) {
 
 /**
  * 清洗 region 并拼装展示文本：isp + ' ' + region
- * "中国 海南省 五指山市 五指山市" → 去连续重复 → "中国 海南省 五指山市" → 去省市后缀 → "中国 海南 五指山"
+ * "示例省 示例市 示例区 示例区" → 去连续重复 → "示例省 示例市 示例区"（再由 stripAdminSuffix 去行政区后缀）
  * @param {object} data - uapis.cn 响应体
  * @returns {string|null}
  */
@@ -84,7 +84,7 @@ function formatLocation(data) {
     var parts = [];
     var seen = {};
     region.split(/\s+/).filter(Boolean).forEach(function (seg) {
-        if (seen[seg]) return; // 去连续重复（如 "五指山市 五指山市"）
+        if (seen[seg]) return; // 去连续重复（如 "示例区 示例区"）
         seen[seg] = true;
         parts.push(parts.length === 0 ? seg : stripAdminSuffix(seg));
     });
