@@ -1,5 +1,24 @@
 # Changelog
 
+## [2.33.10] - 2026-08-03
+
+### Changed
+- **perf: 数据库补索引、Redis 缓存链路修复与表单加载提速**
+  - **数据库补索引（27 个）**：`migrateSchema()` 新增 PERF-02 索引块（`safeAddIndex` 幂等迁移，服务启动自动执行），覆盖 `memos.user_id`、`users.role`、`backups.ct_id`、`cdk_codes.is_used`、`transaction_records.pay_time`、`disks(status, expire_time)`、`vm_packages.template_id`、`messages.type`、`vm_os_switch_logs(user_id, started_at)` 等高频查询路径
+  - **Redis 缓存链路修复（核心 Bug）**：`cache-store.js` / `token-store.js` 原在模块加载时获取 Redis 客户端，而 Redis 配置在 listen 回调才从 DB 加载，导致 Redis 实际从未启用（缓存全走进程内存）。改为**惰性获取**（调用时才 `getRedisClient()`）；`scanDel` 适配 keyPrefix；Redis 读取失败静默回退内存
+  - **Redis 重连优化**：`retryStrategy` 持续重连（退避 `min(times*1000, 30000)`），删除无效参数 `offlineQueueMaxItems`
+  - **分布式锁修复**：`tasks.js` 锁 token 化，Lua 原子比对释放，防止误删他人锁
+  - **PVE 只读缓存**：`pve-api.js` 11 个只读方法加 30s 短 TTL 缓存（存储列表/模板/VM config/快照等），24 个写操作统一清缓存，异常不缓存
+  - **前端并行化**：admin/dashboard 初始化加载链改 `Promise.all`，消除串行等待
+  - **/disk-options 缓存**：复用管理端规格/存储分组缓存（300s），写操作统一失效
+  - **日志页 IP 归属地优化**：开关 60s 缓存、外呼失败不写缓存、single-flight 同 IP 并发去重
+- **docs(readme): 全量维护文档**，同步 v2.32.1~v2.33.9 新功能与项目结构
+
+### Notes
+- 索引迁移为幂等操作，升级后首次启动自动执行，无需手动 SQL
+- 修复后 Redis 缓存将真正生效（此前实际未启用），配置了 Redis 的环境重启后即生效
+- PVE 只读缓存 30s TTL，异常不缓存每次回源，不影响数据一致性
+
 ## [2.33.9] - 2026-08-03
 
 ### Added
