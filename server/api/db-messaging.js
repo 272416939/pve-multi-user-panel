@@ -42,6 +42,25 @@ function buildAuditCategoryWhere(category) {
     }
 }
 
+// 每用户日志保留上限清理（防写爆数据库，供定时任务调用）：
+// 只处理超限用户（GROUP BY HAVING COUNT > keep），取该用户第 keep+1 条 id 作为 cutoff，
+// 删除更旧的记录——走 user_id 索引，保留最新 keep 条不误删
+// table 仅限本文件内部白名单（audit_logs / login_logs），非用户输入
+const LOG_TRIM_TABLES = ['audit_logs', 'login_logs'];
+async function trimTableOverflow(table, keepCount) {
+    if (LOG_TRIM_TABLES.indexOf(table) === -1) return 0;
+    var keep = Math.max(parseInt(keepCount) || 5000, 100);
+    var users = await queryAll('SELECT user_id FROM ' + table + ' GROUP BY user_id HAVING COUNT(*) > ?', [keep]);
+    var total = 0;
+    for (var i = 0; i < users.length; i++) {
+        var cutoff = await queryOne('SELECT id FROM ' + table + ' WHERE user_id = ? ORDER BY id DESC LIMIT 1 OFFSET ?', [users[i].user_id, keep]);
+        if (!cutoff) continue;
+        var result = await execute('DELETE FROM ' + table + ' WHERE user_id = ? AND id < ?', [users[i].user_id, cutoff.id]);
+        total += result.affectedRows || 0;
+    }
+    return total;
+}
+
 const auditLogs = {
     create: async (data) => {
         // details 兼容两种形态：字符串（展示文本，原样存储）/ 对象（旧记录 JSON 序列化）
@@ -89,7 +108,9 @@ const auditLogs = {
         );
         return { rows: rows, total: totalRow.total, page: page, limit: limit };
     },
-    clearByUser: (userId) => execute('DELETE FROM audit_logs WHERE user_id = ?', [userId])
+    clearByUser: (userId) => execute('DELETE FROM audit_logs WHERE user_id = ?', [userId]),
+    // 每用户保留最新 keepCount 条，返回删除总数（供定时任务调用）
+    trimOverflow: (keepCount) => trimTableOverflow('audit_logs', keepCount)
 };
 
 // 登录日志（登录成功/失败）
@@ -132,7 +153,9 @@ const loginLogs = {
         );
         return { rows: rows, total: totalRow.total, page: page, limit: limit };
     },
-    clearByUser: (userId) => execute('DELETE FROM login_logs WHERE user_id = ?', [userId])
+    clearByUser: (userId) => execute('DELETE FROM login_logs WHERE user_id = ?', [userId]),
+    // 每用户保留最新 keepCount 条，返回删除总数（供定时任务调用）
+    trimOverflow: (keepCount) => trimTableOverflow('login_logs', keepCount)
 };
 
 // 备忘录操作

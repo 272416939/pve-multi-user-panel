@@ -913,6 +913,7 @@ async function initDefaultConfig() {
         'uapipro:enabled': '0',
         'uapipro:api_key': '',
         'disk:temp_vmid': '9999',
+        'log:keep_count': '5000',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {
