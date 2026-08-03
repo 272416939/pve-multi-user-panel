@@ -25,7 +25,7 @@
                 <!-- 筛选栏 -->
                 <div class="row g-2 mb-3">
                     <div class="col-auto" v-if="logTab === 'operation'">
-                        <select class="form-select form-select-sm" style="width:140px" v-model="opLogFilter.category">
+                        <select class="form-select form-select-sm" style="width:140px" v-model="opLogFilter.category" @change="searchLogs">
                             <option value="">全部</option>
                             <option value="user_login">用户登陆</option>
                             <option value="vm_lxc">操作VM/LXC</option>
@@ -37,7 +37,7 @@
                         </select>
                     </div>
                     <div class="col-auto" v-if="logTab === 'login'">
-                        <select class="form-select form-select-sm" style="width:140px" v-model="loginLogFilter.status">
+                        <select class="form-select form-select-sm" style="width:140px" v-model="loginLogFilter.status" @change="searchLogs">
                             <option value="">全部</option>
                             <option value="success">登录成功</option>
                             <option value="failed">登录失败</option>
