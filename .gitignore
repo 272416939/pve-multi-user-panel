@@ -29,8 +29,7 @@ package-lock.json
 .vscode/
 .idea/
 .trae/
-.zcode/*
-!.zcode/skills/
+.zcode/
 
 # 操作系统
 Thumbs.db
