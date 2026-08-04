@@ -144,12 +144,13 @@
                                 <pv-button variant="danger" size="sm" @click="clearAllMessages">清空已读</pv-button>
                             </div>
                         </div>
-                        <ul class="nav nav-pills mb-3" style="gap:4px">
-                            <li class="nav-item"><pv-button :class="{ active: msgType === 'all' }" @click="msgType = 'all'; loadMessages()">全部</pv-button></li>
-                            <li class="nav-item"><pv-button :class="{ active: msgType === '1' }" @click="msgType = '1'; loadMessages()">系统公告</pv-button></li>
-                            <li class="nav-item"><pv-button :class="{ active: msgType === '2' }" @click="msgType = '2'; loadMessages()">业务通知</pv-button></li>
-                            <li class="nav-item"><pv-button :class="{ active: msgType === '3' }" @click="msgType = '3'; loadMessages()">续费提醒</pv-button></li>
-                            <li class="nav-item"><pv-button :class="{ active: msgType === '5' }" @click="msgType = '5'; loadMessages()">客服私聊</pv-button></li>
+                        <!-- 消息类型 tabs：与 admin 日志中心一致的玻璃渐变药丸样式（nav-tabs） -->
+                        <ul class="nav nav-tabs mb-3">
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === 'all' }" href="#" @click.prevent="msgType = 'all'; loadMessages()">全部</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '1' }" href="#" @click.prevent="msgType = '1'; loadMessages()">系统公告</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '2' }" href="#" @click.prevent="msgType = '2'; loadMessages()">业务通知</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '3' }" href="#" @click.prevent="msgType = '3'; loadMessages()">续费提醒</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '5' }" href="#" @click.prevent="msgType = '5'; loadMessages()">客服私聊</a></li>
                         </ul>
                         <div v-if="messagesLoading" class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
