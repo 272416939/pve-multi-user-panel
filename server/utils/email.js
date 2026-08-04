@@ -1,9 +1,10 @@
 const nodemailer = require('nodemailer');
-const db = require('../api/db');
 
 // 统一获取站点名称（管理端可自定义），供邮件主题/模板头部使用，避免硬编码面板名
 async function getSiteName() {
     try {
+        // 行内懒加载避免 utils 顶层依赖 api 层（规范第七节：utils 是叶子层）
+        var db = require('../api/db');
         var name = await db.config.get('site:name');
         return name || '云服务控制台';
     } catch (e) {

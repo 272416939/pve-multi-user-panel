@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const db = require('../api/db');
 
 const CDK_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
@@ -16,6 +15,8 @@ function generateCdkCode() {
 }
 
 async function generateUniqueCdkCode() {
+    // 行内懒加载避免 utils 顶层依赖 api 层（规范第七节：utils 是叶子层）
+    const db = require('../api/db');
     let code;
     let attempts = 0;
     do {

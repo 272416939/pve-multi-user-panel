@@ -9,7 +9,10 @@
  * - 单次性：consumeSession 获取后立即删除，防止重放
  */
 const crypto = require('crypto');
-const { getRedisClient } = require('../api/redis');
+// 行内懒加载避免 utils 顶层依赖 api 层（规范第七节：utils 是叶子层）
+function getRedisClient() {
+    return require('../api/redis').getRedisClient();
+}
 
 const SESSION_TTL_SEC = 300; // 5 分钟
 const SESSION_PREFIX = 'console:session:';

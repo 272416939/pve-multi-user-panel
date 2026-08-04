@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const CryptoJS = require('crypto-js');
 const fs = require('fs');
 const path = require('path');
-const db = require('../api/db');
+// 注意：不 require ../api/db（历史死导入会与 db-config → crypto-utils 形成软环，已删除）
 
 // 尝试从多个来源获取 JWT_SECRET
 let JWT_SECRET = process.env.JWT_SECRET;
