@@ -11,7 +11,7 @@ require('dotenv').config();
 require('./utils/logger');
 const crypto = require('crypto');
 const { authMiddleware } = require('./middleware/auth');
-const { checkRateLimit } = require('./middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('./middleware/rate-limiter');
 
 // 统一设置服务器时区为 Asia/Shanghai，确保 new Date() 和数据库时间写入一致
 process.env.TZ = process.env.TZ || 'Asia/Shanghai';
@@ -229,7 +229,7 @@ app.get('/api/site/config', async (req, res) => {
 // MISC-5 修复：全局 API 限速（每 IP 每分钟 300 次请求）
 app.use('/api', async (req, res, next) => {
     try {
-        var limit = await checkRateLimit('ratelimit:global:' + req.ip, 300, 60000);
+        var limit = await checkConfiguredRateLimit('global', 'ratelimit:global:' + req.ip);
         if (!limit.allowed) {
             return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
         }

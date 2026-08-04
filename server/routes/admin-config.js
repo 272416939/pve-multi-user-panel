@@ -9,7 +9,7 @@ const pkg = require('../../package.json');
 const { safeError } = require('../utils/safe-error');
 const { maskSecret, isMasked, encrypt, decrypt } = require('../utils/crypto-utils');
 const { queryIpLocation } = require('../services/ip-location');
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkRateLimit, invalidateRateLimitCache } = require('../middleware/rate-limiter');
 // 运维业务下沉 services/（规范第七节）：版本检查/系统更新/Redis 管理
 const { checkForUpdates } = require('../services/release-check');
 const { executeUpdate } = require('../services/system-update');
@@ -276,7 +276,7 @@ router.put('/admin/uapipro/config', authMiddleware, adminMiddleware, async (req,
 // 测试查询：直接外呼 uapis.cn（不走缓存），验证 API Key / 连通性
 router.post('/admin/uapipro/test', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        var rateLimitResult = await checkRateLimit('ratelimit:uapipro-test:' + req.user.id, 10, 60 * 1000);
+        var rateLimitResult = await checkConfiguredRateLimit('uapipro_test', 'ratelimit:uapipro-test:' + req.user.id);
         if (!rateLimitResult.allowed) {
             return res.status(429).json({ error: '测试过于频繁，请稍后再试' });
         }
@@ -290,6 +290,93 @@ router.post('/admin/uapipro/test', authMiddleware, adminMiddleware, async (req, 
         var errMsg = e.response && e.response.data && e.response.data.message
             ? e.response.data.message : (e.message || '未知错误');
         res.status(400).json({ error: '查询失败: ' + errMsg });
+    }
+});
+
+// ========== 限速配置（安全防护·限速设置） ==========
+
+// GET /admin/rate-limit/config - 获取限速配置（含规则元数据与默认值，前端展示/恢复默认使用）
+router.get('/admin/rate-limit/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var config = await db.config.getRateLimits();
+        var { RATE_LIMIT_CATEGORIES } = require('../constants');
+        var categories = RATE_LIMIT_CATEGORIES.map(function(cat) {
+            return {
+                key: cat.key,
+                label: cat.label,
+                rules: cat.rules.map(function(rule) {
+                    var cur = config.rules[rule.key] || {};
+                    return {
+                        key: rule.key,
+                        label: rule.label,
+                        hint: rule.hint || '',
+                        enabled: cur.enabled !== false,
+                        max: cur.max || rule.max,
+                        windowSec: cur.windowSec || rule.windowSec,
+                        defaults: { enabled: true, max: rule.max, windowSec: rule.windowSec }
+                    };
+                })
+            };
+        });
+        res.json({ master_enabled: config.master_enabled, categories: categories });
+    } catch (e) {
+        console.error('[限速配置]', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+// PUT /admin/rate-limit/config - 保存限速配置（ruleKey 白名单 + 次数/时间窗范围校验）
+router.put('/admin/rate-limit/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var { RATE_LIMIT_RULES } = require('../constants');
+        var body = req.body || {};
+        var masterEnabled = body.master_enabled !== false;
+        var rules = {};
+        var cats = body.categories || [];
+        for (var i = 0; i < cats.length; i++) {
+            var catRules = (cats[i] && cats[i].rules) || [];
+            for (var j = 0; j < catRules.length; j++) {
+                var r = catRules[j];
+                if (!r || !RATE_LIMIT_RULES[r.key]) {
+                    return res.status(400).json({ error: '存在未知限速规则: ' + (r && r.key) });
+                }
+                var max = parseInt(r.max);
+                var windowSec = parseInt(r.windowSec);
+                if (!Number.isInteger(max) || max < 1 || max > 10000) {
+                    return res.status(400).json({ error: '限速次数须为 1-10000 的整数（规则: ' + r.key + '）' });
+                }
+                if (!Number.isInteger(windowSec) || windowSec < 1 || windowSec > 86400) {
+                    return res.status(400).json({ error: '时间窗须为 1-86400 秒的整数（规则: ' + r.key + '）' });
+                }
+                rules[r.key] = { enabled: r.enabled !== false, max: max, windowSec: windowSec };
+            }
+        }
+        // 前端全量提交，未覆盖的规则回退注册表默认（防御漏传）
+        Object.keys(RATE_LIMIT_RULES).forEach(function(k) {
+            if (!rules[k]) {
+                rules[k] = { enabled: true, max: RATE_LIMIT_RULES[k].max, windowSec: RATE_LIMIT_RULES[k].windowSec };
+            }
+        });
+        await db.config.setRateLimits({ master_enabled: masterEnabled, rules: rules });
+        // 失效 60s 缓存，让新配置立即生效
+        invalidateRateLimitCache();
+        // 审计埋点（security. 前缀 → 安全设置分类，审计失败不影响主流程）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({
+                userId: req.user.id,
+                username: req.user.username,
+                action: 'security.rate-limit',
+                resourceType: 'config',
+                resourceId: 'rate-limit',
+                details: '更新限速配置（总开关：' + (masterEnabled ? '开启' : '关闭') + '，规则 ' + Object.keys(rules).length + ' 项）',
+                req
+            });
+        } catch (e) {}
+        res.json({ message: '限速配置保存成功' });
+    } catch (e) {
+        console.error('[限速配置]', e.message);
+        res.status(500).json({ error: safeError(e) });
     }
 });
 

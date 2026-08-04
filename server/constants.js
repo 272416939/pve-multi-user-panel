@@ -45,6 +45,114 @@ var TEMPLATE_STATUS = ['active', 'maintenance', 'deprecated'];
 // 支付方式白名单
 var PAYMENT_METHODS = ['alipay', 'wxpay'];
 
+// ==================== 限速规则（安全防护·限速设置单一来源） ====================
+
+// 限速规则注册表：大类（category）→ 规则列表。
+// 默认 max/windowSec 与各调用点改造前的硬编码参数一致（默认全部开启）；
+// admin「安全防护 > 限速设置」页的展示、config 表 ratelimit:* 默认键、运行时校验白名单均由此生成。
+var RATE_LIMIT_CATEGORIES = [
+    {
+        key: 'global',
+        label: '全局限制',
+        rules: [
+            { key: 'global', label: '全局接口限速', hint: '所有 /api 请求，按 IP 统计', max: 300, windowSec: 60 }
+        ]
+    },
+    {
+        key: 'auth',
+        label: '登录认证',
+        rules: [
+            { key: 'login', label: '登录尝试', hint: '按 IP+用户名', max: 5, windowSec: 60 },
+            { key: 'login_2fa', label: '2FA 验证', hint: '按 IP+用户', max: 3, windowSec: 60 },
+            { key: 'refresh', label: '令牌刷新', hint: '按 IP', max: 30, windowSec: 60 },
+            { key: 'forgot', label: '找回密码邮件', hint: '按 IP，10 分钟 1 次', max: 1, windowSec: 600 },
+            { key: 'reset_pwd', label: '重置密码', hint: '按 IP', max: 5, windowSec: 60 }
+        ]
+    },
+    {
+        key: 'register',
+        label: '注册',
+        rules: [
+            { key: 'register_code', label: '注册验证码发送', hint: '按邮箱', max: 1, windowSec: 60 },
+            { key: 'register_code_ip', label: '注册验证码发送', hint: '按 IP，1 小时', max: 5, windowSec: 3600 },
+            { key: 'register', label: '注册提交', hint: '按 IP，1 小时', max: 3, windowSec: 3600 }
+        ]
+    },
+    {
+        key: 'cdk',
+        label: 'CDK 兑换',
+        rules: [
+            { key: 'cdk', label: 'CDK 兑换', hint: '按用户+IP', max: 5, windowSec: 60 }
+        ]
+    },
+    {
+        key: 'vm',
+        label: '虚拟机',
+        rules: [
+            { key: 'user_vms', label: '虚拟机列表查询', hint: '按用户', max: 10, windowSec: 60 },
+            { key: 'vm_status', label: '虚拟机状态查询', hint: '按用户', max: 30, windowSec: 60 },
+            { key: 'os_switch', label: '换系统操作', hint: '按用户', max: 5, windowSec: 60 },
+            { key: 'os_switch_status', label: '换系统状态查询', hint: '按用户', max: 30, windowSec: 60 },
+            { key: 'provision_status', label: '开通状态查询', hint: '按用户', max: 30, windowSec: 60 }
+        ]
+    },
+    {
+        key: 'lxc',
+        label: 'LXC 容器',
+        rules: [
+            { key: 'user_lxc', label: '容器列表查询', hint: '按用户', max: 10, windowSec: 60 },
+            { key: 'lxc_status', label: '容器状态查询', hint: '按用户', max: 30, windowSec: 60 },
+            { key: 'vm_backups', label: 'VM 备份列表查询', hint: '按用户', max: 30, windowSec: 60 },
+            { key: 'lxc_backups', label: 'LXC 备份列表查询', hint: '按用户', max: 30, windowSec: 60 }
+        ]
+    },
+    {
+        key: 'backup',
+        label: '备份操作',
+        rules: [
+            { key: 'backup_op', label: '创建备份', hint: '按用户', max: 5, windowSec: 60 },
+            { key: 'restore_op', label: '恢复备份', hint: '按用户', max: 5, windowSec: 60 }
+        ]
+    },
+    {
+        key: 'disk',
+        label: '磁盘操作',
+        rules: [
+            { key: 'disk_purchase', label: '购买磁盘', hint: '按用户', max: 2, windowSec: 60 },
+            { key: 'disk_bind', label: '绑定磁盘', hint: '按用户', max: 2, windowSec: 10 },
+            { key: 'disk_unbind', label: '解绑磁盘', hint: '按用户', max: 2, windowSec: 10 },
+            { key: 'disk_resize', label: '扩容磁盘', hint: '按用户', max: 20, windowSec: 60 },
+            { key: 'disk_destroy', label: '销毁磁盘', hint: '按用户', max: 20, windowSec: 60 },
+            { key: 'disk_renew', label: '续费磁盘', hint: '按用户', max: 2, windowSec: 30 }
+        ]
+    },
+    {
+        key: 'log',
+        label: '日志清理',
+        rules: [
+            { key: 'log_clear_op', label: '清空操作日志', hint: '按用户', max: 5, windowSec: 60 },
+            { key: 'log_clear_login', label: '清空登录日志', hint: '按用户', max: 5, windowSec: 60 }
+        ]
+    },
+    {
+        key: 'other',
+        label: '其他',
+        rules: [
+            { key: 'notification_settings', label: '通知设置保存', hint: '按用户', max: 30, windowSec: 60 },
+            { key: 'uapipro_test', label: 'UApiPro 测试查询', hint: '按用户', max: 10, windowSec: 60 },
+            { key: 'random_port', label: '随机端口申请', hint: '按用户', max: 30, windowSec: 60 }
+        ]
+    }
+];
+
+// 拍平映射：ruleKey → 规则定义（运行时查表 / 保存校验白名单直接使用）
+var RATE_LIMIT_RULES = {};
+RATE_LIMIT_CATEGORIES.forEach(function(cat) {
+    cat.rules.forEach(function(rule) {
+        RATE_LIMIT_RULES[rule.key] = rule;
+    });
+});
+
 // ==================== 便捷函数（保留各调用点原有回退语义） ====================
 
 /**
@@ -95,6 +203,8 @@ module.exports = {
     ORDER_STATUS,
     TEMPLATE_STATUS,
     PAYMENT_METHODS,
+    RATE_LIMIT_CATEGORIES,
+    RATE_LIMIT_RULES,
     getPeriodDays,
     getPeriodMonths,
     getPeriodUnit,

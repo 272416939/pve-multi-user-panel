@@ -16,6 +16,10 @@
     $.activeTabLxc = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_LXC) || 'create');
     $.activeTabVm = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_VM) || 'manage');
     $.activeTabDisk = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_DISK) || 'storage-groups');
+    // 安全防护 section 子标签（当前仅 限速设置；白名单校验 + 非法值回退默认，键名规范第四节）
+    var securityTabWhitelist = ['ratelimit'];
+    var savedSecurityTab = localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_SECURITY);
+    $.activeTabSecurity = ref(securityTabWhitelist.indexOf(savedSecurityTab) !== -1 ? savedSecurityTab : 'ratelimit');
     $.loading = ref(false);
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
@@ -869,7 +873,7 @@ $.initDetailCharts = function() {
                 ]);
                 // Auto-expand submenu based on current section
                 // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates / os-switch-logs → submenu-logs）
-                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'os-switch-logs'];
+                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'os-switch-logs'];
                 var submenuIdMap = { 'templates-os': 'templates', 'os-switch-logs': 'logs' };
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
@@ -878,6 +882,7 @@ $.initDetailCharts = function() {
                         var tabVar = {
                             vms: $.activeTabVm, lxc: $.activeTabLxc,
                             manage: $.activeTab, settings: $.activeTab,
+                            security: $.activeTabSecurity,
                             templates: $.activeTabTemplates, packages: $.activeTabPackages,
                             finance: $.activeTab
                         }[section];
@@ -1003,6 +1008,10 @@ $.initDetailCharts = function() {
                 if ($.activeTab.value === 'uapipro') {
                     $.loadUapiproConfig();
                 }
+                // 刷新后停留在安全防护·限速设置时主动加载配置（watch 不会在初始化时触发）
+                if ($.activeSection.value === 'security' && $.activeTabSecurity.value === 'ratelimit') {
+                    $.loadRateLimitConfig();
+                }
                 if ($.activeTab.value === 'orders') {
                     $.loadOrders(1);
                 }
@@ -1054,6 +1063,10 @@ $.initDetailCharts = function() {
                 $.loadTransactions(1);
             }
             if (newTab === 'users') { $.loadUsers(1); }
+        });
+
+        watch($.activeTabSecurity, function(newTab) {
+            localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB_SECURITY, newTab);
         });
 
         watch($.activeTabPackages, function(newTab) {

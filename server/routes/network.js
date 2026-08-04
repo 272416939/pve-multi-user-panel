@@ -8,7 +8,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, getWanInterface, getWanInterfaces } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 const { safeError } = require('../utils/safe-error');
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
 
@@ -580,7 +580,7 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
     try {
         // SEC-02: 代理外部 API（ikuai）端点加速率限制，防止滥用导致外部系统 DoS
         const rateLimitKey = 'ratelimit:random-port:' + req.user.id;
-        const rateLimitResult = await checkRateLimit(rateLimitKey, 30, 60 * 1000);
+        const rateLimitResult = await checkConfiguredRateLimit('random_port', rateLimitKey);
         if (!rateLimitResult.allowed) {
             return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
         }

@@ -690,9 +690,98 @@
         }
     };
 
+    // ==================== 安全防护·限速设置 ====================
+    $.rateLimitConfig = ref({ master_enabled: true, categories: [] });
+    $.rateLimitSaving = ref(false);
+
+    // 秒 → 显示值+单位（整小时→小时，整分钟→分钟，否则秒）；时间窗统一以秒存储
+    function secToWindowUI(sec) {
+        if (sec % 3600 === 0) return { windowValue: sec / 3600, windowUnit: 'hour' };
+        if (sec % 60 === 0) return { windowValue: sec / 60, windowUnit: 'min' };
+        return { windowValue: sec, windowUnit: 'sec' };
+    }
+    // 显示值+单位 → 秒
+    function windowUIToSec(value, unit) {
+        if (unit === 'hour') return value * 3600;
+        if (unit === 'min') return value * 60;
+        return value;
+    }
+
+    $.loadRateLimitConfig = async function() {
+        try {
+            var data = await api('/admin/rate-limit/config');
+            // 注入 windowValue/windowUnit 供表单编辑（原始秒值保留在 windowSec）
+            data.categories.forEach(function(cat) {
+                cat.rules.forEach(function(rule) {
+                    var ui = secToWindowUI(rule.windowSec);
+                    rule.windowValue = ui.windowValue;
+                    rule.windowUnit = ui.windowUnit;
+                });
+            });
+            $.rateLimitConfig.value = data;
+        } catch (e) {
+            console.error('加载限速配置失败', e);
+        }
+    };
+
+    $.saveRateLimitConfig = async function() {
+        if ($.rateLimitSaving.value) return;
+        var cfg = $.rateLimitConfig.value;
+        // 前端兜底校验（与后端一致：次数 1-10000，时间窗 1-86400 秒）
+        for (var i = 0; i < cfg.categories.length; i++) {
+            var cat = cfg.categories[i];
+            for (var j = 0; j < cat.rules.length; j++) {
+                var rule = cat.rules[j];
+                var max = parseInt(rule.max);
+                var windowSec = windowUIToSec(parseInt(rule.windowValue) || 0, rule.windowUnit);
+                if (!Number.isInteger(max) || max < 1 || max > 10000) {
+                    alert('规则「' + rule.label + '」限速次数须为 1-10000 的整数');
+                    return;
+                }
+                if (!Number.isInteger(windowSec) || windowSec < 1 || windowSec > 86400) {
+                    alert('规则「' + rule.label + '」时间窗须在 1 秒 ~ 24 小时之间');
+                    return;
+                }
+                rule.max = max;
+                rule.windowSec = windowSec;
+            }
+        }
+        $.rateLimitSaving.value = true;
+        try {
+            await api('/admin/rate-limit/config', {
+                method: 'PUT',
+                body: JSON.stringify({ master_enabled: !!cfg.master_enabled, categories: cfg.categories })
+            });
+            alert('限速配置保存成功');
+            await $.loadRateLimitConfig();
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        } finally {
+            $.rateLimitSaving.value = false;
+        }
+    };
+
+    // 恢复默认：将每条规则与总开关还原为服务端下发的 defaults（与系统内置一致）
+    $.resetRateLimitConfig = async function() {
+        if ($.rateLimitSaving.value) return;
+        var cfg = $.rateLimitConfig.value;
+        if (!cfg.categories || !cfg.categories.length) return;
+        cfg.master_enabled = true;
+        cfg.categories.forEach(function(cat) {
+            cat.rules.forEach(function(rule) {
+                rule.enabled = rule.defaults.enabled;
+                rule.max = rule.defaults.max;
+                rule.windowSec = rule.defaults.windowSec;
+                var ui = secToWindowUI(rule.windowSec);
+                rule.windowValue = ui.windowValue;
+                rule.windowUnit = ui.windowUnit;
+            });
+        });
+        await $.saveRateLimitConfig();
+    };
+
     // 财务管理 - 交易流水
-    $.financeFilter = ref({ start_time: '', end_time: '', pay_method: '', trade_type: '', order_no: '' });
-    $.transactionList = ref([]);
+    $.financeFilter = ref({ start_time: '', end_time: '', pay_method: '', trade_type: '', order_no: '' });    $.transactionList = ref([]);
     $.transactionTotal = ref(0);
     $.financePage = ref(1);
 

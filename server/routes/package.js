@@ -7,7 +7,7 @@ var { authMiddleware, adminMiddleware } = require('../middleware/auth');
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
 var cacheStore = require('../utils/cache-store');
-var { checkRateLimit } = require('../middleware/rate-limiter');
+var { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 // 单一来源：周期常量统一走 constants（规范第七节）
 var { VALID_PERIODS } = require('../constants');
@@ -352,7 +352,7 @@ router.get('/provision-status', authMiddleware, async (req, res) => {
 
         // SEC-02: 速率限制（每用户每分钟 30 次，略高于前端 3 秒轮询频率）
         var rateLimitKey = 'ratelimit:provision-status:' + req.user.id;
-        var rateLimitResult = await checkRateLimit(rateLimitKey, 30, 60 * 1000);
+        var rateLimitResult = await checkConfiguredRateLimit('provision_status', rateLimitKey);
         if (!rateLimitResult.allowed) {
             return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
         }

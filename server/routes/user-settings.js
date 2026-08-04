@@ -4,7 +4,7 @@
 const express = require('express');
 const router = express.Router();
 const { authMiddleware } = require('../middleware/auth');
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 
 // 获取用户通知设置
@@ -22,7 +22,7 @@ router.get('/user/notification-settings', authMiddleware, async (req, res) => {
 // 更新用户通知设置（支持部分更新，自动保存）
 router.put('/user/notification-settings', authMiddleware, async (req, res) => {
     // SEC-02: 速率限制 - 每用户 60 秒 30 次
-    var limit = await checkRateLimit('settings:' + req.user.id, 30, 60000);
+    var limit = await checkConfiguredRateLimit('notification_settings', 'settings:' + req.user.id);
     if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
 
     try {

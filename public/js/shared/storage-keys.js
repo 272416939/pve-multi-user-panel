@@ -12,6 +12,7 @@ window.__storageKeys = {
     ADMIN_ACTIVE_TAB_VM: 'admin_activeTabVm',
     ADMIN_ACTIVE_TAB_LXC: 'admin_activeTabLxc',
     ADMIN_ACTIVE_TAB_DISK: 'admin_activeTabDisk',
+    ADMIN_ACTIVE_TAB_SECURITY: 'admin_activeTabSecurity',
     ADMIN_ACTIVE_TAB_TEMPLATES: 'admin_activeTabTemplates',
     ADMIN_ACTIVE_TAB_PACKAGES: 'admin_activeTabPackages',
 

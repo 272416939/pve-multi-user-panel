@@ -6,7 +6,7 @@
 var express = require('express');
 var router = express.Router();
 var { authMiddleware } = require('../middleware/auth');
-var { checkRateLimit } = require('../middleware/rate-limiter');
+var { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 var { safeError } = require('../utils/safe-error');
 var db = require('../api/db');
 var cacheStore = require('../utils/cache-store');
@@ -106,7 +106,7 @@ router.get('/disk-options', authMiddleware, async (req, res) => {
 // 购买数据盘（业务在 services/disk.js）
 router.post('/disks/purchase', authMiddleware, async (req, res) => {
   // 限速：每用户 60 秒 2 次
-  var limit = await checkRateLimit('disk_purchase:' + req.user.id, 2, 60000);
+  var limit = await checkConfiguredRateLimit('disk_purchase', 'disk_purchase:' + req.user.id);
   if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
 
   try {
@@ -155,7 +155,7 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
 
 // 挂载磁盘到虚拟机（业务在 services/disk.js）
 router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwnership, async (req, res) => {
-  var limit = await checkRateLimit('disk_bind:' + req.user.id, 2, 10000);
+  var limit = await checkConfiguredRateLimit('disk_bind', 'disk_bind:' + req.user.id);
   if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁' });
 
   try {
@@ -177,7 +177,7 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
 
 // 卸载磁盘（业务在 services/disk.js）
 router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req, res) => {
-  var limit = await checkRateLimit('disk_unbind:' + req.user.id, 2, 10000);
+  var limit = await checkConfiguredRateLimit('disk_unbind', 'disk_unbind:' + req.user.id);
   if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁' });
 
   try {
@@ -198,7 +198,7 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
 
 // 扩容磁盘（业务在 services/disk.js）
 router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req, res) => {
-  var limit = await checkRateLimit('disk_resize:' + req.user.id, 20, 60000);
+  var limit = await checkConfiguredRateLimit('disk_resize', 'disk_resize:' + req.user.id);
   if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁' });
 
   try {
@@ -225,7 +225,7 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
 
 // 销毁磁盘（业务在 services/disk.js）
 router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req, res) => {
-  var limit = await checkRateLimit('disk_destroy:' + req.user.id, 20, 60000);
+  var limit = await checkConfiguredRateLimit('disk_destroy', 'disk_destroy:' + req.user.id);
   if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁' });
 
   try {
@@ -246,7 +246,7 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
 
 // 续费磁盘（业务在 services/disk.js）
 router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, res) => {
-  var limit = await checkRateLimit('disk_renew:' + req.user.id, 2, 30000);
+  var limit = await checkConfiguredRateLimit('disk_renew', 'disk_renew:' + req.user.id);
   if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁' });
 
   try {

@@ -140,6 +140,16 @@
                     <a class="nav-item" data-subsection="settings-uapipro" href="#" @click.prevent="switchAdminTab('uapipro')"><span class="nav-text">UApiPro</span></a>
                 </div>
 
+                <!-- 安全防护（父菜单，仅admin） -->
+                <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('security')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+                    <span class="nav-text">安全防护</span>
+                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+                </a>
+                <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-security">
+                    <a class="nav-item" data-subsection="security-ratelimit" href="#" @click.prevent="switchSection('security'); activeTabSecurity = 'ratelimit'"><span class="nav-text">限速设置</span></a>
+                </div>
+
                 <!-- 功能日志（父菜单，仅admin） -->
                 <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('logs')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>

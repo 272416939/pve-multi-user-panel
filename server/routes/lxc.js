@@ -13,7 +13,7 @@ const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = requir
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
 // 单一来源：周期白名单统一走 constants（规范第七节）
@@ -60,7 +60,7 @@ router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 router.get('/user/lxc', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
-        const listRate = await checkRateLimit('ratelimit:user-lxc:' + req.user.id, 10, 60000);
+        const listRate = await checkConfiguredRateLimit('user_lxc', 'ratelimit:user-lxc:' + req.user.id);
         if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
 
         let userCts;
@@ -734,7 +734,7 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
 router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：状态查询端点限速（30次/分钟）
-        const statusRate = await checkRateLimit('ratelimit:lxc-status:' + req.user.id, 30, 60000);
+        const statusRate = await checkConfiguredRateLimit('lxc_status', 'ratelimit:lxc-status:' + req.user.id);
         if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
 
         const vmid = parseInt(req.params.vmid);

@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const { execute, queryOne, queryAll, mysqlNow } = require('./db-core');
+// 限速规则注册表（单一来源）：ratelimit:* 默认键由 RATE_LIMIT_RULES 程序化生成
+const { RATE_LIMIT_RULES } = require('../constants');
 
 /**
  * 生成指定长度的随机强密码（使用 crypto.randomBytes，兼容 Node.js）
@@ -950,6 +952,28 @@ async function initDefaultConfig() {
         await execute(
             'INSERT IGNORE INTO config (`key`, value) VALUES (?, ?)',
             [key, value]
+        );
+    }
+
+    // 限速规则默认配置（安全防护·限速设置）：总开关默认开启，全部规则默认开启，
+    // 次数/时间窗默认值与 RATE_LIMIT_RULES 注册表一致（即改造前的硬编码参数）
+    await execute(
+        'INSERT IGNORE INTO config (`key`, value) VALUES (?, ?)',
+        ['ratelimit:master_enabled', '1']
+    );
+    for (const ruleKey of Object.keys(RATE_LIMIT_RULES)) {
+        const rule = RATE_LIMIT_RULES[ruleKey];
+        await execute(
+            'INSERT IGNORE INTO config (`key`, value) VALUES (?, ?)',
+            ['ratelimit:' + ruleKey + ':enabled', '1']
+        );
+        await execute(
+            'INSERT IGNORE INTO config (`key`, value) VALUES (?, ?)',
+            ['ratelimit:' + ruleKey + ':max', String(rule.max)]
+        );
+        await execute(
+            'INSERT IGNORE INTO config (`key`, value) VALUES (?, ?)',
+            ['ratelimit:' + ruleKey + ':window', String(rule.windowSec)]
         );
     }
 }

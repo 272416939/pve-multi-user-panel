@@ -4,7 +4,6 @@ const router = express.Router();
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const { checkRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 // 单一来源：模板状态白名单统一走 constants（规范第七节）
 const { TEMPLATE_STATUS } = require('../constants');

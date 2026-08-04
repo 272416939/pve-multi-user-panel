@@ -12,7 +12,7 @@ const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 const tokenStore = require('../utils/token-store');
 const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
 
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { sanitizeUser } = require('../utils/safe-error');
 const { hashPassword, verifyPassword, needsUpgrade } = require('../utils/password-hash');
 // 本地时间格式化统一走 utils/date.js（规范第八节：禁止自写/复用 toISOString 直写）
@@ -21,7 +21,7 @@ const RATELIMIT_PREFIX = 'ratelimit:login:';
 
 async function checkLoginRateLimit(ip, username) {
     const key = `${RATELIMIT_PREFIX}${ip}:${username}`;
-    return checkRateLimit(key, 5, 60000);
+    return checkConfiguredRateLimit('login', key);
 }
 
 // 登录日志埋点（成功/失败），写入失败不阻断登录流程
@@ -151,7 +151,7 @@ router.post('/login/2fa', async (req, res) => {
         // 令牌无效，后续校验会拦截
     }
 
-    const tfaLimit = await checkRateLimit(`ratelimit:2fa:${req.ip}:${rateLimitUserId || 'unknown'}`, 3, 60000);
+    const tfaLimit = await checkConfiguredRateLimit('login_2fa', `ratelimit:2fa:${req.ip}:${rateLimitUserId || 'unknown'}`);
     if (!tfaLimit.allowed) {
         return res.status(429).json({ error: '2FA 验证过于频繁，请 60 秒后重试' });
     }
@@ -264,7 +264,7 @@ router.post('/login/2fa', async (req, res) => {
 
 router.post('/auth/refresh', async (req, res) => {
     try {
-        var rateLimitResult = await checkRateLimit('ratelimit:refresh:' + req.ip, 30, 60000);
+        var rateLimitResult = await checkConfiguredRateLimit('refresh', 'ratelimit:refresh:' + req.ip);
         if (!rateLimitResult.allowed) return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
 
         const { refreshToken } = req.body;
@@ -333,7 +333,7 @@ router.post('/logout', async (req, res) => {
 });
 
 router.post('/auth/forgot-password', async (req, res) => {
-    const forgotLimit = await checkRateLimit(`ratelimit:forgot:${req.ip}`, 1, 600000);
+    const forgotLimit = await checkConfiguredRateLimit('forgot', `ratelimit:forgot:${req.ip}`);
     if (!forgotLimit.allowed) {
         return res.status(429).json({ error: '密码重置邮件发送过于频繁，请 10 分钟后重试' });
     }
@@ -393,7 +393,7 @@ router.post('/auth/forgot-password', async (req, res) => {
 
 router.get('/auth/reset-password/:token', async (req, res) => {
     try {
-        const resetLimit = await checkRateLimit(`ratelimit:reset-pwd:${req.ip}`, 5, 60000);
+        const resetLimit = await checkConfiguredRateLimit('reset_pwd', `ratelimit:reset-pwd:${req.ip}`);
         if (!resetLimit.allowed) {
             return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
         }
@@ -413,7 +413,7 @@ router.get('/auth/reset-password/:token', async (req, res) => {
 
 router.post('/auth/reset-password', async (req, res) => {
     try {
-        const resetLimit = await checkRateLimit(`ratelimit:reset-pwd:${req.ip}`, 5, 60000);
+        const resetLimit = await checkConfiguredRateLimit('reset_pwd', `ratelimit:reset-pwd:${req.ip}`);
         if (!resetLimit.allowed) {
             return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
         }
@@ -492,7 +492,7 @@ router.post('/register/send-code', async (req, res) => {
         }
 
         // 限速1：同一邮箱 1 次/60 秒
-        const emailLimit = await checkRateLimit(`ratelimit:register-code:${email}`, 1, 60000);
+        const emailLimit = await checkConfiguredRateLimit('register_code', `ratelimit:register-code:${email}`);
         if (!emailLimit.allowed) {
             return res.status(429).json({
                 error: '验证码发送过于频繁，请稍后再试',
@@ -501,7 +501,7 @@ router.post('/register/send-code', async (req, res) => {
         }
 
         // 限速2：同一 IP 5 次/小时
-        const ipLimit = await checkRateLimit(`ratelimit:register-code-ip:${req.ip}`, 5, 3600000);
+        const ipLimit = await checkConfiguredRateLimit('register_code_ip', `ratelimit:register-code-ip:${req.ip}`);
         if (!ipLimit.allowed) {
             return res.status(429).json({
                 error: '请求过于频繁，请稍后再试',
@@ -549,7 +549,7 @@ router.post('/register', async (req, res) => {
         }
 
         // 限速：同一 IP 3 次/小时
-        const ipLimit = await checkRateLimit(`ratelimit:register:${req.ip}`, 3, 3600000);
+        const ipLimit = await checkConfiguredRateLimit('register', `ratelimit:register:${req.ip}`);
         if (!ipLimit.allowed) {
             return res.status(429).json({
                 error: '注册请求过于频繁，请稍后再试',

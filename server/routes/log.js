@@ -4,7 +4,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
 const { authMiddleware } = require('../middleware/auth');
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 // 审计分类单一来源：白名单/中文名/action→分类映射均来自 db-messaging.js，禁止本地拷贝
 const { AUDIT_CATEGORIES, AUDIT_CATEGORY_NAMES, actionToCategory } = require('../api/db-messaging');
@@ -253,7 +253,7 @@ router.post('/logs/operation/clear', authMiddleware, async (req, res) => {
         if (req.body.confirm !== 'CLEAR_OPERATION_LOGS') {
             return res.status(400).json({ error: '确认串不正确' });
         }
-        var limit = await checkRateLimit('log-clear-op:' + req.user.id, 5, 60000);
+        var limit = await checkConfiguredRateLimit('log_clear_op', 'log-clear-op:' + req.user.id);
         if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
         await db.auditLogs.clearByUser(req.user.id);
         res.json({ message: '操作日志已清空' });
@@ -268,7 +268,7 @@ router.post('/logs/login/clear', authMiddleware, async (req, res) => {
         if (req.body.confirm !== 'CLEAR_LOGIN_LOGS') {
             return res.status(400).json({ error: '确认串不正确' });
         }
-        var limit = await checkRateLimit('log-clear-login:' + req.user.id, 5, 60000);
+        var limit = await checkConfiguredRateLimit('log_clear_login', 'log-clear-login:' + req.user.id);
         if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
         await db.loginLogs.clearByUser(req.user.id);
         res.json({ message: '登录日志已清空' });

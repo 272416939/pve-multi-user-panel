@@ -8,10 +8,10 @@ const { safeError } = require('../utils/safe-error');
 const cdkService = require('../services/cdk');
 const pveApi = require('../api/pve-api');
 
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 
 async function checkCdkRateLimit(userId, ip) {
-    return checkRateLimit(`ratelimit:cdk:${userId}:${ip}`, 5, 60000);
+    return checkConfiguredRateLimit('cdk', `ratelimit:cdk:${userId}:${ip}`);
 }
 
 router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, res) => {
