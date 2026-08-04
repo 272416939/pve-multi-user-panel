@@ -405,6 +405,62 @@ const confirmCancel = (customConfirmResolve) => {
     }
 };
 
+// 自定义 Prompt 弹窗（带输入框，基于 Promise）——原 admin/core.js 实现统一收编，三端共享
+const setupCustomPrompt = (customPromptMessage, customPromptValue, customPromptResolve) => {
+    window.customPrompt = (message, defaultValue) => {
+        return new Promise((resolve) => {
+            customPromptMessage.value = message;
+            customPromptValue.value = defaultValue || '';
+            customPromptResolve.value = resolve;
+            const el = document.getElementById('customPromptModal');
+            if (!el) { resolve(null); return; }
+            if (document.activeElement && document.activeElement !== document.body) {
+                document.activeElement.blur();
+            }
+            const old = bootstrap.Modal.getInstance(el);
+            if (old) old.dispose();
+            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
+            window.applyModalZIndex(el);
+            const modal = new bootstrap.Modal(el, { focus: false });
+            modal.show();
+            // shown 后聚焦输入框（applyModalZIndex 已处理 backdrop z-index）
+            el.addEventListener('shown.bs.modal', function onShown() {
+                el.removeEventListener('shown.bs.modal', onShown);
+                const input = el.querySelector('#customPromptInput');
+                if (input) { input.focus(); input.select(); }
+            }, { once: true });
+        });
+    };
+};
+
+// Prompt 确定/取消（Vue 模板 @click 调用，从 refs 取 resolve）
+const promptOk = (customPromptResolve, customPromptValue) => {
+    const resolve = customPromptResolve.value;
+    if (resolve) {
+        const val = customPromptValue.value;
+        customPromptResolve.value = null;
+        resolve(val);
+    }
+    const el = document.getElementById('customPromptModal');
+    if (el) {
+        const modal = bootstrap.Modal.getInstance(el);
+        if (modal) modal.hide();
+    }
+};
+
+const promptCancel = (customPromptResolve) => {
+    const resolve = customPromptResolve.value;
+    if (resolve) {
+        customPromptResolve.value = null;
+        resolve(null);
+    }
+    const el = document.getElementById('customPromptModal');
+    if (el) {
+        const modal = bootstrap.Modal.getInstance(el);
+        if (modal) modal.hide();
+    }
+};
+
 const authGuard = async () => {
     const token = localStorage.getItem('token');
     if (!token) {

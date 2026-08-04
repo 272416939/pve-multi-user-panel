@@ -23,6 +23,10 @@
     $.customPromptMessage = ref('');
     $.customPromptValue = ref('');
     $.customPromptResolve = ref(null);
+    // 弹窗逻辑统一由 shared.js 提供（规范第七节：单一来源），refs 就绪后立即接入
+    setupCustomAlert($.customAlertMessage);
+    setupCustomConfirm($.customConfirmMessage, $.customConfirmResolve);
+    setupCustomPrompt($.customPromptMessage, $.customPromptValue, $.customPromptResolve);
     $.unreadCount = ref(0);
     $.destroyLxcConfirmText = ref('');
     $.currentMsg = ref({ title: '', content: '', type: 1, created_at: '' });
@@ -613,57 +617,7 @@ watch($.user, function(u) {
         }
     };
 
-    // 覆盖 window.alert
-    window.alert = function(message) {
-        $.customAlertMessage.value = message;
-        var el = document.getElementById('customAlertModal');
-        if (el) {
-            var old = bootstrap.Modal.getInstance(el);
-            if (old) old.dispose();
-            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
-            // 注意：必须调用 applyModalZIndex 设置 z-index，否则叠加时会被遮挡
-            window.applyModalZIndex(el);
-            new bootstrap.Modal(el, { focus: false }).show();
-        }
-    };
-
-    // 覆盖 window.customConfirm
-    window.customConfirm = function(message) {
-        return new Promise(function(resolve) {
-            $.customConfirmMessage.value = message;
-            $.customConfirmResolve.value = resolve;
-            var el = document.getElementById('customConfirmModal');
-            if (!el) { resolve(false); return; }
-            var old = bootstrap.Modal.getInstance(el);
-            if (old) old.dispose();
-            // 动态 z-index + backdrop z-index + hidden release（统一走 applyModalZIndex）
-            window.applyModalZIndex(el);
-            new bootstrap.Modal(el, { focus: false }).show();
-        });
-    };
-
-    // 自定义 Prompt 弹窗（带输入框，基于 Promise）
-    window.customPrompt = function(message, defaultValue) {
-        return new Promise(function(resolve) {
-            $.customPromptMessage.value = message;
-            $.customPromptValue.value = defaultValue || '';
-            $.customPromptResolve.value = resolve;
-            var el = document.getElementById('customPromptModal');
-            if (!el) { resolve(null); return; }
-            var old = bootstrap.Modal.getInstance(el);
-            if (old) old.dispose();
-            // 动态 z-index + backdrop z-index + hidden release（统一走 applyModalZIndex）
-            window.applyModalZIndex(el);
-            var modal = new bootstrap.Modal(el, { focus: false });
-            modal.show();
-            // shown 后聚焦输入框（applyModalZIndex 已处理 backdrop z-index）
-            el.addEventListener('shown.bs.modal', function onShown() {
-                el.removeEventListener('shown.bs.modal', onShown);
-                var input = el.querySelector('#customPromptInput');
-                if (input) { input.focus(); input.select(); }
-            }, { once: true });
-        });
-    };
+    // window.alert / customConfirm / customPrompt 统一由 shared.js 的 setupCustomAlert/SetupCustomConfirm/SetupCustomPrompt 提供（规范第七节：单一来源）
 
     // ===== 二级菜单 =====
     $.expandedSections = ref({});

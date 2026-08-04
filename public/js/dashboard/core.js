@@ -18,6 +18,9 @@
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
     $.customConfirmResolve = ref(null);
+    // 弹窗逻辑统一由 shared.js 提供（规范第七节：单一来源），refs 就绪后立即接入
+    setupCustomAlert($.customAlertMessage);
+    setupCustomConfirm($.customConfirmMessage, $.customConfirmResolve);
     $.unreadCount = ref(0);
     $.activeSection = ref(new URLSearchParams(window.location.search).get('section') || 'overview');
     $.navItems = ref([]);
@@ -254,19 +257,7 @@
         return formatUptime(uptime);
     };
 
-    // ===== alert/confirm =====
-    window.alert = function(message) {
-        $.customAlertMessage.value = message;
-        var el = document.getElementById('customAlertModal');
-        if (el) {
-            var old = bootstrap.Modal.getInstance(el);
-            if (old) old.dispose();
-            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
-            window.applyModalZIndex(el);
-            new bootstrap.Modal(el).show();
-        }
-    };
-
+    // window.alert / customConfirm 统一由 shared.js 的 setupCustomAlert/SetupCustomConfirm 提供（规范第七节：单一来源）
     $.showAlertAndWait = function(message) {
         return new Promise(function(resolve) {
             $.customAlertMessage.value = message;
@@ -280,38 +271,6 @@
             window.applyModalZIndex(el);
             var modal = bootstrap.Modal.getOrCreateInstance(el);
             modal.show();
-        });
-    };
-
-    window.customConfirm = function(message) {
-        return new Promise(function(resolve) {
-            $.customConfirmMessage.value = message;
-            $.customConfirmResolve.value = resolve;
-            var el = document.getElementById('customConfirmModal');
-            if (!el) { resolve(false); return; }
-            // 获取动态 z-index（customConfirmModal 不走 bsModalShow，需单独管理）
-            var zIndex = window.ModalZIndexManager.acquire();
-            el._modalZIndex = zIndex;
-            el.style.zIndex = zIndex;
-            // hidden 时释放 z-index（confirmOk/confirmCancel 均通过 modal.hide() 关闭）
-            el.addEventListener('hidden.bs.modal', function onHidden() {
-                el.removeEventListener('hidden.bs.modal', onHidden);
-                if (el._modalZIndex != null) {
-                    window.ModalZIndexManager.release(el._modalZIndex);
-                    el._modalZIndex = null;
-                    el.style.zIndex = '';
-                }
-            }, { once: true });
-            var modal = bootstrap.Modal.getOrCreateInstance(el);
-            modal.show();
-            // shown 后设置 backdrop z-index
-            el.addEventListener('shown.bs.modal', function onShown() {
-                el.removeEventListener('shown.bs.modal', onShown);
-                var backdrop = document.querySelector('.modal-backdrop');
-                if (backdrop) {
-                    backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
-                }
-            }, { once: true });
         });
     };
 
