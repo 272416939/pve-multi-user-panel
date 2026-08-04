@@ -1096,6 +1096,11 @@ $.initDetailCharts = function() {
             if (val === 'port-forward') {
                 $.loadForwardRules('all');
             }
+            // 安全防护·限速设置：点击侧边栏进入时加载（activeTabSecurity 默认即 ratelimit，
+            // watch(activeTabSecurity) 值不变不会触发，故挂在 section 变化上；刷新路径由 onMounted 分支覆盖）
+            if (val === 'security') {
+                $.loadRateLimitConfig();
+            }
         });
 
         watch(function() { return $.showCreateUser.value; }, function(val) {
