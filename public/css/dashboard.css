@@ -622,6 +622,19 @@
     .nav-tabs .nav-link:hover { background: var(--bg-hover); color: var(--text-primary); }
     .nav-tabs .nav-link.active { background: var(--color-primary); color: #fff !important; }
 
+    /* 日志页 tabs：与 admin 日志中心一致的玻璃渐变药丸样式（置于 .nav-tabs 之后以覆盖全局规则） */
+    .log-nav-tabs { display: flex; gap: 4px; padding: 6px 8px;
+        background: var(--bg-input); border: 1px solid var(--border-color);
+        border-radius: 10px; list-style: none; margin-bottom: 20px !important; flex-wrap: wrap;
+        transition: background-color 0.3s ease, border-color 0.3s ease; }
+    .log-nav-tabs .nav-item { margin-bottom: 0; }
+    .log-nav-tabs .nav-link { padding: 7px 18px; font-size: 13px; font-weight: 500; color: var(--text-secondary);
+        background: transparent; border: none; border-radius: 7px; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease; cursor: pointer;
+        white-space: nowrap; position: relative; }
+    .log-nav-tabs .nav-link:hover { color: var(--text-primary); background: rgba(99,102,241,0.08); }
+    .log-nav-tabs .nav-link.active { color: #fff; background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.15));
+        box-shadow: 0 2px 12px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600; }
+
     /* Nav pills */
     .nav-pills {
         background: var(--bg-hover); border: 1px solid var(--border-color);

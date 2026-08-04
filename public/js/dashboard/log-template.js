@@ -12,8 +12,8 @@
             </div>
         </div>
         <div class="table-container mb-4" style="padding:12px;">
-                <!-- tab 切换：按钮在切换时保持一致，仅刷新/导出/清空对应 tab 数据 -->
-                <ul class="nav nav-tabs mb-3">
+                <!-- tab 切换：按钮在切换时保持一致，仅刷新/导出/清空对应 tab 数据（log-nav-tabs：与 admin 日志中心一致的玻璃渐变药丸样式） -->
+                <ul class="nav nav-tabs log-nav-tabs mb-3">
                     <li class="nav-item">
                         <a class="nav-link" :class="{ active: logTab === 'operation' }" href="#" @click.prevent="switchLogTab('operation')">操作日志</a>
                     </li>
