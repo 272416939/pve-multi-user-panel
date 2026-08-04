@@ -39,6 +39,16 @@ function validateActionPrefix(prefix) {
     return true;
 }
 
+// 后台操作二级子域中文名（单一来源 ADMIN_SUB_CATEGORIES）：action 形如 admin.<子域>.<动作>，
+// 列表「操作类型」列与 CSV 导出共用，禁止前端自行拷贝映射
+function subCategoryName(action) {
+    var parts = String(action || '').split('.');
+    if (parts.length >= 3 && parts[0] === 'admin') {
+        return ADMIN_SUB_CATEGORIES[parts[1]] || '';
+    }
+    return '';
+}
+
 // 校验操作日志通用筛选参数（列表与导出共用），返回规范化参数对象；非法返回 { error }
 function buildOperationFilters(req) {
     var scope = (req.query.scope || 'all').trim();
@@ -119,6 +129,7 @@ router.get('/admin/logs/operation', async (req, res) => {
                 username: r.username,
                 action: r.action,
                 category_name: AUDIT_CATEGORY_NAMES[actionToCategory(r.action)] || '其他',
+                sub_category_name: subCategoryName(r.action),
                 detail_text: buildRowDetail(r, locMap),
                 created_at: r.created_at
             };
@@ -197,13 +208,14 @@ router.get('/admin/logs/operation/export', async (req, res) => {
 
         var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }));
 
-        // 操作类型列展示 action 原文（后台操作含 admin.<子域>.<动作>，区分度更高）
+        // 操作类型列与列表一致：后台操作显示子域中文名（如 admin.config.log → 配置管理），
+        // 具体动作在详情列；非后台操作显示完整 action
         var csvRows = ['用户,操作类型,详情,操作时间'];
         for (var i = 0; i < rows.length; i++) {
             var r = rows[i];
             csvRows.push([
                 csvEscape(r.username),
-                csvEscape(r.action),
+                csvEscape(subCategoryName(r.action) || r.action),
                 csvEscape(buildRowDetail(r, locMap)),
                 csvEscape(csvTime(r.created_at))
             ].join(','));

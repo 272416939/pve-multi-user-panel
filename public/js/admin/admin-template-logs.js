@@ -186,7 +186,7 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- 后台操作表格（仅 admin.*，操作类型列展示 action 原文） -->
+                <!-- 后台操作表格（仅 admin.*，操作类型列显示子域中文映射，如 admin.config.log → 配置管理） -->
                 <div class="table-responsive" v-if="logTab === 'admin'">
                     <table class="table table-striped mb-0 table-sm table-align-center">
                         <thead>
@@ -194,7 +194,7 @@
                                 <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
                                 <th style="width:80px">ID</th>
                                 <th style="width:110px">管理员</th>
-                                <th style="width:200px">操作类型</th>
+                                <th style="width:130px">操作类型</th>
                                 <th class="text-start">详情</th>
                                 <th style="width:170px">操作时间</th>
                                 <th style="width:70px">操作</th>
@@ -205,7 +205,7 @@
                                 <td class="checkbox-col"><input type="checkbox" :checked="selectedLogIds.includes(row.id)" @change="toggleOneLog(row.id)"></td>
                                 <td class="small">{{ row.id }}</td>
                                 <td class="small">{{ row.username || row.user_id || '-' }}</td>
-                                <td class="small text-break">{{ row.action }}</td>
+                                <td class="small text-break">{{ row.sub_category_name || row.action }}</td>
                                 <td class="small text-start text-break">{{ row.detail_text }}</td>
                                 <td class="small text-nowrap">{{ row.created_at }}</td>
                                 <td><pv-button size="sm" variant="danger" @click="deleteLogRow(row)">删除</pv-button></td>
