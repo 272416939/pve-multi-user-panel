@@ -1,7 +1,9 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { createEmailTemplate, sendEmail, shouldSendEmail } = require('../utils/email');
-const { pushToUser, markBackupRestoreComplete } = require('../websocket/push-proxy');
+const { pushToUser } = require('../websocket/push-proxy');
+// 备份/恢复完成标记抽离到 services/status-cache.js（规范第七节：状态缓存单一来源）
+const { markBackupRestoreComplete } = require('./status-cache');
 const { takeDiskSnapshot, auditAfterRestore } = require('./disk-audit');
 
 const lxcBackupPollingMap = new Map();
