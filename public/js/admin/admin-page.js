@@ -205,8 +205,8 @@ app.config.errorHandler = function(err, instance, info) {
 app.component('port-forward-list', {
     template: '\
         <div>\
-<div class="d-flex justify-content-between align-items-center mb-3">\
-	                <h4 class="mb-0">端口转发管理</h4>\
+<div class="module-header">\
+	                <h4 class="module-title">端口转发管理</h4>\
 	                <div class="d-flex align-items-center gap-2">\
 	                    <select class="form-select form-select-sm" style="width:auto" v-model="forwardFilterType" @change="filterForward">\
 	                        <option value="all">全部</option>\

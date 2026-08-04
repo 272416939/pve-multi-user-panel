@@ -5,8 +5,10 @@
 
                     <!-- Tab 1: 新建 LXC 容器 -->
                     <div v-if="activeTabLxc === 'create'">
+                        <div class="module-header">
+                            <h4 class="module-title">新建 LXC 容器</h4>
+                        </div>
                         <div class="card">
-                            <div class="card-header"><h5 class="mb-0">新建 LXC 容器</h5></div>
                             <div class="card-body">
                                 <form @submit.prevent="createLxc" novalidate>
                                     <div class="row mb-3">
@@ -250,6 +252,9 @@
 
                     <!-- Tab 3: 容器管理 -->
                     <div v-if="activeTabLxc === 'manage'">
+                        <div class="module-header">
+                            <h4 class="module-title">容器管理</h4>
+                        </div>
                         <div v-if="lxcLoading" class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="visually-hidden">加载中...</span>

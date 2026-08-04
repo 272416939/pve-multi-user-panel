@@ -429,7 +429,7 @@
 <!-- 套餐订购页 -->
 <div v-if="activeSection === 'order'">
     <div v-if="activeTabOrder === 'vm'">
-        <h4 class="mb-4">VM 虚拟机套餐</h4>
+        <h4 class="module-title">VM 虚拟机套餐</h4>
         <div v-for="grp in vmGroupedPackages" :key="grp.group_name" class="package-group-section">
             <h5 class="package-group-title" v-if="grp.group_name !== '默认'">{{ grp.group_name }}</h5>
             <div class="package-cards">
@@ -472,7 +472,7 @@
         <div class="package-empty" v-if="vmGroupedPackages.length === 0">暂无可用套餐</div>
     </div>
     <div v-if="activeTabOrder === 'lxc'">
-        <h4 class="mb-4">LXC 容器套餐</h4>
+        <h4 class="module-title">LXC 容器套餐</h4>
         <div v-for="grp in lxcGroupedPackages" :key="grp.group_name" class="package-group-section">
             <h5 class="package-group-title" v-if="grp.group_name !== '默认'">{{ grp.group_name }}</h5>
             <div class="package-cards">

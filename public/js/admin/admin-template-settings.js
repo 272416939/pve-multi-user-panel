@@ -4,7 +4,9 @@
 <div v-if="activeSection === 'settings'">
                     <!-- SMTP 配置 -->
                     <div v-if="activeTab === 'smtp'">
-                        <h4 class="module-title">SMTP 配置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">SMTP 配置</h4>
+                        </div>
                         <div class="card mb-4">
                             <div class="card-body">
                                 <form @submit.prevent="saveSmtpConfig">
@@ -55,7 +57,9 @@
                             </div>
                         </div>
 
-                        <h4 class="module-title">到期提醒配置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">到期提醒配置</h4>
+                        </div>
                         <div class="card">
                             <div class="card-body">
                                 <form @submit.prevent="saveReminderConfig">
@@ -88,7 +92,9 @@
 
                 <!-- PVE 节点设置 -->
                 <div v-if="activeTab === 'pve'">
-                    <h4 class="module-title">PVE 节点设置</h4>
+                    <div class="module-header">
+                        <h4 class="module-title">PVE 节点设置</h4>
+                    </div>
                     <div class="card mb-4">
                         <div class="card-body">
                             <p class="text-muted small mb-3">配置 Proxmox VE 服务器的连接信息。API Token 和 SSH 密码将加密存储，保存后显示为打码值。</p>
@@ -146,7 +152,9 @@
 
                     <!-- 快照 & 备份配置（合并） -->
                     <div v-if="activeTab === 'snapshot-backup'">
-                        <h4 class="module-title">快照 & 备份配置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">快照 & 备份配置</h4>
+                        </div>
 
                         <!-- 快照配置 -->
                         <div class="card mb-4">
@@ -203,7 +211,9 @@
 
                     <!-- 网络管理 -->
                     <div v-if="activeTab === 'network'">
-                        <h4 class="module-title">端口转发配置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">端口转发配置</h4>
+                        </div>
                         <div class="card" style="position: relative; z-index: 3; overflow: visible;">
                             <div class="card-header"><h5 class="mb-0">全局设置</h5></div>
                             <div class="card-body">
@@ -403,7 +413,9 @@
 
                     <!-- 站点设置 -->
                     <div v-if="activeSection === 'settings' && activeTab === 'site'">
-                        <h4 class="module-title">站点设置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">站点设置</h4>
+                        </div>
                         <div class="card">
                             <div class="card-body">
                                 <div class="mb-3">

@@ -162,7 +162,9 @@
                     <div v-if="activeTab === 'messages'">
                         <div class="row justify-content-center">
                             <div class="col-md-8">
-                                <h4 class="module-title">消息管理</h4>
+                                <div class="module-header">
+                                    <h4 class="module-title">消息管理</h4>
+                                </div>
                                 <div class="card">
                                     <div class="card-body">
                                         <form @submit.prevent="sendAdminMessage">

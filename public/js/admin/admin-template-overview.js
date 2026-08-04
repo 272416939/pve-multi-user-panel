@@ -2,7 +2,9 @@
   if (!window.__adminTemplateParts) window.__adminTemplateParts = [];
   window.__adminTemplateParts.push(`
 <div v-if="activeSection === 'overview'">
-                    <h4 class="module-title">资源运行概况</h4>
+                    <div class="module-header">
+                        <h4 class="module-title">资源运行概况</h4>
+                    </div>
                     <div class="row g-3 mb-4">
                         <div class="col-sm-6 col-md-3">
                             <div class="stat-card">
@@ -42,7 +44,9 @@
                         </div>
                     </div>
 
-                    <h4 class="module-title">资源分布</h4>
+                    <div class="module-header">
+                        <h4 class="module-title">资源分布</h4>
+                    </div>
                     <div class="row g-4">
                         <div class="col-md-6">
                             <div class="overview-chart-card">

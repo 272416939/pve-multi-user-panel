@@ -5,8 +5,8 @@
 
                     <!-- VM 模板管理 -->
                     <div v-if="activeTabTemplates === 'vm'" class="tab-panel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">VM 模板管理</h5>
+                        <div class="module-header">
+                            <h4 class="module-title">VM 模板管理</h4>
                             <pv-button @click="templatePage.openVmTemplateForm(null)" size="sm">+ 新建 VM 模板</pv-button>
                         </div>
                         <div class="table-container mb-4" style="padding:12px;">
@@ -44,8 +44,8 @@
 
                     <!-- LXC 模板管理 -->
                     <div v-if="activeTabTemplates === 'lxc'" class="tab-panel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="mb-0">LXC 模板管理</h5>
+                        <div class="module-header">
+                            <h4 class="module-title">LXC 模板管理</h4>
                             <pv-button @click="templatePage.openLxcTemplateForm(null)" size="sm">+ 新建 LXC 模板</pv-button>
                         </div>
                         <div class="table-container mb-4" style="padding:12px;">

@@ -11,8 +11,8 @@
 
   <!-- ====== 存储分组管理 ====== -->
   <div v-if="activeTabDisk === 'storage-groups'">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0">存储分组管理</h5>
+    <div class="module-header">
+      <h4 class="module-title">存储分组管理</h4>
       <pv-button @click="diskPage.openStorageGroupForm(null)" size="sm">+ 新建分组</pv-button>
     </div>
     <div class="row">
@@ -52,8 +52,8 @@
 
   <!-- ====== 数据盘规格管理 ====== -->
   <div v-if="activeTabDisk === 'specs'">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0">硬盘规格管理</h5>
+    <div class="module-header">
+      <h4 class="module-title">硬盘规格管理</h4>
       <pv-button @click="diskPage.openDiskSpecForm(null)" size="sm">+ 新建硬盘</pv-button>
     </div>
     <div class="row">
@@ -107,10 +107,10 @@
 
   <!-- ====== 生命周期与到期处理 ====== -->
   <div v-if="activeTabDisk === 'lifecycle'">
+    <div class="module-header">
+      <h4 class="module-title">生命周期参数配置</h4>
+    </div>
     <div class="card">
-      <div class="card-header">
-        <span>生命周期参数配置</span>
-      </div>
       <div class="card-body">
         <div v-if="diskPage.lifecycleConfig.value">
           <div class="row g-3">
@@ -164,8 +164,8 @@
 
   <!-- 数据盘管理 -->
   <div v-if="activeTabDisk === 'data-disks'">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h4 class="module-title mb-0">数据盘管理</h4>
+    <div class="module-header">
+      <h4 class="module-title">数据盘管理</h4>
       <div class="d-flex gap-2">
         <pv-button variant="outline" size="sm" @click="diskPage.importExistingDisks()">导入存量磁盘</pv-button>
         <pv-button variant="primary" size="sm" @click="diskPage.openBatchEditGroup()" :disabled="diskPage.selectedDiskIds.value.length === 0">批量修改分组</pv-button>
