@@ -1,5 +1,56 @@
 # Changelog
 
+## [2.34.0] - 2026-08-03
+
+### 概览
+
+本次为**重大架构重构版本**：按「低耦合高内聚」规范对全项目前后端高耦合点做了行为保持型重构（只移动/归位/合并，不改业务逻辑与接口）。后端路由层大幅瘦身（**11,664 行 -> 约 7,400 行，-43%**），新增 11 个业务服务模块，前端弹窗体系 4 套收敛为 1 套。测试从 293 增至 **309 passing / 0 failing**，三端 UI 冒烟全部通过。
+
+### Changed（11 个 refactor，按业务域分批）
+
+- **常量与时间统一（`48fc203`）**
+  - 新建 `server/constants.js` 单一来源：周期/磁盘类型/订单状态/模板状态/支付方式等，替换 6 个大路由中 3-4 份重复拷贝
+  - 时间工具统一到 `utils/date.js`：**12 处 `toISOString` 清理至仅剩 2 处合法用法**
+- **支付/CDK/计费域（`2353385`）**：抽取 `services/payment.js` / `cdk.js` / `billing.js`，`wallet.js` 大幅瘦身（顶层仅保留 express/db/auth/safeError/services/constants）
+- **开通域（`f16387f`）**：抽取 `services/provisioning.js`（VM/LXC 开通/管理端代开），`package.js` 1237 -> 约 570 行，移除 SSH/ikuai/email 依赖
+- **磁盘域（`61bf340`）**：`disk-utils.js` 一拆三（`disk-validation.js` 校验纯函数、`disk-billing.js` 计费纯函数、`services/disk-ops.js` PVE/SSH 命令封装），新增 `services/disk.js`（购买/挂载/卸载/扩容/续费/销毁/自动续费 7 个编排，含事务与退款回滚），`routes/disk.js` 954 -> 约 300 行
+- **配置运维域（`1fb93c8`）**：抽取 `services/release-check.js`（GitHub/Gitee 双源+回退+静默降级）/ `system-update.js` / `redis-admin.js`，`admin-config.js` 移除顶层 axios/child_process 依赖
+- **系统切换域（`a822699`）**：系统切换业务上移 `utils/os-switch-utils.js` -> `services/os-switch.js`，utils 不再依赖 api/services
+- **WebSocket 解耦（`045b89e`）**：`push-proxy` 只留连接管理，状态缓存抽到 `services/status-cache.js`
+- **软环修复（`bd1017f`）**：utils 层顶层 require 倒挂清零（7 文件改行内懒加载），删除软环死导入（如 token.js 死导入）
+- **前端弹窗统一（`4307ee4`）**：customAlert/customConfirm 4 套平行实现 -> 1 套（shared 模板 + `shared.js` 统一逻辑）
+- **前端常量与注册表（`6198781`）**：常量单一来源（`storage-keys.js` / `api-paths.js`）+ section 注册表，去掉 dashboard `switchSection` monkey-patch（改 `registerSectionLoader`）
+- **模板 div hack 修复（`11348ab`）**：去掉模板装配器 div 配平 hack，14 个模板片段自包含根节点（delta=0 验证）
+
+### Added
+
+- **test(quality): 新增低耦合自动化断言 `scripts/check-coupling.js`**（7 项架构断言门禁：常量单一来源/无 Module 自引用/DDL 集中/toISOString 合规/utils 叶子层无顶层 api-services 依赖/事务统一/无循环依赖）+ 16 个 services 行为测试
+
+### 📝 性能与代码量说明
+
+| 维度 | 优化前 | 优化后 | 收益 |
+|------|--------|--------|------|
+| 后端 routes 总行数 | 11,664 行 | 约 7,400 行 | **-43%**，路由层仅保留校验/限速/响应 |
+| `package.js` | 1237 行 | 约 570 行 | -54% |
+| `disk.js` 路由 | 954 行 | 约 300 行 | -69% |
+| `wallet.js` | 约 950 行 | 约 350 行 | -63% |
+| 前端弹窗体系 | 4 套平行实现 | 1 套 | 4:1 收敛 |
+| 常量定义 | 6 路由内 3-4 份重复拷贝 | `constants.js` 单一来源 | 消除重复 |
+| `toISOString` 用法 | 12 处 | 2 处（合法） | 统一时间处理 |
+| utils 层顶层倒挂 | 7 文件 | 0 | 软环清零 |
+| 测试 | 293 passing | **309 passing / 0 failing** | +16 services 行为测试 |
+
+- 架构收益：路由层从「业务大杂烩」变为「校验 + 响应」薄层；services 按业务域垂直拆分（支付/开通/磁盘/运维/系统切换）；纯函数模块（disk-validation/billing）无外部 I/O 便于单测；前端结构收益为弹窗资源 4:1 收敛、模板装配器不再因结构变更破坏整页布局
+- 行为保持型重构：业务逻辑与接口零改动，30+ 消费者无感
+
+### Notes
+
+- 新增 `server/constants.js`、`server/services/` 目录（11 个模块）、`server/utils/disk-validation.js` / `disk-billing.js`
+- 新增 `scripts/check-coupling.js` 架构门禁（CI 可接入）
+- 冒烟验证：16/16 只读接口返回 JSON + 三端 Playwright UI 冒烟全部通过
+- 无数据库 schema 变更，升级无需额外操作
+- 顺带修复 3 个既有缺陷：token-store 引用未定义变量、VM 开通 DHCP 绑定依赖 MAC 分组变量、订单导出接口路径 `-users` 假阳性
+
 ## [2.33.10] - 2026-08-03
 
 ### Changed
