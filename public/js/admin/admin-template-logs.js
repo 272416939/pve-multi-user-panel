@@ -27,9 +27,9 @@
                 <a class="nav-link" :class="{ active: logTab === 'os-switch' }" href="#" @click.prevent="switchLogTab('os-switch')">系统切换</a>
             </li>
         </ul>
-        <!-- 四个 tab 共用同一卡片结构，保证排版一致；系统切换详情弹窗由 admin-template-os-switch-logs.js 提供 -->
-        <div class="card mb-4">
-            <div class="card-body">
+        <!-- 四个 tab 共用同一表格容器（玻璃态 table-container，与交易流水样式一致融入主题）；
+             系统切换详情弹窗由 admin-template-os-switch-logs.js 提供 -->
+        <div class="table-container mb-4" style="padding:12px;">
                 <!-- Tips：日志保留上限提示（红字，深色模式自动加深） -->
                 <div class="py-1 px-2 mb-2 small" style="color: var(--color-danger);" v-if="logKeepCount > 0">
                     <i class="bi bi-info-circle me-1"></i>Tips：用户操作日志每用户上限 {{ logKeepCount }} 条，后台操作日志全站上限 {{ logKeepAdminCount }} 条，超出自动清理最早的历史数据
@@ -158,7 +158,7 @@
                 </div>
                 <!-- 操作日志表格（全站用户操作，排除后台操作） -->
                 <div class="table-responsive" v-if="logTab === 'operation'">
-                    <table class="table table-striped mb-0 table-sm table-align-center">
+                    <table class="table table-hover mb-0 table-sm table-align-center">
                         <thead>
                             <tr>
                                 <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
@@ -188,7 +188,7 @@
                 </div>
                 <!-- 后台操作表格（仅 admin.*，操作类型列显示子域中文映射，如 admin.config.log → 配置管理） -->
                 <div class="table-responsive" v-if="logTab === 'admin'">
-                    <table class="table table-striped mb-0 table-sm table-align-center">
+                    <table class="table table-hover mb-0 table-sm table-align-center">
                         <thead>
                             <tr>
                                 <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
@@ -218,7 +218,7 @@
                 </div>
                 <!-- 登录日志表格（全站） -->
                 <div class="table-responsive" v-if="logTab === 'login'">
-                    <table class="table table-striped mb-0 table-sm table-align-center">
+                    <table class="table table-hover mb-0 table-sm table-align-center">
                         <thead>
                             <tr>
                                 <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
@@ -250,7 +250,7 @@
                 </div>
                 <!-- 系统切换表格 -->
                 <div class="table-responsive" v-if="logTab === 'os-switch'">
-                    <table class="table table-striped mb-0 table-sm table-align-center">
+                    <table class="table table-hover mb-0 table-sm table-align-center">
                         <thead>
                             <tr>
                                 <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
@@ -314,7 +314,6 @@
                         <span class="text-muted small">页</span>
                     </div>
                 </div>
-            </div>
         </div>
     </div>
     `);
