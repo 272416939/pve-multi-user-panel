@@ -225,7 +225,7 @@
                     </div>
                     <div class="card-body p-0">
                         <div v-if="backups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
-                        <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
+                        <div v-else class="table-container" style="padding:12px;"><div class="table-responsive" style="max-height:360px;overflow-y:auto;">
                             <table class="table table-striped mb-0 table-sm table-align-center">
                                 <thead style="position:sticky;top:0;">
                                     <tr>
@@ -262,6 +262,7 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
                         </div>
                     </div>
                 </div>
@@ -527,7 +528,7 @@
                     </div>
                     <div class="card-body p-0">
                         <div v-if="lxcBackups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
-                        <div v-else class="table-responsive" style="max-height:360px;overflow-y:auto;">
+                        <div v-else class="table-container" style="padding:12px;"><div class="table-responsive" style="max-height:360px;overflow-y:auto;">
                             <table class="table table-striped mb-0 table-sm table-align-center">
                                 <thead style="position:sticky;top:0;">
                                     <tr>
@@ -562,6 +563,7 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
                         </div>
                     </div>
                 </div>

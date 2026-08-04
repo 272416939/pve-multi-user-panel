@@ -190,7 +190,7 @@
 
                         <div v-show="availableLxc.length > 0">
                             <h5>待分配的容器:</h5>
-                            <div class="card mb-4">
+                            <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
                                     <table class="table table-striped mb-0 table-align-center">
                                         <thead>
@@ -218,7 +218,7 @@
 
                         <div v-show="assignedLxc.length > 0">
                             <h5>已分配的容器:</h5>
-                            <div class="card">
+                            <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
                                     <table class="table table-striped mb-0 table-align-center">
                                         <thead>

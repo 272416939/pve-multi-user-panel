@@ -618,6 +618,7 @@
                                     <svg class="me-2 flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                                     <span>请立即保存这些恢复码！每个恢复码只能使用一次。</span>
                                 </div>
+                                <div class="table-container mb-3" style="padding:12px;">
                                 <table class="table table-sm table-hover table-align-center">
                                     <thead><tr><th>#</th><th>恢复码</th><th>状态</th><th>创建时间</th></tr></thead>
                                     <tbody>
@@ -632,6 +633,7 @@
                                         </tr>
                                     </tbody>
                                 </table>
+                                </div>
                                 <div class="d-flex gap-2 mt-3">
                                     <pv-button variant="secondary" size="sm" @click="copyRecoveryCodes">复制全部</pv-button>
                                     <pv-button variant="outline" size="sm" @click="downloadRecoveryCodes">下载</pv-button>
