@@ -3,6 +3,8 @@
  * 优先使用 Redis（短期数据高频读写），Redis 不可用时回退到数据库
  */
 const db = require('../api/db');
+// 本地时间格式化统一走 utils/date.js（规范第八节：禁止自写 toISOString 直写）
+const { formatLocalDate } = require('./date');
 
 /**
  * 惰性获取 Redis 客户端（不能在模块加载时捕获——Redis 配置在服务启动后
@@ -35,13 +37,12 @@ async function setRegisterCode(email, code, ttlSeconds) {
     }
     // 回退：存入数据库
     var expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-    var d = new Date(expiresAt.getTime() - expiresAt.getTimezoneOffset() * 60000);
     await db.passwordResetTokens.create({
         userId: 0,
         email: email,
         token: code,
         type: 'register_code',
-        expiresAt: d.toISOString().slice(0, 19).replace('T', ' ')
+        expiresAt: formatLocalDate(expiresAt)
     });
 }
 
@@ -103,12 +104,11 @@ async function setResetToken(token, userId, ttlSeconds) {
     }
     // 回退：存入数据库
     var expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-    var d = new Date(expiresAt.getTime() - expiresAt.getTimezoneOffset() * 60000);
     await db.passwordResetTokens.create({
         userId: userId,
         token: token,
         type: 'password_reset',
-        expiresAt: d.toISOString().slice(0, 19).replace('T', ' ')
+        expiresAt: formatLocalDate(expiresAt)
     });
 }
 
@@ -139,6 +139,7 @@ async function getResetToken(token) {
  * @param {string} token - 重置 token
  */
 async function delResetToken(token) {
+    var redisClient = getRedisClient();
     if (redisClient) {
         try { await redisClient.del('reset_token:' + token); } catch (e) {}
     }

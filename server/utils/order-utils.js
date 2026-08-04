@@ -1,10 +1,6 @@
 var crypto = require('crypto');
-
-function getPeriodMonths(period) {
-  if (period === 'quarter') return 3;
-  if (period === 'year') return 12;
-  return 1;
-}
+// 单一来源：周期映射统一走 constants（规范第七节，禁止业务文件重复定义）
+var { getPeriodMonths } = require('../constants');
 
 function calculateAmount(monthlyPrice, period, periodCount, quarterlyDiscount, yearlyDiscount) {
   var months = getPeriodMonths(period);

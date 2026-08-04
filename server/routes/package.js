@@ -17,8 +17,8 @@ var { takeDiskSnapshot } = require('../services/disk-audit');
 const { safeError } = require('../utils/safe-error');
 const { formatLocalDate } = require('../utils/date');
 const diskUtils = require('../utils/disk-utils');
-
-var VALID_PERIODS = ['month', 'quarter', 'year'];
+// 单一来源：周期常量统一走 constants（规范第七节）
+var { VALID_PERIODS, getPeriodDays } = require('../constants');
 
 // 套餐列表缓存（5 分钟 TTL，低频变更场景）
 var vmPackageCache = cacheStore.create('vm_packages', 300);
@@ -175,7 +175,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             });
 
             // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪
-            var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
+            var addDays = getPeriodDays(period);
             var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
             newVm = await db.vms.create({
                 vm_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
@@ -476,7 +476,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             // createLxc 返回 response.data，PVE 创建接口返回 { data: upid }
             var lxcUpid = (lxcResp && lxcResp.data) ? lxcResp.data : lxcResp;
 
-            var addDays = period === 'year' ? 365 : period === 'quarter' ? 90 : 30;
+            var addDays = getPeriodDays(period);
             var expDate = new Date(Date.now() + addDays * period_count * 24 * 60 * 60 * 1000);
 
             // 预创建 DB 记录，pve_upid 有值表示开通中，便于前端通过 PVE 真实任务状态跟踪

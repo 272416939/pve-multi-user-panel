@@ -224,7 +224,7 @@ async function sendBackupNotification(userId, vmId, status, filename) {
             content,
             type: 2,
             send_type: 1,
-            created_at: new Date().toISOString()
+            created_at: db.now()
         });
     } catch (e) {
         console.error('备份通知站内信发送失败:', e.message);
@@ -328,7 +328,7 @@ async function sendRestoreNotification(userId, vmId, statusMsg) {
     try {
         await db.messages.create({
             uid: userId, title, content, type: 2, send_type: 1,
-            created_at: new Date().toISOString()
+            created_at: db.now()
         });
     } catch (e) { console.error('恢复通知站内信发送失败:', e.message); }
     if (user.email && user.emailVerified) {

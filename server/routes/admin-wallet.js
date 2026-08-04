@@ -108,6 +108,7 @@ router.get('/admin/transactions/export', authMiddleware, adminMiddleware, async 
 });
 
 // ========== 管理员订单查询（含筛选） ==========
+const { getPeriodName } = require('../constants');
 router.get('/admin/orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var params = {};
@@ -142,7 +143,7 @@ router.get('/admin/orders/export', authMiddleware, adminMiddleware, async (req, 
         var csvRows = ['订单号,用户名,套餐名,类型,周期,数量,金额,状态,创建时间'];
         result.rows.forEach(function(o) {
             var typeName = o.type === 'vm' ? 'VM' : 'LXC';
-            var periodName = o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付';
+            var periodName = getPeriodName(o.period);
             var statusName = o.status === 'completed' ? '已开通' : o.status;
             csvRows.push([
                 o.order_no, o.username || '', o.package_name || '', typeName,

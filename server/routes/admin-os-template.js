@@ -6,6 +6,8 @@ const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
+// 单一来源：模板状态白名单统一走 constants（规范第七节）
+const { TEMPLATE_STATUS } = require('../constants');
 
 // 所有端点都需要管理员权限
 router.use(authMiddleware, adminMiddleware);
@@ -187,7 +189,7 @@ router.post('/admin/os-templates', async (req, res) => {
             sort_order: parseInt(data.sort_order) || 0,
             allowed_package_ids: String(data.allowed_package_ids || '').slice(0, 500),
             enabled: data.enabled === false ? 0 : 1,
-            status: ['active', 'maintenance', 'deprecated'].includes(data.status) ? data.status : 'active'
+            status: TEMPLATE_STATUS.includes(data.status) ? data.status : 'active'
         });
         res.json({ success: true, id });
     } catch (e) {

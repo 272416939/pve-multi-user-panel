@@ -15,14 +15,9 @@ const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache } = req
 const { checkRateLimit } = require('../middleware/rate-limiter');
 const { sanitizeUser } = require('../utils/safe-error');
 const { hashPassword, verifyPassword, needsUpgrade } = require('../utils/password-hash');
+// 本地时间格式化统一走 utils/date.js（规范第八节：禁止自写/复用 toISOString 直写）
+const { formatLocalDate } = require('../utils/date');
 const RATELIMIT_PREFIX = 'ratelimit:login:';
-
-// 本地时间格式化：返回 YYYY-MM-DD HH:MM:SS（Asia/Shanghai）
-// 避免使用 toISOString()（UTC）导致 MySQL DATETIME 丢失时区信息
-function formatLocalDateTime(date) {
-    var d = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-    return d.toISOString().slice(0, 19).replace('T', ' ');
-}
 
 async function checkLoginRateLimit(ip, username) {
     const key = `${RATELIMIT_PREFIX}${ip}:${username}`;
@@ -119,8 +114,8 @@ if (passwordMatch && needsUpgrade(user.password)) {
         device_name: deviceName,
         ip,
         user_agent: ua,
-        created_at: formatLocalDateTime(new Date()),
-        expires_at: formatLocalDateTime(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
+        created_at: formatLocalDate(new Date()),
+        expires_at: formatLocalDate(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
     });
 
     if (await db.twofa.isEnabled(user.id)) {
@@ -210,8 +205,8 @@ router.post('/login/2fa', async (req, res) => {
                 device_name: deviceName,
                 ip,
                 user_agent: ua,
-                created_at: formatLocalDateTime(new Date()),
-                expires_at: formatLocalDateTime(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
+                created_at: formatLocalDate(new Date()),
+                expires_at: formatLocalDate(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
             });
         }
 
@@ -247,8 +242,8 @@ router.post('/login/2fa', async (req, res) => {
                     device_name: deviceName,
                     ip,
                     user_agent: ua,
-                    created_at: formatLocalDateTime(new Date()),
-                    expires_at: formatLocalDateTime(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
+                    created_at: formatLocalDate(new Date()),
+                    expires_at: formatLocalDate(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
                 });
             }
             // 恢复码验证通过：登录成功埋点
@@ -300,8 +295,8 @@ router.post('/auth/refresh', async (req, res) => {
             token: newRefreshToken,
             ip: req.ip,
             user_agent: req.headers['user-agent'] || '',
-            created_at: formatLocalDateTime(new Date()),
-            expires_at: formatLocalDateTime(expiresAt)
+            created_at: formatLocalDate(new Date()),
+            expires_at: formatLocalDate(expiresAt)
         });
 
         // 用新记录的 id 生成 access token，确保设备校验通过

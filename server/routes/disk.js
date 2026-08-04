@@ -15,12 +15,13 @@ var db = require('../api/db');
 var diskUtils = require('../utils/disk-utils');
 var { takeDiskSnapshot } = require('../services/disk-audit');
 var cacheStore = require('../utils/cache-store');
+// 单一来源：周期常量统一走 constants（规范第七节）
+var { VALID_PERIODS, getPeriodMonths, getPeriodUnit } = require('../constants');
 
 // PERF-07: 复用管理端磁盘规格/存储分组缓存（同一命名空间，管理端写操作 clearDiskCache 同时失效）
 var specCache = cacheStore.create('disk_specs', 300);
 var groupCache = cacheStore.create('storage_groups', 300);
 
-var VALID_PERIODS = ['month', 'quarter', 'year'];
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 var { auditAction } = require('../utils/audit-log');
 
@@ -166,7 +167,7 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
 
 	// 计算到期时间
 	  var now = new Date();
-	  var months = period === 'year' ? 12 : period === 'quarter' ? 3 : 1;
+	  var months = getPeriodMonths(period);
 	  var expireTime = new Date(now.getTime() + months * periodCount * 30 * 24 * 60 * 60 * 1000);
 
 	  var createdDiskIds = [];
@@ -257,7 +258,7 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
 	      if (purchaseUser && purchaseUser.email && purchaseUser.emailVerified && purchaseUser.email.includes('@')) {
 	        var siteName = await getSiteName();
 	        var diskNamesStr = diskNames.join('、');
-	        var periodLabel = period === 'year' ? periodCount + '年' : period === 'quarter' ? periodCount + '季' : periodCount + '个月';
+	        var periodLabel = periodCount + getPeriodUnit(period);
 	        var newBalance = (balanceBefore - totalAmount).toFixed(2);
 	        var emailHtml = createEmailTemplate('硬盘购买成功',
 	          '<p>您的数据盘已购买成功！</p>' +
@@ -867,9 +868,9 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
       return res.status(400).json({ error: '余额不足，需要 ' + amount + ' 元' });
     }
 
-    // 计算续费后到期时间
-    var months = period === 'year' ? 12 : period === 'quarter' ? 3 : 1;
-    var currentExpire = disk.expire_time ? new Date(disk.expire_time) : new Date();
+	    // 计算续费后到期时间
+	    var months = getPeriodMonths(period);
+	    var currentExpire = disk.expire_time ? new Date(disk.expire_time) : new Date();
     var baseTime = currentExpire > new Date() ? currentExpire : new Date();
     var newExpire = new Date(baseTime.getTime() + months * periodCount * 30 * 24 * 60 * 60 * 1000);
 
@@ -901,7 +902,7 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
       var renewUser = await db.users.getById(req.user.id);
       if (renewUser && renewUser.email && renewUser.emailVerified && renewUser.email.includes('@')) {
         var siteName = await getSiteName();
-        var periodLabel = period === 'year' ? periodCount + '年' : period === 'quarter' ? periodCount + '季' : periodCount + '个月';
+        var periodLabel = periodCount + getPeriodUnit(period);
         var expiryDisplay = newExpire ? new Date(newExpire).toLocaleString('zh-CN') : '永久有效';
         var newBalance = (balanceBefore - amount).toFixed(2);
         var emailHtml = createEmailTemplate('硬盘续费成功',

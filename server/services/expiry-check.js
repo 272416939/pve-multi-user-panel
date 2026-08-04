@@ -38,17 +38,19 @@ async function isReminderSent(vmId, days, date) {
 
 async function loadSentRemindersFromDb() {
     try {
-        const today = new Date().toISOString().split('T')[0];
+        // 本地日期（规范第八节：与 DB 存储/查询的本地时间一致，禁止 toISOString UTC）
+        const today = new Date();
+        const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
         const todayReminders = await db.vms.reminders.getTodayAll();
         let preExpiryCount = 0;
         let expiredCount = 0;
 
         for (const record of todayReminders) {
             if (record.days === 0) {
-                await markReminderSent(record.vm_id, 0, today);
+                await markReminderSent(record.vm_id, 0, todayStr);
                 expiredCount++;
             } else {
-                await markReminderSent(record.vm_id, record.days, today);
+                await markReminderSent(record.vm_id, record.days, todayStr);
                 preExpiryCount++;
             }
         }
@@ -94,7 +96,8 @@ const checkExpiredVms = async () => {
             const now = new Date();
             const timeUntilExpiry = expDate - now;
             const currentDay = Math.round(timeUntilExpiry / oneDayMs);
-            const today = now.toISOString().split('T')[0];
+            // 本地日期（规范第八节：与 DB 的 CURDATE 一致，禁止 toISOString UTC 偏差）
+            const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
             
             for (const days of reminderDays) {
                 if (timeUntilExpiry <= 0 || currentDay !== days) {

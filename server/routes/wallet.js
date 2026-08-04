@@ -11,6 +11,8 @@ const pveApi = require('../api/pve-api');
 const { withTransaction } = require('../utils/with-transaction');
 const { safeError } = require('../utils/safe-error');
 const { formatLocalDate } = require('../utils/date');
+// 单一来源：周期/订单/支付常量统一走 constants（规范第七节）
+const { VALID_PERIODS, ORDER_STATUS, PAYMENT_METHODS, getPeriodDays } = require('../constants');
 
 var callbackRateLimiter = new Map();
 function checkCallbackRate(ip) {
@@ -108,7 +110,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '充值金额必须在 ' + minAmount + ' ~ ' + maxAmount + ' 之间' });
         }
         
-        if (!pay_method || !['alipay', 'wxpay'].includes(pay_method)) {
+        if (!pay_method || !PAYMENT_METHODS.includes(pay_method)) {
             return res.status(400).json({ error: '请选择支付方式' });
         }
         
@@ -561,7 +563,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
 
         var period = req.body.period || resource.renewal_period || 'month';
         // SEC-04: period 白名单校验
-        if (!['month', 'quarter', 'year'].includes(period)) {
+        if (!VALID_PERIODS.includes(period)) {
             return res.status(400).json({ error: '无效的计费周期' });
         }
 
@@ -592,7 +594,7 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '当前账户余额不足，无法使用余额抵扣，请先充值后再续费' });
         }
         
-        var addDays = period === 'year' ? qty * 365 : period === 'quarter' ? qty * 90 : qty * 30;
+        var addDays = qty * getPeriodDays(period);
         
         var oldExpiration = resource.expiration_date ? new Date(resource.expiration_date) : new Date();
         oldExpiration.setDate(oldExpiration.getDate() + addDays);
@@ -744,7 +746,7 @@ router.get('/orders', authMiddleware, async (req, res) => {
             if (order_no.length > 50) return res.status(400).json({ error: '订单号过长' });
             if (order_no) params.order_no = order_no;
             if (req.query.type && ['vm', 'lxc', 'disk'].includes(req.query.type)) params.type = req.query.type;
-            if (req.query.status && ['completed', 'pending', 'refunded', 'destroyed'].includes(req.query.status)) params.status = req.query.status;
+            if (req.query.status && ORDER_STATUS.includes(req.query.status)) params.status = req.query.status;
             var result = await db.orders.getByUser(req.user.id, params);
             result.rows = await Promise.all((result.rows || result.data || []).map(async function(order) {
                 var packageName = '';

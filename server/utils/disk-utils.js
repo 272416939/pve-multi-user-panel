@@ -6,6 +6,8 @@ var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 var pveApi = require('../api/pve-api');
 var { calculateAmount } = require('./order-utils');
 var logger = require('./logger');
+// 单一来源：磁盘类型/格式白名单统一走 constants（规范第七节）
+var { DISK_TYPES, DISK_FORMATS } = require('../constants');
 
 // ==================== 参数白名单校验 ====================
 // 参照文档 7.2.1 节：每个参数在拼接前经过严格白名单校验
@@ -16,8 +18,8 @@ var PARAM_PATTERNS = {
   bus:      { type: 'enum', values: ['scsi', 'sata', 'virtio'] },
   dev:      { type: 'int', min: 1, max: 30 }, // 永不从 0 开始（系统盘保护）
   sizeGb:   { type: 'int', min: 1, max: 10000 },
-  diskType: { type: 'enum', values: ['NVME', 'SATA', 'HDD', 'U2'] },
-  diskFormat: { type: 'enum', values: ['raw', 'qcow2', 'vmdk', 'subvol'] },
+  diskType: { type: 'enum', values: DISK_TYPES },
+  diskFormat: { type: 'enum', values: DISK_FORMATS },
 };
 
 // 系统盘总线设备名防护：禁止操作 *0（如 scsi0、virtio0、sata0）
