@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.34.2] - 2026-08-04
+
+### Fixed
+- **fix(email): 恢复 sendEmail/shouldSendEmail 的 db 懒加载引用（bd1017f 回归）**
+  - **问题**：pm2 日志持续报错 `[email] shouldSendEmail 查询失败: db is not defined` + `[payment] 邮件发送失败: db is not defined`，**所有邮件通知（支付/开通/到期/备份，约 13 个文件引用）均受影响**
+  - **根因**：低耦合优化批次 3 commit `bd1017f`（utils 层倒挂清零）删除了 `server/utils/email.js` 顶部的 `const db = require('../api/db')`，但只给 `getSiteName()` 补了行内懒加载，**漏掉 `sendEmail()` 和 `shouldSendEmail()` 两处** -> 运行时 `ReferenceError: db is not defined`
+  - **修复**：按 utils 叶子层规范（不能顶层 require api），在两函数体内加行内懒加载（与 `getSiteName()` 同款写法），共 4 行
+  - 错误链说明：`shouldSendEmail` 抛错被自身 catch 吞掉（返回 true）-> 继续调 `sendEmail` 再次抛错 -> 被 `payment.js` 的 catch 捕获。日志两条错误实为**同一封邮件连报两次**
+
+### Notes
+- 验证：`node --check` 通过 / `npm test` 341 passing / `check-coupling` 7 项全绿
+- 线上部署后需 `pm2 restart pve-panel` 生效
+- 与安全审计 V4 无关（V4-03 只改配置存储层，email.js 未动）
+
 ## [2.34.1] - 2026-08-04
 
 ### Security
