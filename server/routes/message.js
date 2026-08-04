@@ -7,21 +7,8 @@ const { createEmailTemplate, sendEmail } = require('../utils/email');
 const cacheStore = require('../utils/cache-store');
 // unreadCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
 const unreadCache = cacheStore.create('unread', 10);
-
-// V3-04 修复：消息内容服务端净化（纵深防御，防 DOMPurify 异常时存储型 XSS）
-// 保留基本换行/列表语义，剔除 HTML 标签、javascript: 协议与内联事件
-function sanitizeMessageContent(text) {
-    var s = String(text == null ? '' : text);
-    // 1. 剔除 script/style 块及其内容
-    s = s.replace(/<\s*(script|style)[^>]*>[\s\S]*?<\s*\/\s*(script|style)\s*>/gi, '');
-    // 2. 剥离剩余 HTML 标签
-    s = s.replace(/<[^>]*>/g, '');
-    // 3. 剔除危险协议链接（javascript:/data:/vbscript:）
-    s = s.replace(/(javascript|data|vbscript)\s*:/gi, '$1&#58;');
-    // 4. 截断长度（与服务端限制一致）
-    if (s.length > 50000) s = s.substring(0, 50000);
-    return s;
-}
+// V4-05 修复：净化函数下沉到 utils/message-sanitize.js（db-messaging.create 已统一调用，此处复用共享实现）
+const { sanitizeTitle, sanitizeMessageContent, sanitizeLinkUrl, sanitizeLinkText } = require('../utils/message-sanitize');
 
 router.get('/messages', authMiddleware, async (req, res) => {
     try {
@@ -133,11 +120,11 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
     try {
         const { uids, title, content, type, link_url, link_text } = req.body;
         if (!title || !content) return res.status(400).json({ error: '标题和内容不能为空' });
-        // V3-04 修复：发送前净化标题与内容（服务端纵深防御）
-        const safeTitle = String(title).replace(/<[^>]*>/g, '').substring(0, 500);
+        // V3-04/V4-05 修复：发送前净化标题与内容（服务端纵深防御，与 create 统一净化幂等）
+        const safeTitle = sanitizeTitle(title);
         const safeContent = sanitizeMessageContent(content);
-        const safeLinkUrl = String(link_url || '').substring(0, 500).replace(/(javascript|data|vbscript)\s*:/gi, '');
-        const safeLinkText = String(link_text || '').replace(/<[^>]*>/g, '').substring(0, 200);
+        const safeLinkUrl = sanitizeLinkUrl(link_url);
+        const safeLinkText = sanitizeLinkText(link_text);
 
         if (!uids || uids.length === 0) {
             const users = await db.users.getAll();

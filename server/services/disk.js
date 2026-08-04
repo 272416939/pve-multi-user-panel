@@ -66,8 +66,12 @@ async function purchaseDisk(opts) {
 
     // 事务一：扣款 + 创建订单 + 创建流水 + 写入台账（不调 PVE）
     await withTransaction(async (conn) => {
-        // 原子扣款（一次总扣）
-        await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, userId]);
+        // 原子扣款（V4-02 修复：条件扣款防并发双花，余额不足回滚）
+        var [deductRes] = await conn.execute(
+            'UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ? AND balance >= ?',
+            [totalAmount, userId, totalAmount]
+        );
+        if (deductRes.affectedRows === 0) throw new Error('余额不足');
         var balanceAfter = balanceBefore - totalAmount;
 
         // 逐块磁盘：创建独立订单 + 流水 + 台账
@@ -399,8 +403,12 @@ async function resizeDisk(opts) {
 
     // 事务：扣款 + 创建订单 + 流水 + 更新容量 + 更新价格
     await withTransaction(async (conn) => {
-        // 原子扣款
-        await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [resizeAmount, userId]);
+        // 原子扣款（V4-02 修复：条件扣款防并发双花，余额不足回滚）
+        var [deductRes] = await conn.execute(
+            'UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ? AND balance >= ?',
+            [resizeAmount, userId, resizeAmount]
+        );
+        if (deductRes.affectedRows === 0) throw new Error('余额不足');
         var balanceAfter = balanceBefore - resizeAmount;
 
         // 创建订单
@@ -726,8 +734,12 @@ async function renewDisk(opts) {
     var dbNow = db.now();
 
     await withTransaction(async (conn) => {
-        // 原子扣款
-        await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [amount, userId]);
+        // 原子扣款（V4-02 修复：条件扣款防并发双花，余额不足回滚）
+        var [deductRes] = await conn.execute(
+            'UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ? AND balance >= ?',
+            [amount, userId, amount]
+        );
+        if (deductRes.affectedRows === 0) throw new Error('余额不足');
         var balanceAfter = balanceBefore - amount;
         // 创建续费订单（resource_name 格式：续费 diskId|xxGiB）
         await conn.execute(

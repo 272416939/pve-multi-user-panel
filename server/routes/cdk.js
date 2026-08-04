@@ -78,23 +78,24 @@ router.get('/admin/cdk/export', authMiddleware, adminMiddleware, async (req, res
             cdkList = await db.cdk.getAll();
         }
  
-        // 构建 CSV
+        // 构建 CSV（V4-06 修复：全字段统一转义，防公式注入 + 逗号/引号错位）
         const headers = '兑换码,续费天数,批次号,分配用户,创建时间,有效期,状态,使用用户,使用VM,使用时间';
+        const { escapeCsvField } = require('../utils/csv');
         const rows = cdkList.map(c => {
             const status = c.is_used ? '已使用' : (c.expires_at && new Date(c.expires_at) <= new Date() ? '已过期' : '未使用');
             const usedUser = c.used_username || '';
             const usedVm = c.used_vm_name || (c.used_vm_vmid ? 'VM ' + c.used_vm_vmid : '');
             return [
-                c.code,
-                c.duration_days,
-                c.batch_id || '',
-                c.target_username || '',
-                c.created_at,
-                c.expires_at || '',
-                status,
-                usedUser,
-                usedVm,
-                c.used_at || ''
+                escapeCsvField(c.code),
+                escapeCsvField(c.duration_days),
+                escapeCsvField(c.batch_id || ''),
+                escapeCsvField(c.target_username || ''),
+                escapeCsvField(c.created_at),
+                escapeCsvField(c.expires_at || ''),
+                escapeCsvField(status),
+                escapeCsvField(usedUser),
+                escapeCsvField(usedVm),
+                escapeCsvField(c.used_at || '')
             ].join(',');
         });
  

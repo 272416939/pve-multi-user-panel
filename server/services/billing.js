@@ -8,7 +8,7 @@ const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require
 const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
 const { formatLocalDate } = require('../utils/date');
-const { VALID_PERIODS, getPeriodDays, getPeriodUnit } = require('../constants');
+const { VALID_PERIODS, getPeriodDays, getPeriodUnit, MAX_PERIOD_COUNT } = require('../constants');
 
 /**
  * 余额扣款（原子扣减，返回扣款前后余额）
@@ -22,12 +22,12 @@ async function deductBalance(userId, amount, dbInstance) {
   if (amount <= 0) throw new Error('扣款金额必须大于0');
   var user = await dbInstance.users.getById(userId);
   var balanceBefore = parseFloat(user.balance || '0');
-  if (balanceBefore < amount) {
+  // V4-02 修复：原子条件扣款（WHERE balance >= amount），余额不足时 affectedRows=0，消除并发双花
+  var [result] = await dbInstance.users.decrementBalance(userId, amount);
+  if (!result || result.affectedRows === 0) {
     throw new Error('余额不足');
   }
-  var updatedUser = await dbInstance.users.incrementBalance(userId, -amount);
-  var balanceAfter = parseFloat(updatedUser.balance || '0');
-  return { balanceBefore: balanceBefore, balanceAfter: balanceAfter };
+  return { balanceBefore: balanceBefore, balanceAfter: balanceBefore - amount };
 }
 
 /**
@@ -50,6 +50,10 @@ async function renewByBalance(opts) {
     }
     if (!Number.isInteger(qty) || qty < 1) {
         return { ok: false, status: 400, error: '续费数量必须为正整数' };
+    }
+    // V4-11 修复：续费数量上限与开通侧一致（1-99，常量单一来源），防超大数量日期溢出
+    if (qty > MAX_PERIOD_COUNT) {
+        return { ok: false, status: 400, error: '续费数量不能超过 ' + MAX_PERIOD_COUNT };
     }
 
     var resource;
@@ -116,8 +120,14 @@ async function renewByBalance(opts) {
     var orderNo = generateOrderNo('renewal');
     // ARCH-10: 扣款+更新到期时间+流水记录三步放入事务，保证原子性
     await withTransaction(async (conn) => {
-        // 1. 扣款（原子扣减）
-        await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalPrice, userId]);
+        // 1. 扣款（V4-02 修复：原子条件扣款，并发余额不足时回滚事务）
+        var [deductRes] = await conn.execute(
+            'UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ? AND balance >= ?',
+            [totalPrice, userId, totalPrice]
+        );
+        if (deductRes.affectedRows === 0) {
+            throw new Error('余额不足');
+        }
         // 2. 更新到期时间
         if (type === 'vm') {
             await conn.execute('UPDATE vms SET expiration_date = ? WHERE id = ?', [newExpiration, resource.id]);

@@ -7,6 +7,9 @@
 // 有效周期列表（白名单校验）
 var VALID_PERIODS = ['month', 'quarter', 'year'];
 
+// 订购/续费周期数量上限（V4-11：开通与续费统一 1-99 白名单，防日期溢出）
+var MAX_PERIOD_COUNT = 99;
+
 // 周期 → 天数映射（开通/续费按 30/90/365 天计算）
 var PERIOD_DAYS = { month: 30, quarter: 90, year: 365 };
 
@@ -82,6 +85,7 @@ function getPeriodName(period) {
 
 module.exports = {
     VALID_PERIODS,
+    MAX_PERIOD_COUNT,
     PERIOD_DAYS,
     PERIOD_MONTHS,
     PERIOD_UNITS,

@@ -13,13 +13,14 @@ const logger = require('../utils/logger');
 // ==================== 内部工具函数 ====================
 
 // SSH 命令执行（复用 disk-utils 的 SSH 工具，检查退出码）
+// V4-08 修复：错误消息不包含完整命令串（防存储型信息泄露，与 SEC-002 同原则），保留 exit code + stderr 供排障
 async function runSsh(cmd) {
     const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
     const sshConfig = await getPveSshConfig();
     const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 60000);
     if (result.code !== 0) {
         const errDetail = (result.stderr || result.stdout || '').trim();
-        throw new Error(`SSH 命令执行失败 [exit ${result.code}]: ${cmd}\n${errDetail}`);
+        throw new Error(`SSH 命令执行失败 [exit ${result.code}]\n${errDetail}`);
     }
     return result.stdout.trim();
 }
@@ -140,47 +141,15 @@ async function getStorageType(storage) {
     return s ? s.type : '';
 }
 
-// 2.5.1 获取 LVM 卷的物理设备路径
-// 优先使用 pvesm path，失败时使用 lvs 查询
-async function getLvmDevicePath(volumeId, storage) {
-    // 1. 尝试 pvesm path
-    try {
-        const path = (await runSsh(`pvesm path ${volumeId}`)).trim();
-        if (path) {
-            logger.info(`[os-switch] pvesm path ${volumeId} -> ${path}`);
-            return path;
-        }
-    } catch (e) {
-        logger.info(`[os-switch] pvesm path ${volumeId} 失败: ${e.message.substring(0, 100)}`);
-    }
-    // 2. fallback: 使用 lvs 查询（卷名格式: vm-<vmid>-disk-<n>）
-    // 从 volumeId 中提取卷名（如 nvme2T:vm-103-disk-0 -> vm-103-disk-0）
-    const parts = volumeId.split(':');
-    const volName = parts[1] || '';
-    if (volName) {
-        try {
-            // lvs 输出: /dev/nvme2T/vm-103-disk-0
-            const cmd = `lvs --noheadings -o lv_path ${storage} 2>/dev/null | grep '${volName}' | head -1 | tr -d ' '`;
-            const path = (await runSsh(cmd)).trim();
-            if (path) {
-                logger.info(`[os-switch] lvs fallback ${volumeId} -> ${path}`);
-                return path;
-            }
-        } catch (e) {
-            logger.info(`[os-switch] lvs fallback 失败: ${e.message.substring(0, 100)}`);
-        }
-    }
-    return '';
-}
-
 // 扩展的 SSH 执行（支持自定义超时）
+// V4-08 修复：错误消息不包含完整命令串
 async function runSshWithTimeout(cmd, timeout = 60000) {
     const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
     const sshConfig = await getPveSshConfig();
     const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, timeout);
     if (result.code !== 0) {
         const errDetail = (result.stderr || result.stdout || '').trim();
-        throw new Error(`SSH 命令执行失败 [exit ${result.code}]: ${cmd}\n${errDetail}`);
+        throw new Error(`SSH 命令执行失败 [exit ${result.code}]\n${errDetail}`);
     }
     return result.stdout.trim();
 }
@@ -219,46 +188,6 @@ async function cleanupTempVm(tempVmid, bus) {
         logger.info(`[os-switch] cleanupTempVm unlink 失败（可能已解绑）: ${e.message.substring(0, 100)}`);
     }
     await pveApi.destroyVm(tempVmid);
-}
-
-// 3. 替换目标 VM 系统盘（仅 DIR 旧路径使用，迁移后统一走 move_disk 流程）
-async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId) {
-    const safeVmid = validateParam('vmid', vmid);
-    const bus = oldSysDisk.bus;
-    // 确保 newVolumeId 是一个有效的 volume ID 格式
-    const cleanVolId = newVolumeId && typeof newVolumeId === 'string' ? newVolumeId.trim() : '';
-    if (!cleanVolId) {
-        throw new Error('新系统盘 volume ID 为空');
-    }
-
-    // 3.1 使用 qm unlink 卸载原系统盘配置（比 qm set --delete 更可靠，不留划线状态）
-    await runSsh(`qm unlink ${safeVmid} --idlist ${bus}0`);
-
-    // 3.2 检查旧卷是否仍存在，如果存在才释放
-    try {
-        const checkCmd = `pvesm list $(echo ${oldSysDisk.volume_id} | cut -d: -f1) 2>/dev/null | grep -F '${oldSysDisk.volume_id.split(':')[1]}'`;
-        const checkResult = await runSsh(checkCmd);
-        if (checkResult) {
-            await diskOps._internal.destroySystemDisk(oldSysDisk.volume_id);
-        }
-    } catch (e) {
-        // 卷不存在或查询失败则跳过释放（可能已被前一次切换清理）
-    }
-
-    // 3.3 挂载新系统盘（剥离 size= 参数）
-    const mountParams = oldSysDisk.params_without_size || oldSysDisk.params || '';
-    const newDiskConfig = mountParams ? `${cleanVolId},${mountParams}` : cleanVolId;
-    await runSsh(`qm set ${safeVmid} --${bus}0 ${newDiskConfig}`);
-
-    // 3.4 扩容到目标的 VM 系统盘容量 或 模板 disk_size
-const targetSizeGb = oldSysDisk.size_gb || 0;
-            if (targetSizeGb > 0) {
-                await runSsh(`qm resize ${safeVmid} ${bus}0 ${targetSizeGb}G`);
-
-                // 3.5 补回 size= 元数据
-                const finalParams = mountParams ? `${mountParams},size=${targetSizeGb}G` : `size=${targetSizeGb}G`;
-                await runSsh(`qm set ${safeVmid} --${bus}0 ${cleanVolId},${finalParams}`);
-            }
 }
 
 // 4. 更新 cloud-init 配置
@@ -497,7 +426,6 @@ module.exports = {
     getStorageType,
     moveDiskToTarget,
     cleanupTempVm,
-    replaceSystemDisk,
     updateCloudInit,
     verifyAndSyncMac,
     performOsSwitch,

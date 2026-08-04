@@ -150,8 +150,10 @@ router.get('/logs/login', authMiddleware, async (req, res) => {
 });
 
 // ========== 导出（CSV，带 BOM 保证 Excel 中文不乱码） ==========
+// V4-06 修复：字段转义下沉到 utils/csv.js（引号转义 + 公式注入防护），此处保留包装保持调用点不变
+const { escapeCsvField } = require('../utils/csv');
 function csvEscape(v) {
-    return '"' + String(v === undefined || v === null ? '' : v).replace(/"/g, '""') + '"';
+    return escapeCsvField(v);
 }
 
 // Excel/WPS 打开 CSV 时会把 yyyy-MM-dd HH:mm:ss 自动识别为日期并隐藏秒（默认格式 yyyy/m/d h:mm），
