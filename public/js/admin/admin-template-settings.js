@@ -481,13 +481,18 @@
                         <!-- 用户日志上限配置 -->
                         <div class="card mt-3">
                             <div class="card-body">
-                                <h5 class="card-title mb-3">用户日志上限</h5>
-                                <p class="text-muted small mb-3">每个用户的操作日志与登录日志最多保留的条数，超出后自动清理最早的历史数据（每小时清理一次）。</p>
+                                <h5 class="card-title mb-3">日志保留上限</h5>
+                                <p class="text-muted small mb-3">用户操作日志按每个用户维度保留，后台操作日志按全站维度保留；超出后自动清理最早的历史数据（每小时清理一次），两者互不挤占。</p>
                                 <form @submit.prevent="saveLogConfig">
                                     <div class="row mb-3">
                                         <div class="col-md-4">
-                                            <label class="form-label">保留条数</label>
+                                            <label class="form-label">用户操作日志（每用户）</label>
                                             <input type="number" class="form-control" v-model.number="logConfigForm.keep_count" min="100" max="100000" placeholder="5000">
+                                            <small class="text-muted">范围 100-100000，默认 5000</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">后台操作日志（全站）</label>
+                                            <input type="number" class="form-control" v-model.number="logConfigForm.keep_admin_count" min="100" max="100000" placeholder="5000">
                                             <small class="text-muted">范围 100-100000，默认 5000</small>
                                         </div>
                                     </div>

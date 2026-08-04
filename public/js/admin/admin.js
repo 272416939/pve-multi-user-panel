@@ -29,7 +29,7 @@
     $.redisTesting = ref(false);
     $.cacheClearing = ref(false);
     // 用户日志上限配置
-    $.logConfigForm = ref({ keep_count: 5000 });
+    $.logConfigForm = ref({ keep_count: 5000, keep_admin_count: 5000 });
     $.logConfigSaving = ref(false);
     $.cdkList = ref([]);
     $.cdkForm = ref({ duration_days: 30, count: 1, expires_at: '' });
@@ -373,11 +373,11 @@
         $.redisConfigSaving.value = false;
     };
 
-    // 用户日志上限配置
+    // 用户日志上限配置（用户操作按用户维度 / 后台操作按全站维度）
     $.loadLogConfig = async function() {
         try {
             var config = await api('/admin/log/config');
-            $.logConfigForm.value = { keep_count: config.keep_count || 5000 };
+            $.logConfigForm.value = { keep_count: config.keep_count || 5000, keep_admin_count: config.keep_admin_count || 5000 };
         } catch (e) {
             console.warn('日志配置加载失败:', e.message || e);
         }

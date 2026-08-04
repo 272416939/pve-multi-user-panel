@@ -946,6 +946,8 @@ async function initDefaultConfig() {
         'uapipro:api_key': '',
         'disk:temp_vmid': '9999',
         'log:keep_count': '5000',
+        // 后台操作日志全站独立保留上限（与用户维度 log:keep_count 隔离，防相互挤占）
+        'log:keep_admin_count': '5000',
     };
 
     for (const [key, value] of Object.entries(defaultConfigs)) {

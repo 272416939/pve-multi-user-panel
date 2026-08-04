@@ -319,11 +319,17 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
             await pveApi.startVm(parseInt(vm_id));
             dbg(`虚拟机 ${vm_id} 已自动开机（分配后）`);
         }
-    } catch (startError) {
-        console.error(`虚拟机 ${vm_id} 自动开机失败:`, startError.message);
-    }
-    
-	    res.json(newVm);
+	    } catch (startError) {
+	        console.error(`虚拟机 ${vm_id} 自动开机失败:`, startError.message);
+	    }
+	    
+	    // 操作审计：管理员创建/分配 VM
+	    try {
+	        const { auditLog } = require('../utils/audit-log');
+	        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.vm.create', resourceType: 'vm', resourceId: parsedVmId, details: '为 用户#' + parsedUserId + ' 创建 VM #' + parsedVmId + '(' + (name || 'VM ' + vm_id) + (expiration_date ? ',到期:' + expiration_date : '') + ')', req });
+	    } catch (e) {}
+	    
+		    res.json(newVm);
 
 		    // 异步更新磁盘快照（不阻塞响应）
 		    takeDiskSnapshot(parsedVmId, parsedUserId).catch(function(err) {

@@ -19,6 +19,11 @@ router.post('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, 
     try {
         var { mac_group_id = '' } = req.body;
         var t = await db.vmTemplates.create({ ...req.body, mac_group_id });
+        // 操作审计：创建 VM 模板
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.template.create', resourceType: 'vm-template', resourceId: t.id, details: '创建VM模板:' + (req.body.name || t.id), req });
+        } catch (e) {}
         res.json(t);
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -30,6 +35,11 @@ router.put('/admin/vm-templates/:id', authMiddleware, adminMiddleware, async (re
     try {
         var { mac_group_id = '' } = req.body;
         var t = await db.vmTemplates.update(parseInt(req.params.id), { ...req.body, mac_group_id });
+        // 操作审计：更新 VM 模板
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.template.update', resourceType: 'vm-template', resourceId: parseInt(req.params.id), details: '更新VM模板 #' + parseInt(req.params.id) + ':' + (req.body.name || ''), req });
+        } catch (e) {}
         res.json(t);
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -44,6 +54,11 @@ router.delete('/admin/vm-templates/:id', authMiddleware, adminMiddleware, async 
         var ref = packages.find(function(p) { return p.template_id === id; });
         if (ref) return res.status(400).json({ error: '该模板被套餐 [' + ref.name + '] 引用，请先删除套餐' });
         await db.vmTemplates.delete(id);
+        // 操作审计：删除 VM 模板
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.template.delete', resourceType: 'vm-template', resourceId: id, details: '删除VM模板 #' + id, req });
+        } catch (e) {}
         res.json({ message: '已删除' });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -60,6 +75,11 @@ router.post('/admin/lxc-templates', authMiddleware, adminMiddleware, async (req,
     try {
         var { mac_group_id = '' } = req.body;
         var t = await db.lxcTemplates.create({ ...req.body, mac_group_id });
+        // 操作审计：创建 LXC 模板
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.template.create', resourceType: 'lxc-template', resourceId: t.id, details: '创建LXC模板:' + (req.body.name || t.id), req });
+        } catch (e) {}
         res.json(t);
     } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
@@ -69,6 +89,11 @@ router.put('/admin/lxc-templates/:id', authMiddleware, adminMiddleware, async (r
     try {
         var { mac_group_id = '' } = req.body;
         var t = await db.lxcTemplates.update(parseInt(req.params.id), { ...req.body, mac_group_id });
+        // 操作审计：更新 LXC 模板
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.template.update', resourceType: 'lxc-template', resourceId: parseInt(req.params.id), details: '更新LXC模板 #' + parseInt(req.params.id) + ':' + (req.body.name || ''), req });
+        } catch (e) {}
         res.json(t);
     } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
@@ -81,6 +106,11 @@ router.delete('/admin/lxc-templates/:id', authMiddleware, adminMiddleware, async
         var ref = packages.find(function(p) { return p.template_id === id; });
         if (ref) return res.status(400).json({ error: '该模板被套餐 [' + ref.name + '] 引用，请先删除套餐' });
         await db.lxcTemplates.delete(id);
+        // 操作审计：删除 LXC 模板
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.template.delete', resourceType: 'lxc-template', resourceId: id, details: '删除LXC模板 #' + id, req });
+        } catch (e) {}
         res.json({ message: '已删除' });
     } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });

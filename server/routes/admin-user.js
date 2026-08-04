@@ -91,6 +91,12 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
         emailVerified: !!emailVerified
     });
     
+    // 操作审计：管理员创建用户
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.user.create', resourceType: 'user', resourceId: newUser.id, details: '创建用户:' + username + '(角色:' + (role || 'user') + (email ? ',邮箱:' + email : '') + ')', req });
+    } catch (_) {}
+    
     const { password: _, password_salt: __, totp_secret: ___, ...safeUser } = newUser;
     await userListCache.del('list');
     res.json(safeUser);
@@ -194,6 +200,17 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     await db.users.update(userId, updates);
     await userListCache.del('list');
     await invalidateUserActiveCache(userId);
+    // 操作审计：管理员修改用户资料（角色/用户名/邮箱变更摘要；密码重置单独记 password.reset.admin）
+    try {
+        var changeParts = [];
+        if (updates.username) changeParts.push('用户名:' + user.username + '→' + updates.username);
+        if (updates.role) changeParts.push('角色:' + user.role + '→' + updates.role);
+        if (updates.email !== undefined && String(updates.email) !== String(user.email)) changeParts.push('邮箱:' + user.email + '→' + updates.email);
+        const { auditLog } = require('../utils/audit-log');
+        if (changeParts.length > 0) {
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.user.update', resourceType: 'user', resourceId: userId, details: '修改用户[' + (user.username || userId) + ']:' + changeParts.join(','), req });
+        }
+    } catch (_) {}
     // 操作审计：管理员重置用户密码（记录到管理员自己的操作日志）
     if (password) {
         try {
@@ -237,6 +254,12 @@ router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, 
             balance_after: newBalance.toFixed(2),
             trade_no: '', api_trade_no: ''
         });
+
+        // 操作审计：人工充值（资金操作，含金额与前后余额）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.user.recharge', resourceType: 'user', resourceId: userId, details: '人工充值:用户[' + (user.username || userId) + '] +¥' + amount.toFixed(2) + ',余额 ¥' + oldBalance.toFixed(2) + '→¥' + newBalance.toFixed(2), req });
+        } catch (_) {}
 
         try {
             await db.messages.create({

@@ -306,6 +306,12 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         }
     } catch (e) { console.error(`LXC ${parsedCtId} DHCP 静态绑定失败:`, e.message); }
 
+    // 操作审计：管理员创建/分配 LXC
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.lxc.create', resourceType: 'lxc', resourceId: parsedCtId, details: '为 用户#' + parsedUserId + ' 创建 LXC #' + parsedCtId + '(' + (name || 'CT ' + ct_id) + (expiration_date ? ',到期:' + expiration_date : '') + ')', req });
+    } catch (e) {}
+
     res.json(newCt);
     } catch (e) {
         console.error('[lxc] 操作失败:', e.message);
@@ -823,7 +829,13 @@ router.post('/lxc/create', authMiddleware, adminMiddleware, async (req, res) => 
  
         const result = await pveApi.createLxc(params);
         const upid = result.data;
- 
+
+        // 操作审计：管理员直开 LXC（PVE 层创建）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.lxc.create', resourceType: 'lxc', resourceId: newVmid, details: 'PVE直开 LXC #' + newVmid + '(' + (hostname || '') + ',' + (cores || 1) + '核/' + (memory || 512) + 'M/' + (disk || 8) + 'G,模板:' + ostemplate + ')', req });
+        } catch (e) {}
+
         res.json({ upid, ct_id: newVmid, message: 'LXC 容器创建任务已提交' });
     } catch (error) {
         console.error('创建 LXC 容器失败:', error.response?.data || error.message);

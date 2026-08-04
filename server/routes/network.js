@@ -96,6 +96,11 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         await setConfig('dhcp:dns1', dhcp_dns1 || '119.29.29.29');
         await setConfig('dhcp:dns2', dhcp_dns2 || '223.5.5.5');
         await setConfig('cname:domain', (cname_domain || '').trim());
+        // 操作审计：更新网络/端口转发配置
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.network', resourceType: 'config', resourceId: 'network', details: '更新网络配置(端口段:' + (port_range_start ?? 50000) + '-' + (port_range_end ?? 60000) + ',每用户上限:' + (max_per_user ?? 10) + ',DHCP:' + (dhcp_ip_range_start || '10.0.0.110') + '-' + (dhcp_ip_range_end || '10.0.0.199') + ')', req });
+        } catch (e) {}
         res.json({ message: '网络配置已更新' });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -190,6 +195,11 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
         }
 
         console.log(`[sync-dhcp] 同步完成: 更新 ${updated}, 跳过 ${skipped}, 错误 ${errors}`);
+        // 操作审计：同步 iKuai DHCP 绑定
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.network.sync-dhcp', resourceType: 'network', details: '同步DHCP绑定:更新 ' + updated + ' 条,跳过 ' + skipped + ',错误 ' + errors, req });
+        } catch (e) {}
         res.json({ updated, skipped, errors, total: bindings.length });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -482,6 +492,10 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             updates.ikuai_id = stringifyIkuaiIds(newIkuaiIds);
         }
         const updated = await db.portForwards.update(id, updates);
+        // 操作审计：编辑端口转发规则（补漏：add/delete 均有埋点，edit 原先缺失）
+        try {
+            await auditAction(req, 'network.port.update', portAuditDetail('编辑', Object.assign({}, existing, updates), existing.vm_id, existing.ct_id), { resourceType: 'port-forward', resourceId: id });
+        } catch (e) {}
         res.json(updated);
     } catch (e) {
         res.status(500).json({ error: safeError(e) });

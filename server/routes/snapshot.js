@@ -320,6 +320,11 @@ router.put('/admin/snapshot-config', authMiddleware, adminMiddleware, async (req
         daily_create_limit: Math.max(1, parseInt(daily_create_limit) || 20),
         daily_restore_limit: Math.max(1, parseInt(daily_restore_limit) || 10)
     });
+    // 操作审计：更新快照配置
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.snapshot', resourceType: 'config', resourceId: 'snapshot', details: '更新快照配置(每机上限:' + Math.max(1, parseInt(max_per_vm) || 5) + ',每日创建:' + Math.max(1, parseInt(daily_create_limit) || 20) + ',每日恢复:' + Math.max(1, parseInt(daily_restore_limit) || 10) + ')', req });
+    } catch (e) {}
     res.json({ message: '快照配置已保存' });
 });
 

@@ -278,6 +278,11 @@ router.put('/admin/backup-config', authMiddleware, adminMiddleware, async (req, 
         max_per_vm: Math.max(1, parseInt(max_per_vm) || 3),
         daily_limit: Math.max(1, parseInt(daily_limit) || 3)
     });
+    // 操作审计：更新备份配置
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.backup', resourceType: 'config', resourceId: 'backup', details: '更新备份配置(存储:' + (default_storage || 'local') + ',每机上限:' + Math.max(1, parseInt(max_per_vm) || 3) + ',每日上限:' + Math.max(1, parseInt(daily_limit) || 3) + ')', req });
+    } catch (e) {}
     res.json({ message: '备份配置已保存' });
 });
 
@@ -464,6 +469,11 @@ router.delete('/admin/backups/:id', authMiddleware, adminMiddleware, async (req,
         }
         await db.restoreTasks.deleteByBackupId(parseInt(req.params.id));
         await db.backups.delete(req.params.id);
+        // 操作审计：管理员删除备份
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.backup.delete', resourceType: 'backup', resourceId: parseInt(req.params.id), details: '删除备份 #' + parseInt(req.params.id) + '(VM ' + (backup.vm_id || '-') + ')', req });
+        } catch (e) {}
         res.json({ message: '备份已删除' });
     } catch (error) {
         res.status(500).json({ error: '删除备份失败' });
@@ -559,6 +569,11 @@ router.post('/admin/backups/cleanup', authMiddleware, adminMiddleware, async (re
                 deleted++;
             }
         }
+        // 操作审计：批量清理备份记录
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.backup.cleanup', resourceType: 'backup', details: '清理备份记录 ' + deleted + ' 条', req });
+        } catch (e) {}
         res.json({ message: `已清理 ${deleted} 条备份记录` });
     } catch (error) {
         console.error('清理备份记录失败:', error);

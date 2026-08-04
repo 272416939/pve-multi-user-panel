@@ -64,6 +64,11 @@ router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
         });
 
         const { password: _, ...configWithoutPassword } = await db.config.getSmtp();
+        // 操作审计：更新 SMTP 配置（不记录密码/凭据原文）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.smtp', resourceType: 'config', resourceId: 'smtp', details: '更新SMTP配置(服务器:' + (host || '') + ',启用:' + (enabled ? '是' : '否') + ')', req });
+        } catch (e) {}
         res.json({ message: '配置更新成功', config: configWithoutPassword });
     } catch (error) {
         console.error('更新 SMTP 配置失败:', error);
@@ -118,6 +123,12 @@ router.put('/admin/reminder', authMiddleware, adminMiddleware, async (req, res) 
             days3: days3 !== undefined ? parseInt(days3) : 1
         });
         
+        // 操作审计：更新到期提醒配置
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.reminder', resourceType: 'config', resourceId: 'reminder', details: '更新提醒配置:' + (days1 !== undefined ? parseInt(days1) : 7) + '/' + (days2 !== undefined ? parseInt(days2) : 3) + '/' + (days3 !== undefined ? parseInt(days3) : 1) + '天', req });
+        } catch (e) {}
+        
         res.json({ message: '提醒配置更新成功', config: db.config.getReminder() });
     } catch (error) {
         console.error('更新提醒配置失败:', error);
@@ -142,6 +153,11 @@ router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, asy
     if (!result.ok) {
         return res.status(result.status).json({ error: result.error });
     }
+    // 操作审计：执行系统更新
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.system.update', resourceType: 'system', resourceId: 'update', details: '执行系统更新(来源:' + ((req.body && req.body.source) || 'gitee') + (result.data && result.data.version ? ',目标版本:' + result.data.version : '') + ')', req });
+    } catch (e) {}
     res.json(result.data);
 });
 
@@ -235,6 +251,17 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         if (minHasVal) await setConfig('pay:min_amount', String(minNum));
         if (maxHasVal) await setConfig('pay:max_amount', String(maxNum));
 
+        // 操作审计：更新支付配置（资金配置，不记录密钥/商户私钥原文）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            var switchParts = [];
+            if (v1_enabled !== undefined) switchParts.push('V1:' + (v1_enabled ? '开' : '关'));
+            if (v2_enabled !== undefined) switchParts.push('V2:' + (v2_enabled ? '开' : '关'));
+            if (alipay_enabled !== undefined) switchParts.push('支付宝:' + (alipay_enabled ? '开' : '关'));
+            if (wxpay_enabled !== undefined) switchParts.push('微信:' + (wxpay_enabled ? '开' : '关'));
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.pay', resourceType: 'config', resourceId: 'pay', details: '更新支付配置(商户号:' + (pid !== undefined ? pid : '-') + (switchParts.length ? ',' + switchParts.join(',') : '') + (minHasVal ? ',最低¥' + minNum : '') + (maxHasVal ? ',最高¥' + maxNum : '') + ')', req });
+        } catch (e) {}
+
         res.json({ message: '支付配置保存成功' });
     } catch (e) {
         console.error('[支付配置]', e.message);
@@ -266,6 +293,11 @@ router.put('/admin/uapipro/config', authMiddleware, adminMiddleware, async (req,
         }
         // 失效 ip-location 的启用开关缓存（60s TTL），让新配置立即生效
         require('../services/ip-location').invalidateEnabledCache();
+        // 操作审计：更新 UApiPro 配置（不记录 API Key 原文）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.uapipro', resourceType: 'config', resourceId: 'uapipro', details: '更新UApiPro配置(启用:' + (enabled !== undefined ? (enabled ? '是' : '否') : '-') + (api_key !== undefined && !isMasked(api_key) ? ',已更新API Key' : '') + ')', req });
+        } catch (e) {}
         res.json({ message: 'UApiPro 配置保存成功' });
     } catch (e) {
         console.error('[UApiPro配置]', e.message);
@@ -411,6 +443,11 @@ router.put('/admin/register/config', authMiddleware, adminMiddleware, async (req
         if (enabled !== undefined) {
             await setConfig('register:enabled', enabled ? '1' : '0');
         }
+        // 操作审计：更新注册配置
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.register', resourceType: 'config', resourceId: 'register', details: '更新注册配置(开放注册:' + (enabled !== undefined ? (enabled ? '是' : '否') : '-') + ')', req });
+        } catch (e) {}
         res.json({ message: '注册配置保存成功' });
     } catch (e) {
         console.error('[注册配置]', e.message);
@@ -471,6 +508,11 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
             req.app.locals.siteConfigCache.data = null;
             req.app.locals.siteConfigCache.expires = 0;
         }
+        // 操作审计：更新站点设置（仅摘要，不含敏感内容）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.site', resourceType: 'config', resourceId: 'site', details: '更新站点设置(站点名:' + (name !== undefined ? name : '-') + (register_enabled !== undefined ? ',开放注册:' + (register_enabled ? '是' : '否') : '') + ')', req });
+        } catch (e) {}
         res.json({ message: '站点配置保存成功' });
     } catch (e) {
         console.error('[admin] site config set:', e.message);
@@ -482,6 +524,11 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
 router.post('/admin/cache/clear', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         await redisAdmin.clearAllCaches(req.app);
+        // 操作审计：清空缓存
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.cache.clear', resourceType: 'system', resourceId: 'cache', details: '清空全部缓存(Redis+内存)', req });
+        } catch (e) {}
         res.json({ message: '所有缓存已清除' });
     } catch (e) {
         console.error('[admin] cache clear:', e.message);
@@ -525,6 +572,11 @@ router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
         await db.config.setPve(configToSave);
         // 刷新 PVE API 实例的配置缓存
         await pveApi.reloadConfig();
+        // 操作审计：更新 PVE 节点配置（不记录 token/SSH 密码原文）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.pve', resourceType: 'config', resourceId: 'pve', details: '更新PVE节点配置(节点:' + (host || '') + ',SSH:' + (ssh_user || 'root') + '@' + (ssh_host || '') + ':' + (parseInt(ssh_port) || 22) + ')', req });
+        } catch (e) {}
         res.json({ message: 'PVE 配置保存成功' });
     } catch (error) {
         console.error('更新 PVE 配置失败:', error.message);
@@ -566,6 +618,12 @@ router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
         // 热更新 Redis 连接（业务在 services/redis-admin.js）
         await redisAdmin.applyRedisConfig(configToSave);
 
+        // 操作审计：更新 Redis 配置（不记录密码原文）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.redis', resourceType: 'config', resourceId: 'redis', details: '更新Redis配置(' + (host || '') + ':' + (parseInt(port) || 6379) + '/db' + (parseInt(redisDb) || 0) + ')', req });
+        } catch (e) {}
+
         res.json({ message: 'Redis 配置保存成功' });
     } catch (error) {
         console.error('更新 Redis 配置失败:', error.message);
@@ -573,12 +631,13 @@ router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
     }
 });
 
-// ==================== 用户日志上限配置 ====================
+// ==================== 用户日志上限配置（用户操作按用户维度 / 后台操作按全站维度） ====================
 
 router.get('/admin/log/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
-        res.json({ keep_count: keepCount });
+        var keepAdminCount = parseInt(await db.config.get('log:keep_admin_count')) || 5000;
+        res.json({ keep_count: keepCount, keep_admin_count: keepAdminCount });
     } catch (error) {
         console.error('获取日志配置失败:', error.message);
         res.status(500).json({ error: safeError(error) });
@@ -588,11 +647,23 @@ router.get('/admin/log/config', authMiddleware, adminMiddleware, async (req, res
 router.put('/admin/log/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var keepCount = parseInt(req.body.keep_count);
+        var keepAdminCount = req.body.keep_admin_count !== undefined ? parseInt(req.body.keep_admin_count) : null;
         // 上限校验：100-100000，防止误填 0 或超大值导致日志被清空/爆库
         if (!Number.isInteger(keepCount) || keepCount < 100 || keepCount > 100000) {
             return res.status(400).json({ error: '用户日志上限须为 100-100000 的整数' });
         }
+        if (keepAdminCount !== null && (!Number.isInteger(keepAdminCount) || keepAdminCount < 100 || keepAdminCount > 100000)) {
+            return res.status(400).json({ error: '后台操作日志上限须为 100-100000 的整数' });
+        }
         await db.config.set('log:keep_count', String(keepCount));
+        if (keepAdminCount !== null) {
+            await db.config.set('log:keep_admin_count', String(keepAdminCount));
+        }
+        // 操作审计：更新日志保留上限
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.log', resourceType: 'config', resourceId: 'log', details: '更新日志上限(每用户:' + keepCount + ',后台操作全站:' + (keepAdminCount !== null ? keepAdminCount : '不变') + ')', req });
+        } catch (e) {}
         res.json({ message: '日志配置保存成功' });
     } catch (error) {
         console.error('更新日志配置失败:', error.message);

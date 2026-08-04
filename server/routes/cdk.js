@@ -30,6 +30,11 @@ router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, 
             expires_at: expires_at || null
         });
  
+        // 操作审计：生成 CDK
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.cdk.generate', resourceType: 'cdk', resourceId: newCdk.id, details: '生成CDK 1 张(续费' + parseInt(duration_days) + '天)', req });
+        } catch (e) {}
         res.json(newCdk);
     } catch (error) {
         console.error('生成 CDK 失败:', error);
@@ -50,6 +55,13 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
         if (!result.ok) {
             return res.status(result.status).json({ error: result.error });
         }
+        // 操作审计：批量生成 CDK
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            var generatedCount = result.data && typeof result.data.count === 'number' ? result.data.count
+                : (result.data && Array.isArray(result.data.cdks) ? result.data.cdks.length : '');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.cdk.generate', resourceType: 'cdk', details: '批量生成CDK ' + generatedCount + ' 张(续费' + parseInt(req.body.duration_days) + '天)', req });
+        } catch (e) {}
         res.json(result.data);
     } catch (error) {
         console.error('批量生成 CDK 失败:', error);
@@ -120,6 +132,11 @@ router.delete('/admin/cdk/:id', authMiddleware, adminMiddleware, async (req, res
         }
  
         await db.cdk.delete(id);
+        // 操作审计：删除 CDK
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.cdk.delete', resourceType: 'cdk', resourceId: id, details: '删除CDK #' + id + '(续费' + (cdk.duration_days || '-') + '天)', req });
+        } catch (e) {}
         res.json({ message: 'CDK 删除成功' });
     } catch (error) {
         console.error('删除 CDK 失败:', error);
@@ -130,6 +147,11 @@ router.delete('/admin/cdk/:id', authMiddleware, adminMiddleware, async (req, res
 router.post('/admin/cdk/cleanup', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const result = await db.cdk.deleteExpiredOrUsed();
+        // 操作审计：清理过期/已用 CDK
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.cdk.delete', resourceType: 'cdk', details: '清理过期/已用CDK ' + (result.changes || 0) + ' 张', req });
+        } catch (e) {}
         res.json({ message: '清理完成', deleted: result.changes });
     } catch (error) {
         console.error('清理 CDK 失败:', error);
@@ -144,6 +166,11 @@ router.post('/admin/cdk/batch-delete', authMiddleware, adminMiddleware, async (r
             return res.status(400).json({ error: '请提供要删除的 CDK ID 列表' });
         }
         await db.cdk.deleteBatch(ids.map(id => parseInt(id)));
+        // 操作审计：批量删除 CDK
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.cdk.delete', resourceType: 'cdk', details: '批量删除CDK ' + ids.length + ' 张', req });
+        } catch (e) {}
         res.json({ message: `成功删除 ${ids.length} 个 CDK` });
     } catch (error) {
         console.error('批量删除 CDK 失败:', error);
