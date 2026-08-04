@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.34.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.35.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -132,17 +132,23 @@
 | 58 | **操作/登录日志** | Dashboard 侧边栏「日志」页查看操作日志与登录日志，支持筛选/搜索/导出/批量删除/清空 |
 | 59 | **日志保留上限** | 每用户日志保留上限（默认 5000 条）自动循环清理防写爆，Admin 站点设置可调（v2.33.9） |
 | 60 | **侧边栏状态保持** | 刷新后保持当前标签页与折叠组展开状态，直达链接高亮与内容一致（v2.33.8） |
+| 61 | **Admin 日志中心** | 侧边栏「日志中心」四 tab（操作/后台/登录/系统切换），后台操作按子域筛选，约 50 处敏感操作埋点，后台操作日志独立保留上限（v2.35.0） |
+
+### 🔒 安全防护（v2.35.0 新增）
+| # | 功能 | 说明 |
+|---|------|------|
+| 62 | **限速设置** | 系统设置「安全防护 -> 限速设置」：限速总开关 + 10 大类 32 条规则可配置化（次数/时间窗），保存即生效，DB 异常自动降级默认规则不裸奔 |
 
 ### 🗄️ 基础设施（v1.8.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 61 | **MySQL 数据库** | MySQL 5.7+ 唯一驱动，utf8mb4 编码，自动建表迁移 |
-| 62 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
-| 63 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
-| 64 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
-| 65 | **EJS 模板缓存** | 编译后缓存在内存，`NODE_ENV=production` 自动启用 |
-| 66 | **Gzip 压缩** | compression 中间件，所有响应压缩 60-80% |
-| 67 | **资源预加载** | preconnect / dns-prefetch / script defer 优化首屏加载 |
+| 63 | **MySQL 数据库** | MySQL 5.7+ 唯一驱动，utf8mb4 编码，自动建表迁移 |
+| 64 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
+| 65 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
+| 66 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
+| 67 | **EJS 模板缓存** | 编译后缓存在内存，`NODE_ENV=production` 自动启用 |
+| 68 | **Gzip 压缩** | compression 中间件，所有响应压缩 60-80% |
+| 69 | **资源预加载** | preconnect / dns-prefetch / script defer 优化首屏加载 |
 
 ---
 
@@ -481,9 +487,9 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 | **模板管理** | VM/LXC 套餐模板 + 系统模板（OS 模板，系统切换用） |
 | **套餐管理** | VM/LXC 套餐与分组管理，拖拽排序、优惠百分比、库存 |
 | **财务管理** | 交易流水查询/CSV 导出、订单管理，支付网关配置（PID/密钥/开关） |
-| **系统设置** | 站点设置（含 Redis、日志上限）、SMTP、快照&备份、网络、支付、PVE 节点、UApiPro 配置 |
+| **系统设置** | 站点设置（含 Redis、日志上限）、SMTP、快照&备份、网络、支付、PVE 节点、UApiPro、安全防护·限速设置配置 |
 | **硬盘设置** | 💾 **存储分组（拖拽排序）/规格管理（含 QoS 限速）、生命周期配置、数据盘管理（查看/编辑/销毁/多选批量迁移/导入存量磁盘，含 PVE 路径列）** |
-| **功能日志** | 系统切换日志（筛选/分页/批量删除/详情） |
+| **日志中心** | 操作/后台/登录/系统切换四 tab，后台操作按子域筛选，约 50 处敏感操作埋点（v2.35.0） |
 | **系统更新** | 检查更新、查看更新日志、一键更新 |
 
 ### 普通用户功能

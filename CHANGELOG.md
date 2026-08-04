@@ -1,5 +1,55 @@
 # Changelog
 
+## [2.35.0] - 2026-08-04
+
+### Added（5 个 feat）
+- **feat(security): 新增安全防护·限速设置（全站限速可配置化）**
+  - admin 侧边栏「系统设置」下方新增「安全防护 -> 限速设置」菜单（盾牌图标，仅 admin 可见，`?section=security`）
+  - **限速总开关**（关闭后全站所有限速失效）+ **10 大类 32 条规则**，每条可单独开关并配置「N 次 / 时间窗」
+  - `server/constants.js` 新增 `RATE_LIMIT_CATEGORIES` / `RATE_LIMIT_RULES` 为唯一默认值来源（替代原 31 处硬编码）
+  - 27 处 `checkRateLimit` -> `checkConfiguredRateLimit`（DB 读取失败降级回默认规则，不裸奔）
+  - 保存后立即生效（缓存放行）+ 写审计日志（`security.rate-limit`）+ 恢复默认按钮
+  - 规则覆盖：登录认证/注册/CDK 兑换/虚拟机/LXC/备份/磁盘操作/日志清理等
+- **feat(logs): 新增 admin 日志中心（操作/后台/登录/系统切换四 tab）**
+  - 侧边栏一级菜单「日志中心」（`?section=logs`），页内 4 tabs：
+    - 操作日志：全站用户操作（强制排除 `admin.*`）
+    - 后台操作：仅 `admin.*`，按二级子域下拉筛选（`ADMIN_SUB_CATEGORIES` 单一来源中文映射）
+    - 登录日志：全站登录日志
+    - 系统切换：原 os-switch-logs 页面迁入，能力保留
+  - 新增约 10 个 admin 端点（`server/routes/admin-logs.js`），支持 scope/action_prefix 筛选、访问/导出/删除/清空
+  - tab 白名单 localStorage 持久化；旧链接 `?section=os-switch-logs` 兼容映射
+- **feat(audit): 补齐 admin 后台操作审计埋点并升级日志清理策略**
+  - 从原 4 处补齐至约 50 处（82 处 `admin.*` 引用），覆盖人工充值/配置保存/CDK/套餐模板/消息群发/admin 代开/端口转发编辑/2FA 禁用等
+  - `admin.*` 日志从用户维度收敛中隔离，按全站独立上限 `log:keep_admin_count`（默认 5000）保留
+  - 后台操作「操作类型」列映射子域中文名，CSV 导出同步
+- **feat(logs): 日志中心检索增强**
+  - 编码列/用户名 ID/系统切换用户名搜索/回车查询
+- **feat(style): 统一面板表格样式（玻璃态 table-container + 通用 pv-pagination 组件）**
+  - `public/shared/css/components.css` 作为唯一 `.table-container` 定义（玻璃态单一来源，删除 admin/dashboard 重复定义）
+  - 新建通用分页组件 `public/components/pv-pagination.js`（仿 pv-button.js 模式），三端 EJS 引入
+  - 弹窗内表格统一玻璃态容器；`--glass-bg` 透明度 0.9 -> 暗色 0.7 / 亮色 0.8 提升玻璃可见性
+  - 16 处 `table-striped`（斑马纹）-> `table-hover`（透明行 + 悬停高亮），全量零残留
+
+### Changed
+- style(admin): 全站页面标题统一 `module-header` 徽章模板（26 处：缺徽章 10 处 + 容器不标准 11 处 + 特例 3 处 + dashboard 2 处），复用共享层单一来源
+- style(logs): 日志表格容器玻璃态 `table-container`，dashboard/用户中心消息 tabs 统一 admin 日志中心玻璃渐变药丸样式
+- fix(style): 亮色模式下 tabs active 白字看不清，改用深色主题字（三端共用）
+- refactor(style): 统一面板表格样式（玻璃态 table-container + 通用 pv-pagination 组件）
+
+### Fixed
+- fix(logs): 修复全站日志查询无筛选条件时生成空 `WHERE` 子句的 SQL 语法错误
+- fix(logs): 修复 `execute()` 返回数组未解构导致删除/清空计数恒为 0、删除误报 404（db-vms 同类问题一并修复）
+- fix(logs): 修复首次访问日志中心不加载（初始化接口异常中断 Promise.all）
+- fix(logs): 系统切换底部分页条与条数统计补齐（四 tab 统一）
+- fix(security): 修复限速设置点击进入不加载规则列表（watch 值不变不触发问题）
+
+### Notes
+- 新增配置：`ratelimit:master_enabled` + 32 条规则（共 97 键），存量库重启自动补齐（`INSERT IGNORE` 幂等）
+- 新增配置：`log:keep_admin_count`（默认 5000），后台操作日志独立保留上限
+- 新增文件：`server/routes/admin-logs.js`、`server/utils/log-format.js`、`public/components/pv-pagination.js`、`public/js/admin/admin-logs.js`、`admin-template-logs.js`、`admin-template-security.js`
+- 测试：**389 passing**；`check-coupling` 通过
+- 迁移说明：限速配置与 admin 日志上限配置升级后首次启动自动初始化，无需手动 SQL
+
 ## [2.34.2] - 2026-08-04
 
 ### Fixed
