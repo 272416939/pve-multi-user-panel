@@ -13,7 +13,8 @@ const config = {
             port: parseInt(map['smtp:port'] || '587'),
             secure: map['smtp:secure'] === '1',
             user: map['smtp:user'] || '',
-            password: map['smtp:password'] || '',
+            // V4-03 修复：SMTP 密码 AES 加密存储，读取时解密（decrypt 对存量明文自动透传）
+            password: require('../utils/crypto-utils').decrypt(map['smtp:password'] || ''),
             from: map['smtp:from'] || '',
             from_name: map['smtp:from_name'] || '',
             enabled: map['smtp:enabled'] === '1'
@@ -21,11 +22,17 @@ const config = {
     },
     setSmtp: async (smtpConfig) => {
         const currentPassword = (await queryOne('SELECT value FROM config WHERE `key` = ?', ['smtp:password']))?.value || '';
+        // V4-03 修复：SMTP 密码 AES 加密存储，掩码值跳过（保留旧值）
+        var smtpPassword = smtpConfig.password;
+        var storedSmtpPassword = currentPassword;
+        if (smtpPassword !== undefined && !require('../utils/crypto-utils').isMasked(smtpPassword)) {
+            storedSmtpPassword = require('../utils/crypto-utils').encrypt(String(smtpPassword).trim());
+        }
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:host', smtpConfig.host ?? '']);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:port', String(smtpConfig.port ?? 587)]);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:secure', smtpConfig.secure ? '1' : '0']);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:user', smtpConfig.user ?? '']);
-        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:password', smtpConfig.password !== undefined ? smtpConfig.password : currentPassword]);
+        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:password', storedSmtpPassword]);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:from', smtpConfig.from ?? '']);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:from_name', smtpConfig.from_name ?? '']);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['smtp:enabled', smtpConfig.enabled ? '1' : '0']);

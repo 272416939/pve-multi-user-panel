@@ -14,7 +14,7 @@ const { calculateAmount, setVmAffinity, generateOrderNo } = require('../utils/or
 const { withTransaction } = require('../utils/with-transaction');
 const { takeDiskSnapshot } = require('../services/disk-audit');
 const { formatLocalDate } = require('../utils/date');
-const { VALID_PERIODS, getPeriodDays } = require('../constants');
+const { VALID_PERIODS, getPeriodDays, MAX_PERIOD_COUNT } = require('../constants');
 
 // 套餐列表缓存（5 分钟 TTL，低频变更场景；cache-store 按 namespace 单例，与路由共享同一份）
 var vmPackageCache = cacheStore.create('vm_packages', 300);
@@ -81,7 +81,7 @@ async function provisionVm(opts) {
     if (!VALID_PERIODS.includes(period)) {
         return { ok: false, status: 400, error: '无效的计费周期' };
     }
-    if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
+    if (!Number.isInteger(period_count) || period_count < 1 || period_count > MAX_PERIOD_COUNT) {
         return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
     }
 
@@ -135,8 +135,12 @@ async function provisionVm(opts) {
         var [userRows] = await conn.execute('SELECT balance FROM users WHERE id = ?', [userId]);
         balanceBefore = parseFloat((userRows[0] && userRows[0].balance) || '0');
         if (balanceBefore < totalAmount) throw new Error('余额不足');
-        // 2. 扣款
-        await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, userId]);
+        // 2. 扣款（V4-02 修复：原子条件扣款，并发余额不足时回滚事务）
+        var [deductRes] = await conn.execute(
+            'UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ? AND balance >= ?',
+            [totalAmount, userId, totalAmount]
+        );
+        if (deductRes.affectedRows === 0) throw new Error('余额不足');
         balanceAfter = balanceBefore - totalAmount;
         // 3. 创建订单
         await conn.execute(
@@ -376,7 +380,7 @@ async function provisionLxc(opts) {
     if (!VALID_PERIODS.includes(period)) {
         return { ok: false, status: 400, error: '无效的计费周期' };
     }
-    if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
+    if (!Number.isInteger(period_count) || period_count < 1 || period_count > MAX_PERIOD_COUNT) {
         return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
     }
 
@@ -408,8 +412,12 @@ async function provisionLxc(opts) {
         var [userRows] = await conn.execute('SELECT balance FROM users WHERE id = ?', [userId]);
         balanceBefore = parseFloat((userRows[0] && userRows[0].balance) || '0');
         if (balanceBefore < totalAmount) throw new Error('余额不足');
-        // 2. 扣款
-        await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ?', [totalAmount, userId]);
+        // 2. 扣款（V4-02 修复：原子条件扣款，并发余额不足时回滚事务）
+        var [deductRes] = await conn.execute(
+            'UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ? AND balance >= ?',
+            [totalAmount, userId, totalAmount]
+        );
+        if (deductRes.affectedRows === 0) throw new Error('余额不足');
         balanceAfter = balanceBefore - totalAmount;
         // 3. 创建订单
         await conn.execute(
@@ -629,7 +637,7 @@ async function adminProvisionVm(opts) {
     if (!VALID_PERIODS.includes(period)) {
         return { ok: false, status: 400, error: '无效的计费周期' };
     }
-    if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
+    if (!Number.isInteger(period_count) || period_count < 1 || period_count > MAX_PERIOD_COUNT) {
         return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
     }
     if (!userId) return { ok: false, status: 400, error: '请选择用户' };
@@ -789,7 +797,7 @@ async function adminProvisionLxc(opts) {
     if (!VALID_PERIODS.includes(period)) {
         return { ok: false, status: 400, error: '无效的计费周期' };
     }
-    if (!Number.isInteger(period_count) || period_count < 1 || period_count > 99) {
+    if (!Number.isInteger(period_count) || period_count < 1 || period_count > MAX_PERIOD_COUNT) {
         return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
     }
     if (!userId) return { ok: false, status: 400, error: '请选择用户' };

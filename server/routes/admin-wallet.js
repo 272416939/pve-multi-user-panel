@@ -80,19 +80,20 @@ router.get('/admin/transactions/export', authMiddleware, adminMiddleware, async 
         var userMap = {};
         for (var u of users) { userMap[u.id] = u.username; }
 
-        // 构建CSV
+        // 构建CSV（V4-06 修复：全字段统一转义，防公式注入 + 逗号/引号错位）
+        var { escapeCsvField } = require('../utils/csv');
         var rows = [['支付时间', '用户名', '支付方式', '商户订单号', '接口订单号', '交易类型', '交易金额', '操作前余额', '操作后余额'].join(',')];
         for (var r of list) {
             rows.push([
-                r.pay_time || '',
-                '"' + (userMap[r.user_id] || '-').replace(/"/g, '""') + '"',
-                r.pay_method === 'alipay' ? '支付宝' : r.pay_method === 'wxpay' ? '微信支付' : r.pay_method,
-                r.order_no,
-                r.api_trade_no || r.trade_no || '',
-                r.trade_type === 'recharge' ? '余额充值' : r.trade_type === 'admin_recharge' ? '后台充值' : r.trade_type === 'new_order' ? '新购服务器' : '服务器续费',
-                parseFloat(r.amount).toFixed(2),
-                parseFloat(r.balance_before).toFixed(2),
-                parseFloat(r.balance_after).toFixed(2)
+                escapeCsvField(r.pay_time || ''),
+                escapeCsvField(userMap[r.user_id] || '-'),
+                escapeCsvField(r.pay_method === 'alipay' ? '支付宝' : r.pay_method === 'wxpay' ? '微信支付' : r.pay_method),
+                escapeCsvField(r.order_no),
+                escapeCsvField(r.api_trade_no || r.trade_no || ''),
+                escapeCsvField(r.trade_type === 'recharge' ? '余额充值' : r.trade_type === 'admin_recharge' ? '后台充值' : r.trade_type === 'new_order' ? '新购服务器' : '服务器续费'),
+                escapeCsvField(parseFloat(r.amount).toFixed(2)),
+                escapeCsvField(parseFloat(r.balance_before).toFixed(2)),
+                escapeCsvField(parseFloat(r.balance_after).toFixed(2))
             ].join(','));
         }
 
@@ -139,15 +140,16 @@ router.get('/admin/orders/export', authMiddleware, adminMiddleware, async (req, 
         params.limit = 999999;
         params.page = 1;
         var result = await db.orders.getAll(params);
-        // 生成 CSV 行列：订单号,用户名,套餐名,类型,周期,数量,金额,状态,创建时间
+        // 生成 CSV 行列：订单号,用户名,套餐名,类型,周期,数量,金额,状态,创建时间（V4-06 修复：全字段统一转义）
+        var { escapeCsvField } = require('../utils/csv');
         var csvRows = ['订单号,用户名,套餐名,类型,周期,数量,金额,状态,创建时间'];
         result.rows.forEach(function(o) {
             var typeName = o.type === 'vm' ? 'VM' : 'LXC';
             var periodName = getPeriodName(o.period);
             var statusName = o.status === 'completed' ? '已开通' : o.status;
             csvRows.push([
-                o.order_no, o.username || '', o.package_name || '', typeName,
-                periodName, o.period_count, o.amount, statusName, o.created_at
+                escapeCsvField(o.order_no), escapeCsvField(o.username || ''), escapeCsvField(o.package_name || ''), escapeCsvField(typeName),
+                escapeCsvField(periodName), escapeCsvField(o.period_count), escapeCsvField(o.amount), escapeCsvField(statusName), escapeCsvField(o.created_at)
             ].join(','));
         });
         res.setHeader('Content-Type', 'text/csv; charset=utf-8');

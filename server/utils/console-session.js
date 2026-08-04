@@ -18,6 +18,13 @@ const SESSION_TTL_SEC = 300; // 5 分钟
 const SESSION_PREFIX = 'console:session:';
 const sessionRegistry = new Map(); // 内存回退（Redis 不可用时）
 
+// V4-12 修复：Redis 路径原子消费（GET + DEL 一条 Lua 完成，消除重放竞态窗口，与 rate-limiter Lua 风格一致）
+const CONSUME_LUA = [
+    "local v = redis.call('GET', KEYS[1])",
+    "if v then redis.call('DEL', KEYS[1]) end",
+    "return v"
+].join('\n');
+
 /**
  * 创建会话，返回不透明的 session ID
  * @param {Object} data - 要存储的会话数据（必须可 JSON 序列化）
@@ -69,10 +76,23 @@ async function getSession(sessionId) {
 
 /**
  * 消费会话（获取并立即删除，单次性）
+ * V4-12 修复：Redis 路径 Lua 原子 GET+DEL，并发双连接同票据不可能同时取到
  * @param {string} sessionId
  * @returns {Promise<Object|null>}
  */
 async function consumeSession(sessionId) {
+    if (!sessionId) return null;
+    const redis = getRedisClient();
+    if (redis) {
+        try {
+            const value = await redis.eval(CONSUME_LUA, 1, SESSION_PREFIX + sessionId);
+            if (value) return JSON.parse(value);
+            return null;
+        } catch (e) {
+            // Redis 异常时回退到内存
+        }
+    }
+    // 内存回退：单进程内读-删天然原子
     const data = await getSession(sessionId);
     if (data) await deleteSession(sessionId);
     return data;

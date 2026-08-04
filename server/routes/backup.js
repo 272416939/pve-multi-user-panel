@@ -334,6 +334,9 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
             if (dailyCount >= cfg.daily_limit) {
                 return res.status(400).json({ error: `今日备份次数已达上限（${cfg.daily_limit} 次）` });
             }
+        } else if (storage && !/^[a-zA-Z0-9_-]+$/.test(storage)) {
+            // V4-09 修复：admin 自定义 storage 白名单校验（与 LXC 路径 V3-02 一致），空值走下方默认存储
+            return res.status(400).json({ error: '无效的存储位置' });
         }
         if (!storage) storage = (await db.backupConfig.get()).default_storage;
         const backup = await db.backups.create({ vm_id: vmid, user_id: req.user.id, storage, notes: req.body.notes || '' });

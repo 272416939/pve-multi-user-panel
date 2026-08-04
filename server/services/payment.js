@@ -8,6 +8,8 @@ const { createEmailTemplate, sendEmail, shouldSendEmail } = require('../utils/em
 const dbg = require('../utils/debug');
 const { generateOrderNo } = require('../utils/order-utils');
 const { PAYMENT_METHODS } = require('../constants');
+// V4-01 修复：支付密钥 AES 加密存储，消费前解密（decrypt 对存量明文自动透传）
+const { decrypt } = require('../utils/crypto-utils');
 
 /**
  * 向支付网关查询接口订单号（失败静默降级，返回 null）
@@ -17,9 +19,9 @@ const { PAYMENT_METHODS } = require('../constants');
 async function queryApiTradeNo(outTradeNo) {
     try {
         var pid = await db.config.get('pay:pid');
-        var md5Key = await db.config.get('pay:md5_key');
-        var v2PrivateKey = await db.config.get('pay:v2_private_key');
-        var v2PublicKey = await db.config.get('pay:v2_public_key');
+        var md5Key = decrypt(await db.config.get('pay:md5_key') || '');
+        var v2PrivateKey = decrypt(await db.config.get('pay:v2_private_key') || '');
+        var v2PublicKey = decrypt(await db.config.get('pay:v2_public_key') || '');
         var baseUrl = await db.config.get('pay:base_url') || 'https://pay.microgg.cn/';
         var v2Enabled = (await db.config.get('pay:v2_enabled') || '0') === '1';
         if (!pid) return null;
@@ -81,11 +83,13 @@ async function createRechargeOrder(opts) {
     }
 
     var pid = await db.config.get('pay:pid');
-    var md5Key = await db.config.get('pay:md5_key');
-    var v2PrivateKey = await db.config.get('pay:v2_private_key');
-    var v2PublicKey = await db.config.get('pay:v2_public_key');
+    var md5Key = decrypt(await db.config.get('pay:md5_key') || '');
+    var v2PrivateKey = decrypt(await db.config.get('pay:v2_private_key') || '');
+    var v2PublicKey = decrypt(await db.config.get('pay:v2_public_key') || '');
     var baseUrl = await db.config.get('pay:base_url') || 'https://pay.microgg.cn/';
     var v2Enabled = (await db.config.get('pay:v2_enabled') || '0') === '1';
+    // V4-04 修复：v1_enabled 开关生效（默认 '1' 保持存量行为），V1 通道可被管理员显式关闭
+    var v1Enabled = (await db.config.get('pay:v1_enabled') || '1') === '1';
 
     if (!pid) return { ok: false, status: 400, error: '支付接口未配置，请联系管理员' };
 
@@ -132,6 +136,10 @@ async function createRechargeOrder(opts) {
         gatewayRes = await payClient._post('/api/pay/create', payParams);
         dbg('[payment] 网关响应(create):', JSON.stringify(gatewayRes));
     } else {
+        // V4-04 修复：V1 mapi 通道受 v1_enabled 开关控制，关闭后拒绝下单
+        if (!v1Enabled) {
+            return { ok: false, status: 400, error: 'V1 支付通道已关闭，请联系管理员' };
+        }
         // V1: /mapi.php 接口，clientip 为必填，device 可选
         payParams.clientip = clientIp;
         payParams.device = isMobile ? 'mobile' : 'pc';
@@ -197,9 +205,11 @@ async function processPayCallback(params, opts) {
         return { ok: false, reason: 'trade_status' };
     }
 
-    var md5Key = await db.config.get('pay:md5_key');
-    var v2PublicKey = await db.config.get('pay:v2_public_key');
+    var md5Key = decrypt(await db.config.get('pay:md5_key') || '');
+    var v2PublicKey = decrypt(await db.config.get('pay:v2_public_key') || '');
     var v2Enabled = (await db.config.get('pay:v2_enabled') || '0') === '1';
+    // V4-04 修复：v1_enabled 开关生效（默认 '1' 保持存量行为），关闭后 MD5 验签回退被禁用
+    var v1Enabled = (await db.config.get('pay:v1_enabled') || '1') === '1';
 
     // 兼容 MD5：优先 V2 RSA 验签，未配置 V2 时回退 MD5（生产建议配置 V2）
     // return 模式原行为：sign_type === 'RSA' 且 v2 配置才走 RSA，否则走 MD5
@@ -209,7 +219,7 @@ async function processPayCallback(params, opts) {
         var { rsaVerify, buildSignStr } = require('../sdk/pay/sign');
         var signStr = buildSignStr(params);
         valid = rsaVerify(signStr, params.sign, v2PublicKey);
-    } else if (md5Key) {
+    } else if (md5Key && v1Enabled) {
         var { md5Sign } = require('../sdk/pay/sign');
         var expected = md5Sign(params, md5Key);
         valid = expected === (params.sign || '').toLowerCase();

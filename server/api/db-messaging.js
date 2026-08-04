@@ -216,17 +216,19 @@ const memos = {
 // 站内消息操作
 const messages = {
     create: async (data) => {
+        // V4-05 修复：创建链路统一服务端净化（覆盖群发/LXC 通知/任务通知/管理员补发等全部路径）
+        const { sanitizeTitle, sanitizeMessageContent, sanitizeLinkUrl, sanitizeLinkText } = require('../utils/message-sanitize');
         const [result] = await execute(
             `INSERT INTO messages (uid, title, content, type, send_type, link_url, link_text, batch_id, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 data.uid,
-                data.title || '',
-                data.content || '',
+                sanitizeTitle(data.title),
+                sanitizeMessageContent(data.content),
                 data.type || 1,
                 data.send_type || 1,
-                data.link_url || '',
-                data.link_text || '',
+                sanitizeLinkUrl(data.link_url),
+                sanitizeLinkText(data.link_text),
                 data.batch_id || '',
                 mysqlNow()
             ]

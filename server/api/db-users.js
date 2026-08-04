@@ -73,6 +73,12 @@ const users = {
         await execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [amount, id]);
         return queryOne('SELECT * FROM users WHERE id = ?', [id]);
     },
+    // V4-02 修复：原子条件扣款（防并发读-改-写 TOCTOU 双花）
+    // 余额不足时 affectedRows = 0，由调用方抛"余额不足"并回滚事务
+    decrementBalance: async (id, amount) => execute(
+        'UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) - ? WHERE id = ? AND balance >= ?',
+        [amount, id, amount]
+    ),
 };
 
 // 密码重置令牌操作

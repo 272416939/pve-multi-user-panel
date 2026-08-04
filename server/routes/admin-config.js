@@ -56,7 +56,8 @@ router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
             port: port || 587,
             secure: !!secure,
             user: user || '',
-            password: password !== undefined ? password : existingSmtp.password,
+            // V4-03 适配：未传密码时不回传解密明文（undefined → setSmtp 保留库内旧密文），避免每次保存重新加密
+            password: password !== undefined ? password : undefined,
             from: from || '',
             from_name: from_name || '',
             enabled: !!enabled
@@ -151,9 +152,10 @@ router.get('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         var getConfig = db.config.get;
         var baseUrl = await getConfig('pay:base_url') || 'https://pay.microgg.cn/';
         var pid = await getConfig('pay:pid') || '';
-        var md5Key = await getConfig('pay:md5_key') || '';
-        var v2PublicKey = await getConfig('pay:v2_public_key') || '';
-        var v2PrivateKey = await getConfig('pay:v2_private_key') || '';
+        // V4-01 修复：支付密钥 AES 加密存储，回显前解密（decrypt 对存量明文自动透传）
+        var md5Key = decrypt(await getConfig('pay:md5_key') || '');
+        var v2PublicKey = decrypt(await getConfig('pay:v2_public_key') || '');
+        var v2PrivateKey = decrypt(await getConfig('pay:v2_private_key') || '');
         var v1Enabled = await getConfig('pay:v1_enabled') || '1';
         var v2Enabled = await getConfig('pay:v2_enabled') || '0';
         var alipayEnabled = await getConfig('pay:alipay_enabled') || '1';
@@ -191,14 +193,15 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         if (pid !== undefined) {
             await setConfig('pay:pid', String(pid).trim());
         }
+        // V4-01 修复：支付密钥加密存储，掩码值跳过（保留旧密文）
         if (md5_key !== undefined && !isMasked(md5_key)) {
-            await setConfig('pay:md5_key', md5_key.trim());
+            await setConfig('pay:md5_key', encrypt(String(md5_key).trim()));
         }
         if (v2_public_key !== undefined && !isMasked(v2_public_key)) {
-            await setConfig('pay:v2_public_key', v2_public_key.trim());
+            await setConfig('pay:v2_public_key', encrypt(String(v2_public_key).trim()));
         }
         if (v2_private_key !== undefined && !isMasked(v2_private_key)) {
-            await setConfig('pay:v2_private_key', v2_private_key.trim());
+            await setConfig('pay:v2_private_key', encrypt(String(v2_private_key).trim()));
         }
         if (v1_enabled !== undefined) {
             await setConfig('pay:v1_enabled', v1_enabled ? '1' : '0');

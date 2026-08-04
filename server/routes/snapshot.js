@@ -129,6 +129,10 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
 router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        // V4-10 修复：vmid 范围白名单（与同文件其余 3 个快照端点一致，规范 C-2）
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
+            return res.status(400).json({ error: '无效的 LXC ID' });
+        }
         const snapname = req.params.snapname;
         if (!/^[a-zA-Z0-9_-]{2,20}$/.test(snapname)) {
             return res.status(400).json({ error: '无效的快照名称' });
