@@ -188,7 +188,8 @@ const auditLogs = {
             where.push('created_at <= ?');
             args.push(params.endDate);
         }
-        var whereClause = ' WHERE ' + where.join(' AND ');
+        // 无筛选条件时不得生成空 WHERE（全站视图默认），否则 SQL 语法错误
+        var whereClause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : '';
         var totalRow = await queryOne('SELECT COUNT(*) AS total FROM audit_logs' + whereClause, args);
         var rows = await queryAll(
             'SELECT id, user_id, username, action, resource_type, resource_id, ip, details, created_at FROM audit_logs' + whereClause + ' ORDER BY id DESC LIMIT ? OFFSET ?',
@@ -279,7 +280,8 @@ const loginLogs = {
             where.push('created_at <= ?');
             args.push(params.endDate);
         }
-        var whereClause = ' WHERE ' + where.join(' AND ');
+        // 无筛选条件时不得生成空 WHERE（全站视图默认），否则 SQL 语法错误
+        var whereClause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : '';
         var totalRow = await queryOne('SELECT COUNT(*) AS total FROM login_logs' + whereClause, args);
         var rows = await queryAll(
             'SELECT id, user_id, username, ip, user_agent, status, details, created_at FROM login_logs' + whereClause + ' ORDER BY id DESC LIMIT ? OFFSET ?',
