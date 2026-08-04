@@ -193,8 +193,8 @@ async function provisionVm(opts) {
         // 扩容系统盘到套餐模板设定的目标容量
         if (template.disk_size && template.disk_size > 0) {
             try {
-                var diskUtils = require('../utils/disk-utils');
-                var systemBus = await diskUtils.getSystemDiskBus(newVmid);
+                var diskOps = require('../services/disk-ops');
+                var systemBus = await diskOps.getSystemDiskBus(newVmid);
                 var resizeCmd = systemBus + '0';
                 // 先获取当前系统盘实际容量，只大不小
                 var oldConfig = await pveApi.getVmConfig(newVmid);

@@ -531,7 +531,8 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
     }
 
     var user = await db.users.getById(disk.user_id);
-    var diskUtils = require('../utils/disk-utils');
+    // 磁盘域拆分（规范第七节）：PVE 命令走 services/disk-ops.js
+    var diskOps = require('../services/disk-ops');
 
     // 事务：PVE销毁 + 退款 + 订单状态更新
     var { withTransaction } = require('../utils/with-transaction');
@@ -546,7 +547,7 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
 
       // 执行 PVE 销毁
       try {
-        await diskUtils.destroyDisk(lockedDisk.volume_id);
+        await diskOps.destroyDisk(lockedDisk.volume_id);
       } catch (pveErr) {
         // PVE 卷可能已不存在，继续执行
         console.error('[admin disk destroy] PVE 销毁失败:', pveErr.message);
