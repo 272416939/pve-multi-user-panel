@@ -412,7 +412,7 @@
                                     暂无登录设备记录
                                 </div>
                                 <div v-else class="table-responsive">
-                                    <table class="table table-sm mb-0 table-align-center">
+                                    <table class="table table-sm table-hover mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>设备</th>

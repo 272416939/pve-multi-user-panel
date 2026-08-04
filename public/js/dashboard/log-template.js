@@ -56,7 +56,7 @@
                 </div>
                 <!-- 操作日志表格 -->
                 <div class="table-responsive" v-if="logTab === 'operation'">
-                    <table class="table table-striped mb-0 table-sm table-align-center">
+                    <table class="table table-hover mb-0 table-sm table-align-center">
                         <thead>
                             <tr>
                                 <th style="width:120px">用户</th>
@@ -80,7 +80,7 @@
                 </div>
                 <!-- 登录日志表格 -->
                 <div class="table-responsive" v-if="logTab === 'login'">
-                    <table class="table table-striped mb-0 table-sm table-align-center">
+                    <table class="table table-hover mb-0 table-sm table-align-center">
                         <thead>
                             <tr>
                                 <th style="width:230px">IP地址（归属地）</th>

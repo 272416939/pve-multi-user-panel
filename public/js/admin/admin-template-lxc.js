@@ -192,7 +192,7 @@
                             <h5>待分配的容器:</h5>
                             <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
-                                    <table class="table table-striped mb-0 table-align-center">
+                                    <table class="table table-hover mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>CT ID</th>
@@ -220,7 +220,7 @@
                             <h5>已分配的容器:</h5>
                             <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
-                                    <table class="table table-striped mb-0 table-align-center">
+                                    <table class="table table-hover mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>CT ID</th>
