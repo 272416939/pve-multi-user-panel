@@ -137,6 +137,8 @@ function createEmailTemplate(title, content, siteName) {
 }
 
 async function sendEmail(to, subject, html) {
+    // 行内懒加载避免 utils 顶层依赖 api 层（规范第七节：utils 是叶子层）
+    var db = require('../api/db');
     const config = await db.config.getSmtp();
     
     if (!config.enabled || !config.host || !config.user || !config.password) {
@@ -195,6 +197,8 @@ async function sendEmail(to, subject, html) {
  */
 async function shouldSendEmail(userId, category) {
     try {
+        // 行内懒加载避免 utils 顶层依赖 api 层（规范第七节：utils 是叶子层）
+        var db = require('../api/db');
         if (!userId || !category) return true;
         var settings = await db.userSettings.getByUserId(userId);
         // 总开关关闭 → 不发送
