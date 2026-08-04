@@ -1,5 +1,35 @@
 # Changelog
 
+## [2.34.1] - 2026-08-04
+
+### Security
+
+**安全审计报告 V4 全量修复（12 项漏洞，审计继承链 DEBUG->V1->V2->SEC-001~011->V3->V4）**
+
+- 🔴 **V4-01 [高] 支付商户密钥（含 RSA 私钥）明文落库**
+  - AES-256-GCM 加密存储 + 解密消费（payment.js 5 处消费点）+ 掩码回显
+  - `decrypt` 内置明文兼容，存量数据无损迁移
+- 🟠 **V4-02 [中] 余额扣款 TOCTOU 竞态（并发负余额双花）**
+  - 6 处扣款点加 `AND balance >= ?` + affectedRows 判断回滚
+  - `db-users.js` 新增原子 `decrementBalance`；充值沿用 `CAST(balance AS DECIMAL(10,2)) + ?`
+- 🟠 **V4-03 [中] SMTP 密码明文入库** -> 同加密模式；未传密码时保留库内旧密文（修复重复加密 bug）
+- 🟠 **V4-04 [中] `pay:v1_enabled` 死开关**（MD5 无法禁用）-> 下单/验签路径均消费该开关，默认 '1' 保持存量行为
+- 🟡 **V4-05 [中低] 非群发站内信无服务端净化** -> 新建 `server/utils/message-sanitize.js`，messages.create 链路统一净化
+- 🟡 **V4-06 [低] CSV 导出公式注入/字段未转义** -> 新建 `server/utils/csv.js`，log/流水/订单/CDK 四处统一转义（`=+-@` 前缀处理与引号包裹）
+- 🟡 **V4-07 [低] os-switch 死代码含未校验命令插值**（LVM path 拼接）-> 全仓确认无引用后整段删除
+- 🟡 **V4-08 [低] SSH 错误串泄露完整命令** -> 错误信息去掉 `${cmd}`
+- 🟡 **V4-09 [低] VM 备份 admin storage 无白名单** -> 补白名单校验（空值仍走默认）
+- 🟡 **V4-10 [低] snapshot LXC delete 缺 vmid 范围校验** -> 补 100~999999999 校验
+- 🟡 **V4-11 [低] 续费数量无上限（可日期溢出）** -> `MAX_PERIOD_COUNT=99` 常量单一来源，续费/加购统一限量
+- 🟡 **V4-12 [低] 会话消费非原子（重放竞态）** -> `consumeSession` 改 Lua 原子 GET+DEL
+
+### Notes
+
+- 验证：`node --check` 0 错误 / `npm test` **341 passing**（基线 309 + 32 项安全回归测试）/ `check-coupling.js` 7 项全绿
+- 存量兼容：支付 MD5 兼容保留（`v1_enabled` 开关控制）；支付密钥/SMTP 密码加密后历史明文可无损迁移
+- 审计报告：`.zcode/安全审计报告V4.md`（本地留存，不入库）
+- 已知降级面（不强制改）：rate-limiter Redis 内存回退、旧 SHA256 无盐兼容
+
 ## [2.34.0] - 2026-08-03
 
 ### 概览

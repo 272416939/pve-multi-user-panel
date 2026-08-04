@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.34.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.34.1-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -293,6 +293,8 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 	│   │   ├── logger.js          # 统一日志工具
 	│   │   ├── audit-log.js       # 📋 操作日志埋点（审计）
 	│   │   ├── password-hash.js   # bcryptjs 密码哈希
+	│   │   ├── csv.js            # 🔒 CSV 导出统一转义（防公式注入 =+-@）
+	│   │   ├── message-sanitize.js # 🔒 站内信服务端净化（DOMPurify 等价）
 	│   │   └── with-transaction.js # MySQL 事务封装
 	│   ├── constants.js           # ⚙️ 全局共享常量（周期/磁盘/订单/模板/支付，单一来源）
 		│   ├── routes/                # 路由模块（21 个）
