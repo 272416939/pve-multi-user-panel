@@ -15,6 +15,9 @@ window.__storageKeys = {
     ADMIN_ACTIVE_TAB_SECURITY: 'admin_activeTabSecurity',
     ADMIN_ACTIVE_TAB_TEMPLATES: 'admin_activeTabTemplates',
     ADMIN_ACTIVE_TAB_PACKAGES: 'admin_activeTabPackages',
+    // 日志中心 tab 与每页条数
+    ADMIN_LOGTAB: 'admin_logTab',
+    ADMIN_LOG_PAGE_SIZE: 'admin_logPageSize',
 
     // 仪表盘状态
     DASHBOARD_ACTIVE_TAB: 'dashboard_activeTab',

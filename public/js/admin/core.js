@@ -9,7 +9,13 @@
 
     // ==================== 状态 ====================
     $.user = ref(null);
-    $.activeSection = ref(new URLSearchParams(window.location.search).get('section') || 'overview');
+    // 旧版直达链接兼容：os-switch-logs 已并入日志中心（logs），tab 预置系统切换
+    var urlSection = new URLSearchParams(window.location.search).get('section') || '';
+    if (urlSection === 'os-switch-logs') {
+        urlSection = 'logs';
+        localStorage.setItem(window.__storageKeys.ADMIN_LOGTAB, 'os-switch');
+    }
+    $.activeSection = ref(urlSection || 'overview');
     $.navItems = ref([]);
     var savedTab = localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB);
     $.activeTab = ref((savedTab === 'assign' ? 'users' : savedTab) || 'users');
@@ -219,16 +225,16 @@ watch($.user, function(u) {
             section = 'templates-os';
             subId = 'templates-os';
             if (window.__admin.osTemplatePage) window.__admin.osTemplatePage.load();
-        } else if (page === 'os-switch-logs') {
-            section = 'os-switch-logs';
-            subId = 'logs-os-switch';
-            $.loadOsSwitchLogs(1);
+        } else if (page === 'logs') {
+            section = 'logs';
+            subId = 'logs';
+            $.loadLogs(1);
         }
         if (!section) return;
         $.switchSection(section);
         $.expandedSections.value[section] = true;
-        // section 与父菜单 id 可能不同（templates-os → submenu-templates / os-switch-logs → submenu-logs）
-        var menuKey = section === 'templates-os' ? 'templates' : (section === 'os-switch-logs' ? 'logs' : section);
+        // section 与父菜单 id 可能不同（templates-os → submenu-templates）；logs 为一级菜单，菜单键即 section 名
+        var menuKey = section === 'templates-os' ? 'templates' : section;
         var el = document.getElementById('submenu-' + menuKey);
         if (el) el.classList.add('open');
         var parent = el ? el.previousElementSibling : null;
@@ -872,9 +878,10 @@ $.initDetailCharts = function() {
                     $.loadMacGroups()
                 ]);
                 // Auto-expand submenu based on current section
-                // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates / os-switch-logs → submenu-logs）
-                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'os-switch-logs'];
-                var submenuIdMap = { 'templates-os': 'templates', 'os-switch-logs': 'logs' };
+                // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates）；
+                // logs 为一级菜单（active 由模板 :class 绑定），无需展开子菜单
+                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os'];
+                var submenuIdMap = { 'templates-os': 'templates' };
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
                         var section = $.activeSection.value;
@@ -890,8 +897,8 @@ $.initDetailCharts = function() {
                             var target = document.querySelector('[data-subsection="' + section + '-' + tabVar.value + '"]');
                             if (target) target.classList.add('active');
                         }
-                        // templates-os / os-switch-logs 的 tabVar 不在上方映射中，单独高亮子项
-                        var subIdMap2 = { 'templates-os': 'templates-os', 'os-switch-logs': 'logs-os-switch' }[section];
+                        // templates-os 的 tabVar 不在上方映射中，单独高亮子项
+                        var subIdMap2 = { 'templates-os': 'templates-os' }[section];
                         if (subIdMap2) {
                             var t2 = document.querySelector('[data-subsection="' + subIdMap2 + '"]');
                             if (t2) t2.classList.add('active');
@@ -920,8 +927,9 @@ $.initDetailCharts = function() {
                         if (section === 'templates-os' && window.__admin.osTemplatePage) {
                             window.__admin.osTemplatePage.load();
                         }
-                        if (section === 'os-switch-logs') {
-                            $.loadOsSwitchLogs(1);
+                        if (section === 'logs') {
+                            // 日志中心：按已持久化的 tab 加载对应日志（刷新/直达路径）
+                            $.loadLogs(1);
                         }
                     }, 100);
                 }

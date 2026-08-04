@@ -150,15 +150,11 @@
                     <a class="nav-item" data-subsection="security-ratelimit" href="#" @click.prevent="switchSection('security'); activeTabSecurity = 'ratelimit'"><span class="nav-text">限速设置</span></a>
                 </div>
 
-                <!-- 功能日志（父菜单，仅admin） -->
-                <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('logs')">
+                <!-- 日志中心（独立一级菜单，仅admin） -->
+                <a v-if="user && user.role === 'admin'" class="nav-item" :class="{ active: activeSection === 'logs' }" href="#" @click.prevent="switchPage('logs')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-                    <span class="nav-text">功能日志</span>
-                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+                    <span class="nav-text">日志中心</span>
                 </a>
-                <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-logs">
-                    <a class="nav-item" data-subsection="logs-os-switch" href="#" @click.prevent="switchPage('os-switch-logs')"><span class="nav-text">系统切换</span></a>
-                </div>
 
                 <!-- 系统更新（独立一级菜单） -->
                 <a class="nav-item" :class="{ active: activeSection === 'system-update' }" href="#" @click.prevent="switchSection('system-update')">

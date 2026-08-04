@@ -1,15 +1,8 @@
 (function () {
     if (!window.__adminTemplateParts) window.__adminTemplateParts = [];
     window.__adminTemplateParts.push(`
-    <!-- 系统切换日志 -->
-    <div v-if="activeSection === 'os-switch-logs'">
-        <div class="module-header">
-            <h4 class="module-title">系统切换日志</h4>
-            <div class="d-flex gap-2">
-                <pv-button variant="outline-danger" size="sm" @click="batchDeleteOsSwitchLog">批量删除</pv-button>
-                <pv-button variant="danger" size="sm" @click="clearAllOsSwitchLog">清空全部</pv-button>
-            </div>
-        </div>
+    <!-- 系统切换日志（日志中心 tab，header 按钮由 admin-template-logs.js 统一提供） -->
+    <div v-if="activeSection === 'logs' && logTab === 'os-switch'">
         <div class="card mb-4">
             <div class="card-body">
                 <!-- 筛选栏 -->
