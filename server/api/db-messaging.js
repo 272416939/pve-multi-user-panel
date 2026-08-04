@@ -84,7 +84,8 @@ async function trimUserOverflow(table, userId, keepCount) {
     var excludeAdmin = table === 'audit_logs' ? " AND action NOT LIKE 'admin.%'" : '';
     var cutoff = await queryOne('SELECT id FROM ' + table + ' WHERE user_id = ?' + excludeAdmin + ' ORDER BY id DESC LIMIT 1 OFFSET ?', [uid, keep]);
     if (!cutoff) return 0;
-    var result = await execute('DELETE FROM ' + table + ' WHERE user_id = ?' + excludeAdmin + ' AND id < ?', [uid, cutoff.id]);
+    // execute 返回 [ResultSetHeader, fields]，需解构取 affectedRows（否则恒为 undefined）
+    const [result] = await execute('DELETE FROM ' + table + ' WHERE user_id = ?' + excludeAdmin + ' AND id < ?', [uid, cutoff.id]);
     return result.affectedRows || 0;
 }
 
@@ -94,7 +95,7 @@ async function trimAdminLogs(keepAdminCount) {
     var keep = Math.max(parseInt(keepAdminCount) || 5000, 100);
     var cutoff = await queryOne("SELECT id FROM audit_logs WHERE action LIKE 'admin.%' ORDER BY id DESC LIMIT 1 OFFSET ?", [keep]);
     if (!cutoff) return 0;
-    var result = await execute("DELETE FROM audit_logs WHERE action LIKE 'admin.%' AND id < ?", [cutoff.id]);
+    const [result] = await execute("DELETE FROM audit_logs WHERE action LIKE 'admin.%' AND id < ?", [cutoff.id]);
     return result.affectedRows || 0;
 }
 
@@ -197,26 +198,29 @@ const auditLogs = {
         );
         return { rows: rows, total: totalRow.total, page: page, limit: limit };
     },
-    deleteById: (id) => execute('DELETE FROM audit_logs WHERE id = ?', [parseInt(id) || 0]),
+    deleteById: async (id) => {
+        const [result] = await execute('DELETE FROM audit_logs WHERE id = ?', [parseInt(id) || 0]);
+        return result;
+    },
     // 批量删除（ids 长度白名单由路由层校验 1-500）
     batchDeleteByIds: async (ids) => {
         var list = ids.map(function(x) { return parseInt(x); }).filter(function(x) { return Number.isInteger(x) && x > 0; });
         if (list.length === 0) return { deleted: 0 };
         var placeholders = list.map(function() { return '?'; }).join(',');
-        var result = await execute('DELETE FROM audit_logs WHERE id IN (' + placeholders + ')', list);
+        const [result] = await execute('DELETE FROM audit_logs WHERE id IN (' + placeholders + ')', list);
         return { deleted: result.affectedRows || 0 };
     },
     // 清空：scope 'user' 清用户操作（排除 admin.*）/ 'admin' 仅清后台操作 / 其他清全部
     clearAll: async (scope) => {
         if (scope === 'user') {
-            var r1 = await execute("DELETE FROM audit_logs WHERE action NOT LIKE 'admin.%'");
+            const [r1] = await execute("DELETE FROM audit_logs WHERE action NOT LIKE 'admin.%'");
             return { deleted: r1.affectedRows || 0 };
         }
         if (scope === 'admin') {
-            var r2 = await execute("DELETE FROM audit_logs WHERE action LIKE 'admin.%'");
+            const [r2] = await execute("DELETE FROM audit_logs WHERE action LIKE 'admin.%'");
             return { deleted: r2.affectedRows || 0 };
         }
-        var r3 = await execute('DELETE FROM audit_logs');
+        const [r3] = await execute('DELETE FROM audit_logs');
         return { deleted: r3.affectedRows || 0 };
     },
     clearByUser: (userId) => execute('DELETE FROM audit_logs WHERE user_id = ?', [userId]),
@@ -289,16 +293,19 @@ const loginLogs = {
         );
         return { rows: rows, total: totalRow.total, page: page, limit: limit };
     },
-    deleteById: (id) => execute('DELETE FROM login_logs WHERE id = ?', [parseInt(id) || 0]),
+    deleteById: async (id) => {
+        const [result] = await execute('DELETE FROM login_logs WHERE id = ?', [parseInt(id) || 0]);
+        return result;
+    },
     batchDeleteByIds: async (ids) => {
         var list = ids.map(function(x) { return parseInt(x); }).filter(function(x) { return Number.isInteger(x) && x > 0; });
         if (list.length === 0) return { deleted: 0 };
         var placeholders = list.map(function() { return '?'; }).join(',');
-        var result = await execute('DELETE FROM login_logs WHERE id IN (' + placeholders + ')', list);
+        const [result] = await execute('DELETE FROM login_logs WHERE id IN (' + placeholders + ')', list);
         return { deleted: result.affectedRows || 0 };
     },
     clearAll: async () => {
-        var result = await execute('DELETE FROM login_logs');
+        const [result] = await execute('DELETE FROM login_logs');
         return { deleted: result.affectedRows || 0 };
     },
     clearByUser: (userId) => execute('DELETE FROM login_logs WHERE user_id = ?', [userId]),
