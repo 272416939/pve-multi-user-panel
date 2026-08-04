@@ -49,10 +49,10 @@
                         </select>
                     </div>
                     <div class="col-auto">
-                        <input class="form-control form-control-sm" style="width:100px" v-model="opLogFilter.user_id" placeholder="用户ID" type="number" autocomplete="off">
+                        <input class="form-control form-control-sm" style="width:100px" v-model="opLogFilter.user_id" placeholder="用户ID" type="number" autocomplete="off" @keyup.enter="searchLogs">
                     </div>
                     <div class="col-auto">
-                        <input class="form-control form-control-sm" style="width:110px" v-model="opLogFilter.username" placeholder="用户名" autocomplete="off">
+                        <input class="form-control form-control-sm" style="width:110px" v-model="opLogFilter.username" placeholder="用户名" autocomplete="off" @keyup.enter="searchLogs">
                     </div>
                     <div class="col-auto">
                         <input class="form-control form-control-sm" style="width:160px" v-model="opLogFilter.keyword" placeholder="关键字搜索" autocomplete="off" @keyup.enter="searchLogs">
@@ -88,7 +88,7 @@
                         </select>
                     </div>
                     <div class="col-auto">
-                        <input class="form-control form-control-sm" style="width:100px" v-model="adminLogFilter.user_id" placeholder="用户ID" type="number" autocomplete="off">
+                        <input class="form-control form-control-sm" style="width:100px" v-model="adminLogFilter.user_id" placeholder="用户ID" type="number" autocomplete="off" @keyup.enter="searchLogs">
                     </div>
                     <div class="col-auto">
                         <input class="form-control form-control-sm" style="width:160px" v-model="adminLogFilter.keyword" placeholder="关键字搜索" autocomplete="off" @keyup.enter="searchLogs">
@@ -114,10 +114,10 @@
                         </select>
                     </div>
                     <div class="col-auto">
-                        <input class="form-control form-control-sm" style="width:100px" v-model="loginLogFilter.user_id" placeholder="用户ID" type="number" autocomplete="off">
+                        <input class="form-control form-control-sm" style="width:100px" v-model="loginLogFilter.user_id" placeholder="用户ID" type="number" autocomplete="off" @keyup.enter="searchLogs">
                     </div>
                     <div class="col-auto">
-                        <input class="form-control form-control-sm" style="width:110px" v-model="loginLogFilter.username" placeholder="用户名" autocomplete="off">
+                        <input class="form-control form-control-sm" style="width:110px" v-model="loginLogFilter.username" placeholder="用户名" autocomplete="off" @keyup.enter="searchLogs">
                     </div>
                     <div class="col-auto">
                         <input class="form-control form-control-sm" style="width:160px" v-model="loginLogFilter.keyword" placeholder="关键字搜索" autocomplete="off" @keyup.enter="searchLogs">
@@ -146,13 +146,16 @@
                         </select>
                     </div>
                     <div class="col-auto">
-                        <input class="form-control form-control-sm" style="width:100px" v-model="osSwitchLogFilter.vm_id" placeholder="VMID" type="number">
+                        <input class="form-control form-control-sm" style="width:100px" v-model="osSwitchLogFilter.vm_id" placeholder="VMID" type="number" autocomplete="off" @keyup.enter="loadOsSwitchLogs(1)">
                     </div>
                     <div class="col-auto">
-                        <input class="form-control form-control-sm" style="width:100px" v-model="osSwitchLogFilter.user_id" placeholder="用户ID" type="number">
+                        <input class="form-control form-control-sm" style="width:100px" v-model="osSwitchLogFilter.user_id" placeholder="用户ID" type="number" autocomplete="off" @keyup.enter="loadOsSwitchLogs(1)">
+                    </div>
+                    <div class="col-auto">
+                        <input class="form-control form-control-sm" style="width:110px" v-model="osSwitchLogFilter.username" placeholder="用户名" autocomplete="off" @keyup.enter="loadOsSwitchLogs(1)">
                     </div>
                     <div class="col-auto d-flex gap-2">
-                        <pv-button size="sm" @click="loadOsSwitchLogs(1)">筛选</pv-button>
+                        <pv-button size="sm" @click="loadOsSwitchLogs(1)">查询</pv-button>
                         <pv-button size="sm" variant="outline" @click="resetOsSwitchLogFilter()">重置</pv-button>
                     </div>
                 </div>
@@ -162,7 +165,7 @@
                         <thead>
                             <tr>
                                 <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
-                                <th style="width:80px">ID</th>
+                                <th style="width:80px">编码</th>
                                 <th style="width:110px">用户</th>
                                 <th style="width:110px">操作类型</th>
                                 <th class="text-start">详情</th>
@@ -174,7 +177,7 @@
                             <tr v-for="row in currentLogList" :key="row.id">
                                 <td class="checkbox-col"><input type="checkbox" :checked="selectedLogIds.includes(row.id)" @change="toggleOneLog(row.id)"></td>
                                 <td class="small">{{ row.id }}</td>
-                                <td class="small">{{ row.username || row.user_id || '-' }}</td>
+                                <td class="small">{{ row.username ? row.username + '[' + row.user_id + ']' : (row.user_id || '-') }}</td>
                                 <td class="small">{{ row.category_name }}</td>
                                 <td class="small text-start text-break">{{ row.detail_text }}</td>
                                 <td class="small text-nowrap">{{ row.created_at }}</td>
@@ -192,7 +195,7 @@
                         <thead>
                             <tr>
                                 <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
-                                <th style="width:80px">ID</th>
+                                <th style="width:80px">编码</th>
                                 <th style="width:110px">管理员</th>
                                 <th style="width:130px">操作类型</th>
                                 <th class="text-start">详情</th>
@@ -204,7 +207,7 @@
                             <tr v-for="row in currentLogList" :key="row.id">
                                 <td class="checkbox-col"><input type="checkbox" :checked="selectedLogIds.includes(row.id)" @change="toggleOneLog(row.id)"></td>
                                 <td class="small">{{ row.id }}</td>
-                                <td class="small">{{ row.username || row.user_id || '-' }}</td>
+                                <td class="small">{{ row.username ? row.username + '[' + row.user_id + ']' : (row.user_id || '-') }}</td>
                                 <td class="small text-break">{{ row.sub_category_name || row.action }}</td>
                                 <td class="small text-start text-break">{{ row.detail_text }}</td>
                                 <td class="small text-nowrap">{{ row.created_at }}</td>
@@ -222,7 +225,7 @@
                         <thead>
                             <tr>
                                 <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
-                                <th style="width:80px">ID</th>
+                                <th style="width:80px">编码</th>
                                 <th style="width:110px">用户</th>
                                 <th style="width:230px">IP地址（归属地）</th>
                                 <th class="text-start ps-3">用户代理</th>
@@ -235,7 +238,7 @@
                             <tr v-for="row in currentLogList" :key="row.id">
                                 <td class="checkbox-col"><input type="checkbox" :checked="selectedLogIds.includes(row.id)" @change="toggleOneLog(row.id)"></td>
                                 <td class="small">{{ row.id }}</td>
-                                <td class="small">{{ row.username || row.user_id || '-' }}</td>
+                                <td class="small">{{ row.username ? row.username + '[' + row.user_id + ']' : (row.user_id || '-') }}</td>
                                 <td class="small">{{ row.ip }}<span v-if="row.ip_location">（{{ row.ip_location }}）</span></td>
                                 <td class="small text-start ps-3 text-break">{{ row.user_agent }}</td>
                                 <td class="text-nowrap"><span :class="'badge ' + (row.status === 'success' ? 'bg-success' : 'bg-danger')">{{ row.status === 'success' ? '登录成功' : '登录失败' }}</span></td>
@@ -254,7 +257,7 @@
                         <thead>
                             <tr>
                                 <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
-                                <th style="width:80px">ID</th>
+                                <th style="width:80px">编码</th>
                                 <th style="width:90px">VMID</th>
                                 <th style="width:110px">用户</th>
                                 <th>来源系统</th>
@@ -269,7 +272,7 @@
                                 <td class="checkbox-col"><input type="checkbox" :checked="osSwitchLogSelected.includes(row.id)" @change="toggleOneOsSwitchLog(row.id)"></td>
                                 <td class="small">{{ row.id }}</td>
                                 <td class="small">{{ row.vm_id }}</td>
-                                <td class="small">{{ row.username || row.user_id }}</td>
+                                <td class="small">{{ row.username ? row.username + '[' + row.user_id + ']' : row.user_id }}</td>
                                 <td class="small text-muted">{{ row.from_os_template_name || row.from_os_template_id || '-' }}</td>
                                 <td class="small">{{ row.to_os_template_name || row.to_os_template_id }}</td>
                                 <td>

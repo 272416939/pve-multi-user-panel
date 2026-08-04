@@ -905,7 +905,7 @@
     $.osSwitchLogList = Vue.ref([]);
     $.osSwitchLogTotal = Vue.ref(0);
     $.osSwitchLogPage = Vue.ref(1);
-    $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '' });
+    $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '', username: '' });
     $.osSwitchLogSelected = Vue.reactive([]);
     $.osSwitchLogDetail = Vue.ref(null);
     const OS_SWITCH_LOG_LIMIT = 20;
@@ -920,6 +920,7 @@
             if ($.osSwitchLogFilter.status) params += '&status=' + encodeURIComponent($.osSwitchLogFilter.status);
             if ($.osSwitchLogFilter.vm_id) params += '&vm_id=' + encodeURIComponent($.osSwitchLogFilter.vm_id);
             if ($.osSwitchLogFilter.user_id) params += '&user_id=' + encodeURIComponent($.osSwitchLogFilter.user_id);
+            if ($.osSwitchLogFilter.username) params += '&username=' + encodeURIComponent($.osSwitchLogFilter.username);
             var res = await api('/admin/os-switch-logs' + params);
             if (res && res.success) {
                 $.osSwitchLogList.value = res.data || [];
@@ -940,6 +941,7 @@
         $.osSwitchLogFilter.status = '';
         $.osSwitchLogFilter.vm_id = '';
         $.osSwitchLogFilter.user_id = '';
+        $.osSwitchLogFilter.username = '';
         $.loadOsSwitchLogs(1);
     };
 

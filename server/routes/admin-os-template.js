@@ -286,6 +286,7 @@ router.get('/admin/os-switch-logs', async (req, res) => {
             status: req.query.status,
             vm_id: req.query.vm_id,
             user_id: req.query.user_id,
+            username: (req.query.username || '').trim(),
             before_date: req.query.before_date
         };
         const logs = await db.vmOsSwitchLogs.getListWithPaging(filters);
