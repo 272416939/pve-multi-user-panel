@@ -24,13 +24,12 @@
         </div>
     </div>
 
-    <!-- 分类规则 -->
-    <div v-for="cat in rateLimitConfig.categories" :key="cat.key" class="card mb-4">
-        <div class="card-header">
+    <!-- 分类规则（表格容器统一玻璃态 table-container） -->
+    <div v-for="cat in rateLimitConfig.categories" :key="cat.key" class="table-container mb-4" style="padding:12px;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
             <h5 class="mb-0">{{ cat.label }}</h5>
         </div>
-        <div class="card-body p-0">
-            <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0">
                 <thead>
                     <tr>
                         <th style="width:28%">规则</th>
@@ -63,7 +62,6 @@
                     </tr>
                 </tbody>
             </table>
-        </div>
     </div>
 
     <div class="d-flex gap-2">

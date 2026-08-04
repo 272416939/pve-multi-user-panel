@@ -80,15 +80,8 @@
                             </tbody>
                         </table>
 
-                        <!-- 分页 -->
-                        <div class="d-flex justify-content-between align-items-center mt-3" v-if="transactionTotal > 0">
-                            <small class="text-muted">共 {{ transactionTotal }} 条</small>
-                            <div>
-                                <pv-button :disabled="financePage <= 1" @click="loadTransactions(financePage - 1)" variant="outline" size="sm">上一页</pv-button>
-                                <span class="mx-2 text-muted small">{{ financePage }} / {{ Math.ceil(transactionTotal / 20) || 1 }}</span>
-                                <pv-button :disabled="financePage * 20 >= transactionTotal" @click="loadTransactions(financePage + 1)" variant="outline" size="sm">下一页</pv-button>
-                            </div>
-                        </div>
+                        <!-- 分页：通用分页条（pv-pagination 单一实现） -->
+                        <pv-pagination :total="transactionTotal" :page="financePage" :page-size="financePageSize" @change="loadTransactions" @page-size-change="changeFinancePageSize"></pv-pagination>
                     </div>
                     </div>
 
@@ -97,10 +90,9 @@
                         <div class="module-header">
                             <h4 class="module-title">订单管理</h4>
                         </div>
-                        <div class="card">
+                        <div class="table-container mb-4" style="padding:12px;">
                             <!-- 筛选栏 -->
-                            <div class="card-body pb-0">
-                                <div class="row g-2 mb-3 align-items-end">
+                            <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">订单号</label>
                                         <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号" autocomplete="off">
@@ -137,7 +129,6 @@
                                         <pv-button @click="exportOrders" size="sm">导出</pv-button>
                                     </div>
                                 </div>
-                            </div>
                             <div class="table-responsive">
                                 <table class="table table-striped mb-0 table-align-center">
                                     <thead>
@@ -159,15 +150,8 @@
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-                        <!-- 分页 -->
-                        <div class="d-flex justify-content-between align-items-center mt-3" v-if="orderTotal > 0">
-                            <small class="text-muted">共 {{ orderTotal }} 条</small>
-                            <div>
-                                <pv-button :disabled="orderPage <= 1" @click="loadOrders(orderPage-1)" variant="outline" size="sm">上一页</pv-button>
-                                <span class="mx-2 text-muted small">{{ orderPage }} / {{ Math.ceil(orderTotal / 20) || 1 }}</span>
-                                <pv-button :disabled="orderPage*20 >= orderTotal" @click="loadOrders(orderPage+1)" variant="outline" size="sm">下一页</pv-button>
-                            </div>
+                            <!-- 分页：通用分页条（pv-pagination 单一实现） -->
+                            <pv-pagination :total="orderTotal" :page="orderPage" :page-size="orderPageSize" @change="loadOrders" @page-size-change="changeOrderPageSize"></pv-pagination>
                         </div>
                     </div>
                 </div>

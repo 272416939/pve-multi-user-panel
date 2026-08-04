@@ -118,7 +118,6 @@
 .vm-mobile-card-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
     @media (max-width: 768px) {
-        .table-container { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
         /* 移动端隐藏直接操作按钮，统一收入"更多"下拉菜单 */
         .btn-group-table { display: none !important; }
         /* 大弹窗移动端适配 */
@@ -288,16 +287,6 @@
         color: #BFDBFE; box-shadow: 0 4px 16px rgba(59,130,246,0.25); }
 
     /* ========== 表格样式 ========== */
-    .table-container {
-        background: var(--glass-surface);
-        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-        border: 1px solid var(--border-color); border-radius: 12px;
-        overflow: hidden; box-shadow: var(--shadow-md);
-        position: relative;
-    }
-    .table-scroll { overflow-x: auto; pointer-events: auto; }
-    .vm-table-wrap { margin-top: 0; }
-
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
     thead th, .table thead th, .table-striped thead th {
         padding: 14px 18px !important; text-align: left; font-weight: 600 !important;

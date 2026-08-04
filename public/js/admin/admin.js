@@ -8,6 +8,7 @@
     // ==================== 状态 ====================
     $.users = ref([]);
     $.userPage = ref(1);
+    $.userPageSize = ref(20);
     $.userTotal = ref(0);
     $.userFilter = ref({ keyword: '', role: '' });
     $.showCreateUser = ref(false);
@@ -139,7 +140,7 @@
         var seq = ++$.userLoadSeq;
         $.userPage.value = page || 1;
         try {
-            var params = { page: $.userPage.value, limit: 20 };
+            var params = { page: $.userPage.value, limit: $.userPageSize.value };
             if ($.userFilter.value.keyword) params.keyword = $.userFilter.value.keyword;
             if ($.userFilter.value.role) params.role = $.userFilter.value.role;
             var res = await api('/users?' + new URLSearchParams(params));
@@ -157,6 +158,11 @@
         }
     };
     $.searchUsers = function() { $.loadUsers(1); };
+    // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+    $.changeUserPageSize = function(size) {
+        $.userPageSize.value = size || 20;
+        $.loadUsers(1);
+    };
 
     $.createUser = async function() {
         try {
@@ -784,11 +790,12 @@
     $.financeFilter = ref({ start_time: '', end_time: '', pay_method: '', trade_type: '', order_no: '' });    $.transactionList = ref([]);
     $.transactionTotal = ref(0);
     $.financePage = ref(1);
+    $.financePageSize = ref(20);
 
     $.loadTransactions = async function(page) {
         $.financePage.value = page || 1;
         try {
-            var params = { page: $.financePage.value, limit: 20 };
+            var params = { page: $.financePage.value, limit: $.financePageSize.value };
             var f = $.financeFilter.value;
             if (f.start_time) params.start_time = f.start_time;
             if (f.end_time) params.end_time = f.end_time;
@@ -801,6 +808,11 @@
         } catch (e) {
             console.error('加载流水失败', e);
         }
+    };
+    // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+    $.changeFinancePageSize = function(size) {
+        $.financePageSize.value = size || 20;
+        $.loadTransactions(1);
     };
 
     $.exportTransactions = async function() {
@@ -835,6 +847,7 @@
     // 订单管理
     $.orders = Vue.ref([]);
     $.orderPage = Vue.ref(1);
+    $.orderPageSize = Vue.ref(20);
     $.orderTotal = Vue.ref(0);
     $.orderFilter = Vue.reactive({ order_no: '', type: '', status: '', start_time: '', end_time: '' });
 
@@ -844,7 +857,7 @@
         try {
             var params = new URLSearchParams();
             params.set('page', page);
-            params.set('limit', '20');
+            params.set('limit', String($.orderPageSize.value));
             if ($.orderFilter.order_no) params.set('order_no', $.orderFilter.order_no);
             if ($.orderFilter.type) params.set('type', $.orderFilter.type);
             if ($.orderFilter.status) params.set('status', $.orderFilter.status);
@@ -854,6 +867,11 @@
             $.orders.value = data.rows || [];
             $.orderTotal.value = data.total || 0;
         } catch(e) { console.error('加载订单失败', e); }
+    };
+    // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+    $.changeOrderPageSize = function(size) {
+        $.orderPageSize.value = size || 20;
+        $.loadOrders(1);
     };
 
     $.exportOrders = async function() {

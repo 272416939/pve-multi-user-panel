@@ -283,8 +283,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">交易明细</h4>
                         </div>
-                        <div class="card">
-                            <div class="card-body">
+                        <div class="table-container mb-4" style="padding:12px;">
                                 <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">开始时间</label>
@@ -332,15 +331,8 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center mt-3" v-if="txTotal > 0">
-                                    <small class="text-muted">共 {{ txTotal }} 条</small>
-                                    <div>
-                                        <pv-button variant="outline" size="sm" :disabled="txPage <= 1" @click="loadTx(txPage - 1)">上一页</pv-button>
-                                        <span class="mx-2 text-muted small">{{ txPage }} / {{ Math.ceil(txTotal / 20) || 1 }}</span>
-                                        <pv-button variant="outline" size="sm" :disabled="txPage * 20 >= txTotal" @click="loadTx(txPage + 1)">下一页</pv-button>
-                                    </div>
-                                </div>
-                            </div>
+                                <!-- 分页：通用分页条（pv-pagination 单一实现） -->
+                                <pv-pagination :total="txTotal" :page="txPage" :page-size="txPageSize" @change="loadTx" @page-size-change="changeTxPageSize"></pv-pagination>
                         </div>
                     </div>
                 </div>
@@ -353,8 +345,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">我的订单</h4>
                         </div>
-                        <div class="card">
-                            <div class="card-body pb-0">
+                        <div class="table-container mb-4" style="padding:12px;">
                                 <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">订单号</label>
@@ -384,7 +375,6 @@
                                         <pv-button @click="orderFilter={order_no:'',type:'',status:''};loadMyOrders(1)" variant="outline" size="sm">重置</pv-button>
                                     </div>
                                 </div>
-                            </div>
                             <div class="table-responsive">
                                     <table class="table table-hover table-sm mb-0 table-align-center">
                                         <thead><tr><th>订单号</th><th>套餐/产品</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>状态</th><th>时间</th></tr></thead>
@@ -403,16 +393,8 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mt-3" v-if="orderTotal > 0">
-                                    <small class="text-muted">共 {{ orderTotal }} 条</small>
-                                    <div>
-                                        <pv-button variant="outline" size="sm" :disabled="orderPage <= 1" @click="loadMyOrders(orderPage - 1)">上一页</pv-button>
-                                        <span class="mx-2 text-muted small">{{ orderPage }} / {{ Math.ceil(orderTotal / 20) || 1 }}</span>
-                                        <pv-button variant="outline" size="sm" :disabled="orderPage * 20 >= orderTotal" @click="loadMyOrders(orderPage + 1)">下一页</pv-button>
-                                    </div>
-                                </div>
-                            </div>
+                            <!-- 分页：通用分页条（pv-pagination 单一实现） -->
+                            <pv-pagination :total="orderTotal" :page="orderPage" :page-size="orderPageSize" @change="loadMyOrders" @page-size-change="changeOrderPageSize"></pv-pagination>
                         </div>
                     </div>
                 </div>
@@ -421,9 +403,8 @@
             <div v-if="activeSubTab === 'security'">
                 <div class="row justify-content-center">
                     <div class="col-md-8">
-                        <div class="card mb-4">
-                            <div class="card-body">
-                                <h5 class="card-title mb-3">登录设备管理</h5>
+                        <div class="table-container mb-4" style="padding:12px;">
+                                <h5 class="mb-3">登录设备管理</h5>
                                 <div v-if="devicesLoading" class="text-center py-3">
                                     <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
                                 </div>
@@ -459,7 +440,6 @@
                                 <div v-if="devices.length > 0" class="mt-2">
                                     <pv-button variant="secondary" size="sm" @click="revokeOtherDevices">下线其他设备</pv-button>
                                 </div>
-                            </div>
                         </div>
 
                         <div class="card">

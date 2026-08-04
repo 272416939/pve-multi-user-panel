@@ -110,8 +110,6 @@
 .vm-mobile-card-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 
 @media (max-width: 768px) {
-    /* Mobile table optimization */
-    .table-container { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
     /* 移动端隐藏直接操作按钮，统一收入"更多"下拉菜单 */
     .btn-group-table { display: none !important; }
     /* 大弹窗移动端适配 */
@@ -172,13 +170,6 @@
 .legend-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .dot-run { background: var(--color-success); }
 .dot-stop { background: var(--text-muted); }
-
-/* ========== 表格布局样式 ========== */
-.table-container { background: var(--glass-bg); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow-sm);
-    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
-.table-scroll { overflow-x: auto; pointer-events: auto; }
-.vm-table-wrap { margin-top: 0; }
 
 /* 子Tab导航（玻璃态药丸风格） */
 .nav-tabs { display: flex; gap: 4px; padding: 6px 8px;

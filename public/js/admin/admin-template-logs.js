@@ -294,26 +294,8 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- 分页：条数统计 + 页码按钮 + 省略号 + 每页条数 + 跳页（四 tab 统一，无数据时显示统计与禁用态） -->
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-                    <small class="text-muted">共 {{ currentLogTotal }} 条</small>
-                    <div class="d-flex align-items-center gap-1">
-                        <pv-button variant="outline" size="sm" :disabled="currentLogPage <= 1" @click="loadCurrentLogs(currentLogPage - 1)">&lt;</pv-button>
-                        <template v-for="(p, idx) in logPageNumbers" :key="idx">
-                            <span v-if="p === '...'" class="text-muted small px-1">…</span>
-                            <pv-button v-else size="sm" :variant="p === currentLogPage ? 'primary' : 'outline'" @click="loadCurrentLogs(p)">{{ p }}</pv-button>
-                        </template>
-                        <pv-button variant="outline" size="sm" :disabled="currentLogPage >= currentLogTotalPages" @click="loadCurrentLogs(currentLogPage + 1)">&gt;</pv-button>
-                        <select class="form-select form-select-sm ms-2" style="width:auto" v-model="logPageSize" @change="changeLogPageSize">
-                            <option :value="20">20条/页</option>
-                            <option :value="50">50条/页</option>
-                            <option :value="100">100条/页</option>
-                        </select>
-                        <span class="text-muted small ms-2">前往</span>
-                        <input type="number" class="form-control form-control-sm" style="width:70px" v-model="logGoPage" min="1" :max="currentLogTotalPages" placeholder="页" autocomplete="off" @keyup.enter="goLogPage">
-                        <span class="text-muted small">页</span>
-                    </div>
-                </div>
+                <!-- 分页：通用分页条（pv-pagination 单一实现，四 tab 统一） -->
+                <pv-pagination :total="currentLogTotal" :page="currentLogPage" :page-size="logPageSize" @change="loadCurrentLogs" @page-size-change="changeLogPageSize"></pv-pagination>
         </div>
     </div>
     `);

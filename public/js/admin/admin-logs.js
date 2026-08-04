@@ -30,9 +30,8 @@
     // 日志保留上限（后端返回，Tips 提示用）：用户操作按用户维度 / 后台操作按全站维度
     $.logKeepCount = ref(0);
     $.logKeepAdminCount = ref(0);
-    // 分页：每页条数（20/50/100 可选，localStorage 持久化）与跳页输入
+    // 分页：每页条数（20/50/100 可选，localStorage 持久化；页码/省略号/跳页逻辑由 pv-pagination 组件内置）
     $.logPageSize = ref(parseInt(localStorage.getItem(window.__storageKeys.ADMIN_LOG_PAGE_SIZE)) || 20);
-    $.logGoPage = ref('');
     $.selectedLogIds = Vue.reactive([]);
     $.logLoading = ref(false);
 
@@ -55,34 +54,7 @@
         if ($.logTab.value === 'os-switch') return $.osSwitchLogPage.value;
         return $.opLogPage.value;
     });
-    $.currentLogTotalPages = computed(function() {
-        return Math.ceil($.currentLogTotal.value / $.logPageSize.value) || 1;
-    });
-    // 页码数组（当前页前后 2 页窗口 + 省略号），如 [1, '...', 3, 4, 5, 6, 7, '...', 100]
-    $.logPageNumbers = computed(function() {
-        var totalPages = $.currentLogTotalPages.value;
-        var cur = $.currentLogPage.value;
-        if (totalPages <= 7) {
-            var all = [];
-            for (var i = 1; i <= totalPages; i++) all.push(i);
-            return all;
-        }
-        var pages = {};
-        pages[1] = true;
-        pages[totalPages] = true;
-        for (var p = cur - 2; p <= cur + 2; p++) {
-            if (p >= 1 && p <= totalPages) pages[p] = true;
-        }
-        var sorted = Object.keys(pages).map(Number).sort(function(a, b) { return a - b; });
-        var out = [];
-        var prev = 0;
-        for (var i = 0; i < sorted.length; i++) {
-            if (prev && sorted[i] - prev > 1) out.push('...');
-            out.push(sorted[i]);
-            prev = sorted[i];
-        }
-        return out;
-    });
+    // 注：总页数/页码数组/跳页逻辑统一由 pv-pagination 组件内置（低耦合单一实现），页面只维护 total/page/pageSize
 
     // 请求序号保护：防止旧响应覆盖新数据
     var opLogLoadSeq = 0;
@@ -200,23 +172,11 @@
         $.loadLogs(page);
     };
 
-    // 每页条数切换：记住选择并从第 1 页重新加载
-    $.changeLogPageSize = function() {
+    // 每页条数切换：记住选择并从第 1 页重新加载（pv-pagination 事件回调，接收新条数）
+    $.changeLogPageSize = function(size) {
+        $.logPageSize.value = size || 20;
         localStorage.setItem(window.__storageKeys.ADMIN_LOG_PAGE_SIZE, $.logPageSize.value);
         $.loadLogs(1);
-    };
-
-    // 前往指定页（输入页码回车跳转，越界自动收敛）
-    $.goLogPage = function() {
-        var p = parseInt($.logGoPage.value);
-        if (!Number.isInteger(p) || p < 1) {
-            $.logGoPage.value = '';
-            return;
-        }
-        var max = $.currentLogTotalPages.value;
-        if (p > max) p = max;
-        $.logGoPage.value = '';
-        $.loadCurrentLogs(p);
     };
 
     // ===== tab 切换 =====

@@ -8,6 +8,7 @@
                             <h5 class="mb-0">VM 套餐管理</h5>
                             <pv-button @click="packagePage.openVmPackageForm(null)" size="sm">+ 新建套餐</pv-button>
                         </div>
+                        <div class="table-container mb-4" style="padding:12px;">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
@@ -58,6 +59,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        </div>
                     </div>
 
                     <div v-if="activeTabPackages === 'vm-groups'" class="tab-panel">
@@ -65,6 +67,7 @@
                             <h5 class="mb-0">VM 套餐分组管理</h5>
                             <pv-button @click="packagePage.openVmGroupForm(null)" size="sm">+ 新建分组</pv-button>
                         </div>
+                        <div class="table-container mb-4" style="padding:12px;">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
@@ -100,6 +103,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        </div>
                     </div>
 
                     <div v-if="activeTabPackages === 'lxc'" class="tab-panel">
@@ -107,6 +111,7 @@
                             <h5 class="mb-0">LXC 套餐管理</h5>
                             <pv-button @click="packagePage.openLxcPackageForm(null)" size="sm">+ 新建套餐</pv-button>
                         </div>
+                        <div class="table-container mb-4" style="padding:12px;">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
@@ -147,6 +152,7 @@
                                 </tbody>
                             </table>
                         </div>
+                        </div>
                     </div>
 
                     <div v-if="activeTabPackages === 'lxc-groups'" class="tab-panel">
@@ -154,6 +160,7 @@
                             <h5 class="mb-0">LXC 套餐分组管理</h5>
                             <pv-button @click="packagePage.openLxcGroupForm(null)" size="sm">+ 新建分组</pv-button>
                         </div>
+                        <div class="table-container mb-4" style="padding:12px;">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
@@ -188,6 +195,7 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
                         </div>
                     </div>
 

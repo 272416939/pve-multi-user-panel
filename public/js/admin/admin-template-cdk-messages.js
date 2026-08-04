@@ -94,8 +94,8 @@
                             </div>
                         </div>
 
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="table-container mb-4" style="padding:12px;">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h5 class="mb-0">CDK 列表（{{ cdkList.length }}）</h5>
                                 <div v-if="selectedCdkIds.length > 0" class="d-flex align-items-center gap-2">
                                     <span class="text-muted small">已选 {{ selectedCdkIds.length }} 个</span>

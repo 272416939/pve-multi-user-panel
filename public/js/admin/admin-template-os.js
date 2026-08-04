@@ -3,9 +3,9 @@
     window.__adminTemplateParts.push(`
     <!-- OS 模板管理 -->
     <div v-if="activeSection === 'templates-os'">
-        <div class="admin-card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="mb-0">可切换系统模板</h3>
+        <div class="table-container mb-4" style="padding:12px;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">可切换系统模板</h5>
                 <pv-button variant="primary" @click="osTemplatePage.openForm()">新增模板</pv-button>
             </div>
             <div class="table-responsive">
