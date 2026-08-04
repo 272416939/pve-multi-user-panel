@@ -229,7 +229,8 @@ watch($.user, function(u) {
         } else if (page === 'logs') {
             section = 'logs';
             subId = 'logs';
-            $.loadLogs(1);
+            // 容错调用：点击路径显式加载（与刷新/直达路径复用同一函数，规范第四节）
+            if ($.loadLogs) $.loadLogs(1);
         }
         if (!section) return;
         $.switchSection(section);
@@ -872,12 +873,21 @@ $.initDetailCharts = function() {
             if (hasAccess) {
                 // PERF-07: 初始化加载并行化（导航/VM 分配/业务数据/MAC 分组相互独立，
                 // 原串行需等待最慢接口完成，并行后总耗时 ≈ 最慢单个接口）
+                // 兜底：loadAssignData/loadMacGroups 内部无 catch，PVE 节点不可用等环境异常
+                // 若直接 reject 会让 Promise.all 中断，导致下方日志中心/直达链接的数据加载永不执行
                 await Promise.all([
                     $.loadNavItems(),
-                    $.loadAssignData(),
+                    $.loadAssignData().catch(function(e) { console.error('加载分配数据失败', e && e.message); }),
                     $.loadData(),
-                    $.loadMacGroups()
+                    $.loadMacGroups().catch(function(e) { console.error('加载 MAC 分组失败', e && e.message); })
                 ]);
+                // 日志中心数据加载独立于 expandSections 块：即使上方初始化接口异常，
+                // 直达 ?section=logs 的日志也必须加载（规范第四节：刷新/直达路径显式加载）
+                if ($.activeSection.value === 'logs') {
+                    setTimeout(function() {
+                        if ($.loadLogs) $.loadLogs(1);
+                    }, 100);
+                }
                 // Auto-expand submenu based on current section
                 // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates）；
                 // logs 为一级菜单（active 由模板 :class 绑定），无需展开子菜单
@@ -927,10 +937,6 @@ $.initDetailCharts = function() {
                         }
                         if (section === 'templates-os' && window.__admin.osTemplatePage) {
                             window.__admin.osTemplatePage.load();
-                        }
-                        if (section === 'logs') {
-                            // 日志中心：按已持久化的 tab 加载对应日志（刷新/直达路径）
-                            $.loadLogs(1);
                         }
                     }, 100);
                 }
