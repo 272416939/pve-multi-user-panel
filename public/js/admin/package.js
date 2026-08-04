@@ -569,5 +569,5 @@
     };
 
     admin.packagePage = $;
-    window.packagePage = $;
+    window.__admin.packagePage = $;
 })();
