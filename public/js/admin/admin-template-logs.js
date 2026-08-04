@@ -294,8 +294,8 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- 分页：页码按钮 + 省略号 + 每页条数 + 跳页（四 tab 统一） -->
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3" v-if="currentLogTotal > 0">
+                <!-- 分页：条数统计 + 页码按钮 + 省略号 + 每页条数 + 跳页（四 tab 统一，无数据时显示统计与禁用态） -->
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
                     <small class="text-muted">共 {{ currentLogTotal }} 条</small>
                     <div class="d-flex align-items-center gap-1">
                         <pv-button variant="outline" size="sm" :disabled="currentLogPage <= 1" @click="loadCurrentLogs(currentLogPage - 1)">&lt;</pv-button>

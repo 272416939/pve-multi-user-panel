@@ -289,8 +289,9 @@ router.get('/admin/os-switch-logs', async (req, res) => {
             before_date: req.query.before_date
         };
         const logs = await db.vmOsSwitchLogs.getListWithPaging(filters);
-        const total = await db.vmOsSwitchLogs.countWithFilters(filters);
-        res.json({ success: true, data: logs, total, page: filters.page, limit: filters.limit });
+        // countWithFilters 返回 { c: N } 行对象，转数字 total（接口契约：total 为数字，供前端分页/条数统计）
+        const countRow = await db.vmOsSwitchLogs.countWithFilters(filters);
+        res.json({ success: true, data: logs, total: countRow ? (countRow.c || 0) : 0, page: filters.page, limit: filters.limit });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
     }
