@@ -9,11 +9,12 @@
 
     // ==================== 状态 ====================
     $.user = ref(null);
-    // 旧版直达链接兼容：os-switch-logs 已并入日志中心（logs），tab 预置系统切换
+    // 旧版直达链接兼容：os-switch-logs 已并入日志中心（logs），仅本次会话定位到系统切换 tab，
+    // 不写入 localStorage（避免污染默认 tab 状态，正常进入日志中心始终默认操作日志）
     var urlSection = new URLSearchParams(window.location.search).get('section') || '';
     if (urlSection === 'os-switch-logs') {
         urlSection = 'logs';
-        localStorage.setItem(window.__storageKeys.ADMIN_LOGTAB, 'os-switch');
+        window.__admin.__legacyOsSwitchTab = true;
     }
     $.activeSection = ref(urlSection || 'overview');
     $.navItems = ref([]);

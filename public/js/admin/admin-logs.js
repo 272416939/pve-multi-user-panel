@@ -6,10 +6,14 @@
     var watch = Vue.watch;
 
     // ===== 状态 =====
-    // tab 白名单校验 + 非法值回退默认（规范第四节：localStorage + 白名单）
+    // tab 白名单校验 + 非法值回退默认（规范第四节：localStorage + 白名单）。
+    // 系统切换 tab 不参与持久化：进入日志中心默认打开操作日志；旧链接 ?section=os-switch-logs
+    // 由 core.js 置 __legacyOsSwitchTab 标记（仅本次会话定位到系统切换，不污染持久化状态）
     var LOG_TAB_WHITELIST = ['operation', 'admin', 'login', 'os-switch'];
-    var savedLogTab = localStorage.getItem(window.__storageKeys.ADMIN_LOGTAB);
-    $.logTab = ref(LOG_TAB_WHITELIST.indexOf(savedLogTab) !== -1 ? savedLogTab : 'operation');
+    var legacyOsSwitchTab = !!(window.__admin && window.__admin.__legacyOsSwitchTab);
+    var savedLogTab = legacyOsSwitchTab ? 'os-switch' : localStorage.getItem(window.__storageKeys.ADMIN_LOGTAB);
+    if (savedLogTab === 'os-switch' && !legacyOsSwitchTab) savedLogTab = null;
+    $.logTab = ref(savedLogTab && LOG_TAB_WHITELIST.indexOf(savedLogTab) !== -1 ? savedLogTab : 'operation');
     $.opLogList = ref([]);
     $.adminLogList = ref([]);
     $.loginLogList = ref([]);
@@ -32,20 +36,23 @@
     $.selectedLogIds = Vue.reactive([]);
     $.logLoading = ref(false);
 
-    // 当前 tab 的列表/分页/总数（模板共用）
+    // 当前 tab 的列表/分页/总数（模板共用；系统切换 tab 复用 admin.js 的 osSwitchLog 状态）
     $.currentLogList = computed(function() {
         if ($.logTab.value === 'admin') return $.adminLogList.value;
         if ($.logTab.value === 'login') return $.loginLogList.value;
+        if ($.logTab.value === 'os-switch') return $.osSwitchLogList.value;
         return $.opLogList.value;
     });
     $.currentLogTotal = computed(function() {
         if ($.logTab.value === 'admin') return $.adminLogTotal.value;
         if ($.logTab.value === 'login') return $.loginLogTotal.value;
+        if ($.logTab.value === 'os-switch') return $.osSwitchLogTotal.value;
         return $.opLogTotal.value;
     });
     $.currentLogPage = computed(function() {
         if ($.logTab.value === 'admin') return $.adminLogPage.value;
         if ($.logTab.value === 'login') return $.loginLogPage.value;
+        if ($.logTab.value === 'os-switch') return $.osSwitchLogPage.value;
         return $.opLogPage.value;
     });
     $.currentLogTotalPages = computed(function() {
@@ -220,9 +227,14 @@
         $.loadLogs(1);
     };
 
-    // watch 仅持久化 tab 选择（白名单已在 ref 初始化校验）
+    // watch 仅持久化 tab 选择（白名单已在 ref 初始化校验）；
+    // 系统切换 tab 不持久化：切走/刷新后回到默认操作日志，避免污染默认 tab 状态
     watch($.logTab, function(tab) {
-        localStorage.setItem(window.__storageKeys.ADMIN_LOGTAB, tab);
+        if (tab === 'os-switch') {
+            localStorage.removeItem(window.__storageKeys.ADMIN_LOGTAB);
+        } else {
+            localStorage.setItem(window.__storageKeys.ADMIN_LOGTAB, tab);
+        }
     });
 
     // ===== 刷新 =====

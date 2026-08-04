@@ -27,8 +27,8 @@
                 <a class="nav-link" :class="{ active: logTab === 'os-switch' }" href="#" @click.prevent="switchLogTab('os-switch')">系统切换</a>
             </li>
         </ul>
-        <!-- 操作/后台/登录 三个 tab 共用卡片；系统切换 tab 内容由 admin-template-os-switch-logs.js 渲染 -->
-        <div class="card mb-4" v-if="logTab !== 'os-switch'">
+        <!-- 四个 tab 共用同一卡片结构，保证排版一致；系统切换详情弹窗由 admin-template-os-switch-logs.js 提供 -->
+        <div class="card mb-4">
             <div class="card-body">
                 <!-- Tips：日志保留上限提示（红字，深色模式自动加深） -->
                 <div class="py-1 px-2 mb-2 small" style="color: var(--color-danger);" v-if="logKeepCount > 0">
@@ -133,6 +133,29 @@
                         <pv-button size="sm" variant="outline" @click="resetLogFilter">重置</pv-button>
                     </div>
                 </div>
+                <!-- 筛选栏：系统切换 -->
+                <div class="row g-2 mb-3" v-if="logTab === 'os-switch'">
+                    <div class="col-auto">
+                        <select class="form-select form-select-sm" style="width:130px" v-model="osSwitchLogFilter.status">
+                            <option value="">全部状态</option>
+                            <option value="success">成功</option>
+                            <option value="failed">失败</option>
+                            <option value="running">切换中</option>
+                            <option value="pending">等待中</option>
+                            <option value="rolled_back">已回滚</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <input class="form-control form-control-sm" style="width:100px" v-model="osSwitchLogFilter.vm_id" placeholder="VMID" type="number">
+                    </div>
+                    <div class="col-auto">
+                        <input class="form-control form-control-sm" style="width:100px" v-model="osSwitchLogFilter.user_id" placeholder="用户ID" type="number">
+                    </div>
+                    <div class="col-auto d-flex gap-2">
+                        <pv-button size="sm" @click="loadOsSwitchLogs(1)">筛选</pv-button>
+                        <pv-button size="sm" variant="outline" @click="resetOsSwitchLogFilter()">重置</pv-button>
+                    </div>
+                </div>
                 <!-- 操作日志表格（全站用户操作，排除后台操作） -->
                 <div class="table-responsive" v-if="logTab === 'operation'">
                     <table class="table table-striped mb-0 table-sm table-align-center">
@@ -225,7 +248,53 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- 分页：页码按钮 + 省略号 + 每页条数 + 跳页 -->
+                <!-- 系统切换表格 -->
+                <div class="table-responsive" v-if="logTab === 'os-switch'">
+                    <table class="table table-striped mb-0 table-sm table-align-center">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-col"><input type="checkbox" @change="toggleAllLog($event)" :checked="isAllLogSelected()"></th>
+                                <th style="width:80px">ID</th>
+                                <th style="width:90px">VMID</th>
+                                <th style="width:110px">用户</th>
+                                <th>来源系统</th>
+                                <th>目标系统</th>
+                                <th style="width:110px">状态</th>
+                                <th style="width:170px">时间</th>
+                                <th style="width:130px">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="row in osSwitchLogList" :key="row.id">
+                                <td class="checkbox-col"><input type="checkbox" :checked="osSwitchLogSelected.includes(row.id)" @change="toggleOneOsSwitchLog(row.id)"></td>
+                                <td class="small">{{ row.id }}</td>
+                                <td class="small">{{ row.vm_id }}</td>
+                                <td class="small">{{ row.username || row.user_id }}</td>
+                                <td class="small text-muted">{{ row.from_os_template_name || row.from_os_template_id || '-' }}</td>
+                                <td class="small">{{ row.to_os_template_name || row.to_os_template_id }}</td>
+                                <td>
+                                    <span :class="'badge ' + {
+                                        success: 'bg-success', failed: 'bg-danger',
+                                        running: 'bg-primary', pending: 'bg-warning text-dark',
+                                        rolled_back: 'bg-secondary'
+                                    }[row.status] || 'bg-secondary'">{{ {success:'成功',failed:'失败',running:'切换中',pending:'等待中',rolled_back:'已回滚'}[row.status] || row.status }}</span>
+                                    <span v-if="row.admin_intervention_required" class="badge bg-danger ms-1">需介入</span>
+                                </td>
+                                <td class="small">{{ row.started_at ? formatDate(row.started_at) : '-' }}</td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <pv-button size="sm" @click="showOsSwitchLogDetail(row)">详情</pv-button>
+                                        <pv-button size="sm" variant="danger" @click="deleteLogRow(row)" :disabled="row.status === 'running'">删除</pv-button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr v-if="!osSwitchLogList || osSwitchLogList.length === 0">
+                                <td colspan="9" class="text-center text-muted py-3">暂无切换日志</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- 分页：页码按钮 + 省略号 + 每页条数 + 跳页（四 tab 统一） -->
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3" v-if="currentLogTotal > 0">
                     <small class="text-muted">共 {{ currentLogTotal }} 条</small>
                     <div class="d-flex align-items-center gap-1">

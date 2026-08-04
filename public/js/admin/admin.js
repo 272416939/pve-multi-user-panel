@@ -896,7 +896,9 @@
         page = page || 1;
         $.osSwitchLogPage.value = page;
         try {
-            var params = '?page=' + page + '&limit=' + OS_SWITCH_LOG_LIMIT;
+            // 分页大小跟随日志中心统一设置（20/50/100，admin-logs.js 未加载时回退常量）
+            var pageSize = ($.logPageSize && $.logPageSize.value) ? $.logPageSize.value : OS_SWITCH_LOG_LIMIT;
+            var params = '?page=' + page + '&limit=' + pageSize;
             if ($.osSwitchLogFilter.status) params += '&status=' + encodeURIComponent($.osSwitchLogFilter.status);
             if ($.osSwitchLogFilter.vm_id) params += '&vm_id=' + encodeURIComponent($.osSwitchLogFilter.vm_id);
             if ($.osSwitchLogFilter.user_id) params += '&user_id=' + encodeURIComponent($.osSwitchLogFilter.user_id);
