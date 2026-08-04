@@ -27,9 +27,9 @@
                                 <pv-button @click="userFilter={keyword:'',role:''};searchUsers()" variant="outline" size="sm">重置</pv-button>
                             </div>
                         </div>
-                        <div class="card">
+                        <div class="table-container mb-4" style="padding:12px;">
                             <div class="table-responsive">
-                                <table class="table table-striped mb-0 table-align-center">
+                                <table class="table table-hover mb-0 table-align-center">
                                     <thead>
                                         <tr>
                                             <th>ID</th>
@@ -73,14 +73,8 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <div class="d-flex justify-content-between align-items-center mt-3" v-if="userTotal > 0">
-                                <small class="text-muted">共 {{ userTotal }} 条</small>
-                                <div>
-                                    <pv-button :disabled="userPage <= 1" @click="loadUsers(userPage - 1)" variant="outline" size="sm">上一页</pv-button>
-                                    <span class="mx-2 text-muted small">{{ userPage }} / {{ Math.ceil(userTotal / 20) || 1 }}</span>
-                                    <pv-button :disabled="userPage * 20 >= userTotal" @click="loadUsers(userPage + 1)" variant="outline" size="sm">下一页</pv-button>
-                                </div>
-                            </div>
+                            <!-- 分页：通用分页条（pv-pagination 单一实现） -->
+                            <pv-pagination :total="userTotal" :page="userPage" :page-size="userPageSize" @change="loadUsers" @page-size-change="changeUserPageSize"></pv-pagination>
                         </div>
                     </div>
 

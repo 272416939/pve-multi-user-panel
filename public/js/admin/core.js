@@ -9,13 +9,24 @@
 
     // ==================== 状态 ====================
     $.user = ref(null);
-    $.activeSection = ref(new URLSearchParams(window.location.search).get('section') || 'overview');
+    // 旧版直达链接兼容：os-switch-logs 已并入日志中心（logs），仅本次会话定位到系统切换 tab，
+    // 不写入 localStorage（避免污染默认 tab 状态，正常进入日志中心始终默认操作日志）
+    var urlSection = new URLSearchParams(window.location.search).get('section') || '';
+    if (urlSection === 'os-switch-logs') {
+        urlSection = 'logs';
+        window.__admin.__legacyOsSwitchTab = true;
+    }
+    $.activeSection = ref(urlSection || 'overview');
     $.navItems = ref([]);
     var savedTab = localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB);
     $.activeTab = ref((savedTab === 'assign' ? 'users' : savedTab) || 'users');
     $.activeTabLxc = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_LXC) || 'create');
     $.activeTabVm = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_VM) || 'manage');
     $.activeTabDisk = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_DISK) || 'storage-groups');
+    // 安全防护 section 子标签（当前仅 限速设置；白名单校验 + 非法值回退默认，键名规范第四节）
+    var securityTabWhitelist = ['ratelimit'];
+    var savedSecurityTab = localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_SECURITY);
+    $.activeTabSecurity = ref(securityTabWhitelist.indexOf(savedSecurityTab) !== -1 ? savedSecurityTab : 'ratelimit');
     $.loading = ref(false);
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
@@ -215,16 +226,17 @@ watch($.user, function(u) {
             section = 'templates-os';
             subId = 'templates-os';
             if (window.__admin.osTemplatePage) window.__admin.osTemplatePage.load();
-        } else if (page === 'os-switch-logs') {
-            section = 'os-switch-logs';
-            subId = 'logs-os-switch';
-            $.loadOsSwitchLogs(1);
+        } else if (page === 'logs') {
+            section = 'logs';
+            subId = 'logs';
+            // 容错调用：点击路径显式加载（与刷新/直达路径复用同一函数，规范第四节）
+            if ($.loadLogs) $.loadLogs(1);
         }
         if (!section) return;
         $.switchSection(section);
         $.expandedSections.value[section] = true;
-        // section 与父菜单 id 可能不同（templates-os → submenu-templates / os-switch-logs → submenu-logs）
-        var menuKey = section === 'templates-os' ? 'templates' : (section === 'os-switch-logs' ? 'logs' : section);
+        // section 与父菜单 id 可能不同（templates-os → submenu-templates）；logs 为一级菜单，菜单键即 section 名
+        var menuKey = section === 'templates-os' ? 'templates' : section;
         var el = document.getElementById('submenu-' + menuKey);
         if (el) el.classList.add('open');
         var parent = el ? el.previousElementSibling : null;
@@ -861,16 +873,26 @@ $.initDetailCharts = function() {
             if (hasAccess) {
                 // PERF-07: 初始化加载并行化（导航/VM 分配/业务数据/MAC 分组相互独立，
                 // 原串行需等待最慢接口完成，并行后总耗时 ≈ 最慢单个接口）
+                // 兜底：loadAssignData/loadMacGroups 内部无 catch，PVE 节点不可用等环境异常
+                // 若直接 reject 会让 Promise.all 中断，导致下方日志中心/直达链接的数据加载永不执行
                 await Promise.all([
                     $.loadNavItems(),
-                    $.loadAssignData(),
+                    $.loadAssignData().catch(function(e) { console.error('加载分配数据失败', e && e.message); }),
                     $.loadData(),
-                    $.loadMacGroups()
+                    $.loadMacGroups().catch(function(e) { console.error('加载 MAC 分组失败', e && e.message); })
                 ]);
+                // 日志中心数据加载独立于 expandSections 块：即使上方初始化接口异常，
+                // 直达 ?section=logs 的日志也必须加载（规范第四节：刷新/直达路径显式加载）
+                if ($.activeSection.value === 'logs') {
+                    setTimeout(function() {
+                        if ($.loadLogs) $.loadLogs(1);
+                    }, 100);
+                }
                 // Auto-expand submenu based on current section
-                // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates / os-switch-logs → submenu-logs）
-                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'os-switch-logs'];
-                var submenuIdMap = { 'templates-os': 'templates', 'os-switch-logs': 'logs' };
+                // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates）；
+                // logs 为一级菜单（active 由模板 :class 绑定），无需展开子菜单
+                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os'];
+                var submenuIdMap = { 'templates-os': 'templates' };
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
                         var section = $.activeSection.value;
@@ -878,6 +900,7 @@ $.initDetailCharts = function() {
                         var tabVar = {
                             vms: $.activeTabVm, lxc: $.activeTabLxc,
                             manage: $.activeTab, settings: $.activeTab,
+                            security: $.activeTabSecurity,
                             templates: $.activeTabTemplates, packages: $.activeTabPackages,
                             finance: $.activeTab
                         }[section];
@@ -885,8 +908,8 @@ $.initDetailCharts = function() {
                             var target = document.querySelector('[data-subsection="' + section + '-' + tabVar.value + '"]');
                             if (target) target.classList.add('active');
                         }
-                        // templates-os / os-switch-logs 的 tabVar 不在上方映射中，单独高亮子项
-                        var subIdMap2 = { 'templates-os': 'templates-os', 'os-switch-logs': 'logs-os-switch' }[section];
+                        // templates-os 的 tabVar 不在上方映射中，单独高亮子项
+                        var subIdMap2 = { 'templates-os': 'templates-os' }[section];
                         if (subIdMap2) {
                             var t2 = document.querySelector('[data-subsection="' + subIdMap2 + '"]');
                             if (t2) t2.classList.add('active');
@@ -914,9 +937,6 @@ $.initDetailCharts = function() {
                         }
                         if (section === 'templates-os' && window.__admin.osTemplatePage) {
                             window.__admin.osTemplatePage.load();
-                        }
-                        if (section === 'os-switch-logs') {
-                            $.loadOsSwitchLogs(1);
                         }
                     }, 100);
                 }
@@ -1003,6 +1023,10 @@ $.initDetailCharts = function() {
                 if ($.activeTab.value === 'uapipro') {
                     $.loadUapiproConfig();
                 }
+                // 刷新后停留在安全防护·限速设置时主动加载配置（watch 不会在初始化时触发）
+                if ($.activeSection.value === 'security' && $.activeTabSecurity.value === 'ratelimit') {
+                    $.loadRateLimitConfig();
+                }
                 if ($.activeTab.value === 'orders') {
                     $.loadOrders(1);
                 }
@@ -1056,6 +1080,10 @@ $.initDetailCharts = function() {
             if (newTab === 'users') { $.loadUsers(1); }
         });
 
+        watch($.activeTabSecurity, function(newTab) {
+            localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB_SECURITY, newTab);
+        });
+
         watch($.activeTabPackages, function(newTab) {
             localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB_PACKAGES, newTab);
         });
@@ -1082,6 +1110,11 @@ $.initDetailCharts = function() {
             history.replaceState({}, '', url);
             if (val === 'port-forward') {
                 $.loadForwardRules('all');
+            }
+            // 安全防护·限速设置：点击侧边栏进入时加载（activeTabSecurity 默认即 ratelimit，
+            // watch(activeTabSecurity) 值不变不会触发，故挂在 section 变化上；刷新路径由 onMounted 分支覆盖）
+            if (val === 'security') {
+                $.loadRateLimitConfig();
             }
         });
 

@@ -109,6 +109,11 @@ router.post('/storage-groups', authMiddleware, adminMiddleware, async (req, res)
 
     var group = await db.storageGroups.create({ name: name, sort_order: sortOrder });
     clearDiskCache();
+    // 操作审计：创建存储分组
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.storage-group.create', resourceType: 'storage-group', resourceId: group.id, details: '创建存储分组:' + name, req });
+    } catch (e) {}
     res.json(group);
   } catch (e) {
     if (e && e.code === 'ER_DUP_ENTRY') {
@@ -139,6 +144,11 @@ router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, 
       await db.storageGroups.update(ids[i], { sort_order: i });
     }
     clearDiskCache();
+    // 操作审计：调整存储分组排序
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.storage-group.sort', resourceType: 'storage-group', details: '调整存储分组排序 ' + ids.length + ' 个', req });
+    } catch (e) {}
     res.json({ success: true });
   } catch (e) {
     console.error('[storage-groups] sort error:', e.message);
@@ -159,6 +169,11 @@ router.put('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, r
 
     var group = await db.storageGroups.update(id, { name: name, sort_order: sortOrder });
     clearDiskCache();
+    // 操作审计：编辑存储分组
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.storage-group.update', resourceType: 'storage-group', resourceId: id, details: '编辑存储分组:' + name, req });
+    } catch (e) {}
     res.json(group);
   } catch (e) {
     if (e && e.code === 'ER_DUP_ENTRY') {
@@ -182,6 +197,11 @@ router.delete('/storage-groups/:id', authMiddleware, adminMiddleware, async (req
 
     await db.storageGroups.delete(id);
     clearDiskCache();
+    // 操作审计：删除存储分组
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.storage-group.delete', resourceType: 'storage-group', resourceId: id, details: '删除存储分组 #' + id, req });
+    } catch (e) {}
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -240,6 +260,11 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
       description: data.description || null
     });
     clearDiskCache();
+    // 操作审计：创建磁盘规格（资金面定价，含单价）
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.spec.create', resourceType: 'disk-spec', resourceId: spec.id, details: '创建磁盘规格:' + data.name.trim() + '(' + data.disk_type + ',' + parseInt(data.min_size_gb) + '-' + parseInt(data.max_size_gb) + 'G,单价¥' + pricePerGbVal.toFixed(2) + '/G)', req });
+    } catch (e) {}
     res.json(spec);
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -281,6 +306,11 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
       description: data.description || null
     });
     clearDiskCache();
+    // 操作审计：编辑磁盘规格（资金面定价，含单价）
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.spec.update', resourceType: 'disk-spec', resourceId: id, details: '编辑磁盘规格:' + data.name.trim() + '(单价¥' + pricePerGbVal2.toFixed(2) + '/G)', req });
+    } catch (e) {}
     res.json(spec);
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -301,6 +331,11 @@ router.delete('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, re
 
     await db.diskSpecs.delete(id);
     clearDiskCache();
+    // 操作审计：删除磁盘规格
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.spec.delete', resourceType: 'disk-spec', resourceId: id, details: '删除磁盘规格 #' + id, req });
+    } catch (e) {}
     res.json({ success: true });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -336,6 +371,11 @@ router.put('/lifecycle-config', authMiddleware, adminMiddleware, async (req, res
     };
 
     var config = await db.diskLifecycleConfig.upsert(data);
+    // 操作审计：更新磁盘生命周期配置
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.lifecycle-config', resourceType: 'config', resourceId: 'disk-lifecycle', details: '更新磁盘生命周期配置(提醒' + data.warn_days + '天,宽限' + data.grace_days + '天,保留' + data.retention_days + '天,自动续费前' + data.auto_renew_days + '天)', req });
+    } catch (e) {}
     res.json(config);
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -348,6 +388,13 @@ router.put('/lifecycle-config', authMiddleware, adminMiddleware, async (req, res
 router.post('/disk-import', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     var report = await importExistingDisks();
+    // 操作审计：导入存量数据盘（含导入数量摘要）
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      var importedCount = report && typeof report.imported === 'number' ? report.imported
+        : (report && Array.isArray(report.disks) ? report.disks.length : '');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.import', resourceType: 'disk', details: '导入存量数据盘' + (importedCount !== '' ? ' ' + importedCount + ' 个' : ''), req });
+    } catch (e) {}
     res.json(report);
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -408,6 +455,11 @@ router.put('/admin/disks/:id', authMiddleware, adminMiddleware, async (req, res)
 
     // 重新获取完整信息
     var updated = await db.disks.getById(id);
+    // 操作审计：编辑磁盘（名称/分组/规格）
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.update', resourceType: 'disk', resourceId: id, details: '编辑磁盘 #' + id + '(名称:' + diskName + ')', req });
+    } catch (e) {}
     res.json(updated);
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -444,6 +496,12 @@ router.put('/admin/disks/batch/storage-group', authMiddleware, adminMiddleware, 
       }
     }
 
+    // 操作审计：批量修改磁盘存储分组
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.batch-storage-group', resourceType: 'disk', details: '批量修改 ' + updated + ' 个磁盘存储分组' + (group ? '(分组:' + group.name + ')' : ''), req });
+    } catch (e) {}
+
     res.json({ success: true, updated: updated, total: diskIds.length });
   } catch (e) {
     res.status(500).json({ error: safeError(e) });
@@ -464,6 +522,11 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
     // 已销毁的记录：硬删除
     if (disk.status === 'destroyed') {
       await db.disks.hardDelete(disk.id);
+      // 操作审计：硬删除已销毁磁盘记录
+      try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.destroy', resourceType: 'disk', resourceId: diskId, details: '清理已销毁磁盘记录 #' + diskId + '(' + (disk.disk_name || '') + ')', req });
+      } catch (e) {}
       return res.json({ success: true });
     }
 
@@ -608,6 +671,11 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
     });
 
     // 邮件通知：管理员操作硬盘销毁退款（仅退款金额>0时发送）
+    // 操作审计：销毁磁盘（资金操作，含退款金额与用户）
+    try {
+      const { auditLog } = require('../utils/audit-log');
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.destroy', resourceType: 'disk', resourceId: disk.id, details: '销毁磁盘 #' + disk.id + '(' + (disk.disk_name || '') + ')' + (refundAmount > 0 ? ' 退款 ¥' + refundAmount.toFixed(2) + ' 至用户[' + (user ? user.username : disk.user_id) + ']' : ' 无退款') + ':' + refundDesc, req });
+    } catch (e) {}
     if (refundAmount > 0) {
       try {
         var destroyUser = await db.users.getById(disk.user_id);

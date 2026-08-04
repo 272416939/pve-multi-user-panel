@@ -4,7 +4,7 @@ const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const dbg = require('../utils/debug');
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { startLxcBackupPolling, sendLxcRestoreNotification, startBackupPolling, startRestorePolling } = require('../services/backup-polling');
 const { safeError } = require('../utils/safe-error');
 const { takeDiskSnapshot } = require('../services/disk-audit');
@@ -15,7 +15,7 @@ router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         // V3-08 修复：列表类端点限速
-        const listRate = await checkRateLimit('ratelimit:lxc-backups:' + req.user.id, 30, 60000);
+        const listRate = await checkConfiguredRateLimit('lxc_backups', 'ratelimit:lxc-backups:' + req.user.id);
         if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
@@ -48,7 +48,7 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         const { notes, storage: reqStorage } = req.body;
 
         // V3-09 修复：备份操作用户级限速（5次/分钟）
-        const opRate = await checkRateLimit('ratelimit:backup-op:' + req.user.id, 5, 60000);
+        const opRate = await checkConfiguredRateLimit('backup_op', 'ratelimit:backup-op:' + req.user.id);
         if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试' });
  
         const allCts = await db.lxcContainers.getAll();
@@ -180,7 +180,7 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
         const vmid = parseInt(req.params.vmid);
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的容器 ID' });
         // V3-09 修复：恢复操作用户级限速（5次/分钟）
-        const restoreRate = await checkRateLimit('ratelimit:restore-op:' + req.user.id, 5, 60000);
+        const restoreRate = await checkConfiguredRateLimit('restore_op', 'ratelimit:restore-op:' + req.user.id);
         if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试' });
         const backupId = parseInt(req.params.id);
  
@@ -278,13 +278,18 @@ router.put('/admin/backup-config', authMiddleware, adminMiddleware, async (req, 
         max_per_vm: Math.max(1, parseInt(max_per_vm) || 3),
         daily_limit: Math.max(1, parseInt(daily_limit) || 3)
     });
+    // 操作审计：更新备份配置
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.backup', resourceType: 'config', resourceId: 'backup', details: '更新备份配置(存储:' + (default_storage || 'local') + ',每机上限:' + Math.max(1, parseInt(max_per_vm) || 3) + ',每日上限:' + Math.max(1, parseInt(daily_limit) || 3) + ')', req });
+    } catch (e) {}
     res.json({ message: '备份配置已保存' });
 });
 
 router.get('/vm/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表类端点限速
-        const listRate = await checkRateLimit('ratelimit:vm-backups:' + req.user.id, 30, 60000);
+        const listRate = await checkConfiguredRateLimit('vm_backups', 'ratelimit:vm-backups:' + req.user.id);
         if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
@@ -306,7 +311,7 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
         // V3-09 修复：备份操作用户级限速（5次/分钟）
-        const opRate = await checkRateLimit('ratelimit:backup-op:' + req.user.id, 5, 60000);
+        const opRate = await checkConfiguredRateLimit('backup_op', 'ratelimit:backup-op:' + req.user.id);
         if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
@@ -464,6 +469,11 @@ router.delete('/admin/backups/:id', authMiddleware, adminMiddleware, async (req,
         }
         await db.restoreTasks.deleteByBackupId(parseInt(req.params.id));
         await db.backups.delete(req.params.id);
+        // 操作审计：管理员删除备份
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.backup.delete', resourceType: 'backup', resourceId: parseInt(req.params.id), details: '删除备份 #' + parseInt(req.params.id) + '(VM ' + (backup.vm_id || '-') + ')', req });
+        } catch (e) {}
         res.json({ message: '备份已删除' });
     } catch (error) {
         res.status(500).json({ error: '删除备份失败' });
@@ -475,7 +485,7 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
         const vmid = parseInt(req.params.vmid);
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
         // V3-09 修复：恢复操作用户级限速（5次/分钟）
-        const restoreRate = await checkRateLimit('ratelimit:restore-op:' + req.user.id, 5, 60000);
+        const restoreRate = await checkConfiguredRateLimit('restore_op', 'ratelimit:restore-op:' + req.user.id);
         if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试' });
         const backupId = req.params.id;
         const backup = await db.backups.getById(backupId);
@@ -559,6 +569,11 @@ router.post('/admin/backups/cleanup', authMiddleware, adminMiddleware, async (re
                 deleted++;
             }
         }
+        // 操作审计：批量清理备份记录
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.backup.cleanup', resourceType: 'backup', details: '清理备份记录 ' + deleted + ' 条', req });
+        } catch (e) {}
         res.json({ message: `已清理 ${deleted} 条备份记录` });
     } catch (error) {
         console.error('清理备份记录失败:', error);

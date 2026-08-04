@@ -40,9 +40,11 @@ const App = {
         const txList = ref([]);
         const txTotal = ref(0);
         const txPage = ref(1);
+        const txPageSize = ref(20);
         const txFilter = ref({ start_time: '', end_time: '', trade_type: '', order_no: '' });
         const myOrders = ref([]);
         const orderPage = ref(1);
+        const orderPageSize = ref(20);
         const orderTotal = ref(0);
         const orderFilter = ref({ order_no: '', type: '', status: '' });
 
@@ -532,7 +534,7 @@ const App = {
         const loadTx = async (page) => {
             txPage.value = page || 1;
             try {
-                const params = { page: txPage.value, limit: 20 };
+                const params = { page: txPage.value, limit: txPageSize.value };
                 const f = txFilter.value;
                 if (f.start_time) params.start_time = f.start_time;
                 if (f.end_time) params.end_time = f.end_time;
@@ -543,6 +545,11 @@ const App = {
                 txTotal.value = res.total || 0;
             } catch (e) { console.error('加载交易明细失败', e); }
         };
+        // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+        const changeTxPageSize = (size) => {
+            txPageSize.value = size || 20;
+            loadTx(1);
+        };
 
         const copyOrderNo = (orderNo) => {
             if (navigator.clipboard) { navigator.clipboard.writeText(orderNo).then(() => alert('订单号已复制')); }
@@ -552,7 +559,7 @@ const App = {
         const loadMyOrders = async (page) => {
             orderPage.value = page || 1;
             try {
-                const params = { page: orderPage.value, limit: 20 };
+                const params = { page: orderPage.value, limit: orderPageSize.value };
                 if (orderFilter.value.order_no) params.order_no = orderFilter.value.order_no;
                 if (orderFilter.value.type) params.type = orderFilter.value.type;
                 if (orderFilter.value.status) params.status = orderFilter.value.status;
@@ -565,6 +572,11 @@ const App = {
                     orderTotal.value = res.total || 0;
                 }
             } catch (e) { console.error('加载订单失败', e); }
+        };
+        // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+        const changeOrderPageSize = (size) => {
+            orderPageSize.value = size || 20;
+            loadMyOrders(1);
         };
 
         // 初始化加载钱包数据
@@ -1370,8 +1382,8 @@ const App = {
             openDisableTwofa,
             disableTwofa,
             walletBalance, payMethods, rechargeAmount, rechargeMethod, rechargeSubmitting, rechargeError,
-            txList, txTotal, txPage, txFilter, myOrders, orderPage, orderTotal, orderFilter,
-            submitRecharge, loadTx, copyOrderNo, loadMyOrders,
+            txList, txTotal, txPage, txPageSize, txFilter, myOrders, orderPage, orderPageSize, orderTotal, orderFilter,
+            submitRecharge, loadTx, copyOrderNo, loadMyOrders, changeTxPageSize, changeOrderPageSize,
             rechargePendingOrderNo, rechargePendingAmount, rechargeResultType, rechargeResultTitle, rechargeResultAmount,
             rechargeQrLoading, rechargePayUrl, rechargeIsMobile,
             pollOrderStatus, cancelRecharge, closeRechargeResult, openMobilePay, checkPayStatus,

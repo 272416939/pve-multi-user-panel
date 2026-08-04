@@ -2,6 +2,57 @@ const { getRedisClient } = require('../api/redis');
 
 const memoryStore = new Map();
 
+// 限速配置缓存（60s TTL）：每个限速点每请求都触发检查，避免每请求查库
+// （参照 services/ip-location.js 的 enabledCache 模式，保存配置时调 invalidateRateLimitCache 立即生效）
+const RATE_CONFIG_TTL = 60 * 1000;
+let rateConfigCache = null;
+let rateConfigCacheTime = 0;
+
+/**
+ * 读取限速配置（总开关 + 各规则 enabled/max/windowSec），60s 内存缓存。
+ * DB 读取失败降级为「全开启 + 注册表默认值」——宁可保持限速，也不因配置故障裸奔。
+ */
+async function getRateLimitConfig() {
+    var now = Date.now();
+    if (rateConfigCache !== null && now - rateConfigCacheTime < RATE_CONFIG_TTL) {
+        return rateConfigCache;
+    }
+    try {
+        // 惰性 require，避免 middleware 与 api 层顶层循环依赖
+        rateConfigCache = await require('../api/db').config.getRateLimits();
+    } catch (e) {
+        console.warn('[rate-limiter] 读取限速配置失败，使用默认规则:', e.message);
+        var { RATE_LIMIT_RULES } = require('../constants');
+        var rules = {};
+        Object.keys(RATE_LIMIT_RULES).forEach(function(k) {
+            rules[k] = { enabled: true, max: RATE_LIMIT_RULES[k].max, windowSec: RATE_LIMIT_RULES[k].windowSec };
+        });
+        rateConfigCache = { master_enabled: true, rules: rules };
+    }
+    rateConfigCacheTime = now;
+    return rateConfigCache;
+}
+
+/** 失效限速配置缓存（保存配置后调用，让新配置立即生效） */
+function invalidateRateLimitCache() {
+    rateConfigCache = null;
+    rateConfigCacheTime = 0;
+}
+
+/**
+ * 配置化限速检查（安全防护·限速设置入口）
+ * @param {string} ruleKey - 规则 key（RATE_LIMIT_RULES 注册表白名单，单一来源 server/constants.js）
+ * @param {string} key - 限速计数 key（调用方按场景拼装，如 'ratelimit:login:'+ip+':'+username）
+ * 总开关或单规则关闭 → 直接放行；否则按配置（次数/时间窗）调 checkRateLimit
+ */
+async function checkConfiguredRateLimit(ruleKey, key) {
+    var cfg = await getRateLimitConfig();
+    if (!cfg.master_enabled) return { allowed: true };
+    var rule = cfg.rules[ruleKey];
+    if (!rule || !rule.enabled) return { allowed: true };
+    return checkRateLimit(key, rule.max, rule.windowSec * 1000);
+}
+
 /**
  * 限速器 Lua 脚本（原子操作）
  * INCR + EXPIRE 在一个 Lua 脚本中执行，避免竞态条件导致 TTL 丢失
@@ -81,4 +132,4 @@ function memoryRateLimit(key, maxAttempts, windowMs) {
     return { allowed: true };
 }
 
-module.exports = { checkRateLimit, getRateLimitScript };
+module.exports = { checkRateLimit, checkConfiguredRateLimit, getRateLimitScript, invalidateRateLimitCache };

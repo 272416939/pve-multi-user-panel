@@ -140,6 +140,11 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
                     batch_id: batchId
                 });
             }
+            // 操作审计：全站群发消息
+            try {
+                const { auditLog } = require('../utils/audit-log');
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.message.broadcast', resourceType: 'message', details: '群发消息 ' + users.length + ' 条(标题:' + safeTitle + ')', req });
+            } catch (e) {}
             res.json({ message: `已向 ${users.length} 个用户发送消息` });
             await unreadCache.clear();
             pushUnreadCount();
@@ -164,6 +169,11 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
                 });
                 sentCount++;
             }
+            // 操作审计：多选用户发送消息
+            try {
+                const { auditLog } = require('../utils/audit-log');
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.message.broadcast', resourceType: 'message', details: '发送消息 ' + sentCount + ' 条(标题:' + safeTitle + ')', req });
+            } catch (e) {}
             res.json({ message: `消息已发送给 ${sentCount} 个用户` });
             for (const uid of uidArr) { await unreadCache.del(String(parseInt(uid))); }
             pushUnreadCount();

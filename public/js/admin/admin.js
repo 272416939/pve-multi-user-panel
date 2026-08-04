@@ -8,6 +8,7 @@
     // ==================== 状态 ====================
     $.users = ref([]);
     $.userPage = ref(1);
+    $.userPageSize = ref(20);
     $.userTotal = ref(0);
     $.userFilter = ref({ keyword: '', role: '' });
     $.showCreateUser = ref(false);
@@ -29,7 +30,7 @@
     $.redisTesting = ref(false);
     $.cacheClearing = ref(false);
     // 用户日志上限配置
-    $.logConfigForm = ref({ keep_count: 5000 });
+    $.logConfigForm = ref({ keep_count: 5000, keep_admin_count: 5000 });
     $.logConfigSaving = ref(false);
     $.cdkList = ref([]);
     $.cdkForm = ref({ duration_days: 30, count: 1, expires_at: '' });
@@ -139,7 +140,7 @@
         var seq = ++$.userLoadSeq;
         $.userPage.value = page || 1;
         try {
-            var params = { page: $.userPage.value, limit: 20 };
+            var params = { page: $.userPage.value, limit: $.userPageSize.value };
             if ($.userFilter.value.keyword) params.keyword = $.userFilter.value.keyword;
             if ($.userFilter.value.role) params.role = $.userFilter.value.role;
             var res = await api('/users?' + new URLSearchParams(params));
@@ -157,6 +158,11 @@
         }
     };
     $.searchUsers = function() { $.loadUsers(1); };
+    // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+    $.changeUserPageSize = function(size) {
+        $.userPageSize.value = size || 20;
+        $.loadUsers(1);
+    };
 
     $.createUser = async function() {
         try {
@@ -373,11 +379,11 @@
         $.redisConfigSaving.value = false;
     };
 
-    // 用户日志上限配置
+    // 用户日志上限配置（用户操作按用户维度 / 后台操作按全站维度）
     $.loadLogConfig = async function() {
         try {
             var config = await api('/admin/log/config');
-            $.logConfigForm.value = { keep_count: config.keep_count || 5000 };
+            $.logConfigForm.value = { keep_count: config.keep_count || 5000, keep_admin_count: config.keep_admin_count || 5000 };
         } catch (e) {
             console.warn('日志配置加载失败:', e.message || e);
         }
@@ -690,16 +696,106 @@
         }
     };
 
+    // ==================== 安全防护·限速设置 ====================
+    $.rateLimitConfig = ref({ master_enabled: true, categories: [] });
+    $.rateLimitSaving = ref(false);
+
+    // 秒 → 显示值+单位（整小时→小时，整分钟→分钟，否则秒）；时间窗统一以秒存储
+    function secToWindowUI(sec) {
+        if (sec % 3600 === 0) return { windowValue: sec / 3600, windowUnit: 'hour' };
+        if (sec % 60 === 0) return { windowValue: sec / 60, windowUnit: 'min' };
+        return { windowValue: sec, windowUnit: 'sec' };
+    }
+    // 显示值+单位 → 秒
+    function windowUIToSec(value, unit) {
+        if (unit === 'hour') return value * 3600;
+        if (unit === 'min') return value * 60;
+        return value;
+    }
+
+    $.loadRateLimitConfig = async function() {
+        try {
+            var data = await api('/admin/rate-limit/config');
+            // 注入 windowValue/windowUnit 供表单编辑（原始秒值保留在 windowSec）
+            data.categories.forEach(function(cat) {
+                cat.rules.forEach(function(rule) {
+                    var ui = secToWindowUI(rule.windowSec);
+                    rule.windowValue = ui.windowValue;
+                    rule.windowUnit = ui.windowUnit;
+                });
+            });
+            $.rateLimitConfig.value = data;
+        } catch (e) {
+            console.error('加载限速配置失败', e);
+        }
+    };
+
+    $.saveRateLimitConfig = async function() {
+        if ($.rateLimitSaving.value) return;
+        var cfg = $.rateLimitConfig.value;
+        // 前端兜底校验（与后端一致：次数 1-10000，时间窗 1-86400 秒）
+        for (var i = 0; i < cfg.categories.length; i++) {
+            var cat = cfg.categories[i];
+            for (var j = 0; j < cat.rules.length; j++) {
+                var rule = cat.rules[j];
+                var max = parseInt(rule.max);
+                var windowSec = windowUIToSec(parseInt(rule.windowValue) || 0, rule.windowUnit);
+                if (!Number.isInteger(max) || max < 1 || max > 10000) {
+                    alert('规则「' + rule.label + '」限速次数须为 1-10000 的整数');
+                    return;
+                }
+                if (!Number.isInteger(windowSec) || windowSec < 1 || windowSec > 86400) {
+                    alert('规则「' + rule.label + '」时间窗须在 1 秒 ~ 24 小时之间');
+                    return;
+                }
+                rule.max = max;
+                rule.windowSec = windowSec;
+            }
+        }
+        $.rateLimitSaving.value = true;
+        try {
+            await api('/admin/rate-limit/config', {
+                method: 'PUT',
+                body: JSON.stringify({ master_enabled: !!cfg.master_enabled, categories: cfg.categories })
+            });
+            alert('限速配置保存成功');
+            await $.loadRateLimitConfig();
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        } finally {
+            $.rateLimitSaving.value = false;
+        }
+    };
+
+    // 恢复默认：将每条规则与总开关还原为服务端下发的 defaults（与系统内置一致）
+    $.resetRateLimitConfig = async function() {
+        if ($.rateLimitSaving.value) return;
+        var cfg = $.rateLimitConfig.value;
+        if (!cfg.categories || !cfg.categories.length) return;
+        cfg.master_enabled = true;
+        cfg.categories.forEach(function(cat) {
+            cat.rules.forEach(function(rule) {
+                rule.enabled = rule.defaults.enabled;
+                rule.max = rule.defaults.max;
+                rule.windowSec = rule.defaults.windowSec;
+                var ui = secToWindowUI(rule.windowSec);
+                rule.windowValue = ui.windowValue;
+                rule.windowUnit = ui.windowUnit;
+            });
+        });
+        await $.saveRateLimitConfig();
+    };
+
     // 财务管理 - 交易流水
-    $.financeFilter = ref({ start_time: '', end_time: '', pay_method: '', trade_type: '', order_no: '' });
-    $.transactionList = ref([]);
+    $.financeFilter = ref({ start_time: '', end_time: '', pay_method: '', trade_type: '', order_no: '' });    $.transactionList = ref([]);
     $.transactionTotal = ref(0);
     $.financePage = ref(1);
+    $.financePageSize = ref(20);
 
     $.loadTransactions = async function(page) {
         $.financePage.value = page || 1;
         try {
-            var params = { page: $.financePage.value, limit: 20 };
+            var params = { page: $.financePage.value, limit: $.financePageSize.value };
             var f = $.financeFilter.value;
             if (f.start_time) params.start_time = f.start_time;
             if (f.end_time) params.end_time = f.end_time;
@@ -712,6 +808,11 @@
         } catch (e) {
             console.error('加载流水失败', e);
         }
+    };
+    // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+    $.changeFinancePageSize = function(size) {
+        $.financePageSize.value = size || 20;
+        $.loadTransactions(1);
     };
 
     $.exportTransactions = async function() {
@@ -746,6 +847,7 @@
     // 订单管理
     $.orders = Vue.ref([]);
     $.orderPage = Vue.ref(1);
+    $.orderPageSize = Vue.ref(20);
     $.orderTotal = Vue.ref(0);
     $.orderFilter = Vue.reactive({ order_no: '', type: '', status: '', start_time: '', end_time: '' });
 
@@ -755,7 +857,7 @@
         try {
             var params = new URLSearchParams();
             params.set('page', page);
-            params.set('limit', '20');
+            params.set('limit', String($.orderPageSize.value));
             if ($.orderFilter.order_no) params.set('order_no', $.orderFilter.order_no);
             if ($.orderFilter.type) params.set('type', $.orderFilter.type);
             if ($.orderFilter.status) params.set('status', $.orderFilter.status);
@@ -765,6 +867,11 @@
             $.orders.value = data.rows || [];
             $.orderTotal.value = data.total || 0;
         } catch(e) { console.error('加载订单失败', e); }
+    };
+    // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+    $.changeOrderPageSize = function(size) {
+        $.orderPageSize.value = size || 20;
+        $.loadOrders(1);
     };
 
     $.exportOrders = async function() {
@@ -798,7 +905,7 @@
     $.osSwitchLogList = Vue.ref([]);
     $.osSwitchLogTotal = Vue.ref(0);
     $.osSwitchLogPage = Vue.ref(1);
-    $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '' });
+    $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '', username: '' });
     $.osSwitchLogSelected = Vue.reactive([]);
     $.osSwitchLogDetail = Vue.ref(null);
     const OS_SWITCH_LOG_LIMIT = 20;
@@ -807,10 +914,13 @@
         page = page || 1;
         $.osSwitchLogPage.value = page;
         try {
-            var params = '?page=' + page + '&limit=' + OS_SWITCH_LOG_LIMIT;
+            // 分页大小跟随日志中心统一设置（20/50/100，admin-logs.js 未加载时回退常量）
+            var pageSize = ($.logPageSize && $.logPageSize.value) ? $.logPageSize.value : OS_SWITCH_LOG_LIMIT;
+            var params = '?page=' + page + '&limit=' + pageSize;
             if ($.osSwitchLogFilter.status) params += '&status=' + encodeURIComponent($.osSwitchLogFilter.status);
             if ($.osSwitchLogFilter.vm_id) params += '&vm_id=' + encodeURIComponent($.osSwitchLogFilter.vm_id);
             if ($.osSwitchLogFilter.user_id) params += '&user_id=' + encodeURIComponent($.osSwitchLogFilter.user_id);
+            if ($.osSwitchLogFilter.username) params += '&username=' + encodeURIComponent($.osSwitchLogFilter.username);
             var res = await api('/admin/os-switch-logs' + params);
             if (res && res.success) {
                 $.osSwitchLogList.value = res.data || [];
@@ -831,6 +941,7 @@
         $.osSwitchLogFilter.status = '';
         $.osSwitchLogFilter.vm_id = '';
         $.osSwitchLogFilter.user_id = '';
+        $.osSwitchLogFilter.username = '';
         $.loadOsSwitchLogs(1);
     };
 

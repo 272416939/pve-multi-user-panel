@@ -429,7 +429,7 @@
 <!-- 套餐订购页 -->
 <div v-if="activeSection === 'order'">
     <div v-if="activeTabOrder === 'vm'">
-        <h4 class="mb-4">VM 虚拟机套餐</h4>
+        <h4 class="module-title">VM 虚拟机套餐</h4>
         <div v-for="grp in vmGroupedPackages" :key="grp.group_name" class="package-group-section">
             <h5 class="package-group-title" v-if="grp.group_name !== '默认'">{{ grp.group_name }}</h5>
             <div class="package-cards">
@@ -472,7 +472,7 @@
         <div class="package-empty" v-if="vmGroupedPackages.length === 0">暂无可用套餐</div>
     </div>
     <div v-if="activeTabOrder === 'lxc'">
-        <h4 class="mb-4">LXC 容器套餐</h4>
+        <h4 class="module-title">LXC 容器套餐</h4>
         <div v-for="grp in lxcGroupedPackages" :key="grp.group_name" class="package-group-section">
             <h5 class="package-group-title" v-if="grp.group_name !== '默认'">{{ grp.group_name }}</h5>
             <div class="package-cards">
@@ -535,7 +535,7 @@
                     </div>
                     <div v-if="deviceRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>
                     <div v-else class="table-responsive mb-0">
-                        <table class="table table-striped table-hover mb-0 table-align-center">
+                        <table class="table table-hover mb-0 table-align-center">
                             <thead><tr>
                                 <th>名称</th><th>目标 IP</th><th>内网端口</th><th>外网端口</th><th>协议</th><th>状态</th><th>操作</th>
                             </tr></thead>

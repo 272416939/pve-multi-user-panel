@@ -4,7 +4,6 @@ const router = express.Router();
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const { checkRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 // 单一来源：模板状态白名单统一走 constants（规范第七节）
 const { TEMPLATE_STATUS } = require('../constants');
@@ -191,6 +190,11 @@ router.post('/admin/os-templates', async (req, res) => {
             enabled: data.enabled === false ? 0 : 1,
             status: TEMPLATE_STATUS.includes(data.status) ? data.status : 'active'
         });
+        // 操作审计：创建 OS 模板
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.os-template.create', resourceType: 'os-template', resourceId: id, details: '创建OS模板:' + String(data.name || '') + '(模板VMID:' + templateVmid + ')', req });
+        } catch (e) {}
         res.json({ success: true, id });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -219,6 +223,11 @@ router.put('/admin/os-templates/:id', async (req, res) => {
             }
         }
         const result = await db.osTemplates.update(id, updates);
+        // 操作审计：更新 OS 模板
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.os-template.update', resourceType: 'os-template', resourceId: id, details: '更新OS模板:' + (existing.name || id) + (updates.enabled !== undefined ? '(启用:' + (updates.enabled ? '是' : '否') + ')' : ''), req });
+        } catch (e) {}
         res.json({ success: true, data: result });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -242,6 +251,11 @@ router.delete('/admin/os-templates/:id', async (req, res) => {
             });
         }
         await db.osTemplates.delete(id);
+        // 操作审计：删除 OS 模板
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.os-template.delete', resourceType: 'os-template', resourceId: id, details: '删除OS模板:' + (tpl.name || id), req });
+        } catch (e) {}
         res.json({ success: true, message: '已删除' });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -272,11 +286,13 @@ router.get('/admin/os-switch-logs', async (req, res) => {
             status: req.query.status,
             vm_id: req.query.vm_id,
             user_id: req.query.user_id,
+            username: (req.query.username || '').trim(),
             before_date: req.query.before_date
         };
         const logs = await db.vmOsSwitchLogs.getListWithPaging(filters);
-        const total = await db.vmOsSwitchLogs.countWithFilters(filters);
-        res.json({ success: true, data: logs, total, page: filters.page, limit: filters.limit });
+        // countWithFilters 返回 { c: N } 行对象，转数字 total（接口契约：total 为数字，供前端分页/条数统计）
+        const countRow = await db.vmOsSwitchLogs.countWithFilters(filters);
+        res.json({ success: true, data: logs, total: countRow ? (countRow.c || 0) : 0, page: filters.page, limit: filters.limit });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
     }
@@ -296,6 +312,11 @@ router.delete('/admin/os-switch-logs/:id', async (req, res) => {
             return res.status(400).json({ error: '该日志标记为需管理员介入，删除请加 ?force=1 二次确认' });
         }
         const result = await db.vmOsSwitchLogs.deleteById(id);
+        // 操作审计：删除系统切换日志
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.log.delete.os-switch', resourceType: 'os-switch-log', resourceId: id, details: '删除切换日志 #' + id, req });
+        } catch (e) {}
         res.json({ success: true, message: '日志已删除', deleted: result.deleted });
     } catch (e) {
         if (e.code === 'LOG_RUNNING') {
@@ -313,6 +334,11 @@ router.post('/admin/os-switch-logs/batch-delete', async (req, res) => {
             return res.status(400).json({ error: 'ids 必须是 1-500 长度的数组' });
         }
         const result = await db.vmOsSwitchLogs.batchDelete({ ids, status, vm_id, user_id, before_date });
+        // 操作审计：批量删除系统切换日志
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.log.delete.os-switch', resourceType: 'os-switch-log', details: '批量删除切换日志 ' + result.deleted + ' 条(跳过运行中 ' + result.skipped_running + ' 条)', req });
+        } catch (e) {}
         res.json({
             success: true,
             message: `已删除 ${result.deleted} 条，跳过 ${result.skipped_running} 条运行中日志`,
@@ -331,6 +357,11 @@ router.post('/admin/os-switch-logs/clear', async (req, res) => {
             return res.status(400).json({ error: '高危操作，请传入 confirm: "CLEAR_ALL_OS_SWITCH_LOGS" 二次确认' });
         }
         const result = await db.vmOsSwitchLogs.clearAllExceptRunningAndIntervention();
+        // 操作审计：清空系统切换日志
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.log.clear.os-switch', resourceType: 'os-switch-log', details: '清空切换日志 ' + result.deleted + ' 条(保留运行中 ' + result.skipped_running + ' + 需介入 ' + result.skipped_intervention + ')', req });
+        } catch (e) {}
         res.json({
             success: true,
             message: `已清空 ${result.deleted} 条，保留 ${result.skipped_running} 条运行中 + ${result.skipped_intervention} 条需介入日志`,

@@ -229,15 +229,17 @@ async function recoverOsSwitchTasks() {
     }
 }
 
-// 日志容量清理：每用户保留最新 log:keep_count 条（默认 5000），超限自动循环清理旧日志防写爆数据库
+// 日志容量清理：每用户保留最新 log:keep_count 条（默认 5000），后台操作日志按全站
+// log:keep_admin_count 条（默认 5000）独立收敛，超限自动循环清理旧日志防写爆数据库
 async function trimLogsKeepLatest() {
     try {
         var db = require('../api/db');
         var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
-        var auditDeleted = await db.auditLogs.trimOverflow(keepCount);
+        var keepAdminCount = parseInt(await db.config.get('log:keep_admin_count')) || 5000;
+        var auditDeleted = await db.auditLogs.trimOverflow(keepCount, keepAdminCount);
         var loginDeleted = await db.loginLogs.trimOverflow(keepCount);
         if (auditDeleted > 0 || loginDeleted > 0) {
-            console.log('[日志清理] 操作日志清理 ' + auditDeleted + ' 条，登录日志清理 ' + loginDeleted + ' 条（每用户保留最新 ' + keepCount + ' 条）');
+            console.log('[日志清理] 操作日志清理 ' + auditDeleted + ' 条（每用户保留最新 ' + keepCount + ' 条，后台操作全站保留最新 ' + keepAdminCount + ' 条），登录日志清理 ' + loginDeleted + ' 条');
         }
     } catch (e) {
         console.error('[日志清理] 失败:', e.message);

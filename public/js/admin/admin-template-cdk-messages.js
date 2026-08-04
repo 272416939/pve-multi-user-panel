@@ -94,8 +94,8 @@
                             </div>
                         </div>
 
-                        <div class="card">
-                            <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="table-container mb-4" style="padding:12px;">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
                                 <h5 class="mb-0">CDK 列表（{{ cdkList.length }}）</h5>
                                 <div v-if="selectedCdkIds.length > 0" class="d-flex align-items-center gap-2">
                                     <span class="text-muted small">已选 {{ selectedCdkIds.length }} 个</span>
@@ -103,7 +103,7 @@
                                 </div>
                             </div>
                             <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
-                                <table class="table table-striped mb-0 table-sm table-align-center">
+                                <table class="table table-hover mb-0 table-sm table-align-center">
                                     <thead style="position: sticky; top: 0;">
                                         <tr>
                                             <th class="checkbox-col">
@@ -162,7 +162,9 @@
                     <div v-if="activeTab === 'messages'">
                         <div class="row justify-content-center">
                             <div class="col-md-8">
-                                <h4 class="module-title">消息管理</h4>
+                                <div class="module-header">
+                                    <h4 class="module-title">消息管理</h4>
+                                </div>
                                 <div class="card">
                                     <div class="card-body">
                                         <form @submit.prevent="sendAdminMessage">

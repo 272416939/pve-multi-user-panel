@@ -4,7 +4,9 @@
 <div v-if="activeSection === 'system-update'">
                     <!-- 系统更新 -->
                     <div>
-                        <h4 class="module-title">系统更新</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">系统更新</h4>
+                        </div>
 
                         <!-- 当前版本 -->
                         <div class="card mb-3">

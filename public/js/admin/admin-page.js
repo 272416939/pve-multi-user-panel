@@ -205,8 +205,8 @@ app.config.errorHandler = function(err, instance, info) {
 app.component('port-forward-list', {
     template: '\
         <div>\
-<div class="d-flex justify-content-between align-items-center mb-3">\
-	                <h4 class="mb-0">端口转发管理</h4>\
+<div class="module-header">\
+	                <h4 class="module-title">端口转发管理</h4>\
 	                <div class="d-flex align-items-center gap-2">\
 	                    <select class="form-select form-select-sm" style="width:auto" v-model="forwardFilterType" @change="filterForward">\
 	                        <option value="all">全部</option>\
@@ -221,8 +221,9 @@ app.component('port-forward-list', {
             </div>\
             <div v-if="forwardRulesLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>\
             <div v-else-if="forwardRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>\
-            <div v-else class="table-responsive">\
-                <table class="table table-striped table-hover table-align-center">\
+            <div v-else class="table-container mb-4" style="padding:12px;">\
+                <div class="table-responsive">\
+                <table class="table table-hover table-align-center">\
                     <thead>\
                         <tr>\
                             <th v-if="userRole === \'admin\'" class="checkbox-col"><input type="checkbox" @change="toggleAll"></th>\
@@ -266,20 +267,10 @@ app.component('port-forward-list', {
                         </tr>\
                     </tbody>\
                 </table>\
+                </div>\
+                <!-- 分页：通用分页条（pv-pagination 单一实现） -->\
+                <pv-pagination :total="forwardTotal" :page="forwardPage" :page-size="forwardPageSize" @change="setPage"></pv-pagination>\
             </div>\
-            <nav v-if="forwardTotal > forwardPageSize" class="mt-2">\
-                <ul class="pagination pagination-sm justify-content-center mb-0">\
-                    <li class="page-item" :class="{ disabled: forwardPage <= 1 }">\
-                        <button class="page-link" @click="prevPage">上一页</button>\
-                    </li>\
-                    <li class="page-item disabled">\
-                        <span class="page-link">{{ forwardPage }} / {{ Math.ceil(forwardTotal / forwardPageSize) }}</span>\
-                    </li>\
-                    <li class="page-item" :class="{ disabled: forwardPage >= Math.ceil(forwardTotal / forwardPageSize) }">\
-                        <button class="page-link" @click="nextPage">下一页</button>\
-                    </li>\
-                </ul>\
-            </nav>\
             <div class="text-muted small" v-if="userRole !== \'admin\'">\
                 已使用 {{ userForwardCount }} / {{ maxForwardPerUser }} 条\
             </div>\
@@ -325,6 +316,7 @@ app.component('port-forward-list', {
         },
         prevPage() { if ($.forwardPage.value > 1) $.forwardPage.value--; },
         nextPage() { $.forwardPage.value++; },
+        setPage(p) { if (p >= 1) $.forwardPage.value = p; },
         editForward(rule) {
             $.isEditingForward.value = true;
             Object.assign($.forwardForm, {

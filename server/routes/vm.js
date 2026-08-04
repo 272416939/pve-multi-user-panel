@@ -12,7 +12,7 @@ const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindin
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError, sanitizeErrorMsg } = require('../utils/safe-error');
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { withTransaction } = require('../utils/with-transaction');
 const osSwitchUtils = require('../services/os-switch');
 const { generateOrderNo } = require('../utils/order-utils');
@@ -65,7 +65,7 @@ router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
 router.get('/user/vms', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
-        var listRate = await checkRateLimit('ratelimit:user-vms:' + req.user.id, 10, 60000);
+        var listRate = await checkConfiguredRateLimit('user_vms', 'ratelimit:user-vms:' + req.user.id);
         if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
 
         let userVms;
@@ -319,11 +319,17 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
             await pveApi.startVm(parseInt(vm_id));
             dbg(`虚拟机 ${vm_id} 已自动开机（分配后）`);
         }
-    } catch (startError) {
-        console.error(`虚拟机 ${vm_id} 自动开机失败:`, startError.message);
-    }
-    
-	    res.json(newVm);
+	    } catch (startError) {
+	        console.error(`虚拟机 ${vm_id} 自动开机失败:`, startError.message);
+	    }
+	    
+	    // 操作审计：管理员创建/分配 VM
+	    try {
+	        const { auditLog } = require('../utils/audit-log');
+	        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.vm.create', resourceType: 'vm', resourceId: parsedVmId, details: '为 用户#' + parsedUserId + ' 创建 VM #' + parsedVmId + '(' + (name || 'VM ' + vm_id) + (expiration_date ? ',到期:' + expiration_date : '') + ')', req });
+	    } catch (e) {}
+	    
+		    res.json(newVm);
 
 		    // 异步更新磁盘快照（不阻塞响应）
 		    takeDiskSnapshot(parsedVmId, parsedUserId).catch(function(err) {
@@ -728,7 +734,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
 router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：状态查询端点限速（30次/分钟，前端正常轮询远低于该值）
-        var statusRate = await checkRateLimit('ratelimit:vm-status:' + req.user.id, 30, 60000);
+        var statusRate = await checkConfiguredRateLimit('vm_status', 'ratelimit:vm-status:' + req.user.id);
         if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
 
         const vmid = parseInt(req.params.vmid);
@@ -1007,7 +1013,7 @@ try {
     // POST /vm/:vmid/switch-os — 用户切换系统
     router.post('/vm/:vmid/switch-os', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
-        const rateLimit = await checkRateLimit('ratelimit:os-switch:' + req.user.id, 5, 60000);
+        const rateLimit = await checkConfiguredRateLimit('os_switch', 'ratelimit:os-switch:' + req.user.id);
         if (!rateLimit.allowed) {
             return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
         }
@@ -1130,7 +1136,7 @@ try {
     // GET /vm/:vmid/switch-os/status — 查询切换进度
     router.get('/vm/:vmid/switch-os/status', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
-        const rateLimit = await checkRateLimit('ratelimit:os-switch-status:' + req.user.id, 30, 60000);
+        const rateLimit = await checkConfiguredRateLimit('os_switch_status', 'ratelimit:os-switch-status:' + req.user.id);
         if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁' });
         const vm = await db.vms.getByVmid(vmid);
         if (!vm) return res.status(404).json({ error: '虚拟机不存在' });

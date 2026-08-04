@@ -129,7 +129,47 @@ const config = {
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['redis:prefix', redisConfig.prefix ?? 'pve:']);
     },
     get: async (key) => (await queryOne('SELECT value FROM config WHERE `key` = ?', [key]))?.value,
-    set: (key, value) => execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', [key, value])
+    set: (key, value) => execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', [key, value]),
+
+    // ========== 限速配置（安全防护·限速设置） ==========
+    // 键规则：ratelimit:master_enabled（总开关）+ ratelimit:<ruleKey>:enabled/max/window，
+    // 规则白名单与默认值单一来源 server/constants.js 的 RATE_LIMIT_RULES
+    getRateLimits: async () => {
+        const { RATE_LIMIT_RULES } = require('../constants');
+        const keys = ['ratelimit:master_enabled'];
+        Object.keys(RATE_LIMIT_RULES).forEach(ruleKey => {
+            keys.push('ratelimit:' + ruleKey + ':enabled', 'ratelimit:' + ruleKey + ':max', 'ratelimit:' + ruleKey + ':window');
+        });
+        const placeholders = keys.map(() => '?').join(',');
+        const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+        const map = {};
+        rows.forEach(r => { map[r.key] = r.value; });
+        const rules = {};
+        Object.keys(RATE_LIMIT_RULES).forEach(ruleKey => {
+            const rule = RATE_LIMIT_RULES[ruleKey];
+            rules[ruleKey] = {
+                enabled: map['ratelimit:' + ruleKey + ':enabled'] !== '0',
+                max: parseInt(map['ratelimit:' + ruleKey + ':max']) || rule.max,
+                windowSec: parseInt(map['ratelimit:' + ruleKey + ':window']) || rule.windowSec
+            };
+        });
+        return {
+            master_enabled: map['ratelimit:master_enabled'] !== '0',
+            rules
+        };
+    },
+    setRateLimits: async (payload) => {
+        const { RATE_LIMIT_RULES } = require('../constants');
+        // 白名单兜底：未知 ruleKey 一律跳过（路由层已校验，这里防绕过）
+        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ratelimit:master_enabled', payload.master_enabled ? '1' : '0']);
+        for (const ruleKey of Object.keys(payload.rules || {})) {
+            if (!RATE_LIMIT_RULES[ruleKey]) continue;
+            const rule = payload.rules[ruleKey];
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ratelimit:' + ruleKey + ':enabled', rule.enabled ? '1' : '0']);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ratelimit:' + ruleKey + ':max', String(rule.max)]);
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ratelimit:' + ruleKey + ':window', String(rule.windowSec)]);
+        }
+    }
 };
 
 // 刷新令牌操作

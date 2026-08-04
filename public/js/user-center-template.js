@@ -144,12 +144,13 @@
                                 <pv-button variant="danger" size="sm" @click="clearAllMessages">清空已读</pv-button>
                             </div>
                         </div>
-                        <ul class="nav nav-pills mb-3" style="gap:4px">
-                            <li class="nav-item"><pv-button :class="{ active: msgType === 'all' }" @click="msgType = 'all'; loadMessages()">全部</pv-button></li>
-                            <li class="nav-item"><pv-button :class="{ active: msgType === '1' }" @click="msgType = '1'; loadMessages()">系统公告</pv-button></li>
-                            <li class="nav-item"><pv-button :class="{ active: msgType === '2' }" @click="msgType = '2'; loadMessages()">业务通知</pv-button></li>
-                            <li class="nav-item"><pv-button :class="{ active: msgType === '3' }" @click="msgType = '3'; loadMessages()">续费提醒</pv-button></li>
-                            <li class="nav-item"><pv-button :class="{ active: msgType === '5' }" @click="msgType = '5'; loadMessages()">客服私聊</pv-button></li>
+                        <!-- 消息类型 tabs：与 admin 日志中心一致的玻璃渐变药丸样式（nav-tabs） -->
+                        <ul class="nav nav-tabs mb-3">
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === 'all' }" href="#" @click.prevent="msgType = 'all'; loadMessages()">全部</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '1' }" href="#" @click.prevent="msgType = '1'; loadMessages()">系统公告</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '2' }" href="#" @click.prevent="msgType = '2'; loadMessages()">业务通知</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '3' }" href="#" @click.prevent="msgType = '3'; loadMessages()">续费提醒</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '5' }" href="#" @click.prevent="msgType = '5'; loadMessages()">客服私聊</a></li>
                         </ul>
                         <div v-if="messagesLoading" class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
@@ -283,8 +284,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">交易明细</h4>
                         </div>
-                        <div class="card">
-                            <div class="card-body">
+                        <div class="table-container mb-4" style="padding:12px;">
                                 <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">开始时间</label>
@@ -332,15 +332,8 @@
                                         </tbody>
                                     </table>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center mt-3" v-if="txTotal > 0">
-                                    <small class="text-muted">共 {{ txTotal }} 条</small>
-                                    <div>
-                                        <pv-button variant="outline" size="sm" :disabled="txPage <= 1" @click="loadTx(txPage - 1)">上一页</pv-button>
-                                        <span class="mx-2 text-muted small">{{ txPage }} / {{ Math.ceil(txTotal / 20) || 1 }}</span>
-                                        <pv-button variant="outline" size="sm" :disabled="txPage * 20 >= txTotal" @click="loadTx(txPage + 1)">下一页</pv-button>
-                                    </div>
-                                </div>
-                            </div>
+                                <!-- 分页：通用分页条（pv-pagination 单一实现） -->
+                                <pv-pagination :total="txTotal" :page="txPage" :page-size="txPageSize" @change="loadTx" @page-size-change="changeTxPageSize"></pv-pagination>
                         </div>
                     </div>
                 </div>
@@ -353,8 +346,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h4 class="mb-0">我的订单</h4>
                         </div>
-                        <div class="card">
-                            <div class="card-body pb-0">
+                        <div class="table-container mb-4" style="padding:12px;">
                                 <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
                                         <label class="form-label small mb-1">订单号</label>
@@ -384,7 +376,6 @@
                                         <pv-button @click="orderFilter={order_no:'',type:'',status:''};loadMyOrders(1)" variant="outline" size="sm">重置</pv-button>
                                     </div>
                                 </div>
-                            </div>
                             <div class="table-responsive">
                                     <table class="table table-hover table-sm mb-0 table-align-center">
                                         <thead><tr><th>订单号</th><th>套餐/产品</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>状态</th><th>时间</th></tr></thead>
@@ -403,16 +394,8 @@
                                     </tbody>
                                 </table>
                             </div>
-                            <div class="card-body">
-                                <div class="d-flex justify-content-between align-items-center mt-3" v-if="orderTotal > 0">
-                                    <small class="text-muted">共 {{ orderTotal }} 条</small>
-                                    <div>
-                                        <pv-button variant="outline" size="sm" :disabled="orderPage <= 1" @click="loadMyOrders(orderPage - 1)">上一页</pv-button>
-                                        <span class="mx-2 text-muted small">{{ orderPage }} / {{ Math.ceil(orderTotal / 20) || 1 }}</span>
-                                        <pv-button variant="outline" size="sm" :disabled="orderPage * 20 >= orderTotal" @click="loadMyOrders(orderPage + 1)">下一页</pv-button>
-                                    </div>
-                                </div>
-                            </div>
+                            <!-- 分页：通用分页条（pv-pagination 单一实现） -->
+                            <pv-pagination :total="orderTotal" :page="orderPage" :page-size="orderPageSize" @change="loadMyOrders" @page-size-change="changeOrderPageSize"></pv-pagination>
                         </div>
                     </div>
                 </div>
@@ -421,9 +404,8 @@
             <div v-if="activeSubTab === 'security'">
                 <div class="row justify-content-center">
                     <div class="col-md-8">
-                        <div class="card mb-4">
-                            <div class="card-body">
-                                <h5 class="card-title mb-3">登录设备管理</h5>
+                        <div class="table-container mb-4" style="padding:12px;">
+                                <h5 class="mb-3">登录设备管理</h5>
                                 <div v-if="devicesLoading" class="text-center py-3">
                                     <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
                                 </div>
@@ -431,7 +413,7 @@
                                     暂无登录设备记录
                                 </div>
                                 <div v-else class="table-responsive">
-                                    <table class="table table-sm mb-0 table-align-center">
+                                    <table class="table table-sm table-hover mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>设备</th>
@@ -459,7 +441,6 @@
                                 <div v-if="devices.length > 0" class="mt-2">
                                     <pv-button variant="secondary" size="sm" @click="revokeOtherDevices">下线其他设备</pv-button>
                                 </div>
-                            </div>
                         </div>
 
                         <div class="card">
@@ -638,6 +619,7 @@
                                     <svg class="me-2 flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                                     <span>请立即保存这些恢复码！每个恢复码只能使用一次。</span>
                                 </div>
+                                <div class="table-container mb-3" style="padding:12px;">
                                 <table class="table table-sm table-hover table-align-center">
                                     <thead><tr><th>#</th><th>恢复码</th><th>状态</th><th>创建时间</th></tr></thead>
                                     <tbody>
@@ -652,6 +634,7 @@
                                         </tr>
                                     </tbody>
                                 </table>
+                                </div>
                                 <div class="d-flex gap-2 mt-3">
                                     <pv-button variant="secondary" size="sm" @click="copyRecoveryCodes">复制全部</pv-button>
                                     <pv-button variant="outline" size="sm" @click="downloadRecoveryCodes">下载</pv-button>

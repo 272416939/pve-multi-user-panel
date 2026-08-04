@@ -13,7 +13,7 @@ const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = requir
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError } = require('../utils/safe-error');
-const { checkRateLimit } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
 // 单一来源：周期白名单统一走 constants（规范第七节）
@@ -60,7 +60,7 @@ router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 router.get('/user/lxc', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
-        const listRate = await checkRateLimit('ratelimit:user-lxc:' + req.user.id, 10, 60000);
+        const listRate = await checkConfiguredRateLimit('user_lxc', 'ratelimit:user-lxc:' + req.user.id);
         if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
 
         let userCts;
@@ -305,6 +305,12 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
             }
         }
     } catch (e) { console.error(`LXC ${parsedCtId} DHCP 静态绑定失败:`, e.message); }
+
+    // 操作审计：管理员创建/分配 LXC
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.lxc.create', resourceType: 'lxc', resourceId: parsedCtId, details: '为 用户#' + parsedUserId + ' 创建 LXC #' + parsedCtId + '(' + (name || 'CT ' + ct_id) + (expiration_date ? ',到期:' + expiration_date : '') + ')', req });
+    } catch (e) {}
 
     res.json(newCt);
     } catch (e) {
@@ -734,7 +740,7 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
 router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：状态查询端点限速（30次/分钟）
-        const statusRate = await checkRateLimit('ratelimit:lxc-status:' + req.user.id, 30, 60000);
+        const statusRate = await checkConfiguredRateLimit('lxc_status', 'ratelimit:lxc-status:' + req.user.id);
         if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
 
         const vmid = parseInt(req.params.vmid);
@@ -823,7 +829,13 @@ router.post('/lxc/create', authMiddleware, adminMiddleware, async (req, res) => 
  
         const result = await pveApi.createLxc(params);
         const upid = result.data;
- 
+
+        // 操作审计：管理员直开 LXC（PVE 层创建）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.lxc.create', resourceType: 'lxc', resourceId: newVmid, details: 'PVE直开 LXC #' + newVmid + '(' + (hostname || '') + ',' + (cores || 1) + '核/' + (memory || 512) + 'M/' + (disk || 8) + 'G,模板:' + ostemplate + ')', req });
+        } catch (e) {}
+
         res.json({ upid, ct_id: newVmid, message: 'LXC 容器创建任务已提交' });
     } catch (error) {
         console.error('创建 LXC 容器失败:', error.response?.data || error.message);

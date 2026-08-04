@@ -7,7 +7,7 @@ var { authMiddleware, adminMiddleware } = require('../middleware/auth');
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
 var cacheStore = require('../utils/cache-store');
-var { checkRateLimit } = require('../middleware/rate-limiter');
+var { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 // 单一来源：周期常量统一走 constants（规范第七节）
 var { VALID_PERIODS } = require('../constants');
@@ -17,6 +17,20 @@ var provisioning = require('../services/provisioning');
 // 套餐列表缓存（5 分钟 TTL，低频变更场景；cache-store 按 namespace 单例，与 service 共享）
 var vmPackageCache = cacheStore.create('vm_packages', 300);
 var lxcPackageCache = cacheStore.create('lxc_packages', 300);
+
+// 操作审计统一封装（敏感写操作埋点，失败不影响主流程；规范十一）
+async function adminAudit(req, action, details) {
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({ userId: req.user.id, username: req.user.username, action: action, details: details, req });
+    } catch (e) {}
+}
+
+// 套餐规格摘要（埋点详情适配：名称 + 核心/内存/磁盘/月付价格）
+function packageSpec(p) {
+    var memG = Math.round((parseInt(p && p.memory) || 0) / 1024);
+    return (p && p.name || '') + '(' + (parseInt(p && p.cores) || 0) + '核/' + memG + 'G/' + (parseInt(p && p.disk_size) || 0) + 'G' + (p && p.monthly_price !== undefined && p.monthly_price !== null ? '/月付¥' + p.monthly_price : '') + ')';
+}
 
 // ===== 用户侧：套餐列表（无需 admin） =====
 router.get('/vm-packages', authMiddleware, async (req, res) => {
@@ -154,15 +168,33 @@ router.get('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, re
 });
 
 router.post('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { var r = await db.vmPackages.create(req.body); await vmPackageCache.del('all'); res.json(r); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        var r = await db.vmPackages.create(req.body);
+        await vmPackageCache.del('all');
+        // 操作审计：创建 VM 套餐
+        await adminAudit(req, 'admin.package.create', '创建VM套餐:' + packageSpec(req.body));
+        res.json(r);
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.put('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { var r = await db.vmPackages.update(parseInt(req.params.id), req.body); await vmPackageCache.del('all'); res.json(r); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        var r = await db.vmPackages.update(parseInt(req.params.id), req.body);
+        await vmPackageCache.del('all');
+        // 操作审计：更新 VM 套餐
+        await adminAudit(req, 'admin.package.update', '更新VM套餐 #' + parseInt(req.params.id) + ':' + packageSpec(req.body));
+        res.json(r);
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.delete('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { await db.vmPackages.delete(parseInt(req.params.id)); await vmPackageCache.del('all'); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        await db.vmPackages.delete(parseInt(req.params.id));
+        await vmPackageCache.del('all');
+        // 操作审计：删除 VM 套餐
+        await adminAudit(req, 'admin.package.delete', '删除VM套餐 #' + parseInt(req.params.id));
+        res.json({ message: '已删除' });
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.post('/admin/vm-packages/reorder', authMiddleware, adminMiddleware, async (req, res) => {
@@ -179,6 +211,8 @@ router.post('/admin/vm-packages/reorder', authMiddleware, adminMiddleware, async
         }
         await db.vmPackages.batchUpdateSortOrder(ids);
         await vmPackageCache.del('all');
+        // 操作审计：调整 VM 套餐排序
+        await adminAudit(req, 'admin.package.reorder', '调整VM套餐排序 ' + ids.length + ' 个');
         res.json({ success: true });
     } catch (e) {
         console.error('[package] vm-packages reorder error:', e.message);
@@ -210,6 +244,8 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         if (!result.ok) {
             return res.status(result.status).json({ error: result.error });
         }
+        // 操作审计：管理员代开 VM（资源创建，含套餐/用户）
+        await adminAudit(req, 'admin.order.provision', '为 用户#' + (parseInt(req.body.user_id) || '-') + ' 代开 VM(套餐#' + parseInt(req.params.id) + ')' + (result.data && result.data.vmid ? ',VMID:' + result.data.vmid : ''));
         res.json(result.data);
     } catch (e) {
         console.error('[package] VM 套餐开通失败:', e.message);
@@ -229,15 +265,33 @@ router.get('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, r
 });
 
 router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, res) => {
-    try { var r = await db.lxcPackages.create(req.body); await lxcPackageCache.del('all'); res.json(r); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        var r = await db.lxcPackages.create(req.body);
+        await lxcPackageCache.del('all');
+        // 操作审计：创建 LXC 套餐
+        await adminAudit(req, 'admin.package.create', '创建LXC套餐:' + packageSpec(req.body));
+        res.json(r);
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.put('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { var r = await db.lxcPackages.update(parseInt(req.params.id), req.body); await lxcPackageCache.del('all'); res.json(r); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        var r = await db.lxcPackages.update(parseInt(req.params.id), req.body);
+        await lxcPackageCache.del('all');
+        // 操作审计：更新 LXC 套餐
+        await adminAudit(req, 'admin.package.update', '更新LXC套餐 #' + parseInt(req.params.id) + ':' + packageSpec(req.body));
+        res.json(r);
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.delete('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try { await db.lxcPackages.delete(parseInt(req.params.id)); await lxcPackageCache.del('all'); res.json({ message: '已删除' }); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try {
+        await db.lxcPackages.delete(parseInt(req.params.id));
+        await lxcPackageCache.del('all');
+        // 操作审计：删除 LXC 套餐
+        await adminAudit(req, 'admin.package.delete', '删除LXC套餐 #' + parseInt(req.params.id));
+        res.json({ message: '已删除' });
+    } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
 
 router.post('/admin/lxc-packages/reorder', authMiddleware, adminMiddleware, async (req, res) => {
@@ -254,6 +308,8 @@ router.post('/admin/lxc-packages/reorder', authMiddleware, adminMiddleware, asyn
         }
         await db.lxcPackages.batchUpdateSortOrder(ids);
         await lxcPackageCache.del('all');
+        // 操作审计：调整 LXC 套餐排序
+        await adminAudit(req, 'admin.package.reorder', '调整LXC套餐排序 ' + ids.length + ' 个');
         res.json({ success: true });
     } catch (e) {
         console.error('[package] lxc-packages reorder error:', e.message);
@@ -285,6 +341,8 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         if (!result.ok) {
             return res.status(result.status).json({ error: result.error });
         }
+        // 操作审计：管理员代开 LXC（资源创建，含套餐/用户）
+        await adminAudit(req, 'admin.order.provision', '为 用户#' + (parseInt(req.body.user_id) || '-') + ' 代开 LXC(套餐#' + parseInt(req.params.id) + ')' + (result.data && result.data.ctid ? ',CTID:' + result.data.ctid : ''));
         res.json(result.data);
     } catch (e) {
         console.error('[package] LXC 套餐开通失败:', e.message);
@@ -304,6 +362,8 @@ router.get('/admin/package-groups', authMiddleware, adminMiddleware, async (req,
 router.post('/admin/package-groups', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var r = await db.packageGroups.create(req.body);
+        // 操作审计：创建套餐分组
+        await adminAudit(req, 'admin.package-group.create', '创建套餐分组:' + (req.body.name || r.id) + '(类型:' + (req.body.type || '-') + ')');
         res.json(r);
     } catch (e) { console.error('[package] create group error:', e.message); res.status(500).json({ error: safeError(e) }); }
 });
@@ -311,6 +371,8 @@ router.post('/admin/package-groups', authMiddleware, adminMiddleware, async (req
 router.put('/admin/package-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var r = await db.packageGroups.update(parseInt(req.params.id), req.body);
+        // 操作审计：更新套餐分组
+        await adminAudit(req, 'admin.package-group.update', '更新套餐分组 #' + parseInt(req.params.id) + ':' + (req.body.name || ''));
         res.json(r);
     } catch (e) { console.error('[package] update group error:', e.message); res.status(500).json({ error: safeError(e) }); }
 });
@@ -318,6 +380,8 @@ router.put('/admin/package-groups/:id', authMiddleware, adminMiddleware, async (
 router.delete('/admin/package-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         await db.packageGroups.delete(parseInt(req.params.id));
+        // 操作审计：删除套餐分组
+        await adminAudit(req, 'admin.package-group.delete', '删除套餐分组 #' + parseInt(req.params.id));
         res.json({ message: '已删除' });
     } catch (e) { console.error('[package] delete group error:', e.message); res.status(500).json({ error: safeError(e) }); }
 });
@@ -335,6 +399,8 @@ router.post('/admin/package-groups/reorder', authMiddleware, adminMiddleware, as
             }
         }
         await db.packageGroups.batchUpdateSortOrder(ids);
+        // 操作审计：调整套餐分组排序
+        await adminAudit(req, 'admin.package-group.reorder', '调整套餐分组排序 ' + ids.length + ' 个');
         res.json({ success: true });
     } catch (e) {
         console.error('[package] package-groups reorder error:', e.message);
@@ -352,7 +418,7 @@ router.get('/provision-status', authMiddleware, async (req, res) => {
 
         // SEC-02: 速率限制（每用户每分钟 30 次，略高于前端 3 秒轮询频率）
         var rateLimitKey = 'ratelimit:provision-status:' + req.user.id;
-        var rateLimitResult = await checkRateLimit(rateLimitKey, 30, 60 * 1000);
+        var rateLimitResult = await checkConfiguredRateLimit('provision_status', rateLimitKey);
         if (!rateLimitResult.allowed) {
             return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
         }

@@ -135,6 +135,11 @@ router.post('/admin/user/:id/disable-2fa', authMiddleware, adminMiddleware, asyn
 
         await db.twofa.disable(req.params.id);
         await db.twofa.deleteRecoveryCodes(req.params.id);
+        // 操作审计：管理员禁用用户 2FA
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.user.disable-2fa', resourceType: 'user', resourceId: parseInt(req.params.id), details: '关闭 用户[' + user.username + '] 的2FA', req });
+        } catch (e) {}
         res.json({ message: `已为用户 ${user.username} 禁用 2FA` });
     } catch (error) {
         res.status(500).json({ error: '禁用 2FA 失败' });

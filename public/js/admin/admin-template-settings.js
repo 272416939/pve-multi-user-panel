@@ -4,7 +4,9 @@
 <div v-if="activeSection === 'settings'">
                     <!-- SMTP 配置 -->
                     <div v-if="activeTab === 'smtp'">
-                        <h4 class="module-title">SMTP 配置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">SMTP 配置</h4>
+                        </div>
                         <div class="card mb-4">
                             <div class="card-body">
                                 <form @submit.prevent="saveSmtpConfig">
@@ -55,7 +57,9 @@
                             </div>
                         </div>
 
-                        <h4 class="module-title">到期提醒配置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">到期提醒配置</h4>
+                        </div>
                         <div class="card">
                             <div class="card-body">
                                 <form @submit.prevent="saveReminderConfig">
@@ -88,7 +92,9 @@
 
                 <!-- PVE 节点设置 -->
                 <div v-if="activeTab === 'pve'">
-                    <h4 class="module-title">PVE 节点设置</h4>
+                    <div class="module-header">
+                        <h4 class="module-title">PVE 节点设置</h4>
+                    </div>
                     <div class="card mb-4">
                         <div class="card-body">
                             <p class="text-muted small mb-3">配置 Proxmox VE 服务器的连接信息。API Token 和 SSH 密码将加密存储，保存后显示为打码值。</p>
@@ -146,7 +152,9 @@
 
                     <!-- 快照 & 备份配置（合并） -->
                     <div v-if="activeTab === 'snapshot-backup'">
-                        <h4 class="module-title">快照 & 备份配置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">快照 & 备份配置</h4>
+                        </div>
 
                         <!-- 快照配置 -->
                         <div class="card mb-4">
@@ -203,7 +211,9 @@
 
                     <!-- 网络管理 -->
                     <div v-if="activeTab === 'network'">
-                        <h4 class="module-title">端口转发配置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">端口转发配置</h4>
+                        </div>
                         <div class="card" style="position: relative; z-index: 3; overflow: visible;">
                             <div class="card-header"><h5 class="mb-0">全局设置</h5></div>
                             <div class="card-body">
@@ -403,7 +413,9 @@
 
                     <!-- 站点设置 -->
                     <div v-if="activeSection === 'settings' && activeTab === 'site'">
-                        <h4 class="module-title">站点设置</h4>
+                        <div class="module-header">
+                            <h4 class="module-title">站点设置</h4>
+                        </div>
                         <div class="card">
                             <div class="card-body">
                                 <div class="mb-3">
@@ -481,13 +493,18 @@
                         <!-- 用户日志上限配置 -->
                         <div class="card mt-3">
                             <div class="card-body">
-                                <h5 class="card-title mb-3">用户日志上限</h5>
-                                <p class="text-muted small mb-3">每个用户的操作日志与登录日志最多保留的条数，超出后自动清理最早的历史数据（每小时清理一次）。</p>
+                                <h5 class="card-title mb-3">日志保留上限</h5>
+                                <p class="text-muted small mb-3">用户操作日志按每个用户维度保留，后台操作日志按全站维度保留；超出后自动清理最早的历史数据（每小时清理一次），两者互不挤占。</p>
                                 <form @submit.prevent="saveLogConfig">
                                     <div class="row mb-3">
                                         <div class="col-md-4">
-                                            <label class="form-label">保留条数</label>
+                                            <label class="form-label">用户操作日志（每用户）</label>
                                             <input type="number" class="form-control" v-model.number="logConfigForm.keep_count" min="100" max="100000" placeholder="5000">
+                                            <small class="text-muted">范围 100-100000，默认 5000</small>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label">后台操作日志（全站）</label>
+                                            <input type="number" class="form-control" v-model.number="logConfigForm.keep_admin_count" min="100" max="100000" placeholder="5000">
                                             <small class="text-muted">范围 100-100000，默认 5000</small>
                                         </div>
                                     </div>
