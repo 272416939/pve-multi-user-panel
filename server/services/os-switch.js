@@ -1,14 +1,14 @@
-// server/utils/os-switch-utils.js - 系统切换核心 PVE 操作封装
+// server/services/os-switch.js - 系统切换业务服务
+// 规范第七节：核心业务流程进 services/（原 utils/os-switch-utils.js 上移）
 // 安全设计：所有外部参数经过严格白名单校验，通过 utils/disk-validation.validateParam 过滤
-// 注：本文件为系统切换业务（批次 2e 将整体上移为 services/os-switch.js）
 
 // 磁盘域拆分（规范第七节）：校验纯函数走 utils/disk-validation.js，PVE 命令走 services/disk-ops.js
-const { validateParam, inferDiskFormat } = require('./disk-validation');
-const diskOps = require('../services/disk-ops');
+const { validateParam, inferDiskFormat } = require('../utils/disk-validation');
+const diskOps = require('./disk-ops');
 const pveApi = require('../api/pve-api');
 const db = require('../api/db');
 const crypto = require('crypto');
-const logger = require('./logger');
+const logger = require('../utils/logger');
 
 // ==================== 内部工具函数 ====================
 
