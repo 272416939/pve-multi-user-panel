@@ -234,76 +234,9 @@ const App = {
         const customAlertMessage = ref('');
         const customConfirmMessage = ref('');
         const customConfirmResolve = ref(null);
-
-        window.alert = (message) => {
-            customAlertMessage.value = message;
-            const el = document.getElementById('customAlertModal');
-            if (el) {
-                if (document.activeElement && document.activeElement !== document.body) {
-                    document.activeElement.blur();
-                }
-                // 注意：不得删除所有 .modal-backdrop（会破坏其他仍开着弹窗的遮罩）
-                el.addEventListener('hide.bs.modal', function onHide() {
-                    if (document.activeElement && document.activeElement !== document.body) {
-                        document.activeElement.blur();
-                    }
-                }, { once: true });
-                var oldModal = bootstrap.Modal.getInstance(el);
-                if (oldModal) oldModal.dispose();
-                // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
-                window.applyModalZIndex(el);
-                new bootstrap.Modal(el, { focus: false }).show();
-            }
-        };
-
-        window.customConfirm = (message) => {
-            return new Promise((resolve) => {
-                customConfirmMessage.value = message;
-                customConfirmResolve.value = resolve;
-                const el = document.getElementById('customConfirmModal');
-                if (!el) { resolve(false); return; }
-                if (document.activeElement && document.activeElement !== document.body) {
-                    document.activeElement.blur();
-                }
-                // 先 dispose 旧实例，再注册事件（dispose 会清除旧监听器）
-                var oldModal = bootstrap.Modal.getInstance(el);
-                if (oldModal) oldModal.dispose();
-                // hide 前彻底 blur 焦点，防止 Bootstrap 恢复焦点到底层 modal 触发 focus trap 冲突
-                el.addEventListener('hide.bs.modal', function onHide() {
-                    if (document.activeElement && document.activeElement !== document.body) {
-                        document.activeElement.blur();
-                    }
-                }, { once: true });
-                // 获取动态 z-index（customConfirmModal 不走 bsModalShow，需单独管理）
-                const zIndex = window.ModalZIndexManager.acquire();
-                el._modalZIndex = zIndex;
-                el.style.zIndex = zIndex;
-                // hidden 时释放 z-index + 清理 body 状态，防止残留 modal-open 导致底层 modal 卡死
-                el.addEventListener('hidden.bs.modal', function onHidden() {
-                    el.removeEventListener('hidden.bs.modal', onHidden);
-                    if (el._modalZIndex != null) {
-                        window.ModalZIndexManager.release(el._modalZIndex);
-                        el._modalZIndex = null;
-                        el.style.zIndex = '';
-                    }
-                    if (window.ModalZIndexManager && window.ModalZIndexManager.getActiveCount() === 0) {
-                        document.body.classList.remove('modal-open');
-                        document.body.style.removeProperty('padding-right');
-                        document.body.style.removeProperty('overflow');
-                    }
-                }, { once: true });
-                new bootstrap.Modal(el, { focus: false }).show();
-                // shown 后设置 backdrop z-index
-                el.addEventListener('shown.bs.modal', function onShown() {
-                    el.removeEventListener('shown.bs.modal', onShown);
-                    var backdrops = document.querySelectorAll('.modal-backdrop');
-                    var backdrop = backdrops.length > 0 ? backdrops[backdrops.length - 1] : null;
-                    if (backdrop) {
-                        backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
-                    }
-                }, { once: true });
-            });
-        };
+        // 弹窗逻辑统一由 shared.js 提供（规范第七节：单一来源），refs 就绪后立即接入
+        setupCustomAlert(customAlertMessage);
+        setupCustomConfirm(customConfirmMessage, customConfirmResolve);
 
         // ===== 钱包相关 =====
         const loadWalletBalance = async () => {

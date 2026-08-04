@@ -511,44 +511,7 @@
                     </div>
                 </div>
 
-                <!-- 自定义提示弹窗 -->
-                <div class="modal fade" id="customAlertModal" tabindex="-1" data-bs-backdrop="static">
-                    <div class="modal-dialog modal-sm modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-body text-center py-4">
-                                <div class="custom-alert-icon mb-3">
-                                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                                    </svg>
-                                </div>
-                                <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customAlertMessage }}</p>
-                            </div>
-                            <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                                <button type="button" class="btn btn-primary px-4" @mousedown="(e) => e.target.blur()" data-bs-dismiss="modal">确定</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 自定义确认弹窗 -->
-                <div class="modal fade" id="customConfirmModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-                    <div class="modal-dialog modal-sm modal-dialog-centered">
-                        <div class="modal-content">
-                            <div class="modal-body text-center py-4">
-                                <div class="custom-alert-icon mb-3">
-                                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#ffc107" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-                                    </svg>
-                                </div>
-                                <p class="custom-confirm-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customConfirmMessage }}</p>
-                            </div>
-                            <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
-                                <button type="button" class="btn btn-outline-light px-3" @click="confirmCancel">取消</button>
-                                <button type="button" class="btn btn-primary px-3" @click="confirmOk">确定</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                ${window.__sharedDialogTemplates}
 
                 <!-- 扫码/跳转支付弹窗 -->
                 <div class="modal fade" id="rechargePendingModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">

@@ -294,7 +294,6 @@ router.get('/vm/:vmid/backups', authMiddleware, async (req, res) => {
         const backups = await db.backups.getByVmId(req.params.vmid);
         const cfg = await db.backupConfig.get();
         const current = backups.filter(b => b.status !== 'failed').length;
-        const todayStr = new Date().toISOString().split('T')[0];
         const todayCount = await db.backupLogs.getDailyCount(req.user.id);
         res.json({ backups, limits: { current, max_per_vm: cfg.max_per_vm, today_creates: todayCount, daily_limit: cfg.daily_limit } });
     } catch (error) {
@@ -331,7 +330,6 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
             if (backupCount >= cfg.max_per_vm) {
                 return res.status(400).json({ error: `该虚拟机备份数已达上限（${cfg.max_per_vm} 个），请删除旧备份后再试` });
             }
-            const todayStr = new Date().toISOString().split('T')[0];
             const dailyCount = await db.backupLogs.getDailyCount(req.user.id);
             if (dailyCount >= cfg.daily_limit) {
                 return res.status(400).json({ error: `今日备份次数已达上限（${cfg.daily_limit} 次）` });

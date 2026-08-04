@@ -16,17 +16,17 @@ const api = (endpoint, options = {}) => {
         if (res.status === 401) {
             const data = await res.json().catch(() => ({}));
             if (data.code === 'TOKEN_EXPIRED') {
-                const refreshToken = localStorage.getItem('refreshToken');
+                const refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
                 if (refreshToken) {
-                    const refreshRes = await fetch('/api/auth/refresh', {
+                    const refreshRes = await fetch(window.__apiPaths.REFRESH_TOKEN, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ refreshToken })
                     });
                     if (refreshRes.ok) {
                         const refreshData = await refreshRes.json();
-                        localStorage.setItem('token', refreshData.token);
-                        localStorage.setItem('refreshToken', refreshData.refreshToken);
+                        localStorage.setItem(window.__storageKeys.TOKEN, refreshData.token);
+                        localStorage.setItem(window.__storageKeys.REFRESH_TOKEN, refreshData.refreshToken);
                         const retryOptions = {
                             ...options,
                             headers: {
@@ -46,10 +46,10 @@ const api = (endpoint, options = {}) => {
                     }
                 }
             }
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem(window.__storageKeys.TOKEN);
             if (token) {
-                localStorage.removeItem('token');
-                localStorage.removeItem('refreshToken');
+                localStorage.removeItem(window.__storageKeys.TOKEN);
+                localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
                 window.location.href = 'login.html';
             }
             throw new Error(data.error || '请求失败');
@@ -64,7 +64,7 @@ const api = (endpoint, options = {}) => {
 var _refreshPromise = null;
 
 function ensureValidToken() {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem(window.__storageKeys.TOKEN);
     if (!token) return Promise.resolve(null);
     try {
         const payload = JSON.parse(atob(token.split('.')[1]));
@@ -77,12 +77,12 @@ function ensureValidToken() {
     // token 将在5分钟内过期或已过期，需要刷新
     // 防止并发刷新：如果已有刷新进行中，等待同一个 Promise
     if (_refreshPromise) return _refreshPromise;
-    const refreshToken = localStorage.getItem('refreshToken');
+    const refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
     if (!refreshToken) {
-        localStorage.removeItem('token');
+        localStorage.removeItem(window.__storageKeys.TOKEN);
         return Promise.resolve(null);
     }
-    _refreshPromise = fetch('/api/auth/refresh', {
+    _refreshPromise = fetch(window.__apiPaths.REFRESH_TOKEN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: refreshToken })
@@ -91,16 +91,16 @@ function ensureValidToken() {
         return res.json().then(function(d) { throw new Error(d.error || '刷新失败'); });
     }).then(function(data) {
         if (data.token) {
-            localStorage.setItem('token', data.token);
-            if (data.refreshToken) localStorage.setItem('refreshToken', data.refreshToken);
+            localStorage.setItem(window.__storageKeys.TOKEN, data.token);
+            if (data.refreshToken) localStorage.setItem(window.__storageKeys.REFRESH_TOKEN, data.refreshToken);
             _refreshPromise = null;
             return data.token;
         }
         throw new Error('无token');
     }).catch(function() {
         _refreshPromise = null;
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
+        localStorage.removeItem(window.__storageKeys.TOKEN);
+        localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
         return null;
     });
     return _refreshPromise;
@@ -405,8 +405,64 @@ const confirmCancel = (customConfirmResolve) => {
     }
 };
 
+// 自定义 Prompt 弹窗（带输入框，基于 Promise）——原 admin/core.js 实现统一收编，三端共享
+const setupCustomPrompt = (customPromptMessage, customPromptValue, customPromptResolve) => {
+    window.customPrompt = (message, defaultValue) => {
+        return new Promise((resolve) => {
+            customPromptMessage.value = message;
+            customPromptValue.value = defaultValue || '';
+            customPromptResolve.value = resolve;
+            const el = document.getElementById('customPromptModal');
+            if (!el) { resolve(null); return; }
+            if (document.activeElement && document.activeElement !== document.body) {
+                document.activeElement.blur();
+            }
+            const old = bootstrap.Modal.getInstance(el);
+            if (old) old.dispose();
+            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
+            window.applyModalZIndex(el);
+            const modal = new bootstrap.Modal(el, { focus: false });
+            modal.show();
+            // shown 后聚焦输入框（applyModalZIndex 已处理 backdrop z-index）
+            el.addEventListener('shown.bs.modal', function onShown() {
+                el.removeEventListener('shown.bs.modal', onShown);
+                const input = el.querySelector('#customPromptInput');
+                if (input) { input.focus(); input.select(); }
+            }, { once: true });
+        });
+    };
+};
+
+// Prompt 确定/取消（Vue 模板 @click 调用，从 refs 取 resolve）
+const promptOk = (customPromptResolve, customPromptValue) => {
+    const resolve = customPromptResolve.value;
+    if (resolve) {
+        const val = customPromptValue.value;
+        customPromptResolve.value = null;
+        resolve(val);
+    }
+    const el = document.getElementById('customPromptModal');
+    if (el) {
+        const modal = bootstrap.Modal.getInstance(el);
+        if (modal) modal.hide();
+    }
+};
+
+const promptCancel = (customPromptResolve) => {
+    const resolve = customPromptResolve.value;
+    if (resolve) {
+        customPromptResolve.value = null;
+        resolve(null);
+    }
+    const el = document.getElementById('customPromptModal');
+    if (el) {
+        const modal = bootstrap.Modal.getInstance(el);
+        if (modal) modal.hide();
+    }
+};
+
 const authGuard = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem(window.__storageKeys.TOKEN);
     if (!token) {
         window.location.href = 'login.html';
         return null;
@@ -415,7 +471,7 @@ const authGuard = async () => {
         const userData = await api('/user/profile');
         return userData;
     } catch (e) {
-        localStorage.removeItem('token');
+        localStorage.removeItem(window.__storageKeys.TOKEN);
         window.location.href = 'login.html';
         return null;
     }
@@ -446,7 +502,7 @@ function fallbackCopy(text) {
 }
 
 const logout = () => {
-    const refreshToken = localStorage.getItem('refreshToken');
+    const refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
     if (refreshToken) {
         fetch('/api/logout', {
             method: 'POST',
@@ -454,8 +510,8 @@ const logout = () => {
             body: JSON.stringify({ refreshToken })
         }).catch(() => {});
     }
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
+    localStorage.removeItem(window.__storageKeys.TOKEN);
+    localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
     window.location.href = 'login.html';
 };
 

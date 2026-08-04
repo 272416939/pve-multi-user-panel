@@ -1,7 +1,9 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { createEmailTemplate, sendEmail, shouldSendEmail } = require('../utils/email');
-const { pushToUser, markBackupRestoreComplete } = require('../websocket/push-proxy');
+const { pushToUser } = require('../websocket/push-proxy');
+// 备份/恢复完成标记抽离到 services/status-cache.js（规范第七节：状态缓存单一来源）
+const { markBackupRestoreComplete } = require('./status-cache');
 const { takeDiskSnapshot, auditAfterRestore } = require('./disk-audit');
 
 const lxcBackupPollingMap = new Map();
@@ -224,7 +226,7 @@ async function sendBackupNotification(userId, vmId, status, filename) {
             content,
             type: 2,
             send_type: 1,
-            created_at: new Date().toISOString()
+            created_at: db.now()
         });
     } catch (e) {
         console.error('备份通知站内信发送失败:', e.message);
@@ -328,7 +330,7 @@ async function sendRestoreNotification(userId, vmId, statusMsg) {
     try {
         await db.messages.create({
             uid: userId, title, content, type: 2, send_type: 1,
-            created_at: new Date().toISOString()
+            created_at: db.now()
         });
     } catch (e) { console.error('恢复通知站内信发送失败:', e.message); }
     if (user.email && user.emailVerified) {

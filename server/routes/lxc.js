@@ -5,7 +5,8 @@ const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
-const { getStatusCache } = require('../websocket/push-proxy');
+// 状态缓存读写抽离到 services/status-cache.js（规范第七节）
+const { getStatusCache } = require('../services/status-cache');
 const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp } = require('../services/dhcp');
 const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
@@ -15,6 +16,8 @@ const { safeError } = require('../utils/safe-error');
 const { checkRateLimit } = require('../middleware/rate-limiter');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
+// 单一来源：周期白名单统一走 constants（规范第七节）
+const { VALID_PERIODS } = require('../constants');
 
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
 router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
@@ -192,7 +195,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 
     // SEC-04: period 白名单校验
     var validPeriod = renewal_period || 'month';
-    if (!['month', 'quarter', 'year'].includes(validPeriod)) {
+    if (!VALID_PERIODS.includes(validPeriod)) {
         return res.status(400).json({ error: '无效的计费周期' });
     }
  

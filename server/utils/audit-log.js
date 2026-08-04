@@ -1,6 +1,6 @@
 // server/utils/audit-log.js - 敏感操作审计日志（V3-14）
 // 异步写入、失败不阻断主流程；所有敏感写操作（登录/余额/销毁/删除等）埋点
-const db = require('../api/db');
+// 注意：不顶层 require ../api/db（规范第七节：utils 是叶子层，函数内懒加载）
 
 /**
  * 记录审计日志
@@ -16,6 +16,8 @@ const db = require('../api/db');
 async function auditLog(opts) {
     try {
         if (!opts || !opts.action) return;
+        // 行内懒加载避免 utils 顶层依赖 api 层
+        var db = require('../api/db');
         var req = opts.req || null;
         await db.auditLogs.create({
             user_id: opts.userId != null ? opts.userId : (req ? (req.user ? req.user.id : 0) : 0),

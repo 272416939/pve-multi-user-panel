@@ -288,12 +288,13 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 	│   │   ├── safe-error.js      # 统一错误脱敏（safeError）
 	│   │   ├── username-blacklist.js
 	│   │   ├── crypto-utils.js    # AES-256-GCM 加密工具（JWT_SECRET 派生等）
-	│   │   ├── disk-utils.js      # 💾 磁盘操作工具（创建/销毁/扩容/挂载/卸载/QoS）
+	│   │   ├── disk-validation.js # 💾 磁盘校验纯函数（白名单/卷名/系统盘判定）
+	│   │   ├── disk-billing.js    # 💾 磁盘计费纯函数（购买/续费/扩容金额）
 	│   │   ├── logger.js          # 统一日志工具
 	│   │   ├── audit-log.js       # 📋 操作日志埋点（审计）
-	│   │   ├── os-switch-utils.js # 🔄 系统切换工具（QoS 参数过滤等）
 	│   │   ├── password-hash.js   # bcryptjs 密码哈希
 	│   │   └── with-transaction.js # MySQL 事务封装
+	│   ├── constants.js           # ⚙️ 全局共享常量（周期/磁盘/订单/模板/支付，单一来源）
 		│   ├── routes/                # 路由模块（21 个）
 		│   │   ├── auth.js            # 认证 + 2FA + 忘记密码
 		│   │   ├── user.js            # 用户中心 + 2FA + 设备 + Push ticket
@@ -328,7 +329,18 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 		│   │   ├── disk-expiry-check.js # 💾 磁盘到期巡检（预警/宽限期/停机分离/销毁回收）
 		│   │   ├── disk-audit.js      # 💾 备份恢复后磁盘对账审计（防白嫖）
 		│   │   ├── holding-vm.js      # 💾 中转 VM（VMID 9999）托管服务（卸载磁盘托管）
-		│   │   └── ip-location.js     # 📍 IP 归属地查询（UApiPro，7 天缓存）
+		│   │   ├── ip-location.js     # 📍 IP 归属地查询（UApiPro，7 天缓存）
+	│   │   ├── payment.js         # 💰 支付业务（充值下单/回调入账）
+	│   │   ├── cdk.js             # 💰 CDK 兑换/批量生成
+	│   │   ├── billing.js         # 💰 计费业务（余额扣款/余额续费）
+	│   │   ├── provisioning.js    # 🚀 VM/LXC 开通业务（扣款→克隆→DHCP→通知）
+	│   │   ├── disk.js            # 💾 磁盘生命周期业务（购买/挂载/扩容/续费/销毁）
+	│   │   ├── disk-ops.js        # 💾 磁盘 PVE/SSH 命令层
+	│   │   ├── os-switch.js       # 🔄 系统切换业务流程（13 阶段）
+	│   │   ├── status-cache.js    # 📡 VM/LXC 实时状态缓存（websocket 解耦）
+	│   │   ├── release-check.js   # 🔄 版本检查（GitHub/Gitee 双源）
+	│   │   ├── system-update.js   # 🔄 系统在线更新（git fetch/reset）
+	│   │   └── redis-admin.js     # ⚙️ Redis 配置/测试/清缓存
 		│   ├── schedule/
 		│   │   └── tasks.js           # 定时任务
 		│   ├── api/

@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const { JWT_SECRET } = require('../utils/token');
 const { _applyRate } = require('../utils/pve-rate');
 const dbg = require('../utils/debug');
+// 状态缓存读写抽离到 services/status-cache.js（规范第七节：websocket 只做连接管理与推送）
+const statusCache = require('../services/status-cache');
 
 const pushProxy = new WebSocketServer({ noServer: true });
 
@@ -14,21 +16,6 @@ const TICKET_TTL = 5 * 60;
 const SUBSCRIPTIONS = new Map();
 const MAX_CONNECTIONS = 1000; // 全局连接上限
 const MAX_PER_IP = 20; // 单 IP 连接上限
-
-// 备份/恢复/切换完成后短暂宽限窗口（ms）：此期间 PVE 可能仍报瞬时 running，
-// 若立即放行会闪现运行中。窗口内仍合并为 backup（显示备份中），直到台账落定。
-const COMPLETED_GRACE_MS = 5000;
-// vmid -> 完成时间戳（内存态，仅用于抑制瞬时闪现）
-const recentlyCompleted = new Map();
-function markCompleted(vmid) {
-    recentlyCompleted.set(vmid, Date.now());
-}
-function pruneCompleted() {
-    const now = Date.now();
-    for (const [k, t] of recentlyCompleted) {
-        if (now - t > COMPLETED_GRACE_MS) recentlyCompleted.delete(k);
-    }
-}
 
 function validateTicket(token) {
     try {
@@ -73,7 +60,6 @@ function pushToUser(userId, data) {
 
 let pveApiCache = null;
 let dbCache = null;
-let statusCacheGlobal = new Map();
 
 function getPveApi() {
     if (!pveApiCache) pveApiCache = require('../api/pve-api');
@@ -105,40 +91,34 @@ async function pushStatus() {
         for (const l of info.lxcs) { lxcs.add(l); }
     }
 
-    const statusCache = new Map();
-
-    // 存储前检查全局缓存大小，超过上限时清理最旧的条目，防止内存泄漏
-    if (statusCacheGlobal.size > 10000) {
-        const keysToDelete = Array.from(statusCacheGlobal.keys()).slice(0, 2000);
-        keysToDelete.forEach(k => statusCacheGlobal.delete(k));
-    }
+    const statusCacheLocal = new Map();
 
     for (const vmid of vms) {
         try {
             const raw = await pveApi.getVmStatus(vmid);
             const s = _applyRate('vm:' + vmid, raw);
-            statusCache.set('vm:' + vmid, s);
-            statusCacheGlobal.set('vm:' + vmid, { s, ts: Date.now() });
+            statusCacheLocal.set('vm:' + vmid, s);
+            statusCache.setStatusCache('vm:' + vmid, s);
         } catch (e) {}
     }
     for (const vmid of lxcs) {
         try {
             const raw = await pveApi.getLxcStatus(vmid);
             const s = _applyRate('lxc:' + vmid, raw);
-            statusCache.set('lxc:' + vmid, s);
-            statusCacheGlobal.set('lxc:' + vmid, { s, ts: Date.now() });
+            statusCacheLocal.set('lxc:' + vmid, s);
+            statusCache.setStatusCache('lxc:' + vmid, s);
         } catch (e) {}
     }
 
     // 并行查询 DB 台账，合并"进行中"状态到推送，避免 PVE status 与台账竞态造成徽标闪现
     const busyMap = await computeBusyState(vms, lxcs);
 
-    if (statusCache.size === 0) return;
+    if (statusCacheLocal.size === 0) return;
 
     for (const [ws, info] of SUBSCRIPTIONS) {
         const updates = [];
         for (const v of info.vms) {
-            const s = statusCache.get('vm:' + v);
+            const s = statusCacheLocal.get('vm:' + v);
             if (s) {
                 const st = Object.assign({}, s);
                 const busy = busyMap.vm.get(v);
@@ -147,7 +127,7 @@ async function pushStatus() {
             }
         }
         for (const l of info.lxcs) {
-            const s = statusCache.get('lxc:' + l);
+            const s = statusCacheLocal.get('lxc:' + l);
             if (s) {
                 const st = Object.assign({}, s);
                 const busy = busyMap.lxc.get(l);
@@ -167,7 +147,7 @@ async function computeBusyState(vms, lxcs) {
     const db = getDb();
     const result = { vm: new Map(), lxc: new Map() };
     try {
-        pruneCompleted();
+        statusCache.pruneCompleted();
         // 备份（含 pending/running）
         const runningBackups = await db.backups.getRunningBackups();
         const runningRestores = await db.restoreTasks.getRunning();
@@ -190,25 +170,20 @@ async function computeBusyState(vms, lxcs) {
                 else if (restoreVms.has(v)) busy = 'restore';
             } catch (_) {}
             // 台账不再进行中，但刚完成不久（可能瞬时报 running）：宽限期内仍按 busy 抑制闪现
-            if (!busy && recentlyCompleted.has(v)) busy = 'backup';
+            if (!busy && statusCache.isRecentlyCompleted(v)) busy = 'backup';
             if (busy) result.vm.set(v, busy);
         }
         for (const l of lxcs) {
             let busy = null;
             if (backupCts.has(l)) busy = 'backup';
             else if (restoreCts.has(l)) busy = 'restore';
-            if (!busy && recentlyCompleted.has(l)) busy = 'backup';
+            if (!busy && statusCache.isRecentlyCompleted(l)) busy = 'backup';
             if (busy) result.lxc.set(l, busy);
         }
     } catch (e) {
         console.error('[pushStatus] 合并进行中状态失败:', e.message);
     }
     return result;
-}
-
-// 标记 backup/restore 完成（供 pushStatus 抑制瞬时 running 闪现）
-function markBackupRestoreComplete(vmid) {
-    markCompleted(vmid);
 }
 
 async function checkResourceOwnership(userId, role, vmid, isLxc) {
@@ -375,15 +350,3 @@ function ensureTimers() {
 module.exports = pushProxy;
 module.exports.pushUnreadCount = pushUnreadCount;
 module.exports.pushToUser = pushToUser;
-module.exports.markBackupRestoreComplete = markBackupRestoreComplete;
-module.exports.getStatusCache = function(key, userId) {
-    var cacheKey = userId ? userId + ':' + key : key;
-    var e = statusCacheGlobal.get(cacheKey);
-    if (!e && userId) {
-        // 兼容旧数据：pushStatus 存储时未带 userId 前缀，回退到不带 userId 的 key
-        e = statusCacheGlobal.get(key);
-    }
-    if (e && Date.now() - e.ts < 5000) return e.s;
-    if (e) statusCacheGlobal.delete(cacheKey);
-    return null;
-};

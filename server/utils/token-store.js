@@ -1,8 +1,15 @@
 /**
  * Token Store — 验证码/找回密码 token 的统一存储
  * 优先使用 Redis（短期数据高频读写），Redis 不可用时回退到数据库
+ * 注意：不顶层 require ../api/db（规范第七节：utils 是叶子层，函数内懒加载）
  */
-const db = require('../api/db');
+// 行内懒加载避免 utils 顶层依赖 api 层（规范第七节：utils 是叶子层）
+function getDb() {
+    return require('../api/db');
+}
+
+// 本地时间格式化统一走 utils/date.js（规范第八节：禁止自写 toISOString 直写）
+const { formatLocalDate } = require('./date');
 
 /**
  * 惰性获取 Redis 客户端（不能在模块加载时捕获——Redis 配置在服务启动后
@@ -22,7 +29,7 @@ function getRedisClient() {
  */
 async function setRegisterCode(email, code, ttlSeconds) {
     // 先删除数据库中旧的验证码
-    await db.passwordResetTokens.deleteByEmailAndType(email, 'register_code');
+    await getDb().passwordResetTokens.deleteByEmailAndType(email, 'register_code');
 
     var redisClient = getRedisClient();
     if (redisClient) {
@@ -35,13 +42,12 @@ async function setRegisterCode(email, code, ttlSeconds) {
     }
     // 回退：存入数据库
     var expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-    var d = new Date(expiresAt.getTime() - expiresAt.getTimezoneOffset() * 60000);
-    await db.passwordResetTokens.create({
+    await getDb().passwordResetTokens.create({
         userId: 0,
         email: email,
         token: code,
         type: 'register_code',
-        expiresAt: d.toISOString().slice(0, 19).replace('T', ' ')
+        expiresAt: formatLocalDate(expiresAt)
     });
 }
 
@@ -62,7 +68,7 @@ async function getRegisterCode(email) {
         }
     }
     // 回退：从数据库查询
-    var record = await db.passwordResetTokens.getByEmailAndType(email, 'register_code');
+    var record = await getDb().passwordResetTokens.getByEmailAndType(email, 'register_code');
     if (!record) return null;
     if (new Date(record.expires_at) <= new Date()) return null;
     return record.token;
@@ -77,7 +83,7 @@ async function delRegisterCode(email) {
     if (redisClient) {
         try { await redisClient.del('register_code:' + email); } catch (e) {}
     }
-    await db.passwordResetTokens.deleteByEmailAndType(email, 'register_code');
+    await getDb().passwordResetTokens.deleteByEmailAndType(email, 'register_code');
 }
 
 // ==================== 找回密码 Token ====================
@@ -90,7 +96,7 @@ async function delRegisterCode(email) {
  */
 async function setResetToken(token, userId, ttlSeconds) {
     // 先删除数据库中旧的 token
-    await db.passwordResetTokens.deleteByType(userId, 'password_reset');
+    await getDb().passwordResetTokens.deleteByType(userId, 'password_reset');
 
     var redisClient = getRedisClient();
     if (redisClient) {
@@ -103,12 +109,11 @@ async function setResetToken(token, userId, ttlSeconds) {
     }
     // 回退：存入数据库
     var expiresAt = new Date(Date.now() + ttlSeconds * 1000);
-    var d = new Date(expiresAt.getTime() - expiresAt.getTimezoneOffset() * 60000);
-    await db.passwordResetTokens.create({
+    await getDb().passwordResetTokens.create({
         userId: userId,
         token: token,
         type: 'password_reset',
-        expiresAt: d.toISOString().slice(0, 19).replace('T', ' ')
+        expiresAt: formatLocalDate(expiresAt)
     });
 }
 
@@ -128,7 +133,7 @@ async function getResetToken(token) {
         }
     }
     // 回退：从数据库查询
-    var record = await db.passwordResetTokens.getByToken(token);
+    var record = await getDb().passwordResetTokens.getByToken(token);
     if (!record || record.type !== 'password_reset') return null;
     if (new Date(record.expires_at) <= new Date()) return null;
     return record.user_id;
@@ -139,13 +144,14 @@ async function getResetToken(token) {
  * @param {string} token - 重置 token
  */
 async function delResetToken(token) {
+    var redisClient = getRedisClient();
     if (redisClient) {
         try { await redisClient.del('reset_token:' + token); } catch (e) {}
     }
     // 数据库中也删除（兼容回退模式下存入的记录）
-    var record = await db.passwordResetTokens.getByToken(token);
+    var record = await getDb().passwordResetTokens.getByToken(token);
     if (record) {
-        await db.passwordResetTokens.delete(record.id);
+        await getDb().passwordResetTokens.delete(record.id);
     }
 }
 

@@ -43,7 +43,9 @@
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     <script nonce="<%= locals.cspNonce %>">window.__siteLoginTitle = <%- JSON.stringify(locals.siteConfig.login_title).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;</script>
-    <script src="js/shared.js?cv=<%= locals.cacheVersion %>"></script>
+    <script src="js/shared/storage-keys.js?cv=<%= locals.cacheVersion %>"></script>
+<script src="js/shared/api-paths.js?cv=<%= locals.cacheVersion %>"></script>
+<script src="js/shared.js?cv=<%= locals.cacheVersion %>"></script>
     <script src="components/pv-button.js?cv=<%= locals.cacheVersion %>"></script>
 <script src="js/login-template.js?cv=<%= locals.cacheVersion %>"></script>
 <script src="js/login-page.js?cv=<%= locals.cacheVersion %>"></script>

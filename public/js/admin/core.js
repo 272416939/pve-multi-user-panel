@@ -11,11 +11,11 @@
     $.user = ref(null);
     $.activeSection = ref(new URLSearchParams(window.location.search).get('section') || 'overview');
     $.navItems = ref([]);
-    var savedTab = localStorage.getItem('admin_activeTab');
+    var savedTab = localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB);
     $.activeTab = ref((savedTab === 'assign' ? 'users' : savedTab) || 'users');
-    $.activeTabLxc = ref(localStorage.getItem('admin_activeTabLxc') || 'create');
-    $.activeTabVm = ref(localStorage.getItem('admin_activeTabVm') || 'manage');
-    $.activeTabDisk = ref(localStorage.getItem('admin_activeTabDisk') || 'storage-groups');
+    $.activeTabLxc = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_LXC) || 'create');
+    $.activeTabVm = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_VM) || 'manage');
+    $.activeTabDisk = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_DISK) || 'storage-groups');
     $.loading = ref(false);
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
@@ -23,6 +23,10 @@
     $.customPromptMessage = ref('');
     $.customPromptValue = ref('');
     $.customPromptResolve = ref(null);
+    // 弹窗逻辑统一由 shared.js 提供（规范第七节：单一来源），refs 就绪后立即接入
+    setupCustomAlert($.customAlertMessage);
+    setupCustomConfirm($.customConfirmMessage, $.customConfirmResolve);
+    setupCustomPrompt($.customPromptMessage, $.customPromptValue, $.customPromptResolve);
     $.unreadCount = ref(0);
     $.destroyLxcConfirmText = ref('');
     $.currentMsg = ref({ title: '', content: '', type: 1, created_at: '' });
@@ -34,8 +38,8 @@ $.detailVmTimer = null;
 $.detailVmChartData = null;
 
     // ==================== 模板/套餐页面状态 ====================
-    $.activeTabTemplates = ref(localStorage.getItem('admin_activeTabTemplates') || 'vm');
-    $.activeTabPackages = ref(localStorage.getItem('admin_activeTabPackages') || 'vm');
+    $.activeTabTemplates = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_TEMPLATES) || 'vm');
+    $.activeTabPackages = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_PACKAGES) || 'vm');
 
     // ==================== 工具函数注册到$ ====================
     $.formatMemory = formatMemory;
@@ -181,32 +185,32 @@ watch($.user, function(u) {
             section = 'templates';
             subId = 'templates-vm';
             $.activeTabTemplates.value = 'vm';
-            window.templatePage.loadVmTemplates();
+            window.__admin.templatePage.loadVmTemplates();
         } else if (page === 'lxc-templates') {
             section = 'templates';
             subId = 'templates-lxc';
             $.activeTabTemplates.value = 'lxc';
-            window.templatePage.loadLxcTemplates();
+            window.__admin.templatePage.loadLxcTemplates();
         } else if (page === 'vm-packages') {
             section = 'packages';
             subId = 'packages-vm';
             $.activeTabPackages.value = 'vm';
-            window.packagePage.loadVmPackages();
-            window.packagePage.loadVmPackageGroups();
+            window.__admin.packagePage.loadVmPackages();
+            window.__admin.packagePage.loadVmPackageGroups();
         } else if (page === 'lxc-packages') {
             section = 'packages';
             subId = 'packages-lxc';
             $.activeTabPackages.value = 'lxc';
-            window.packagePage.loadLxcPackages();
-            window.packagePage.loadLxcPackageGroups();
+            window.__admin.packagePage.loadLxcPackages();
+            window.__admin.packagePage.loadLxcPackageGroups();
         } else if (page === 'vm-package-groups') {
             section = 'packages'; subId = 'packages-vm-groups';
             $.activeTabPackages.value = 'vm-groups';
-            window.packagePage.loadVmPackageGroups();
+            window.__admin.packagePage.loadVmPackageGroups();
         } else if (page === 'lxc-package-groups') {
             section = 'packages'; subId = 'packages-lxc-groups';
             $.activeTabPackages.value = 'lxc-groups';
-            window.packagePage.loadLxcPackageGroups();
+            window.__admin.packagePage.loadLxcPackageGroups();
         } else if (page === 'os-templates') {
             section = 'templates-os';
             subId = 'templates-os';
@@ -613,57 +617,7 @@ watch($.user, function(u) {
         }
     };
 
-    // 覆盖 window.alert
-    window.alert = function(message) {
-        $.customAlertMessage.value = message;
-        var el = document.getElementById('customAlertModal');
-        if (el) {
-            var old = bootstrap.Modal.getInstance(el);
-            if (old) old.dispose();
-            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
-            // 注意：必须调用 applyModalZIndex 设置 z-index，否则叠加时会被遮挡
-            window.applyModalZIndex(el);
-            new bootstrap.Modal(el, { focus: false }).show();
-        }
-    };
-
-    // 覆盖 window.customConfirm
-    window.customConfirm = function(message) {
-        return new Promise(function(resolve) {
-            $.customConfirmMessage.value = message;
-            $.customConfirmResolve.value = resolve;
-            var el = document.getElementById('customConfirmModal');
-            if (!el) { resolve(false); return; }
-            var old = bootstrap.Modal.getInstance(el);
-            if (old) old.dispose();
-            // 动态 z-index + backdrop z-index + hidden release（统一走 applyModalZIndex）
-            window.applyModalZIndex(el);
-            new bootstrap.Modal(el, { focus: false }).show();
-        });
-    };
-
-    // 自定义 Prompt 弹窗（带输入框，基于 Promise）
-    window.customPrompt = function(message, defaultValue) {
-        return new Promise(function(resolve) {
-            $.customPromptMessage.value = message;
-            $.customPromptValue.value = defaultValue || '';
-            $.customPromptResolve.value = resolve;
-            var el = document.getElementById('customPromptModal');
-            if (!el) { resolve(null); return; }
-            var old = bootstrap.Modal.getInstance(el);
-            if (old) old.dispose();
-            // 动态 z-index + backdrop z-index + hidden release（统一走 applyModalZIndex）
-            window.applyModalZIndex(el);
-            var modal = new bootstrap.Modal(el, { focus: false });
-            modal.show();
-            // shown 后聚焦输入框（applyModalZIndex 已处理 backdrop z-index）
-            el.addEventListener('shown.bs.modal', function onShown() {
-                el.removeEventListener('shown.bs.modal', onShown);
-                var input = el.querySelector('#customPromptInput');
-                if (input) { input.focus(); input.select(); }
-            }, { once: true });
-        });
-    };
+    // window.alert / customConfirm / customPrompt 统一由 shared.js 的 setupCustomAlert/SetupCustomConfirm/SetupCustomPrompt 提供（规范第七节：单一来源）
 
     // ===== 二级菜单 =====
     $.expandedSections = ref({});
@@ -937,25 +891,25 @@ $.initDetailCharts = function() {
                             var t2 = document.querySelector('[data-subsection="' + subIdMap2 + '"]');
                             if (t2) t2.classList.add('active');
                         }
-                        if (section === 'templates' && window.templatePage) {
+                        if (section === 'templates' && window.__admin.templatePage) {
                             if (tabVar && tabVar.value === 'lxc') {
-                                window.templatePage.loadLxcTemplates();
+                                window.__admin.templatePage.loadLxcTemplates();
                             } else {
-                                window.templatePage.loadVmTemplates();
+                                window.__admin.templatePage.loadVmTemplates();
                             }
                         }
-                        if (section === 'packages' && window.packagePage) {
+                        if (section === 'packages' && window.__admin.packagePage) {
                             var pkgTab = tabVar ? tabVar.value : 'vm';
                             if (pkgTab === 'lxc') {
-                                window.packagePage.loadLxcPackages();
-                                window.packagePage.loadLxcPackageGroups();
+                                window.__admin.packagePage.loadLxcPackages();
+                                window.__admin.packagePage.loadLxcPackageGroups();
                             } else if (pkgTab === 'lxc-groups') {
-                                window.packagePage.loadLxcPackageGroups();
+                                window.__admin.packagePage.loadLxcPackageGroups();
                             } else if (pkgTab === 'vm-groups') {
-                                window.packagePage.loadVmPackageGroups();
+                                window.__admin.packagePage.loadVmPackageGroups();
                             } else {
-                                window.packagePage.loadVmPackages();
-                                window.packagePage.loadVmPackageGroups();
+                                window.__admin.packagePage.loadVmPackages();
+                                window.__admin.packagePage.loadVmPackageGroups();
                             }
                         }
                         if (section === 'templates-os' && window.__admin.osTemplatePage) {
@@ -1075,7 +1029,7 @@ $.initDetailCharts = function() {
 
 
         watch($.activeTab, function(newTab) {
-            localStorage.setItem('admin_activeTab', newTab);
+            localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB, newTab);
             if (newTab === 'messages') {
                 $.loadUnreadCount();
             }
@@ -1103,23 +1057,23 @@ $.initDetailCharts = function() {
         });
 
         watch($.activeTabPackages, function(newTab) {
-            localStorage.setItem('admin_activeTabPackages', newTab);
+            localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB_PACKAGES, newTab);
         });
 
         watch($.activeTabVm, function(newTab) {
-            localStorage.setItem('admin_activeTabVm', newTab);
+            localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB_VM, newTab);
         });
 
         watch($.activeTabLxc, function(newTab) {
-            localStorage.setItem('admin_activeTabLxc', newTab);
+            localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB_LXC, newTab);
         });
 
         watch($.activeTabTemplates, function(newTab) {
-            localStorage.setItem('admin_activeTabTemplates', newTab);
+            localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB_TEMPLATES, newTab);
         });
 
         watch($.activeTabDisk, function(newTab) {
-            localStorage.setItem('admin_activeTabDisk', newTab);
+            localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB_DISK, newTab);
         });
 
         watch($.activeSection, function(val) {

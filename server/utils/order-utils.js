@@ -1,10 +1,6 @@
 var crypto = require('crypto');
-
-function getPeriodMonths(period) {
-  if (period === 'quarter') return 3;
-  if (period === 'year') return 12;
-  return 1;
-}
+// 单一来源：周期映射统一走 constants（规范第七节，禁止业务文件重复定义）
+var { getPeriodMonths } = require('../constants');
 
 function calculateAmount(monthlyPrice, period, periodCount, quarterlyDiscount, yearlyDiscount) {
   var months = getPeriodMonths(period);
@@ -18,16 +14,16 @@ function calculateAmount(monthlyPrice, period, periodCount, quarterlyDiscount, y
   return parseFloat((baseAmount * (1 - discount / 100)).toFixed(2));
 }
 
+/**
+ * 兼容转发：deductBalance 已迁移至 services/billing.js（规范第七节：业务进 services）
+ * 此处行内懒加载转发保持旧 API 形状，避免顶层 require 与 billing 形成循环依赖
+ * @param {number} userId - 用户 ID
+ * @param {number} amount - 扣款金额
+ * @param {object} dbInstance - db 聚合入口
+ * @returns {Promise<{balanceBefore: number, balanceAfter: number}>}
+ */
 async function deductBalance(userId, amount, dbInstance) {
-  if (amount <= 0) throw new Error('扣款金额必须大于0');
-  var user = await dbInstance.users.getById(userId);
-  var balanceBefore = parseFloat(user.balance || '0');
-  if (balanceBefore < amount) {
-    throw new Error('余额不足');
-  }
-  var updatedUser = await dbInstance.users.incrementBalance(userId, -amount);
-  var balanceAfter = parseFloat(updatedUser.balance || '0');
-  return { balanceBefore: balanceBefore, balanceAfter: balanceAfter };
+  return require('../services/billing').deductBalance(userId, amount, dbInstance);
 }
 
 async function setVmAffinity(vmid, affinityValue) {

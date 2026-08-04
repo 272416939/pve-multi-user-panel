@@ -1,11 +1,14 @@
-// server/utils/os-switch-utils.js - 系统切换核心 PVE 操作封装
-// 安全设计：所有外部参数经过严格白名单校验，通过 disk-utils.validateParam 过滤
+// server/services/os-switch.js - 系统切换业务服务
+// 规范第七节：核心业务流程进 services/（原 utils/os-switch-utils.js 上移）
+// 安全设计：所有外部参数经过严格白名单校验，通过 utils/disk-validation.validateParam 过滤
 
-const diskUtils = require('./disk-utils');
+// 磁盘域拆分（规范第七节）：校验纯函数走 utils/disk-validation.js，PVE 命令走 services/disk-ops.js
+const { validateParam, inferDiskFormat } = require('../utils/disk-validation');
+const diskOps = require('./disk-ops');
 const pveApi = require('../api/pve-api');
 const db = require('../api/db');
 const crypto = require('crypto');
-const logger = require('./logger');
+const logger = require('../utils/logger');
 
 // ==================== 内部工具函数 ====================
 
@@ -185,8 +188,8 @@ async function runSshWithTimeout(cmd, timeout = 60000) {
 // 2.6 根据存储类型将磁盘从临时 VM 移动到目标 VM
 // 统一使用 PVE move_disk API，兼容所有存储类型（lvm/lvmthin/zfs/dir/btrfs/nfs/cephfs）
 async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, tempVmid) {
-    const safeStorage = diskUtils.validateParam('storage', storage);
-    const safeVmid = diskUtils.validateParam('vmid', targetVmid);
+    const safeStorage = validateParam('storage', storage);
+    const safeVmid = validateParam('vmid', targetVmid);
     // 验证 volume id 格式
     if (!/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_./\-]+$/.test(sourceVolumeId)) {
         throw new Error('无效的 volume id: ' + sourceVolumeId);
@@ -197,7 +200,7 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
     // 从临时 VM 解绑系统盘（使卷变为 unused）
     logger.info(`[os-switch] 存储 ${safeStorage} (${storageType})，unlink 临时 VM 的磁盘，准备 move_disk`);
     try {
-        await diskUtils._internal.unbindSystemDisk(tempVmid, sourceBus);
+        await diskOps._internal.unbindSystemDisk(tempVmid, sourceBus);
         logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
     } catch (e) {
         logger.info(`[os-switch] 临时 VM unlink 失败: ${e.message.substring(0, 100)}`);
@@ -211,7 +214,7 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
 async function cleanupTempVm(tempVmid, bus) {
     // unlink 可能已由 moveDiskToTarget 执行过，失败不阻断
     try {
-        await diskUtils._internal.unbindSystemDisk(tempVmid, bus);
+        await diskOps._internal.unbindSystemDisk(tempVmid, bus);
     } catch (e) {
         logger.info(`[os-switch] cleanupTempVm unlink 失败（可能已解绑）: ${e.message.substring(0, 100)}`);
     }
@@ -220,7 +223,7 @@ async function cleanupTempVm(tempVmid, bus) {
 
 // 3. 替换目标 VM 系统盘（仅 DIR 旧路径使用，迁移后统一走 move_disk 流程）
 async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId) {
-    const safeVmid = diskUtils.validateParam('vmid', vmid);
+    const safeVmid = validateParam('vmid', vmid);
     const bus = oldSysDisk.bus;
     // 确保 newVolumeId 是一个有效的 volume ID 格式
     const cleanVolId = newVolumeId && typeof newVolumeId === 'string' ? newVolumeId.trim() : '';
@@ -236,7 +239,7 @@ async function replaceSystemDisk(vmid, oldSysDisk, newVolumeId) {
         const checkCmd = `pvesm list $(echo ${oldSysDisk.volume_id} | cut -d: -f1) 2>/dev/null | grep -F '${oldSysDisk.volume_id.split(':')[1]}'`;
         const checkResult = await runSsh(checkCmd);
         if (checkResult) {
-            await diskUtils._internal.destroySystemDisk(oldSysDisk.volume_id);
+            await diskOps._internal.destroySystemDisk(oldSysDisk.volume_id);
         }
     } catch (e) {
         // 卷不存在或查询失败则跳过释放（可能已被前一次切换清理）
@@ -374,7 +377,7 @@ async function performOsSwitch(vmid, osTemplate, logId) {
             const checkCmd = `pvesm list $(echo ${systemDisk.volume_id} | cut -d: -f1) 2>/dev/null | grep -F '${systemDisk.volume_id.split(':')[1]}'`;
             const checkResult = await runSsh(checkCmd);
             if (checkResult) {
-                await diskUtils._internal.destroySystemDisk(systemDisk.volume_id);
+                await diskOps._internal.destroySystemDisk(systemDisk.volume_id);
             }
         } catch (e) { /* ignore */ }
 
@@ -382,7 +385,7 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         logger.info(`[os-switch] 使用 PVE move_disk 将临时 VM 的磁盘转移到目标 VM`);
         // 仅文件系统类存储（dir/btrfs/nfs/cephfs）需传 format，LVM/ZFS 不需要
         const needFormat = ['dir', 'btrfs', 'nfs', 'cephfs'].includes(moveResult.storageType);
-        const sourceFormat = needFormat ? (osTemplate.disk_format || diskUtils.inferDiskFormat(cloneResult.systemVolumeId) || undefined) : undefined;
+        const sourceFormat = needFormat ? (osTemplate.disk_format || inferDiskFormat(cloneResult.systemVolumeId) || undefined) : undefined;
         const upid = await pveApi.moveDisk(cloneResult.tempVmid, 'unused0', vmid, `${newSysDisk.bus}0`, sourceFormat);
         // 等待任务完成
         await pveApi.waitForTask(upid, 300000);

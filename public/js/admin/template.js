@@ -136,5 +136,5 @@
             }
         });
     };
-    window.templatePage = tp;
+    window.__admin.templatePage = tp;
 })();

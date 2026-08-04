@@ -10,7 +10,9 @@
 
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const diskUtils = require('../utils/disk-utils');
+// 磁盘域拆分（规范第七节）：纯函数走 utils/disk-validation.js，PVE 命令走 services/disk-ops.js
+const { getVmDiskVolumes } = require('../utils/disk-validation');
+const diskOps = require('./disk-ops');
 
 /**
  * 获取 VM 当前的磁盘快照，并持久化到 vm_disk_snapshots 表
@@ -27,7 +29,7 @@ async function takeDiskSnapshot(vmId, userId) {
     config = {};
   }
 
-  var volumes = diskUtils.getVmDiskVolumes(config);
+  var volumes = getVmDiskVolumes(config);
   var allDisks = await db.disks.getByBindVmid(vmId);
 
   // 记录所有磁盘的槽位（含 legacy），用于对账时识别已知槽位
@@ -142,7 +144,7 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
             console.log('[盘审计] 数据盘 ' + knownDisk.id + ' volume_id 已更新: ' + oldVolId + ' -> ' + volPart);
             // 释放旧卷（PVE 恢复后旧卷仍残留在存储池，不释放会变成孤儿）
             try {
-              await diskUtils._internal.destroySystemDisk(oldVolId);
+              await diskOps._internal.destroySystemDisk(oldVolId);
               console.log('[盘审计] 旧卷 ' + oldVolId + ' 已释放');
             } catch (oldErr) {
               console.error('[盘审计] 释放旧卷 ' + oldVolId + ' 失败:', oldErr.message);
@@ -187,7 +189,7 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
           }
 
           // 第二步：销毁卷（宽松校验路径，不拦截 disk-0 卷名）
-          await diskUtils._internal.destroySystemDisk(volPart);
+          await diskOps._internal.destroySystemDisk(volPart);
           console.log('[盘审计] 幽灵盘 ' + volPart + ' 已销毁');
 
           // 第三步：清理 PVE 可能留下的 unused0~unused9 残留配置行

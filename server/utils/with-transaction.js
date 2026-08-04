@@ -8,7 +8,6 @@
  *       return { success: true };
  *   });
  */
-const db = require('../api/db');
 
 /**
  * 在事务中执行一组数据库操作
@@ -17,6 +16,8 @@ const db = require('../api/db');
  * @throws {Error} 事务失败时回滚并抛出原始错误
  */
 async function withTransaction(fn) {
+    // 行内懒加载避免 utils 顶层依赖 api 层（规范第七节：utils 是叶子层）
+    const db = require('../api/db');
     const pool = db.getPool();
     const conn = await pool.getConnection();
     try {

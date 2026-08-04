@@ -10,14 +10,17 @@
     // ===== 状态 =====
     $.user = ref(null);
     $.loading = ref(false);
-    $.activeTab = ref(localStorage.getItem('dashboard_activeTab') || 'vms');
+    $.activeTab = ref(localStorage.getItem(window.__storageKeys.DASHBOARD_ACTIVE_TAB) || 'vms');
     $.activeTabVm = ref('info');
     $.activeTabLxc = ref('info');
     // 日志页 tab（操作日志/登陆日志），刷新后保持
-    $.logTab = ref(localStorage.getItem('dashboard_logTab') || 'operation');
+    $.logTab = ref(localStorage.getItem(window.__storageKeys.DASHBOARD_LOGTAB) || 'operation');
     $.customAlertMessage = ref('');
     $.customConfirmMessage = ref('');
     $.customConfirmResolve = ref(null);
+    // 弹窗逻辑统一由 shared.js 提供（规范第七节：单一来源），refs 就绪后立即接入
+    setupCustomAlert($.customAlertMessage);
+    setupCustomConfirm($.customConfirmMessage, $.customConfirmResolve);
     $.unreadCount = ref(0);
     $.activeSection = ref(new URLSearchParams(window.location.search).get('section') || 'overview');
     $.navItems = ref([]);
@@ -70,7 +73,7 @@
     $.vmPackages = ref([]);
     $.lxcPackages = ref([]);
     // 套餐开通子菜单选中项（VM/LXC），刷新后保持；白名单校验防 localStorage 污染
-    var _savedSubOrder = localStorage.getItem('dashboard_activeTabOrder');
+    var _savedSubOrder = localStorage.getItem(window.__storageKeys.DASHBOARD_ACTIVE_TAB_ORDER);
     $.activeTabOrder = ref((_savedSubOrder === 'vm' || _savedSubOrder === 'lxc') ? _savedSubOrder : 'vm');
     $.orderForm = ref({ period: 'month', quantity: 1, mac_group_id: '', os_template_id: 0 });
     $.orderPackage = ref({});
@@ -254,19 +257,7 @@
         return formatUptime(uptime);
     };
 
-    // ===== alert/confirm =====
-    window.alert = function(message) {
-        $.customAlertMessage.value = message;
-        var el = document.getElementById('customAlertModal');
-        if (el) {
-            var old = bootstrap.Modal.getInstance(el);
-            if (old) old.dispose();
-            // 动态 z-index：后弹出的弹窗始终在之前弹窗之上
-            window.applyModalZIndex(el);
-            new bootstrap.Modal(el).show();
-        }
-    };
-
+    // window.alert / customConfirm 统一由 shared.js 的 setupCustomAlert/SetupCustomConfirm 提供（规范第七节：单一来源）
     $.showAlertAndWait = function(message) {
         return new Promise(function(resolve) {
             $.customAlertMessage.value = message;
@@ -280,38 +271,6 @@
             window.applyModalZIndex(el);
             var modal = bootstrap.Modal.getOrCreateInstance(el);
             modal.show();
-        });
-    };
-
-    window.customConfirm = function(message) {
-        return new Promise(function(resolve) {
-            $.customConfirmMessage.value = message;
-            $.customConfirmResolve.value = resolve;
-            var el = document.getElementById('customConfirmModal');
-            if (!el) { resolve(false); return; }
-            // 获取动态 z-index（customConfirmModal 不走 bsModalShow，需单独管理）
-            var zIndex = window.ModalZIndexManager.acquire();
-            el._modalZIndex = zIndex;
-            el.style.zIndex = zIndex;
-            // hidden 时释放 z-index（confirmOk/confirmCancel 均通过 modal.hide() 关闭）
-            el.addEventListener('hidden.bs.modal', function onHidden() {
-                el.removeEventListener('hidden.bs.modal', onHidden);
-                if (el._modalZIndex != null) {
-                    window.ModalZIndexManager.release(el._modalZIndex);
-                    el._modalZIndex = null;
-                    el.style.zIndex = '';
-                }
-            }, { once: true });
-            var modal = bootstrap.Modal.getOrCreateInstance(el);
-            modal.show();
-            // shown 后设置 backdrop z-index
-            el.addEventListener('shown.bs.modal', function onShown() {
-                el.removeEventListener('shown.bs.modal', onShown);
-                var backdrop = document.querySelector('.modal-backdrop');
-                if (backdrop) {
-                    backdrop.style.zIndex = window.ModalZIndexManager.acquireBackdrop(zIndex);
-                }
-            }, { once: true });
         });
     };
 
@@ -348,6 +307,12 @@
     };
 
     // ===== 导航/用户函数 =====
+    // section 懒加载注册表（规范第七节：core 只查表派发，新增 section 由模块自注册，无需改 core）
+    var sectionLoaders = {};
+    $.registerSectionLoader = function(section, loader) {
+        sectionLoaders[section] = loader;
+    };
+
     $.switchSection = function(section) {
         $.activeSection.value = section;
         // Update sidebar active state
@@ -359,6 +324,18 @@
             document.getElementById('sidebar')?.classList.remove('open');
             var overlay = document.getElementById('sidebarOverlay');
             if (overlay) { overlay.style.display = 'none'; }
+        }
+        // 切换 section 时清理打开 modal 的残留 backdrop（Vue 移除 DOM 后 backdrop 会孤悬）
+        document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('padding-right');
+        document.querySelectorAll('.modal.show').forEach(function(m) {
+            var inst = bootstrap.Modal.getInstance(m);
+            if (inst) inst.hide();
+        });
+        // 按注册表派发 section 懒加载（order/disk/logs 由各模块注册）
+        if (sectionLoaders[section]) {
+            sectionLoaders[section]();
         }
     };
 
@@ -1327,14 +1304,14 @@
         if (trigger) trigger.classList.toggle('expanded');
         // 持久化子菜单展开态，刷新后恢复
         try {
-            var expanded = (localStorage.getItem('dashboard_sidebarExpanded') || '').split(',').filter(Boolean);
+            var expanded = (localStorage.getItem(window.__storageKeys.DASHBOARD_SIDEBAR_EXPANDED) || '').split(',').filter(Boolean);
             var idx = expanded.indexOf(id);
             if (el && el.classList.contains('open')) {
                 if (idx === -1) expanded.push(id);
             } else if (idx !== -1) {
                 expanded.splice(idx, 1);
             }
-            localStorage.setItem('dashboard_sidebarExpanded', expanded.join(','));
+            localStorage.setItem(window.__storageKeys.DASHBOARD_SIDEBAR_EXPANDED, expanded.join(','));
         } catch (e) {}
     };
 
@@ -1357,7 +1334,7 @@
         } else {
             // 恢复其他子菜单的展开态（选中态在子菜单内时必然展开，此处只管非选中场景）
             var expanded = [];
-            try { expanded = (localStorage.getItem('dashboard_sidebarExpanded') || '').split(',').filter(Boolean); } catch (e) {}
+            try { expanded = (localStorage.getItem(window.__storageKeys.DASHBOARD_SIDEBAR_EXPANDED) || '').split(',').filter(Boolean); } catch (e) {}
             document.querySelectorAll('.nav-submenu').forEach(function(el2) {
                 var open = expanded.indexOf(el2.id.replace('submenu-', '')) !== -1;
                 el2.classList.toggle('open', open);
@@ -1367,33 +1344,22 @@
         }
     };
 
-    // 扩展 switchSection 以支持 order
-    var _origSwitchSection = $.switchSection;
-    $.switchSection = function(section) {
-        _origSwitchSection(section);
-        // 切换 section 时清理打开 modal 的残留 backdrop（Vue 移除 DOM 后 backdrop 会孤悬）
-        document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
-        document.body.classList.remove('modal-open');
-        document.body.style.removeProperty('padding-right');
-        document.querySelectorAll('.modal.show').forEach(function(m) {
-            var inst = bootstrap.Modal.getInstance(m);
-            if (inst) inst.hide();
-        });
-        if (section === 'order') {
-            $.loadPackages();
+    // ===== section 懒加载注册（原 monkey-patch 移入 switchSection 本体 + 注册表，规范第七节） =====
+    // order/disk/logs 的懒加载钩子由 core 注册（各模块私有函数通过判空调用，保持容错）
+    $.registerSectionLoader('order', function() {
+        $.loadPackages();
+    });
+    $.registerSectionLoader('disk', function() {
+        if ($.loadDisks) $.loadDisks();
+    });
+    $.registerSectionLoader('logs', function() {
+        // 日志页为单菜单，tab 状态由 localStorage 保持，加载当前 tab 数据
+        if ($.logTab.value === 'operation') {
+            if ($.loadOperationLogs) $.loadOperationLogs(1);
+        } else {
+            if ($.loadLoginLogs) $.loadLoginLogs(1);
         }
-        if (section === 'disk' && $.loadDisks) {
-            $.loadDisks();
-        }
-        if (section === 'logs') {
-            // 日志页为单菜单，tab 状态由 localStorage 保持，加载当前 tab 数据
-            if ($.logTab.value === 'operation') {
-                if ($.loadOperationLogs) $.loadOperationLogs(1);
-            } else {
-                if ($.loadLoginLogs) $.loadLoginLogs(1);
-            }
-        }
-    };
+    });
 
     // ===== 生命周期 =====
     $.refreshInterval = null;

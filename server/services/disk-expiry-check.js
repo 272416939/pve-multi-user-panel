@@ -37,7 +37,9 @@ async function isDiskReminderSent(diskId, stage, date) {
 }
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  // 本地日期（规范第八节：与 DB 的 CURDATE 一致，禁止 toISOString UTC 偏差）
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
 // ==================== 发送提醒邮件 ====================

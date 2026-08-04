@@ -1,17 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const crypto = require('crypto');
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { generateUniqueCdkCode } = require('../utils/cdk-generator');
-const getSiteUrl = require('../utils/site-url');
-const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const { safeError } = require('../utils/safe-error');
-const { formatLocalDate } = require('../utils/date');
+// 业务下沉 services/（规范第七节）：CDK 兑换/批量生成走 services/cdk.js
+const cdkService = require('../services/cdk');
+const pveApi = require('../api/pve-api');
 
 const { checkRateLimit } = require('../middleware/rate-limiter');
-const pveApi = require('../api/pve-api');
-const dbg = require('../utils/debug');
 
 async function checkCdkRateLimit(userId, ip) {
     return checkRateLimit(`ratelimit:cdk:${userId}:${ip}`, 5, 60000);
@@ -40,132 +37,20 @@ router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, 
     }
 });
 
+// 批量生成（业务在 services/cdk.js）
 router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { duration_days, count, expires_at, target_user_ids } = req.body;
- 
-        if (!duration_days || duration_days < 1) {
-            return res.status(400).json({ error: '请提供有效的续费天数' });
-        }
- 
-        // 解析目标用户列表
-        const targetUserIds = Array.isArray(target_user_ids) ? target_user_ids.filter(id => id).map(id => parseInt(id)) : [];
-        const targetUsers = [];
-        for (const uid of targetUserIds) {
-            const user = await db.users.getById(uid);
-            if (!user) {
-                return res.status(400).json({ error: `用户 ID ${uid} 不存在` });
-            }
-            targetUsers.push(user);
-        }
- 
-        const targetNum = Math.min(Math.max(parseInt(count) || 1, 1), 1000);
-        // 选中用户时，每人自动生成一个 CDK
-        const num = targetUsers.length > 0 ? targetUsers.length : targetNum;
-        const batchId = `BATCH-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-        const createdCdkCodes = [];
- 
-        // 生成 CDK，轮询分配给多用户
-        for (let i = 0; i < num; i++) {
-            const code = await generateUniqueCdkCode();
-            const assignedUserId = targetUsers.length > 0 ? targetUsers[i % targetUsers.length].id : null;
-            const newCdk = await db.cdk.create({
-                code,
-                duration_days: parseInt(duration_days),
-                created_by: req.user.id,
-                target_user_id: assignedUserId,
-                expires_at: expires_at || null,
-                batch_id: batchId
-            });
-            createdCdkCodes.push(newCdk);
-        }
- 
-        // 为每个 CDK 附加 target_username
-        const userMap = {};
-        for (const u of targetUsers) {
-            userMap[u.id] = u.username;
-        }
-        const enrichedCodes = createdCdkCodes.map(cdk => ({
-            ...cdk,
-            target_username: cdk.target_user_id ? (userMap[cdk.target_user_id] || null) : null
-        }));
- 
-        // 按用户分组发送通知
-        if (targetUsers.length > 0) {
-            const durationStr = duration_days >= 365 ? `${Math.floor(duration_days / 365)}年` : `${duration_days}天`;
-            const expiryStr = expires_at ? new Date(expires_at).toLocaleString('zh-CN') : '永久有效';
- 
-            // 按用户分组
-            const userCdkMap = {};
-            for (const cdk of createdCdkCodes) {
-                if (!cdk.target_user_id) continue;
-                if (!userCdkMap[cdk.target_user_id]) userCdkMap[cdk.target_user_id] = [];
-                userCdkMap[cdk.target_user_id].push(cdk);
-            }
- 
-            for (const [uid, cdkList] of Object.entries(userCdkMap)) {
-                const parsedUid = parseInt(uid);
-                const user = targetUsers.find(u => u.id === parsedUid);
-                if (!user) continue;
- 
-                const userCount = cdkList.length;
-                const codeListStr = userCount <= 5 ? '\n\n兑换码：\n' + cdkList.map(c => c.code).join('\n') : '';
- 
-                // 发送站内消息
-                try {
-                    await db.messages.create({
-                        uid: parsedUid,
-                        title: '您收到 CDK 兑换码',
-                        content: `${userCount > 1 ? `为您生成了 ${userCount} 张 CDK 兑换码` : '为您生成了一张 CDK 兑换码'}${codeListStr}\n续费时长：${durationStr}\n有效期至：${expiryStr}\n\n请前往「我的虚拟机」页面点击「CDK 兑换」输入此码进行续费。`,
-                        type: 2,
-                        send_type: 2,
-                        link_url: '',
-                        link_text: '去兑换'
-                    });
-                } catch (e) {}
- 
-                // 发送邮件通知
-                if (user.email && user.emailVerified) {
-                    if (await shouldSendEmail(parsedUid, 'notify_recharge')) {
-                        try {
-                            const emailContent = `
-                                <p>您好 <strong>${user.username}</strong>，</p>
-                                <div class="info-box" style="border-left-color: #48bb78;">
-                                    <p style="margin-bottom: 8px; font-size: 16px;">
-                                        ${userCount > 1 ? `为您生成了 ${userCount} 张 CDK 兑换码` : '为您生成了一张 CDK 兑换码'}
-                                    </p>
-                                </div>
-                                <div class="info-box">
-                                    <p style="margin-bottom: 8px;"><strong>CDK 详情：</strong></p>
-                                    <p style="margin-bottom: 4px;">续费时长：${durationStr}</p>
-                                    <p style="margin-bottom: 4px;">有效期至：${expiryStr}</p>
-                                    ${userCount <= 5 ? `<p style="margin-bottom: 4px;">兑换码：<br>${cdkList.map(c => c.code).join('<br>')}</p>` : ''}
-                                </div>
-                                <div class="divider"></div>
-                                <p>请前往「我的虚拟机」页面点击「CDK 兑换」输入兑换码进行续费。</p>
-                            `;
-                            const subjectSiteName = await getSiteName();
-                            if (await shouldSendEmail(user.id, 'notify_recharge')) {
-                                await sendEmail(
-                                    user.email,
-                                    '您收到 CDK 兑换码 - ' + subjectSiteName,
-                                    createEmailTemplate('CDK 兑换码通知', emailContent, subjectSiteName)
-                                );
-                            }
-                        } catch (emailError) {
-                            console.error(`发送 CDK 分配邮件给 ${user.username} 失败:`, emailError.message);
-                        }
-                    }
-                }
-            }
-        }
- 
-        res.json({
-            batch_id: batchId,
-            count: enrichedCodes.length,
-            codes: enrichedCodes,
-            target_users: targetUsers.map(u => ({ id: u.id, username: u.username }))
+        const result = await cdkService.batchGenerateCdk({
+            duration_days: req.body.duration_days,
+            count: req.body.count,
+            expires_at: req.body.expires_at,
+            target_user_ids: req.body.target_user_ids,
+            created_by: req.user.id
         });
+        if (!result.ok) {
+            return res.status(result.status).json({ error: result.error });
+        }
+        res.json(result.data);
     } catch (error) {
         console.error('批量生成 CDK 失败:', error);
         res.status(500).json({ error: safeError(error) });
@@ -298,230 +183,23 @@ router.get('/user/cdk/redeemable-vms', authMiddleware, async (req, res) => {
     }
 });
 
+// 用户兑换（业务在 services/cdk.js）
 router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
     try {
         if (!(await checkCdkRateLimit(req.user.id, req.ip)).allowed) {
             return res.status(429).json({ error: 'CDK 兑换操作过于频繁，请稍后再试' });
         }
 
-        const { code, vm_id, container_id } = req.body;
- 
-        if (!code || (!vm_id && !container_id)) {
-            return res.status(400).json({ error: '请提供 CDK 码和虚拟机/容器' });
+        const result = await cdkService.redeemCdk({
+            userId: req.user.id,
+            code: req.body.code,
+            vm_id: req.body.vm_id,
+            container_id: req.body.container_id
+        });
+        if (!result.ok) {
+            return res.status(result.status).json({ error: result.error });
         }
- 
-        // 查找 CDK
-        const cdk = await db.cdk.getByCode(code.trim().toUpperCase());
-        if (!cdk) {
-            return res.status(400).json({ error: 'CDK 码不存在' });
-        }
-
-        // 检查有效期
-        if (cdk.expires_at && new Date(cdk.expires_at) <= new Date()) {
-            return res.status(400).json({ error: '该 CDK 已过期' });
-        }
-
-        // 检查分配限制：指定用户的 CDK 仅允许该用户使用
-        if (cdk.target_user_id && cdk.target_user_id !== req.user.id) {
-            return res.status(403).json({ error: '该 CDK 已被指定给其他用户，无法使用' });
-        }
-
-        // 原子 CAS 操作防并发重复兑换
-        const markResult = await db.cdk.markAsUsed(cdk.id, req.user.id, vm_id ? parseInt(vm_id) : null, container_id ? parseInt(container_id) : null);
-        if (markResult.affected === 0) {
-            return res.status(400).json({ error: 'CDK 已被使用或无效' });
-        }
-
-        let targetName, targetId, targetType, renewalPrice;
-
-        if (container_id) {
-            const ct = await db.lxcContainers.getById(parseInt(container_id));
-            if (!ct) {
-                return res.status(404).json({ error: 'LXC 容器不存在' });
-            }
- 
-            if (ct.user_id !== req.user.id) {
-                return res.status(403).json({ error: '无权操作此容器' });
-            }
- 
-            targetType = 'lxc';
-            targetId = ct.id;
-            targetName = ct.name || 'CT ' + ct.ct_id;
-            renewalPrice = ct.renewal_price;
- 
-            // 计算新的到期时间
-            let newExpirationDate;
-            if (ct.expiration_date) {
-                const currentExp = new Date(ct.expiration_date);
-                const now = new Date();
-                const baseDate = currentExp > now ? currentExp : now;
-                newExpirationDate = new Date(baseDate.getTime() + cdk.duration_days * 24 * 60 * 60 * 1000);
-            } else {
-                newExpirationDate = new Date(Date.now() + cdk.duration_days * 24 * 60 * 60 * 1000);
-            }
- 
-            // 更新容器到期时间
-            await db.lxcContainers.update(targetId, {
-                expiration_date: formatLocalDate(newExpirationDate),
-                reminderSent: false,
-                lastReminderDate: ''
-            });
-            await db.lxcContainers.reminders.clear(targetId);
- 
-            // 续费后尝试自动开机
-            try {
-                const currentStatus = await pveApi.getLxcStatus(ct.ct_id);
-                if (currentStatus && currentStatus.status === 'stopped') {
-                    await pveApi.startLxc(ct.ct_id);
-                    dbg(`LXC 容器 ${ct.ct_id} 已自动开机（CDK 续费后）`);
-                }
-            } catch (startError) {
-                console.error(`LXC 容器 ${ct.ct_id} 自动开机失败:`, startError.message);
-            }
- 
-            // 发送通知
-            const redeemer = await db.users.getById(req.user.id);
-            if (redeemer && redeemer.email && redeemer.emailVerified) {
-                if (await shouldSendEmail(redeemer.id, 'notify_recharge')) {
-                    try {
-                        const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
-                        const emailContent = `
-                            <p>您好 <strong>${redeemer.username}</strong>，</p>
-                            <div class="info-box" style="border-left-color: #48bb78;">
-                                <p style="margin-bottom: 8px; font-size: 16px;">
-                                    ✅ CDK 续费成功！
-                                </p>
-                            </div>
-                            <div class="info-box">
-                                <p style="margin-bottom: 8px;"><strong>续费详情：</strong></p>
-                                <p style="margin-bottom: 4px;">LXC 容器：${targetName}（CT ${ct.ct_id}）</p>
-                                <p style="margin-bottom: 4px;">续费时长：${durationStr}</p>
-                                ${renewalPrice ? `<p style="margin-bottom: 4px;">续费价格：${renewalPrice}</p>` : ''}
-                                <p style="margin-bottom: 0;">新到期时间：${newExpirationDate.toLocaleString('zh-CN')}</p>
-                            </div>
-                            <p>祝您使用愉快！如有问题请联系管理员。</p>
-                        `;
-                        const subjectSiteName2 = await getSiteName();
-                        if (await shouldSendEmail(redeemer.id, 'notify_recharge')) {
-                            await sendEmail(redeemer.email, 'CDK 续费成功 - ' + subjectSiteName2, createEmailTemplate('续费成功通知', emailContent, subjectSiteName2));
-                        }
-                    } catch (emailError) {
-                        console.error('发送 CDK 续费成功邮件失败:', emailError.message);
-                    }
-                }
-            }
- 
-            try {
-                const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
-                await db.messages.create({
-                    uid: redeemer.id,
-                    title: 'CDK 续费成功',
-                    content: `您的 LXC 容器 ${targetName} 已成功续费 ${durationStr}！\n新到期时间：${newExpirationDate.toLocaleString('zh-CN')}`,
-                    type: 2,
-                    send_type: 1
-                });
-            } catch (e) {}
- 
-            return res.json({
-                message: `兑换成功！LXC 容器到期时间已延长 ${cdk.duration_days} 天`,
-                new_expiration_date: formatLocalDate(newExpirationDate)
-            });
-        } else {
-            // ===== 虚拟机续费 =====
-            const vm = await db.vms.getById(parseInt(vm_id));
-            if (!vm) {
-                return res.status(404).json({ error: '虚拟机不存在' });
-            }
- 
-            if (vm.user_id !== req.user.id) {
-                return res.status(403).json({ error: '无权操作此虚拟机' });
-            }
- 
-            targetType = 'vm';
-            targetId = vm.id;
-            targetName = vm.name || 'VM ' + vm.vm_id;
-            renewalPrice = vm.renewal_price;
- 
-            // 计算新的到期时间
-            let newExpirationDate;
-            if (vm.expiration_date) {
-                const currentExp = new Date(vm.expiration_date);
-                const now = new Date();
-                const baseDate = currentExp > now ? currentExp : now;
-                newExpirationDate = new Date(baseDate.getTime() + cdk.duration_days * 24 * 60 * 60 * 1000);
-            } else {
-                newExpirationDate = new Date(Date.now() + cdk.duration_days * 24 * 60 * 60 * 1000);
-            }
- 
-            // 更新虚拟机到期时间
-            await db.vms.update(vm.id, {
-                expiration_date: formatLocalDate(newExpirationDate),
-                reminderSent: false,
-                lastReminderDate: ''
-            });
-            await db.vms.reminders.clear(vm.id);
- 
-            // 发送续费成功邮件和站内信
-            const redeemer = await db.users.getById(req.user.id);
-            if (redeemer && redeemer.email && redeemer.emailVerified) {
-                if (await shouldSendEmail(redeemer.id, 'notify_recharge')) {
-                    try {
-                        const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
-                        const emailContent = `
-                            <p>您好 <strong>${redeemer.username}</strong>，</p>
-                            <div class="info-box" style="border-left-color: #48bb78;">
-                                <p style="margin-bottom: 8px; font-size: 16px;">
-                                    ✅ CDK 续费成功！
-                                </p>
-                            </div>
-                            <div class="info-box">
-                                <p style="margin-bottom: 8px;"><strong>续费详情：</strong></p>
-                                <p style="margin-bottom: 4px;">虚拟机：${targetName}（VMID: ${vm.vm_id}）</p>
-                                <p style="margin-bottom: 4px;">续费时长：${durationStr}</p>
-                                ${renewalPrice ? `<p style="margin-bottom: 4px;">续费价格：${renewalPrice}</p>` : ''}
-                                <p style="margin-bottom: 0;">新到期时间：${newExpirationDate.toLocaleString('zh-CN')}</p>
-                            </div>
-                            <p>祝您使用愉快！如有问题请联系管理员。</p>
-                        `;
-                        const subjectSiteName3 = await getSiteName();
-                        await sendEmail(
-                            redeemer.email,
-                            'CDK 续费成功 - ' + subjectSiteName3,
-                            createEmailTemplate('续费成功通知', emailContent, subjectSiteName3)
-                        );
-                    } catch (emailError) {
-                    console.error('发送 CDK 续费成功邮件失败:', emailError.message);
-                }
-            }
-            }
-
-            try {
-                const durationStr = cdk.duration_days >= 365 ? `${Math.floor(cdk.duration_days / 365)}年` : `${cdk.duration_days}天`;
-                await db.messages.create({
-                    uid: redeemer.id,
-                    title: 'CDK 续费成功',
-                    content: `您的虚拟机 ${targetName} 已成功续费 ${durationStr}！\n新到期时间：${newExpirationDate.toLocaleString('zh-CN')}`,
-                    type: 2,
-                    send_type: 1
-                });
-            } catch (e) {}
- 
-            // 虚拟机之前可能因到期被关机，尝试自动开机
-            try {
-                const currentStatus = await pveApi.getVmStatus(vm.vm_id);
-                if (currentStatus && currentStatus.status === 'stopped') {
-                    await pveApi.startVm(vm.vm_id);
-                    dbg(`虚拟机 ${vm.vm_id} 已自动开机（CDK 续费后）`);
-                }
-            } catch (startError) {
-                console.error(`虚拟机 ${vm.vm_id} 自动开机失败:`, startError.message);
-            }
- 
-            res.json({
-                message: `兑换成功！虚拟机到期时间已延长 ${cdk.duration_days} 天`,
-                new_expiration_date: formatLocalDate(newExpirationDate)
-            });
-        }
+        res.json(result.data);
     } catch (error) {
         console.error('兑换 CDK 失败:', error);
         res.status(500).json({ error: safeError(error) });

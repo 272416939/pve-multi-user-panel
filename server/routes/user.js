@@ -18,6 +18,8 @@ const cacheStore = require('../utils/cache-store');
 const { getIpLocation, getIpLocations } = require('../services/ip-location');
 const { invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/safe-error');
+// 本地时间格式化统一走 utils/date.js（规范第八节：禁止 toISOString 直写）
+const { formatLocalDate } = require('../utils/date');
 // profileCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
 const profileCache = cacheStore.create('profile', 60);
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
@@ -423,7 +425,7 @@ router.put('/user/email', authMiddleware, async (req, res) => {
             email,
             token: verifyToken,
             type: 'email_verify',
-            expiresAt: expiresAt.toISOString()
+            expiresAt: formatLocalDate(expiresAt)
         });
         
         try {

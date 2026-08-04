@@ -10,6 +10,8 @@ var cacheStore = require('../utils/cache-store');
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
 var { importExistingDisks } = require('../services/disk-expiry-check');
+// 单一来源：磁盘类型白名单统一走 constants（规范第七节）
+var { DISK_TYPES } = require('../constants');
 
 // 规格列表缓存（5 分钟 TTL）
 var specCache = cacheStore.create('disk_specs', 300);
@@ -206,7 +208,7 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
     // 参数校验
     if (!data.name || !data.name.trim()) return res.status(400).json({ error: '请输入规格名称' });
     if (data.name.length > 100) return res.status(400).json({ error: '规格名称不能超过 100 字符' });
-    if (['NVME', 'SATA', 'HDD', 'U2'].indexOf(data.disk_type) === -1) return res.status(400).json({ error: '无效的硬盘类型' });
+    if (DISK_TYPES.indexOf(data.disk_type) === -1) return res.status(400).json({ error: '无效的硬盘类型' });
     if (!data.storage_group_id) return res.status(400).json({ error: '请选择存储分组' });
     if (!data.storage_pool || !data.storage_pool.trim()) return res.status(400).json({ error: '请选择存储位置' });
     if (!data.min_size_gb || data.min_size_gb < 1) return res.status(400).json({ error: '最低容量必须大于 0' });
@@ -251,7 +253,7 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
     var data = req.body;
     if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID' });
     if (!data.name || !data.name.trim()) return res.status(400).json({ error: '请输入规格名称' });
-    if (['NVME', 'SATA', 'HDD', 'U2'].indexOf(data.disk_type) === -1) return res.status(400).json({ error: '无效的硬盘类型' });
+    if (DISK_TYPES.indexOf(data.disk_type) === -1) return res.status(400).json({ error: '无效的硬盘类型' });
     if (!data.storage_group_id) return res.status(400).json({ error: '请选择存储分组' });
     if (!data.storage_pool || !data.storage_pool.trim()) return res.status(400).json({ error: '请选择存储位置' });
     var pricePerGbVal2 = Math.round(parseFloat(data.price_per_gb) * 100) / 100;
@@ -529,7 +531,8 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
     }
 
     var user = await db.users.getById(disk.user_id);
-    var diskUtils = require('../utils/disk-utils');
+    // 磁盘域拆分（规范第七节）：PVE 命令走 services/disk-ops.js
+    var diskOps = require('../services/disk-ops');
 
     // 事务：PVE销毁 + 退款 + 订单状态更新
     var { withTransaction } = require('../utils/with-transaction');
@@ -544,7 +547,7 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
 
       // 执行 PVE 销毁
       try {
-        await diskUtils.destroyDisk(lockedDisk.volume_id);
+        await diskOps.destroyDisk(lockedDisk.volume_id);
       } catch (pveErr) {
         // PVE 卷可能已不存在，继续执行
         console.error('[admin disk destroy] PVE 销毁失败:', pveErr.message);
