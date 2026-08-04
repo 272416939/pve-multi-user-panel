@@ -401,7 +401,8 @@ const vmOsSwitchLogs = {
             err.code = 'LOG_RUNNING';
             throw err;
         }
-        const result = await execute("DELETE FROM vm_os_switch_logs WHERE id = ? AND status != 'running'", [parseInt(id)]);
+        // execute 返回 [ResultSetHeader, fields]，需解构取 affectedRows（否则恒为 undefined）
+        const [result] = await execute("DELETE FROM vm_os_switch_logs WHERE id = ? AND status != 'running'", [parseInt(id)]);
         return { deleted: result.affectedRows };
     },
     batchDelete: async (criteria) => {
@@ -420,11 +421,11 @@ const vmOsSwitchLogs = {
         const skipped = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE status = 'running'" +
             (ids && ids.length ? ' AND id IN (' + ids.map(() => '?').join(',') + ')' : ''),
             ids && ids.length ? ['running', ...ids.map(id => parseInt(id))] : ['running']);
-        const result = await execute(sql, params);
+        const [result] = await execute(sql, params);
         return { deleted: result.affectedRows, skipped_running: skipped.c };
     },
     clearAllExceptRunningAndIntervention: async () => {
-        const result = await execute("DELETE FROM vm_os_switch_logs WHERE status != 'running' AND admin_intervention_required = 0");
+        const [result] = await execute("DELETE FROM vm_os_switch_logs WHERE status != 'running' AND admin_intervention_required = 0");
         const skippedRunning = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE status = 'running'");
         const skippedIntervention = await queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE admin_intervention_required = 1");
         return {
