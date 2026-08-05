@@ -927,18 +927,16 @@
     <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
         <div class="modal-header"><h5 class="modal-title">新建子网</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
-            <p class="text-muted small">创建私有网络子网将自动完成以下操作：</p>
+            <p class="text-muted small">创建后系统将自动完成网段分配，无需手动配置：</p>
             <ul class="small text-muted mb-3">
-                <li>在爱快中创建 VLAN 接口（名称系统内置：vlan_VPC 开头，不可编辑）</li>
-                <li>在该 VLAN 上创建 DHCP 服务端（网关为自动分配的网段起始地址）</li>
-                <li>子网备注自动记录所属用户</li>
+                <li>VLAN ID 与网段自动分配，依次递增</li>
+                <li>网关为网段起始地址（如 172.16.0.1）</li>
+                <li>名称由系统自动生成，不可编辑</li>
             </ul>
             <div class="alert alert-info mb-0">
-                <div>VLAN ID 与网段由系统自动分配，依次递增</div>
-                <div class="mt-1">网段起始：<strong>后台「私有网络 - VLAN 设置」</strong>中配置的 IP 段开始范围</div>
                 <div>创建完成后可在列表中查看分配的 <strong>VLAN ID / 网段 / 网关</strong></div>
+                <div class="mt-1">删除子网前需先解绑其下所有服务器</div>
             </div>
-            <div class="form-text text-muted mt-2">VLAN 名称系统内置（vlan_VPC 开头，≤15 位），不可编辑；删除子网前需先解绑其下所有服务器。</div>
         </div>
         <div class="modal-footer d-flex gap-2">
             <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
@@ -963,7 +961,7 @@
                 服务器正在运行，请先关机后再进行子网操作
             </div>
             <div class="alert alert-warning small" v-else-if="bindSubnetDevice.status && bindSubnetDevice.status.status !== 'running'">
-                绑定/解绑子网后，重新开机时若尚未绑定子网将无法启动，需先完成绑定
+                解绑子网后需重新绑定才能开机
             </div>
             <!-- 已绑定：显示当前子网 + 解绑按钮 -->
             <template v-if="bindSubnetCurrentSubnet">

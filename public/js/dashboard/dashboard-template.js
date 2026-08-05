@@ -480,7 +480,7 @@
                                 </td>
                             </tr>
                             <tr v-if="subnets.length === 0">
-                                <td :colspan="isAdmin ? 8 : 7" class="text-center text-muted py-4">暂无子网，点击「新建子网」创建私有网络（将自动创建 VLAN 与 DHCP 服务端）</td>
+                                <td :colspan="isAdmin ? 8 : 7" class="text-center text-muted py-4">暂无子网，点击「新建子网」创建私有网络</td>
                             </tr>
                         </tbody>
                     </table>

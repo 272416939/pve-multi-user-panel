@@ -39,7 +39,7 @@
             await api('/subnets', { method: 'POST' });
             $.bsModalHide('createSubnetModal');
             await $.loadSubnets();
-            alert('私有网络子网已创建，VLAN 与 DHCP 服务端已同步到爱快');
+            alert('私有网络子网已创建');
         } catch (e) {
             alert('创建失败：' + e.message);
         } finally {
@@ -49,7 +49,7 @@
 
     // ==================== 删除子网 ====================
     $.deleteSubnet = async function(s) {
-        var ok = await window.customConfirm('确定删除子网 ' + s.vlan_name + '（' + (s.cidr || '') + '）？\n删除后对应的 VLAN 与 DHCP 服务端将被移除，删除前请先解绑其下所有服务器。');
+        var ok = await window.customConfirm('确定删除子网 ' + s.vlan_name + '（' + (s.cidr || '') + '）？\n删除前请先解绑其下所有服务器。');
         if (!ok) return;
         try {
             await api('/subnets/' + s.id, { method: 'DELETE' });
