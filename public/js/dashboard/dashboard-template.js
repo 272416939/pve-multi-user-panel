@@ -451,7 +451,6 @@
                                 <th>IPv4 CIDR</th>
                                 <th>服务器</th>
                                 <th>可用IP</th>
-                                <th v-if="isAdmin">所属用户</th>
                                 <th>创建时间</th>
                                 <th>操作</th>
                             </tr>
@@ -473,14 +472,13 @@
                                     </span>
                                 </td>
                                 <td>{{ s.available }}</td>
-                                <td v-if="isAdmin">{{ s.username || '-' }}</td>
                                 <td>{{ formatDate(s.created_at) }}</td>
                                 <td>
                                     <pv-button size="sm" variant="outline-danger" @click="deleteSubnet(s)">删除</pv-button>
                                 </td>
                             </tr>
                             <tr v-if="subnets.length === 0">
-                                <td :colspan="isAdmin ? 8 : 7" class="text-center text-muted py-4">暂无子网，点击「新建子网」创建私有网络</td>
+                                <td colspan="7" class="text-center text-muted py-4">暂无子网，点击「新建子网」创建私有网络</td>
                             </tr>
                         </tbody>
                     </table>

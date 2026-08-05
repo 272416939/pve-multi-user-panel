@@ -67,29 +67,18 @@ async function checkDeviceAccess(req, type, vmid) {
     return { record, status };
 }
 
-// ===== 子网列表 =====
+// ===== 子网列表（仅当前用户自己的子网，admin 一视同仁，不泄露他人网段） =====
 router.get('/subnets', authMiddleware, async (req, res) => {
     try {
-        const isAdmin = req.user.role === 'admin';
-        const list = isAdmin ? await db.subnets.getAll() : await db.subnets.getByUserId(req.user.id);
+        const list = await db.subnets.getByUserId(req.user.id);
 
         // 绑定设备统计（一次查询避免 N+1）
-        const myVms = isAdmin ? await db.vms.getAll() : await db.vms.getByUserId(req.user.id);
-        const myCts = isAdmin ? await db.lxcContainers.getAll() : await db.lxcContainers.getByUserId(req.user.id);
+        const myVms = await db.vms.getByUserId(req.user.id);
+        const myCts = await db.lxcContainers.getByUserId(req.user.id);
         const vmCount = {};
         const ctCount = {};
         myVms.forEach(v => { if (v.subnet_id) vmCount[v.subnet_id] = (vmCount[v.subnet_id] || 0) + 1; });
         myCts.forEach(c => { if (c.subnet_id) ctCount[c.subnet_id] = (ctCount[c.subnet_id] || 0) + 1; });
-
-        // 所属用户名（admin 列表展示）
-        const userIds = [...new Set(list.map(s => s.user_id))];
-        const usernames = {};
-        for (const uid of userIds) {
-            try {
-                const u = await db.users.getById(uid);
-                if (u) usernames[uid] = u.username;
-            } catch (_) {}
-        }
 
         const result = list.map(s => {
             const gwParts = (s.gateway || '').split('.');
@@ -105,7 +94,6 @@ router.get('/subnets', authMiddleware, async (req, res) => {
                 available: s.available,
                 vm_count: vmCount[s.id] || 0,
                 lxc_count: ctCount[s.id] || 0,
-                username: usernames[s.user_id] || '',
                 created_at: s.created_at
             };
         });
