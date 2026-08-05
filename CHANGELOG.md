@@ -1,5 +1,19 @@
 # Changelog
 
+## [2.35.2] - 2026-08-05
+
+### Fixed
+- **fix(logs): 补全后台操作子域映射（cache/package-group 漏映射）**
+  - 盘点全部 `admin.*` 埋点与 `ADMIN_SUB_CATEGORIES` 白名单差异，补上 2 个遗漏子域：
+    - `cache` -> 「缓存管理」
+    - `package-group` -> 「套餐分组」
+  - 前端后台操作筛选下拉同步新增这两项（共 16 项），子域中文名映射正确
+  - 涉及文件：`server/api/db-messaging.js`（白名单单一来源）、`public/js/admin/admin-template-logs.js`（下拉）、`public/cache-version.json`（v51）
+
+### Notes
+- 验证：全量测试 396 passing（含 17 子域白名单断言）、浏览器冒烟 `cache` 筛选命中 `admin.cache.clear` 且中文名正确
+- 缓存版本 v51
+
 ## [2.35.1] - 2026-08-04
 
 ### Added
