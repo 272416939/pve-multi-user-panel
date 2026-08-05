@@ -4,8 +4,12 @@
  * 调用 uapis.cn /api/v1/network/ipinfo 查询公网 IP 归属地：
  * - 认证头 X-API-Key（留空则使用游客免费额度，有限流）
  * - source=commercial 获取中文运营商名（isp）与完整区域信息
- * - 结果带 7 天缓存（Redis 优先，内存回退）
- * - 任何失败静默降级返回 ''，绝不影响主流程
+ *
+ * 三层缓存架构（行业惯例，避免重复外呼产生费用）：
+ * - L2 Redis/内存缓存（7 天 TTL，短期加速层）
+ * - L3 数据库持久缓存 ip_locations 表（30 天有效，重启不丢；首次外呼成功后入库）
+ * - L1 single-flight 外呼去重：同一 IP 并发查询只外呼一次，成功写回 L2+L3
+ * - 任何失败静默降级返回 ''，绝不影响主流程（失败不写负缓存，API 恢复立即生效）
  */
 'use strict';
 const axios = require('axios');
@@ -150,7 +154,7 @@ async function loadFromUapi(ip) {
 }
 
 /**
- * 获取 IP 归属地（带 7 天缓存 + 启用开关校验），失败返回 ''
+ * 获取 IP 归属地（三层缓存：Redis 短期层 → DB 持久层 → 外呼写回），失败返回 ''
  * 供业务接口（如 /user/devices）使用，绝不抛异常
  * @param {string} ip
  * @returns {Promise<string>}
@@ -160,20 +164,35 @@ async function getIpLocation(ip) {
     if (!normalized) return '';
     try {
         if (!(await isUapiProEnabled())) return '';
-        // 显式 get/set 而非 loader 形式：外呼失败（null）不写缓存，
-        // 避免失败结果被负缓存近 2 天（cache-store 对 null 缓存 TTL/4），API 恢复后立即生效
+        // L2: Redis/内存缓存（7 天 TTL，短期加速层；重启即丢）
         var loc = await ipCache.get(normalized);
         if (loc !== null) {
             return typeof loc === 'string' ? loc : '';
         }
-        // single-flight：同一 IP 已有外呼进行中时直接复用，不重复外呼
+        // L3: DB 持久缓存（30 天有效，重启不丢；命中零外呼，顺带回填 Redis 短期层）
+        try {
+            var rows = await db.ipLocations.batchGet([normalized]);
+            if (rows.length > 0 && rows[0].location) {
+                ipCache.set(normalized, rows[0].location).catch(function () {});
+                return rows[0].location;
+            }
+        } catch (e) {
+            console.error('[IP归属地] 读缓存表失败:', ip, e.message);
+        }
+        // L1: single-flight：同一 IP 已有外呼进行中时直接复用，不重复外呼
         if (inFlight.has(normalized)) {
             return inFlight.get(normalized);
         }
         var pending = (async () => {
             var fetched = await loadFromUapi(normalized);
             if (fetched) {
-                await ipCache.set(normalized, fetched);
+                // 显式 set 而非 loader 形式：外呼失败（null）不写缓存，
+                // 避免失败结果被负缓存（cache-store 对 null 缓存 TTL/4），API 恢复后立即生效
+                ipCache.set(normalized, fetched).catch(function () {});
+                // 首次查询入库（30 天有效）；入库失败不影响本次返回
+                try { await db.ipLocations.upsert(normalized, fetched); } catch (e) {
+                    console.error('[IP归属地] 写入缓存表失败:', normalized, e.message);
+                }
                 return fetched;
             }
             return '';
@@ -200,7 +219,7 @@ async function queryIpLocation(ip) {
 }
 
 /**
- * 批量获取 IP 归属地（去重 + 并发 + 容错，失败返回空串）
+ * 批量获取 IP 归属地（去重 + 先批量读 DB 持久缓存 + 未命中并发外呼写回，失败返回空串）
  * 供列表类接口（日志页/设备列表）使用，避免 N 次串行外呼
  * @param {string[]} ipList
  * @returns {Promise<Object>} { ip: location } 映射
@@ -208,10 +227,22 @@ async function queryIpLocation(ip) {
 async function getIpLocations(ipList) {
     var locMap = {};
     var unique = Array.from(new Set((ipList || []).filter(Boolean)));
-    if (unique.length > 0) {
-        var results = await Promise.allSettled(unique.map(function(ip) { return getIpLocation(ip); }));
-        unique.forEach(function(ip, i) {
-            if (results[i].status === 'fulfilled') locMap[ip] = results[i].value || '';
+    if (unique.length === 0) return locMap;
+    // L3: 先批量读 DB 持久缓存（1 次 IN 查询），命中即零外呼
+    try {
+        var cached = await db.ipLocations.batchGet(unique);
+        cached.forEach(function (r) {
+            if (r.location) locMap[r.ip] = r.location;
+        });
+    } catch (e) {
+        console.error('[IP归属地] 批量读缓存表失败:', e.message);
+    }
+    // 未命中的 IP 走单查链路（Redis → 外呼 → 写回 DB）
+    var missing = unique.filter(function (ip) { return !locMap[ip]; });
+    if (missing.length > 0) {
+        var results = await Promise.allSettled(missing.map(function (ip) { return getIpLocation(ip); }));
+        missing.forEach(function (ip, i) {
+            if (results[i].status === 'fulfilled' && results[i].value) locMap[ip] = results[i].value;
         });
     }
     return locMap;

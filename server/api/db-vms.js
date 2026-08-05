@@ -350,9 +350,9 @@ const vmOsSwitchLogs = {
         return queryOne('SELECT * FROM vm_os_switch_logs WHERE id = ?', [parseInt(id)]);
     },
     countTodayByUser: (userId) => queryOne("SELECT COUNT(*) AS c FROM vm_os_switch_logs WHERE user_id = ? AND DATE(started_at) = CURDATE()", [parseInt(userId)]),
-    // 管理端翻页
+    // 管理端翻页（keyword 模糊匹配：用户名/VMID/来源/目标系统名；日期按 started_at 范围）
     getListWithPaging: (filters) => {
-        const { page = 1, limit = 20, status, vm_id, user_id, username, before_date } = filters;
+        const { page = 1, limit = 20, status, vm_id, user_id, username, keyword, start_date, end_date, before_date } = filters;
         const offset = (Math.min(page, 1000) - 1) * Math.min(limit, 200);
         let sql = `SELECT l.*, u.username,
                           from_t.name AS from_os_template_name,
@@ -366,20 +366,34 @@ const vmOsSwitchLogs = {
         if (status) { sql += ' AND l.status = ?'; params.push(status); }
         if (vm_id) { sql += ' AND l.vm_id = ?'; params.push(parseInt(vm_id)); }
         if (user_id) { sql += ' AND l.user_id = ?'; params.push(parseInt(user_id)); }
-        if (username) { sql += ' AND u.username = ?'; params.push(username); }
+        if (username) { sql += ' AND u.username LIKE ?'; params.push('%' + username + '%'); }
+        if (keyword) {
+            const kw = '%' + keyword + '%';
+            sql += ' AND (u.username LIKE ? OR l.vm_id LIKE ? OR from_t.name LIKE ? OR to_t.name LIKE ?)';
+            params.push(kw, kw, kw, kw);
+        }
+        if (start_date) { sql += ' AND l.started_at >= ?'; params.push(start_date); }
+        if (end_date) { sql += ' AND l.started_at <= ?'; params.push(end_date); }
         if (before_date) { sql += ' AND l.started_at < ?'; params.push(before_date); }
         sql += ' ORDER BY l.id DESC LIMIT ? OFFSET ?';
         params.push(parseInt(limit), offset);
         return queryAll(sql, params);
     },
     countWithFilters: (filters) => {
-        const { status, vm_id, user_id, username, before_date } = filters;
-        let sql = 'SELECT COUNT(*) AS c FROM vm_os_switch_logs l LEFT JOIN users u ON l.user_id = u.id WHERE 1=1';
+        const { status, vm_id, user_id, username, keyword, start_date, end_date, before_date } = filters;
+        let sql = 'SELECT COUNT(*) AS c FROM vm_os_switch_logs l LEFT JOIN users u ON l.user_id = u.id LEFT JOIN os_templates from_t ON l.from_os_template_id = from_t.id LEFT JOIN os_templates to_t ON l.to_os_template_id = to_t.id WHERE 1=1';
         const params = [];
         if (status) { sql += ' AND l.status = ?'; params.push(status); }
         if (vm_id) { sql += ' AND l.vm_id = ?'; params.push(parseInt(vm_id)); }
         if (user_id) { sql += ' AND l.user_id = ?'; params.push(parseInt(user_id)); }
-        if (username) { sql += ' AND u.username = ?'; params.push(username); }
+        if (username) { sql += ' AND u.username LIKE ?'; params.push('%' + username + '%'); }
+        if (keyword) {
+            const kw = '%' + keyword + '%';
+            sql += ' AND (u.username LIKE ? OR l.vm_id LIKE ? OR from_t.name LIKE ? OR to_t.name LIKE ?)';
+            params.push(kw, kw, kw, kw);
+        }
+        if (start_date) { sql += ' AND l.started_at >= ?'; params.push(start_date); }
+        if (end_date) { sql += ' AND l.started_at <= ?'; params.push(end_date); }
         if (before_date) { sql += ' AND l.started_at < ?'; params.push(before_date); }
         return queryOne(sql, params);
     },

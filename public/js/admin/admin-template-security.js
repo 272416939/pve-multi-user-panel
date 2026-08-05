@@ -65,7 +65,7 @@
     </div>
 
     <div class="d-flex gap-2">
-        <pv-button type="button" variant="glass" @click="saveRateLimitConfig" :disabled="rateLimitSaving">
+        <pv-button type="button" variant="glass" @click="saveRateLimitConfig()" :disabled="rateLimitSaving">
             {{ rateLimitSaving ? '保存中...' : '保存配置' }}
         </pv-button>
         <pv-button type="button" variant="outline" @click="resetRateLimitConfig" :disabled="rateLimitSaving">恢复默认配置</pv-button>

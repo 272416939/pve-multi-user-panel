@@ -730,7 +730,7 @@
         }
     };
 
-    $.saveRateLimitConfig = async function() {
+    $.saveRateLimitConfig = async function(restoreDefault) {
         if ($.rateLimitSaving.value) return;
         var cfg = $.rateLimitConfig.value;
         // 前端兜底校验（与后端一致：次数 1-10000，时间窗 1-86400 秒）
@@ -754,9 +754,11 @@
         }
         $.rateLimitSaving.value = true;
         try {
+            // 严格 === true 判断：按钮事件绑定会传入 MouseEvent，!!restoreDefault 会把普通保存误判为恢复默认
+            var isRestoreDefault = restoreDefault === true;
             await api('/admin/rate-limit/config', {
                 method: 'PUT',
-                body: JSON.stringify({ master_enabled: !!cfg.master_enabled, categories: cfg.categories })
+                body: JSON.stringify({ master_enabled: !!cfg.master_enabled, categories: cfg.categories, restore_default: isRestoreDefault })
             });
             alert('限速配置保存成功');
             await $.loadRateLimitConfig();
@@ -783,7 +785,8 @@
                 rule.windowUnit = ui.windowUnit;
             });
         });
-        await $.saveRateLimitConfig();
+        // 恢复默认：传 restore_default 标记，后端审计详情按「恢复默认参数」记录
+        await $.saveRateLimitConfig(true);
     };
 
     // 财务管理 - 交易流水
@@ -905,7 +908,7 @@
     $.osSwitchLogList = Vue.ref([]);
     $.osSwitchLogTotal = Vue.ref(0);
     $.osSwitchLogPage = Vue.ref(1);
-    $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '', username: '' });
+    $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '', username: '', keyword: '', start_date: '', end_date: '' });
     $.osSwitchLogSelected = Vue.reactive([]);
     $.osSwitchLogDetail = Vue.ref(null);
     const OS_SWITCH_LOG_LIMIT = 20;
@@ -921,6 +924,10 @@
             if ($.osSwitchLogFilter.vm_id) params += '&vm_id=' + encodeURIComponent($.osSwitchLogFilter.vm_id);
             if ($.osSwitchLogFilter.user_id) params += '&user_id=' + encodeURIComponent($.osSwitchLogFilter.user_id);
             if ($.osSwitchLogFilter.username) params += '&username=' + encodeURIComponent($.osSwitchLogFilter.username);
+            var osKw = ($.osSwitchLogFilter.keyword || '').trim();
+            if (osKw) params += '&keyword=' + encodeURIComponent(osKw);
+            if ($.osSwitchLogFilter.start_date) params += '&start_date=' + encodeURIComponent($.osSwitchLogFilter.start_date);
+            if ($.osSwitchLogFilter.end_date) params += '&end_date=' + encodeURIComponent($.osSwitchLogFilter.end_date);
             var res = await api('/admin/os-switch-logs' + params);
             if (res && res.success) {
                 $.osSwitchLogList.value = res.data || [];
@@ -942,6 +949,9 @@
         $.osSwitchLogFilter.vm_id = '';
         $.osSwitchLogFilter.user_id = '';
         $.osSwitchLogFilter.username = '';
+        $.osSwitchLogFilter.keyword = '';
+        $.osSwitchLogFilter.start_date = '';
+        $.osSwitchLogFilter.end_date = '';
         $.loadOsSwitchLogs(1);
     };
 

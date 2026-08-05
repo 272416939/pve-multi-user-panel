@@ -49,7 +49,8 @@ const ADMIN_SUB_CATEGORIES = {
     network: '网络管理',
     order: '订单开通',
     log: '日志管理',
-    system: '系统操作'
+    system: '系统操作',
+    security: '安全设置'
 };
 
 // category -> SQL 条件（参数化），返回 [whereSql, args]
@@ -169,8 +170,9 @@ const auditLogs = {
             args.push(parseInt(params.filterUserId));
         }
         if (params.username) {
-            where.push('username = ?');
-            args.push(String(params.username));
+            // 用户名模糊搜索（与 keyword 的 LIKE 风格一致）
+            where.push('username LIKE ?');
+            args.push('%' + String(params.username) + '%');
         }
         if (params.category && AUDIT_CATEGORIES.indexOf(params.category) !== -1) {
             var cat = buildAuditCategoryWhere(params.category);
@@ -178,8 +180,9 @@ const auditLogs = {
             args = args.concat(cat[1]);
         }
         if (params.keyword) {
-            where.push('details LIKE ?');
-            args.push('%' + params.keyword + '%');
+            where.push('(details LIKE ? OR ip_loc.location LIKE ?)');
+            var kw = '%' + params.keyword + '%';
+            args.push(kw, kw);
         }
         if (params.startDate) {
             where.push('created_at >= ?');
@@ -189,11 +192,13 @@ const auditLogs = {
             where.push('created_at <= ?');
             args.push(params.endDate);
         }
-        // 无筛选条件时不得生成空 WHERE（全站视图默认），否则 SQL 语法错误
+        // 无筛选条件时不得生成空 WHERE（全站视图默认），否则 SQL 语法错误；
+        // 关键字匹配归属地文本时需 JOIN ip_locations 持久缓存表（列表与 COUNT 同步）
+        var joinClause = params.keyword ? ' LEFT JOIN ip_locations ip_loc ON ip_loc.ip = audit_logs.ip' : '';
         var whereClause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : '';
-        var totalRow = await queryOne('SELECT COUNT(*) AS total FROM audit_logs' + whereClause, args);
+        var totalRow = await queryOne('SELECT COUNT(*) AS total FROM audit_logs' + joinClause + whereClause, args);
         var rows = await queryAll(
-            'SELECT id, user_id, username, action, resource_type, resource_id, ip, details, created_at FROM audit_logs' + whereClause + ' ORDER BY id DESC LIMIT ? OFFSET ?',
+            'SELECT id, user_id, username, action, resource_type, resource_id, audit_logs.ip, details, created_at FROM audit_logs' + joinClause + whereClause + ' ORDER BY id DESC LIMIT ? OFFSET ?',
             args.concat([limit, offset])
         );
         return { rows: rows, total: totalRow.total, page: page, limit: limit };
@@ -264,17 +269,19 @@ const loginLogs = {
             args.push(parseInt(params.filterUserId));
         }
         if (params.username) {
-            where.push('username = ?');
-            args.push(String(params.username));
+            // 用户名模糊搜索（与 keyword 的 LIKE 风格一致）
+            where.push('username LIKE ?');
+            args.push('%' + String(params.username) + '%');
         }
         if (params.status && ['success', 'failed'].indexOf(params.status) !== -1) {
             where.push('status = ?');
             args.push(params.status);
         }
         if (params.keyword) {
-            where.push('(username LIKE ? OR ip LIKE ? OR user_agent LIKE ?)');
+            // 归属地表有 ip 列，裸 ip LIKE 会歧义，需限定 login_logs.ip
+            where.push('(username LIKE ? OR login_logs.ip LIKE ? OR user_agent LIKE ? OR ip_loc.location LIKE ?)');
             var kw = '%' + params.keyword + '%';
-            args.push(kw, kw, kw);
+            args.push(kw, kw, kw, kw);
         }
         if (params.startDate) {
             where.push('created_at >= ?');
@@ -284,11 +291,13 @@ const loginLogs = {
             where.push('created_at <= ?');
             args.push(params.endDate);
         }
-        // 无筛选条件时不得生成空 WHERE（全站视图默认），否则 SQL 语法错误
+        // 无筛选条件时不得生成空 WHERE（全站视图默认），否则 SQL 语法错误；
+        // 关键字匹配归属地文本时需 JOIN ip_locations 持久缓存表（列表与 COUNT 同步）
+        var joinClause = params.keyword ? ' LEFT JOIN ip_locations ip_loc ON ip_loc.ip = login_logs.ip' : '';
         var whereClause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : '';
-        var totalRow = await queryOne('SELECT COUNT(*) AS total FROM login_logs' + whereClause, args);
+        var totalRow = await queryOne('SELECT COUNT(*) AS total FROM login_logs' + joinClause + whereClause, args);
         var rows = await queryAll(
-            'SELECT id, user_id, username, ip, user_agent, status, details, created_at FROM login_logs' + whereClause + ' ORDER BY id DESC LIMIT ? OFFSET ?',
+            'SELECT id, user_id, username, login_logs.ip, user_agent, status, details, created_at FROM login_logs' + joinClause + whereClause + ' ORDER BY id DESC LIMIT ? OFFSET ?',
             args.concat([limit, offset])
         );
         return { rows: rows, total: totalRow.total, page: page, limit: limit };

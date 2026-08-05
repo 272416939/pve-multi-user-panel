@@ -25,7 +25,7 @@
     $.loginLogPage = ref(1);
     // 三个 tab 独立筛选状态（reactive 对象，重置用 Object.assign）
     $.opLogFilter = Vue.reactive({ category: '', user_id: '', username: '', keyword: '', start_date: '', end_date: '' });
-    $.adminLogFilter = Vue.reactive({ action_prefix: '', user_id: '', keyword: '', start_date: '', end_date: '' });
+    $.adminLogFilter = Vue.reactive({ action_prefix: '', user_id: '', username: '', keyword: '', start_date: '', end_date: '' });
     $.loginLogFilter = Vue.reactive({ status: '', user_id: '', username: '', keyword: '', start_date: '', end_date: '' });
     // 日志保留上限（后端返回，Tips 提示用）：用户操作按用户维度 / 后台操作按全站维度
     $.logKeepCount = ref(0);
@@ -80,6 +80,7 @@
         var f = $.adminLogFilter;
         if (f.action_prefix) params.action_prefix = f.action_prefix;
         if (f.user_id) params.user_id = f.user_id;
+        if (f.username) params.username = f.username;
         var kw = (f.keyword || '').trim();
         if (kw) params.keyword = kw;
         if (f.start_date) params.start_date = f.start_date;
@@ -209,7 +210,7 @@
 
     $.resetLogFilter = function() {
         if ($.logTab.value === 'admin') {
-            Object.assign($.adminLogFilter, { action_prefix: '', user_id: '', keyword: '', start_date: '', end_date: '' });
+            Object.assign($.adminLogFilter, { action_prefix: '', user_id: '', username: '', keyword: '', start_date: '', end_date: '' });
         } else if ($.logTab.value === 'login') {
             Object.assign($.loginLogFilter, { status: '', user_id: '', username: '', keyword: '', start_date: '', end_date: '' });
         } else if ($.logTab.value !== 'os-switch') {

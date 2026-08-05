@@ -85,10 +85,14 @@
                             <option value="order">订单开通</option>
                             <option value="log">日志管理</option>
                             <option value="system">系统操作</option>
+                            <option value="security">安全设置</option>
                         </select>
                     </div>
                     <div class="col-auto">
                         <input class="form-control form-control-sm" style="width:100px" v-model="adminLogFilter.user_id" placeholder="用户ID" type="number" autocomplete="off" @keyup.enter="searchLogs">
+                    </div>
+                    <div class="col-auto">
+                        <input class="form-control form-control-sm" style="width:110px" v-model="adminLogFilter.username" placeholder="用户名" autocomplete="off" @keyup.enter="searchLogs">
                     </div>
                     <div class="col-auto">
                         <input class="form-control form-control-sm" style="width:160px" v-model="adminLogFilter.keyword" placeholder="关键字搜索" autocomplete="off" @keyup.enter="searchLogs">
@@ -136,7 +140,7 @@
                 <!-- 筛选栏：系统切换 -->
                 <div class="row g-2 mb-3" v-if="logTab === 'os-switch'">
                     <div class="col-auto">
-                        <select class="form-select form-select-sm" style="width:130px" v-model="osSwitchLogFilter.status">
+                        <select class="form-select form-select-sm" style="width:130px" v-model="osSwitchLogFilter.status" @change="loadOsSwitchLogs(1)">
                             <option value="">全部状态</option>
                             <option value="success">成功</option>
                             <option value="failed">失败</option>
@@ -153,6 +157,15 @@
                     </div>
                     <div class="col-auto">
                         <input class="form-control form-control-sm" style="width:110px" v-model="osSwitchLogFilter.username" placeholder="用户名" autocomplete="off" @keyup.enter="loadOsSwitchLogs(1)">
+                    </div>
+                    <div class="col-auto">
+                        <input class="form-control form-control-sm" style="width:160px" v-model="osSwitchLogFilter.keyword" placeholder="关键字搜索" autocomplete="off" @keyup.enter="loadOsSwitchLogs(1)">
+                    </div>
+                    <div class="col-auto">
+                        <input class="form-control form-control-sm" type="date" style="width:150px" v-model="osSwitchLogFilter.start_date" title="开始日期">
+                    </div>
+                    <div class="col-auto">
+                        <input class="form-control form-control-sm" type="date" style="width:150px" v-model="osSwitchLogFilter.end_date" title="结束日期">
                     </div>
                     <div class="col-auto d-flex gap-2">
                         <pv-button size="sm" @click="loadOsSwitchLogs(1)">查询</pv-button>

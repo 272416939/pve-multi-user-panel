@@ -169,10 +169,55 @@ function hasCycle(file) {
 }
 for (const f of files) hasCycle(f);
 
+// ==================== 8. 前端刷新路径防回归 + 常量格式断言 ====================
+// 背景：常量单一来源重构（6198781）把 shared.js 两处 fetch('/api/auth/refresh') 换成
+// fetch(window.__apiPaths.REFRESH_TOKEN)，而常量不含 /api 前缀（仅 api() 封装自动加），
+// 导致刷新请求 404、登录 2 小时强制退出。此处断言防复发（全前端文件，不限于 shared.js）。
+const PUBLIC_JS = path.join(ROOT, 'public/js');
+const frontFiles = walk(PUBLIC_JS);
+for (const f of frontFiles) {
+    const lines = fs.readFileSync(f, 'utf8').split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        const ln = lines[i];
+        if (ln.trim().startsWith('//')) continue;
+        // 裸引用常量直接 fetch 为违规；必须写成 fetch('/api' + window.__apiPaths.xxx)
+        const bare = /fetch\(window\.__apiPaths\./.test(ln);
+        const prefixed = /fetch\(\s*'\/api'\s*\+\s*window\.__apiPaths\./.test(ln);
+        if (bare && !prefixed) {
+            errors.push(`直接 fetch 常量缺 /api 前缀（须写成 fetch('/api' + window.__apiPaths.xxx）: ${rel(f)}:${i + 1}`);
+        }
+    }
+}
+
+// 8b. api-paths.js 常量值校验：一律不含 /api 前缀、以 / 开头（前缀由 api() 封装或调用方手动拼接）
+const apiPathsSrc = fs.readFileSync(path.join(PUBLIC_JS, 'shared/api-paths.js'), 'utf8');
+const apiPathRe = /^\s*([A-Z][A-Z0-9_]*):\s*'([^']*)'/gm;
+let apiPathMatch;
+while ((apiPathMatch = apiPathRe.exec(apiPathsSrc))) {
+    const val = apiPathMatch[2];
+    if (val.startsWith('/api')) {
+        errors.push(`api-paths.js 常量 ${apiPathMatch[1]} 值 '${val}' 含 /api 前缀（常量一律不含前缀，调用方拼）`);
+    }
+    if (!val.startsWith('/')) {
+        errors.push(`api-paths.js 常量 ${apiPathMatch[1]} 值 '${val}' 不以 / 开头（路径常量应为 /xxx 形式）`);
+    }
+}
+
+// 8c. storage-keys.js 常量值格式：仅常规键名字符、非空（防拼写/非法字符回归）
+const storageKeysSrc = fs.readFileSync(path.join(PUBLIC_JS, 'shared/storage-keys.js'), 'utf8');
+const storageKeyRe = /^\s*([A-Z][A-Z0-9_]*):\s*'([^']*)'/gm;
+let storageKeyMatch;
+while ((storageKeyMatch = storageKeyRe.exec(storageKeysSrc))) {
+    const val = storageKeyMatch[2];
+    if (val.length === 0 || !/^[A-Za-z0-9_.:-]+$/.test(val)) {
+        errors.push(`storage-keys.js 常量 ${storageKeyMatch[1]} 值 '${val}' 非法（应为非空常规键名，仅含字母数字_.:-）`);
+    }
+}
+
 // ==================== 输出 ====================
 if (errors.length > 0) {
     console.error('❌ 低耦合断言失败（' + errors.length + ' 项）：');
     for (const e of errors) console.error('  - ' + e);
     process.exit(1);
 }
-console.log('✅ check-coupling 全部通过：常量单一来源 / 无自引用 / DDL 集中 / 时间合规 / utils 叶子层 / 事务统一 / 无循环依赖');
+console.log('✅ check-coupling 全部通过：常量单一来源 / 无自引用 / DDL 集中 / 时间合规 / utils 叶子层 / 事务统一 / 无循环依赖 / 前端路径前缀与常量格式');

@@ -125,8 +125,8 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             if (inputEl) inputEl.focus();
                             return;
                         }
-                        localStorage.setItem('token', data.token);
-                        localStorage.setItem('refreshToken', data.refreshToken);
+                        localStorage.setItem(window.__storageKeys.TOKEN, data.token);
+                        localStorage.setItem(window.__storageKeys.REFRESH_TOKEN, data.refreshToken);
 
                         // C-2 修复：强制改密检查
                         if (data.must_change_password) {
@@ -175,8 +175,8 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                                 refresh_token: pendingRefreshToken.value
                             })
                         });
-                        localStorage.setItem('token', data.token);
-                        localStorage.setItem('refreshToken', data.refreshToken);
+                        localStorage.setItem(window.__storageKeys.TOKEN, data.token);
+                        localStorage.setItem(window.__storageKeys.REFRESH_TOKEN, data.refreshToken);
 
                         // C-2 修复：强制改密检查（2FA 登录）
                         if (data.must_change_password) {
@@ -379,7 +379,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     }
 
                     // 检查是否已登录
-                    const token = localStorage.getItem('token');
+                    const token = localStorage.getItem(window.__storageKeys.TOKEN);
                     if (token) {
                         window.location.href = 'dashboard.html';
                         return;

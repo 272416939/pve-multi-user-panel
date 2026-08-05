@@ -54,7 +54,7 @@ const App = {
 
         // pending order 持久化：手机端支付完成后页面可能被支付宝/浏览器重建，
         // 通过 localStorage 在页面加载时恢复轮询，确保支付成功后能看到弹窗+余额更新
-        const PENDING_KEY = 'recharge_pending';
+        const PENDING_KEY = window.__storageKeys.RECHARGE_PENDING;
         const savePending = (orderNo, amount, method) => {
             try {
                 localStorage.setItem(PENDING_KEY, JSON.stringify({ orderNo, amount, method, ts: Date.now() }));
@@ -1006,7 +1006,7 @@ const App = {
         const loadDevices = async () => {
             devicesLoading.value = true;
             try {
-                const refreshToken = localStorage.getItem('refreshToken');
+                const refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
                 const data = await api('/user/devices');
                 devices.value = data;
                 if (refreshToken) {
@@ -1034,7 +1034,7 @@ const App = {
         const revokeOtherDevices = async () => {
             if (await window.customConfirm('确定要下线除当前设备外的所有设备吗？')) {
                 try {
-                    const refreshToken = localStorage.getItem('refreshToken');
+                    const refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
                     await api('/user/devices', {
                         method: 'DELETE',
                         body: JSON.stringify({ refreshToken })

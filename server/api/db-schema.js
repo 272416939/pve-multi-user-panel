@@ -645,6 +645,16 @@ async function initDb() {
         ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // IP 归属地持久化缓存表：首次外呼查询成功后入库，后续直接读库，
+    // 避免日志页/设备列表每页重复外呼 UApiPro 产生费用；30 天未更新视为过期重新查询
+    await execute(`
+        CREATE TABLE IF NOT EXISTS ip_locations (
+            ip VARCHAR(64) NOT NULL PRIMARY KEY,
+            location VARCHAR(255) NOT NULL DEFAULT '',
+            updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
     // 创建用户通知设置表
     await execute(`
         CREATE TABLE IF NOT EXISTS user_settings (

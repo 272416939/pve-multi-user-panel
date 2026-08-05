@@ -50,7 +50,7 @@
 
   // 获取 token 的辅助函数
   function getToken() {
-    return localStorage.getItem('token');
+    return localStorage.getItem(window.__storageKeys.TOKEN);
   }
 
   // 带认证的 fetch 封装
