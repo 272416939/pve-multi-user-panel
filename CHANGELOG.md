@@ -1,5 +1,42 @@
 # Changelog
 
+## [2.35.1] - 2026-08-04
+
+### Added
+- **feat(logs): 日志中心筛选功能统一与用户名模糊搜索**
+  - 四个 tab（操作/后台/登录/系统切换）筛选功能统一，以「操作日志」为基准
+  - 后台操作 tab 补齐用户名输入框；系统切换 tab 补齐关键字 + 起止日期输入框，按钮统一「查询」
+  - 用户名模糊搜索：`username = ?` -> `username LIKE ?`（操作/登录/系统切换日志）
+  - 系统切换 keyword 同时匹配用户名/VMID/来源系统名/目标系统名，日期范围过滤
+  - 请求参数均 `encodeURIComponent`；服务端状态白名单/长度/日期格式/数字校验补强
+  - `normalizeDateParam` 日期工具收敛到 `utils/date.js` 单一来源
+- **feat(ip-location): IP 归属地持久化入库，消除重复外呼费用**
+  - 新增 `ip_locations` 表（ip 主键 + 归属地 + 更新时间，启动幂等建表）+ `db-ip.js`（批量读库 + 幂等 upsert）
+  - 三层缓存：Redis（7 天）-> 数据库表（30 天）-> 外呼 UApiPro；首次查询成功即写回 DB+Redis，外呼失败不写负缓存
+  - 9 处调用点自动受益；keyword 搜索 JOIN `ip_locations` 表匹配归属地
+
+### Fixed
+- **fix(auth): 修复 token 自动续期 /api 前缀回归，恢复登录自动续期**
+  - 低耦合优化 `6198781` 将 `shared.js` 两处 refresh 改为 `fetch(window.__apiPaths.REFRESH_TOKEN)`，但常量值不含 `/api` 前缀（仅 `api()` 封装约定）-> 请求变 `POST /auth/refresh` -> 404 -> token 被清空 -> 登录 2 小时强制退出
+  - 修复：改为 `fetch('/api' + window.__apiPaths.REFRESH_TOKEN, ...)`；`check-coupling.js` 新增防复发断言（裸 `fetch(window.__apiPaths.` 即报错）
+  - 顺带修复 `dashboard/core.js` 双前缀 `api('/api/cname')` 历史遗留
+- **fix(rate-limit): 限速设置日志改归后台操作·安全设置，详情记录参数变化明细**
+  - 审计 action `security.rate-limit` -> `admin.security.rate-limit`，自动从「操作日志」移入「后台操作 > 安全设置」（新增 `security: '安全设置'` 子域白名单）
+  - 保存前读旧配置对比构造 details：`登录尝试 5次/1分钟→6次/2分钟`，恢复默认显示 `恢复默认参数`，无变化显示 `无参数变化`
+  - `formatRateLimitWindow` 按前端规则换算易读单位
+- **fix(rate-limit): 修复保存按钮被误判为恢复默认**
+  - 模板 `@click="saveRateLimitConfig"`（函数引用）传参时 Vue 把 MouseEvent 当第一个参数 -> `!!restoreDefault` 恒为 true
+  - 双保险：`restoreDefault === true` 严格比较 + 模板改 `@click="saveRateLimitConfig()"`
+- **fix(refactor): 低耦合优化残留低危项修复与前端常量收敛补全**
+  - 修正 `api-paths.js` `ADMIN_USERS` 错误值（`/admin/users` -> `/users`）；`push-proxy.js` hbTimer 声明上移（TDZ 脆弱写法）
+  - check-coupling 断言扩展：全前端裸 `fetch(window.__apiPaths.)` 检查 + api-paths 不得以 `/api` 开头 + storage-keys 格式校验
+  - 常量收敛补全：logout 路径 3 处、token 键名 16 处、tab/分页键 6 处、`PROVISIONING_PREFIX` 12 处 -> 单一来源
+
+### Notes
+- 新表 `ip_locations` 启动自动创建，无需手动 SQL；历史日志不批量回填（浏览到的 IP 才入库）
+- 测试：**396 passing**；`check-coupling` 8 项断言全绿
+- 线上部署需 `pm2 restart pve-panel` 生效
+
 ## [2.35.0] - 2026-08-04
 
 ### Added（5 个 feat）

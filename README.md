@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.35.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v2.35.1-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -49,7 +49,7 @@
 | 11 | **权限控制** | 用户仅可见操作已分配的虚拟机/容器 |
 | 12 | **全站统一弹窗** | 自定义深色科技风格 Modal 替代原生 alert/confirm |
 | 13 | **速率限制** | 登录/2FA/忘记密码/CDK 兑换自动限速，支持 Redis |
-| 14 | **IP 归属地查询** | UApiPro 集成，登录设备列表显示 IP 归属地；Admin 系统设置配置页（默认关闭，v2.33.6 新增） |
+| 14 | **IP 归属地查询** | UApiPro 集成，登录设备列表显示 IP 归属地；三层缓存（Redis 7天 -> 数据库 30天 -> 外呼）持久化入库，消除重复外呼费用（v2.33.6 新增 / v2.35.1 持久化） |
 
 ### 🛠️ 管理功能
 | # | 功能 | 说明 |
@@ -132,7 +132,7 @@
 | 58 | **操作/登录日志** | Dashboard 侧边栏「日志」页查看操作日志与登录日志，支持筛选/搜索/导出/批量删除/清空 |
 | 59 | **日志保留上限** | 每用户日志保留上限（默认 5000 条）自动循环清理防写爆，Admin 站点设置可调（v2.33.9） |
 | 60 | **侧边栏状态保持** | 刷新后保持当前标签页与折叠组展开状态，直达链接高亮与内容一致（v2.33.8） |
-| 61 | **Admin 日志中心** | 侧边栏「日志中心」四 tab（操作/后台/登录/系统切换），后台操作按子域筛选，约 50 处敏感操作埋点，后台操作日志独立保留上限（v2.35.0） |
+| 61 | **Admin 日志中心** | 侧边栏「日志中心」四 tab（操作/后台/登录/系统切换），后台操作按子域筛选，四 tab 筛选统一 + 用户名模糊搜索 + 关键字/日期过滤，约 50 处敏感操作埋点，后台操作日志独立保留上限（v2.35.0 / v2.35.1 筛选统一） |
 
 ### 🔒 安全防护（v2.35.0 新增）
 | # | 功能 | 说明 |
