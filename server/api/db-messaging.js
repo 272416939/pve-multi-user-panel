@@ -20,7 +20,7 @@ const AUDIT_CATEGORY_NAMES = {
 function actionToCategory(action) {
     action = String(action || '');
     if (action === 'user.login') return 'user_login';
-    if (/^(vm|lxc|backup|snapshot|network)\./.test(action)) return 'vm_lxc';
+    if (/^(vm|lxc|backup|snapshot|network|subnet)\./.test(action)) return 'vm_lxc';
     if (/^password\./.test(action)) return 'password';
     if (/^order\./.test(action)) return 'order';
     if (/^disk\./.test(action)) return 'disk';
@@ -48,7 +48,6 @@ const ADMIN_SUB_CATEGORIES = {
     backup: '备份管理',
     message: '消息管理',
     network: '网络管理',
-    subnet: '私有网络',
     order: '订单开通',
     log: '日志管理',
     cache: '缓存管理',
@@ -60,7 +59,7 @@ const ADMIN_SUB_CATEGORIES = {
 function buildAuditCategoryWhere(category) {
     switch (category) {
         case 'user_login': return ['action = ?', ['user.login']];
-        case 'vm_lxc': return ['(action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ?)', ['vm.%', 'lxc.%', 'backup.%', 'snapshot.%', 'network.%']];
+        case 'vm_lxc': return ['(action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ?)', ['vm.%', 'lxc.%', 'backup.%', 'snapshot.%', 'network.%', 'subnet.%']];
         case 'password': return ['action LIKE ?', ['password.%']];
         case 'order': return ['action LIKE ?', ['order.%']];
         case 'disk': return ['action LIKE ?', ['disk.%']];

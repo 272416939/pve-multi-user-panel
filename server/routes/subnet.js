@@ -214,7 +214,7 @@ router.post('/subnets', authMiddleware, async (req, res) => {
             ikuai_dhcp_id: dhcpId
         });
 
-        await auditAction(req, 'admin.subnet.create', '创建子网 ' + vlanName + ' (VLAN ' + vlanId + ', 网关 ' + gw + ', 地址池 ' + addrPool + ')', { resourceType: 'subnet', resourceId: subnet.id });
+        await auditAction(req, 'subnet.create', '创建子网 ' + vlanName + ' (VLAN ' + vlanId + ', 网关 ' + gw + ', 地址池 ' + addrPool + ')', { resourceType: 'subnet', resourceId: subnet.id });
         res.json(subnet);
     } catch (e) {
         console.error('[subnet] 创建子网失败:', e.message);
@@ -245,7 +245,7 @@ router.delete('/subnets/:id', authMiddleware, async (req, res) => {
             }
         }
         await db.subnets.delete(id);
-        await auditAction(req, 'admin.subnet.delete', '删除子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')', { resourceType: 'subnet', resourceId: id });
+        await auditAction(req, 'subnet.delete', '删除子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')', { resourceType: 'subnet', resourceId: id });
         res.json({ message: '子网已删除' });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -267,6 +267,7 @@ router.post('/subnets/:id/refresh', authMiddleware, async (req, res) => {
         }
         await refreshSubnetAvailable(subnet);
         const updated = await db.subnets.getById(id);
+        await auditAction(req, 'subnet.refresh', '刷新子网 ' + subnet.vlan_name + ' 可用IP: ' + (updated ? updated.available : 0), { resourceType: 'subnet', resourceId: id });
         res.json({ available: updated ? updated.available : 0 });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -325,7 +326,7 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
 
         await db.vms.update(vm.id, { subnet_id: subnetId, dhcp_static_ip: dhcpIp || '' });
         await refreshSubnetAvailable(subnet);
-        await auditAction(req, 'admin.subnet.bind.vm', 'VM ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : ''), { resourceType: 'subnet', resourceId: subnetId });
+        await auditAction(req, 'subnet.bind.vm', 'VM ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : ''), { resourceType: 'subnet', resourceId: subnetId });
         res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -380,7 +381,7 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
 
         await db.lxcContainers.update(ct.id, { subnet_id: subnetId, dhcp_static_ip: dhcpIp || '' });
         await refreshSubnetAvailable(subnet);
-        await auditAction(req, 'admin.subnet.bind.lxc', 'LXC ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : ''), { resourceType: 'subnet', resourceId: subnetId });
+        await auditAction(req, 'subnet.bind.lxc', 'LXC ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : ''), { resourceType: 'subnet', resourceId: subnetId });
         res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -417,7 +418,7 @@ router.post('/vm/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
         try { await removeDhcpStaticBinding('vm', vmid); } catch (e) { console.error('[subnet] VM 解绑 DHCP 失败:', e.message); }
         await db.vms.update(vm.id, { subnet_id: null, dhcp_static_ip: '' });
         if (subnet) await refreshSubnetAvailable(subnet);
-        await auditAction(req, 'admin.subnet.unbind.vm', 'VM ' + vmid + ' 解绑子网 ' + (subnet ? subnet.vlan_name : String(vm.subnet_id)), { resourceType: 'subnet', resourceId: vm.subnet_id });
+        await auditAction(req, 'subnet.unbind.vm', 'VM ' + vmid + ' 解绑子网 ' + (subnet ? subnet.vlan_name : String(vm.subnet_id)), { resourceType: 'subnet', resourceId: vm.subnet_id });
         res.json({ message: '解绑成功' });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
@@ -453,7 +454,7 @@ router.post('/lxc/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
         try { await removeDhcpStaticBinding('lxc', vmid); } catch (e) { console.error('[subnet] LXC 解绑 DHCP 失败:', e.message); }
         await db.lxcContainers.update(ct.id, { subnet_id: null, dhcp_static_ip: '' });
         if (subnet) await refreshSubnetAvailable(subnet);
-        await auditAction(req, 'admin.subnet.unbind.lxc', 'LXC ' + vmid + ' 解绑子网 ' + (subnet ? subnet.vlan_name : String(ct.subnet_id)), { resourceType: 'subnet', resourceId: ct.subnet_id });
+        await auditAction(req, 'subnet.unbind.lxc', 'LXC ' + vmid + ' 解绑子网 ' + (subnet ? subnet.vlan_name : String(ct.subnet_id)), { resourceType: 'subnet', resourceId: ct.subnet_id });
         res.json({ message: '解绑成功' });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
