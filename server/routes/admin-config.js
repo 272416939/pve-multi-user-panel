@@ -357,6 +357,42 @@ router.get('/admin/rate-limit/config', authMiddleware, adminMiddleware, async (r
     }
 });
 
+// 时间窗秒 → 易读单位（与前端 secToWindowUI 一致：整小时→小时、整分钟→分钟、否则秒）
+function formatRateLimitWindow(sec) {
+    if (sec % 3600 === 0) return sec / 3600 + '小时';
+    if (sec % 60 === 0) return sec / 60 + '分钟';
+    return sec + '秒';
+}
+
+// 审计详情组装：恢复默认 → 简略文案；修改 → 逐条列出新旧参数变化（label 单一来源 RATE_LIMIT_RULES）
+function buildRateLimitLogDetails(oldConfig, masterEnabled, rules, isRestoreDefault) {
+    if (isRestoreDefault) return '更新限速配置：恢复默认参数';
+    var parts = [];
+    if (oldConfig) {
+        if (oldConfig.master_enabled !== masterEnabled) {
+            parts.push('总开关 ' + (oldConfig.master_enabled ? '开启' : '关闭') + '→' + (masterEnabled ? '开启' : '关闭'));
+        }
+        var { RATE_LIMIT_RULES } = require('../constants');
+        Object.keys(RATE_LIMIT_RULES).forEach(function(k) {
+            var old = oldConfig.rules[k];
+            var cur = rules[k];
+            if (!old || !cur) return;
+            var ruleParts = [];
+            if (old.enabled !== cur.enabled) {
+                ruleParts.push((old.enabled ? '启用' : '停用') + '→' + (cur.enabled ? '启用' : '停用'));
+            }
+            if (old.max !== cur.max || old.windowSec !== cur.windowSec) {
+                ruleParts.push(old.max + '次/' + formatRateLimitWindow(old.windowSec) + '→' + cur.max + '次/' + formatRateLimitWindow(cur.windowSec));
+            }
+            if (ruleParts.length) {
+                parts.push(RATE_LIMIT_RULES[k].label + ' ' + ruleParts.join('，'));
+            }
+        });
+    }
+    if (!parts.length) return '更新限速配置（无参数变化）';
+    return '更新限速配置：' + parts.join('；');
+}
+
 // PUT /admin/rate-limit/config - 保存限速配置（ruleKey 白名单 + 次数/时间窗范围校验）
 router.put('/admin/rate-limit/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -389,19 +425,22 @@ router.put('/admin/rate-limit/config', authMiddleware, adminMiddleware, async (r
                 rules[k] = { enabled: true, max: RATE_LIMIT_RULES[k].max, windowSec: RATE_LIMIT_RULES[k].windowSec };
             }
         });
+        // 保存前取旧配置，供审计详情对比参数变化（失败回退简略文案，不影响主流程）
+        var oldConfig = null;
+        try { oldConfig = await db.config.getRateLimits(); } catch (_) {}
         await db.config.setRateLimits({ master_enabled: masterEnabled, rules: rules });
         // 失效 60s 缓存，让新配置立即生效
         invalidateRateLimitCache();
-        // 审计埋点（security. 前缀 → 安全设置分类，审计失败不影响主流程）
+        // 审计埋点（admin.security.rate-limit → 后台操作·安全设置，审计失败不影响主流程）
         try {
             const { auditLog } = require('../utils/audit-log');
             await auditLog({
                 userId: req.user.id,
                 username: req.user.username,
-                action: 'security.rate-limit',
+                action: 'admin.security.rate-limit',
                 resourceType: 'config',
                 resourceId: 'rate-limit',
-                details: '更新限速配置（总开关：' + (masterEnabled ? '开启' : '关闭') + '，规则 ' + Object.keys(rules).length + ' 项）',
+                details: buildRateLimitLogDetails(oldConfig, masterEnabled, rules, body.restore_default === true),
                 req
             });
         } catch (e) {}

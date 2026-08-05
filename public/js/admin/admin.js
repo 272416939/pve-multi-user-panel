@@ -730,7 +730,7 @@
         }
     };
 
-    $.saveRateLimitConfig = async function() {
+    $.saveRateLimitConfig = async function(restoreDefault) {
         if ($.rateLimitSaving.value) return;
         var cfg = $.rateLimitConfig.value;
         // 前端兜底校验（与后端一致：次数 1-10000，时间窗 1-86400 秒）
@@ -756,7 +756,7 @@
         try {
             await api('/admin/rate-limit/config', {
                 method: 'PUT',
-                body: JSON.stringify({ master_enabled: !!cfg.master_enabled, categories: cfg.categories })
+                body: JSON.stringify({ master_enabled: !!cfg.master_enabled, categories: cfg.categories, restore_default: !!restoreDefault })
             });
             alert('限速配置保存成功');
             await $.loadRateLimitConfig();
@@ -783,7 +783,8 @@
                 rule.windowUnit = ui.windowUnit;
             });
         });
-        await $.saveRateLimitConfig();
+        // 恢复默认：传 restore_default 标记，后端审计详情按「恢复默认参数」记录
+        await $.saveRateLimitConfig(true);
     };
 
     // 财务管理 - 交易流水

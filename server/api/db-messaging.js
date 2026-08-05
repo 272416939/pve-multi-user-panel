@@ -49,7 +49,8 @@ const ADMIN_SUB_CATEGORIES = {
     network: '网络管理',
     order: '订单开通',
     log: '日志管理',
-    system: '系统操作'
+    system: '系统操作',
+    security: '安全设置'
 };
 
 // category -> SQL 条件（参数化），返回 [whereSql, args]

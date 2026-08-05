@@ -85,6 +85,7 @@
                             <option value="order">订单开通</option>
                             <option value="log">日志管理</option>
                             <option value="system">系统操作</option>
+                            <option value="security">安全设置</option>
                         </select>
                     </div>
                     <div class="col-auto">
