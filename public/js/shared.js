@@ -18,7 +18,7 @@ const api = (endpoint, options = {}) => {
             if (data.code === 'TOKEN_EXPIRED') {
                 const refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
                 if (refreshToken) {
-                    const refreshRes = await fetch(window.__apiPaths.REFRESH_TOKEN, {
+                    const refreshRes = await fetch('/api' + window.__apiPaths.REFRESH_TOKEN, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ refreshToken })
@@ -82,7 +82,7 @@ function ensureValidToken() {
         localStorage.removeItem(window.__storageKeys.TOKEN);
         return Promise.resolve(null);
     }
-    _refreshPromise = fetch(window.__apiPaths.REFRESH_TOKEN, {
+    _refreshPromise = fetch('/api' + window.__apiPaths.REFRESH_TOKEN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: refreshToken })

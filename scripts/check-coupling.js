@@ -169,10 +169,28 @@ function hasCycle(file) {
 }
 for (const f of files) hasCycle(f);
 
+// ==================== 8. 前端刷新路径防回归（shared.js 直接 fetch 常量必须拼 /api 前缀） ====================
+// 背景：常量单一来源重构（6198781）把 shared.js 两处 fetch('/api/auth/refresh') 换成
+// fetch(window.__apiPaths.REFRESH_TOKEN)，而常量不含 /api 前缀（仅 api() 封装自动加），
+// 导致刷新请求 404、登录 2 小时强制退出。此处断言防复发。
+const sharedJs = path.join(ROOT, 'public/js/shared.js');
+const sharedSrc = fs.readFileSync(sharedJs, 'utf8');
+const sharedLines = sharedSrc.split('\n');
+for (let i = 0; i < sharedLines.length; i++) {
+    const ln = sharedLines[i];
+    if (ln.trim().startsWith('//')) continue;
+    // 裸引用常量直接 fetch 为违规；必须写成 fetch('/api' + window.__apiPaths.xxx)
+    const bare = /fetch\(window\.__apiPaths\./.test(ln);
+    const prefixed = /fetch\(\s*'\/api'\s*\+\s*window\.__apiPaths\./.test(ln);
+    if (bare && !prefixed) {
+        errors.push(`shared.js 直接 fetch 常量缺 /api 前缀（须写成 fetch('/api' + window.__apiPaths.xxx）: public/js/shared.js:${i + 1}`);
+    }
+}
+
 // ==================== 输出 ====================
 if (errors.length > 0) {
     console.error('❌ 低耦合断言失败（' + errors.length + ' 项）：');
     for (const e of errors) console.error('  - ' + e);
     process.exit(1);
 }
-console.log('✅ check-coupling 全部通过：常量单一来源 / 无自引用 / DDL 集中 / 时间合规 / utils 叶子层 / 事务统一 / 无循环依赖');
+console.log('✅ check-coupling 全部通过：常量单一来源 / 无自引用 / DDL 集中 / 时间合规 / utils 叶子层 / 事务统一 / 无循环依赖 / 前端刷新路径前缀');

@@ -697,7 +697,7 @@
 
     $.loadCnameDomain = async function() {
         try {
-            var data = await api('/api/cname');
+            var data = await api('/cname');
             $.cnameDomain.value = data.cname_domain || '';
         } catch (e) {}
     };
