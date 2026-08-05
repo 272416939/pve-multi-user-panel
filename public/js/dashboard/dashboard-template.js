@@ -460,7 +460,6 @@
                                 <td>{{ s.id }}</td>
                                 <td>
                                     <span class="text-primary">{{ s.vlan_name }}</span>
-                                    <small class="text-muted d-block">VLAN {{ s.vlan_id }}</small>
                                 </td>
                                 <td>{{ s.cidr || '-' }}</td>
                                 <td>

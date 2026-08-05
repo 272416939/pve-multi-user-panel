@@ -929,12 +929,12 @@
         <div class="modal-body">
             <p class="text-muted small">创建后系统将自动完成网段分配，无需手动配置：</p>
             <ul class="small text-muted mb-3">
-                <li>VLAN ID 与网段自动分配，依次递增</li>
+                <li>网段自动分配，依次递增</li>
                 <li>网关为网段起始地址（如 172.16.0.1）</li>
                 <li>名称由系统自动生成，不可编辑</li>
             </ul>
             <div class="alert alert-info mb-0">
-                <div>创建完成后可在列表中查看分配的 <strong>VLAN ID / 网段 / 网关</strong></div>
+                <div>创建完成后可在列表中查看分配的 <strong>网段 / 网关</strong></div>
                 <div class="mt-1">删除子网前需先解绑其下所有服务器</div>
             </div>
         </div>
