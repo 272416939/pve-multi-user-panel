@@ -90,7 +90,6 @@ router.get('/subnets', authMiddleware, async (req, res) => {
                 netmask: s.netmask,
                 addr_pool: s.addr_pool,
                 cidr: gwParts.length === 4 ? gwParts.slice(0, 3).join('.') + '.0/24' : '',
-                interface: s.interface,
                 available: s.available,
                 vm_count: vmCount[s.id] || 0,
                 lxc_count: ctCount[s.id] || 0,
@@ -166,10 +165,23 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         let available = 0;
         try {
             await ikuaiApi.addDhcpServer({ interface: vlanName, addr_pool: addrPool, netmask: '255.255.255.0', gateway: gw, dns1, dns2 });
-            const server = await ikuaiApi.getDhcpServerByInterface(vlanName);
-            if (server) {
-                dhcpId = String(server.id);
-                available = server.available || 0;
+            // 爱快对新建 DHCP 服务端的 available 为异步计算，轮询重试获取
+            for (let attempt = 0; attempt < 3; attempt++) {
+                await new Promise(r => setTimeout(r, 1000));
+                const server = await ikuaiApi.getDhcpServerByInterface(vlanName);
+                if (server) {
+                    dhcpId = String(server.id);
+                    available = server.available || 0;
+                    if (available > 0) break;
+                }
+            }
+            // 兜底：仍取不到时按池容量减去已绑定静态 IP 估算（与爱快语义一致）
+            if (available <= 0) {
+                try {
+                    const bindings = await ikuaiApi.getDhcpStaticBindings();
+                    const bound = bindings.filter(b => b.interface === vlanName).length;
+                    available = Math.max(0, 254 - bound);
+                } catch (_) {}
             }
         } catch (e) {
             // DHCP 服务端创建失败：回滚已创建的 VLAN，避免孤儿资源
