@@ -7,6 +7,8 @@ const pveApi = require('../api/pve-api');
 const { safeError } = require('../utils/safe-error');
 // 单一来源：模板状态白名单统一走 constants（规范第七节）
 const { TEMPLATE_STATUS } = require('../constants');
+// 日期参数校验单一来源：utils/date.js（与 admin-logs.js 共用，禁止本地拷贝）
+const { normalizeDateParam } = require('../utils/date');
 
 // 所有端点都需要管理员权限
 router.use(authMiddleware, adminMiddleware);
@@ -277,16 +279,37 @@ router.get('/admin/os-templates/:id/vms', async (req, res) => {
 
 // ==================== 切换日志管理 ====================
 
+// 切换日志状态白名单（列表筛选；删除/清空的 running 保护在 db 层另行校验）
+const OS_SWITCH_LOG_STATUS = ['success', 'failed', 'running', 'pending', 'rolled_back'];
+
 // GET /api/admin/os-switch-logs — 翻页查询（支持过滤）
 router.get('/admin/os-switch-logs', async (req, res) => {
     try {
+        const status = (req.query.status || '').trim();
+        if (status && OS_SWITCH_LOG_STATUS.indexOf(status) === -1) {
+            return res.status(400).json({ error: '无效的日志状态' });
+        }
+        const username = (req.query.username || '').trim();
+        if (username.length > 64) return res.status(400).json({ error: '用户名过长' });
+        const keyword = (req.query.keyword || '').trim();
+        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
+        const vmId = (req.query.vm_id || '').trim();
+        if (vmId && !/^\d+$/.test(vmId)) return res.status(400).json({ error: '无效的 VMID' });
+        const userId = (req.query.user_id || '').trim();
+        if (userId && !/^\d+$/.test(userId)) return res.status(400).json({ error: '无效的用户ID' });
+        const startDate = normalizeDateParam(req.query.start_date || '', false);
+        const endDate = normalizeDateParam(req.query.end_date || '', true);
+        if (startDate === null || endDate === null) return res.status(400).json({ error: '无效的日期格式' });
         const filters = {
             page: Math.min(parseInt(req.query.page) || 1, 1000),
             limit: Math.min(parseInt(req.query.limit) || 20, 200),
-            status: req.query.status,
-            vm_id: req.query.vm_id,
-            user_id: req.query.user_id,
-            username: (req.query.username || '').trim(),
+            status: status,
+            vm_id: vmId,
+            user_id: userId,
+            username: username,
+            keyword: keyword,
+            start_date: startDate,
+            end_date: endDate,
             before_date: req.query.before_date
         };
         const logs = await db.vmOsSwitchLogs.getListWithPaging(filters);

@@ -170,8 +170,9 @@ const auditLogs = {
             args.push(parseInt(params.filterUserId));
         }
         if (params.username) {
-            where.push('username = ?');
-            args.push(String(params.username));
+            // 用户名模糊搜索（与 keyword 的 LIKE 风格一致）
+            where.push('username LIKE ?');
+            args.push('%' + String(params.username) + '%');
         }
         if (params.category && AUDIT_CATEGORIES.indexOf(params.category) !== -1) {
             var cat = buildAuditCategoryWhere(params.category);
@@ -265,8 +266,9 @@ const loginLogs = {
             args.push(parseInt(params.filterUserId));
         }
         if (params.username) {
-            where.push('username = ?');
-            args.push(String(params.username));
+            // 用户名模糊搜索（与 keyword 的 LIKE 风格一致）
+            where.push('username LIKE ?');
+            args.push('%' + String(params.username) + '%');
         }
         if (params.status && ['success', 'failed'].indexOf(params.status) !== -1) {
             where.push('status = ?');

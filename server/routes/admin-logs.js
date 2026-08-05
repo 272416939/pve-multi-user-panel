@@ -9,6 +9,8 @@ const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 // 审计分类/子域白名单单一来源：均来自 db-messaging.js，禁止本地拷贝
 const { AUDIT_CATEGORIES, AUDIT_CATEGORY_NAMES, actionToCategory, ADMIN_SUB_CATEGORIES } = require('../api/db-messaging');
+// 日期参数校验单一来源：utils/date.js（admin-os-template.js 复用同一实现）
+const { normalizeDateParam } = require('../utils/date');
 const { getIpLocations } = require('../services/ip-location');
 // 日志详情/CSV 组装统一走 utils/log-format.js（与用户端共用，禁止双份拷贝）
 const { buildRowDetail, csvEscape, csvTime } = require('../utils/log-format');
@@ -18,15 +20,6 @@ router.use(authMiddleware, adminMiddleware);
 
 // scope 白名单：user = 仅用户操作（排除 admin.*）/ admin = 仅后台操作 / all = 全部
 const SCOPE_WHITELIST = ['user', 'admin', 'all'];
-
-// 日期参数校验：YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS；纯日期 end 补全天边界（23:59:59）
-function normalizeDateParam(v, isEnd) {
-    if (!v) return '';
-    var s = String(v).trim();
-    if (!/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/.test(s)) return null;
-    if (isEnd && s.length === 10) s += ' 23:59:59';
-    return s;
-}
 
 // action_prefix 二级子域校验（支持逗号分隔多值，如 'vm,lxc'），非法返回 null
 function validateActionPrefix(prefix) {

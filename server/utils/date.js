@@ -30,4 +30,19 @@ function today() {
     return formatLocalDate(new Date()).slice(0, 10);
 }
 
-module.exports = { formatLocalDate, now, today };
+/**
+ * 查询参数日期规范化（日志等列表筛选共用，单一来源）：
+ * 校验 YYYY-MM-DD 或 YYYY-MM-DD HH:MM:SS；非法返回 null；结束日期纯日期补全天边界 23:59:59
+ * @param {string} v - 原始参数值
+ * @param {boolean} isEnd - 是否为结束日期（结束日期纯日期补 23:59:59）
+ * @returns {string|null}
+ */
+function normalizeDateParam(v, isEnd) {
+    if (!v) return '';
+    var s = String(v).trim();
+    if (!/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/.test(s)) return null;
+    if (isEnd && s.length === 10) s += ' 23:59:59';
+    return s;
+}
+
+module.exports = { formatLocalDate, now, today, normalizeDateParam };
