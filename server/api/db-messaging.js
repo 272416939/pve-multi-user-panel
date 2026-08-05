@@ -41,6 +41,7 @@ const ADMIN_SUB_CATEGORIES = {
     vm: '虚拟机管理',
     lxc: 'LXC管理',
     package: '套餐管理',
+    'package-group': '套餐分组',
     template: '模板管理',
     'os-template': 'OS模板',
     cdk: 'CDK管理',
@@ -49,6 +50,7 @@ const ADMIN_SUB_CATEGORIES = {
     network: '网络管理',
     order: '订单开通',
     log: '日志管理',
+    cache: '缓存管理',
     system: '系统操作',
     security: '安全设置'
 };

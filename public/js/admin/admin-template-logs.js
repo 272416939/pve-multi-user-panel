@@ -78,12 +78,14 @@
                             <option value="disk">磁盘管理</option>
                             <option value="vm,lxc">虚拟机管理</option>
                             <option value="package,template,os-template">套餐模板</option>
+                            <option value="package-group">套餐分组</option>
                             <option value="cdk">CDK管理</option>
                             <option value="backup">备份管理</option>
                             <option value="message">消息管理</option>
                             <option value="network">网络管理</option>
                             <option value="order">订单开通</option>
                             <option value="log">日志管理</option>
+                            <option value="cache">缓存管理</option>
                             <option value="system">系统操作</option>
                             <option value="security">安全设置</option>
                         </select>
