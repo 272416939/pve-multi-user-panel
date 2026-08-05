@@ -2,23 +2,65 @@ const crypto = require('crypto');
 const ikuaiApi = require('../api/ikuai-api');
 const db = require('../api/db');
 
-async function pickUnusedStaticIp() {
+// IP 地址转数值（比较大小用）
+function ipToInt(ip) {
+    return ip.split('.').reduce((acc, part) => acc * 256 + parseInt(part), 0);
+}
+
+// 判断 IP 是否在地址池内（addr_pool 格式: "172.16.0.2-172.16.0.255"）
+function isIpInAddrPool(ip, addrPool) {
+    if (!ip || !addrPool) return false;
+    const parts = String(addrPool).split('-');
+    if (parts.length !== 2) return false;
+    const start = parts[0].trim();
+    const end = parts[1].trim();
+    if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) return false;
+    const ipNum = ipToInt(ip);
+    return ipNum >= ipToInt(start) && ipNum <= ipToInt(end);
+}
+
+// 解析地址池起止（subnet 传 { addr_pool }），返回 { startNum, endNum, prefix }
+function parsePool(subnet) {
+    const pool = (subnet && subnet.addr_pool) ? subnet.addr_pool : '';
+    if (pool) {
+        const parts = String(pool).split('-');
+        if (parts.length === 2) {
+            const startParts = parts[0].trim().split('.').map(Number);
+            const endParts = parts[1].trim().split('.').map(Number);
+            if (startParts.length === 4 && endParts.length === 4) {
+                return {
+                    startNum: startParts[3] || 2,
+                    endNum: endParts[3] || 255,
+                    prefix: startParts.slice(0, 3).join('.') + '.'
+                };
+            }
+        }
+    }
+    return null;
+}
+
+async function pickUnusedStaticIp(subnet) {
     if (!ikuaiApi.isConfigured()) return '';
     try {
-        const rangeStart = await db.config.get('dhcp:ip_range_start') || '10.0.0.110';
-        const rangeEnd = await db.config.get('dhcp:ip_range_end') || '10.0.0.199';
-        const startParts = rangeStart.split('.').map(Number);
-        const endParts = rangeEnd.split('.').map(Number);
-        const startNum = startParts[3] || 110;
-        const endNum = endParts[3] || 199;
-        const subnet = startParts.slice(0, 3).join('.') + '.';
+        let rangeStart, rangeEnd, subnetPrefix;
+        const parsed = parsePool(subnet);
+        if (parsed) {
+            rangeStart = parsed.startNum;
+            rangeEnd = parsed.endNum;
+            subnetPrefix = parsed.prefix;
+        } else {
+            // 回退：未绑定子网时使用旧的 DHCP 配置范围
+            rangeStart = parseInt((await db.config.get('dhcp:ip_range_start') || '10.0.0.110').split('.').pop()) || 110;
+            rangeEnd = parseInt((await db.config.get('dhcp:ip_range_end') || '10.0.0.199').split('.').pop()) || 199;
+            subnetPrefix = ((await db.config.get('dhcp:ip_range_start') || '10.0.0.110').split('.').slice(0, 3).join('.') || '10.0.0') + '.';
+        }
 
         const bindings = await ikuaiApi.getDhcpStaticBindings();
         const usedIps = new Set(bindings.map(b => b.ip));
 
         const candidates = [];
-        for (let i = startNum; i <= endNum; i++) {
-            const ip = subnet + i;
+        for (let i = rangeStart; i <= rangeEnd; i++) {
+            const ip = subnetPrefix + i;
             if (!usedIps.has(ip)) candidates.push(ip);
         }
         if (candidates.length === 0) {
@@ -33,7 +75,7 @@ async function pickUnusedStaticIp() {
     }
 }
 
-async function createDhcpStaticBinding(type, vmid, mac, preferredIp) {
+async function createDhcpStaticBinding(type, vmid, mac, preferredIp, subnet) {
     if (!ikuaiApi.isConfigured() || !mac) return '';
     try {
         const bindings = await ikuaiApi.getDhcpStaticBindings();
@@ -43,7 +85,7 @@ async function createDhcpStaticBinding(type, vmid, mac, preferredIp) {
             return existing.ip;
         }
 
-        // 优先使用指定的 IP（用户手动输入），否则随机选取
+        // 优先使用指定的 IP（用户手动输入），否则在子网池/配置范围内随机选取
         let ip = '';
         if (preferredIp) {
             const ipBase = preferredIp.split('/')[0]; // 去掉 CIDR 后缀
@@ -55,23 +97,33 @@ async function createDhcpStaticBinding(type, vmid, mac, preferredIp) {
             }
         }
         if (!ip) {
-            ip = await pickUnusedStaticIp();
+            ip = await pickUnusedStaticIp(subnet);
         }
         if (!ip) return '';
 
         const comment = type === 'vm' ? `VM-${vmid}` : `CT-${vmid}`;
-        const iface = await db.config.get('dhcp:interface') || 'lan2';
-        const gateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
-        const dns1 = await db.config.get('dhcp:dns1') || '119.29.29.29';
+        // 已绑定子网时使用子网的 VLAN 接口/网关，否则回退旧 DHCP 配置
+        const iface = (subnet && subnet.vlan_name) ? subnet.vlan_name : (await db.config.get('dhcp:interface') || 'lan2');
+        const gateway = (subnet && subnet.gateway) ? subnet.gateway : (await db.config.get('dhcp:gateway') || '10.0.0.1');
+        const dns1 = await db.config.get('dhcp:dns1') || '180.76.76.76';
         const dns2 = await db.config.get('dhcp:dns2') || '223.5.5.5';
 
         await ikuaiApi.addDhcpStaticBinding(mac, ip, comment, iface, gateway, dns1, dns2);
-        console.log(`[DHCP] 静态绑定创建成功: ${type}/${vmid} ${mac} → ${ip}`);
+        console.log(`[DHCP] 静态绑定创建成功: ${type}/${vmid} ${mac} → ${ip} (${iface})`);
         return ip;
     } catch (e) {
         console.error(`[DHCP] 创建静态绑定失败 (${type}/${vmid}):`, e.message);
         return '';
     }
+}
+
+// 重新绑定 DHCP 静态绑定（解绑旧子网后换绑新子网 / 开机兜底）：先删旧绑定，再在新子网池分配 IP 创建
+async function rebindDhcpForDevice(type, vmid, subnet, mac) {
+    await removeDhcpStaticBinding(type, vmid);
+    if (!mac || !subnet) return '';
+    const ip = await pickUnusedStaticIp(subnet);
+    if (!ip) return '';
+    return createDhcpStaticBinding(type, vmid, mac, ip, subnet);
 }
 
 async function removeDhcpStaticBinding(type, vmid) {
@@ -148,4 +200,4 @@ async function getWanInterfaces() {
     return [];
 }
 
-module.exports = { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, getWanInterface, getWanInterfaces };
+module.exports = { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool, getWanInterface, getWanInterfaces };

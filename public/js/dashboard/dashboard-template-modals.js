@@ -779,9 +779,21 @@
         <div class="modal-header"><h5 class="modal-title">确认订购</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="mb-3"><strong>{{ orderPackage.name }}</strong></div>
+            <!-- 私有网络：子网选择（VM/LXC 下单必选，放在操作系统上方） -->
+            <div class="mb-3">
+                <label class="form-label">网络（子网）<span class="text-danger">*</span></label>
+                <select class="form-select" v-model="orderForm.subnet_id" :disabled="orderSubnetsLoading">
+                    <option :value="0">请选择网络</option>
+                    <option v-for="s in orderSubnets" :key="s.id" :value="s.id">
+                        {{ s.vlan_name }}（{{ s.cidr }}）
+                    </option>
+                </select>
+                <div class="form-text text-muted" v-if="orderSubnetsLoading">加载中...</div>
+                <div class="form-text text-muted" v-else-if="orderSubnets.length === 0">暂无子网，请先在「私有网络」中新建子网后再购买</div>
+            </div>
             <!-- v1.3 新增：操作系统选择（仅 VM 套餐显示） -->
             <div class="mb-3" v-if="orderType === 'vm'">
-                <label class="form-label">操作系统</label>
+                <label class="form-label">操作系统<span class="text-danger">*</span></label>
                 <select class="form-select" v-model="orderForm.os_template_id" :disabled="orderOsLoading">
                     <option :value="0">请选择系统</option>
                     <option v-for="t in orderOsTemplates" :key="t.id" :value="t.id">
@@ -790,7 +802,7 @@
                 </select>
                 <div class="form-text text-muted" v-if="orderOsLoading">加载中...</div>
                 <div class="form-text text-muted" v-else-if="orderOsTemplates.length === 0">
-                    该套餐暂无可选系统，将使用默认模板开通，开通后可切换
+                    该套餐暂无可选系统，请选择其他套餐
                 </div>
             </div>
             <div class="mb-3">
@@ -811,7 +823,7 @@
         </div>
         <div class="modal-footer d-flex gap-2">
             <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-            <pv-button type="button" @click="confirmOrder" :disabled="orderLoading" variant="primary">{{ orderLoading ? '处理中...' : '确认开通' }}</pv-button>
+            <pv-button type="button" @click="confirmOrder" :disabled="orderLoading || (orderType === 'vm' && (!orderForm.os_template_id || !orderForm.subnet_id)) || (orderType === 'lxc' && !orderForm.subnet_id)" variant="primary">{{ orderLoading ? '处理中...' : '确认开通' }}</pv-button>
         </div>
     </div></div>
 </div>
@@ -904,6 +916,80 @@
         <div class="modal-footer d-flex gap-2">
             <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
             <pv-button type="button" variant="danger" :disabled="!osSwitchConfirm || osSwitchSubmitting" :loading="osSwitchSubmitting" @click="submitOsSwitch()">确认切换系统</pv-button>
+        </div>
+    </div></div>
+</div>
+</Teleport>
+
+<!-- 新建子网确认弹窗 -->
+<Teleport to="body">
+<div class="modal fade" id="createSubnetModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
+        <div class="modal-header"><h5 class="modal-title">新建子网</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-body">
+            <p class="text-muted small">创建私有网络子网将自动完成以下操作：</p>
+            <ul class="small text-muted mb-3">
+                <li>在爱快中创建 VLAN 接口（名称系统内置：vlan_VPC 开头，不可编辑）</li>
+                <li>在该 VLAN 上创建 DHCP 服务端（网关为自动分配的网段起始地址）</li>
+                <li>子网备注自动记录所属用户</li>
+            </ul>
+            <div class="alert alert-info mb-0">
+                <div>VLAN ID 与网段由系统自动分配，依次递增</div>
+                <div class="mt-1">网段起始：<strong>后台「私有网络 - VLAN 设置」</strong>中配置的 IP 段开始范围</div>
+                <div>创建完成后可在列表中查看分配的 <strong>VLAN ID / 网段 / 网关</strong></div>
+            </div>
+            <div class="form-text text-muted mt-2">VLAN 名称系统内置（vlan_VPC 开头，≤15 位），不可编辑；删除子网前需先解绑其下所有服务器。</div>
+        </div>
+        <div class="modal-footer d-flex gap-2">
+            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+            <pv-button type="button" @click="createSubnet" :disabled="subnetCreating" :loading="subnetCreating" variant="primary">确认创建</pv-button>
+        </div>
+    </div></div>
+</div>
+</Teleport>
+
+<!-- 绑定子网弹窗 -->
+<Teleport to="body">
+<div class="modal fade" id="bindSubnetModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
+        <div class="modal-header"><h5 class="modal-title">绑定子网</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <strong>{{ bindSubnetDevice.name || (bindSubnetDevice.type === 'vm' ? ('VM ' + bindSubnetDevice.vm_id) : ('CT ' + bindSubnetDevice.ct_id)) }}</strong>
+                <span v-if="bindSubnetDevice.status && bindSubnetDevice.status.status === 'running'" class="badge bg-success ms-2">运行中</span>
+                <span v-else class="badge bg-secondary ms-2">已停止</span>
+            </div>
+            <div class="alert alert-warning small" v-if="bindSubnetDevice.status && bindSubnetDevice.status.status === 'running'">
+                服务器正在运行，请先关机后再进行子网操作
+            </div>
+            <div class="alert alert-warning small" v-else-if="bindSubnetDevice.status && bindSubnetDevice.status.status !== 'running'">
+                绑定/解绑子网后，重新开机时若尚未绑定子网将无法启动，需先完成绑定
+            </div>
+            <!-- 已绑定：显示当前子网 + 解绑按钮 -->
+            <template v-if="bindSubnetCurrentSubnet">
+                <div class="mb-3">
+                    <label class="form-label">当前绑定子网</label>
+                    <div class="form-control" readonly>
+                        {{ bindSubnetCurrentSubnet.vlan_name }}（{{ bindSubnetCurrentSubnet.cidr }}）· 可用 IP：{{ bindSubnetCurrentSubnet.available }}
+                    </div>
+                    <div class="form-text text-muted" v-if="bindSubnetDevice.dhcp_static_ip">已分配 IP：{{ bindSubnetDevice.dhcp_static_ip }}</div>
+                </div>
+                <pv-button type="button" variant="outline-danger" :disabled="bindSubnetSubmitting" :loading="bindSubnetSubmitting" @click="unbindSubnet">解绑子网</pv-button>
+            </template>
+            <!-- 未绑定：选择子网 + 绑定按钮 -->
+            <template v-else>
+                <div class="mb-3">
+                    <label class="form-label">选择子网<span class="text-danger">*</span></label>
+                    <select class="form-select" v-model="bindSubnetForm.subnet_id">
+                        <option :value="0">请选择子网</option>
+                        <option v-for="s in subnets" :key="s.id" :value="s.id">
+                            {{ s.vlan_name }}（{{ s.cidr }}）· 可用 IP：{{ s.available }}
+                        </option>
+                    </select>
+                    <div class="form-text text-muted" v-if="subnets.length === 0">暂无子网，请先在「私有网络」中新建子网</div>
+                </div>
+                <pv-button type="button" @click="bindSubnet" :disabled="bindSubnetSubmitting || !bindSubnetForm.subnet_id" :loading="bindSubnetSubmitting" variant="primary">确认绑定</pv-button>
+            </template>
         </div>
     </div></div>
 </div>

@@ -8,8 +8,8 @@ const vms = {
     getByVmid: (vmid) => queryOne('SELECT * FROM vms WHERE vm_id = ?', [parseInt(vmid)]),
     create: async (vm) => {
         const [result] = await execute(
-            `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, current_os_template_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, current_os_template_id, subnet_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 vm.vm_id,
                 vm.user_id,
@@ -22,6 +22,7 @@ const vms = {
                 vm.yearly_discount || '',
                 vm.pve_upid || '',
                 vm.current_os_template_id || null,
+                vm.subnet_id || null,
                 mysqlNow()
             ]
         );
@@ -30,7 +31,7 @@ const vms = {
     update: async (id, updates) => {
         const allowedColumns = ['name', 'vm_id', 'user_id', 'expiration_date',
             'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'backup_storage', 'reminderSent', 'lastReminderDate', 'shutdown_reason',
-            'current_os_template_id', 'last_os_switch_at', 'os_switch_pve_upid'];
+            'current_os_template_id', 'last_os_switch_at', 'os_switch_pve_upid', 'subnet_id'];
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }
@@ -100,8 +101,8 @@ const lxcContainers = {
     findByUpid: (upid) => queryOne('SELECT * FROM lxc_containers WHERE pve_upid = ? LIMIT 1', [upid]),
     create: async (ct) => {
         const [result] = await execute(
-            `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, subnet_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 ct.ct_id,
                 ct.user_id,
@@ -113,6 +114,7 @@ const lxcContainers = {
                 ct.quarterly_discount || '',
                 ct.yearly_discount || '',
                 ct.pve_upid || '',
+                ct.subnet_id || null,
                 mysqlNow()
             ]
         );
@@ -120,7 +122,7 @@ const lxcContainers = {
     },
     update: async (id, updates) => {
         const allowedColumns = ['name', 'ct_id', 'user_id', 'expiration_date',
-            'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate', 'shutdown_reason'];
+            'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate', 'shutdown_reason', 'subnet_id'];
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }

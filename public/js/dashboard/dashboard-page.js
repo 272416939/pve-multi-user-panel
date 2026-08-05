@@ -58,6 +58,13 @@ var App = {
             if (!$.showResizeModal) $.showResizeModal = Vue.ref(false);
             if (!$.resizePrice) $.resizePrice = Vue.ref(0);
             if (!$.diskOptionsGroups) $.diskOptionsGroups = Vue.computed(function() { var o = $.diskOptions && $.diskOptions.value; return (o && o.groups) ? o.groups : []; });
+            // 私有网络兜底初始化
+            if (!$.subnets) $.subnets = Vue.ref([]);
+            if (!$.subnetLoading) $.subnetLoading = Vue.ref(false);
+            if (!$.subnetCreating) $.subnetCreating = Vue.ref(false);
+            if (!$.bindSubnetForm) $.bindSubnetForm = Vue.ref({ subnet_id: 0 });
+            if (!$.bindSubnetCurrentSubnet) $.bindSubnetCurrentSubnet = Vue.ref(null);
+            if (!$.bindSubnetSubmitting) $.bindSubnetSubmitting = Vue.ref(false);
             $.initCore();
             $.initVm();
             $.initLxc();

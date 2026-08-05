@@ -37,6 +37,28 @@ function logPveError(e) {
     }
 }
 
+// 私有网络：校验子网归属（用户下单必选；admin 代开可选）
+// 返回 { subnet } 或 { error }
+async function validateSubnetForUser(subnetId, userId, required) {
+    if (!subnetId || !Number.isInteger(subnetId) || subnetId <= 0) {
+        if (required) return { error: '请选择网络（子网）后再购买' };
+        return { subnet: null };
+    }
+    const subnet = await db.subnets.getById(subnetId);
+    if (!subnet) return { error: '子网不存在' };
+    if (subnet.user_id !== userId) return { error: '无权使用该子网' };
+    return { subnet };
+}
+
+// 刷新子网 DHCP 剩余可用数（创建 DHCP 绑定后回写）
+async function refreshSubnetAvailableById(subnet) {
+    if (!subnet || !ikuaiApi.isConfigured()) return;
+    try {
+        const srv = await ikuaiApi.getDhcpServerByInterface(subnet.vlan_name);
+        if (srv) await db.subnets.update(subnet.id, { available: srv.available || 0 });
+    } catch (_) {}
+}
+
 // 退款通知（开通失败共用）：站内信 + 邮件
 async function notifyProvisionFailed(opts) {
     var { userId, resourceLabel, resourceName, orderNo, totalAmount, balanceAfterRefund, refundOrderNo, resourceType, notifyKey, title, failTitle } = opts;
@@ -76,7 +98,7 @@ async function notifyProvisionFailed(opts) {
  * @param {object} opts - { userId, username, req, packageId, period, periodCount, macGroupId, osTemplateId }
  */
 async function provisionVm(opts) {
-    var { userId, username, req, packageId, period, period_count, macGroupId, osTemplateId } = opts;
+    var { userId, username, req, packageId, period, period_count, macGroupId, osTemplateId, subnetId } = opts;
 
     if (!VALID_PERIODS.includes(period)) {
         return { ok: false, status: 400, error: '无效的计费周期' };
@@ -113,6 +135,11 @@ async function provisionVm(opts) {
     } else {
         return { ok: false, status: 400, error: '请选择系统模板' };
     }
+
+    // 私有网络：新购必须选择并绑定子网（VLAN）
+    var subnetCheck = await validateSubnetForUser(subnetId, userId, true);
+    if (subnetCheck.error) return { ok: false, status: 400, error: subnetCheck.error };
+    var subnet = subnetCheck.subnet;
 
     // 克隆源：使用 OS 模板
     var cloneSourceVmid = osTemplate.template_vmid;
@@ -183,7 +210,8 @@ async function provisionVm(opts) {
             quarterly_discount: String(pkg.quarterly_discount || ''),
             yearly_discount: String(pkg.yearly_discount || ''),
             pve_upid: upid,
-            current_os_template_id: osTemplate ? osTemplate.id : null
+            current_os_template_id: osTemplate ? osTemplate.id : null,
+            subnet_id: subnet ? subnet.id : null
         });
 
         // 等待 clone 任务完成
@@ -233,6 +261,17 @@ async function provisionVm(opts) {
         if (osTemplate.ostype) {
             vmUpdateCfg.ostype = osTemplate.ostype;
         }
+        // 私有网络：网卡写入 VLAN tag（保留模板网卡的 MAC/bridge/model）
+        if (subnet) {
+            try {
+                var cloneCfg = await pveApi.getVmConfig(newVmid);
+                if (cloneCfg && cloneCfg.net0) {
+                    vmUpdateCfg.net0 = cloneCfg.net0 + ',tag=' + subnet.vlan_id;
+                }
+            } catch (netErr) {
+                console.error('[provisioning] VM 写入 VLAN tag 失败:', netErr.message);
+            }
+        }
         await pveApi.updateVmConfig(newVmid, vmUpdateCfg);
 
         if (template.cpu_affinity) {
@@ -256,9 +295,10 @@ async function provisionVm(opts) {
             if (!macCfg) macCfg = await pveApi.getVmConfig(newVmid);
             var dhcpMac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
             if (dhcpMac) {
-                var dhcpIp = await createDhcpStaticBinding('vm', newVmid, dhcpMac[0], '');
+                var dhcpIp = await createDhcpStaticBinding('vm', newVmid, dhcpMac[0], '', subnet);
                 if (dhcpIp) {
                     await db.vms.update(newVm.id, { dhcp_static_ip: dhcpIp });
+                    await refreshSubnetAvailableById(subnet);
                 }
             }
         } catch (dhcpErr) { console.error('[provisioning] VM DHCP绑定失败:', dhcpErr.message); }
@@ -375,7 +415,7 @@ async function provisionVm(opts) {
  * @param {object} opts - { userId, username, req, packageId, period, periodCount, macGroupId }
  */
 async function provisionLxc(opts) {
-    var { userId, username, req, packageId, period, period_count, macGroupId } = opts;
+    var { userId, username, req, packageId, period, period_count, macGroupId, subnetId } = opts;
 
     if (!VALID_PERIODS.includes(period)) {
         return { ok: false, status: 400, error: '无效的计费周期' };
@@ -396,6 +436,11 @@ async function provisionLxc(opts) {
     if (template.status !== 'active') return { ok: false, status: 400, error: '关联模板已停用' };
 
     var finalMacGroupId = macGroupId || template.mac_group_id || null;
+
+    // 私有网络：新购必须选择并绑定子网（VLAN）
+    var subnetCheck = await validateSubnetForUser(subnetId, userId, true);
+    if (subnetCheck.error) return { ok: false, status: 400, error: subnetCheck.error };
+    var subnet = subnetCheck.subnet;
 
     var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
 
@@ -452,6 +497,8 @@ async function provisionLxc(opts) {
                         n += ',ip6=' + template.ip6_addr;
                     }
                 }
+                // 私有网络：写入 VLAN tag
+                if (subnet) n += ',tag=' + subnet.vlan_id;
                 return n;
             })(),
             unprivileged: template.unprivileged !== undefined ? template.unprivileged : 1,
@@ -467,7 +514,8 @@ async function provisionLxc(opts) {
         newCt = await db.lxcContainers.create({
             ct_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
             renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
-            pve_upid: lxcUpid
+            pve_upid: lxcUpid,
+            subnet_id: subnet ? subnet.id : null
         });
 
         // 等待 LXC 创建任务完成
@@ -500,9 +548,10 @@ async function provisionLxc(opts) {
             var lxcDhcpCfg = await pveApi.getLxcConfig(newVmid);
             var dhcpLxcMac = lxcDhcpCfg && lxcDhcpCfg.net0 ? lxcDhcpCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
             if (dhcpLxcMac) {
-                var dhcpLxcIp = await createDhcpStaticBinding('lxc', newVmid, dhcpLxcMac[0], '');
+                var dhcpLxcIp = await createDhcpStaticBinding('lxc', newVmid, dhcpLxcMac[0], '', subnet);
                 if (dhcpLxcIp) {
                     await db.lxcContainers.update(newCt.id, { dhcp_static_ip: dhcpLxcIp });
+                    await refreshSubnetAvailableById(subnet);
                 }
             }
         } catch (dhcpErr) { console.error('[provisioning] LXC DHCP绑定失败:', dhcpErr.message); }
@@ -632,7 +681,7 @@ async function provisionLxc(opts) {
  * @param {object} opts - { userId, packageId, name, expDate, renewalPrice, renewalPeriod, period, periodCount }
  */
 async function adminProvisionVm(opts) {
-    var { userId, packageId, name, expDate, renewalPrice, renewalPeriod, period, period_count } = opts;
+    var { userId, packageId, name, expDate, renewalPrice, renewalPeriod, period, period_count, subnetId } = opts;
 
     if (!VALID_PERIODS.includes(period)) {
         return { ok: false, status: 400, error: '无效的计费周期' };
@@ -641,6 +690,11 @@ async function adminProvisionVm(opts) {
         return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
     }
     if (!userId) return { ok: false, status: 400, error: '请选择用户' };
+
+    // 私有网络：admin 代开可选绑定子网（不传则以关机状态交付，用户开机时需先绑定子网）
+    var subnetCheck = await validateSubnetForUser(subnetId, userId, false);
+    if (subnetCheck.error) return { ok: false, status: 400, error: subnetCheck.error };
+    var subnet = subnetCheck.subnet;
 
     var pkg = await db.vmPackages.getById(packageId);
     if (!pkg) return { ok: false, status: 404, error: '套餐不存在' };
@@ -668,6 +722,17 @@ async function adminProvisionVm(opts) {
         adminVmCfg.ciuser = template.ciuser;
         adminVmCfg.cipassword = generateRandomPassword();
     }
+    // 私有网络：网卡写入 VLAN tag（保留模板网卡的 MAC/bridge/model）
+    if (subnet) {
+        try {
+            var adminCfg0 = await pveApi.getVmConfig(newVmid);
+            if (adminCfg0 && adminCfg0.net0) {
+                adminVmCfg.net0 = adminCfg0.net0 + ',tag=' + subnet.vlan_id;
+            }
+        } catch (netErr) {
+            console.error('[provisioning] admin VM 写入 VLAN tag 失败:', netErr.message);
+        }
+    }
     await pveApi.updateVmConfig(newVmid, adminVmCfg);
 
     // CPU 亲和性
@@ -685,8 +750,24 @@ async function adminProvisionVm(opts) {
         renewal_period: renewalPeriod,
         monthly_price: String(pkg.monthly_price || ''),
         quarterly_discount: String(pkg.quarterly_discount || ''),
-        yearly_discount: String(pkg.yearly_discount || '')
+        yearly_discount: String(pkg.yearly_discount || ''),
+        subnet_id: subnet ? subnet.id : null
     });
+
+    // 私有网络：已指定子网时立即创建 DHCP 静态绑定（未指定则以关机状态交付，开机时提示绑定）
+    if (subnet) {
+        try {
+            var adminMacCfg = await pveApi.getVmConfig(newVmid);
+            var adminMac = adminMacCfg && adminMacCfg.net0 ? adminMacCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
+            if (adminMac) {
+                var adminDhcpIp = await createDhcpStaticBinding('vm', newVmid, adminMac[0], '', subnet);
+                if (adminDhcpIp) {
+                    await db.vms.update(newVm.id, { dhcp_static_ip: adminDhcpIp });
+                    await refreshSubnetAvailableById(subnet);
+                }
+            }
+        } catch (dhcpErr) { console.error('[provisioning] admin VM DHCP绑定失败:', dhcpErr.message); }
+    }
 
     // MAC 分组同步
     if (macGroupId) {
@@ -771,10 +852,7 @@ async function adminProvisionVm(opts) {
         } catch (e) { console.error('[provisioning] VM 密码邮件发送失败', e); }
     }
 
-    // 自动开机
-    try {
-        await pveApi.startVm(newVmid);
-    } catch (startErr) { console.error('[provisioning] VM 自动开机失败:', startErr.message); }
+    // 私有网络要求：admin 代开不自动开机，以关机状态交付，用户开机时需先绑定子网
 
     // 异步更新磁盘快照（不阻塞响应）
     takeDiskSnapshot(newVmid, userId).catch(function(err) {
@@ -792,7 +870,7 @@ async function adminProvisionVm(opts) {
  * @param {object} opts - { userId, packageId, name, expDate, renewalPrice, renewalPeriod, period, periodCount }
  */
 async function adminProvisionLxc(opts) {
-    var { userId, packageId, name, expDate, renewalPrice, renewalPeriod, period, period_count } = opts;
+    var { userId, packageId, name, expDate, renewalPrice, renewalPeriod, period, period_count, subnetId } = opts;
 
     if (!VALID_PERIODS.includes(period)) {
         return { ok: false, status: 400, error: '无效的计费周期' };
@@ -801,6 +879,11 @@ async function adminProvisionLxc(opts) {
         return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
     }
     if (!userId) return { ok: false, status: 400, error: '请选择用户' };
+
+    // 私有网络：admin 代开可选绑定子网（不传则以关机状态交付，用户开机时需先绑定子网）
+    var subnetCheck = await validateSubnetForUser(subnetId, userId, false);
+    if (subnetCheck.error) return { ok: false, status: 400, error: subnetCheck.error };
+    var subnet = subnetCheck.subnet;
 
     var pkg = await db.lxcPackages.getById(packageId);
     if (!pkg) return { ok: false, status: 404, error: '套餐不存在' };
@@ -837,6 +920,8 @@ async function adminProvisionLxc(opts) {
                     n += ',ip6=' + template.ip6_addr;
                 }
             }
+            // 私有网络：写入 VLAN tag
+            if (subnet) n += ',tag=' + subnet.vlan_id;
             return n;
         })(),
         unprivileged: template.unprivileged !== undefined ? template.unprivileged : 1,
@@ -854,8 +939,24 @@ async function adminProvisionLxc(opts) {
         renewal_period: renewalPeriod,
         monthly_price: String(pkg.monthly_price || ''),
         quarterly_discount: String(pkg.quarterly_discount || ''),
-        yearly_discount: String(pkg.yearly_discount || '')
+        yearly_discount: String(pkg.yearly_discount || ''),
+        subnet_id: subnet ? subnet.id : null
     });
+
+    // 私有网络：已指定子网时立即创建 DHCP 静态绑定（未指定则以关机状态交付，开机时提示绑定）
+    if (subnet) {
+        try {
+            var adminLxcCfg = await pveApi.getLxcConfig(newVmid);
+            var adminLxcMac = adminLxcCfg && adminLxcCfg.net0 ? adminLxcCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
+            if (adminLxcMac) {
+                var adminLxcDhcpIp = await createDhcpStaticBinding('lxc', newVmid, adminLxcMac[0], '', subnet);
+                if (adminLxcDhcpIp) {
+                    await db.lxcContainers.update(newCt.id, { dhcp_static_ip: adminLxcDhcpIp });
+                    await refreshSubnetAvailableById(subnet);
+                }
+            }
+        } catch (dhcpErr) { console.error('[provisioning] admin LXC DHCP绑定失败:', dhcpErr.message); }
+    }
 
     // MAC 分组同步
     if (macGroupId) {
@@ -911,13 +1012,7 @@ async function adminProvisionLxc(opts) {
         }
     } catch (e) { console.error('[provisioning] LXC 邮件发送失败', e); }
 
-    // 自动开机
-    try {
-        var adminAutoLxc = await pveApi.getLxcStatus(newVmid);
-        if (adminAutoLxc && adminAutoLxc.status === 'stopped') {
-            await pveApi.startLxc(newVmid);
-        }
-    } catch (startErr) { console.error('[provisioning] LXC 自动开机失败:', startErr.message); }
+    // 私有网络要求：admin 代开不自动开机，以关机状态交付，用户开机时需先绑定子网
 
     // 生成随机 root 密码并设置
     var adminLxcPwd = '';

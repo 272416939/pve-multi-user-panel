@@ -83,6 +83,7 @@
                             <option value="backup">备份管理</option>
                             <option value="message">消息管理</option>
                             <option value="network">网络管理</option>
+                            <option value="subnet">私有网络</option>
                             <option value="order">订单开通</option>
                             <option value="log">日志管理</option>
                             <option value="cache">缓存管理</option>

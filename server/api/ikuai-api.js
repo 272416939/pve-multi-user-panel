@@ -230,6 +230,114 @@ class IkuaiApi {
         return interfaces;
     }
 
+    // ===== 私有网络：VLAN 接口 =====
+    // VLAN 列表（创建子网时查重、反查 id 用）
+    async getVlans() {
+        const data = await this._call('vlan', 'show', {
+            TYPE: 'data,total',
+            limit: '0,1000',
+            ORDER_BY: '',
+            ORDER: ''
+        });
+        const list = data?.data || data || [];
+        return list.map(item => ({
+            id: item.id || '',
+            vlan_id: String(item.vlan_id || ''),
+            vlan_name: item.vlan_name || '',
+            ip_addr: item.ip_addr || '',
+            interface: item.interface || '',
+            comment: item.comment || '',
+            enabled: item.enabled
+        }));
+    }
+
+    // VLAN 新增（私有网络子网创建）
+    async addVlan({ vlan_id, vlan_name, ip_addr, interface: iface, netmask, comment }) {
+        const result = await this._call('vlan', 'add', {
+            vlan_id: String(vlan_id),
+            vlan_name: vlan_name,
+            ip_addr: ip_addr,
+            mac: '',
+            ip_mask: '',
+            interface: iface || '',
+            netmask: netmask || '255.255.255.0',
+            comment: comment || '',
+            enabled: 'yes'
+        });
+        console.log(`[ikuai] VLAN 新增成功: ${vlan_name} (ID=${vlan_id}, IP=${ip_addr}, 接口=${iface})`);
+        return result;
+    }
+
+    // VLAN 删除（子网删除）
+    async deleteVlan(id) {
+        const result = await this._call('vlan', 'del', { id: Number(id) });
+        console.log(`[ikuai] VLAN 删除成功: ID=${id}`);
+        return result;
+    }
+
+    // ===== 私有网络：DHCP 服务端 =====
+    // DHCP 服务端列表（反查 id/available 用）
+    async getDhcpServers() {
+        const data = await this._call('dhcp_server', 'show', {
+            TYPE: 'total,data',
+            limit: '0,1000',
+            ORDER_BY: '',
+            ORDER: ''
+        });
+        const list = data?.data || data || [];
+        return list.map(item => ({
+            id: item.id || '',
+            interface: item.interface || '',
+            addr_pool: item.addr_pool || '',
+            netmask: item.netmask || '',
+            gateway: item.gateway || '',
+            dns1: item.dns1 || '',
+            dns2: item.dns2 || '',
+            available: parseInt(item.available) || 0,
+            enabled: item.enabled,
+            status: item.status
+        }));
+    }
+
+    // 按接口名反查 DHCP 服务端（子网创建/刷新 available 用）
+    async getDhcpServerByInterface(iface) {
+        const servers = await this.getDhcpServers();
+        return servers.find(s => s.interface === iface) || null;
+    }
+
+    // DHCP 服务端新增（私有网络子网创建）
+    async addDhcpServer({ interface: iface, addr_pool, netmask, gateway, dns1, dns2 }) {
+        const result = await this._call('dhcp_server', 'add', {
+            interface: iface,
+            addr_pool: addr_pool,
+            netmask: netmask || '255.255.255.0',
+            gateway: gateway,
+            dns1: dns1 || '180.76.76.76',
+            dns2: dns2 || '223.5.5.5',
+            lease: 120,
+            delay: 0,
+            exclude_pool: '',
+            enabled: 'yes',
+            check_addr_valid: 1,
+            check_relay_only: 0,
+            phy_ifnames: 'all',
+            opt15: '', opt_type15: 0, opt28: '', opt_type28: 0, opt43: '', opt_type43: 0,
+            opt60: '', opt_type60: 0, opt66: '', opt_type66: 0, opt67: '', opt_type67: 0,
+            opt80: '', opt_type80: 0, opt119: '', opt_type119: 0, opt125: '', opt_type125: 0,
+            opt128: '', opt_type128: 0, opt138: '', opt_type138: 0,
+            wins1: '', wins2: '', domain: '', opt121: '', opt_type121: 2
+        });
+        console.log(`[ikuai] DHCP 服务端新增成功: 接口=${iface}, 地址池=${addr_pool}`);
+        return result;
+    }
+
+    // DHCP 服务端删除（子网删除）
+    async deleteDhcpServer(id) {
+        const result = await this._call('dhcp_server', 'del', { id: Number(id) });
+        console.log(`[ikuai] DHCP 服务端删除成功: ID=${id}`);
+        return result;
+    }
+
     // DHCP 静态绑定：查询所有已绑定的 MAC/IP
     async getDhcpStaticBindings() {
         const data = await this._call('dhcp_static', 'show', {

@@ -8,7 +8,7 @@ const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
 const { getStatusCache } = require('../services/status-cache');
 const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
-const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
+const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError, sanitizeErrorMsg } = require('../utils/safe-error');
@@ -580,9 +580,30 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
         }
 
+        // 私有网络：未绑定子网的存量设备关机后拒绝开机（全角色生效，含管理员）
+        if (vm && !vm.subnet_id) {
+            return res.status(400).json({ error: '该虚拟机尚未绑定子网，请先在「更多→绑定子网」中绑定后再开机' });
+        }
+
         await pveApi.startVm(vmid);
         // 启动成功后清除关机原因标记
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: null }); } catch (_) {}
+
+        // 私有网络：启动后兜底重绑 DHCP 静态绑定（绑定子网后首次开机时分配新 IP，绑定丢失时恢复）
+        try {
+            if (vm && vm.subnet_id) {
+                const subnet = await db.subnets.getById(vm.subnet_id);
+                if (subnet && (!vm.dhcp_static_ip || !isIpInAddrPool(vm.dhcp_static_ip, subnet.addr_pool))) {
+                    const cfg = await pveApi.getVmConfig(vmid);
+                    const mac = ((cfg && cfg.net0) || '').match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+                    if (mac) {
+                        const newIp = await rebindDhcpForDevice('vm', vmid, subnet, mac[0]);
+                        if (newIp) await db.vms.update(vm.id, { dhcp_static_ip: newIp });
+                    }
+                }
+            }
+        } catch (e) { console.error('[vm.start] 重绑 DHCP 静态绑定失败:', e.message); }
+
         await auditAction(req, 'vm.start', '开机 VM ' + vmid);
         res.json({ message: '虚拟机启动成功' });
     } catch (error) {

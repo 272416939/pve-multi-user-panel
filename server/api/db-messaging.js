@@ -48,6 +48,7 @@ const ADMIN_SUB_CATEGORIES = {
     backup: '备份管理',
     message: '消息管理',
     network: '网络管理',
+    subnet: '私有网络',
     order: '订单开通',
     log: '日志管理',
     cache: '缓存管理',

@@ -140,7 +140,9 @@ var RATE_LIMIT_CATEGORIES = [
         rules: [
             { key: 'notification_settings', label: '通知设置保存', hint: '按用户', max: 30, windowSec: 60 },
             { key: 'uapipro_test', label: 'UApiPro 测试查询', hint: '按用户', max: 10, windowSec: 60 },
-            { key: 'random_port', label: '随机端口申请', hint: '按用户', max: 30, windowSec: 60 }
+            { key: 'random_port', label: '随机端口申请', hint: '按用户', max: 30, windowSec: 60 },
+            { key: 'subnet_create', label: '创建子网', hint: '按用户', max: 5, windowSec: 60 },
+            { key: 'subnet_refresh', label: '刷新子网可用IP', hint: '按用户', max: 10, windowSec: 60 }
         ]
     }
 ];

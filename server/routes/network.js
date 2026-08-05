@@ -62,8 +62,11 @@ router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req,
             dhcp_ip_range_end: await db.config.get('dhcp:ip_range_end') || '10.0.0.199',
             dhcp_interface: await db.config.get('dhcp:interface') || 'lan2',
             dhcp_gateway: await db.config.get('dhcp:gateway') || '10.0.0.1',
-            dhcp_dns1: await db.config.get('dhcp:dns1') || '119.29.29.29',
+            dhcp_dns1: await db.config.get('dhcp:dns1') || '180.76.76.76',
             dhcp_dns2: await db.config.get('dhcp:dns2') || '223.5.5.5',
+            vlan_ip_segment_start: await db.config.get('vlan:ip_segment_start') || '172.16.0.1',
+            vlan_id_start: parseInt(await db.config.get('vlan:id_start')) || 1000,
+            vlan_interface: await db.config.get('vlan:interface') || 'lan1',
             cname_domain: await db.config.get('cname:domain') || ''
         });
     } catch (e) {
@@ -75,7 +78,19 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
     try {
         const { port_range_start, port_range_end, default_protocol, wan_interface, max_per_user,
                 dhcp_ip_range_start, dhcp_ip_range_end, dhcp_interface, dhcp_gateway, dhcp_dns1, dhcp_dns2,
+                vlan_ip_segment_start, vlan_id_start, vlan_interface,
                 cname_domain } = req.body;
+        // 私有网络 VLAN 设置校验：IP 段必须为合法 IPv4，VLAN ID 起始值必须在 2~4090
+        const ipv4Re = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        if (vlan_ip_segment_start !== undefined && !ipv4Re.test(String(vlan_ip_segment_start).trim())) {
+            return res.status(400).json({ error: 'IP 段开始范围必须是合法 IPv4 地址' });
+        }
+        if (vlan_id_start !== undefined) {
+            const vlanIdNum = parseInt(vlan_id_start);
+            if (!Number.isInteger(vlanIdNum) || vlanIdNum < 2 || vlanIdNum > 4090) {
+                return res.status(400).json({ error: 'VLANID 开始范围必须是 2~4090 的整数' });
+            }
+        }
         const setConfig = db.config.set;
         await setConfig('forward:port_range_start', String(port_range_start ?? 50000));
         await setConfig('forward:port_range_end', String(port_range_end ?? 60000));
@@ -93,13 +108,16 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         await setConfig('dhcp:ip_range_end', dhcp_ip_range_end || '10.0.0.199');
         await setConfig('dhcp:interface', dhcp_interface || 'lan2');
         await setConfig('dhcp:gateway', dhcp_gateway || '10.0.0.1');
-        await setConfig('dhcp:dns1', dhcp_dns1 || '119.29.29.29');
+        await setConfig('dhcp:dns1', dhcp_dns1 || '180.76.76.76');
         await setConfig('dhcp:dns2', dhcp_dns2 || '223.5.5.5');
+        await setConfig('vlan:ip_segment_start', String(vlan_ip_segment_start || '172.16.0.1').trim());
+        await setConfig('vlan:id_start', String(vlan_id_start ?? 1000));
+        await setConfig('vlan:interface', (vlan_interface || 'lan1').trim());
         await setConfig('cname:domain', (cname_domain || '').trim());
         // 操作审计：更新网络/端口转发配置
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.network', resourceType: 'config', resourceId: 'network', details: '更新网络配置(端口段:' + (port_range_start ?? 50000) + '-' + (port_range_end ?? 60000) + ',每用户上限:' + (max_per_user ?? 10) + ',DHCP:' + (dhcp_ip_range_start || '10.0.0.110') + '-' + (dhcp_ip_range_end || '10.0.0.199') + ')', req });
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.network', resourceType: 'config', resourceId: 'network', details: '更新网络配置(端口段:' + (port_range_start ?? 50000) + '-' + (port_range_end ?? 60000) + ',每用户上限:' + (max_per_user ?? 10) + ',DHCP:' + (dhcp_ip_range_start || '10.0.0.110') + '-' + (dhcp_ip_range_end || '10.0.0.199') + ',VLAN段:' + (vlan_ip_segment_start || '172.16.0.1') + ',VLAN起始ID:' + (vlan_id_start ?? 1000) + ',VLAN接口:' + (vlan_interface || 'lan1') + ')', req });
         } catch (e) {}
         res.json({ message: '网络配置已更新' });
     } catch (e) {

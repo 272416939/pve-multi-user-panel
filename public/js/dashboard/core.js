@@ -75,7 +75,7 @@
     // 套餐开通子菜单选中项（VM/LXC），刷新后保持；白名单校验防 localStorage 污染
     var _savedSubOrder = localStorage.getItem(window.__storageKeys.DASHBOARD_ACTIVE_TAB_ORDER);
     $.activeTabOrder = ref((_savedSubOrder === 'vm' || _savedSubOrder === 'lxc') ? _savedSubOrder : 'vm');
-    $.orderForm = ref({ period: 'month', quantity: 1, mac_group_id: '', os_template_id: 0 });
+    $.orderForm = ref({ period: 'month', quantity: 1, mac_group_id: '', os_template_id: 0, subnet_id: 0 });
     $.orderPackage = ref({});
     $.orderType = ref('vm');
     $.orderLoading = ref(false);
@@ -84,6 +84,9 @@
     // v1.3 新增：OS 模板选择状态
     $.orderOsTemplates = ref([]);       // 当前套餐可选的 OS 模板列表
     $.orderOsLoading = ref(false);      // 加载 OS 模板时的 loading
+    // 私有网络：当前用户的子网列表（下单必选）
+    $.orderSubnets = ref([]);           // 当前用户可选的子网列表
+    $.orderSubnetsLoading = ref(false); // 加载子网列表时的 loading
     $.lxcGroupedPackages = ref([]);
 
     $.orderTotal = computed(function() {
@@ -1038,12 +1041,26 @@
     $.openOrderModal = function(pkg, type, selectedPeriod) {
         $.orderPackage.value = pkg;
         $.orderType.value = type;
-        $.orderForm.value = { period: selectedPeriod || 'month', quantity: 1, os_template_id: 0, mac_group_id: '' };
+        $.orderForm.value = { period: selectedPeriod || 'month', quantity: 1, os_template_id: 0, mac_group_id: '', subnet_id: 0 };
         // v1.3 新增：仅 VM 套餐才加载 OS 模板
         if (type === 'vm') {
             $.orderOsTemplates.value = [];
             $.orderOsLoading.value = true;
         }
+        // 私有网络：加载当前用户子网（无子网时提示先创建，无法购买）
+        $.orderSubnets.value = [];
+        $.orderSubnetsLoading.value = true;
+        api('/subnets').then(function(list) {
+            $.orderSubnets.value = list || [];
+            // 默认选中第一个可用子网
+            if ($.orderSubnets.value.length > 0) {
+                $.orderForm.value.subnet_id = $.orderSubnets.value[0].id;
+            }
+        }).catch(function(e) {
+            console.error('加载子网列表失败', e);
+        }).finally(function() {
+            $.orderSubnetsLoading.value = false;
+        });
         // 刷新余额显示
         $.loadWalletBalance();
         // 用 nextTick 确保 Vue 完成 DOM 更新后再显示 Modal
@@ -1077,6 +1094,8 @@
         if (type === 'vm') {
             orderForm.os_template_id = parseInt($.orderForm.value.os_template_id) || 0;
         }
+        // 私有网络：VM/LXC 都必须选择子网
+        orderForm.subnet_id = parseInt($.orderForm.value.subnet_id) || 0;
 
         // 立即创建占位记录，显示"开通中"状态
         var placeholderId = window.__storageKeys.PROVISIONING_PREFIX + Date.now();
@@ -1393,6 +1412,10 @@
                     } else {
                         if ($.loadLoginLogs) await $.loadLoginLogs(1);
                     }
+                }
+                if ($.activeSection.value === 'subnet') {
+                    // 刷新/直达链接：加载子网列表（点击路径由 registerSectionLoader 派发）
+                    if ($.loadSubnets) await $.loadSubnets();
                 }
                 $.loadUnreadCount();
                 $.loadWalletBalance();

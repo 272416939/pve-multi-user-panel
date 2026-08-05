@@ -84,7 +84,8 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             period: period,
             period_count: period_count,
             macGroupId: req.body.mac_group_id || '',
-            osTemplateId: parseInt(req.body.os_template_id) || 0
+            osTemplateId: parseInt(req.body.os_template_id) || 0,
+            subnetId: parseInt(req.body.subnet_id) || 0
         });
         if (!result.ok) {
             return res.status(result.status).json({ error: result.error });
@@ -113,7 +114,8 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             packageId: parseInt(req.params.id),
             period: period,
             period_count: period_count,
-            macGroupId: req.body.mac_group_id || ''
+            macGroupId: req.body.mac_group_id || '',
+            subnetId: parseInt(req.body.subnet_id) || 0
         });
         if (!result.ok) {
             return res.status(result.status).json({ error: result.error });
@@ -239,7 +241,8 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
             renewalPrice: req.body.renewal_price || '',
             renewalPeriod: req.body.renewal_period || 'month',
             period: period,
-            period_count: period_count
+            period_count: period_count,
+            subnetId: parseInt(req.body.subnet_id) || 0
         });
         if (!result.ok) {
             return res.status(result.status).json({ error: result.error });
@@ -336,7 +339,8 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
             renewalPrice: req.body.renewal_price || '',
             renewalPeriod: req.body.renewal_period || 'month',
             period: period,
-            period_count: period_count
+            period_count: period_count,
+            subnetId: parseInt(req.body.subnet_id) || 0
         });
         if (!result.ok) {
             return res.status(result.status).json({ error: result.error });
