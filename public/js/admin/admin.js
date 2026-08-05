@@ -754,9 +754,11 @@
         }
         $.rateLimitSaving.value = true;
         try {
+            // 严格 === true 判断：按钮事件绑定会传入 MouseEvent，!!restoreDefault 会把普通保存误判为恢复默认
+            var isRestoreDefault = restoreDefault === true;
             await api('/admin/rate-limit/config', {
                 method: 'PUT',
-                body: JSON.stringify({ master_enabled: !!cfg.master_enabled, categories: cfg.categories, restore_default: !!restoreDefault })
+                body: JSON.stringify({ master_enabled: !!cfg.master_enabled, categories: cfg.categories, restore_default: isRestoreDefault })
             });
             alert('限速配置保存成功');
             await $.loadRateLimitConfig();
