@@ -119,7 +119,7 @@ var App = {
         if (!$.osSwitchLogFilter) $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '' });
         if (!$.osSwitchLogSelected) $.osSwitchLogSelected = Vue.reactive([]);
         if (!$.osSwitchLogDetail) $.osSwitchLogDetail = Vue.ref(null);
-        if (!$.activeTabDisk) $.activeTabDisk = Vue.ref(localStorage.getItem('admin_activeTabDisk') || 'storage-groups');
+        if (!$.activeTabDisk) $.activeTabDisk = Vue.ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_DISK) || 'storage-groups');
         $.initCore();
         $.initVm();
         $.initLxc();

@@ -17,6 +17,12 @@ const SUBSCRIPTIONS = new Map();
 const MAX_CONNECTIONS = 1000; // 全局连接上限
 const MAX_PER_IP = 20; // 单 IP 连接上限
 
+// 定时器句柄（声明在使用点之前，避免 TDZ；ensureTimers 函数声明提升不受影响）
+let hbTimer = null;
+let statusTimer = null;
+let unreadTimer = null;
+let tickTimer = null;
+
 function validateTicket(token) {
     try {
         const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
@@ -330,11 +336,6 @@ pushProxy.on('connection', async (clientWs, request) => {
         SUBSCRIPTIONS.delete(clientWs);
     });
 });
-
-let hbTimer = null;
-let statusTimer = null;
-let unreadTimer = null;
-let tickTimer = null;
 
 function ensureTimers() {
     if (!hbTimer) hbTimer = setInterval(heartbeat, HEARTBEAT_INTERVAL);

@@ -545,7 +545,7 @@
                     try {
                         var dres = await fetch('/api/disks/' + disks[i].id + '/renew', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem(window.__storageKeys.TOKEN) },
                             body: JSON.stringify({
                                 period: $.renewFormPeriod.value,
                                 period_count: qty
@@ -571,7 +571,7 @@
                     try {
                         await fetch('/api/disks/' + renewedDiskIds[j] + '/renew', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('token') },
+                            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem(window.__storageKeys.TOKEN) },
                             body: JSON.stringify({ period: 'month', period_count: -1 })
                         });
                     } catch (e) {}
@@ -724,16 +724,16 @@
     };
 
     $.logout = function() {
-        var refreshToken = localStorage.getItem('refreshToken');
+        var refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
         if (refreshToken) {
-            fetch('/api/logout', {
+            fetch('/api' + window.__apiPaths.LOGOUT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refreshToken: refreshToken })
             }).catch(function() {});
         }
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
+        localStorage.removeItem(window.__storageKeys.TOKEN);
+        localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
         window.location.href = 'login.html';
     };
 
@@ -1079,7 +1079,7 @@
         }
 
         // 立即创建占位记录，显示"开通中"状态
-        var placeholderId = 'provisioning_' + Date.now();
+        var placeholderId = window.__storageKeys.PROVISIONING_PREFIX + Date.now();
         var placeholder = {
             id: placeholderId,
             name: '开通中...',
@@ -1096,7 +1096,7 @@
         }
         // 持久化开通中状态到 localStorage，支持页面刷新恢复
         try {
-            var taskKey = 'provisioning_' + type;
+            var taskKey = window.__storageKeys.PROVISIONING_PREFIX + type;
             var taskData = { id: placeholderId, type: type, startTime: Date.now(), pkgName: pkg.name || '' };
             localStorage.setItem(taskKey, JSON.stringify(taskData));
         } catch (e2) {}
@@ -1115,7 +1115,7 @@
             // 后端同步开通完成时 _provisioning 为 false；若为 true（异步场景），改用 resourceId 轮询 PVE 任务状态
             if (result && result._provisioning && result.id) {
                 try {
-                    localStorage.setItem('provisioning_' + type, JSON.stringify({ id: placeholderId, type: type, startTime: Date.now(), resourceId: result.id }));
+                    localStorage.setItem(window.__storageKeys.PROVISIONING_PREFIX + type, JSON.stringify({ id: placeholderId, type: type, startTime: Date.now(), resourceId: result.id }));
                 } catch (e2) {}
                 // 移除占位记录，加载 DB 预创建记录（_provisioning 为 true 会被 loadData 标记为开通中），再启动 PVE 状态轮询
                 if (type === 'vm') {
@@ -1136,7 +1136,7 @@
                     await $.loadLxcContainers();
                 }
                 // 清除开通中状态
-                try { localStorage.removeItem('provisioning_' + type); } catch (e2) {}
+                try { localStorage.removeItem(window.__storageKeys.PROVISIONING_PREFIX + type); } catch (e2) {}
                 // 刷新余额
                 $.loadWalletBalance();
             }
@@ -1148,7 +1148,7 @@
                 $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
             }
             // 清除开通中状态
-            try { localStorage.removeItem('provisioning_' + type); } catch (e2) {}
+            try { localStorage.removeItem(window.__storageKeys.PROVISIONING_PREFIX + type); } catch (e2) {}
             alert('开通失败：' + (e.message || '未知错误'));
         }
     };
@@ -1169,23 +1169,23 @@
         for (var i = 0; i < types.length; i++) {
             var t = types[i];
             try {
-                var raw = localStorage.getItem('provisioning_' + t);
+                var raw = localStorage.getItem(window.__storageKeys.PROVISIONING_PREFIX + t);
                 if (!raw) continue;
                 var data = JSON.parse(raw);
                 // SEC-07: 字段类型断言，防止 localStorage 被污染后注入异常值
                 if (!data || typeof data.id !== 'string' || typeof data.startTime !== 'number') {
-                    localStorage.removeItem('provisioning_' + t);
+                    localStorage.removeItem(window.__storageKeys.PROVISIONING_PREFIX + t);
                     continue;
                 }
                 // 若已有 _provisioning 轮询在跑，说明新方案已接管，清除旧 localStorage
                 var hasProvisioningPoll = (t === 'vm' && provisioningVm) || (t === 'lxc' && provisioningLxc);
                 if (hasProvisioningPoll) {
-                    localStorage.removeItem('provisioning_' + t);
+                    localStorage.removeItem(window.__storageKeys.PROVISIONING_PREFIX + t);
                     continue;
                 }
                 // 超过 10 分钟视为超时，清除不恢复
                 if (Date.now() - (data.startTime || 0) > 10 * 60 * 1000) {
-                    localStorage.removeItem('provisioning_' + t);
+                    localStorage.removeItem(window.__storageKeys.PROVISIONING_PREFIX + t);
                     continue;
                 }
                 var placeholder = {
@@ -1226,7 +1226,7 @@
                     } else {
                         await $.loadLxcContainers();
                     }
-                    try { localStorage.removeItem('provisioning_' + type); } catch (e2) {}
+                    try { localStorage.removeItem(window.__storageKeys.PROVISIONING_PREFIX + type); } catch (e2) {}
                     $.loadWalletBalance();
                 }
             } catch (e) {}
@@ -1248,7 +1248,7 @@
         $[pollKey] = setInterval(async function() {
             try {
                 // 情况1：localStorage 已被清除（其他标签页或原 await 完成）→ 移除占位记录
-                var raw = localStorage.getItem('provisioning_' + type);
+                var raw = localStorage.getItem(window.__storageKeys.PROVISIONING_PREFIX + type);
                 if (!raw) {
                     clearInterval($[pollKey]);
                     $[pollKey] = null;
@@ -1278,7 +1278,7 @@
                     } else {
                         $.userLxcContainers.value = $.userLxcContainers.value.filter(function(c) { return c.id !== placeholderId; });
                     }
-                    try { localStorage.removeItem('provisioning_' + type); } catch (e2) {}
+                    try { localStorage.removeItem(window.__storageKeys.PROVISIONING_PREFIX + type); } catch (e2) {}
                     $.loadWalletBalance();
                 }
             } catch (e) {}
@@ -1464,7 +1464,7 @@
 
                 // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
                 setInterval(function() {
-                    var token = localStorage.getItem('token');
+                    var token = localStorage.getItem(window.__storageKeys.TOKEN);
                     if (!token) return;
                     try {
                         var payload = JSON.parse(atob(token.split('.')[1]));
@@ -1485,11 +1485,11 @@
 
         // 套餐开通子菜单选中项持久化，刷新后恢复
         watch($.activeTabOrder, function(newTab) {
-            localStorage.setItem('dashboard_activeTabOrder', newTab);
+            localStorage.setItem(window.__storageKeys.DASHBOARD_ACTIVE_TAB_ORDER, newTab);
         });
 
         watch($.activeTab, function(newTab) {
-            localStorage.setItem('dashboard_activeTab', newTab);
+            localStorage.setItem(window.__storageKeys.DASHBOARD_ACTIVE_TAB, newTab);
             if (newTab === 'messages') {
                 $.loadMessages();
                 $.loadUnreadCount();
@@ -1497,7 +1497,7 @@
         });
 
         watch($.logTab, function(newTab) {
-            localStorage.setItem('dashboard_logTab', newTab);
+            localStorage.setItem(window.__storageKeys.DASHBOARD_LOGTAB, newTab);
             if (newTab === 'operation') {
                 if ($.loadOperationLogs) $.loadOperationLogs(1);
             } else {

@@ -504,7 +504,7 @@ function fallbackCopy(text) {
 const logout = () => {
     const refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
     if (refreshToken) {
-        fetch('/api/logout', {
+        fetch('/api' + window.__apiPaths.LOGOUT, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ refreshToken })

@@ -18,7 +18,7 @@
     // 日志保留上限（后端返回，Tips 提示用）
     $.logKeepCount = ref(0);
     // 分页：每页条数（20/50/100 可选；页码/省略号/跳页逻辑由 pv-pagination 组件内置）
-    $.logPageSize = ref(parseInt(localStorage.getItem('dashboard_logPageSize')) || 20);
+    $.logPageSize = ref(parseInt(localStorage.getItem(window.__storageKeys.DASHBOARD_LOG_PAGE_SIZE)) || 20);
 
     // 当前 tab 的分页/总数（模板共用）
     $.currentLogTotal = computed(function() {
@@ -98,7 +98,7 @@
     // 每页条数切换：记住选择并从第 1 页重新加载（pv-pagination 事件回调，接收新条数）
     $.changeLogPageSize = function(size) {
         $.logPageSize.value = size || 20;
-        localStorage.setItem('dashboard_logPageSize', $.logPageSize.value);
+        localStorage.setItem(window.__storageKeys.DASHBOARD_LOG_PAGE_SIZE, $.logPageSize.value);
         if ($.logTab.value === 'operation') {
             $.loadOperationLogs(1);
         } else {

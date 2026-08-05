@@ -401,16 +401,16 @@ watch($.user, function(u) {
     };
 
     $.logout = function() {
-        var refreshToken = localStorage.getItem('refreshToken');
+        var refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
         if (refreshToken) {
-            fetch('/api/logout', {
+            fetch('/api' + window.__apiPaths.LOGOUT, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refreshToken: refreshToken })
             }).catch(function() {});
         }
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
+        localStorage.removeItem(window.__storageKeys.TOKEN);
+        localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
         window.location.href = 'login.html';
     };
 
@@ -1039,7 +1039,7 @@ $.initDetailCharts = function() {
                 }
                 // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
                 setInterval(function() {
-                    var token = localStorage.getItem('token');
+                    var token = localStorage.getItem(window.__storageKeys.TOKEN);
                     if (!token) return;
                     try {
                         var payload = JSON.parse(atob(token.split('.')[1]));

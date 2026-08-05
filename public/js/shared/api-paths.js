@@ -30,8 +30,8 @@ window.__apiPaths = {
     LXC_PACKAGES: '/lxc-packages',
     PACKAGE_GROUPS: '/package-groups',
 
-    // 管理端
-    ADMIN_USERS: '/admin/users',
+    // 管理端（注意：admin-user.js 挂载于 /api，用户管理真实路径为 /api/users，不是 /admin/users）
+    ADMIN_USERS: '/users',
     ADMIN_TRANSACTIONS: '/admin/transactions',
     ADMIN_ORDERS: '/admin/orders',
     ADMIN_CDK_LIST: '/admin/cdk/list'

@@ -30,5 +30,8 @@ window.__storageKeys = {
     THEME: 'theme',
 
     // 开通轮询前缀（key = 前缀 + resourceId）
-    PROVISIONING_PREFIX: 'provisioning_'
+    PROVISIONING_PREFIX: 'provisioning_',
+
+    // 充值轮询（用户中心支付轮询持久化，手机端支付完成重建页面后恢复）
+    RECHARGE_PENDING: 'recharge_pending'
 };
