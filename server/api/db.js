@@ -21,6 +21,7 @@ const dbNetwork = require('./db-network');
 const dbMessaging = require('./db-messaging');
 const dbConfig = require('./db-config');
 const dbBilling = require('./db-billing');
+const dbIp = require('./db-ip');
 
 module.exports = {
     // 数据库连接
@@ -143,4 +144,7 @@ module.exports = {
 
     // 用户通知设置
     userSettings: dbUsers.userSettings,
+
+    // IP 归属地持久化缓存（ip_locations）
+    ipLocations: dbIp.ipLocations,
 };
