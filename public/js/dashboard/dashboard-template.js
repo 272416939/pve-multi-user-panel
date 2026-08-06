@@ -433,7 +433,10 @@
         <div v-show="activeSection === 'subnet'">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h4 class="module-title">子网管理</h4>
-                <pv-button variant="glass" @click="openCreateSubnet">+ 新建子网</pv-button>
+                <div class="d-flex gap-2">
+                    <pv-button variant="outline" @click="refreshSubnets" :disabled="subnetRefreshing" :loading="subnetRefreshing">刷新可用IP</pv-button>
+                    <pv-button variant="glass" @click="openCreateSubnet">+ 新建子网</pv-button>
+                </div>
             </div>
             <div v-if="subnetLoading" class="text-center py-4">
                 <div class="spinner-border text-primary" role="status">
