@@ -279,15 +279,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         }
     }
  
-    try {
-        const currentStatus = await pveApi.getLxcStatus(parseInt(ct_id));
-        if (currentStatus && currentStatus.status === 'stopped') {
-            await pveApi.startLxc(parseInt(ct_id));
-            dbg(`LXC 容器 ${ct_id} 已自动开机（分配后）`);
-        }
-    } catch (startError) {
-        console.error(`LXC 容器 ${ct_id} 自动开机失败:`, startError.message);
-    }
+    // 私有网络要求：admin 手动分配不自动开机，以关机状态交付，用户开机时需先绑定子网
 
     // DHCP 静态绑定：分配 IP
     try {
