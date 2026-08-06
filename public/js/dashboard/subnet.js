@@ -88,7 +88,7 @@
             var id = type === 'vm' ? $.bindSubnetDevice.vm_id : $.bindSubnetDevice.ct_id;
             var res = await api('/' + type + '/' + id + '/bind-subnet', { method: 'POST', body: { subnet_id: subnetId } });
             $.bsModalHide('bindSubnetModal');
-            alert('绑定成功' + (res.dhcp_static_ip ? '，分配 IP：' + res.dhcp_static_ip : ''));
+            alert('绑定成功' + (res.dhcp_static_ip ? '，分配 IP：' + res.dhcp_static_ip : '') + (res.port_forwards_rebuilt ? '，已更新 ' + res.port_forwards_rebuilt + ' 条端口转发' : ''));
             // 刷新设备列表与子网可用 IP
             if (type === 'vm') { await $.loadData(); } else { await $.loadLxcContainers(); }
             await $.loadSubnets();

@@ -6,6 +6,8 @@ const pveApi = require('../api/pve-api');
 const ikuaiApi = require('../api/ikuai-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, getWanInterface, getWanInterfaces } = require('../services/dhcp');
+// ikuai_id 解析/序列化单一来源（services/port-forward-sync.js，禁止本地双份拷贝）
+const { parseIkuaiIds, stringifyIkuaiIds } = require('../services/port-forward-sync');
 const dbg = require('../utils/debug');
 const { safeError } = require('../utils/safe-error');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
@@ -20,23 +22,6 @@ function portAuditDetail(action, rule, vmId, ctId) {
     return detail;
 }
 
-// 解析 ikuai_id 字段，兼容旧格式（纯字符串）和新格式（JSON 数组）
-// 返回 [{interface, id}] 数组
-function parseIkuaiIds(raw) {
-    if (!raw) return [];
-    if (typeof raw !== 'string') return [];
-    try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-    } catch (_) {}
-    // 旧格式：纯 ID 字符串
-    return [{ interface: '', id: raw }];
-}
-
-// 序列化 ikuai_id 数组为 JSON 字符串
-function stringifyIkuaiIds(arr) {
-    return JSON.stringify(arr || []);
-}
 router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         let ifaceList = [];

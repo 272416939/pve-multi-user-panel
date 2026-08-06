@@ -6,6 +6,7 @@ const pveApi = require('../api/pve-api');
 const ikuaiApi = require('../api/ikuai-api');
 const { authMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, isIpInAddrPool } = require('../services/dhcp');
+const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync');
 const { safeError } = require('../utils/safe-error');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { auditAction } = require('../utils/audit-log');
@@ -326,8 +327,13 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
 
         await db.vms.update(vm.id, { subnet_id: subnetId, dhcp_static_ip: dhcpIp || '' });
         await refreshSubnetAvailable(subnet);
-        await auditAction(req, 'subnet.bind.vm', 'VM ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : ''), { resourceType: 'subnet', resourceId: subnetId });
-        res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId });
+        // 设备 IP 已更换：同步重建端口转发（爱快删旧建新 + DB 回写新 IP）
+        let rebuiltCount = 0;
+        if (dhcpIp) {
+            rebuiltCount = await rebuildPortForwardsForDevice('vm', vmid, dhcpIp);
+        }
+        await auditAction(req, 'subnet.bind.vm', 'VM ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : '') + (rebuiltCount > 0 ? ', 更新端口转发 ' + rebuiltCount + ' 条' : ''), { resourceType: 'subnet', resourceId: subnetId });
+        res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId, port_forwards_rebuilt: rebuiltCount });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
     }
@@ -381,8 +387,13 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
 
         await db.lxcContainers.update(ct.id, { subnet_id: subnetId, dhcp_static_ip: dhcpIp || '' });
         await refreshSubnetAvailable(subnet);
-        await auditAction(req, 'subnet.bind.lxc', 'LXC ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : ''), { resourceType: 'subnet', resourceId: subnetId });
-        res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId });
+        // 设备 IP 已更换：同步重建端口转发（爱快删旧建新 + DB 回写新 IP）
+        let rebuiltCount = 0;
+        if (dhcpIp) {
+            rebuiltCount = await rebuildPortForwardsForDevice('lxc', vmid, dhcpIp);
+        }
+        await auditAction(req, 'subnet.bind.lxc', 'LXC ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : '') + (rebuiltCount > 0 ? ', 更新端口转发 ' + rebuiltCount + ' 条' : ''), { resourceType: 'subnet', resourceId: subnetId });
+        res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId, port_forwards_rebuilt: rebuiltCount });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
     }

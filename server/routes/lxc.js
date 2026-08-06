@@ -9,6 +9,7 @@ const { _applyRate } = require('../utils/pve-rate');
 const { getStatusCache } = require('../services/status-cache');
 const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
+const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync');
 const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
@@ -562,7 +563,15 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
                     const mac = ((cfg && cfg.net0) || '').match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
                     if (mac) {
                         const newIp = await rebindDhcpForDevice('lxc', vmid, subnet, mac[0]);
-                        if (newIp) await db.lxcContainers.update(ct.id, { dhcp_static_ip: newIp });
+                        if (newIp) {
+                            await db.lxcContainers.update(ct.id, { dhcp_static_ip: newIp });
+                            // 端口转发同步：IP 变化时重建规则（绑定后首次开机/绑定丢失恢复场景）
+                            if (newIp !== ct.dhcp_static_ip) {
+                                try {
+                                    await rebuildPortForwardsForDevice('lxc', vmid, newIp);
+                                } catch (pfErr) { console.error('[lxc.start] 同步端口转发失败:', pfErr.message); }
+                            }
+                        }
                     }
                 }
             }

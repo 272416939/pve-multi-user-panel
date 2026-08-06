@@ -9,6 +9,7 @@ const { _applyRate } = require('../utils/pve-rate');
 const { getStatusCache } = require('../services/status-cache');
 const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
+const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError, sanitizeErrorMsg } = require('../utils/safe-error');
@@ -598,7 +599,15 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
                     const mac = ((cfg && cfg.net0) || '').match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
                     if (mac) {
                         const newIp = await rebindDhcpForDevice('vm', vmid, subnet, mac[0]);
-                        if (newIp) await db.vms.update(vm.id, { dhcp_static_ip: newIp });
+                        if (newIp) {
+                            await db.vms.update(vm.id, { dhcp_static_ip: newIp });
+                            // 端口转发同步：IP 变化时重建规则（绑定后首次开机/绑定丢失恢复场景）
+                            if (newIp !== vm.dhcp_static_ip) {
+                                try {
+                                    await rebuildPortForwardsForDevice('vm', vmid, newIp);
+                                } catch (pfErr) { console.error('[vm.start] 同步端口转发失败:', pfErr.message); }
+                            }
+                        }
                     }
                 }
             }
