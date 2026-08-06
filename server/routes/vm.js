@@ -542,6 +542,11 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
         }
     }
 
+    // 操作审计：移除 VM（台账移除，不销毁 PVE 虚拟机）
+    if (removedVmInfo) {
+        await auditAction(req, 'admin.vm.remove', '移除VM #' + removedVmInfo.vm_id + ':' + (removedVmInfo.name || 'VM ' + removedVmInfo.vm_id) + '(用户#' + removedVmInfo.user_id + ')', { resourceType: 'vm', resourceId: removedVmInfo.vm_id });
+    }
+
     res.json({ message: '虚拟机移除成功' });
     } catch (e) {
         console.error('[vm] 操作失败:', e.message);
@@ -817,7 +822,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
             // DHCP模式：删除爱快静态绑定（如果有），VM将自动从爱快获取动态IP
             await removeDhcpStaticBinding('vm', vmid);
             if (vmRecord) await db.vms.update(vmRecord.id, { dhcp_static_ip: '' });
-            await auditAction(req, 'vm.reset-ip', 'VM ' + vmid + ' 切换为 DHCP 模式');
+            await auditAction(req, 'admin.vm.reset-ip', 'VM ' + vmid + ' 切换为 DHCP 模式');
             return res.json({ success: true, ip: null, message: '已切换为DHCP模式' });
         }
 
@@ -890,7 +895,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
             }
         }
 
-        await auditAction(req, 'vm.reset-ip', '设置 VM ' + vmid + ' 静态IP ' + finalIp);
+        await auditAction(req, 'admin.vm.reset-ip', '设置 VM ' + vmid + ' 静态IP ' + finalIp);
         res.json({ success: true, ip: finalIp, message: `已设置静态IP ${finalIp}（通过爱快DHCP绑定）` });
     } catch (error) {
         dbg('[vm/reset-ip]', error.message);
@@ -952,8 +957,10 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
         const vmid = parseInt(req.params.vmid);
         const force = req.query.force === '1';
 
-        // V3-14 修复：销毁前记录审计（含 vmid 与 force）
-        await auditAction(req, 'vm.destroy', '销毁 VM ' + vmid + (force ? '（强制）' : ''));
+        const assignedVms = (await db.vms.getAll()).filter(v => v.vm_id === vmid);
+        // V3-14 修复：销毁前记录审计（含 vmid、归属与 force；后台操作域）
+        const destroyTargets = assignedVms.map(v => (v.name || 'VM ' + v.vm_id) + '(用户#' + v.user_id + ')').join('/');
+        await auditAction(req, 'admin.vm.destroy', '销毁 VM ' + vmid + (destroyTargets ? ':' + destroyTargets : '') + (force ? '（强制）' : ''), { resourceType: 'vm' });
 
         if (!force) {
             try {
@@ -966,7 +973,6 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             }
         }
 
-        const assignedVms = (await db.vms.getAll()).filter(v => v.vm_id === vmid);
         for (const vm of assignedVms) {
             await db.vms.reminders.clear(vm.id);
             try {

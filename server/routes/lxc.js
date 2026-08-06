@@ -507,6 +507,11 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
         }
     }
 
+    // 操作审计：移除 LXC（台账移除，不销毁 PVE 容器）
+    if (removedCtInfo) {
+        await auditAction(req, 'admin.lxc.remove', '移除LXC #' + removedCtInfo.ct_id + ':' + (removedCtInfo.name || 'CT ' + removedCtInfo.ct_id) + '(用户#' + removedCtInfo.user_id + ')', { resourceType: 'lxc', resourceId: removedCtInfo.ct_id });
+    }
+
     res.json({ message: '容器移除成功' });
     } catch (e) {
         console.error('[lxc] 操作失败:', e.message);
@@ -1154,7 +1159,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
             }
         }
 
-        await auditAction(req, 'lxc.reset-ip', '设置 LXC ' + vmid + ' IP: ' + (newIp || 'DHCP') + '（' + ip_mode + '）');
+        await auditAction(req, 'admin.lxc.reset-ip', '设置 LXC ' + vmid + ' IP: ' + (newIp || 'DHCP') + '（' + ip_mode + '）');
         res.json({ message: 'IP 重置成功', ip: newIp || 'DHCP', net0: newNet0 });
     } catch (error) {
         console.error('重置 LXC IP 失败:', error.message);
@@ -1178,6 +1183,9 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
         
         // 先解除分配记录
         const assignedCts = await db.lxcContainers.getByCtId(vmid);
+        // 操作审计：销毁前记录（含归属；后台操作域）
+        const destroyTargets = assignedCts.map(ct => (ct.name || 'CT ' + ct.ct_id) + '(用户#' + ct.user_id + ')').join('/');
+        await auditAction(req, 'admin.lxc.destroy', '销毁 LXC ' + vmid + (destroyTargets ? ':' + destroyTargets : ''), { resourceType: 'lxc' });
         for (const ct of assignedCts) {
             await db.lxcContainers.reminders.clear(ct.id);
             // 级联清理端口转发
@@ -1209,7 +1217,6 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
  
         // 在 PVE 上销毁
         await pveApi.deleteLxc(vmid);
-        await auditAction(req, 'lxc.destroy', '销毁 LXC ' + vmid);
         res.json({ message: 'LXC 容器已销毁' });
     } catch (error) {
         res.status(500).json({ error: safeError(error) });
