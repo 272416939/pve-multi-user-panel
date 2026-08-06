@@ -38,6 +38,12 @@
     $.backupForm = ref({ notes: '' });
     $.backupLimits = ref({ current: 0, max_per_vm: 3, today_creates: 0, daily_limit: 3 });
 
+    // 重置 IP 状态（私有网络：随机 IP 取自绑定的子网 IP 池）
+    $.vmIpForm = ref({ ip_mode: 'dhcp', ip: '' });
+    $.vmIpError = ref('');
+    $.vmIpLoading = ref(false);
+    $.resetVmIpVm = ref(null); // 重置 IP 当前操作的虚拟机对象（含 subnet_id）
+
     // ===== Computed =====
     $.isAllSnapshotsSelected = computed(function() {
         return $.snapshots.value.length > 0 && $.snapshots.value.every(function(s) { return $.snapshotSelected.value.has(s.name); });
@@ -569,6 +575,72 @@
                     }
                 });
             });
+        }
+    };
+
+    // ===== VM 重置 IP（私有网络：必须绑定子网，随机 IP 取自子网 IP 池）=====
+    $.openResetVmIpModal = function(vm) {
+        // 私有网络：重置 IP 必须先绑定子网
+        if (!vm.subnet_id) {
+            alert('该虚拟机尚未绑定子网，请先绑定后再重置 IP');
+            return;
+        }
+        $.resetVmIpVm.value = vm;
+        let currentIp = vm.dhcp_static_ip || '';
+        if (!currentIp && vm.config && vm.config.net0) {
+            const m = vm.config.net0.match(/ip=([0-9.]+)/);
+            if (m) currentIp = m[1];
+        }
+        $.vmIpForm.value = { ip_mode: currentIp ? 'static' : 'dhcp', ip: currentIp };
+        $.vmIpError.value = '';
+        $.bsModalShow('resetVmIpModal');
+    };
+
+    $.randomVmIp = async function() {
+        var vm = $.resetVmIpVm.value;
+        if (!vm) return;
+        // 私有网络：随机 IP 从当前虚拟机绑定的子网 IP 池选取
+        if (!vm.subnet_id) {
+            alert('该虚拟机尚未绑定子网，请先绑定后再使用随机 IP 功能');
+            return;
+        }
+        try {
+            var data = await api('/vm/random-ip?subnet_id=' + vm.subnet_id);
+            $.vmIpForm.value.ip = data.ip + '/24';
+            $.vmIpForm.value.ip_mode = 'static';
+        } catch (e) {
+            alert('获取随机 IP 失败：' + e.message);
+        }
+    };
+
+    $.confirmResetVmIp = async function() {
+        var f = $.vmIpForm.value;
+        if (f.ip_mode === 'static' && !f.ip) { $.vmIpError.value = '请输入 IP 地址'; return; }
+        var vm = $.resetVmIpVm.value;
+        if (!vm) return;
+        var confirmed = await window.customConfirm('确认修改 VM ' + vm.vm_id + ' 的 IP？修改后需要重启虚拟机或重新获取 DHCP 才能生效。');
+        if (!confirmed) return;
+        await $.resetVmIp();
+    };
+
+    $.resetVmIp = async function() {
+        var f = $.vmIpForm.value;
+        if (f.ip_mode === 'static' && !f.ip) { $.vmIpError.value = '请输入 IP 地址'; return; }
+        var vm = $.resetVmIpVm.value;
+        if (!vm) return;
+        $.vmIpLoading.value = true;
+        try {
+            var result = await api('/vm/' + vm.vm_id + '/reset-ip', {
+                method: 'POST',
+                body: JSON.stringify({ ip_mode: f.ip_mode, ip: f.ip })
+            });
+            $.vmIpLoading.value = false;
+            $.bsModalHide('resetVmIpModal');
+            alert('IP 重置成功：' + (result.ip || 'DHCP'));
+            if (typeof $.loadData === 'function') { $.loadData(); }
+        } catch (e) {
+            $.vmIpLoading.value = false;
+            $.vmIpError.value = e.message;
         }
     };
 

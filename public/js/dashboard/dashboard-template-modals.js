@@ -1002,6 +1002,108 @@
 </div>
 </Teleport>
 
+<!-- 重置 LXC IP 弹窗（私有网络：需先绑定子网，随机 IP 取自子网 IP 池） -->
+<Teleport to="body">
+<div class="modal fade" id="resetLxcIpModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重置 IP - CT {{ lxcPasswordResetCtId }}</h5>
+                <pv-button type="button" data-bs-dismiss="modal"></pv-button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" style="background:rgba(220,53,69,0.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(220,53,69,0.3);">
+                    <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
+                    <div>
+                        <strong>危险操作</strong><br>
+                        <span style="opacity:0.9">修改 IP 需要重启容器，容器将短暂关机后自动重启。正在运行的服务会中断，请确保已保存重要数据。</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">IP 模式</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="static" id="lxcIpStatic">
+                            <label class="form-check-label" for="lxcIpStatic">手动输入</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="dhcp" id="lxcIpDhcp">
+                            <label class="form-check-label" for="lxcIpDhcp">DHCP 自动获取</label>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="lxcIpForm?.ip_mode === 'static'" class="mb-3">
+                    <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
+                        <pv-button type="button" @click="randomLxcIp" title="随机生成未绑定的 IP" variant="outline">🎲 随机</pv-button>
+                    </div>
+                </div>
+                <div v-if="lxcIpError" class="alert alert-danger py-2">{{ lxcIpError }}</div>
+            </div>
+            <div class="modal-footer d-flex gap-2">
+                <pv-button type="button" data-bs-dismiss="modal">取消</pv-button>
+                <pv-button type="button" @click="confirmResetLxcIp" :disabled="lxcIpLoading">
+                    <span v-if="lxcIpLoading" class="spinner-border spinner-border-sm me-1"></span>
+                    保存
+                </pv-button>
+            </div>
+        </div>
+    </div>
+</div>
+</Teleport>
+
+<!-- 重置 VM IP 弹窗（私有网络：需先绑定子网，随机 IP 取自子网 IP 池） -->
+<Teleport to="body">
+<div class="modal fade" id="resetVmIpModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重置 IP - VM {{ resetVmIpVm?.vm_id }}</h5>
+                <pv-button type="button" data-bs-dismiss="modal"></pv-button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" style="background:rgba(255,193,7,0.15);backdrop-filter:blur(12px);border:1px solid rgba(255,193,7,0.3);">
+                    <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
+                    <div>
+                        <strong>注意</strong><br>
+                        <span style="opacity:0.9">修改虚拟机 IP 后，需要重启虚拟机或重新获取 DHCP 才能生效。</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">IP 模式</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="vmIpForm.ip_mode" value="static" id="vmIpStatic">
+                            <label class="form-check-label" for="vmIpStatic">手动输入</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="vmIpForm.ip_mode" value="dhcp" id="vmIpDhcp">
+                            <label class="form-check-label" for="vmIpDhcp">DHCP 自动获取</label>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="vmIpForm?.ip_mode === 'static'" class="mb-3">
+                    <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" v-model="vmIpForm.ip" placeholder="10.0.0.150/24">
+                        <pv-button type="button" @click="randomVmIp" title="随机生成未绑定的 IP" variant="outline">随机</pv-button>
+                    </div>
+                </div>
+                <div v-if="vmIpError" class="alert alert-danger py-2">{{ vmIpError }}</div>
+            </div>
+            <div class="modal-footer d-flex gap-2">
+                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+                <pv-button type="button" @click="confirmResetVmIp" :disabled="vmIpLoading" variant="warning">
+                    <span v-if="vmIpLoading" class="spinner-border spinner-border-sm me-1"></span>
+                    确认修改
+                </pv-button>
+            </div>
+        </div>
+    </div>
+</div>
+</Teleport>
+
 `);
 
 // 共享弹窗模板（单一来源：shared-dialog-templates.js，规范第七节）

@@ -19,6 +19,7 @@
     $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
     $.lxcIpError = Vue.ref('');
     $.lxcIpLoading = Vue.ref(false);
+    $.lxcResetCt = ref(null); // 重置 IP 当前操作的容器对象（含 subnet_id）
 
     // LXC Snapshot 状态
     $.lxcSnapshots = ref([]);
@@ -271,6 +272,12 @@
     };
 
     $.openResetLxcIpModal = function(ct) {
+        // 私有网络：重置 IP 必须先绑定子网
+        if (!ct.subnet_id) {
+            alert('该容器尚未绑定子网，请先绑定后再重置 IP');
+            return;
+        }
+        $.lxcResetCt.value = ct;
         $.lxcPasswordResetCtId.value = ct.ct_id;
         $.lxcPasswordResetCtName.value = ct.name || 'CT ' + ct.ct_id;
         // 从容器配置中提取当前 IP
@@ -285,8 +292,15 @@
     };
 
     $.randomLxcIp = async function() {
+        var ct = $.lxcResetCt.value;
+        if (!ct) return;
+        // 私有网络：随机 IP 从当前容器绑定的子网 IP 池选取
+        if (!ct.subnet_id) {
+            alert('该容器尚未绑定子网，请先绑定后再使用随机 IP 功能');
+            return;
+        }
         try {
-            var data = await api('/lxc/random-ip');
+            var data = await api('/lxc/random-ip?subnet_id=' + ct.subnet_id);
             $.lxcIpForm.value.ip = data.ip + '/24';
             $.lxcIpForm.value.ip_mode = 'static';
         } catch (e) {

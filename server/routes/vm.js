@@ -787,8 +787,21 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
 });
 
 // VM IP 重置相关路由（通过修改爱快DHCP绑定实现，PVE虚拟机不支持直接设置IP）
+// 可选 subnet_id：从指定子网 IP 池随机（私有网络）；未传则用旧 DHCP 全局范围（兼容创建流程）
 router.get('/vm/random-ip', authMiddleware, async (req, res) => {
     try {
+        const subnetId = parseInt(req.query.subnet_id);
+        if (subnetId) {
+            // 私有网络：随机 IP 从子网 IP 池选取，且非管理员仅限使用自己的子网
+            const subnet = await db.subnets.getById(subnetId);
+            if (!subnet) return res.status(400).json({ error: '子网不存在' });
+            if (req.user.role !== 'admin' && subnet.user_id !== req.user.id) {
+                return res.status(403).json({ error: '无权限使用该子网' });
+            }
+            const ip = await pickUnusedStaticIp(subnet);
+            if (!ip) return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
+            return res.json({ ip });
+        }
         const ip = await pickUnusedStaticIp();
         if (!ip) return res.status(400).json({ error: '无可用 IP' });
         res.json({ ip });
@@ -797,7 +810,7 @@ router.get('/vm/random-ip', authMiddleware, async (req, res) => {
     }
 });
 
-router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         const { ip_mode, ip } = req.body;
@@ -814,15 +827,28 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
         if (vmRecord) {
             const isOwner = req.user.id === vmRecord.user_id;
             if (!isOwner && !isAdmin) return res.status(403).json({ error: '无权限操作此虚拟机' });
+            // 非管理员用户重置 IP 时检查到期时间
+            if (isOwner && !isAdmin && vmRecord.expiration_date && new Date(vmRecord.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+            }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
+        }
+
+        // 私有网络：重置 IP 必须已绑定子网，随机/静态 IP 均取自绑定的子网 IP 池
+        let subnet = null;
+        if (vmRecord && vmRecord.subnet_id) {
+            subnet = await db.subnets.getById(vmRecord.subnet_id);
+        }
+        if (!subnet) {
+            return res.status(400).json({ error: '该虚拟机尚未绑定子网，请先绑定后再重置 IP' });
         }
 
         if (ip_mode === 'dhcp') {
             // DHCP模式：删除爱快静态绑定（如果有），VM将自动从爱快获取动态IP
             await removeDhcpStaticBinding('vm', vmid);
             if (vmRecord) await db.vms.update(vmRecord.id, { dhcp_static_ip: '' });
-            await auditAction(req, 'admin.vm.reset-ip', 'VM ' + vmid + ' 切换为 DHCP 模式');
+            await auditAction(req, 'vm.reset-ip', 'VM ' + vmid + ' 切换为 DHCP 模式');
             return res.json({ success: true, ip: null, message: '已切换为DHCP模式' });
         }
 
@@ -832,10 +858,14 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
             if (!ip) return res.status(400).json({ error: '请输入 IP 地址' });
             const ipBase = ip.split('/')[0];
             if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ipBase)) return res.status(400).json({ error: 'IP 格式不正确' });
+            // 已绑定子网：手动输入 IP 必须在绑定的子网 IP 池内
+            if (!isIpInAddrPool(ipBase, subnet.addr_pool)) {
+                return res.status(400).json({ error: 'IP 不在当前绑定的子网 IP 池范围内，请选择池内地址或使用随机 IP' });
+            }
             targetIp = ipBase;
         } else if (ip_mode === 'random') {
-            targetIp = await pickUnusedStaticIp();
-            if (!targetIp) return res.status(400).json({ error: '无可用 IP，请手动输入' });
+            targetIp = await pickUnusedStaticIp(subnet);
+            if (!targetIp) return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
         }
 
         // 获取VM的MAC地址用于创建/更新DHCP绑定
@@ -848,8 +878,8 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
         let finalIp = targetIp;
         const updated = await updateDhcpStaticBindingIp('vm', vmid, finalIp);
         if (!updated) {
-            // 没有已有绑定，创建新的
-            const boundIp = await createDhcpStaticBinding('vm', vmid, macMatch[1], finalIp);
+            // 没有已有绑定，创建新的（绑定子网时使用子网的 VLAN 接口/网关/DNS）
+            const boundIp = await createDhcpStaticBinding('vm', vmid, macMatch[1], finalIp, subnet);
             finalIp = boundIp || finalIp;
         }
         if (!finalIp) return res.status(500).json({ error: '设置DHCP绑定失败' });
@@ -895,7 +925,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
             }
         }
 
-        await auditAction(req, 'admin.vm.reset-ip', '设置 VM ' + vmid + ' 静态IP ' + finalIp);
+        await auditAction(req, 'vm.reset-ip', '设置 VM ' + vmid + ' 静态IP ' + finalIp);
         res.json({ success: true, ip: finalIp, message: `已设置静态IP ${finalIp}（通过爱快DHCP绑定）` });
     } catch (error) {
         dbg('[vm/reset-ip]', error.message);

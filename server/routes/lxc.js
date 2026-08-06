@@ -933,8 +933,25 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
     }
 });
 
+// 可选 subnet_id：从指定子网 IP 池随机（私有网络）；未传则用旧 DHCP 全局范围（兼容创建流程）
 router.get('/lxc/random-ip', authMiddleware, async (req, res) => {
     try {
+        const subnetId = parseInt(req.query.subnet_id);
+        if (subnetId) {
+            // 私有网络：随机 IP 从子网 IP 池选取，且非管理员仅限使用自己的子网
+            const subnet = await db.subnets.getById(subnetId);
+            if (!subnet) {
+                return res.status(400).json({ error: '子网不存在' });
+            }
+            if (req.user.role !== 'admin' && subnet.user_id !== req.user.id) {
+                return res.status(403).json({ error: '无权限使用该子网' });
+            }
+            const ip = await pickUnusedStaticIp(subnet);
+            if (!ip) {
+                return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
+            }
+            return res.json({ ip });
+        }
         const ip = await pickUnusedStaticIp();
         if (!ip) {
             return res.status(400).json({ error: '无可用 IP' });
@@ -945,7 +962,7 @@ router.get('/lxc/random-ip', authMiddleware, async (req, res) => {
     }
 });
 
-router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         const { ip_mode, ip } = req.body; // ip_mode: 'dhcp' 或 'static'
@@ -970,6 +987,15 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
             }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
+        }
+
+        // 私有网络：重置 IP 必须已绑定子网，随机/静态 IP 均取自绑定的子网 IP 池
+        let subnet = null;
+        if (ct && ct.subnet_id) {
+            subnet = await db.subnets.getById(ct.subnet_id);
+        }
+        if (!subnet) {
+            return res.status(400).json({ error: '该容器尚未绑定子网，请先绑定后再重置 IP' });
         }
 
         // 获取当前配置
@@ -999,8 +1025,8 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
         }
 
         let newIp = '';
-        // 从系统配置获取网关地址
-        const gateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
+        // 私有网络：网关取绑定的子网网关
+        const gateway = subnet.gateway;
 
         if (ip_mode === 'dhcp') {
             newNet0Parts.push('ip=dhcp');
@@ -1015,15 +1041,19 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
             if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ipBase)) {
                 return res.status(400).json({ error: 'IP 地址格式不正确' });
             }
+            // 已绑定子网：手动输入 IP 必须在绑定的子网 IP 池内
+            if (!isIpInAddrPool(ipBase, subnet.addr_pool)) {
+                return res.status(400).json({ error: 'IP 不在当前绑定的子网 IP 池范围内，请选择池内地址或使用随机 IP' });
+            }
             const cidr = ip.includes('/') ? ip : ip + '/24';
             newNet0Parts.push('ip=' + cidr);
             newNet0Parts.push('ip6=dhcp');
             newNet0Parts.push('gw=' + gateway);
             newIp = ipBase;
         } else if (ip_mode === 'random') {
-            const randomIp = await pickUnusedStaticIp();
+            const randomIp = await pickUnusedStaticIp(subnet);
             if (!randomIp) {
-                return res.status(400).json({ error: '无可用 IP，请手动输入' });
+                return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
             }
             newNet0Parts.push('ip=' + randomIp + '/24');
             newNet0Parts.push('ip6=dhcp');
@@ -1101,8 +1131,8 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
                 if (existing && existing.id) {
                     await ikuaiApi.editDhcpStaticBinding(existing.id, mac, newIp, comment);
                 } else {
-                    // 没有已有绑定，创建新的
-                    const createdIp = await createDhcpStaticBinding('lxc', vmid, mac, newIp);
+                    // 没有已有绑定，创建新的（绑定子网时使用子网的 VLAN 接口/网关/DNS）
+                    const createdIp = await createDhcpStaticBinding('lxc', vmid, mac, newIp, subnet);
                     newIp = createdIp || newIp;
                 }
             } catch (e) {
@@ -1159,7 +1189,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, 
             }
         }
 
-        await auditAction(req, 'admin.lxc.reset-ip', '设置 LXC ' + vmid + ' IP: ' + (newIp || 'DHCP') + '（' + ip_mode + '）');
+        await auditAction(req, 'lxc.reset-ip', '设置 LXC ' + vmid + ' IP: ' + (newIp || 'DHCP') + '（' + ip_mode + '）');
         res.json({ message: 'IP 重置成功', ip: newIp || 'DHCP', net0: newNet0 });
     } catch (error) {
         console.error('重置 LXC IP 失败:', error.message);

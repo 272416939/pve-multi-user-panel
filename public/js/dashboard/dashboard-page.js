@@ -32,6 +32,7 @@ var App = {
     setup: function() {
             // 兜底初始化：确保关键 ref 在模板渲染前一定存在
             if (!$.lxcIpForm) $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
+            if (!$.vmIpForm) $.vmIpForm = Vue.ref({ ip_mode: 'dhcp', ip: '' });
             if (!$.confirmState) $.confirmState = Vue.ref({ vmId: null, action: null });
             if (!$.lxcConfirmState) $.lxcConfirmState = Vue.ref({ ctId: null, action: null });
             if (!$.userVms) $.userVms = Vue.ref([]);

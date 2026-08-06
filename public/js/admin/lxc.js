@@ -305,6 +305,11 @@
     };
 
     $.openResetLxcIpModal = function(ct) {
+        // 私有网络：重置 IP 必须先绑定子网
+        if (!ct.subnet_id) {
+            alert('该容器尚未绑定子网，请先绑定后再重置 IP');
+            return;
+        }
         $.selectedLxc.value = ct;
         // 从容器配置中提取当前 IP
         let currentIp = ct.dhcp_static_ip || '';
@@ -318,8 +323,15 @@
     };
 
     $.randomLxcIp = async function() {
+        var ct = $.selectedLxc.value;
+        if (!ct) return;
+        // 私有网络：随机 IP 从当前容器绑定的子网 IP 池选取
+        if (!ct.subnet_id) {
+            alert('该容器尚未绑定子网，请先绑定后再使用随机 IP 功能');
+            return;
+        }
         try {
-            var data = await api('/lxc/random-ip');
+            var data = await api('/lxc/random-ip?subnet_id=' + ct.subnet_id);
             $.lxcIpForm.value.ip = data.ip + '/24';
             $.lxcIpForm.value.ip_mode = 'static';
         } catch (e) {
