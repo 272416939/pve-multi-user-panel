@@ -272,6 +272,68 @@ router.delete('/subnets/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// ===== 批量刷新当前用户全部子网可用 IP =====
+// 爱快 dhcp_server show 一次返回全部服务端（含 available），无需逐个子网轮询
+router.post('/subnets/refresh', authMiddleware, async (req, res) => {
+    const rateLimitResult = await checkConfiguredRateLimit('subnet_refresh', 'ratelimit:subnet-refresh:' + req.user.id);
+    if (!rateLimitResult.allowed) {
+        return res.status(429).json({ error: '刷新过于频繁，请稍后再试' });
+    }
+    try {
+        const subnets = await db.subnets.getByUserId(req.user.id);
+        if (subnets.length === 0) return res.json({ updated: 0 });
+
+        // 1. 一次拉取全部 DHCP 服务端（爱快批量返回 available）
+        let servers = [];
+        if (ikuaiApi.isConfigured()) {
+            try { servers = await ikuaiApi.getDhcpServers(); } catch (e) { console.error('[subnet] 批量刷新获取 DHCP 服务端失败:', e.message); }
+        }
+        let serverByIface = {};
+        servers.forEach(x => { serverByIface[x.interface] = x; });
+
+        // 2. 基准值：池容量(254) - 静态绑定数（一次拉取，判断爱快是否计算完成 + 兜底）
+        const baseline = {};
+        try {
+            const bindings = await ikuaiApi.getDhcpStaticBindings();
+            const boundByIface = {};
+            bindings.forEach(b => { if (b.interface) boundByIface[b.interface] = (boundByIface[b.interface] || 0) + 1; });
+            subnets.forEach(s => { baseline[s.vlan_name] = Math.max(0, 254 - (boundByIface[s.vlan_name] || 0)); });
+        } catch (_) {}
+
+        // 3. 爱快 available 为异步计算（变更后约 5-6 秒）：轮询 show 直到全部与基准值一致，最长 8 秒
+        const allMatched = function() {
+            return subnets.every(s => {
+                const v = serverByIface[s.vlan_name];
+                return v && v.available > 0 && baseline[s.vlan_name] !== undefined && v.available === baseline[s.vlan_name];
+            });
+        };
+        for (let attempt = 0; attempt < 4 && !allMatched(); attempt++) {
+            await new Promise(r => setTimeout(r, 2000));
+            try {
+                const again = await ikuaiApi.getDhcpServers();
+                serverByIface = {};
+                again.forEach(x => { serverByIface[x.interface] = x; });
+            } catch (_) {}
+        }
+
+        // 4. 批量回写 DB（爱快值优先，取不到时用基准值）
+        let updated = 0;
+        for (const s of subnets) {
+            const server = serverByIface[s.vlan_name];
+            let available = server ? (server.available || 0) : 0;
+            if (available <= 0 && baseline[s.vlan_name] !== undefined) available = baseline[s.vlan_name];
+            const updates = { available };
+            if (server && String(server.id)) updates.ikuai_dhcp_id = String(server.id);
+            await db.subnets.update(s.id, updates);
+            updated++;
+        }
+        await auditAction(req, 'subnet.refresh', '批量刷新子网可用IP: 更新 ' + updated + ' 个子网', { resourceType: 'subnet' });
+        res.json({ updated });
+    } catch (e) {
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
 // ===== 刷新子网可用 IP 数（绑定/类似操作时回写） =====
 router.post('/subnets/:id/refresh', authMiddleware, async (req, res) => {
     const rateLimitResult = await checkConfiguredRateLimit('subnet_refresh', 'ratelimit:subnet-refresh:' + req.user.id);

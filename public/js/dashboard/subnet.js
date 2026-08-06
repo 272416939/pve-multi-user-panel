@@ -29,25 +29,15 @@
     };
 
     // ==================== 刷新全部子网可用 IP ====================
+    // 后端批量接口：爱快 dhcp_server show 一次返回全部，避免逐个子网轮询
     $.refreshSubnets = async function() {
         if ($.subnetRefreshing.value) return;
         if ($.subnets.value.length === 0) return alert('暂无子网');
         $.subnetRefreshing.value = true;
-        var ok = 0;
-        var fail = 0;
         try {
-            for (var i = 0; i < $.subnets.value.length; i++) {
-                try {
-                    await api('/subnets/' + $.subnets.value[i].id + '/refresh', { method: 'POST' });
-                    ok++;
-                } catch (e) {
-                    fail++;
-                    // 触发限速（subnet_refresh 10 次/分钟）时停止继续刷新
-                    if (e.message && e.message.indexOf('频繁') > -1) break;
-                }
-            }
+            var res = await api('/subnets/refresh', { method: 'POST' });
             await $.loadSubnets();
-            alert('刷新完成：成功 ' + ok + ' 个' + (fail ? '，失败 ' + fail + ' 个' : ''));
+            alert('刷新完成：已更新 ' + (res.updated || 0) + ' 个子网的可用 IP');
         } catch (e) {
             alert('刷新失败：' + e.message);
         } finally {
