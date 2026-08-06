@@ -958,7 +958,8 @@
                 <span v-else class="badge bg-secondary ms-2">已停止</span>
             </div>
             <div class="alert alert-warning small" v-if="bindSubnetDevice.status && bindSubnetDevice.status.status === 'running'">
-                服务器正在运行，请先关机后再进行子网操作
+                <template v-if="user && user.role === 'admin'">服务器正在运行，绑定后将热更新网卡并短暂断网，需重新获取 IP</template>
+                <template v-else>服务器正在运行，请先关机后再进行子网操作</template>
             </div>
             <div class="alert alert-warning small" v-else-if="bindSubnetDevice.status && bindSubnetDevice.status.status !== 'running'">
                 解绑子网后需重新绑定才能开机
@@ -972,7 +973,7 @@
                     </div>
                     <div class="form-text text-muted" v-if="bindSubnetDevice.dhcp_static_ip">已分配 IP：{{ bindSubnetDevice.dhcp_static_ip }}</div>
                 </div>
-                <pv-button type="button" variant="outline-danger" :disabled="bindSubnetSubmitting" :loading="bindSubnetSubmitting" @click="unbindSubnet">解绑子网</pv-button>
+                <pv-button type="button" variant="outline-danger" :disabled="bindSubnetSubmitting || (bindSubnetDevice.status && bindSubnetDevice.status.status === 'running')" :loading="bindSubnetSubmitting" @click="unbindSubnet">解绑子网</pv-button>
             </template>
             <!-- 未绑定：选择子网 + 绑定按钮 -->
             <template v-else>
@@ -986,7 +987,7 @@
                     </select>
                     <div class="form-text text-muted" v-if="subnets.length === 0">暂无子网，请先在「私有网络」中新建子网</div>
                 </div>
-                <pv-button type="button" @click="bindSubnet" :disabled="bindSubnetSubmitting || !bindSubnetForm.subnet_id" :loading="bindSubnetSubmitting" variant="primary">确认绑定</pv-button>
+                <pv-button type="button" @click="bindSubnet" :disabled="bindSubnetSubmitting || !bindSubnetForm.subnet_id || (bindSubnetDevice.status && bindSubnetDevice.status.status === 'running' && !(user && user.role === 'admin'))" :loading="bindSubnetSubmitting" variant="primary">确认绑定</pv-button>
             </template>
         </div>
     </div></div>

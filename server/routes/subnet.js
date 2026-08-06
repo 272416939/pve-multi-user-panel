@@ -45,7 +45,8 @@ async function refreshSubnetAvailable(subnet) {
 }
 
 // 校验设备归属 + 关机状态，返回 { record, status } 或 { error }
-async function checkDeviceAccess(req, type, vmid) {
+// opts.allowRunning = true 时允许运行中操作（管理员绑定子网特权）
+async function checkDeviceAccess(req, type, vmid, opts) {
     const record = type === 'vm'
         ? (await db.vms.getAll()).find(v => v.vm_id === vmid)
         : (await db.lxcContainers.getAll()).find(c => c.ct_id === vmid);
@@ -55,14 +56,14 @@ async function checkDeviceAccess(req, type, vmid) {
     if (req.user.role !== 'admin' && record.user_id !== req.user.id) {
         return { error: { status: 403, message: '无权限操作此' + (type === 'vm' ? '虚拟机' : '容器') } };
     }
-    // 绑定/解绑必须关机（运行中拒绝操作）
+    // 普通用户绑定/解绑必须关机；管理员绑定可运行中操作（解绑仍要求关机）
     let status = null;
     try {
         status = type === 'vm' ? await pveApi.getVmStatus(vmid) : await pveApi.getLxcStatus(vmid);
     } catch (e) {
         status = null;
     }
-    if (status && status.status === 'running') {
+    if (status && status.status === 'running' && !(opts && opts.allowRunning)) {
         return { error: { status: 400, message: '请先关闭服务器，关机后才能进行子网操作' } };
     }
     return { record, status };
@@ -284,7 +285,7 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         const subnet = await db.subnets.getById(subnetId);
         if (!subnet) return res.status(404).json({ error: '子网不存在' });
 
-        const access = await checkDeviceAccess(req, 'vm', vmid);
+        const access = await checkDeviceAccess(req, 'vm', vmid, { allowRunning: req.user.role === 'admin' });
         if (access.error) return res.status(access.error.status).json({ error: access.error.message });
         const vm = access.record;
         // 非管理员：设备与子网必须同属当前用户
@@ -348,7 +349,7 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         const subnet = await db.subnets.getById(subnetId);
         if (!subnet) return res.status(404).json({ error: '子网不存在' });
 
-        const access = await checkDeviceAccess(req, 'lxc', vmid);
+        const access = await checkDeviceAccess(req, 'lxc', vmid, { allowRunning: req.user.role === 'admin' });
         if (access.error) return res.status(access.error.status).json({ error: access.error.message });
         const ct = access.record;
         if (req.user.role !== 'admin' && subnet.user_id !== ct.user_id) {
