@@ -82,6 +82,12 @@
         var subnetId = parseInt($.bindSubnetForm.subnet_id);
         if (!subnetId) return alert('请选择要绑定的子网');
         if ($.bindSubnetSubmitting.value) return;
+        // 管理员运行中绑定二次确认：热更新网卡后需重启服务器才能正确应用新网段
+        var running = $.bindSubnetDevice.status && $.bindSubnetDevice.status.status === 'running';
+        if (running && $.user && $.user.value && $.user.value.role === 'admin') {
+            var ok = await window.customConfirm('服务器正在运行，绑定后需关闭并重新启动服务器才能正确应用新网段，确定继续绑定？');
+            if (!ok) return;
+        }
         $.bindSubnetSubmitting.value = true;
         try {
             var type = $.bindSubnetDevice.type;

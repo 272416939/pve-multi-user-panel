@@ -31,14 +31,30 @@ function generateVlanComment(username) {
     return '用户' + username + '网络组NT-' + rand;
 }
 
-// 刷新子网 DHCP 剩余可用数（从爱快查询回写 DB）
+// 刷新子网 DHCP 剩余可用数：轮询爱快获取（available 为异步计算，
+// 绑定/解绑变更后约 5-6 秒才更新，且变更期间一直返回旧值不会归零，须固定轮询取最后一次）
 async function refreshSubnetAvailable(subnet) {
     if (!subnet || !ikuaiApi.isConfigured()) return;
     try {
-        const server = await ikuaiApi.getDhcpServerByInterface(subnet.vlan_name);
-        if (server) {
-            await db.subnets.update(subnet.id, { available: server.available || 0, ikuai_dhcp_id: String(server.id) });
+        let dhcpId = subnet.ikuai_dhcp_id || '';
+        let available = 0;
+        for (let attempt = 0; attempt < 8; attempt++) {
+            if (attempt > 0) await new Promise(r => setTimeout(r, 1000));
+            const server = await ikuaiApi.getDhcpServerByInterface(subnet.vlan_name);
+            if (server) {
+                dhcpId = String(server.id);
+                available = server.available || 0;
+            }
         }
+        // 兜底：仍取不到时按池容量减去已绑定静态 IP 估算（与创建子网一致）
+        if (available <= 0) {
+            try {
+                const bindings = await ikuaiApi.getDhcpStaticBindings();
+                const bound = bindings.filter(b => b.interface === subnet.vlan_name).length;
+                available = Math.max(0, 254 - bound);
+            } catch (_) {}
+        }
+        await db.subnets.update(subnet.id, { available, ikuai_dhcp_id: dhcpId });
     } catch (e) {
         console.error('[subnet] 刷新可用 IP 失败:', e.message);
     }
@@ -167,14 +183,13 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         let available = 0;
         try {
             await ikuaiApi.addDhcpServer({ interface: vlanName, addr_pool: addrPool, netmask: '255.255.255.0', gateway: gw, dns1, dns2 });
-            // 爱快对新建 DHCP 服务端的 available 为异步计算，轮询重试获取
-            for (let attempt = 0; attempt < 3; attempt++) {
-                await new Promise(r => setTimeout(r, 1000));
+            // 爱快对新建 DHCP 服务端的 available 为异步计算，固定轮询取最后一次
+            for (let attempt = 0; attempt < 8; attempt++) {
+                if (attempt > 0) await new Promise(r => setTimeout(r, 1000));
                 const server = await ikuaiApi.getDhcpServerByInterface(vlanName);
                 if (server) {
                     dhcpId = String(server.id);
                     available = server.available || 0;
-                    if (available > 0) break;
                 }
             }
             // 兜底：仍取不到时按池容量减去已绑定静态 IP 估算（与爱快语义一致）
