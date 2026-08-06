@@ -575,8 +575,8 @@
     /* Message type badge */
     .message-type-badge { padding: 3px 10px; border-radius: 8px; font-size: 11px; font-weight: 600; }
 
-    /* Footer version */
-    .text-muted.small { opacity: 0.5; }
+    /* Footer version: 明暗模式统一可读（opacity 半透明在亮色下对比度不足） */
+    .text-muted.small { opacity: 1; }
 
     /* ========== 确认弹窗 ========== */
     .vm-detail-modal {
