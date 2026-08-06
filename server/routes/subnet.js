@@ -31,30 +31,46 @@ function generateVlanComment(username) {
     return '用户' + username + '网络组NT-' + rand;
 }
 
-// 刷新子网 DHCP 剩余可用数：轮询爱快获取（available 为异步计算，
-// 绑定/解绑变更后约 5-6 秒才更新，且变更期间一直返回旧值不会归零，须固定轮询取最后一次）
+// 轮询爱快 DHCP 服务端 available：500ms 间隔（爱快异步计算约 5-6 秒），
+// 值与静态绑定基准值（池容量-静态绑定数）一致时提前退出（值未变/已算完场景秒回），
+// 最长轮询 16 次（8 秒）后取最后一次，仍取不到用基准值兜底
+async function pollDhcpAvailable(vlanName) {
+    // 基准值：池容量(254) - 该接口静态绑定数（实测与爱快最终 available 一致）
+    let baseline = 0;
+    try {
+        const bindings = await ikuaiApi.getDhcpStaticBindings();
+        baseline = Math.max(0, 254 - bindings.filter(b => b.interface === vlanName).length);
+    } catch (_) {}
+    let prev = 0;
+    let stable = 0;
+    let available = 0;
+    let dhcpId = '';
+    for (let attempt = 0; attempt < 16; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 500));
+        const server = await ikuaiApi.getDhcpServerByInterface(vlanName);
+        if (!server) continue;
+        dhcpId = String(server.id);
+        const cur = server.available || 0;
+        available = cur;
+        if (cur === prev && cur > 0) {
+            stable++;
+            // 与基准值一致（爱快已算完或值未变）连续 2 次即返回
+            if (baseline > 0 && cur === baseline && stable >= 2) break;
+        } else {
+            stable = 0;
+        }
+        prev = cur;
+    }
+    if (available <= 0 && baseline > 0) available = baseline;
+    return { available, dhcpId };
+}
+
+// 刷新子网 DHCP 剩余可用数（绑定/解绑/手动刷新统一入口）
 async function refreshSubnetAvailable(subnet) {
     if (!subnet || !ikuaiApi.isConfigured()) return;
     try {
-        let dhcpId = subnet.ikuai_dhcp_id || '';
-        let available = 0;
-        for (let attempt = 0; attempt < 8; attempt++) {
-            if (attempt > 0) await new Promise(r => setTimeout(r, 1000));
-            const server = await ikuaiApi.getDhcpServerByInterface(subnet.vlan_name);
-            if (server) {
-                dhcpId = String(server.id);
-                available = server.available || 0;
-            }
-        }
-        // 兜底：仍取不到时按池容量减去已绑定静态 IP 估算（与创建子网一致）
-        if (available <= 0) {
-            try {
-                const bindings = await ikuaiApi.getDhcpStaticBindings();
-                const bound = bindings.filter(b => b.interface === subnet.vlan_name).length;
-                available = Math.max(0, 254 - bound);
-            } catch (_) {}
-        }
-        await db.subnets.update(subnet.id, { available, ikuai_dhcp_id: dhcpId });
+        const { available, dhcpId } = await pollDhcpAvailable(subnet.vlan_name);
+        await db.subnets.update(subnet.id, { available, ikuai_dhcp_id: dhcpId || subnet.ikuai_dhcp_id || '' });
     } catch (e) {
         console.error('[subnet] 刷新可用 IP 失败:', e.message);
     }
@@ -183,23 +199,10 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         let available = 0;
         try {
             await ikuaiApi.addDhcpServer({ interface: vlanName, addr_pool: addrPool, netmask: '255.255.255.0', gateway: gw, dns1, dns2 });
-            // 爱快对新建 DHCP 服务端的 available 为异步计算，固定轮询取最后一次
-            for (let attempt = 0; attempt < 8; attempt++) {
-                if (attempt > 0) await new Promise(r => setTimeout(r, 1000));
-                const server = await ikuaiApi.getDhcpServerByInterface(vlanName);
-                if (server) {
-                    dhcpId = String(server.id);
-                    available = server.available || 0;
-                }
-            }
-            // 兜底：仍取不到时按池容量减去已绑定静态 IP 估算（与爱快语义一致）
-            if (available <= 0) {
-                try {
-                    const bindings = await ikuaiApi.getDhcpStaticBindings();
-                    const bound = bindings.filter(b => b.interface === vlanName).length;
-                    available = Math.max(0, 254 - bound);
-                } catch (_) {}
-            }
+            // 爱快对新建 DHCP 服务端的 available 为异步计算，统一轮询（创建时基准值=254，算完即返回）
+            const polled = await pollDhcpAvailable(vlanName);
+            dhcpId = polled.dhcpId;
+            available = polled.available;
         } catch (e) {
             // DHCP 服务端创建失败：回滚已创建的 VLAN，避免孤儿资源
             try {

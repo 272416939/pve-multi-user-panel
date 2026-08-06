@@ -937,6 +937,10 @@
                 <div>创建完成后可在列表中查看分配的 <strong>网段 / 网关</strong></div>
                 <div class="mt-1">删除子网前需先解绑其下所有服务器</div>
             </div>
+            <div v-if="subnetCreating" class="text-center text-muted py-3">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                正在创建子网，请稍候...
+            </div>
         </div>
         <div class="modal-footer d-flex gap-2">
             <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
@@ -989,6 +993,10 @@
                 </div>
                 <pv-button type="button" @click="bindSubnet" :disabled="bindSubnetSubmitting || !bindSubnetForm.subnet_id || (bindSubnetDevice.status && bindSubnetDevice.status.status === 'running' && !(user && user.role === 'admin'))" :loading="bindSubnetSubmitting" variant="primary">确认绑定</pv-button>
             </template>
+            <div v-if="bindSubnetSubmitting" class="text-center text-muted py-3">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                正在处理中，请稍候...
+            </div>
         </div>
     </div></div>
 </div>
