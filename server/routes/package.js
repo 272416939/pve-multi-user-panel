@@ -32,6 +32,60 @@ function packageSpec(p) {
     return (p && p.name || '') + '(' + (parseInt(p && p.cores) || 0) + '核/' + memG + 'G/' + (parseInt(p && p.disk_size) || 0) + 'G' + (p && p.monthly_price !== undefined && p.monthly_price !== null ? '/月付¥' + p.monthly_price : '') + ')';
 }
 
+// ===== 套餐更新审计：字段级变更明细（补货/编辑共用） =====
+// 补货复用 PUT 更新接口且 body 仅含 stock，直接拼 packageSpec(req.body) 会显示 (0核/0G/0G)；
+// 改为对比 DB 旧/新记录，输出完整规格 + 实际变化字段（字段 旧→新）。
+var PKG_FIELD_LABELS = {
+    name: '名称', template_id: '模板', cores: '核心', memory: '内存', swap: 'Swap',
+    disk_size: '磁盘', monthly_price: '月付', quarterly_price: '季付', yearly_price: '年付',
+    quarterly_discount: '季付优惠', yearly_discount: '年付优惠', stock: '库存', status: '状态',
+    cpu_model: 'CPU型号', bandwidth: '带宽', description: '描述', group_id: '分组'
+};
+
+// 数字字段：DB DECIMAL(10,2) 返回 "100.00" 与前端提交 100 需按数值比较，避免误报变更
+var PKG_NUM_FIELDS = {
+    template_id: 1, cores: 1, memory: 1, swap: 1, disk_size: 1,
+    monthly_price: 1, quarterly_price: 1, yearly_price: 1,
+    quarterly_discount: 1, yearly_discount: 1, stock: 1, bandwidth: 1, group_id: 1
+};
+
+function fmtPkgField(k, v, pkg) {
+    if (v === null || v === undefined || v === '') return '无';
+    if (k === 'memory') return Math.round(v / 1024) + 'G';
+    if (k === 'swap') return v + 'MB';
+    if (k === 'disk_size') return v + 'G';
+    if (k === 'bandwidth') return v + 'Mbps';
+    if (k === 'stock') return v === -1 ? '不限' : v;
+    if (k === 'status') return v === 'active' ? '启用' : '停用';
+    if (k === 'template_id') return v + (pkg && pkg.template_name ? '(' + pkg.template_name + ')' : '');
+    if (k === 'group_id') return v + (pkg && pkg.group_name ? '(' + pkg.group_name + ')' : '');
+    if (k === 'monthly_price' || k === 'quarterly_price' || k === 'yearly_price') return '¥' + v;
+    if (k === 'quarterly_discount' || k === 'yearly_discount') return v + '%';
+    // 描述可能很长，截断防止日志过长
+    if (k === 'description') return String(v).length > 30 ? String(v).slice(0, 30) + '…' : v;
+    return v;
+}
+
+function pkgFieldChanged(k, ov, nv) {
+    if (ov === null || ov === undefined) ov = '';
+    if (nv === null || nv === undefined) nv = '';
+    if (PKG_NUM_FIELDS[k]) return Number(ov) !== Number(nv);
+    return String(ov) !== String(nv);
+}
+
+function buildPkgUpdateDetail(kind, oldPkg, newPkg) {
+    var spec = packageSpec(newPkg);
+    var changes = [];
+    Object.keys(PKG_FIELD_LABELS).forEach(function (k) {
+        if (pkgFieldChanged(k, oldPkg && oldPkg[k], newPkg && newPkg[k])) {
+            changes.push(PKG_FIELD_LABELS[k] + ' ' + fmtPkgField(k, oldPkg && oldPkg[k], oldPkg) + '→' + fmtPkgField(k, newPkg && newPkg[k], newPkg));
+        }
+    });
+    var detail = '更新' + kind + '套餐 #' + newPkg.id + ':' + spec;
+    if (changes.length) detail += '；变更:' + changes.join(', ');
+    return detail;
+}
+
 // ===== 用户侧：套餐列表（无需 admin） =====
 router.get('/vm-packages', authMiddleware, async (req, res) => {
     try {
@@ -181,10 +235,15 @@ router.post('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, r
 
 router.put('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        // 先取旧记录（含模板/分组名），更新后取新记录，diff 输出字段级变更明细
+        var oldPkg = await db.vmPackages.getById(parseInt(req.params.id));
         var r = await db.vmPackages.update(parseInt(req.params.id), req.body);
         await vmPackageCache.del('all');
-        // 操作审计：更新 VM 套餐
-        await adminAudit(req, 'admin.package.update', '更新VM套餐 #' + parseInt(req.params.id) + ':' + packageSpec(req.body));
+        // 操作审计：更新 VM 套餐（补货/编辑共用，记录完整规格与具体变更数量）
+        var newPkg = await db.vmPackages.getById(parseInt(req.params.id));
+        if (newPkg) {
+            await adminAudit(req, 'admin.package.update', buildPkgUpdateDetail('VM', oldPkg, newPkg));
+        }
         res.json(r);
     } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
@@ -279,10 +338,15 @@ router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, 
 
 router.put('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        // 先取旧记录（含模板/分组名），更新后取新记录，diff 输出字段级变更明细
+        var oldPkg = await db.lxcPackages.getById(parseInt(req.params.id));
         var r = await db.lxcPackages.update(parseInt(req.params.id), req.body);
         await lxcPackageCache.del('all');
-        // 操作审计：更新 LXC 套餐
-        await adminAudit(req, 'admin.package.update', '更新LXC套餐 #' + parseInt(req.params.id) + ':' + packageSpec(req.body));
+        // 操作审计：更新 LXC 套餐（补货/编辑共用，记录完整规格与具体变更数量）
+        var newPkg = await db.lxcPackages.getById(parseInt(req.params.id));
+        if (newPkg) {
+            await adminAudit(req, 'admin.package.update', buildPkgUpdateDetail('LXC', oldPkg, newPkg));
+        }
         res.json(r);
     } catch (e) { res.status(500).json({ error: safeError(e) }); }
 });
