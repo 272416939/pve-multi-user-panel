@@ -682,7 +682,8 @@
                             </div>
                             <div class="modal-body">
                                 <p class="mb-2">请输入当前密码或 2FA 动态码以验证身份：</p>
-                                <input type="text" class="form-control" v-model="secondaryAuthInput" placeholder="当前密码 / 6 位验证码" @keyup.enter="confirmSecondaryAuth">
+                                <!-- V5-修复：不用 @keyup.enter 修饰符（Teleport 内 withKeys helper 触发 Vue 3.3.11 编译产物 _Vue 解构失败），改无修饰符 @keyup + JS 判断 -->
+                                <input type="text" class="form-control" v-model="secondaryAuthInput" placeholder="当前密码 / 6 位验证码" @keyup="onSecondaryAuthKeyup">
                             </div>
                             <div class="modal-footer d-flex gap-2">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>

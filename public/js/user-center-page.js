@@ -1208,6 +1208,13 @@ const App = {
             if (cb) await cb(input);
         };
 
+        // V5-修复：回车触发二次验证（无修饰符 @keyup，避免 Teleport 内 withKeys helper 问题）
+        const onSecondaryAuthKeyup = (event) => {
+            if (event && event.key === 'Enter') {
+                confirmSecondaryAuth();
+            }
+        };
+
         const regenerateRecoveryCodes = async () => {
             bsModalHide('twofaRecoveryModal');
             await new Promise(r => setTimeout(r, 300));
@@ -1427,6 +1434,12 @@ const App = {
             regenerateRecoveryCodes,
             openDisableTwofa,
             disableTwofa,
+            // V5-修复：二次验证弹窗状态/函数补暴露（模板引用，缺了会导致 undefined）
+            secondaryAuthInput,
+            secondaryAuthTitle,
+            openSecondaryAuth,
+            confirmSecondaryAuth,
+            onSecondaryAuthKeyup,
             walletBalance, payMethods, rechargeAmount, rechargeMethod, rechargeSubmitting, rechargeError,
             txList, txTotal, txPage, txPageSize, txFilter, myOrders, orderPage, orderPageSize, orderTotal, orderFilter,
             submitRecharge, loadTx, copyOrderNo, loadMyOrders, changeTxPageSize, changeOrderPageSize,
