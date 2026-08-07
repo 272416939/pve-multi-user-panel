@@ -182,7 +182,7 @@ router.get('/user/cdk/redeemable-vms', authMiddleware, async (req, res) => {
     try {
         // L-12 修复：对每台 VM 外呼 PVE，加用户级限速（admin 可配置）
         const listRate = await checkConfiguredRateLimit('cdk_redeemable', 'ratelimit:cdk-redeemable:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
 
         let userVms;
         userVms = await db.vms.getByUserId(req.user.id);
@@ -218,8 +218,9 @@ router.get('/user/cdk/redeemable-vms', authMiddleware, async (req, res) => {
 // 用户兑换（业务在 services/cdk.js）
 router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
     try {
-        if (!(await checkCdkRateLimit(req.user.id, req.ip)).allowed) {
-            return res.status(429).json({ error: 'CDK 兑换操作过于频繁，请稍后再试' });
+        const cdkRate = await checkCdkRateLimit(req.user.id, req.ip);
+        if (!cdkRate.allowed) {
+            return res.status(429).json({ error: 'CDK 兑换操作过于频繁，请稍后再试', retryAfter: cdkRate.retryAfter });
         }
 
         const result = await cdkService.redeemCdk({

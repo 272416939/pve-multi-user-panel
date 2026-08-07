@@ -488,7 +488,7 @@ router.get('/provision-status', authMiddleware, async (req, res) => {
         var rateLimitKey = 'ratelimit:provision-status:' + req.user.id;
         var rateLimitResult = await checkConfiguredRateLimit('provision_status', rateLimitKey);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+            return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
         }
 
         // SEC-01: 归属校验 — 按 resourceId 查 DB 记录，确认属于当前用户，防止 IDOR 越权查询

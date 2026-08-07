@@ -10,7 +10,7 @@ router.get('/mac-groups', authMiddleware, async (req, res) => {
     try {
         // L-12 修复：外呼爱快接口必须限速（admin 可配置）
         const rate = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-query:' + req.user.id);
-        if (!rate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!rate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: rate.retryAfter });
         if (!ikuaiApi.isConfigured()) return res.json([]);
         res.json(await ikuaiApi.getMacGroups());
     } catch (e) {
@@ -23,7 +23,7 @@ router.get('/ikuai/mac-groups', authMiddleware, adminMiddleware, async (req, res
     try {
         // L-12 修复：外呼爱快接口必须限速（admin 可配置）
         const rate = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-query:' + req.user.id);
-        if (!rate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!rate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: rate.retryAfter });
         if (!ikuaiApi.isConfigured()) {
             return res.json([]);
         }

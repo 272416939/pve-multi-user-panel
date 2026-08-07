@@ -153,7 +153,7 @@ router.post('/login/2fa', async (req, res) => {
 
     const tfaLimit = await checkConfiguredRateLimit('login_2fa', `ratelimit:2fa:${req.ip}:${rateLimitUserId || 'unknown'}`);
     if (!tfaLimit.allowed) {
-        return res.status(429).json({ error: '2FA 验证过于频繁，请 60 秒后重试' });
+        return res.status(429).json({ error: '2FA 验证过于频繁，请稍后再试', retryAfter: tfaLimit.retryAfter });
     }
 
     const { partial_token, code, refresh_token: reqRefreshToken } = req.body;
@@ -265,7 +265,7 @@ router.post('/login/2fa', async (req, res) => {
 router.post('/auth/refresh', async (req, res) => {
     try {
         var rateLimitResult = await checkConfiguredRateLimit('refresh', 'ratelimit:refresh:' + req.ip);
-        if (!rateLimitResult.allowed) return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
+        if (!rateLimitResult.allowed) return res.status(429).json({ error: '请求过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
 
         const { refreshToken } = req.body;
         if (!refreshToken) return res.status(400).json({ error: '缺少 refreshToken' });
@@ -313,7 +313,7 @@ router.post('/logout', async (req, res) => {
     // L-12 修复：登出端点按 IP 限速（匿名可调，防 DoS；保持 token 过期也可登出）
     const logoutRate = await checkConfiguredRateLimit('logout', 'ratelimit:logout:' + req.ip);
     if (!logoutRate.allowed) {
-        return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: logoutRate.retryAfter });
     }
     const { refreshToken } = req.body;
     // 将 access token 加入黑名单（从 Authorization header 读取）
@@ -340,7 +340,7 @@ router.post('/logout', async (req, res) => {
 router.post('/auth/forgot-password', async (req, res) => {
     const forgotLimit = await checkConfiguredRateLimit('forgot', `ratelimit:forgot:${req.ip}`);
     if (!forgotLimit.allowed) {
-        return res.status(429).json({ error: '密码重置邮件发送过于频繁，请 10 分钟后重试' });
+        return res.status(429).json({ error: '密码重置邮件发送过于频繁，请稍后再试', retryAfter: forgotLimit.retryAfter });
     }
 
     try {
@@ -400,7 +400,7 @@ router.get('/auth/reset-password/:token', async (req, res) => {
     try {
         const resetLimit = await checkConfiguredRateLimit('reset_pwd', `ratelimit:reset-pwd:${req.ip}`);
         if (!resetLimit.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: resetLimit.retryAfter });
         }
 
         const { token } = req.params;
@@ -420,7 +420,7 @@ router.post('/auth/reset-password', async (req, res) => {
     try {
         const resetLimit = await checkConfiguredRateLimit('reset_pwd', `ratelimit:reset-pwd:${req.ip}`);
         if (!resetLimit.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: resetLimit.retryAfter });
         }
 
         const { token, newPassword } = req.body;

@@ -231,7 +231,7 @@ app.use('/api', async (req, res, next) => {
     try {
         var limit = await checkConfiguredRateLimit('global', 'ratelimit:global:' + req.ip);
         if (!limit.allowed) {
-            return res.status(429).json({ error: '请求过于频繁，请稍后再试' });
+            return res.status(429).json({ error: '请求过于频繁，请稍后再试', retryAfter: limit.retryAfter });
         }
     } catch (e) {
         // 限速器异常不应阻断请求

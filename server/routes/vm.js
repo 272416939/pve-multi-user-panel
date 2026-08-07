@@ -73,7 +73,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
         var listRate = await checkConfiguredRateLimit('user_vms', 'ratelimit:user-vms:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
 
         let userVms;
         if (req.user.role === 'admin') {
@@ -722,7 +722,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
     try {
         // L-6 修复：VNC 会话创建限速（admin 可配置），防并发打满 PVE SSH/VNC 连接
         const vncRate = await checkConfiguredRateLimit('terminal_open', 'ratelimit:terminal-open:' + req.user.id);
-        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: vncRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
@@ -784,7 +784,7 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：状态查询端点限速（30次/分钟，前端正常轮询远低于该值）
         var statusRate = await checkConfiguredRateLimit('vm_status', 'ratelimit:vm-status:' + req.user.id);
-        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: statusRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
@@ -816,7 +816,7 @@ router.get('/vm/random-ip', authMiddleware, async (req, res) => {
     try {
         // L-12 修复：随机 IP 需扫描 IP 池，加用户级限速（admin 可配置）
         const ipRate = await checkConfiguredRateLimit('random_ip', 'ratelimit:random-ip:' + req.user.id);
-        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试' });
+        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试', retryAfter: ipRate.retryAfter });
 
         const subnetId = parseInt(req.query.subnet_id);
         if (subnetId) {
@@ -1102,7 +1102,7 @@ try {
         const vmid = parseInt(req.params.vmid);
         const rateLimit = await checkConfiguredRateLimit('os_switch', 'ratelimit:os-switch:' + req.user.id);
         if (!rateLimit.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: rateLimit.retryAfter });
         }
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
             return res.status(400).json({ error: '无效的 VMID' });
@@ -1224,7 +1224,7 @@ try {
     router.get('/vm/:vmid/switch-os/status', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const rateLimit = await checkConfiguredRateLimit('os_switch_status', 'ratelimit:os-switch-status:' + req.user.id);
-        if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁' });
+        if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁', retryAfter: rateLimit.retryAfter });
         const vm = await db.vms.getByVmid(vmid);
         if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
         if (vm.user_id !== req.user.id && req.user.role !== 'admin') {

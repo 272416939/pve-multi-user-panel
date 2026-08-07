@@ -16,7 +16,7 @@ router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         // V3-08 修复：列表类端点限速
         const listRate = await checkConfiguredRateLimit('lxc_backups', 'ratelimit:lxc-backups:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
  
@@ -49,7 +49,7 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
 
         // V3-09 修复：备份操作用户级限速（5次/分钟）
         const opRate = await checkConfiguredRateLimit('backup_op', 'ratelimit:backup-op:' + req.user.id);
-        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试' });
+        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试', retryAfter: opRate.retryAfter });
  
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
@@ -186,7 +186,7 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的容器 ID' });
         // V3-09 修复：恢复操作用户级限速（5次/分钟）
         const restoreRate = await checkConfiguredRateLimit('restore_op', 'ratelimit:restore-op:' + req.user.id);
-        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试' });
+        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试', retryAfter: restoreRate.retryAfter });
         const backupId = parseInt(req.params.id);
  
         const allCts = await db.lxcContainers.getAll();
@@ -299,7 +299,7 @@ router.get('/vm/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表类端点限速
         const listRate = await checkConfiguredRateLimit('vm_backups', 'ratelimit:vm-backups:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const owned = userVms.some(v => v.vm_id == req.params.vmid);
@@ -321,7 +321,7 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
         // V3-09 修复：备份操作用户级限速（5次/分钟）
         const opRate = await checkConfiguredRateLimit('backup_op', 'ratelimit:backup-op:' + req.user.id);
-        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试' });
+        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试', retryAfter: opRate.retryAfter });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const ownedVm = userVms.find(v => v.vm_id == vmid);
@@ -499,7 +499,7 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
         // V3-09 修复：恢复操作用户级限速（5次/分钟）
         const restoreRate = await checkConfiguredRateLimit('restore_op', 'ratelimit:restore-op:' + req.user.id);
-        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试' });
+        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试', retryAfter: restoreRate.retryAfter });
         const backupId = req.params.id;
         const backup = await db.backups.getById(backupId);
         if (!backup) return res.status(404).json({ error: '备份不存在' });

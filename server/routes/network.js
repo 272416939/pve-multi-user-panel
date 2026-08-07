@@ -691,7 +691,7 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
         const rateLimitKey = 'ratelimit:random-port:' + req.user.id;
         const rateLimitResult = await checkConfiguredRateLimit('random_port', rateLimitKey);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+            return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
         }
         const portRangeStart = parseInt(await db.config.get('forward:port_range_start')) || 50000;
         const portRangeEnd = parseInt(await db.config.get('forward:port_range_end')) || 60000;
@@ -727,7 +727,7 @@ router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
     try {
         // M-3 修复：外呼爱快全量端口表，必须限速（admin 可配置）
         const checkRate = await checkConfiguredRateLimit('port_check', 'ratelimit:port-check:' + req.user.id);
-        if (!checkRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!checkRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: checkRate.retryAfter });
 
         const port = parseInt(req.query.port);
         if (!port || port < 1 || port > 65535) {
@@ -771,7 +771,7 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
     try {
         // M-3 修复：N+1 外呼爱快+PVE，必须限速（admin 可配置）
         const extractRate = await checkConfiguredRateLimit('port_extract_ips', 'ratelimit:port-extract-ips:' + req.user.id);
-        if (!extractRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!extractRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: extractRate.retryAfter });
 
         const devices = [];
         const isAdmin = req.user.role === 'admin';

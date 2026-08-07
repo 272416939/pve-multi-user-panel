@@ -67,7 +67,7 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
         const listRate = await checkConfiguredRateLimit('user_lxc', 'ratelimit:user-lxc:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
 
         let userCts;
         if (req.user.role === 'admin') {
@@ -686,7 +686,7 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
     try {
         // L-6 修复：VNC 会话创建限速（admin 可配置），防并发打满 PVE SSH/VNC 连接
         const vncRate = await checkConfiguredRateLimit('terminal_open', 'ratelimit:terminal-open:' + req.user.id);
-        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: vncRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
@@ -744,7 +744,7 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
     try {
         // L-6 修复：SSH 终端会话创建限速（admin 可配置），防并发打满 PVE 节点 SSH 连接
         const termRate = await checkConfiguredRateLimit('terminal_open', 'ratelimit:terminal-open:' + req.user.id);
-        if (!termRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        if (!termRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: termRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
@@ -800,7 +800,7 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：状态查询端点限速（30次/分钟）
         const statusRate = await checkConfiguredRateLimit('lxc_status', 'ratelimit:lxc-status:' + req.user.id);
-        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: statusRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
@@ -971,7 +971,7 @@ router.get('/lxc/random-ip', authMiddleware, async (req, res) => {
     try {
         // L-12 修复：随机 IP 需扫描 IP 池，加用户级限速（admin 可配置）
         const ipRate = await checkConfiguredRateLimit('random_ip', 'ratelimit:random-ip:' + req.user.id);
-        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试' });
+        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试', retryAfter: ipRate.retryAfter });
 
         const subnetId = parseInt(req.query.subnet_id);
         if (subnetId) {

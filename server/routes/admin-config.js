@@ -310,7 +310,7 @@ router.post('/admin/uapipro/test', authMiddleware, adminMiddleware, async (req, 
     try {
         var rateLimitResult = await checkConfiguredRateLimit('uapipro_test', 'ratelimit:uapipro-test:' + req.user.id);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '测试过于频繁，请稍后再试' });
+            return res.status(429).json({ error: '测试过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
         }
         var ip = String(req.body.ip || '').trim();
         if (!ip) return res.status(400).json({ error: '请输入要查询的 IP 地址' });

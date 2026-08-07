@@ -186,8 +186,8 @@ router.post('/subnets', authMiddleware, async (req, res) => {
     // 限速：防止频繁外呼爱快导致外部系统被拖垮
     const rateLimitResult = await checkConfiguredRateLimit('subnet_create', 'ratelimit:subnet-create:' + req.user.id);
     if (!rateLimitResult.allowed) {
-        return res.status(429).json({ error: '创建子网过于频繁，请稍后再试' });
-    }
+        return res.status(429).json({ error: '创建子网过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+        }
     // 每用户子网数量上限（普通用户受限，管理员不限，与端口转发 max_per_user 一致）
     if (req.user.role !== 'admin') {
         const maxPerUser = parseInt(await db.config.get('vlan:max_per_user')) || 5;
@@ -332,8 +332,8 @@ router.delete('/subnets/:id', authMiddleware, async (req, res) => {
 router.post('/subnets/refresh', authMiddleware, async (req, res) => {
     const rateLimitResult = await checkConfiguredRateLimit('subnet_refresh', 'ratelimit:subnet-refresh:' + req.user.id);
     if (!rateLimitResult.allowed) {
-        return res.status(429).json({ error: '刷新过于频繁，请稍后再试' });
-    }
+        return res.status(429).json({ error: '刷新过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+        }
     try {
         const subnets = await db.subnets.getByUserId(req.user.id);
         if (subnets.length === 0) return res.json({ updated: 0 });
@@ -393,8 +393,8 @@ router.post('/subnets/refresh', authMiddleware, async (req, res) => {
 router.post('/subnets/:id/refresh', authMiddleware, async (req, res) => {
     const rateLimitResult = await checkConfiguredRateLimit('subnet_refresh', 'ratelimit:subnet-refresh:' + req.user.id);
     if (!rateLimitResult.allowed) {
-        return res.status(429).json({ error: '刷新过于频繁，请稍后再试' });
-    }
+        return res.status(429).json({ error: '刷新过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+        }
     try {
         const id = parseInt(req.params.id);
         const subnet = await db.subnets.getById(id);
