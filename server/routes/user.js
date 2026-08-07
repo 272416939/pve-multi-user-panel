@@ -609,6 +609,8 @@ router.get('/user/verify-email/:token', async (req, res) => {
         }
 
         await db.users.update(verifyRecord.user_id, { emailVerified: true });
+        // 失效 profileCache：否则用户中心 60s 内仍显示「未验证」（与头像上传失效模式一致）
+        await profileCache.del(String(verifyRecord.user_id));
         await db.passwordResetTokens.delete(verifyRecord.id);
 
         const siteUrl = getSiteUrl(req) || '';
