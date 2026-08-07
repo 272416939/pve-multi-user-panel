@@ -470,7 +470,7 @@
                                     <span class="text-primary">{{ s.vlan_name }}</span>
                                 </td>
                                 <td>{{ s.gateway }} / {{ s.netmask }}</td>
-                                <td class="small">{{ s.addr_pool }}</td>
+                                <td>{{ s.addr_pool }}</td>
                                 <td>
                                     <span v-if="s.vm_count + s.lxc_count === 0" class="text-muted">-</span>
                                     <span v-else>

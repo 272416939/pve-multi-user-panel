@@ -379,7 +379,7 @@ app.component('private-network-list', {
                             <td><span class="badge bg-primary">{{ s.vlan_id }}</span></td>\
                             <td><span class="text-primary">{{ s.vlan_name }}</span></td>\
                             <td>{{ s.gateway }} / {{ s.netmask }}</td>\
-                            <td class="small">{{ s.addr_pool }}</td>\
+                            <td>{{ s.addr_pool }}</td>\
                             <td>{{ s.available }}</td>\
                             <td>{{ s.interface }}</td>\
                             <td>\
