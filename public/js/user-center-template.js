@@ -70,6 +70,8 @@
                                         <pv-button v-if="!profileForm.email || profileForm.email !== user.email" type="button" variant="outline" @click="bindEmail">绑定</pv-button>
                                         <pv-button v-else-if="!profileForm.emailVerified" type="button" variant="secondary" @click="resendVerification">重发验证</pv-button>
                                     </div>
+                                    <!-- M-1 修复：换绑邮箱需输入当前密码做二次验证 -->
+                                    <input v-if="profileForm.email && profileForm.email !== user.email" type="password" class="form-control mt-2" v-model="profileForm.emailPassword" placeholder="输入当前密码以验证">
                                     <div class="mt-1">
                                         <small v-if="profileForm.emailVerified" class="text-success">✓ 已验证</small>
                                         <small v-else-if="profileForm.email && profileForm.email === user.email" class="text-warning">● 未验证 - 请查收验证邮件</small>
@@ -85,6 +87,11 @@
                                     <div class="mb-3">
                                         <label class="form-label">新密码（留空则不修改）</label>
                                         <input type="password" class="form-control" v-model="profileForm.password">
+                                    </div>
+                                    <!-- M-1 修复：修改密码需输入当前密码做二次验证 -->
+                                    <div v-if="profileForm.password" class="mb-3">
+                                        <label class="form-label">当前密码（用于验证身份）</label>
+                                        <input type="password" class="form-control" v-model="profileForm.currentPassword">
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">个人简介</label>
@@ -213,7 +220,7 @@
                                          @click="group.expanded = !group.expanded">
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="notification-group-icon">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="group.svg"></svg>
+                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="DOMPurify.sanitize(group.svg)"></svg>
                                             </span>
                                             <span class="fw-bold">{{ group.label }}</span>
                                             <small class="text-muted">（{{ group.enabledCount }}/{{ group.items.length }}项已开启）</small>
@@ -660,6 +667,27 @@
                             <div class="modal-footer d-flex gap-2">
                                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
                                 <pv-button type="button" @click="disableTwofa" :disabled="!twofaDisablePassword" variant="danger">确认禁用</pv-button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- M-1 修复：敏感操作二次验证弹窗（当前密码或 2FA 动态码） -->
+                <div class="modal fade" id="secondaryAuthModal" tabindex="-1" data-bs-backdrop="static">
+                    <div class="modal-dialog modal-sm">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">{{ secondaryAuthTitle }}</h5>
+                                <pv-button type="button" data-bs-dismiss="modal"></pv-button>
+                            </div>
+                            <div class="modal-body">
+                                <p class="mb-2">请输入当前密码或 2FA 动态码以验证身份：</p>
+                                <!-- V5-修复：不用 @keyup.enter 修饰符（Teleport 内 withKeys helper 触发 Vue 3.3.11 编译产物 _Vue 解构失败），改无修饰符 @keyup + JS 判断 -->
+                                <input type="text" class="form-control" v-model="secondaryAuthInput" placeholder="当前密码 / 6 位验证码" @keyup="onSecondaryAuthKeyup">
+                            </div>
+                            <div class="modal-footer d-flex gap-2">
+                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+                                <pv-button type="button" @click="confirmSecondaryAuth" :disabled="!secondaryAuthInput" variant="primary">验证</pv-button>
                             </div>
                         </div>
                     </div>

@@ -23,7 +23,7 @@ router.get('/user/notification-settings', authMiddleware, async (req, res) => {
 router.put('/user/notification-settings', authMiddleware, async (req, res) => {
     // SEC-02: 速率限制 - 每用户 60 秒 30 次
     var limit = await checkConfiguredRateLimit('notification_settings', 'settings:' + req.user.id);
-    if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+    if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
 
     try {
         const db = require('../api/db');

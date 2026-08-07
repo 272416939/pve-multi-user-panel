@@ -12,7 +12,11 @@
         default_protocol: 'tcp',
         wan_interface: '',
         max_per_user: 10,
-        cname_domain: ''
+        cname_domain: '',
+        vlan_ip_segment_start: '172.16.0.1',
+        vlan_id_start: 1000,
+        vlan_interface: 'lan1',
+        vlan_max_per_user: 5
     });
     $.cnameEntries = ref([]);
     $.ifaceList = ref([]);
@@ -49,10 +53,22 @@
     $.forwardLxcPage = ref(1);
     $.forwardPageSize = 20;
 
+    // 私有网络管理（管理员视角，只读列表）
+    $.privateSubnets = ref([]);
+    $.privateSubnetsLoading = ref(false);
+    $.privateSubnetSearch = ref('');
+    $.privateSubnetPage = ref(1);
+    $.privateSubnetPageSize = 20;
+
     // ==================== computed ====================
     $.paginatedForwardRules = computed(function() {
         var start = ($.forwardPage.value - 1) * $.forwardPageSize;
         return $.forwardRules.value.slice(start, start + $.forwardPageSize);
+    });
+
+    $.paginatedPrivateSubnets = computed(function() {
+        var start = ($.privateSubnetPage.value - 1) * $.privateSubnetPageSize;
+        return $.privateSubnets.value.slice(start, start + $.privateSubnetPageSize);
     });
 
     $.vmForwardTotal = computed(function() {
@@ -213,6 +229,27 @@
             if ($.forwardPage.value > totalPages) $.forwardPage.value = Math.max(1, totalPages);
         } catch (e) { console.error('加载转发规则失败:', e); }
         finally { $.forwardRulesLoading.value = false; }
+    };
+
+    // 私有网络列表（管理员视角）
+    $.loadPrivateSubnets = async function() {
+        $.privateSubnetsLoading.value = true;
+        try {
+            var search = ($.privateSubnetSearch.value || '').trim();
+            var url = '/admin/subnets';
+            if (search) url += '?search=' + encodeURIComponent(search);
+            var list = await api(url);
+            $.privateSubnets.value = list || [];
+            // 页码修正
+            var totalPages = Math.ceil($.privateSubnets.value.length / $.privateSubnetPageSize);
+            if ($.privateSubnetPage.value > totalPages) $.privateSubnetPage.value = Math.max(1, totalPages);
+        } catch (e) { console.error('加载私有网络列表失败:', e); }
+        finally { $.privateSubnetsLoading.value = false; }
+    };
+
+    $.onPrivateSubnetSearch = function() {
+        $.privateSubnetPage.value = 1;
+        $.loadPrivateSubnets();
     };
 
     $.onForwardTypeChange = function() {

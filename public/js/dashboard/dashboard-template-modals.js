@@ -779,9 +779,21 @@
         <div class="modal-header"><h5 class="modal-title">确认订购</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="mb-3"><strong>{{ orderPackage.name }}</strong></div>
+            <!-- 私有网络：子网选择（VM/LXC 下单必选，放在操作系统上方） -->
+            <div class="mb-3">
+                <label class="form-label">网络（子网）<span class="text-danger">*</span></label>
+                <select class="form-select" v-model="orderForm.subnet_id" :disabled="orderSubnetsLoading">
+                    <option :value="0">请选择网络</option>
+                    <option v-for="s in orderSubnets" :key="s.id" :value="s.id">
+                        {{ s.vlan_name }}（{{ s.cidr }}）
+                    </option>
+                </select>
+                <div class="form-text text-muted" v-if="orderSubnetsLoading">加载中...</div>
+                <div class="form-text text-muted" v-else-if="orderSubnets.length === 0">暂无子网，请先在「私有网络」中新建子网后再购买</div>
+            </div>
             <!-- v1.3 新增：操作系统选择（仅 VM 套餐显示） -->
             <div class="mb-3" v-if="orderType === 'vm'">
-                <label class="form-label">操作系统</label>
+                <label class="form-label">操作系统<span class="text-danger">*</span></label>
                 <select class="form-select" v-model="orderForm.os_template_id" :disabled="orderOsLoading">
                     <option :value="0">请选择系统</option>
                     <option v-for="t in orderOsTemplates" :key="t.id" :value="t.id">
@@ -790,7 +802,7 @@
                 </select>
                 <div class="form-text text-muted" v-if="orderOsLoading">加载中...</div>
                 <div class="form-text text-muted" v-else-if="orderOsTemplates.length === 0">
-                    该套餐暂无可选系统，将使用默认模板开通，开通后可切换
+                    该套餐暂无可选系统，请选择其他套餐
                 </div>
             </div>
             <div class="mb-3">
@@ -811,7 +823,7 @@
         </div>
         <div class="modal-footer d-flex gap-2">
             <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-            <pv-button type="button" @click="confirmOrder" :disabled="orderLoading" variant="primary">{{ orderLoading ? '处理中...' : '确认开通' }}</pv-button>
+            <pv-button type="button" @click="confirmOrder" :disabled="orderLoading || (orderType === 'vm' && (!orderForm.os_template_id || !orderForm.subnet_id)) || (orderType === 'lxc' && !orderForm.subnet_id)" variant="primary">{{ orderLoading ? '处理中...' : '确认开通' }}</pv-button>
         </div>
     </div></div>
 </div>
@@ -906,6 +918,197 @@
             <pv-button type="button" variant="danger" :disabled="!osSwitchConfirm || osSwitchSubmitting" :loading="osSwitchSubmitting" @click="submitOsSwitch()">确认切换系统</pv-button>
         </div>
     </div></div>
+</div>
+</Teleport>
+
+<!-- 新建子网确认弹窗 -->
+<Teleport to="body">
+<div class="modal fade" id="createSubnetModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
+        <div class="modal-header"><h5 class="modal-title">新建子网</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small">已创建 <strong>{{ subnetQuota.used }}</strong> / <strong>{{ subnetQuota.max > 0 ? subnetQuota.max : '∞' }}</strong> 个子网</span>
+                <span v-if="subnetQuota.max > 0" class="text-muted small">剩余 {{ Math.max(0, subnetQuota.max - subnetQuota.used) }} 个</span>
+                <span v-else class="text-muted small">管理员不受限</span>
+            </div>
+            <div v-if="subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max" class="alert alert-warning py-2 small mb-3">
+                子网数量已达上限，无法继续创建，如需更多请联系管理员
+            </div>
+            <p class="text-muted small">创建后系统将自动完成网段分配，无需手动配置：</p>
+            <ul class="small text-muted mb-3">
+                <li>网段自动分配，依次递增</li>
+                <li>网关为网段起始地址（如 172.16.0.1）</li>
+                <li>名称由系统自动生成，不可编辑</li>
+            </ul>
+            <div class="alert alert-info mb-0">
+                <div>创建完成后可在列表中查看分配的 <strong>网段 / 网关</strong></div>
+                <div class="mt-1">删除子网前需先解绑其下所有服务器</div>
+            </div>
+            <div v-if="subnetCreating" class="text-center text-muted py-3">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                正在创建子网，请稍候...
+            </div>
+        </div>
+        <div class="modal-footer d-flex gap-2">
+            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+            <pv-button type="button" @click="createSubnet" :disabled="subnetCreating || (subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max)" :loading="subnetCreating" variant="primary">确认创建</pv-button>
+        </div>
+    </div></div>
+</div>
+</Teleport>
+
+<!-- 绑定子网弹窗 -->
+<Teleport to="body">
+<div class="modal fade" id="bindSubnetModal" tabindex="-1" data-bs-focus="false">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
+        <div class="modal-header"><h5 class="modal-title">绑定子网</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <strong>{{ bindSubnetDevice.name || (bindSubnetDevice.type === 'vm' ? ('VM ' + bindSubnetDevice.vm_id) : ('CT ' + bindSubnetDevice.ct_id)) }}</strong>
+                <span v-if="bindSubnetDevice.status && bindSubnetDevice.status.status === 'running'" class="badge bg-success ms-2">运行中</span>
+                <span v-else class="badge bg-secondary ms-2">已停止</span>
+            </div>
+            <div class="alert alert-warning small" v-if="bindSubnetDevice.status && bindSubnetDevice.status.status === 'running'">
+                <template v-if="user && user.role === 'admin'">服务器正在运行，绑定后将热更新网卡并短暂断网，需重新获取 IP</template>
+                <template v-else>服务器正在运行，请先关机后再进行子网操作</template>
+            </div>
+            <div class="alert alert-warning small" v-else-if="bindSubnetDevice.status && bindSubnetDevice.status.status !== 'running'">
+                解绑子网后需重新绑定才能开机
+            </div>
+            <!-- 已绑定：显示当前子网 + 解绑按钮 -->
+            <template v-if="bindSubnetCurrentSubnet">
+                <div class="mb-3">
+                    <label class="form-label">当前绑定子网</label>
+                    <div class="form-control" readonly>
+                        {{ bindSubnetCurrentSubnet.vlan_name }}（{{ bindSubnetCurrentSubnet.cidr }}）· 可用 IP：{{ bindSubnetCurrentSubnet.available }}
+                    </div>
+                    <div class="form-text text-muted" v-if="bindSubnetDevice.dhcp_static_ip">已分配 IP：{{ bindSubnetDevice.dhcp_static_ip }}</div>
+                </div>
+                <pv-button type="button" variant="outline-danger" :disabled="bindSubnetSubmitting || (bindSubnetDevice.status && bindSubnetDevice.status.status === 'running')" :loading="bindSubnetSubmitting" @click="unbindSubnet">解绑子网</pv-button>
+            </template>
+            <!-- 未绑定：选择子网 + 绑定按钮 -->
+            <template v-else>
+                <div class="mb-3">
+                    <label class="form-label">选择子网<span class="text-danger">*</span></label>
+                    <select class="form-select" v-model="bindSubnetForm.subnet_id">
+                        <option :value="0">请选择子网</option>
+                        <option v-for="s in subnets" :key="s.id" :value="s.id">
+                            {{ s.vlan_name }}（{{ s.cidr }}）· 可用 IP：{{ s.available }}
+                        </option>
+                    </select>
+                    <div class="form-text text-muted" v-if="subnets.length === 0">暂无子网，请先在「私有网络」中新建子网</div>
+                </div>
+                <pv-button type="button" @click="bindSubnet" :disabled="bindSubnetSubmitting || !bindSubnetForm.subnet_id || (bindSubnetDevice.status && bindSubnetDevice.status.status === 'running' && !(user && user.role === 'admin'))" :loading="bindSubnetSubmitting" variant="primary">确认绑定</pv-button>
+            </template>
+            <div v-if="bindSubnetSubmitting" class="text-center text-muted py-3">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                正在处理中，请稍候...
+            </div>
+        </div>
+    </div></div>
+</div>
+</Teleport>
+
+<!-- 重置 LXC IP 弹窗（私有网络：需先绑定子网，随机 IP 取自子网 IP 池） -->
+<Teleport to="body">
+<div class="modal fade" id="resetLxcIpModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重置 IP - CT {{ lxcPasswordResetCtId }}</h5>
+                <pv-button type="button" data-bs-dismiss="modal"></pv-button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" style="background:rgba(220,53,69,0.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(220,53,69,0.3);">
+                    <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
+                    <div>
+                        <strong>危险操作</strong><br>
+                        <span style="opacity:0.9">修改 IP 需要重启容器，容器将短暂关机后自动重启。正在运行的服务会中断，请确保已保存重要数据。</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">IP 模式</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="static" id="lxcIpStatic">
+                            <label class="form-check-label" for="lxcIpStatic">手动输入</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="dhcp" id="lxcIpDhcp">
+                            <label class="form-check-label" for="lxcIpDhcp">DHCP 自动获取</label>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="lxcIpForm?.ip_mode === 'static'" class="mb-3">
+                    <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
+                        <pv-button type="button" @click="randomLxcIp" title="随机生成未绑定的 IP" variant="outline">🎲 随机</pv-button>
+                    </div>
+                </div>
+                <div v-if="lxcIpError" class="alert alert-danger py-2">{{ lxcIpError }}</div>
+            </div>
+            <div class="modal-footer d-flex gap-2">
+                <pv-button type="button" data-bs-dismiss="modal">取消</pv-button>
+                <pv-button type="button" @click="confirmResetLxcIp" :disabled="lxcIpLoading">
+                    <span v-if="lxcIpLoading" class="spinner-border spinner-border-sm me-1"></span>
+                    保存
+                </pv-button>
+            </div>
+        </div>
+    </div>
+</div>
+</Teleport>
+
+<!-- 重置 VM IP 弹窗（私有网络：需先绑定子网，随机 IP 取自子网 IP 池） -->
+<Teleport to="body">
+<div class="modal fade" id="resetVmIpModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">重置 IP - VM {{ resetVmIpVm?.vm_id }}</h5>
+                <pv-button type="button" data-bs-dismiss="modal"></pv-button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" style="background:rgba(255,193,7,0.15);backdrop-filter:blur(12px);border:1px solid rgba(255,193,7,0.3);">
+                    <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
+                    <div>
+                        <strong>注意</strong><br>
+                        <span style="opacity:0.9">修改虚拟机 IP 后，需要重启虚拟机或重新获取 DHCP 才能生效。</span>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">IP 模式</label>
+                    <div class="d-flex gap-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="vmIpForm.ip_mode" value="static" id="vmIpStatic">
+                            <label class="form-check-label" for="vmIpStatic">手动输入</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" v-model="vmIpForm.ip_mode" value="dhcp" id="vmIpDhcp">
+                            <label class="form-check-label" for="vmIpDhcp">DHCP 自动获取</label>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="vmIpForm?.ip_mode === 'static'" class="mb-3">
+                    <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" v-model="vmIpForm.ip" placeholder="10.0.0.150/24">
+                        <pv-button type="button" @click="randomVmIp" title="随机生成未绑定的 IP" variant="outline">随机</pv-button>
+                    </div>
+                </div>
+                <div v-if="vmIpError" class="alert alert-danger py-2">{{ vmIpError }}</div>
+            </div>
+            <div class="modal-footer d-flex gap-2">
+                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+                <pv-button type="button" @click="confirmResetVmIp" :disabled="vmIpLoading" variant="warning">
+                    <span v-if="vmIpLoading" class="spinner-border spinner-border-sm me-1"></span>
+                    确认修改
+                </pv-button>
+            </div>
+        </div>
+    </div>
 </div>
 </Teleport>
 

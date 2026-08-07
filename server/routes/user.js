@@ -11,6 +11,7 @@ const db = require('../api/db');
 const { JWT_SECRET, generateToken } = require('../utils/token');
 const upload = require('../config/multer');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { hashPassword, verifyPassword } = require('../utils/password-hash');
@@ -25,6 +26,40 @@ const profileCache = cacheStore.create('profile', 60);
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
 
+// M-1 修复：敏感操作二次验证（改密/换绑邮箱/重生成恢复码）
+// 支持三种凭据（满足其一）：current_password 当前密码 / code 6 位 2FA 动态码 / code 恢复码（一次性）
+// 返回 { ok, error? }；验证失败次数超过阈值时由调用方限速兜底
+async function verifySensitiveAction(user, body, req) {
+    var currentPassword = body.current_password || '';
+    if (currentPassword) {
+        var passwordOk = await verifyPassword(currentPassword, user.password, user.password_salt);
+        if (passwordOk) return { ok: true };
+    }
+
+    var code = String(body.code || '');
+    if (code) {
+        // 2FA 动态码（仅对已启用 2FA 的用户）
+        var secret = await db.twofa.getSecret(user.id);
+        if (secret) {
+            try {
+                if (/^\d{6}$/.test(code) && otplib.verifySync({ token: code, secret }).valid) {
+                    return { ok: true };
+                }
+            } catch (e) {}
+        }
+        // 恢复码（一次性，使用即作废）
+        var recoveryCodes = await db.twofa.getUnusedRecoveryCodes(user.id);
+        for (var rc of recoveryCodes) {
+            if (code === rc.code) {
+                await db.twofa.markRecoveryCodeUsed(code);
+                return { ok: true };
+            }
+        }
+    }
+
+    // 验证失败统一文案，不区分密码/动态码，防止枚举
+    return { ok: false, error: '验证失败：请提供正确的当前密码或 2FA 验证码' };
+}
 
 router.post('/user/2fa/setup', authMiddleware, async (req, res) => {
     try {
@@ -114,6 +149,11 @@ router.get('/user/2fa/recovery-codes', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/2fa/recovery-codes/regenerate', authMiddleware, async (req, res) => {
+    // M-1 修复：重生成恢复码需要二次验证（当前密码/2FA 动态码/恢复码）
+    const user = await db.users.getById(req.user.id);
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    const secondary = await verifySensitiveAction(user, req.body, req);
+    if (!secondary.ok) return res.status(403).json({ error: secondary.error });
     try {
         const newCodes = [];
         for (let i = 0; i < 8; i++) {
@@ -226,6 +266,13 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         }
         
         const { username, password, bio } = req.body;
+        
+        // M-1 修复：修改密码必须二次验证（当前密码/2FA 动态码/恢复码）
+        if (password) {
+            const secondary = await verifySensitiveAction(user, req.body, req);
+            if (!secondary.ok) return res.status(403).json({ error: secondary.error });
+        }
+        
         const updates = {};
         
         if (username && username !== user.username) {
@@ -411,6 +458,24 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         if (!user) {
             return res.status(404).json({ error: '用户不存在' });
         }
+
+        // M-1 修复：换绑邮箱必须二次验证（当前密码/2FA 动态码/恢复码），防止 token 泄露后接管邮箱
+        // 仅「换绑」（邮箱变更）要求二次验证；重发验证邮件（邮箱未变）不要求
+        var isRebind = !user.email || user.email !== email;
+        if (isRebind) {
+            const secondary = await verifySensitiveAction(user, req.body, req);
+            if (!secondary.ok) return res.status(403).json({ error: secondary.error });
+        }
+
+        // 限速：发送邮箱验证邮件统一按用户限速（重发/首次绑定/换绑，防邮件轰炸）
+        // 放在二次验证之后、写库之前 —— 429 时不修改邮箱、不生成 token、不消耗 SMTP
+        const emailRateLimit = await checkConfiguredRateLimit('email_verify', `ratelimit:email-verify:${req.user.id}`);
+        if (!emailRateLimit.allowed) {
+            return res.status(429).json({
+                error: '验证邮件发送过于频繁，请稍后再试',
+                retryAfter: emailRateLimit.retryAfter
+            });
+        }
         
         const allUsers = await db.users.getAll();
         const existingUser = allUsers.find(u => u.email === email && u.id !== req.user.id);
@@ -436,26 +501,82 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         try {
             const verifyUrl = `${getSiteUrl(req)}/api/user/verify-email/${verifyToken}`;
             const siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
-            const emailContent = `
-                <p>您好，</p>
-                <p>感谢您注册 ${siteName}！</p>
-                <p>请点击下方按钮验证您的邮箱地址：</p>
-                <p style="text-align: center;">
-                    <a href="${verifyUrl}" class="btn" target="_blank">验证邮箱地址</a>
-                </p>
-                <div class="divider"></div>
-                <p style="color: #718096; font-size: 14px;">
-                    如果按钮无法点击，请复制以下链接到浏览器：<br>
-                    <a href="${verifyUrl}" style="word-break: break-all;">${verifyUrl}</a>
-                </p>
-                <div class="info-box">
-                    <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快验证。</p>
-                </div>
-            `;
+            // 三种发信场景区分模板：
+            // 1. 换绑（已有邮箱且变更）→ 换绑验证模板，展示新邮箱 + 安全提醒
+            // 2. 重发验证（已有邮箱且未变）→ 中性验证模板，不再出现注册文案
+            // 3. 首次绑定（从未绑过邮箱）→ 注册欢迎验证模板
+            var isEmailRebind = !!user.email && user.email !== email;
+            var isResendVerify = !!user.email && user.email === email;
+            var emailSubject;
+            var emailTitle;
+            var emailContent;
+            if (isEmailRebind) {
+                emailSubject = '邮箱换绑验证 - ' + siteName;
+                emailTitle = '请验证您的新邮箱';
+                emailContent = `
+                    <p>您好，${user.username}！</p>
+                    <p>您正在将当前账号的绑定邮箱更换为：</p>
+                    <div style="text-align:center;margin:20px 0;">
+                        <span style="font-size:18px;font-weight:bold;color:#7c3aed;background:#f5f3ff;padding:10px 20px;border-radius:8px;display:inline-block;word-break:break-all;">${email}</span>
+                    </div>
+                    <p>请点击下方按钮确认完成换绑：</p>
+                    <p style="text-align: center;">
+                        <a href="${verifyUrl}" class="btn" target="_blank">确认换绑邮箱</a>
+                    </p>
+                    <div class="divider"></div>
+                    <p style="color: #718096; font-size: 14px;">
+                        如果按钮无法点击，请复制以下链接到浏览器：<br>
+                        <a href="${verifyUrl}" style="word-break: break-all;">${verifyUrl}</a>
+                    </p>
+                    <div class="info-box">
+                        <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快完成换绑。</p>
+                    </div>
+                    <div class="warning-box">
+                        <p style="margin-bottom: 0;"><strong>安全提醒：</strong>如非您本人操作，请立即修改账号密码并联系管理员，以防账号被他人接管。</p>
+                    </div>
+                `;
+            } else if (isResendVerify) {
+                emailSubject = '邮箱验证 - ' + siteName;
+                emailTitle = '请验证您的邮箱';
+                emailContent = `
+                    <p>您好，${user.username}！</p>
+                    <p>您正在进行邮箱验证，请点击下方按钮完成验证：</p>
+                    <p style="text-align: center;">
+                        <a href="${verifyUrl}" class="btn" target="_blank">验证邮箱地址</a>
+                    </p>
+                    <div class="divider"></div>
+                    <p style="color: #718096; font-size: 14px;">
+                        如果按钮无法点击，请复制以下链接到浏览器：<br>
+                        <a href="${verifyUrl}" style="word-break: break-all;">${verifyUrl}</a>
+                    </p>
+                    <div class="info-box">
+                        <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快验证。</p>
+                    </div>
+                `;
+            } else {
+                emailSubject = '邮箱验证 - ' + siteName;
+                emailTitle = '请验证您的邮箱';
+                emailContent = `
+                    <p>您好，${user.username}！</p>
+                    <p>感谢您注册 ${siteName}！</p>
+                    <p>请点击下方按钮验证您的邮箱地址：</p>
+                    <p style="text-align: center;">
+                        <a href="${verifyUrl}" class="btn" target="_blank">验证邮箱地址</a>
+                    </p>
+                    <div class="divider"></div>
+                    <p style="color: #718096; font-size: 14px;">
+                        如果按钮无法点击，请复制以下链接到浏览器：<br>
+                        <a href="${verifyUrl}" style="word-break: break-all;">${verifyUrl}</a>
+                    </p>
+                    <div class="info-box">
+                        <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快验证。</p>
+                    </div>
+                `;
+            }
             await sendEmail(
                 email,
-                '邮箱验证 - ' + siteName,
-                createEmailTemplate('请验证您的邮箱', emailContent, siteName)
+                emailSubject,
+                createEmailTemplate(emailTitle, emailContent, siteName)
             );
         } catch (emailError) {
             console.error('发送验证邮件失败，但邮箱已保存', emailError);
@@ -488,6 +609,8 @@ router.get('/user/verify-email/:token', async (req, res) => {
         }
 
         await db.users.update(verifyRecord.user_id, { emailVerified: true });
+        // 失效 profileCache：否则用户中心 60s 内仍显示「未验证」（与头像上传失效模式一致）
+        await profileCache.del(String(verifyRecord.user_id));
         await db.passwordResetTokens.delete(verifyRecord.id);
 
         const siteUrl = getSiteUrl(req) || '';

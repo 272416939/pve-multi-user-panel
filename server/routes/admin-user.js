@@ -234,6 +234,11 @@ router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, 
         if (!amount || amount <= 0 || !isFinite(amount)) {
             return res.status(400).json({ error: '充值金额必须为正数' });
         }
+        // L-3 修复：人工充值金额上限（与 pay:max_amount 默认值一致，防误填超大值）
+        var maxRecharge = parseFloat(await db.config.get('pay:max_amount')) || 999999.99;
+        if (amount > maxRecharge) {
+            return res.status(400).json({ error: '单次充值金额不能超过 ' + maxRecharge.toFixed(2) });
+        }
 
         var user = await db.users.getById(userId);
         if (!user) return res.status(404).json({ error: '用户不存在' });

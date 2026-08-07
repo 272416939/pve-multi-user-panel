@@ -188,7 +188,7 @@ router.post('/logs/operation/clear', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '确认串不正确' });
         }
         var limit = await checkConfiguredRateLimit('log_clear_op', 'log-clear-op:' + req.user.id);
-        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
         await db.auditLogs.clearByUser(req.user.id);
         res.json({ message: '操作日志已清空' });
     } catch (e) {
@@ -203,7 +203,7 @@ router.post('/logs/login/clear', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '确认串不正确' });
         }
         var limit = await checkConfiguredRateLimit('log_clear_login', 'log-clear-login:' + req.user.id);
-        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
         await db.loginLogs.clearByUser(req.user.id);
         res.json({ message: '登录日志已清空' });
     } catch (e) {

@@ -58,10 +58,17 @@
                     <a class="nav-item" data-subsection="lxc-assign" href="#" @click.prevent="switchSubsection('lxc','assign')"><span class="nav-text">分配 LXC 容器</span></a>
                     <a class="nav-item" data-subsection="lxc-manage" href="#" @click.prevent="switchSubsection('lxc','manage')"><span class="nav-text">容器管理</span></a>
                 </div>
-                <a class="nav-item" :class="{ active: activeSection === 'port-forward' }" href="#" @click.prevent="switchSection('port-forward')">
+
+                <!-- 网络管理（父菜单） -->
+                <a class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('network')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
-                    <span class="nav-text">端口转发管理</span>
+                    <span class="nav-text">网络管理</span>
+                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
+                <div class="nav-submenu" id="submenu-network">
+                    <a class="nav-item" :class="{ active: activeSection === 'port-forward' }" data-subsection="port-forward" href="#" @click.prevent="switchSection('port-forward')"><span class="nav-text">端口转发管理</span></a>
+                    <a class="nav-item" :class="{ active: activeSection === 'private-network' }" data-subsection="private-network" href="#" @click.prevent="switchSection('private-network')"><span class="nav-text">私有网络管理</span></a>
+                </div>
                 <!-- 后台管理 -->
                 <a class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('manage')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
@@ -134,7 +141,7 @@
                     <a class="nav-item" data-subsection="settings-smtp" href="#" @click.prevent="switchAdminTab('smtp')"><span class="nav-text">SMTP 配置</span></a>
                     <a class="nav-item" data-subsection="settings-pve" href="#" @click.prevent="switchAdminTab('pve')"><span class="nav-text">PVE节点设置</span></a>
                     <a class="nav-item" data-subsection="settings-snapshot-backup" href="#" @click.prevent="switchAdminTab('snapshot-backup')"><span class="nav-text">快照&备份配置</span></a>
-                    <a class="nav-item" data-subsection="settings-network" href="#" @click.prevent="switchAdminTab('network')"><span class="nav-text">网络管理</span></a>
+                    <a class="nav-item" data-subsection="settings-network" href="#" @click.prevent="switchAdminTab('network')"><span class="nav-text">网络配置</span></a>
                     <a class="nav-item" data-subsection="settings-pay" href="#" @click.prevent="switchAdminTab('pay')"><span class="nav-text">支付配置</span></a>
                     <a class="nav-item" data-subsection="settings-site" href="#" @click.prevent="switchAdminTab('site')"><span class="nav-text">站点设置</span></a>
                     <a class="nav-item" data-subsection="settings-uapipro" href="#" @click.prevent="switchAdminTab('uapipro')"><span class="nav-text">UApiPro</span></a>

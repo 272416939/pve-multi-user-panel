@@ -154,9 +154,11 @@
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openSnapshotPanel(vm)">快照</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBackupPanel(vm)">备份</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openDeviceForward(vm, 'vm')">网络</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBindSubnet(vm, 'vm')">绑定子网</a></li>
                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openRenewModal(vm)">续费</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openVmPasswordReset(vm)">重置密码</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
                                 </ul>
@@ -242,9 +244,11 @@
                                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openSnapshotPanel(vm)">快照</a></li>
                                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBackupPanel(vm)">备份</a></li>
                                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openDeviceForward(vm, 'vm')">网络</a></li>
+                                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBindSubnet(vm, 'vm')">绑定子网</a></li>
                                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openRenewModal(vm)">续费</a></li>
 <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openVmPasswordReset(vm)">重置密码</a></li>
+                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
                                 </ul>
@@ -321,10 +325,12 @@
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcSnapshotPanel(ct)">快照</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcBackupPanel(ct)">备份</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openDeviceForward(ct, 'lxc')">网络</a></li>
+                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openBindSubnet(ct, 'lxc')">绑定子网</a></li>
                                     <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openRenewModal(ct)">续费</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : editLxc(ct)">编辑</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
+                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -406,10 +412,12 @@
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcSnapshotPanel(ct)">快照</a></li>
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcBackupPanel(ct)">备份</a></li>
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openDeviceForward(ct, 'lxc')">网络</a></li>
+                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openBindSubnet(ct, 'lxc')">绑定子网</a></li>
                                                     <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openRenewModal(ct)">续费</a></li>
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : editLxc(ct)">编辑</a></li>
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
+                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
                                                 </ul>
                                             </div>
                                         </div>
@@ -421,6 +429,67 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 私有网络（子网管理） -->
+        <div v-show="activeSection === 'subnet'">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="module-title">子网管理</h4>
+                <div class="d-flex gap-2">
+                    <pv-button variant="outline" @click="refreshSubnets" :disabled="subnetRefreshing" :loading="subnetRefreshing">刷新可用IP</pv-button>
+                    <pv-button variant="glass" @click="openCreateSubnet">+ 新建子网</pv-button>
+                </div>
+            </div>
+            <div v-if="subnetLoading" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">加载中...</span>
+                </div>
+                <p class="mt-2 text-muted">加载中...</p>
+            </div>
+            <div v-else class="table-container" style="padding:12px;">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0 table-align-center">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>所属网络</th>
+                                <th>网关 / 掩码</th>
+                                <th>地址池</th>
+                                <th>服务器</th>
+                                <th>可用IP</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="s in subnets" :key="s.id">
+                                <td>{{ s.id }}</td>
+                                <td>
+                                    <span class="text-primary">{{ s.vlan_name }}</span>
+                                </td>
+                                <td>{{ s.gateway }} / {{ s.netmask }}</td>
+                                <td>{{ s.addr_pool }}</td>
+                                <td>
+                                    <span v-if="s.vm_count + s.lxc_count === 0" class="text-muted">-</span>
+                                    <span v-else>
+                                        <span v-if="s.vm_count > 0">VM {{ s.vm_count }}</span>
+                                        <span v-if="s.vm_count > 0 && s.lxc_count > 0"> | </span>
+                                        <span v-if="s.lxc_count > 0">LXC {{ s.lxc_count }}</span>
+                                    </span>
+                                </td>
+                                <td>{{ s.available }}</td>
+                                <td>{{ formatDate(s.created_at) }}</td>
+                                <td>
+                                    <pv-button size="sm" variant="outline-danger" @click="deleteSubnet(s)">删除</pv-button>
+                                </td>
+                            </tr>
+                            <tr v-if="subnets.length === 0">
+                                <td colspan="8" class="text-center text-muted py-4">暂无子网，点击「新建子网」创建私有网络</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

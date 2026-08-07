@@ -598,6 +598,11 @@
     $.vmIpLoading = ref(false);
 
     $.openResetVmIpModal = function(vm) {
+        // 私有网络：重置 IP 必须先绑定子网
+        if (!vm.subnet_id) {
+            alert('该虚拟机尚未绑定子网，请先绑定后再重置 IP');
+            return;
+        }
         $.selectedVm.value = vm;
         let currentIp = vm.dhcp_static_ip || '';
         if (!currentIp && vm.config && vm.config.net0) {
@@ -610,8 +615,15 @@
     };
 
     $.randomVmIp = async function() {
+        var vm = $.selectedVm.value;
+        if (!vm) return;
+        // 私有网络：随机 IP 从当前虚拟机绑定的子网 IP 池选取
+        if (!vm.subnet_id) {
+            alert('该虚拟机尚未绑定子网，请先绑定后再使用随机 IP 功能');
+            return;
+        }
         try {
-            var data = await api('/vm/random-ip');
+            var data = await api('/vm/random-ip?subnet_id=' + vm.subnet_id);
             $.vmIpForm.value.ip = data.ip + '/24';
             $.vmIpForm.value.ip_mode = 'static';
         } catch (e) {

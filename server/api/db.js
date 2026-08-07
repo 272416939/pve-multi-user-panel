@@ -18,6 +18,7 @@ const dbOrders = require('./db-orders');
 const dbDisks = require('./db-disks');
 const dbBackup = require('./db-backup');
 const dbNetwork = require('./db-network');
+const dbSubnets = require('./db-subnets');
 const dbMessaging = require('./db-messaging');
 const dbConfig = require('./db-config');
 const dbBilling = require('./db-billing');
@@ -93,6 +94,9 @@ module.exports = {
 
     // 端口转发操作
     portForwards: dbNetwork.portForwards,
+
+    // 私有网络子网操作
+    subnets: dbSubnets.subnets,
 
     // 初始化入口（供外部调用，已改为 async）
     initDb: dbSchema.initDb,

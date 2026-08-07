@@ -20,7 +20,7 @@ const AUDIT_CATEGORY_NAMES = {
 function actionToCategory(action) {
     action = String(action || '');
     if (action === 'user.login') return 'user_login';
-    if (/^(vm|lxc|backup|snapshot|network)\./.test(action)) return 'vm_lxc';
+    if (/^(vm|lxc|backup|snapshot|network|subnet)\./.test(action)) return 'vm_lxc';
     if (/^password\./.test(action)) return 'password';
     if (/^order\./.test(action)) return 'order';
     if (/^disk\./.test(action)) return 'disk';
@@ -59,7 +59,7 @@ const ADMIN_SUB_CATEGORIES = {
 function buildAuditCategoryWhere(category) {
     switch (category) {
         case 'user_login': return ['action = ?', ['user.login']];
-        case 'vm_lxc': return ['(action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ?)', ['vm.%', 'lxc.%', 'backup.%', 'snapshot.%', 'network.%']];
+        case 'vm_lxc': return ['(action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ?)', ['vm.%', 'lxc.%', 'backup.%', 'snapshot.%', 'network.%', 'subnet.%']];
         case 'password': return ['action LIKE ?', ['password.%']];
         case 'order': return ['action LIKE ?', ['order.%']];
         case 'disk': return ['action LIKE ?', ['disk.%']];
@@ -331,13 +331,15 @@ const memos = {
     getByUserId: (userId) => queryAll('SELECT * FROM memos WHERE user_id = ?', [userId]),
     getById: (id) => queryOne('SELECT * FROM memos WHERE id = ?', [id]),
     create: async (memo) => {
+        // I-5 修复：备忘录内容服务端净化（防未来改为 v-html 渲染时的存储型 XSS）
+        const { sanitizeTitle, sanitizeMessageContent } = require('../utils/message-sanitize');
         const [result] = await execute(
             `INSERT INTO memos (user_id, title, content, created_at, updated_at)
              VALUES (?, ?, ?, ?, ?)`,
             [
                 memo.user_id,
-                memo.title || '',
-                memo.content || '',
+                sanitizeTitle(memo.title),
+                sanitizeMessageContent(memo.content),
                 mysqlNow(),
                 mysqlNow()
             ]
@@ -349,6 +351,10 @@ const memos = {
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }
+        // I-5 修复：备忘录内容服务端净化（与 create 一致）
+        const { sanitizeTitle, sanitizeMessageContent } = require('../utils/message-sanitize');
+        if (updates.title !== undefined) updates.title = sanitizeTitle(updates.title);
+        if (updates.content !== undefined) updates.content = sanitizeMessageContent(updates.content);
         if (Object.keys(updates).length === 0) return;
         const fields = [];
         const values = [];

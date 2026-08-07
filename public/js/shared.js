@@ -40,7 +40,15 @@ const api = (endpoint, options = {}) => {
                         }
                         return fetch(`/api${endpoint}`, retryOptions).then(async r => {
                             const d = await r.json();
-                            if (!r.ok) throw new Error(d.error || '请求失败');
+                            if (!r.ok) {
+                                // 限速 429：错误文案统一拼接剩余等待秒数（全局倒计时提示，所有页面生效）
+                                const err = new Error(d.error || '请求失败');
+                                if (d.retryAfter != null) {
+                                    err.retryAfter = d.retryAfter;
+                                    err.message = err.message + '，请 ' + Math.ceil(d.retryAfter) + ' 秒后重试';
+                                }
+                                throw err;
+                            }
                             return d;
                         });
                     }
@@ -55,7 +63,15 @@ const api = (endpoint, options = {}) => {
             throw new Error(data.error || '请求失败');
         }
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || '请求失败');
+        if (!res.ok) {
+            // 限速 429：错误文案统一拼接剩余等待秒数（全局倒计时提示，所有页面生效）
+            const err = new Error(data.error || '请求失败');
+            if (data.retryAfter != null) {
+                err.retryAfter = data.retryAfter;
+                err.message = err.message + '，请 ' + Math.ceil(data.retryAfter) + ' 秒后重试';
+            }
+            throw err;
+        }
         return data;
     });
 };

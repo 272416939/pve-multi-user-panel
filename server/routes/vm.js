@@ -8,7 +8,8 @@ const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
 const { getStatusCache } = require('../services/status-cache');
 const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
-const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp } = require('../services/dhcp');
+const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
+const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 const { safeError, sanitizeErrorMsg } = require('../utils/safe-error');
@@ -20,6 +21,12 @@ const { takeDiskSnapshot } = require('../services/disk-audit');
 const { importDisksForVm } = require('../services/disk-expiry-check');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
+
+// L-5 修复：vmid 严格白名单校验（规范 C-2，与 snapshot/backup 端点一致）
+function isValidVmid(v) {
+    return Number.isInteger(v) && v >= 100 && v <= 999999999;
+}
+
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -66,7 +73,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
         var listRate = await checkConfiguredRateLimit('user_vms', 'ratelimit:user-vms:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
 
         let userVms;
         if (req.user.role === 'admin') {
@@ -191,6 +198,10 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     if (isNaN(parsedVmId) || isNaN(parsedUserId)) {
         return res.status(400).json({ error: '无效的虚拟机或用户ID' });
     }
+    // L-5 修复：vmid 严格白名单校验
+    if (!Number.isInteger(parsedVmId) || parsedVmId < 100 || parsedVmId > 999999999) {
+        return res.status(400).json({ error: '无效的虚拟机 ID' });
+    }
 
     // SEC-03: 价格/折扣参数服务端校验
     var parsedMonthlyPrice = parseFloat(monthly_price);
@@ -312,18 +323,9 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         }
     }
     
-    // 分配后尝试自动开机（如果虚拟机是停机状态）
-    try {
-        const currentStatus = await pveApi.getVmStatus(parseInt(vm_id));
-        if (currentStatus && currentStatus.status === 'stopped') {
-            await pveApi.startVm(parseInt(vm_id));
-            dbg(`虚拟机 ${vm_id} 已自动开机（分配后）`);
-        }
-	    } catch (startError) {
-	        console.error(`虚拟机 ${vm_id} 自动开机失败:`, startError.message);
-	    }
-	    
-	    // 操作审计：管理员创建/分配 VM
+    // 私有网络要求：admin 手动分配不自动开机，以关机状态交付，用户开机时需先绑定子网
+
+    // 操作审计：管理员创建/分配 VM
 	    try {
 	        const { auditLog } = require('../utils/audit-log');
 	        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.vm.create', resourceType: 'vm', resourceId: parsedVmId, details: '为 用户#' + parsedUserId + ' 创建 VM #' + parsedVmId + '(' + (name || 'VM ' + vm_id) + (expiration_date ? ',到期:' + expiration_date : '') + ')', req });
@@ -550,6 +552,11 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
         }
     }
 
+    // 操作审计：移除 VM（台账移除，不销毁 PVE 虚拟机）
+    if (removedVmInfo) {
+        await auditAction(req, 'admin.vm.remove', '移除VM #' + removedVmInfo.vm_id + ':' + (removedVmInfo.name || 'VM ' + removedVmInfo.vm_id) + '(用户#' + removedVmInfo.user_id + ')', { resourceType: 'vm', resourceId: removedVmInfo.vm_id });
+    }
+
     res.json({ message: '虚拟机移除成功' });
     } catch (e) {
         console.error('[vm] 操作失败:', e.message);
@@ -560,6 +567,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
 router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -580,9 +588,38 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
         }
 
+        // 私有网络：未绑定子网的存量设备关机后拒绝开机（全角色生效，含管理员）
+        if (vm && !vm.subnet_id) {
+            return res.status(400).json({ error: '该虚拟机尚未绑定子网，请先在「更多→绑定子网」中绑定后再开机' });
+        }
+
         await pveApi.startVm(vmid);
         // 启动成功后清除关机原因标记
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: null }); } catch (_) {}
+
+        // 私有网络：启动后兜底重绑 DHCP 静态绑定（绑定子网后首次开机时分配新 IP，绑定丢失时恢复）
+        try {
+            if (vm && vm.subnet_id) {
+                const subnet = await db.subnets.getById(vm.subnet_id);
+                if (subnet && (!vm.dhcp_static_ip || !isIpInAddrPool(vm.dhcp_static_ip, subnet.addr_pool))) {
+                    const cfg = await pveApi.getVmConfig(vmid);
+                    const mac = ((cfg && cfg.net0) || '').match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
+                    if (mac) {
+                        const newIp = await rebindDhcpForDevice('vm', vmid, subnet, mac[0]);
+                        if (newIp) {
+                            await db.vms.update(vm.id, { dhcp_static_ip: newIp });
+                            // 端口转发同步：IP 变化时重建规则（绑定后首次开机/绑定丢失恢复场景）
+                            if (newIp !== vm.dhcp_static_ip) {
+                                try {
+                                    await rebuildPortForwardsForDevice('vm', vmid, newIp);
+                                } catch (pfErr) { console.error('[vm.start] 同步端口转发失败:', pfErr.message); }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) { console.error('[vm.start] 重绑 DHCP 静态绑定失败:', e.message); }
+
         await auditAction(req, 'vm.start', '开机 VM ' + vmid);
         res.json({ message: '虚拟机启动成功' });
     } catch (error) {
@@ -593,6 +630,7 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -623,6 +661,7 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -653,6 +692,7 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -680,7 +720,12 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
 
 router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
     try {
+        // L-6 修复：VNC 会话创建限速（admin 可配置），防并发打满 PVE SSH/VNC 连接
+        const vncRate = await checkConfiguredRateLimit('terminal_open', 'ratelimit:terminal-open:' + req.user.id);
+        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: vncRate.retryAfter });
+
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -695,6 +740,10 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权操作此虚拟机' });
+            }
+            // M-2 修复：到期资源拦截（VNC 控制台属于资源使用）
+            if (!isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请先续费' });
             }
         }
         
@@ -735,9 +784,10 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：状态查询端点限速（30次/分钟，前端正常轮询远低于该值）
         var statusRate = await checkConfiguredRateLimit('vm_status', 'ratelimit:vm-status:' + req.user.id);
-        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: statusRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -761,8 +811,25 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
 });
 
 // VM IP 重置相关路由（通过修改爱快DHCP绑定实现，PVE虚拟机不支持直接设置IP）
+// 可选 subnet_id：从指定子网 IP 池随机（私有网络）；未传则用旧 DHCP 全局范围（兼容创建流程）
 router.get('/vm/random-ip', authMiddleware, async (req, res) => {
     try {
+        // L-12 修复：随机 IP 需扫描 IP 池，加用户级限速（admin 可配置）
+        const ipRate = await checkConfiguredRateLimit('random_ip', 'ratelimit:random-ip:' + req.user.id);
+        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试', retryAfter: ipRate.retryAfter });
+
+        const subnetId = parseInt(req.query.subnet_id);
+        if (subnetId) {
+            // 私有网络：随机 IP 从子网 IP 池选取，且非管理员仅限使用自己的子网
+            const subnet = await db.subnets.getById(subnetId);
+            if (!subnet) return res.status(400).json({ error: '子网不存在' });
+            if (req.user.role !== 'admin' && subnet.user_id !== req.user.id) {
+                return res.status(403).json({ error: '无权限使用该子网' });
+            }
+            const ip = await pickUnusedStaticIp(subnet);
+            if (!ip) return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
+            return res.json({ ip });
+        }
         const ip = await pickUnusedStaticIp();
         if (!ip) return res.status(400).json({ error: '无可用 IP' });
         res.json({ ip });
@@ -771,9 +838,11 @@ router.get('/vm/random-ip', authMiddleware, async (req, res) => {
     }
 });
 
-router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, res) => {
+router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        // L-5 修复：vmid 严格白名单校验
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
         const { ip_mode, ip } = req.body;
 
         // 参数校验
@@ -788,8 +857,21 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
         if (vmRecord) {
             const isOwner = req.user.id === vmRecord.user_id;
             if (!isOwner && !isAdmin) return res.status(403).json({ error: '无权限操作此虚拟机' });
+            // 非管理员用户重置 IP 时检查到期时间
+            if (isOwner && !isAdmin && vmRecord.expiration_date && new Date(vmRecord.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+            }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
+        }
+
+        // 私有网络：重置 IP 必须已绑定子网，随机/静态 IP 均取自绑定的子网 IP 池
+        let subnet = null;
+        if (vmRecord && vmRecord.subnet_id) {
+            subnet = await db.subnets.getById(vmRecord.subnet_id);
+        }
+        if (!subnet) {
+            return res.status(400).json({ error: '该虚拟机尚未绑定子网，请先绑定后再重置 IP' });
         }
 
         if (ip_mode === 'dhcp') {
@@ -806,10 +888,14 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
             if (!ip) return res.status(400).json({ error: '请输入 IP 地址' });
             const ipBase = ip.split('/')[0];
             if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ipBase)) return res.status(400).json({ error: 'IP 格式不正确' });
+            // 已绑定子网：手动输入 IP 必须在绑定的子网 IP 池内
+            if (!isIpInAddrPool(ipBase, subnet.addr_pool)) {
+                return res.status(400).json({ error: 'IP 不在当前绑定的子网 IP 池范围内，请选择池内地址或使用随机 IP' });
+            }
             targetIp = ipBase;
         } else if (ip_mode === 'random') {
-            targetIp = await pickUnusedStaticIp();
-            if (!targetIp) return res.status(400).json({ error: '无可用 IP，请手动输入' });
+            targetIp = await pickUnusedStaticIp(subnet);
+            if (!targetIp) return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
         }
 
         // 获取VM的MAC地址用于创建/更新DHCP绑定
@@ -822,8 +908,8 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, adminMiddleware, async (req, r
         let finalIp = targetIp;
         const updated = await updateDhcpStaticBindingIp('vm', vmid, finalIp);
         if (!updated) {
-            // 没有已有绑定，创建新的
-            const boundIp = await createDhcpStaticBinding('vm', vmid, macMatch[1], finalIp);
+            // 没有已有绑定，创建新的（绑定子网时使用子网的 VLAN 接口/网关/DNS）
+            const boundIp = await createDhcpStaticBinding('vm', vmid, macMatch[1], finalIp, subnet);
             finalIp = boundIp || finalIp;
         }
         if (!finalIp) return res.status(500).json({ error: '设置DHCP绑定失败' });
@@ -931,8 +1017,10 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
         const vmid = parseInt(req.params.vmid);
         const force = req.query.force === '1';
 
-        // V3-14 修复：销毁前记录审计（含 vmid 与 force）
-        await auditAction(req, 'vm.destroy', '销毁 VM ' + vmid + (force ? '（强制）' : ''));
+        const assignedVms = (await db.vms.getAll()).filter(v => v.vm_id === vmid);
+        // V3-14 修复：销毁前记录审计（含 vmid、归属与 force；后台操作域）
+        const destroyTargets = assignedVms.map(v => (v.name || 'VM ' + v.vm_id) + '(用户#' + v.user_id + ')').join('/');
+        await auditAction(req, 'admin.vm.destroy', '销毁 VM ' + vmid + (destroyTargets ? ':' + destroyTargets : '') + (force ? '（强制）' : ''), { resourceType: 'vm' });
 
         if (!force) {
             try {
@@ -945,7 +1033,6 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             }
         }
 
-        const assignedVms = (await db.vms.getAll()).filter(v => v.vm_id === vmid);
         for (const vm of assignedVms) {
             await db.vms.reminders.clear(vm.id);
             try {
@@ -1015,7 +1102,7 @@ try {
         const vmid = parseInt(req.params.vmid);
         const rateLimit = await checkConfiguredRateLimit('os_switch', 'ratelimit:os-switch:' + req.user.id);
         if (!rateLimit.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: rateLimit.retryAfter });
         }
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
             return res.status(400).json({ error: '无效的 VMID' });
@@ -1137,7 +1224,7 @@ try {
     router.get('/vm/:vmid/switch-os/status', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const rateLimit = await checkConfiguredRateLimit('os_switch_status', 'ratelimit:os-switch-status:' + req.user.id);
-        if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁' });
+        if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁', retryAfter: rateLimit.retryAfter });
         const vm = await db.vms.getByVmid(vmid);
         if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
         if (vm.user_id !== req.user.id && req.user.role !== 'admin') {

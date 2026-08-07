@@ -310,7 +310,7 @@ router.post('/admin/uapipro/test', authMiddleware, adminMiddleware, async (req, 
     try {
         var rateLimitResult = await checkConfiguredRateLimit('uapipro_test', 'ratelimit:uapipro-test:' + req.user.id);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '测试过于频繁，请稍后再试' });
+            return res.status(429).json({ error: '测试过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
         }
         var ip = String(req.body.ip || '').trim();
         if (!ip) return res.status(400).json({ error: '请输入要查询的 IP 地址' });
@@ -318,10 +318,8 @@ router.post('/admin/uapipro/test', authMiddleware, adminMiddleware, async (req, 
         res.json(result);
     } catch (e) {
         console.error('[UApiPro测试]', e.message);
-        // 透出第三方接口的错误描述（不含本地凭据），便于管理员排查
-        var errMsg = e.response && e.response.data && e.response.data.message
-            ? e.response.data.message : (e.message || '未知错误');
-        res.status(400).json({ error: '查询失败: ' + errMsg });
+        // L-8 修复：不向客户端透传第三方接口错误原文，统一走 safeError（详情见服务端日志）
+        res.status(400).json({ error: safeError(e) });
     }
 });
 

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 // 业务下沉 services/（规范第七节）：支付编排走 services/payment.js，续费计费走 services/billing.js
 const paymentService = require('../services/payment');
@@ -10,19 +11,11 @@ const billingService = require('../services/billing');
 const { VALID_PERIODS, ORDER_STATUS } = require('../constants');
 const dbg = require('../utils/debug');
 
-var callbackRateLimiter = new Map();
-function checkCallbackRate(ip) {
-    var now = Date.now();
-    var windowMs = 60000;
-    var maxRequests = 30;
-    var record = callbackRateLimiter.get(ip);
-    if (!record || now - record.windowStart > windowMs) {
-        callbackRateLimiter.set(ip, { windowStart: now, count: 1 });
-        return true;
-    }
-    if (record.count >= maxRequests) return false;
-    record.count++;
-    return true;
+// L-11 修复：回调限速从进程内存 Map 迁移到 rate-limiter（Redis 优先 + 内存回退，多实例一致）
+// 与原内存实现参数一致：30 次/分钟/IP；返回完整 result（含 retryAfter），供 429 响应展示倒计时
+async function checkCallbackRate(ip) {
+    const { checkRateLimit } = require('../middleware/rate-limiter');
+    return await checkRateLimit('ratelimit:pay-callback:' + ip, 30, 60000);
 }
 
 var orderStatusRateLimiter = new Map();
@@ -57,6 +50,10 @@ router.get('/wallet/pay-config', authMiddleware, async (req, res) => {
 // ========== 创建充值订单（业务在 services/payment.js） ==========
 router.post('/wallet/recharge', authMiddleware, async (req, res) => {
     try {
+        // M-4 修复：充值下单外呼支付网关，必须限速防刷单（admin 可配置）
+        const rechargeRate = await checkConfiguredRateLimit('wallet_recharge', 'ratelimit:wallet-recharge:' + req.user.id);
+        if (!rechargeRate.allowed) return res.status(429).json({ error: '下单过于频繁，请稍后再试', retryAfter: rechargeRate.retryAfter });
+
         var result = await paymentService.createRechargeOrder({
             userId: req.user.id,
             amount: req.body.amount,
@@ -79,8 +76,9 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
 
 // ========== 支付异步回调 (公开端点，V1 文档为 GET 请求，兼容 POST) ==========
 router.all('/wallet/notify', async (req, res) => {
-    if (!checkCallbackRate(req.ip)) {
-        return res.status(429).send('Too Many Requests');
+    const cbRate = await checkCallbackRate(req.ip);
+    if (!cbRate.allowed) {
+        return res.status(429).json({ error: '回调过于频繁，请稍后再试', retryAfter: cbRate.retryAfter });
     }
     try {
         // 按请求方法取单一来源，避免 query/body 参数覆盖污染
@@ -98,8 +96,9 @@ router.all('/wallet/notify', async (req, res) => {
 
 // ========== 支付同步跳转处理 (GET, 处理return_url, 备用: 网关notify_url不通时) ==========
 router.get('/wallet/return', async (req, res) => {
-    if (!checkCallbackRate(req.ip)) {
-        return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+    const cbRate = await checkCallbackRate(req.ip);
+    if (!cbRate.allowed) {
+        return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: cbRate.retryAfter });
     }
     try {
         var params = req.query;
@@ -144,7 +143,9 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
             orderStatusRateLimiter.set(rateKey, { windowStart: now, count: 1 });
         } else {
             if (record.count >= maxRequests) {
-                return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+                // 自定义内存限速无 retryAfter，按窗口剩余时间计算供前端倒计时展示
+                var retryAfterSec = Math.ceil((windowMs - (now - record.windowStart)) / 1000);
+                return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: retryAfterSec });
             }
             record.count++;
         }

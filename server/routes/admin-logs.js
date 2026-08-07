@@ -334,7 +334,7 @@ router.post('/admin/logs/operation/clear', async (req, res) => {
             return res.status(400).json({ error: '确认串不正确' });
         }
         var limit = await checkConfiguredRateLimit('log_clear_op', 'log-clear-op:' + req.user.id);
-        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
         var result = await db.auditLogs.clearAll(scope);
         var scopeText = scope === 'admin' ? '后台操作日志' : (scope === 'user' ? '用户操作日志' : '全部操作日志');
         auditLogAction(req, 'admin.log.clear', '清空' + scopeText + ' ' + result.deleted + ' 条');
@@ -351,7 +351,7 @@ router.post('/admin/logs/login/clear', async (req, res) => {
             return res.status(400).json({ error: '确认串不正确' });
         }
         var limit = await checkConfiguredRateLimit('log_clear_login', 'log-clear-login:' + req.user.id);
-        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
         var result = await db.loginLogs.clearAll();
         auditLogAction(req, 'admin.log.clear', '清空登录日志 ' + result.deleted + ' 条');
         res.json({ message: '登录日志已清空 ' + result.deleted + ' 条', deleted: result.deleted });

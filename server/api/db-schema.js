@@ -55,6 +55,7 @@ async function initDb() {
             lastReminderDate VARCHAR(50) DEFAULT '',
             backup_storage VARCHAR(100) DEFAULT '',
             dhcp_static_ip VARCHAR(50) DEFAULT '',
+            subnet_id INT DEFAULT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_vms_user_id (user_id)
         )
@@ -67,6 +68,8 @@ async function initDb() {
     try { await execute('ALTER TABLE vms ADD COLUMN pve_upid VARCHAR(200) DEFAULT \'\''); } catch (_) {}
     // 关机原因：null=未关机/正常, 'manual'=用户手动关机, 'expired'=到期自动关机
     try { await execute('ALTER TABLE vms ADD COLUMN shutdown_reason VARCHAR(20) DEFAULT NULL'); } catch (_) {}
+    // 私有网络：绑定的子网 ID（null=未绑定）
+    try { await execute('ALTER TABLE vms ADD COLUMN subnet_id INT DEFAULT NULL'); } catch (_) {}
 
     // 创建虚拟机提醒记录表
     await execute(`
@@ -251,6 +254,7 @@ async function initDb() {
             reminderSent INT DEFAULT 0,
             lastReminderDate VARCHAR(50) DEFAULT '',
             dhcp_static_ip VARCHAR(50) DEFAULT '',
+            subnet_id INT DEFAULT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX idx_lxc_user_id (user_id)
         )
@@ -263,6 +267,8 @@ async function initDb() {
     try { await execute('ALTER TABLE lxc_containers ADD COLUMN pve_upid VARCHAR(200) DEFAULT \'\''); } catch (_) {}
     // 关机原因：null=未关机/正常, 'manual'=用户手动关机, 'expired'=到期自动关机
     try { await execute('ALTER TABLE lxc_containers ADD COLUMN shutdown_reason VARCHAR(20) DEFAULT NULL'); } catch (_) {}
+    // 私有网络：绑定的子网 ID（null=未绑定）
+    try { await execute('ALTER TABLE lxc_containers ADD COLUMN subnet_id INT DEFAULT NULL'); } catch (_) {}
 
     // 创建 LXC 提醒记录表
     await execute(`
@@ -293,6 +299,26 @@ async function initDb() {
             ikuai_id VARCHAR(100) DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+
+    // 创建私有网络子网表（VLAN + DHCP 服务端）
+    await execute(`
+        CREATE TABLE IF NOT EXISTS subnets (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            vlan_name VARCHAR(32) NOT NULL,
+            vlan_id INT NOT NULL,
+            gateway VARCHAR(15) NOT NULL,
+            netmask VARCHAR(15) NOT NULL DEFAULT '255.255.255.0',
+            addr_pool VARCHAR(50) NOT NULL,
+            interface VARCHAR(32) NOT NULL,
+            available INT DEFAULT 0,
+            ikuai_vlan_id VARCHAR(32) DEFAULT '',
+            ikuai_dhcp_id VARCHAR(32) DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_subnets_user (user_id),
+            INDEX idx_subnets_vlan_id (vlan_id)
         )
     `);
 
@@ -927,8 +953,13 @@ async function initDefaultConfig() {
         'dhcp:ip_range_end': '10.0.0.199',
         'dhcp:interface': 'lan2',
         'dhcp:gateway': '10.0.0.1',
-        'dhcp:dns1': '119.29.29.29',
+        'dhcp:dns1': '180.76.76.76',
         'dhcp:dns2': '223.5.5.5',
+        // 私有网络 - VLAN 设置（创建子网时自动分配起始值）
+        'vlan:ip_segment_start': '172.16.0.1',
+        'vlan:id_start': '1000',
+        'vlan:interface': 'lan1',
+        'vlan:max_per_user': '5',
         'pay:base_url': 'https://pay.microgg.cn/',
         'pay:v1_enabled': '1',
         'pay:v2_enabled': '0',
@@ -966,6 +997,9 @@ async function initDefaultConfig() {
             [key, value]
         );
     }
+
+    // 私有网络迁移：DHCP DNS1 旧默认值 119.29.29.29 → 180.76.76.76（仅迁移未修改过的旧默认值）
+    await execute("UPDATE config SET value = '180.76.76.76' WHERE `key` = 'dhcp:dns1' AND value = '119.29.29.29'");
 
     // 限速规则默认配置（安全防护·限速设置）：总开关默认开启，全部规则默认开启，
     // 次数/时间窗默认值与 RATE_LIMIT_RULES 注册表一致（即改造前的硬编码参数）

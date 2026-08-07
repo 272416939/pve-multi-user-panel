@@ -51,6 +51,8 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                 const showForceChangePwd = ref(false);
                 const forceNewPassword = ref('');
                 const forceConfirmPassword = ref('');
+                // M-1 修复：强制改密需输入当前密码做二次验证
+                const forceCurrentPassword = ref('');
                 const forcePwdError = ref('');
 
                 // 注册功能
@@ -253,7 +255,12 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     forcePwdError.value = '';
                     const newPwd = forceNewPassword.value;
                     const confirmPwd = forceConfirmPassword.value;
+                    const currentPwd = forceCurrentPassword.value;
 
+                    if (!currentPwd) {
+                        forcePwdError.value = '请输入当前密码验证身份';
+                        return;
+                    }
                     if (!newPwd || newPwd.length < 8) {
                         forcePwdError.value = '密码长度至少8位';
                         return;
@@ -266,7 +273,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     try {
                         await api('/user/profile', {
                             method: 'PUT',
-                            body: JSON.stringify({ password: newPwd })
+                            body: JSON.stringify({ password: newPwd, current_password: currentPwd })
                         });
                         // 改密成功，获取角色信息后跳转
                         const userData = await api('/user/profile');

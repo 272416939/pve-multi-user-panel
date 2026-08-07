@@ -254,18 +254,30 @@ async function processPayCallback(params, opts) {
     var apiTradeNo = await queryApiTradeNo(params.out_trade_no);
 
     // PAY-1/2/3 修复：利用 UNIQUE 约束作为幂等 guard，防止 notify/return 双回调双倍入账
+    // M-5 修复：流水插入 + 余额增加 + 订单标记放入同一事务，避免中途失败导致「已付未到账且无法重试」
+    const { withTransaction } = require('../utils/with-transaction');
     try {
-        await db.transactionRecords.create({
-            user_id: userId,
-            order_no: params.out_trade_no,
-            pay_time: db.now(),
-            pay_method: pendingOrder.pay_method || params.type || '',
-            trade_type: 'recharge',
-            amount: amount.toFixed(2),
-            balance_before: balanceBefore.toFixed(2),
-            balance_after: balanceAfter.toFixed(2),
-            trade_no: tradeNo,
-            api_trade_no: apiTradeNo
+        await withTransaction(async (conn) => {
+            // 事务内读取最新余额，保证 balance_before/after 与扣款一致（防并发竞态）
+            const [balanceRows] = await conn.execute('SELECT balance FROM users WHERE id = ?', [userId]);
+            const latestBalance = balanceRows[0] ? parseFloat(balanceRows[0].balance || '0') : balanceBefore;
+            const newBalance = latestBalance + amount;
+            balanceAfter = newBalance;
+            await conn.execute(
+                `INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    userId, params.out_trade_no, db.now(), pendingOrder.pay_method || params.type || '',
+                    'recharge', amount.toFixed(2),
+                    null, null,
+                    latestBalance.toFixed(2), newBalance.toFixed(2),
+                    null, null,
+                    tradeNo, apiTradeNo, db.now()
+                ]
+            );
+            // PAY-6 修复：原子余额增量更新（同一事务内，与流水插入同生共死）
+            await conn.execute('UPDATE users SET balance = CAST(balance AS DECIMAL(10,2)) + ? WHERE id = ?', [amount, userId]);
+            await conn.execute("UPDATE pending_orders SET status = 'processed', processed_at = NOW() WHERE order_no = ?", [params.out_trade_no]);
         });
     } catch (e) {
         if (e.code === 'ER_DUP_ENTRY') {
@@ -274,10 +286,6 @@ async function processPayCallback(params, opts) {
         }
         throw e;
     }
-
-    // PAY-6 修复：原子余额增量更新，避免 read-modify-write 竞态
-    await db.users.incrementBalance(userId, amount);
-    await db.pendingOrders.markProcessed(params.out_trade_no);
 
     try {
         await db.messages.create({

@@ -8,7 +8,7 @@ const App = {
         const navItems = ref([]);
         const currentNavId = ref('user-center');
 
-        const profileForm = ref({ username: '', password: '', bio: '', avatar: '', email: '', emailVerified: false });
+        const profileForm = ref({ username: '', password: '', currentPassword: '', emailPassword: '', bio: '', avatar: '', email: '', emailVerified: false });
         const memos = ref([]);
         const memosLoading = ref(false);
         const editMemoForm = ref({ id: null, title: '', content: '' });
@@ -805,13 +805,21 @@ const App = {
                     bio: profileForm.value.bio
                 };
                 if (profileForm.value.password) {
+                    // M-1 修复：改密必须携带当前密码做二次验证
+                    if (!profileForm.value.currentPassword) {
+                        alert('修改密码需要输入当前密码进行验证');
+                        return;
+                    }
                     data.password = profileForm.value.password;
+                    data.current_password = profileForm.value.currentPassword;
                 }
                 const result = await api('/user/profile', {
                     method: 'PUT',
                     body: JSON.stringify(data)
                 });
                 user.value = result.user;
+                profileForm.value.password = '';
+                profileForm.value.currentPassword = '';
                 alert('资料更新成功！');
             } catch (e) {
                 alert(e.message);
@@ -860,15 +868,22 @@ const App = {
 
         const bindEmail = async () => {
             try {
+                // M-1 修复：换绑邮箱需要当前密码做二次验证
+                if (!profileForm.value.emailPassword) {
+                    alert('绑定新邮箱需要输入当前密码进行验证');
+                    return;
+                }
                 const result = await api('/user/email', {
                     method: 'PUT',
-                    body: JSON.stringify({ email: profileForm.value.email })
+                    body: JSON.stringify({ email: profileForm.value.email, current_password: profileForm.value.emailPassword })
                 });
                 profileForm.value.emailVerified = false;
+                profileForm.value.emailPassword = '';
                 user.value.email = result.user.email;
                 user.value.emailVerified = false;
                 alert(result.message);
             } catch (e) {
+                // 限速 429 倒计时已由 api() 统一拼接进错误文案，这里原样展示
                 alert(e.message);
             }
         };
@@ -881,6 +896,7 @@ const App = {
                 });
                 alert(result.message);
             } catch (e) {
+                // 限速 429 倒计时已由 api() 统一拼接进错误文案，这里原样展示
                 alert(e.message);
             }
         };
@@ -1170,6 +1186,37 @@ const App = {
             URL.revokeObjectURL(url);
         };
 
+        // M-1 修复：恢复码重生成前先做二次验证（当前密码或 2FA 动态码）
+        const secondaryAuthInput = ref('');
+        const secondaryAuthTitle = ref('二次验证');
+        let secondaryAuthCallback = null;
+
+        const openSecondaryAuth = (title, cb) => {
+            secondaryAuthTitle.value = title;
+            secondaryAuthInput.value = '';
+            secondaryAuthCallback = cb;
+            bsModalShow('secondaryAuthModal');
+        };
+
+        const confirmSecondaryAuth = async () => {
+            const input = secondaryAuthInput.value.trim();
+            if (!input) {
+                alert('请输入当前密码或 2FA 验证码');
+                return;
+            }
+            bsModalHide('secondaryAuthModal');
+            const cb = secondaryAuthCallback;
+            secondaryAuthCallback = null;
+            if (cb) await cb(input);
+        };
+
+        // V5-修复：回车触发二次验证（无修饰符 @keyup，避免 Teleport 内 withKeys helper 问题）
+        const onSecondaryAuthKeyup = (event) => {
+            if (event && event.key === 'Enter') {
+                confirmSecondaryAuth();
+            }
+        };
+
         const regenerateRecoveryCodes = async () => {
             bsModalHide('twofaRecoveryModal');
             await new Promise(r => setTimeout(r, 300));
@@ -1177,27 +1224,35 @@ const App = {
                 bsModalShow('twofaRecoveryModal');
                 return;
             }
-            try {
-                const data = await api('/user/2fa/recovery-codes/regenerate', { method: 'POST' });
-                twofaRecoveryCodes.value = (data.recovery_codes || []).map((code, i) => ({ id: i + 1, code, used: 0, created_at: new Date().toISOString() }));
-                twofaRecoveryCount.value = twofaRecoveryCodes.value.length;
-                const el = document.getElementById('customAlertModal');
-                if (el) {
-                    el.addEventListener('hidden.bs.modal', function onHidden() {
-                        el.removeEventListener('hidden.bs.modal', onHidden);
-                        bsModalShow('twofaRecoveryModal');
-                    }, { once: true });
+            openSecondaryAuth('重新生成恢复码', async (input) => {
+                try {
+                    const data = await api('/user/2fa/recovery-codes/regenerate', {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            current_password: input,
+                            code: input
+                        })
+                    });
+                    twofaRecoveryCodes.value = (data.recovery_codes || []).map((code, i) => ({ id: i + 1, code, used: 0, created_at: new Date().toISOString() }));
+                    twofaRecoveryCount.value = twofaRecoveryCodes.value.length;
+                    const el = document.getElementById('customAlertModal');
+                    if (el) {
+                        el.addEventListener('hidden.bs.modal', function onHidden() {
+                            el.removeEventListener('hidden.bs.modal', onHidden);
+                            bsModalShow('twofaRecoveryModal');
+                        }, { once: true });
+                    }
+                    customAlertMessage.value = '恢复码已重新生成';
+                    var oldModal = bootstrap.Modal.getInstance(el);
+                    if (oldModal) oldModal.dispose();
+                    window.applyModalZIndex(el);
+                    new bootstrap.Modal(el, { focus: false }).show();
+                } catch (e) {
+                    bsModalShow('twofaRecoveryModal');
+                    await new Promise(r => setTimeout(r, 300));
+                    alert('重新生成恢复码失败：' + e.message);
                 }
-                customAlertMessage.value = '恢复码已重新生成';
-                var oldModal = bootstrap.Modal.getInstance(el);
-                if (oldModal) oldModal.dispose();
-                window.applyModalZIndex(el);
-                new bootstrap.Modal(el, { focus: false }).show();
-            } catch (e) {
-                bsModalShow('twofaRecoveryModal');
-                await new Promise(r => setTimeout(r, 300));
-                alert('重新生成恢复码失败：' + e.message);
-            }
+            });
         };
 
         const openDisableTwofa = () => {
@@ -1381,6 +1436,12 @@ const App = {
             regenerateRecoveryCodes,
             openDisableTwofa,
             disableTwofa,
+            // V5-修复：二次验证弹窗状态/函数补暴露（模板引用，缺了会导致 undefined）
+            secondaryAuthInput,
+            secondaryAuthTitle,
+            openSecondaryAuth,
+            confirmSecondaryAuth,
+            onSecondaryAuthKeyup,
             walletBalance, payMethods, rechargeAmount, rechargeMethod, rechargeSubmitting, rechargeError,
             txList, txTotal, txPage, txPageSize, txFilter, myOrders, orderPage, orderPageSize, orderTotal, orderFilter,
             submitRecharge, loadTx, copyOrderNo, loadMyOrders, changeTxPageSize, changeOrderPageSize,

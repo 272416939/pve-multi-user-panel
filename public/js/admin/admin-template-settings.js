@@ -287,50 +287,68 @@
                             </div>
                         </div>
 
-                        <!-- DHCP 静态绑定配置 -->
+                        <!-- DHCP 服务端设置 -->
                         <div class="card mt-3">
                             <div class="card-header">
-                                <h5 class="mb-0">DHCP 静态绑定设置</h5>
+                                <h5 class="mb-0">DHCP 服务端设置</h5>
                             </div>
                             <div class="card-body">
                                 <div class="row mb-3">
                                     <div class="col-md-4">
-                                        <label class="form-label">IP 分配范围起始</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.dhcp_ip_range_start" placeholder="10.0.0.110">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">IP 分配范围结束</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.dhcp_ip_range_end" placeholder="10.0.0.199">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">所属接口</label>
-                                        <select class="form-select" v-model="networkConfig.dhcp_interface">
-                                            <option value="" disabled>请选择 LAN 接口</option>
-                                            <option v-for="iface in lanInterfaceList" :key="iface.name" :value="iface.name">
-                                                {{ iface.name }}{{ iface.comment ? ' (' + iface.comment + ')' : '' }}
-                                            </option>
-                                        </select>
-                                        <small class="text-muted">选择爱快中 DHCP 所在的 LAN 接口</small>
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label">网关</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.dhcp_gateway" placeholder="10.0.0.1">
-                                    </div>
-                                    <div class="col-md-4">
                                         <label class="form-label">DNS1</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.dhcp_dns1" placeholder="119.29.29.29">
+                                        <input type="text" class="form-control" v-model="networkConfig.dhcp_dns1" placeholder="180.76.76.76">
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label">DNS2</label>
                                         <input type="text" class="form-control" v-model="networkConfig.dhcp_dns2" placeholder="223.5.5.5">
                                     </div>
                                 </div>
-                                <small class="text-muted">VM/LXC 分配时将自动创建静态绑定，解绑时自动删除。IP 从指定范围中随机选取未被占用的地址。</small>
+                                <small class="text-muted">创建私有网络子网的 DHCP 服务端时将自动填入此 DNS。服务接口、网关与地址池由系统按 VLAN 设置自动生成。</small>
                                 <div class="mt-3 d-flex gap-2">
                                     <pv-button @click="saveNetworkConfig" variant="glass">保存配置</pv-button>
                                     <pv-button style="border-color:rgba(56,189,248,0.3);background:linear-gradient(135deg, rgba(56,189,248,0.15), rgba(59,130,246,0.1));color:#7DD3FC;" @click="syncDhcpBindings" variant="glass">从爱快同步</pv-button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 私有网络 - VLAN 设置 -->
+                        <div class="card mt-3" style="position: relative; z-index: 2;">
+                            <div class="card-header">
+                                <h5 class="mb-0">私有网络 - VLAN 设置</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">IP段开始范围</label>
+                                        <input type="text" class="form-control" v-model="networkConfig.vlan_ip_segment_start" placeholder="172.16.0.1">
+                                        <small class="text-muted">用户创建私有网络时系统从这里获取开始范围，并在倒数第二位 +1 分配（如 172.16.0.1 → 172.16.1.1 → 172.16.2.1）</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">VLANID 开始范围</label>
+                                        <input type="number" class="form-control" v-model.number="networkConfig.vlan_id_start" min="2" max="4090" placeholder="1000">
+                                        <small class="text-muted">整数范围 2~4090</small>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">所属接口（LAN）</label>
+                                        <select class="form-select" v-model="networkConfig.vlan_interface">
+                                            <option value="" disabled>请选择 LAN 接口</option>
+                                            <option v-for="iface in lanInterfaceList" :key="iface.name" :value="iface.name">
+                                                {{ iface.name }}{{ iface.comment ? ' (' + iface.comment + ')' : '' }}
+                                            </option>
+                                        </select>
+                                        <small class="text-muted">新建子网的 VLAN 将挂载到此物理接口</small>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">每用户最多创建子网数量</label>
+                                        <input type="number" class="form-control" v-model.number="networkConfig.vlan_max_per_user" min="0" max="1000" placeholder="5">
+                                        <small class="text-muted">0=不限制，超过限制时用户无法新建子网（管理员不受限）</small>
+                                    </div>
+                                </div>
+                                <small class="text-muted">VLAN 名称由系统内置生成（vlan_VPC 开头 + 随机字符，≤15 位），不可编辑；VLAN 备注自动记录所属用户。所有配置修改均记录操作日志。</small>
+                                <div class="mt-3 d-flex gap-2">
+                                    <pv-button @click="saveNetworkConfig" variant="glass">保存配置</pv-button>
                                 </div>
                             </div>
                         </div>
