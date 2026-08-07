@@ -5,7 +5,36 @@ const consoleSession = require('../utils/console-session');
 
 const terminalProxy = new WebSocketServer({ noServer: true });
 
+// L-6 修复：终端 WS 连接数上限（与 push-proxy 一致），防止认证用户并发打满 PVE 节点 SSH 连接
+const MAX_CONNECTIONS = 200;
+const MAX_CONNECTIONS_PER_IP = 10;
+let currentConnections = 0;
+const ipConnectionCount = new Map();
+
 terminalProxy.on('connection', async (clientWs, request) => {
+    // 连接数上限检查（在消耗 session 前拦截，避免无效会话被计数）
+    const remoteAddr = request.socket.remoteAddress;
+    const ipCount = ipConnectionCount.get(remoteAddr) || 0;
+    if (currentConnections >= MAX_CONNECTIONS) {
+        clientWs.close(1013, '服务器连接数已达上限，请稍后再试');
+        return;
+    }
+    if (ipCount >= MAX_CONNECTIONS_PER_IP) {
+        clientWs.close(1013, '当前 IP 连接数已达上限，请稍后再试');
+        return;
+    }
+    currentConnections++;
+    ipConnectionCount.set(remoteAddr, ipCount + 1);
+
+    const releaseConnection = () => {
+        const c = ipConnectionCount.get(remoteAddr) || 1;
+        if (c <= 1) ipConnectionCount.delete(remoteAddr);
+        else ipConnectionCount.set(remoteAddr, c - 1);
+        currentConnections = Math.max(0, currentConnections - 1);
+    };
+    clientWs.on('close', releaseConnection);
+    clientWs.on('error', releaseConnection);
+
     const url = new URL(request.url, `http://${request.headers.host}`);
     const sessionId = url.searchParams.get('session');
 

@@ -310,6 +310,11 @@ router.post('/auth/refresh', async (req, res) => {
 });
 
 router.post('/logout', async (req, res) => {
+    // L-12 修复：登出端点按 IP 限速（匿名可调，防 DoS；保持 token 过期也可登出）
+    const logoutRate = await checkConfiguredRateLimit('logout', 'ratelimit:logout:' + req.ip);
+    if (!logoutRate.allowed) {
+        return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+    }
     const { refreshToken } = req.body;
     // 将 access token 加入黑名单（从 Authorization header 读取）
     const accessToken = req.headers.authorization?.replace('Bearer ', '');

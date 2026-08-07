@@ -39,14 +39,10 @@ async function redeemCdk(opts) {
         return { ok: false, status: 403, error: '该 CDK 已被指定给其他用户，无法使用' };
     }
 
-    // 原子 CAS 操作防并发重复兑换
-    var markResult = await db.cdk.markAsUsed(cdk.id, userId, vm_id ? parseInt(vm_id) : null, container_id ? parseInt(container_id) : null);
-    if (markResult.affected === 0) {
-        return { ok: false, status: 400, error: 'CDK 已被使用或无效' };
-    }
-
-    var targetName, targetId, targetType, renewalPrice;
-
+    // L-2 修复：先校验目标资源存在与归属，再 CAS 标记（防止对他人资源兑换导致 CDK 被烧毁）
+    // L-9 修复：续费总时长上限（防无限叠加，上限 10 年），超限在消耗 CDK 前拒绝
+    const MAX_CDK_RENEWAL_DAYS = 3650;
+    var targetName, targetId, targetType, renewalPrice, newExpirationDate;
     if (container_id) {
         var ct = await db.lxcContainers.getById(parseInt(container_id));
         if (!ct) {
@@ -63,16 +59,47 @@ async function redeemCdk(opts) {
         renewalPrice = ct.renewal_price;
 
         // 计算新的到期时间
-        var newExpirationDate;
-        if (ct.expiration_date) {
-            var currentExp = new Date(ct.expiration_date);
-            var now = new Date();
-            var baseDate = currentExp > now ? currentExp : now;
-            newExpirationDate = new Date(baseDate.getTime() + cdk.duration_days * 24 * 60 * 60 * 1000);
-        } else {
-            newExpirationDate = new Date(Date.now() + cdk.duration_days * 24 * 60 * 60 * 1000);
+        var currentExp = ct.expiration_date ? new Date(ct.expiration_date) : null;
+        var now = new Date();
+        var baseDate = currentExp && currentExp > now ? currentExp : now;
+        newExpirationDate = new Date(baseDate.getTime() + cdk.duration_days * 24 * 60 * 60 * 1000);
+        var hardCap = new Date(now.getTime() + MAX_CDK_RENEWAL_DAYS * 24 * 60 * 60 * 1000);
+        if (newExpirationDate > hardCap) {
+            return { ok: false, status: 400, error: `续费后到期时间超过上限（${Math.floor(MAX_CDK_RENEWAL_DAYS / 365)} 年），无法兑换` };
+        }
+    } else {
+        var vm = await db.vms.getById(parseInt(vm_id));
+        if (!vm) {
+            return { ok: false, status: 404, error: '虚拟机不存在' };
         }
 
+        if (vm.user_id !== userId) {
+            return { ok: false, status: 403, error: '无权操作此虚拟机' };
+        }
+
+        targetType = 'vm';
+        targetId = vm.id;
+        targetName = vm.name || 'VM ' + vm.vm_id;
+        renewalPrice = vm.renewal_price;
+
+        // 计算新的到期时间 + 上限检查
+        var currentExp2 = vm.expiration_date ? new Date(vm.expiration_date) : null;
+        var now2 = new Date();
+        var baseDate2 = currentExp2 && currentExp2 > now2 ? currentExp2 : now2;
+        newExpirationDate = new Date(baseDate2.getTime() + cdk.duration_days * 24 * 60 * 60 * 1000);
+        var hardCap2 = new Date(now2.getTime() + MAX_CDK_RENEWAL_DAYS * 24 * 60 * 60 * 1000);
+        if (newExpirationDate > hardCap2) {
+            return { ok: false, status: 400, error: `续费后到期时间超过上限（${Math.floor(MAX_CDK_RENEWAL_DAYS / 365)} 年），无法兑换` };
+        }
+    }
+
+    // 原子 CAS 操作防并发重复兑换（归属校验通过后才消耗 CDK）
+    var markResult = await db.cdk.markAsUsed(cdk.id, userId, vm_id ? parseInt(vm_id) : null, container_id ? parseInt(container_id) : null);
+    if (markResult.affected === 0) {
+        return { ok: false, status: 400, error: 'CDK 已被使用或无效' };
+    }
+
+    if (container_id) {
         // 更新容器到期时间
         await db.lxcContainers.update(targetId, {
             expiration_date: formatLocalDate(newExpirationDate),
@@ -157,20 +184,9 @@ async function redeemCdk(opts) {
     targetName = vm.name || 'VM ' + vm.vm_id;
     renewalPrice = vm.renewal_price;
 
-    // 计算新的到期时间
-    var newExpirationDate2;
-    if (vm.expiration_date) {
-        var currentExp2 = new Date(vm.expiration_date);
-        var now2 = new Date();
-        var baseDate2 = currentExp2 > now2 ? currentExp2 : now2;
-        newExpirationDate2 = new Date(baseDate2.getTime() + cdk.duration_days * 24 * 60 * 60 * 1000);
-    } else {
-        newExpirationDate2 = new Date(Date.now() + cdk.duration_days * 24 * 60 * 60 * 1000);
-    }
-
-    // 更新虚拟机到期时间
+    // 更新虚拟机到期时间（newExpirationDate 已在归属校验阶段计算并过上限检查）
     await db.vms.update(vm.id, {
-        expiration_date: formatLocalDate(newExpirationDate2),
+        expiration_date: formatLocalDate(newExpirationDate),
         reminderSent: false,
         lastReminderDate: ''
     });
@@ -194,7 +210,7 @@ async function redeemCdk(opts) {
                         <p style="margin-bottom: 4px;">虚拟机：${targetName}（VMID: ${vm.vm_id}）</p>
                         <p style="margin-bottom: 4px;">续费时长：${durationStr3}</p>
                         ${renewalPrice ? `<p style="margin-bottom: 4px;">续费价格：${renewalPrice}</p>` : ''}
-                        <p style="margin-bottom: 0;">新到期时间：${newExpirationDate2.toLocaleString('zh-CN')}</p>
+                        <p style="margin-bottom: 0;">新到期时间：${newExpirationDate.toLocaleString('zh-CN')}</p>
                     </div>
                     <p>祝您使用愉快！如有问题请联系管理员。</p>
                 `;
@@ -215,7 +231,7 @@ async function redeemCdk(opts) {
         await db.messages.create({
             uid: redeemer2.id,
             title: 'CDK 续费成功',
-            content: `您的虚拟机 ${targetName} 已成功续费 ${durationStr4}！\n新到期时间：${newExpirationDate2.toLocaleString('zh-CN')}`,
+            content: `您的虚拟机 ${targetName} 已成功续费 ${durationStr4}！\n新到期时间：${newExpirationDate.toLocaleString('zh-CN')}`,
             type: 2,
             send_type: 1
         });
@@ -236,7 +252,7 @@ async function redeemCdk(opts) {
         ok: true,
         data: {
             message: `兑换成功！虚拟机到期时间已延长 ${cdk.duration_days} 天`,
-            new_expiration_date: formatLocalDate(newExpirationDate2)
+            new_expiration_date: formatLocalDate(newExpirationDate)
         }
     };
 }

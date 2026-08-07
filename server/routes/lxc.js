@@ -20,6 +20,11 @@ const { auditAction } = require('../utils/audit-log');
 // 单一来源：周期白名单统一走 constants（规范第七节）
 const { VALID_PERIODS } = require('../constants');
 
+// L-5 修复：vmid 严格白名单校验（规范 C-2，与 VM/snapshot 端点一致）
+function isValidVmid(v) {
+    return Number.isInteger(v) && v >= 100 && v <= 999999999;
+}
+
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
 router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -182,6 +187,10 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
  
     if (isNaN(parsedCtId) || isNaN(parsedUserId)) {
         return res.status(400).json({ error: '无效的容器或用户ID' });
+    }
+    // L-5 修复：ct_id 严格白名单校验
+    if (!Number.isInteger(parsedCtId) || parsedCtId < 100 || parsedCtId > 999999999) {
+        return res.status(400).json({ error: '无效的容器 ID' });
     }
 
     // SEC-03: 价格/折扣参数服务端校验
@@ -522,6 +531,7 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
 router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -584,6 +594,7 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -614,6 +625,7 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -644,6 +656,7 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -671,7 +684,12 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
 
 router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
     try {
+        // L-6 修复：VNC 会话创建限速（admin 可配置），防并发打满 PVE SSH/VNC 连接
+        const vncRate = await checkConfiguredRateLimit('terminal_open', 'ratelimit:terminal-open:' + req.user.id);
+        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -686,6 +704,10 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权操作此容器' });
+            }
+            // M-2 修复：到期资源拦截（VNC 控制台属于资源使用）
+            if (!isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请先续费' });
             }
         }
  
@@ -720,7 +742,12 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
 
 router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
     try {
+        // L-6 修复：SSH 终端会话创建限速（admin 可配置），防并发打满 PVE 节点 SSH 连接
+        const termRate = await checkConfiguredRateLimit('terminal_open', 'ratelimit:terminal-open:' + req.user.id);
+        if (!termRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试' });
+
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -736,6 +763,11 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
             }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
+        }
+
+        // M-2 修复：到期资源拦截（SSH 终端属于资源使用）
+        if (!isAdmin && ct && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '容器已到期，请先续费' });
         }
 
         let ctStatus;
@@ -771,6 +803,7 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
         if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
 
         const vmid = parseInt(req.params.vmid);
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -936,6 +969,10 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
 // 可选 subnet_id：从指定子网 IP 池随机（私有网络）；未传则用旧 DHCP 全局范围（兼容创建流程）
 router.get('/lxc/random-ip', authMiddleware, async (req, res) => {
     try {
+        // L-12 修复：随机 IP 需扫描 IP 池，加用户级限速（admin 可配置）
+        const ipRate = await checkConfiguredRateLimit('random_ip', 'ratelimit:random-ip:' + req.user.id);
+        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试' });
+
         const subnetId = parseInt(req.query.subnet_id);
         if (subnetId) {
             // 私有网络：随机 IP 从子网 IP 池选取，且非管理员仅限使用自己的子网
@@ -965,6 +1002,8 @@ router.get('/lxc/random-ip', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        // L-5 修复：vmid 严格白名单校验
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
         const { ip_mode, ip } = req.body; // ip_mode: 'dhcp' 或 'static'
 
         // 参数校验

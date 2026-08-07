@@ -66,7 +66,8 @@ var RATE_LIMIT_CATEGORIES = [
             { key: 'login_2fa', label: '2FA 验证', hint: '按 IP+用户', max: 3, windowSec: 60 },
             { key: 'refresh', label: '令牌刷新', hint: '按 IP', max: 30, windowSec: 60 },
             { key: 'forgot', label: '找回密码邮件', hint: '按 IP，10 分钟 1 次', max: 1, windowSec: 600 },
-            { key: 'reset_pwd', label: '重置密码', hint: '按 IP', max: 5, windowSec: 60 }
+            { key: 'reset_pwd', label: '重置密码', hint: '按 IP', max: 5, windowSec: 60 },
+            { key: 'logout', label: '登出', hint: '按 IP', max: 30, windowSec: 60 }
         ]
     },
     {
@@ -142,7 +143,20 @@ var RATE_LIMIT_CATEGORIES = [
             { key: 'uapipro_test', label: 'UApiPro 测试查询', hint: '按用户', max: 10, windowSec: 60 },
             { key: 'random_port', label: '随机端口申请', hint: '按用户', max: 30, windowSec: 60 },
             { key: 'subnet_create', label: '创建子网', hint: '按用户', max: 5, windowSec: 60 },
-            { key: 'subnet_refresh', label: '刷新子网可用IP', hint: '按用户', max: 10, windowSec: 60 }
+            { key: 'subnet_refresh', label: '刷新子网可用IP', hint: '按用户', max: 10, windowSec: 60 },
+            { key: 'port_check', label: '端口占用检查', hint: '按用户，外呼爱快全量端口表', max: 10, windowSec: 60 },
+            { key: 'port_extract_ips', label: '提取设备可用IP', hint: '按用户，外呼爱快+PVE（N+1）', max: 5, windowSec: 60 },
+            { key: 'ikuai_query', label: '爱快信息查询', hint: '按用户，外呼爱快接口', max: 20, windowSec: 60 },
+            { key: 'random_ip', label: '随机IP申请', hint: '按用户', max: 30, windowSec: 60 },
+            { key: 'cdk_redeemable', label: 'CDK可兑换资源查询', hint: '按用户，外呼PVE', max: 10, windowSec: 60 },
+            { key: 'terminal_open', label: '打开终端/VNC会话', hint: '按用户，消耗SSH/VNC连接', max: 10, windowSec: 60 }
+        ]
+    },
+    {
+        key: 'pay',
+        label: '支付',
+        rules: [
+            { key: 'wallet_recharge', label: '充值下单', hint: '按用户，外呼支付网关', max: 5, windowSec: 60 }
         ]
     }
 ];

@@ -25,6 +25,40 @@ const profileCache = cacheStore.create('profile', 60);
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
 
+// M-1 修复：敏感操作二次验证（改密/换绑邮箱/重生成恢复码）
+// 支持三种凭据（满足其一）：current_password 当前密码 / code 6 位 2FA 动态码 / code 恢复码（一次性）
+// 返回 { ok, error? }；验证失败次数超过阈值时由调用方限速兜底
+async function verifySensitiveAction(user, body, req) {
+    var currentPassword = body.current_password || '';
+    if (currentPassword) {
+        var passwordOk = await verifyPassword(currentPassword, user.password, user.password_salt);
+        if (passwordOk) return { ok: true };
+    }
+
+    var code = String(body.code || '');
+    if (code) {
+        // 2FA 动态码（仅对已启用 2FA 的用户）
+        var secret = await db.twofa.getSecret(user.id);
+        if (secret) {
+            try {
+                if (/^\d{6}$/.test(code) && otplib.verifySync({ token: code, secret }).valid) {
+                    return { ok: true };
+                }
+            } catch (e) {}
+        }
+        // 恢复码（一次性，使用即作废）
+        var recoveryCodes = await db.twofa.getUnusedRecoveryCodes(user.id);
+        for (var rc of recoveryCodes) {
+            if (code === rc.code) {
+                await db.twofa.markRecoveryCodeUsed(code);
+                return { ok: true };
+            }
+        }
+    }
+
+    // 验证失败统一文案，不区分密码/动态码，防止枚举
+    return { ok: false, error: '验证失败：请提供正确的当前密码或 2FA 验证码' };
+}
 
 router.post('/user/2fa/setup', authMiddleware, async (req, res) => {
     try {
@@ -114,6 +148,11 @@ router.get('/user/2fa/recovery-codes', authMiddleware, async (req, res) => {
 });
 
 router.post('/user/2fa/recovery-codes/regenerate', authMiddleware, async (req, res) => {
+    // M-1 修复：重生成恢复码需要二次验证（当前密码/2FA 动态码/恢复码）
+    const user = await db.users.getById(req.user.id);
+    if (!user) return res.status(404).json({ error: '用户不存在' });
+    const secondary = await verifySensitiveAction(user, req.body, req);
+    if (!secondary.ok) return res.status(403).json({ error: secondary.error });
     try {
         const newCodes = [];
         for (let i = 0; i < 8; i++) {
@@ -226,6 +265,13 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         }
         
         const { username, password, bio } = req.body;
+        
+        // M-1 修复：修改密码必须二次验证（当前密码/2FA 动态码/恢复码）
+        if (password) {
+            const secondary = await verifySensitiveAction(user, req.body, req);
+            if (!secondary.ok) return res.status(403).json({ error: secondary.error });
+        }
+        
         const updates = {};
         
         if (username && username !== user.username) {
@@ -410,6 +456,14 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         const user = await db.users.getById(req.user.id);
         if (!user) {
             return res.status(404).json({ error: '用户不存在' });
+        }
+
+        // M-1 修复：换绑邮箱必须二次验证（当前密码/2FA 动态码/恢复码），防止 token 泄露后接管邮箱
+        // 仅「换绑」（邮箱变更）要求二次验证；重发验证邮件（邮箱未变）不要求
+        var isRebind = !user.email || user.email !== email;
+        if (isRebind) {
+            const secondary = await verifySensitiveAction(user, req.body, req);
+            if (!secondary.ok) return res.status(403).json({ error: secondary.error });
         }
         
         const allUsers = await db.users.getAll();

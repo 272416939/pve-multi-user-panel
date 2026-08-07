@@ -63,6 +63,11 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         if (!isOwner && !isAdmin) {
             return res.status(403).json({ error: '无权限操作此容器' });
         }
+
+        // M-2 修复：到期资源拦截（备份创建占用存储资源）
+        if (!isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '容器已到期，请先续费' });
+        }
  
         // 检查容器是否正在运行
         const status = await pveApi.getLxcStatus(vmid);
@@ -193,6 +198,10 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
             if (!isOwner && !isAdmin) {
                 return res.status(403).json({ error: '无权限操作此容器' });
             }
+            // M-2 修复：到期资源拦截（备份恢复属于资源使用）
+            if (!isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请先续费' });
+            }
         } else if (req.user.role !== 'admin') {
             return res.status(403).json({ error: '无权限操作此容器' });
         }
@@ -315,8 +324,12 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
         if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
-            const owned = userVms.some(v => v.vm_id == vmid);
-            if (!owned) return res.status(403).json({ error: '无权操作此虚拟机' });
+            const ownedVm = userVms.find(v => v.vm_id == vmid);
+            if (!ownedVm) return res.status(403).json({ error: '无权操作此虚拟机' });
+            // M-2 修复：到期资源拦截（备份创建占用存储资源）
+            if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+            }
         }
         const status = await pveApi.getVmStatus(vmid);
         if (status.status !== 'stopped') {
@@ -499,8 +512,12 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
         }
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
-            const owned = userVms.some(v => v.vm_id == vmid);
-            if (!owned) return res.status(403).json({ error: '无权操作此虚拟机' });
+            const ownedVm = userVms.find(v => v.vm_id == vmid);
+            if (!ownedVm) return res.status(403).json({ error: '无权操作此虚拟机' });
+            // M-2 修复：到期资源拦截（备份恢复属于资源使用）
+            if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+            }
         }
         const status = await pveApi.getVmStatus(vmid);
         if (status.status !== 'stopped') {

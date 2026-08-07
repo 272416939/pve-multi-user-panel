@@ -83,6 +83,59 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
                 return res.status(400).json({ error: '每用户子网数量上限必须是 0~1000 的整数' });
             }
         }
+        // L-1 修复：端口段/max_per_user/DHCP IP 段/接口/cname 域名校验（防负值/非法 IP/超长串入库）
+        if (port_range_start !== undefined) {
+            const startNum = parseInt(port_range_start);
+            if (!Number.isInteger(startNum) || startNum < 1 || startNum > 65535) {
+                return res.status(400).json({ error: '端口段起始值必须是 1~65535 的整数' });
+            }
+        }
+        if (port_range_end !== undefined) {
+            const endNum = parseInt(port_range_end);
+            if (!Number.isInteger(endNum) || endNum < 1 || endNum > 65535) {
+                return res.status(400).json({ error: '端口段结束值必须是 1~65535 的整数' });
+            }
+        }
+        if (port_range_start !== undefined && port_range_end !== undefined) {
+            if (parseInt(port_range_start) >= parseInt(port_range_end)) {
+                return res.status(400).json({ error: '端口段起始值必须小于结束值' });
+            }
+        }
+        if (max_per_user !== undefined) {
+            const maxNum = parseInt(max_per_user);
+            if (!Number.isInteger(maxNum) || maxNum < 0 || maxNum > 1000) {
+                return res.status(400).json({ error: '每用户端口转发上限必须是 0~1000 的整数' });
+            }
+        }
+        if (dhcp_ip_range_start !== undefined && !ipv4Re.test(String(dhcp_ip_range_start).trim())) {
+            return res.status(400).json({ error: 'DHCP IP 段起始值必须是合法 IPv4 地址' });
+        }
+        if (dhcp_ip_range_end !== undefined && !ipv4Re.test(String(dhcp_ip_range_end).trim())) {
+            return res.status(400).json({ error: 'DHCP IP 段结束值必须是合法 IPv4 地址' });
+        }
+        if (dhcp_gateway !== undefined && !ipv4Re.test(String(dhcp_gateway).trim())) {
+            return res.status(400).json({ error: 'DHCP 网关必须是合法 IPv4 地址' });
+        }
+        if (dhcp_dns1 !== undefined && !ipv4Re.test(String(dhcp_dns1).trim())) {
+            return res.status(400).json({ error: 'DHCP DNS1 必须是合法 IPv4 地址' });
+        }
+        if (dhcp_dns2 !== undefined && !ipv4Re.test(String(dhcp_dns2).trim())) {
+            return res.status(400).json({ error: 'DHCP DNS2 必须是合法 IPv4 地址' });
+        }
+        // 接口名与域名：白名单字符 + 长度限制
+        const ifaceRe = /^[a-zA-Z0-9_.:-]{1,32}$/;
+        if (dhcp_interface !== undefined && !ifaceRe.test(String(dhcp_interface).trim())) {
+            return res.status(400).json({ error: 'DHCP 接口名格式无效（仅字母数字_.:-，≤32字符）' });
+        }
+        if (vlan_interface !== undefined && !ifaceRe.test(String(vlan_interface).trim())) {
+            return res.status(400).json({ error: 'VLAN 接口名格式无效（仅字母数字_.:-，≤32字符）' });
+        }
+        if (cname_domain !== undefined) {
+            const domainStr = String(cname_domain).trim();
+            if (domainStr.length > 253 || (domainStr && !/^(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(domainStr))) {
+                return res.status(400).json({ error: 'CNAME 域名格式无效或过长' });
+            }
+        }
         const setConfig = db.config.set;
         await setConfig('forward:port_range_start', String(port_range_start ?? 50000));
         await setConfig('forward:port_range_end', String(port_range_end ?? 60000));
@@ -256,6 +309,12 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         if (!allowedTypes.includes(type)) {
             return res.status(400).json({ error: '无效的转发类型' });
         }
+        // L-4 修复：protocol 白名单（tcp/udp）+ name 长度限制与控制字符剔除
+        const finalProtocol = String(protocol || 'tcp').toLowerCase();
+        if (!['tcp', 'udp'].includes(finalProtocol)) {
+            return res.status(400).json({ error: '无效的协议，必须为 tcp 或 udp' });
+        }
+        const finalName = String(name || '').replace(/[\x00-\x1f\x7f]/g, '').slice(0, 50);
         // general 类型强制 vm_id/ct_id 为 null
         const finalVmId = type === 'vm' ? (vm_id || null) : null;
         const finalCtId = type === 'lxc' ? (ct_id || null) : null;
@@ -287,16 +346,24 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         // 新增：校验目标资源归属（general 类型 vm_id/ct_id 均为 null，天然跳过）
         if (finalVmId && !isAdmin) {
             const userVms = await db.vms.getByUserId(req.user.id);
-            const ownedVm = userVms.some(v => v.vm_id == finalVmId);
+            const ownedVm = userVms.find(v => v.vm_id == finalVmId);
             if (!ownedVm) {
                 return res.status(403).json({ error: '无权为此虚拟机创建转发规则' });
+            }
+            // M-2 修复：到期资源拦截（端口转发属于资源使用）
+            if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '虚拟机已到期，请先续费' });
             }
         }
         if (finalCtId && !isAdmin) {
             const userCts = await db.lxcContainers.getByUserId(req.user.id);
-            const ownedCt = userCts.some(c => c.ct_id == finalCtId);
+            const ownedCt = userCts.find(c => c.ct_id == finalCtId);
             if (!ownedCt) {
                 return res.status(403).json({ error: '无权为此容器创建转发规则' });
+            }
+            // M-2 修复：到期资源拦截（端口转发属于资源使用）
+            if (ownedCt.expiration_date && new Date(ownedCt.expiration_date) < new Date()) {
+                return res.status(403).json({ error: '容器已到期，请先续费' });
             }
         }
         const existing = await db.portForwards.getByExternalPort(external_port);
@@ -317,22 +384,22 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         // 先写入本地
         const rule = await db.portForwards.create({
             type, vm_id: finalVmId, ct_id: finalCtId,
-            name: name || '', ip, internal_port, external_port,
-            protocol: protocol || 'tcp', sync_status: 'pending'
+            name: finalName, ip, internal_port, external_port,
+            protocol: finalProtocol, sync_status: 'pending'
         });
         // 同步到 ikuai（一条规则支持多外网接口，interface 字段传逗号分隔值）
         try {
             const wanIfaces = await getWanInterfaces();
             // comment 根据 type 区分：general → _GENERAL，lxc → _CT${ct_id}，vm → _VM${vm_id}
             const comment = type === 'general'
-                ? `${name || '转发'}_GENERAL`
+                ? `${finalName || '转发'}_GENERAL`
                 : type === 'lxc'
-                    ? `${name || '转发'}_CT${finalCtId}`
-                    : `${name || '转发'}_VM${finalVmId}`;
+                    ? `${finalName || '转发'}_CT${finalCtId}`
+                    : `${finalName || '转发'}_VM${finalVmId}`;
             const ifaceStr = wanIfaces.join(',');
             let ikuaiIds = [];
             try {
-                await ikuaiApi.addPortForward({ ip, internal_port, external_port, protocol: protocol || 'tcp', comment, enabled: true, interface: ifaceStr });
+                await ikuaiApi.addPortForward({ ip, internal_port, external_port, protocol: finalProtocol, comment, enabled: true, interface: ifaceStr });
                 // 爱快 add 接口不返回 ID，从 ikuai 规则列表反查
                 try {
                     const ikuaiRules = await ikuaiApi.getPortForwards();
@@ -385,6 +452,15 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         if (type !== undefined && type !== null && !['vm', 'lxc', 'general'].includes(type)) {
             return res.status(400).json({ error: '无效的类型，必须为 vm/lxc/general' });
         }
+        // L-4 修复：protocol 白名单 + name 长度限制与控制字符剔除（与 POST 端点一致）
+        if (protocol !== undefined && protocol !== null) {
+            if (!['tcp', 'udp'].includes(String(protocol).toLowerCase())) {
+                return res.status(400).json({ error: '无效的协议，必须为 tcp 或 udp' });
+            }
+        }
+        const finalName = name !== undefined && name !== null
+            ? String(name).replace(/[\x00-\x1f\x7f]/g, '').slice(0, 50)
+            : existing.name;
         // 计算生效的 type/vm_id/ct_id（未传则用 existing 的值）
         const effectiveType = type || existing.type;
         const effectiveVmId = effectiveType === 'vm' ? (vm_id !== undefined ? vm_id : existing.vm_id) : null;
@@ -396,12 +472,20 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         // V3-03 修复：目标资源归属校验（与 POST 端点一致，防止普通用户将转发指向他人资源）
         if (req.user.role !== 'admin') {
             if (effectiveVmId) {
-                const ownedVm = (await db.vms.getByUserId(req.user.id)).some(v => v.vm_id == effectiveVmId);
+                const ownedVm = (await db.vms.getByUserId(req.user.id)).find(v => v.vm_id == effectiveVmId);
                 if (!ownedVm) return res.status(403).json({ error: '无权为此虚拟机创建转发规则' });
+                // M-2 修复：到期资源拦截（端口转发编辑属于资源使用）
+                if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
+                    return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+                }
             }
             if (effectiveCtId) {
-                const ownedCt = (await db.lxcContainers.getByUserId(req.user.id)).some(c => c.ct_id == effectiveCtId);
+                const ownedCt = (await db.lxcContainers.getByUserId(req.user.id)).find(c => c.ct_id == effectiveCtId);
                 if (!ownedCt) return res.status(403).json({ error: '无权为此容器创建转发规则' });
+                // M-2 修复：到期资源拦截（端口转发编辑属于资源使用）
+                if (ownedCt.expiration_date && new Date(ownedCt.expiration_date) < new Date()) {
+                    return res.status(403).json({ error: '容器已到期，请先续费' });
+                }
             }
         }
 
@@ -456,10 +540,10 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                 const wanIfaces = await getWanInterfaces();
                 // comment 根据生效类型区分：general → _GENERAL，lxc → _CT${ct_id}，vm → _VM${vm_id}
                 const comment = effectiveType === 'general'
-                    ? `${name || existing.name || '转发'}_GENERAL`
+                    ? `${finalName || '转发'}_GENERAL`
                     : effectiveType === 'lxc'
-                        ? `${name || existing.name || '转发'}_CT${effectiveCtId}`
-                        : `${name || existing.name || '转发'}_VM${effectiveVmId}`;
+                        ? `${finalName || '转发'}_CT${effectiveCtId}`
+                        : `${finalName || '转发'}_VM${effectiveVmId}`;
                 const ifaceStr = wanIfaces.join(',');
                 newIkuaiIds = [];
                 try {
@@ -482,11 +566,11 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             }
         }
         const updates = {};
-        if (name !== undefined) updates.name = name;
+        if (name !== undefined) updates.name = finalName;
         if (ip !== undefined) updates.ip = ip;
         if (internal_port !== undefined) updates.internal_port = internal_port;
         if (external_port !== undefined) updates.external_port = external_port;
-        if (protocol !== undefined) updates.protocol = protocol;
+        if (protocol !== undefined) updates.protocol = String(protocol).toLowerCase();
         // 支持 type/vm_id/ct_id 更新：切换类型时按新类型互斥设置设备 ID（vm→lxc 时 vm_id 置 null，反之亦然）
         if (type !== undefined && type !== null) {
             updates.type = type;
@@ -641,6 +725,10 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
 
 router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
     try {
+        // M-3 修复：外呼爱快全量端口表，必须限速（admin 可配置）
+        const checkRate = await checkConfiguredRateLimit('port_check', 'ratelimit:port-check:' + req.user.id);
+        if (!checkRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         const port = parseInt(req.query.port);
         if (!port || port < 1 || port > 65535) {
             return res.status(400).json({ error: '无效端口' });
@@ -681,6 +769,10 @@ router.get('/port-forwards/config', authMiddleware, async (req, res) => {
 
 router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
     try {
+        // M-3 修复：N+1 外呼爱快+PVE，必须限速（admin 可配置）
+        const extractRate = await checkConfiguredRateLimit('port_extract_ips', 'ratelimit:port-extract-ips:' + req.user.id);
+        if (!extractRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         const devices = [];
         const isAdmin = req.user.role === 'admin';
         const myVms = isAdmin ? await db.vms.getAll() : await db.vms.getByUserId(req.user.id);

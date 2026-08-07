@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 // 业务下沉 services/（规范第七节）：支付编排走 services/payment.js，续费计费走 services/billing.js
 const paymentService = require('../services/payment');
@@ -10,19 +11,12 @@ const billingService = require('../services/billing');
 const { VALID_PERIODS, ORDER_STATUS } = require('../constants');
 const dbg = require('../utils/debug');
 
-var callbackRateLimiter = new Map();
-function checkCallbackRate(ip) {
-    var now = Date.now();
-    var windowMs = 60000;
-    var maxRequests = 30;
-    var record = callbackRateLimiter.get(ip);
-    if (!record || now - record.windowStart > windowMs) {
-        callbackRateLimiter.set(ip, { windowStart: now, count: 1 });
-        return true;
-    }
-    if (record.count >= maxRequests) return false;
-    record.count++;
-    return true;
+// L-11 修复：回调限速从进程内存 Map 迁移到 rate-limiter（Redis 优先 + 内存回退，多实例一致）
+// 与原内存实现参数一致：30 次/分钟/IP
+async function checkCallbackRate(ip) {
+    const { checkRateLimit } = require('../middleware/rate-limiter');
+    const result = await checkRateLimit('ratelimit:pay-callback:' + ip, 30, 60000);
+    return result.allowed;
 }
 
 var orderStatusRateLimiter = new Map();
@@ -57,6 +51,10 @@ router.get('/wallet/pay-config', authMiddleware, async (req, res) => {
 // ========== 创建充值订单（业务在 services/payment.js） ==========
 router.post('/wallet/recharge', authMiddleware, async (req, res) => {
     try {
+        // M-4 修复：充值下单外呼支付网关，必须限速防刷单（admin 可配置）
+        const rechargeRate = await checkConfiguredRateLimit('wallet_recharge', 'ratelimit:wallet-recharge:' + req.user.id);
+        if (!rechargeRate.allowed) return res.status(429).json({ error: '下单过于频繁，请稍后再试' });
+
         var result = await paymentService.createRechargeOrder({
             userId: req.user.id,
             amount: req.body.amount,

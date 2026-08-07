@@ -136,14 +136,21 @@ router.get('/admin/orders/export', authMiddleware, adminMiddleware, async (req, 
         if (req.query.status) params.status = req.query.status;
         if (req.query.start_time) params.start_time = req.query.start_time;
         if (req.query.end_time) params.end_time = req.query.end_time;
-        // 导出全部，不分页
-        params.limit = 999999;
+        // I-6 修复：导出全部订单，db 层 limit 有 200 条钳制，用循环分页拉取避免导出截断
         params.page = 1;
-        var result = await db.orders.getAll(params);
+        var allRows = [];
+        var pageSize = 200;
+        while (true) {
+            params.limit = pageSize;
+            var pageResult = await db.orders.getAll(params);
+            allRows = allRows.concat(pageResult.rows);
+            if (pageResult.rows.length < pageSize) break;
+            params.page++;
+        }
         // 生成 CSV 行列：订单号,用户名,套餐名,类型,周期,数量,金额,状态,创建时间（V4-06 修复：全字段统一转义）
         var { escapeCsvField } = require('../utils/csv');
         var csvRows = ['订单号,用户名,套餐名,类型,周期,数量,金额,状态,创建时间'];
-        result.rows.forEach(function(o) {
+        allRows.forEach(function(o) {
             var typeName = o.type === 'vm' ? 'VM' : 'LXC';
             var periodName = getPeriodName(o.period);
             var statusName = o.status === 'completed' ? '已开通' : o.status;

@@ -180,6 +180,10 @@ router.post('/admin/cdk/batch-delete', authMiddleware, adminMiddleware, async (r
 
 router.get('/user/cdk/redeemable-vms', authMiddleware, async (req, res) => {
     try {
+        // L-12 修复：对每台 VM 外呼 PVE，加用户级限速（admin 可配置）
+        const listRate = await checkConfiguredRateLimit('cdk_redeemable', 'ratelimit:cdk-redeemable:' + req.user.id);
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试' });
+
         let userVms;
         userVms = await db.vms.getByUserId(req.user.id);
         

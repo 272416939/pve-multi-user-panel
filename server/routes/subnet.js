@@ -415,6 +415,7 @@ router.post('/subnets/:id/refresh', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID' });
         const subnetId = parseInt(req.body.subnet_id);
         if (!Number.isInteger(subnetId) || subnetId <= 0) return res.status(400).json({ error: '请选择要绑定的子网' });
         const subnet = await db.subnets.getById(subnetId);
@@ -426,6 +427,10 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         // 非管理员：设备与子网必须同属当前用户
         if (req.user.role !== 'admin' && subnet.user_id !== vm.user_id) {
             return res.status(403).json({ error: '子网与虚拟机不属于同一用户' });
+        }
+        // M-2 修复：到期资源拦截（子网绑定属于资源使用）
+        if (req.user.role !== 'admin' && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
         }
         // 已绑定子网的设备必须先解绑
         if (vm.subnet_id) {
@@ -479,6 +484,7 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID' });
         const subnetId = parseInt(req.body.subnet_id);
         if (!Number.isInteger(subnetId) || subnetId <= 0) return res.status(400).json({ error: '请选择要绑定的子网' });
         const subnet = await db.subnets.getById(subnetId);
@@ -489,6 +495,10 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         const ct = access.record;
         if (req.user.role !== 'admin' && subnet.user_id !== ct.user_id) {
             return res.status(403).json({ error: '子网与容器不属于同一用户' });
+        }
+        // M-2 修复：到期资源拦截（子网绑定属于资源使用）
+        if (req.user.role !== 'admin' && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '容器已到期，请先续费' });
         }
         if (ct.subnet_id) {
             return res.status(400).json({ error: '该容器已绑定子网，请先解绑后再绑定新的子网' });
@@ -539,9 +549,14 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID' });
         const access = await checkDeviceAccess(req, 'vm', vmid);
         if (access.error) return res.status(access.error.status).json({ error: access.error.message });
         const vm = access.record;
+        // M-2 修复：到期资源拦截（子网解绑同样属于资源管理操作，仅放行销毁类）
+        if (req.user.role !== 'admin' && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+        }
         if (!vm.subnet_id) return res.status(400).json({ error: '该虚拟机未绑定子网' });
         const subnet = await db.subnets.getById(vm.subnet_id);
 
@@ -576,9 +591,14 @@ router.post('/vm/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID' });
         const access = await checkDeviceAccess(req, 'lxc', vmid);
         if (access.error) return res.status(access.error.status).json({ error: access.error.message });
         const ct = access.record;
+        // M-2 修复：到期资源拦截（子网解绑同样属于资源管理操作，仅放行销毁类）
+        if (req.user.role !== 'admin' && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '容器已到期，请先续费' });
+        }
         if (!ct.subnet_id) return res.status(400).json({ error: '该容器未绑定子网' });
         const subnet = await db.subnets.getById(ct.subnet_id);
 

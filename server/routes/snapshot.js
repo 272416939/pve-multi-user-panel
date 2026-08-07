@@ -59,6 +59,11 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '容器未分配，无权限' });
         }
 
+        // M-2 修复：到期资源拦截（快照创建属于资源使用，到期后仅放行清理类操作）
+        if (!isAdmin && ct && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '容器已到期，请先续费' });
+        }
+
         // 非管理员配额限制
         if (!isAdmin) {
             const cfg = await db.snapshotConfig.get();
@@ -102,6 +107,11 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
             }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '容器未分配，无权限' });
+        }
+
+        // M-2 修复：到期资源拦截（快照回滚属于资源使用）
+        if (!isAdmin && ct && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '容器已到期，请先续费' });
         }
 
         // 非管理员额外检查
@@ -207,6 +217,11 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '虚拟机未分配，无权限' });
         }
 
+        // M-2 修复：到期资源拦截（快照创建属于资源使用）
+        if (!isAdmin && vm && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+        }
+
         // 非管理员配额限制
         if (!isAdmin) {
             const cfg = await db.snapshotConfig.get();
@@ -255,6 +270,11 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
             }
         } else if (!isAdmin) {
             return res.status(403).json({ error: '虚拟机未分配，无权限' });
+        }
+
+        // M-2 修复：到期资源拦截（快照回滚属于资源使用）
+        if (!isAdmin && vm && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
+            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
         }
 
         // 非管理员额外检查
