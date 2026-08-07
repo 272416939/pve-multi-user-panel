@@ -15,7 +15,8 @@
         cname_domain: '',
         vlan_ip_segment_start: '172.16.0.1',
         vlan_id_start: 1000,
-        vlan_interface: 'lan1'
+        vlan_interface: 'lan1',
+        vlan_max_per_user: 5
     });
     $.cnameEntries = ref([]);
     $.ifaceList = ref([]);

@@ -177,6 +177,16 @@ router.post('/subnets', authMiddleware, async (req, res) => {
     if (!rateLimitResult.allowed) {
         return res.status(429).json({ error: '创建子网过于频繁，请稍后再试' });
     }
+    // 每用户子网数量上限（普通用户受限，管理员不限，与端口转发 max_per_user 一致）
+    if (req.user.role !== 'admin') {
+        const maxPerUser = parseInt(await db.config.get('vlan:max_per_user')) || 5;
+        if (maxPerUser > 0) {
+            const userSubnetCount = (await db.subnets.getByUserId(req.user.id)).length;
+            if (userSubnetCount >= maxPerUser) {
+                return res.status(400).json({ error: '子网数量已达上限（' + maxPerUser + ' 个），如需更多请联系管理员' });
+            }
+        }
+    }
     try {
         // 1. 读取 admin 配置
         const segStart = (await db.config.get('vlan:ip_segment_start') || '172.16.0.1').trim();

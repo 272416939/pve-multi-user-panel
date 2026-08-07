@@ -959,6 +959,7 @@ async function initDefaultConfig() {
         'vlan:ip_segment_start': '172.16.0.1',
         'vlan:id_start': '1000',
         'vlan:interface': 'lan1',
+        'vlan:max_per_user': '5',
         'pay:base_url': 'https://pay.microgg.cn/',
         'pay:v1_enabled': '1',
         'pay:v2_enabled': '0',

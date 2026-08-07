@@ -339,6 +339,13 @@
                                         <small class="text-muted">新建子网的 VLAN 将挂载到此物理接口</small>
                                     </div>
                                 </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label class="form-label">每用户最多创建子网数量</label>
+                                        <input type="number" class="form-control" v-model.number="networkConfig.vlan_max_per_user" min="0" max="1000" placeholder="5">
+                                        <small class="text-muted">0=不限制，超过限制时用户无法新建子网（管理员不受限）</small>
+                                    </div>
+                                </div>
                                 <small class="text-muted">VLAN 名称由系统内置生成（vlan_VPC 开头 + 随机字符，≤15 位），不可编辑；VLAN 备注自动记录所属用户。所有配置修改均记录操作日志。</small>
                                 <div class="mt-3 d-flex gap-2">
                                     <pv-button @click="saveNetworkConfig" variant="glass">保存配置</pv-button>
