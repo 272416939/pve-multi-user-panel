@@ -490,26 +490,61 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         try {
             const verifyUrl = `${getSiteUrl(req)}/api/user/verify-email/${verifyToken}`;
             const siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
-            const emailContent = `
-                <p>您好，</p>
-                <p>感谢您注册 ${siteName}！</p>
-                <p>请点击下方按钮验证您的邮箱地址：</p>
-                <p style="text-align: center;">
-                    <a href="${verifyUrl}" class="btn" target="_blank">验证邮箱地址</a>
-                </p>
-                <div class="divider"></div>
-                <p style="color: #718096; font-size: 14px;">
-                    如果按钮无法点击，请复制以下链接到浏览器：<br>
-                    <a href="${verifyUrl}" style="word-break: break-all;">${verifyUrl}</a>
-                </p>
-                <div class="info-box">
-                    <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快验证。</p>
-                </div>
-            `;
+            // 真正的「换绑」：用户已有邮箱且邮箱发生变更 → 使用独立的换绑验证邮件模板；
+            // 首次绑定 / 重发验证沿用原模板（避免换绑邮件复用注册文案）
+            var isEmailRebind = !!user.email && user.email !== email;
+            var emailSubject;
+            var emailTitle;
+            var emailContent;
+            if (isEmailRebind) {
+                emailSubject = '邮箱换绑验证 - ' + siteName;
+                emailTitle = '请验证您的新邮箱';
+                emailContent = `
+                    <p>您好，</p>
+                    <p>您正在将当前账号的绑定邮箱更换为：</p>
+                    <div style="text-align:center;margin:20px 0;">
+                        <span style="font-size:18px;font-weight:bold;color:#7c3aed;background:#f5f3ff;padding:10px 20px;border-radius:8px;display:inline-block;word-break:break-all;">${email}</span>
+                    </div>
+                    <p>请点击下方按钮确认完成换绑：</p>
+                    <p style="text-align: center;">
+                        <a href="${verifyUrl}" class="btn" target="_blank">确认换绑邮箱</a>
+                    </p>
+                    <div class="divider"></div>
+                    <p style="color: #718096; font-size: 14px;">
+                        如果按钮无法点击，请复制以下链接到浏览器：<br>
+                        <a href="${verifyUrl}" style="word-break: break-all;">${verifyUrl}</a>
+                    </p>
+                    <div class="info-box">
+                        <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快完成换绑。</p>
+                    </div>
+                    <div class="warning-box">
+                        <p style="margin-bottom: 0;"><strong>安全提醒：</strong>如非您本人操作，请立即修改账号密码并联系管理员，以防账号被他人接管。</p>
+                    </div>
+                `;
+            } else {
+                emailSubject = '邮箱验证 - ' + siteName;
+                emailTitle = '请验证您的邮箱';
+                emailContent = `
+                    <p>您好，</p>
+                    <p>感谢您注册 ${siteName}！</p>
+                    <p>请点击下方按钮验证您的邮箱地址：</p>
+                    <p style="text-align: center;">
+                        <a href="${verifyUrl}" class="btn" target="_blank">验证邮箱地址</a>
+                    </p>
+                    <div class="divider"></div>
+                    <p style="color: #718096; font-size: 14px;">
+                        如果按钮无法点击，请复制以下链接到浏览器：<br>
+                        <a href="${verifyUrl}" style="word-break: break-all;">${verifyUrl}</a>
+                    </p>
+                    <div class="info-box">
+                        <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快验证。</p>
+                    </div>
+                `;
+            }
             await sendEmail(
                 email,
-                '邮箱验证 - ' + siteName,
-                createEmailTemplate('请验证您的邮箱', emailContent, siteName)
+                emailSubject,
+                createEmailTemplate(emailTitle, emailContent, siteName)
             );
         } catch (emailError) {
             console.error('发送验证邮件失败，但邮箱已保存', emailError);
