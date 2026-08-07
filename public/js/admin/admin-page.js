@@ -390,7 +390,7 @@ app.component('private-network-list', {
                                     <span v-if="s.lxc_count > 0">LXC {{ s.lxc_count }}</span>\
                                 </span>\
                             </td>\
-                            <td class="small">{{ formatDate(s.created_at) }}</td>\
+                            <td>{{ formatDate(s.created_at) }}</td>\
                         </tr>\
                     </tbody>\
                 </table>\
