@@ -927,6 +927,14 @@
     <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
         <div class="modal-header"><h5 class="modal-title">新建子网</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-muted small">已创建 <strong>{{ subnetQuota.used }}</strong> / <strong>{{ subnetQuota.max > 0 ? subnetQuota.max : '∞' }}</strong> 个子网</span>
+                <span v-if="subnetQuota.max > 0" class="text-muted small">剩余 {{ Math.max(0, subnetQuota.max - subnetQuota.used) }} 个</span>
+                <span v-else class="text-muted small">管理员不受限</span>
+            </div>
+            <div v-if="subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max" class="alert alert-warning py-2 small mb-3">
+                子网数量已达上限，无法继续创建，如需更多请联系管理员
+            </div>
             <p class="text-muted small">创建后系统将自动完成网段分配，无需手动配置：</p>
             <ul class="small text-muted mb-3">
                 <li>网段自动分配，依次递增</li>
@@ -944,7 +952,7 @@
         </div>
         <div class="modal-footer d-flex gap-2">
             <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-            <pv-button type="button" @click="createSubnet" :disabled="subnetCreating" :loading="subnetCreating" variant="primary">确认创建</pv-button>
+            <pv-button type="button" @click="createSubnet" :disabled="subnetCreating || (subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max)" :loading="subnetCreating" variant="primary">确认创建</pv-button>
         </div>
     </div></div>
 </div>

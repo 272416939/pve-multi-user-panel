@@ -9,11 +9,21 @@
     $.subnetLoading = ref(false);
     $.subnetCreating = ref(false);
     $.subnetRefreshing = ref(false);
+    // 子网配额（创建弹窗展示已用/上限，admin max=0 不限）
+    $.subnetQuota = ref({ used: 0, max: 0 });
     // 绑定子网弹窗状态
     $.bindSubnetDevice = reactive({ type: 'vm', vm_id: null, ct_id: null, name: '', status: null, dhcp_static_ip: '' });
     $.bindSubnetCurrentSubnet = ref(null);
     $.bindSubnetForm = reactive({ subnet_id: 0 });
     $.bindSubnetSubmitting = ref(false);
+
+    $.loadSubnetQuota = async function() {
+        try {
+            $.subnetQuota.value = await api('/subnets/quota');
+        } catch (e) {
+            console.error('加载子网配额失败', e);
+        }
+    };
 
     // ==================== 子网列表 ====================
     $.loadSubnets = async function() {
@@ -21,6 +31,8 @@
         try {
             var list = await api('/subnets');
             $.subnets.value = list || [];
+            // 配额与列表同步（创建/删除后即时更新）
+            await $.loadSubnetQuota();
         } catch (e) {
             console.error('加载子网列表失败', e);
         } finally {
@@ -47,6 +59,8 @@
 
     // ==================== 新建子网 ====================
     $.openCreateSubnet = function() {
+        // 打开弹窗时刷新配额（已用/上限），保证提示最新
+        $.loadSubnetQuota();
         $.bsModalShow('createSubnetModal');
     };
 

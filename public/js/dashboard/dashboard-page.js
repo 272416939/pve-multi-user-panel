@@ -64,6 +64,7 @@ var App = {
             if (!$.subnetLoading) $.subnetLoading = Vue.ref(false);
             if (!$.subnetCreating) $.subnetCreating = Vue.ref(false);
             if (!$.subnetRefreshing) $.subnetRefreshing = Vue.ref(false);
+            if (!$.subnetQuota) $.subnetQuota = Vue.ref({ used: 0, max: 0 });
             if (!$.bindSubnetForm) $.bindSubnetForm = Vue.ref({ subnet_id: 0 });
             if (!$.bindSubnetCurrentSubnet) $.bindSubnetCurrentSubnet = Vue.ref(null);
             if (!$.bindSubnetSubmitting) $.bindSubnetSubmitting = Vue.ref(false);

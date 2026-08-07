@@ -100,6 +100,17 @@ async function checkDeviceAccess(req, type, vmid, opts) {
     return { record, status };
 }
 
+// ===== 子网配额（创建弹窗展示已用/上限，admin 不限 max=0） =====
+router.get('/subnets/quota', authMiddleware, async (req, res) => {
+    try {
+        const max = req.user.role === 'admin' ? 0 : (parseInt(await db.config.get('vlan:max_per_user')) || 5);
+        const used = (await db.subnets.getByUserId(req.user.id)).length;
+        res.json({ used, max });
+    } catch (e) {
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
 // ===== 子网列表（仅当前用户自己的子网，admin 一视同仁，不泄露他人网段） =====
 router.get('/subnets', authMiddleware, async (req, res) => {
     try {
