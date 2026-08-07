@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.0.1] - 2026-08-07
+
+### Fixed
+- **fix(network): CNAME 保存校验兼容多条目格式，修复用户面板域名不显示（双 Bug）**
+  - **Bug 1 - 保存失败**：V5 安全审计（`b08ba2d`）在 `network.js` 新增的后端校验正则只接受纯 ASCII 单个域名，但前端保存的是 `label||.domain` 逗号分隔多条目格式（如 `电信||.auto.mcsr.cc,联通||.cn2.mcsr.cc`）——含中文 label、`||`、前导 `.` 必然被拒 -> 400「CNAME 域名格式无效或过长」
+  - **Bug 2 - 不显示**：`router.get('/api/cname')` 挂在 `/api` 下真实 URL 为 `/api/api/cname`（双重前缀）；`72e64ef` 修复 token 续期时把前端改为 `api('/cname')` -> 请求 `/api/cname` -> 404 -> `loadCnameDomain` 静默吞错 -> CNAME 全部消失
+  - **修复**：新增 `server/utils/cname-validate.js` 纯函数校验模块（整串 ≤4096、按逗号拆分新格式 `label||.domain` + 旧格式兼容、label ≤50 禁控制字符、domain 标准 DNS 正则逐条校验）；`network.js` 校验块改调用 `validateCnameDomain`；路由 `/api/cname` -> `/cname` 与前端对齐
+  - 仅改后端（2 文件 +84/-4），前端零改动，缓存版本不变
+
+### Notes
+- 测试：**426 passing / 0 failing**（新增 `test/network-cname.test.js` 30 用例；顺手修正 rate-limit-config 断言 42->43）
+- 实测 `电信||.auto.mcsr.cc,联通||.cn2.mcsr.cc` 通过、`bad domain!`/`电信||` 拒绝
+- 部署后端后后台保存 CNAME 与用户面板显示即恢复
+
 ## [3.0.0] - 2026-08-07
 
 ### 概览
