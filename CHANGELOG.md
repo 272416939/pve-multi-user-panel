@@ -1,5 +1,67 @@
 # Changelog
 
+## [3.0.0] - 2026-08-07
+
+### 概览
+
+**主版本发布**：核心新增**私有网络 VLAN 子网模块**（用户可自建 VLAN 子网，绑定 VM/LXC 并自动配置 DHCP 静态绑定），同时完成**安全审计报告 V5 全量修复**（5 中危 + 12 低危 + 8 信息）、补货按钮回归修复、换绑邮箱独立邮件模板。自 v2.35.2 以来共 36 个提交（13 feat + 19 fix + 3 refactor + 1 perf），62 文件 +3014/-331。
+
+### Added（13 个 feat）
+- **feat(network): 私有网络 VLAN 子网模块**（主功能）
+  - 用户可自建 VLAN 子网（vlan_name/vlan_id/gateway/netmask/addr_pool/物理接口），绑定到自己的 VM/LXC
+  - VM/LXC 开通时写入 `subnet_id` + net0 尾部追加 `tag=<vlan_id>` VLAN tag + 自动创建 DHCP 静态绑定并回写 `dhcp_static_ip`
+  - admin 代开可选子网；不传子网则**关机状态交付**（移除自动开机）
+  - 每用户最多创建子网数量配置（`vlan_max_per_user` 默认 5）+ 创建弹窗配额展示（已创建/上限/剩余）
+  - 子网列表归属隔离（`GET /subnets` 按 `req.user.id` 过滤，不泄露他人网段）
+  - 可用 IP 刷新（单次爱快调用批量更新 + 轮询优化 + 基准值提前退出 + 处理中动效）
+  - 运行中绑定子网（管理员二次确认），绑定后同步重建端口转发规则为新 IP
+- **feat(network): 管理后台网络菜单重构**
+  - 「系统设置 -> 网络管理」改名「网络配置」；新增一级菜单「网络管理」（端口转发管理 + 私有网络管理页）
+  - 私有网络管理页：只读表格（所有者/VLAN/网关掩码/地址池/可用 IP/绑定设备统计），搜索分页，`getBoundCounts()` 一次 GROUP BY 避免 N+1
+- **feat(ip): 重置 IP 兼容私有网络并开放到用户侧**
+  - `random-ip` 支持 `subnet_id`：从子网 IP 池 `pickUnusedStaticIp` 选取，归属校验防越权
+  - reset-ip 读取 `subnet_id`：未绑定拦截、static 池内校验、LXC 网关用子网 gateway
+  - dashboard 4 处「更多」菜单新增「重置 IP」+ 弹窗（static/dhcp/随机/loading）
+- **feat(security): V5 审计全量修复（5 中危 + 12 低危 + 8 信息）**
+  - M-1 账户接管链：`verifySensitiveAction` 统一二次验证（当前密码/2FA 动态码/恢复码），接入改密/换邮箱/重生成恢复码
+  - M-2 到期资源拦截补全：VNC 控制台/快照/备份/端口转发/子网 bind
+  - M-3/M-4 外呼与充值限速接入 admin 可配置（check-port/extract-ips/recharge/random-ip）
+  - M-5 支付入账三步事务化（流水/余额/标记，崩溃后网关重试不再丢账）
+  - 低危：参数校验、端口转发 name/protocol 白名单、CDK 先验归属后标记 + 时长上限、admin 充值上限、vmid 白名单、uapipro 错误透传、WS 连接数上限（vnc/terminal proxy）
+- **feat(email): 换绑邮箱独立验证邮件模板**
+  - 换绑场景独立模板（紫色高亮新邮箱 + 安全提醒）；重发验证中性文案（不再复用注册文案）；问候语带用户名
+  - 验证成功后清除 `profileCache`，用户中心状态即时同步
+- **feat(ui): 全站限速 429 统一返回 retryAfter**，前端弹窗全局展示倒计时（邮箱验证限速弹窗展示剩余秒数）
+
+### Changed
+- refactor(network): 子网列表隐藏 VLAN ID 仅显示网络名称；VLAN 备注仅保留所属用户（去 NT 随机后缀）；清理用户端文案后台细节
+- perf(network): 可用 IP 轮询优化（基准值提前退出）+ 处理中动效
+- fix(ui): 弹窗说明文字明暗模式可读性修复
+
+### Fixed
+- **fix(frontend): 补货按钮失效回归修复**（VM/LXC 补货、系统操作日志清空）
+  - `4307ee4` 弹窗重构漏掉 `customPromptModal` -> `customPrompt()` 静默 resolve(null) -> 点击无反应
+  - 补回共享模板引入 `_withKeys` 渲染崩溃（dashboard/user-center）-> **最终方案**：prompt 弹窗移至 admin 专属模板
+- **fix(package): 套餐更新日志记录字段级变更明细**
+  - 补货/编辑保存基于 DB 新旧记录 diff，不再依赖请求 body：`更新VM套餐 #6:测试(1核/1G/40G/月付¥100)；变更:库存 0→1`
+- **fix(audit): 补齐 VM/LXC 移除、销毁、重置 IP 的后台操作日志**（`admin.vm.*` / `admin.lxc.*` 前缀归位）
+- **fix(frontend): user-center `_withKeys` 崩溃**（V5 M-1 二次验证弹窗 Teleport 内 `@keyup.enter` 触发 Vue 3.3.11 编译产物解构失败）
+- **fix(security): 邮箱验证邮件统一限速**，修复重发验证可无限点击轰炸
+- fix(user): 验证邮箱后清除 profileCache，用户中心状态即时同步
+- fix(ui): cache-version 70->71 修复线上 JS 缓存不失效（并行会话版本号复用教训）
+
+### Security
+- 🔒 安全审计报告 V5 全量修复（5 中危 + 12 低危 + 8 信息，报告 `.zcode/安全审计报告V5.md`）
+- 🔒 私有网络子网配额服务端校验、创建限速、列表归属隔离（`f4e3ded`）均达标
+- 🔒 命令注入/SQL 注入/WebSocket 认证/XSS 双路径净化/支付回调链确认无回归
+
+### Notes
+- 新增文件：`server/routes/subnet.js`（631 行）、`server/api/db-subnets.js`、`server/services/dhcp.js`、`server/services/port-forward-sync.js`、`server/api/ikuai-api.js` 扩展、`public/js/dashboard/subnet.js`、`public/js/admin/admin-template-private-network.js`
+- 新表/字段：`subnets` 表（启动自动建表）+ `vms/lxc_containers.subnet_id` + `vlan_max_per_user` 配置（默认 5）
+- 限速规则新增「支付」大类（规则数 34 -> 42，大类 10 -> 11）
+- 测试：**396 passing**；`check-coupling` 8 项断言全绿
+- 私有网络功能依赖 ikuai DHCP 静态绑定，需配置 ikuai 软路由
+
 ## [2.35.2] - 2026-08-05
 
 ### Fixed
