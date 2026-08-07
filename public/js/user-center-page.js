@@ -883,7 +883,8 @@ const App = {
                 user.value.emailVerified = false;
                 alert(result.message);
             } catch (e) {
-                alert(e.message);
+                // 限速 429：错误文案后拼接剩余等待秒数
+                alert(e.retryAfter != null ? `${e.message}，请 ${Math.ceil(e.retryAfter)} 秒后重试` : e.message);
             }
         };
 
@@ -895,7 +896,8 @@ const App = {
                 });
                 alert(result.message);
             } catch (e) {
-                alert(e.message);
+                // 限速 429：错误文案后拼接剩余等待秒数
+                alert(e.retryAfter != null ? `${e.message}，请 ${Math.ceil(e.retryAfter)} 秒后重试` : e.message);
             }
         };
 

@@ -40,7 +40,12 @@ const api = (endpoint, options = {}) => {
                         }
                         return fetch(`/api${endpoint}`, retryOptions).then(async r => {
                             const d = await r.json();
-                            if (!r.ok) throw new Error(d.error || '请求失败');
+                            if (!r.ok) {
+                                // 限速 429 响应附带 retryAfter（秒），供调用方展示剩余等待时间
+                                const err = new Error(d.error || '请求失败');
+                                if (d.retryAfter != null) err.retryAfter = d.retryAfter;
+                                throw err;
+                            }
                             return d;
                         });
                     }
@@ -55,7 +60,12 @@ const api = (endpoint, options = {}) => {
             throw new Error(data.error || '请求失败');
         }
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || '请求失败');
+        if (!res.ok) {
+            // 限速 429 响应附带 retryAfter（秒），供调用方展示剩余等待时间
+            const err = new Error(data.error || '请求失败');
+            if (data.retryAfter != null) err.retryAfter = data.retryAfter;
+            throw err;
+        }
         return data;
     });
 };
