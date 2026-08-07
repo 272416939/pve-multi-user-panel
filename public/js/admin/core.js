@@ -891,8 +891,8 @@ $.initDetailCharts = function() {
                 // Auto-expand submenu based on current section
                 // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates）；
                 // logs 为一级菜单（active 由模板 :class 绑定），无需展开子菜单
-                var expandSections = ['vms', 'lxc', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os'];
-                var submenuIdMap = { 'templates-os': 'templates' };
+                var expandSections = ['vms', 'lxc', 'network', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'port-forward', 'private-network'];
+                var submenuIdMap = { 'templates-os': 'templates', 'port-forward': 'network', 'private-network': 'network' };
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
                         var section = $.activeSection.value;
@@ -1037,6 +1037,10 @@ $.initDetailCharts = function() {
                 if ($.activeSection.value === 'port-forward') {
                     $.loadForwardRules('all');
                 }
+                // 刷新后停留在私有网络管理时主动加载数据
+                if ($.activeSection.value === 'private-network') {
+                    $.loadPrivateSubnets();
+                }
                 // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
                 setInterval(function() {
                     var token = localStorage.getItem(window.__storageKeys.TOKEN);
@@ -1110,6 +1114,9 @@ $.initDetailCharts = function() {
             history.replaceState({}, '', url);
             if (val === 'port-forward') {
                 $.loadForwardRules('all');
+            }
+            if (val === 'private-network') {
+                $.loadPrivateSubnets();
             }
             // 安全防护·限速设置：点击侧边栏进入时加载（activeTabSecurity 默认即 ratelimit，
             // watch(activeTabSecurity) 值不变不会触发，故挂在 section 变化上；刷新路径由 onMounted 分支覆盖）

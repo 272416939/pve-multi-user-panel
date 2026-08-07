@@ -4,6 +4,32 @@ const { execute, queryOne, queryAll, mysqlNow } = require('./db-core');
 // 一个子网 = 爱快一个 VLAN 接口 + 一个 DHCP 服务端 + 一个 /24 网段
 const subnets = {
     getAll: () => queryAll('SELECT * FROM subnets ORDER BY id DESC'),
+    // 管理员视角：全部子网 + 所有者用户名（search 可选：用户名/VLAN名称/VLAN ID/网关 模糊匹配，参数化 LIKE）
+    getAllWithOwner: async (search) => {
+        const kw = search ? '%' + search + '%' : null;
+        if (kw) {
+            return queryAll(
+                `SELECT s.*, u.username FROM subnets s
+                 LEFT JOIN users u ON s.user_id = u.id
+                 WHERE u.username LIKE ? OR s.vlan_name LIKE ? OR s.vlan_id LIKE ? OR s.gateway LIKE ?
+                 ORDER BY s.id DESC`,
+                [kw, kw, kw, kw]
+            );
+        }
+        return queryAll(
+            'SELECT s.*, u.username FROM subnets s LEFT JOIN users u ON s.user_id = u.id ORDER BY s.id DESC'
+        );
+    },
+    // 管理员视角：各子网绑定设备数（一次查询避免 N+1）
+    getBoundCounts: async () => {
+        const vms = await queryAll('SELECT subnet_id, COUNT(*) AS cnt FROM vms WHERE subnet_id IS NOT NULL GROUP BY subnet_id');
+        const cts = await queryAll('SELECT subnet_id, COUNT(*) AS cnt FROM lxc_containers WHERE subnet_id IS NOT NULL GROUP BY subnet_id');
+        const vm = {};
+        const lxc = {};
+        vms.forEach(r => { if (r.subnet_id) vm[r.subnet_id] = r.cnt; });
+        cts.forEach(r => { if (r.subnet_id) lxc[r.subnet_id] = r.cnt; });
+        return { vm, lxc };
+    },
     getByUserId: (userId) => queryAll('SELECT * FROM subnets WHERE user_id = ? ORDER BY id DESC', [parseInt(userId)]),
     getById: (id) => queryOne('SELECT * FROM subnets WHERE id = ?', [parseInt(id)]),
     create: async (data) => {

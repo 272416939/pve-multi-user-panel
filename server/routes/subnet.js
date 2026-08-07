@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const ikuaiApi = require('../api/ikuai-api');
-const { authMiddleware } = require('../middleware/auth');
+const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, isIpInAddrPool } = require('../services/dhcp');
 const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync');
 const { safeError } = require('../utils/safe-error');
@@ -127,6 +127,41 @@ router.get('/subnets', authMiddleware, async (req, res) => {
                 available: s.available,
                 vm_count: vmCount[s.id] || 0,
                 lxc_count: ctCount[s.id] || 0,
+                created_at: s.created_at
+            };
+        });
+        res.json(result);
+    } catch (e) {
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+// ===== 管理员：全部私有网络列表（含所有者用户名、绑定设备数） =====
+router.get('/admin/subnets', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const search = (req.query.search || '').trim();
+        if (search.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
+
+        const list = await db.subnets.getAllWithOwner(search || undefined);
+
+        // 绑定设备统计（一次查询避免 N+1）
+        const counts = await db.subnets.getBoundCounts();
+
+        const result = list.map(s => {
+            const gwParts = (s.gateway || '').split('.');
+            return {
+                id: s.id,
+                username: s.username || '',
+                vlan_name: s.vlan_name,
+                vlan_id: s.vlan_id,
+                gateway: s.gateway,
+                netmask: s.netmask,
+                addr_pool: s.addr_pool,
+                cidr: gwParts.length === 4 ? gwParts.slice(0, 3).join('.') + '.0/24' : '',
+                available: s.available,
+                interface: s.interface,
+                vm_count: counts.vm[s.id] || 0,
+                lxc_count: counts.lxc[s.id] || 0,
                 created_at: s.created_at
             };
         });

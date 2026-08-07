@@ -179,6 +179,7 @@ var app = Vue.createApp(App);
   app.config.globalProperties.vmBusyClass = $.vmBusyClass;
   app.config.globalProperties.vmBusyText = $.vmBusyText;
   app.config.globalProperties.vmBusyBlock = $.vmBusyBlock;
+  app.config.globalProperties.formatDate = $.formatDate;
 // Global error handler — catch render errors and show on screen
 app.config.errorHandler = function(err, instance, info) {
     console.error('[Vue Error]', err, instance, info);
@@ -339,6 +340,80 @@ app.component('port-forward-list', {
             $.bsModalShow('forwardModal');
         },
         deleteForward(id) { $.deleteForward(id); }
+    }
+});
+
+// ==================== 私有网络列表组件（管理员视角，只读） ====================
+app.component('private-network-list', {
+    template: '\
+        <div>\
+            <div class="module-header">\
+                <h4 class="module-title">私有网络管理</h4>\
+                <div class="d-flex align-items-center gap-2">\
+                    <input type="text" class="form-control form-control-sm" style="width:240px" v-model="privateSubnetSearch" placeholder="搜索用户名、VLAN ID、网络名称或网关..." @input="onPrivateSubnetSearch">\
+                </div>\
+            </div>\
+            <div v-if="privateSubnetsLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>\
+            <div v-else-if="privateSubnets.length === 0" class="text-center py-4 text-muted">暂无私有网络</div>\
+            <div v-else class="table-container mb-4" style="padding:12px;">\
+                <div class="table-responsive">\
+                <table class="table table-sm table-hover mb-0 table-align-center">\
+                    <thead>\
+                        <tr>\
+                            <th>ID</th>\
+                            <th>所有者</th>\
+                            <th>VLAN ID</th>\
+                            <th>网络名称</th>\
+                            <th>网关 / 掩码</th>\
+                            <th>地址池</th>\
+                            <th>可用IP</th>\
+                            <th>接口</th>\
+                            <th>绑定设备</th>\
+                            <th>创建时间</th>\
+                        </tr>\
+                    </thead>\
+                    <tbody>\
+                        <tr v-for="(s, idx) in paginatedPrivateSubnets" :key="s.id">\
+                            <td>{{ s.id }}</td>\
+                            <td>{{ s.username || \'-\' }}</td>\
+                            <td><span class="badge bg-primary">{{ s.vlan_id }}</span></td>\
+                            <td><span class="text-primary">{{ s.vlan_name }}</span></td>\
+                            <td>{{ s.gateway }} / {{ s.netmask }}</td>\
+                            <td class="small">{{ s.addr_pool }}</td>\
+                            <td>{{ s.available }}</td>\
+                            <td>{{ s.interface }}</td>\
+                            <td>\
+                                <span v-if="s.vm_count + s.lxc_count === 0" class="text-muted">-</span>\
+                                <span v-else>\
+                                    <span v-if="s.vm_count > 0">VM {{ s.vm_count }}</span>\
+                                    <span v-if="s.vm_count > 0 && s.lxc_count > 0"> | </span>\
+                                    <span v-if="s.lxc_count > 0">LXC {{ s.lxc_count }}</span>\
+                                </span>\
+                            </td>\
+                            <td class="small">{{ formatDate(s.created_at) }}</td>\
+                        </tr>\
+                    </tbody>\
+                </table>\
+                </div>\
+                <pv-pagination :total="privateSubnetTotal" :page="privateSubnetPage" :page-size="privateSubnetPageSize" @change="setPrivateSubnetPage"></pv-pagination>\
+            </div>\
+        </div>\
+    ',
+    computed: {
+        privateSubnets() { return $.privateSubnets.value || []; },
+        paginatedPrivateSubnets() { return $.paginatedPrivateSubnets.value || []; },
+        privateSubnetsLoading() { return $.privateSubnetsLoading.value; },
+        privateSubnetTotal() { return $.privateSubnets.value.length; },
+        privateSubnetPage() { return $.privateSubnetPage.value; },
+        privateSubnetPageSize() { return $.privateSubnetPageSize; },
+        privateSubnetSearch: {
+            get() { return $.privateSubnetSearch ? $.privateSubnetSearch.value : ''; },
+            set(val) { if ($.privateSubnetSearch) $.privateSubnetSearch.value = val; }
+        }
+    },
+    methods: {
+        onPrivateSubnetSearch() { $.onPrivateSubnetSearch(); },
+        setPrivateSubnetPage(p) { if (p >= 1) $.privateSubnetPage.value = p; }
     }
 });
 
