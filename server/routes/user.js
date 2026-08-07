@@ -500,7 +500,7 @@ router.put('/user/email', authMiddleware, async (req, res) => {
                 emailSubject = '邮箱换绑验证 - ' + siteName;
                 emailTitle = '请验证您的新邮箱';
                 emailContent = `
-                    <p>您好，</p>
+                    <p>您好，${user.username}！</p>
                     <p>您正在将当前账号的绑定邮箱更换为：</p>
                     <div style="text-align:center;margin:20px 0;">
                         <span style="font-size:18px;font-weight:bold;color:#7c3aed;background:#f5f3ff;padding:10px 20px;border-radius:8px;display:inline-block;word-break:break-all;">${email}</span>
@@ -525,7 +525,7 @@ router.put('/user/email', authMiddleware, async (req, res) => {
                 emailSubject = '邮箱验证 - ' + siteName;
                 emailTitle = '请验证您的邮箱';
                 emailContent = `
-                    <p>您好，</p>
+                    <p>您好，${user.username}！</p>
                     <p>感谢您注册 ${siteName}！</p>
                     <p>请点击下方按钮验证您的邮箱地址：</p>
                     <p style="text-align: center;">
