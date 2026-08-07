@@ -25,10 +25,9 @@ function generateVlanName(existingNames) {
     return null;
 }
 
-// 生成 VLAN 备注：用户{username}网络组NT-{6位随机}
+// 生成 VLAN 备注：仅记录所属用户（如 用户admin）
 function generateVlanComment(username) {
-    const rand = crypto.randomBytes(3).toString('hex').slice(0, 6);
-    return '用户' + username + '网络组NT-' + rand;
+    return '用户' + username;
 }
 
 // 轮询爱快 DHCP 服务端 available：500ms 间隔（爱快异步计算约 5-6 秒），
