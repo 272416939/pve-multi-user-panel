@@ -455,7 +455,8 @@
                             <tr>
                                 <th>ID</th>
                                 <th>所属网络</th>
-                                <th>IPv4 CIDR</th>
+                                <th>网关 / 掩码</th>
+                                <th>地址池</th>
                                 <th>服务器</th>
                                 <th>可用IP</th>
                                 <th>创建时间</th>
@@ -468,7 +469,8 @@
                                 <td>
                                     <span class="text-primary">{{ s.vlan_name }}</span>
                                 </td>
-                                <td>{{ s.cidr || '-' }}</td>
+                                <td>{{ s.gateway }} / {{ s.netmask }}</td>
+                                <td class="small">{{ s.addr_pool }}</td>
                                 <td>
                                     <span v-if="s.vm_count + s.lxc_count === 0" class="text-muted">-</span>
                                     <span v-else>
@@ -484,7 +486,7 @@
                                 </td>
                             </tr>
                             <tr v-if="subnets.length === 0">
-                                <td colspan="7" class="text-center text-muted py-4">暂无子网，点击「新建子网」创建私有网络</td>
+                                <td colspan="8" class="text-center text-muted py-4">暂无子网，点击「新建子网」创建私有网络</td>
                             </tr>
                         </tbody>
                     </table>
