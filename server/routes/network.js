@@ -10,6 +10,8 @@ const { createDhcpStaticBinding, getWanInterface, getWanInterfaces } = require('
 const { parseIkuaiIds, stringifyIkuaiIds } = require('../services/port-forward-sync');
 const dbg = require('../utils/debug');
 const { safeError } = require('../utils/safe-error');
+// CNAME 域名配置校验纯函数（utils/cname-validate.js，格式与前端 parseCnameEntries 对齐）
+const { validateCnameDomain } = require('../utils/cname-validate');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
@@ -130,10 +132,11 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         if (vlan_interface !== undefined && !ifaceRe.test(String(vlan_interface).trim())) {
             return res.status(400).json({ error: 'VLAN 接口名格式无效（仅字母数字_.:-，≤32字符）' });
         }
+        // CNAME 校验：支持前端 label||.domain 逗号分隔多条目格式（含旧格式兼容），逐条校验域名与长度
         if (cname_domain !== undefined) {
-            const domainStr = String(cname_domain).trim();
-            if (domainStr.length > 253 || (domainStr && !/^(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(domainStr))) {
-                return res.status(400).json({ error: 'CNAME 域名格式无效或过长' });
+            const cnameResult = validateCnameDomain(cname_domain);
+            if (!cnameResult.ok) {
+                return res.status(400).json({ error: cnameResult.error || 'CNAME 域名格式无效或过长' });
             }
         }
         const setConfig = db.config.set;
@@ -172,7 +175,8 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
 });
 
 // CNAME 域名配置：所有已登录用户可读取，仅管理员可写入
-router.get('/api/cname', authMiddleware, async (req, res) => {
+// 注意：路由挂载在 /api 前缀下（server.js），此处写 /cname，真实 URL 为 /api/cname（与前端 api('/cname') 对齐）
+router.get('/cname', authMiddleware, async (req, res) => {
     try {
         const domain = await db.config.get('cname:domain') || '';
         res.json({ cname_domain: domain });
