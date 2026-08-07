@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v2.35.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v3.0.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -137,18 +137,28 @@
 ### 🔒 安全防护（v2.35.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 62 | **限速设置** | 系统设置「安全防护 -> 限速设置」：限速总开关 + 10 大类 32 条规则可配置化（次数/时间窗），保存即生效，DB 异常自动降级默认规则不裸奔 |
+| 62 | **限速设置** | 系统设置「安全防护 -> 限速设置」：限速总开关 + 11 大类 42 条规则可配置化（次数/时间窗），保存即生效，DB 异常自动降级默认规则不裸奔（v2.35.0 / v3.0.0 新增支付类） |
+
+### 🌐 私有网络（v3.0.0 新增）
+| # | 功能 | 说明 |
+|---|------|------|
+| 63 | **VLAN 子网创建** | 用户可自建 VLAN 子网（VLAN ID/网关/掩码/地址池/物理接口），每用户上限可配置（默认 5），创建弹窗展示配额 |
+| 64 | **子网绑定 VM/LXC** | 开通/分配时绑定子网：自动写 VLAN tag + 创建 DHCP 静态绑定并回写 IP，管理员可运行中绑定并同步重建端口转发 |
+| 65 | **子网 IP 池** | 可用 IP 批量刷新（单次爱快调用）、随机 IP 从绑定子网池选取、归属隔离不泄露他人网段 |
+| 66 | **重置 IP 适配子网** | 重置 IP 兼容私有网络（未绑定拦截/static 池内校验/LXC 网关用子网网关），并开放到用户侧 |
+| 67 | **网络管理菜单** | Admin 一级菜单「网络管理」：端口转发管理 + 私有网络管理页（只读表格/搜索/分页/绑定设备统计） |
 
 ### 🗄️ 基础设施（v1.8.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
-| 63 | **MySQL 数据库** | MySQL 5.7+ 唯一驱动，utf8mb4 编码，自动建表迁移 |
-| 64 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
-| 65 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
-| 66 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
-| 67 | **EJS 模板缓存** | 编译后缓存在内存，`NODE_ENV=production` 自动启用 |
-| 68 | **Gzip 压缩** | compression 中间件，所有响应压缩 60-80% |
-| 69 | **资源预加载** | preconnect / dns-prefetch / script defer 优化首屏加载 |
+| 68 | **MySQL 数据库** | MySQL 5.7+ 唯一驱动，utf8mb4 编码，自动建表迁移 |
+| 69 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
+| 70 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
+| 71 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
+| 72 | **EJS 模板缓存** | 编译后缓存在内存，`NODE_ENV=production` 自动启用 |
+| 73 | **Gzip 压缩** | compression 中间件，所有响应压缩 60-80% |
+| 74 | **资源预加载** | preconnect / dns-prefetch / script defer 优化首屏加载 |
+| 75 | **安全审计体系** | 五轮安全审计（V1~V5）全量修复：敏感操作二次验证、到期资源拦截、支付事务化、CSV 防注入、限速可配置化等 |
 
 ---
 
@@ -348,15 +358,17 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 	│   │   ├── status-cache.js    # 📡 VM/LXC 实时状态缓存（websocket 解耦）
 	│   │   ├── release-check.js   # 🔄 版本检查（GitHub/Gitee 双源）
 	│   │   ├── system-update.js   # 🔄 系统在线更新（git fetch/reset）
-	│   │   └── redis-admin.js     # ⚙️ Redis 配置/测试/清缓存
+	│   │   ├── redis-admin.js     # ⚙️ Redis 配置/测试/清缓存
+	│   │   ├── dhcp.js            # 🌐 DHCP 静态绑定 + 子网 IP 池工具（isIpInAddrPool/pickUnusedStaticIp）
+	│   │   └── port-forward-sync.js # 🌐 端口转发规则同步（绑定子网后重建新 IP）
 		│   ├── schedule/
 		│   │   └── tasks.js           # 定时任务
 		│   ├── api/
 		│   │   ├── db.js              # 数据库聚合入口（按拆分前导出形状导出）
 		│   │   ├── db-core.js         # 连接池单例 + execute/queryOne/queryAll + 时间工具
 		│   │   ├── db-schema.js       # 建表、迁移、默认配置、默认管理员
-		│   │   ├── db-*.js            # 业务域模块（users/vms/orders/disks/backup/network/messaging/config/billing）
-		│   │   ├── redis.js           # Redis 缓存客户端（可选）
+	│   │   ├── db-*.js            # 业务域模块（users/vms/orders/disks/backup/network/messaging/config/billing/subnets/ip）
+	│   │   ├── redis.js           # Redis 缓存客户端（可选）
 		│   │   ├── pve-api.js         # PVE REST API 封装
 		│   │   ├── ikuai-api.js       # ikuai API 封装
 		│   │   └── ssh-exec.js        # SSH 执行工具（vmid 白名单 + stdin 传密码）
@@ -487,7 +499,8 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 | **模板管理** | VM/LXC 套餐模板 + 系统模板（OS 模板，系统切换用） |
 | **套餐管理** | VM/LXC 套餐与分组管理，拖拽排序、优惠百分比、库存 |
 | **财务管理** | 交易流水查询/CSV 导出、订单管理，支付网关配置（PID/密钥/开关） |
-| **系统设置** | 站点设置（含 Redis、日志上限）、SMTP、快照&备份、网络、支付、PVE 节点、UApiPro、安全防护·限速设置配置 |
+| **系统设置** | 站点设置（含 Redis、日志上限）、SMTP、快照&备份、网络配置、支付、PVE 节点、UApiPro、安全防护·限速设置配置 |
+| **网络管理** | 🌐 **端口转发管理 + 私有网络管理页**（只读表格/搜索/分页/绑定设备统计，v3.0.0） |
 | **硬盘设置** | 💾 **存储分组（拖拽排序）/规格管理（含 QoS 限速）、生命周期配置、数据盘管理（查看/编辑/销毁/多选批量迁移/导入存量磁盘，含 PVE 路径列）** |
 | **日志中心** | 操作/后台/登录/系统切换四 tab，后台操作按子域筛选，约 50 处敏感操作埋点（v2.35.0） |
 | **系统更新** | 检查更新、查看更新日志、一键更新 |
