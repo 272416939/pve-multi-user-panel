@@ -501,9 +501,12 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         try {
             const verifyUrl = `${getSiteUrl(req)}/api/user/verify-email/${verifyToken}`;
             const siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
-            // 真正的「换绑」：用户已有邮箱且邮箱发生变更 → 使用独立的换绑验证邮件模板；
-            // 首次绑定 / 重发验证沿用原模板（避免换绑邮件复用注册文案）
+            // 三种发信场景区分模板：
+            // 1. 换绑（已有邮箱且变更）→ 换绑验证模板，展示新邮箱 + 安全提醒
+            // 2. 重发验证（已有邮箱且未变）→ 中性验证模板，不再出现注册文案
+            // 3. 首次绑定（从未绑过邮箱）→ 注册欢迎验证模板
             var isEmailRebind = !!user.email && user.email !== email;
+            var isResendVerify = !!user.email && user.email === email;
             var emailSubject;
             var emailTitle;
             var emailContent;
@@ -530,6 +533,24 @@ router.put('/user/email', authMiddleware, async (req, res) => {
                     </div>
                     <div class="warning-box">
                         <p style="margin-bottom: 0;"><strong>安全提醒：</strong>如非您本人操作，请立即修改账号密码并联系管理员，以防账号被他人接管。</p>
+                    </div>
+                `;
+            } else if (isResendVerify) {
+                emailSubject = '邮箱验证 - ' + siteName;
+                emailTitle = '请验证您的邮箱';
+                emailContent = `
+                    <p>您好，${user.username}！</p>
+                    <p>您正在进行邮箱验证，请点击下方按钮完成验证：</p>
+                    <p style="text-align: center;">
+                        <a href="${verifyUrl}" class="btn" target="_blank">验证邮箱地址</a>
+                    </p>
+                    <div class="divider"></div>
+                    <p style="color: #718096; font-size: 14px;">
+                        如果按钮无法点击，请复制以下链接到浏览器：<br>
+                        <a href="${verifyUrl}" style="word-break: break-all;">${verifyUrl}</a>
+                    </p>
+                    <div class="info-box">
+                        <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快验证。</p>
                     </div>
                 `;
             } else {
