@@ -66,6 +66,7 @@ var RATE_LIMIT_CATEGORIES = [
             { key: 'login_2fa', label: '2FA 验证', hint: '按 IP+用户', max: 3, windowSec: 60 },
             { key: 'refresh', label: '令牌刷新', hint: '按 IP', max: 30, windowSec: 60 },
             { key: 'forgot', label: '找回密码邮件', hint: '按 IP，10 分钟 1 次', max: 1, windowSec: 600 },
+            { key: 'email_verify', label: '邮箱验证邮件发送', hint: '按用户，1 分钟 1 次', max: 1, windowSec: 60 },
             { key: 'reset_pwd', label: '重置密码', hint: '按 IP', max: 5, windowSec: 60 },
             { key: 'logout', label: '登出', hint: '按 IP', max: 30, windowSec: 60 }
         ]

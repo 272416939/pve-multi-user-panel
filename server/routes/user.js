@@ -11,6 +11,7 @@ const db = require('../api/db');
 const { JWT_SECRET, generateToken } = require('../utils/token');
 const upload = require('../config/multer');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const getSiteUrl = require('../utils/site-url');
 const { createEmailTemplate, sendEmail } = require('../utils/email');
 const { hashPassword, verifyPassword } = require('../utils/password-hash');
@@ -464,6 +465,16 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         if (isRebind) {
             const secondary = await verifySensitiveAction(user, req.body, req);
             if (!secondary.ok) return res.status(403).json({ error: secondary.error });
+        }
+
+        // 限速：发送邮箱验证邮件统一按用户限速（重发/首次绑定/换绑，防邮件轰炸）
+        // 放在二次验证之后、写库之前 —— 429 时不修改邮箱、不生成 token、不消耗 SMTP
+        const emailRateLimit = await checkConfiguredRateLimit('email_verify', `ratelimit:email-verify:${req.user.id}`);
+        if (!emailRateLimit.allowed) {
+            return res.status(429).json({
+                error: '验证邮件发送过于频繁，请稍后再试',
+                retryAfter: emailRateLimit.retryAfter
+            });
         }
         
         const allUsers = await db.users.getAll();
