@@ -7,7 +7,8 @@ const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
 const { getStatusCache } = require('../services/status-cache');
-const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
+const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
 const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync');
 const dbg = require('../utils/debug');
@@ -311,7 +312,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
                 `;
                 const vmSiteName = await getSiteName();
                 if (await shouldSendEmail(assignedUser.id, 'notify_vm_provisioned')) {
-                    await sendEmail(
+                    enqueueEmail(
                         assignedUser.email,
                         '虚拟机已开通 - ' + vmSiteName,
                         createEmailTemplate('虚拟机开通通知', emailContent, vmSiteName)
@@ -539,7 +540,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
                     `;
                     const vmSiteName2 = await getSiteName();
                     if (await shouldSendEmail(removedUser.id, 'notify_vm_provisioned')) {
-                        await sendEmail(
+                        enqueueEmail(
                             removedUser.email,
                             '虚拟机已被移除 - ' + vmSiteName2,
                             createEmailTemplate('虚拟机移除通知', emailContent, vmSiteName2)

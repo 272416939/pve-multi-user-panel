@@ -23,6 +23,12 @@ async function applyRedisConfig(config) {
             delete process.env.REDIS_HOST;
         }
         require('../api/redis').resetClient();
+        // 邮件队列 Worker 依赖 Redis 连接，配置变更后重启（Redis 未配置时内部跳过，邮件走同步发送）
+        try {
+            require('../queue/email-queue').restartEmailWorker();
+        } catch (e) {
+            console.warn('[redis-admin] 重启邮件队列 Worker 失败:', e.message);
+        }
     } catch (e) {
         console.error('热更新 Redis 连接失败:', e.message);
     }

@@ -4,7 +4,8 @@
 
 const db = require('../api/db');
 const { createPayClient } = require('../sdk/pay');
-const { createEmailTemplate, sendEmail, shouldSendEmail } = require('../utils/email');
+const { createEmailTemplate, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 const dbg = require('../utils/debug');
 const { generateOrderNo } = require('../utils/order-utils');
 const { PAYMENT_METHODS } = require('../constants');
@@ -312,7 +313,7 @@ async function processPayCallback(params, opts) {
                         <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
                     <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`, siteName);
-                await sendEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);
+                enqueueEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);
             }
         }
     } catch (e) {

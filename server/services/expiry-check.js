@@ -1,6 +1,7 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const { createEmailTemplate, sendEmail, shouldSendEmail } = require('../utils/email');
+const { createEmailTemplate, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 const dbg = require('../utils/debug');
 const { getRedisClient } = require('../api/redis');
 
@@ -137,7 +138,7 @@ const checkExpiredVms = async () => {
                         <p>请及时续费或联系管理员，以免影响您的使用！</p>
                     `;
                     if (await shouldSendEmail(user.id, 'notify_expiry_reminder')) {
-                        await sendEmail(user.email, '虚拟机到期提醒', createEmailTemplate(`虚拟机将在${days}天后到期`, emailContent));
+                        enqueueEmail(user.email, '虚拟机到期提醒', createEmailTemplate(`虚拟机将在${days}天后到期`, emailContent));
                     }
 
                     await markReminderSent(vm.vm_id, days, today);
@@ -207,7 +208,7 @@ const checkExpiredVms = async () => {
                                 <p style="margin-top: 16px;">如有问题，请联系管理员。</p>
                             `;
                             if (await shouldSendEmail(user.id, 'notify_expiry_alert')) {
-                                await sendEmail(user.email, '虚拟机已到期 - 请及时续费', createEmailTemplate('虚拟机已到期', emailContent));
+                                enqueueEmail(user.email, '虚拟机已到期 - 请及时续费', createEmailTemplate('虚拟机已到期', emailContent));
                             }
                             await markReminderSent(vm.vm_id, 0, today);
                             await db.vms.reminders.add(vm.id, 0);
@@ -306,7 +307,7 @@ async function checkExpiredLxc() {
                                             <p>请及时续费或联系管理员，以免影响您的使用！</p>
                                         `;
                                         if (await shouldSendEmail(user.id, 'notify_expiry_reminder')) {
-                                            await sendEmail(user.email, 'LXC 容器到期提醒', createEmailTemplate(`LXC 容器将在${days}天后到期`, emailContent));
+                                            enqueueEmail(user.email, 'LXC 容器到期提醒', createEmailTemplate(`LXC 容器将在${days}天后到期`, emailContent));
                                         }
                                     } catch (e) {
                                         console.error('发送 LXC 到期提醒邮件失败:', e.message);
@@ -358,7 +359,7 @@ async function checkExpiredLxc() {
                                         <p style="margin-top: 16px;">如有问题，请联系管理员。</p>
                                     `;
                                     if (await shouldSendEmail(user.id, 'notify_expiry_alert')) {
-                                        await sendEmail(user.email, 'LXC 容器已到期 - 请及时续费', createEmailTemplate('LXC 容器已到期', emailContent));
+                                        enqueueEmail(user.email, 'LXC 容器已到期 - 请及时续费', createEmailTemplate('LXC 容器已到期', emailContent));
                                     }
                                 } catch (e) {
                                     console.error('发送 LXC 到期续费邮件失败:', e.message);

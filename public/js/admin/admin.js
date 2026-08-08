@@ -16,6 +16,7 @@
     $.editUserForm = ref({ id: null, username: '', password: '', role: 'user', email: '', emailVerified: false, totp_enabled: false });
     $.assignForm = ref({ vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' });
     $.smtpConfig = ref({ host: '', port: 587, secure: false, user: '', password: '', from: '', from_name: '', enabled: false });
+    $.emailQueueStats = ref(null);
     $.pveConfig = ref({ host: '', api_token: '', ssh_host: '', ssh_port: 22, ssh_user: 'root', ssh_password: '', strict_tls: false });
     $.reminderConfig = ref({ days1: 7, days2: 3, days3: 1 });
     $.snapshotConfig = ref({ max_per_vm: 5, daily_create_limit: 20, daily_restore_limit: 10 });
@@ -248,6 +249,15 @@
             alert('配置已保存');
         } catch (e) {
             alert(e.message);
+        }
+    };
+
+    // 邮件队列状态（Redis 异步发送监控，仅展示不影响主流程）
+    $.loadEmailQueueStats = async function() {
+        try {
+            $.emailQueueStats.value = await api('/admin/email-queue/stats');
+        } catch (e) {
+            console.warn('邮件队列状态加载失败:', e.message || e);
         }
     };
 

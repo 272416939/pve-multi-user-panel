@@ -57,6 +57,21 @@
                             </div>
                         </div>
 
+                        <!-- 邮件队列状态（Redis 异步发送，管理端只读展示） -->
+                        <div class="card mb-4">
+                            <div class="card-body">
+                                <h6 class="mb-2" style="font-weight:600;">邮件队列状态</h6>
+                                <div class="d-flex flex-wrap gap-3" style="font-size:13px;color:#718096;">
+                                    <span>发送模式：{{ emailQueueStats ? (emailQueueStats.redisEnabled ? 'Redis 异步队列' : '同步发送（未配置 Redis）') : '加载中...' }}</span>
+                                    <span v-if="emailQueueStats">待发送：{{ emailQueueStats.pending }}</span>
+                                    <span v-if="emailQueueStats">发送中：{{ emailQueueStats.active }}</span>
+                                    <span v-if="emailQueueStats">重试后失败：{{ emailQueueStats.failed }}</span>
+                                    <span v-if="emailQueueStats && emailQueueStats.lastError" style="color:#ed6463;">最近失败：{{ emailQueueStats.lastError }}（{{ emailQueueStats.lastFailedAt }}）</span>
+                                </div>
+                                <small class="text-muted">通知类邮件通过 Redis 队列异步发送，不阻塞购买/开通等请求；Redis 未启用时自动降级为同步发送。</small>
+                            </div>
+                        </div>
+
                         <div class="module-header">
                             <h4 class="module-title">到期提醒配置</h4>
                         </div>
