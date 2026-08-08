@@ -701,3 +701,36 @@ window.closeFixedDropdownAnimated = function(dropdownEl, callback) {
     }, 200);
 };
 
+// ============================================
+// 界面模板（个人偏好）应用与同步 — 三端共用单一实现
+// 优先级：个人偏好(localStorage 'template') > 站点全局默认(服务端注入)
+// ============================================
+
+// 应用模板：t = ''（跟随站点默认）| 'default' | 'saas'；siteDefault 为站点全局默认（跟随默认时使用）
+window.applyTemplate = function(t, siteDefault) {
+    var html = document.documentElement;
+    if (!html) return;
+    if (t === 'default' || t === 'saas') {
+        localStorage.setItem(window.__storageKeys.TEMPLATE, t);
+        html.setAttribute('data-template', t);
+    } else {
+        // 跟随站点默认：清除本地偏好，回退到站点全局默认
+        localStorage.removeItem(window.__storageKeys.TEMPLATE);
+        html.setAttribute('data-template', siteDefault || 'default');
+    }
+    if (document.body) document.body.setAttribute('data-template', html.getAttribute('data-template'));
+};
+
+// 从服务端同步用户模板偏好（跨设备）：与 localStorage 不一致时更新并应用
+window.syncUserTemplate = async function() {
+    try {
+        var res = await api('/user/template');
+        var t = (res && res.template) || '';
+        var siteDefault = (res && res.siteDefault) || 'default';
+        var cur = localStorage.getItem(window.__storageKeys.TEMPLATE) || '';
+        if (t !== cur) window.applyTemplate(t, siteDefault);
+    } catch (e) {
+        console.error('同步界面模板偏好失败:', e);
+    }
+};
+

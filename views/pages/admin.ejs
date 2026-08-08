@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" data-theme="dark" data-template="<%= locals.templateStyle %>">
 <head>
     <script src="js/theme-init.js"></script>
     <script src="js/app-version.js" defer></script>
@@ -15,6 +15,8 @@
     <link href="shared/css/components.css?cv=<%= locals.cacheVersion %>" rel="stylesheet">
     <link href="shared/css/theme.css?cv=<%= locals.cacheVersion %>" rel="stylesheet">
     <link href="css/admin.css?cv=<%= locals.cacheVersion %>" rel="stylesheet">
+    <!-- 界面模板：template-saas.css 最后加载，仅 html[data-template="saas"] 命中，对默认模板零影响 -->
+    <link href="shared/css/template-saas.css?cv=<%= locals.cacheVersion %>" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.8/dist/chart.umd.min.js" defer></script>
