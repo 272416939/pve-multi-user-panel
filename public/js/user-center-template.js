@@ -138,17 +138,86 @@
                         <div class="card mb-3">
                             <div class="card-body">
                                 <h6 class="card-subtitle mb-3 text-muted">界面模板</h6>
-                                <p class="text-muted small mb-3">选择个人偏好的界面模板；「跟随站点默认」使用管理员在站点设置中配置的模板。保存后立即生效，所有设备同步。</p>
-                                <select class="form-select" v-model="templatePreference" style="max-width: 320px;">
-                                    <option value="">跟随站点默认</option>
-                                    <option value="default">默认模板（经典玻璃拟态）</option>
-                                    <option value="saas">SAAS 企业风</option>
-                                </select>
-                                <div class="mt-3 d-flex gap-2">
-                                    <pv-button type="button" variant="primary" @click="saveTemplatePreference" :disabled="templatePreferenceSaving">
-                                        {{ templatePreferenceSaving ? '保存中...' : '保存模板偏好' }}
-                                    </pv-button>
+                                <p class="text-muted small mb-3">选择个人偏好的界面模板；「跟随站点默认」使用管理员在站点设置中配置的模板。点击卡片实时预览，保存后所有设备同步。</p>
+                                <div class="d-flex flex-wrap gap-3 mb-3">
+                                    <!-- 跟随站点默认 -->
+                                    <div class="template-picker" :class="{ 'template-picker-active': templatePreference === '' }" @click="selectTemplate('')" role="button" tabindex="0">
+                                        <div class="template-preview template-preview-follow">
+                                            <div class="tp-follow-center">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.36-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.36 6.36L3 16"/><path d="M3 21v-5h5"/></svg>
+                                                <span>AUTO</span>
+                                            </div>
+                                        </div>
+                                        <div class="template-picker-body">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>跟随站点默认</strong>
+                                                <span v-if="templatePreference === ''" class="template-check">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">当前：{{ siteDefaultName }}</small>
+                                        </div>
+                                    </div>
+                                    <!-- 默认模板预览卡 -->
+                                    <div class="template-picker" :class="{ 'template-picker-active': templatePreference === 'default' }" @click="selectTemplate('default')" role="button" tabindex="0">
+                                        <div class="template-preview template-preview-default">
+                                            <div class="tp-sidebar">
+                                                <div class="tp-logo"></div>
+                                                <div class="tp-nav"></div>
+                                                <div class="tp-nav tp-nav-active"></div>
+                                                <div class="tp-nav"></div>
+                                            </div>
+                                            <div class="tp-main">
+                                                <div class="tp-header"></div>
+                                                <div class="tp-cards">
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="template-picker-body">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>默认模板</strong>
+                                                <span v-if="templatePreference === 'default'" class="template-check">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">经典玻璃拟态 · 紫色渐变</small>
+                                        </div>
+                                    </div>
+                                    <!-- SAAS 企业风预览卡 -->
+                                    <div class="template-picker" :class="{ 'template-picker-active': templatePreference === 'saas' }" @click="selectTemplate('saas')" role="button" tabindex="0">
+                                        <div class="template-preview template-preview-saas">
+                                            <div class="tp-sidebar">
+                                                <div class="tp-logo"></div>
+                                                <div class="tp-nav"></div>
+                                                <div class="tp-nav tp-nav-active"></div>
+                                                <div class="tp-nav"></div>
+                                            </div>
+                                            <div class="tp-main">
+                                                <div class="tp-header"></div>
+                                                <div class="tp-cards">
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="template-picker-body">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>SAAS 企业风</strong>
+                                                <span v-if="templatePreference === 'saas'" class="template-check">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">腾讯云风格 · 扁平极简</small>
+                                        </div>
+                                    </div>
                                 </div>
+                                <pv-button type="button" variant="primary" @click="saveTemplatePreference" :disabled="templatePreferenceSaving">
+                                    {{ templatePreferenceSaving ? '保存中...' : '保存模板偏好' }}
+                                </pv-button>
                             </div>
                         </div>
                     </div>

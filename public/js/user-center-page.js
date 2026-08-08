@@ -15,6 +15,9 @@ const App = {
         // 界面模板个人偏好（'' = 跟随站点默认，'default' / 'saas' = 个人固定）
         const templatePreference = ref('');
         const templatePreferenceSaving = ref(false);
+        // 站点全局默认模板（跟随站点默认卡需要）
+        const siteDefault = ref('default');
+        const siteDefaultName = ref('默认模板');
         const memos = ref([]);
         const memosLoading = ref(false);
         const editMemoForm = ref({ id: null, title: '', content: '' });
@@ -810,10 +813,23 @@ const App = {
             try {
                 var res = await api('/user/template');
                 templatePreference.value = (res && res.template) || '';
-                window.applyTemplate(templatePreference.value, (res && res.siteDefault) || 'default');
+                var sd = (res && res.siteDefault) || 'default';
+                siteDefault.value = sd;
+                siteDefaultName.value = sd === 'saas' ? 'SAAS 企业风' : '默认模板';
+                window.applyTemplate(templatePreference.value, sd);
             } catch (e) {
                 console.error('加载界面模板偏好失败', e);
             }
+        };
+
+        // 界面模板：点击卡片实时预览（仅改 documentElement，不写 localStorage，保存才持久化）
+        const selectTemplate = (v) => {
+            if (v !== '' && v !== 'default' && v !== 'saas') return;
+            templatePreference.value = v;
+            var target = v === '' ? siteDefault.value : v;
+            var html = document.documentElement;
+            html.setAttribute('data-template', target);
+            if (document.body) document.body.setAttribute('data-template', target);
         };
 
         // 界面模板个人偏好：保存到服务端 + 本地立即应用
@@ -1436,6 +1452,8 @@ const App = {
             profileForm,
             templatePreference,
             templatePreferenceSaving,
+            siteDefaultName,
+            selectTemplate,
             saveTemplatePreference,
             memos,
             memosLoading,
