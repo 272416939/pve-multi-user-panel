@@ -246,12 +246,28 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         const vlanName = generateVlanName(existingNames);
         if (!vlanName) return res.status(400).json({ error: 'VLAN 名称生成失败，请重试' });
 
+        // 5.5 接口有效性预校验（best-effort：枚举为空时跳过，避免误拦截）
+        // 爱快对无效接口返回 30001「写入数据失败」，这里提前给出可读提示
+        const vlanIfaces = await ikuaiApi.getVlanInterfaces();
+        if (vlanIfaces.length > 0 && !vlanIfaces.includes(iface)) {
+            // 接口清单属内网拓扑信息，仅管理员可见详情，普通用户给通用提示
+            const ifaceErr = req.user.role === 'admin'
+                ? `所属接口 ${iface} 在爱快设备上不可用（可用接口：${vlanIfaces.join(', ')}），请到系统设置-网络配置中修改`
+                : '所属接口配置无效，请联系管理员';
+            return res.status(400).json({ error: ifaceErr });
+        }
+
         // 6. 爱快创建 VLAN + DHCP 服务端
         const prefix = gw.split('.').slice(0, 3).join('.');
         const addrPool = prefix + '.2-' + prefix + '.255';
         const comment = generateVlanComment(req.user.username);
 
-        await ikuaiApi.addVlan({ vlan_id: vlanId, vlan_name: vlanName, ip_addr: gw, interface: iface, netmask: '255.255.255.0', comment });
+        try {
+            await ikuaiApi.addVlan({ vlan_id: vlanId, vlan_name: vlanName, ip_addr: gw, interface: iface, netmask: '255.255.255.0', comment });
+        } catch (e) {
+            // 爱快对「参数错误/账号无写权限」统一返回 30001 写入数据失败，附加排查指引
+            return res.status(500).json({ error: safeError(e) + '；如持续失败，请检查面板连接爱快的账号是否被限制为只读或缺少模块写权限' });
+        }
         let dhcpId = '';
         let available = 0;
         try {

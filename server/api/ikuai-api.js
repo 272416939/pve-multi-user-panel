@@ -226,6 +226,32 @@ class IkuaiApi {
             console.error('[ikuai] 从DHCP静态绑定获取接口失败:', e.message);
         }
 
+        // 3.5 并入 VLAN 可用父接口（vlan show TYPE interface，爱快 VLAN 下拉同源；
+        //    设备上仅有 LAN 口时 DHCP 租约可能为空，避免下拉漏掉可用接口）
+        try {
+            const data = await this._call('vlan', 'show', { TYPE: 'interface' });
+            const ifaceList = data?.interface || [];
+            if (Array.isArray(ifaceList)) {
+                ifaceList.forEach(item => {
+                    const name = Array.isArray(item) ? item[0] : String(item);
+                    const comment = Array.isArray(item) && item.length > 1 ? item[1] : '';
+                    if (name && !seen.has(name)) {
+                        seen.add(name);
+                        interfaces.push({
+                            name: name,
+                            ip: '',
+                            status: '已连接',
+                            type: 'lan',
+                            gateway: '',
+                            comment: comment || 'VLAN'
+                        });
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('[ikuai] 从 VLAN 接口枚举获取接口失败:', e.message);
+        }
+
         console.log(`[ikuai] 获取到 ${interfaces.length} 个接口 (WAN: ${interfaces.filter(i=>i.type==='wan').length}, LAN: ${interfaces.filter(i=>i.type==='lan').length})`);
         return interfaces;
     }
@@ -251,21 +277,50 @@ class IkuaiApi {
         }));
     }
 
+    // VLAN 可用父接口枚举（vlan show TYPE interface，与爱快后台 VLAN 下拉同源）
+    // 失败回退：dhcp 服务端 + 现有 vlan 的接口并集（best-effort，空数组表示不可枚举）
+    async getVlanInterfaces() {
+        try {
+            const data = await this._call('vlan', 'show', { TYPE: 'interface' });
+            const list = data?.interface || [];
+            if (Array.isArray(list) && list.length > 0) {
+                return list.map(item => (Array.isArray(item) ? item[0] : String(item))).filter(Boolean);
+            }
+        } catch (e) {
+            console.error('[ikuai] 获取 VLAN 可用接口失败:', e.message);
+        }
+        try {
+            const servers = await this.getDhcpServers();
+            const vlans = await this.getVlans();
+            const set = new Set();
+            servers.forEach(s => { if (s.interface) set.add(s.interface); });
+            vlans.forEach(v => { if (v.interface) set.add(v.interface); });
+            return [...set];
+        } catch (e) {
+            return [];
+        }
+    }
+
     // VLAN 新增（私有网络子网创建）
     async addVlan({ vlan_id, vlan_name, ip_addr, interface: iface, netmask, comment }) {
-        const result = await this._call('vlan', 'add', {
-            vlan_id: String(vlan_id),
-            vlan_name: vlan_name,
-            ip_addr: ip_addr,
-            mac: '',
-            ip_mask: '',
-            interface: iface || '',
-            netmask: netmask || '255.255.255.0',
-            comment: comment || '',
-            enabled: 'yes'
-        });
-        console.log(`[ikuai] VLAN 新增成功: ${vlan_name} (ID=${vlan_id}, IP=${ip_addr}, 接口=${iface})`);
-        return result;
+        try {
+            const result = await this._call('vlan', 'add', {
+                vlan_id: String(vlan_id),
+                vlan_name: vlan_name,
+                ip_addr: ip_addr,
+                mac: '',
+                ip_mask: '',
+                interface: iface || '',
+                netmask: netmask || '255.255.255.0',
+                comment: comment || '',
+                enabled: 'yes'
+            });
+            console.log(`[ikuai] VLAN 新增成功: ${vlan_name} (ID=${vlan_id}, IP=${ip_addr}, 接口=${iface})`);
+            return result;
+        } catch (e) {
+            // 携带创建上下文：爱快 30001 对「参数错误/账号无写权限」统一返回同一文案，无上下文难定位
+            throw new Error(`VLAN 创建失败(接口=${iface || ''}, VLAN=${vlan_id}, IP=${ip_addr || ''}): ${e.message}`);
+        }
     }
 
     // VLAN 删除（子网删除）
