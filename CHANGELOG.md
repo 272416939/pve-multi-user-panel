@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **feat(theme): 界面模板体系 — 新增 SAAS 企业风模板 + 全站/个人双级选择**
+  - 现有紫色玻璃拟态风格固化为「默认模板」，新增「SAAS 企业风」模板（企业蓝主色、扁平克制、去玻璃化、细边框、8px 圆角、system-ui 字体，含完整明暗两套配色），覆盖 admin/仪表盘/用户中心/登录页全站
+  - 管理员在「系统设置 → 站点设置」通过可视化预览卡选择全站默认模板（点击实时预览，`site:template` 配置持久化，`admin.config.site` 审计）
+  - 用户在「用户中心 → 个人设置」自选个人模板偏好（跟随站点默认 / 默认模板 / SAAS），跨设备同步（`user_settings.template` 列 + `setting.template` 审计），优先级：个人偏好 > 站点默认
+  - 服务端注入 `<html data-template>` + theme-init.js 首帧应用（防闪烁），template-saas.css 独立文件后置加载（`html[data-template="saas"]` 作用域隔离，对默认模板零影响）
+
 ## [3.1.0] - 2026-08-08
 
 ### Added（3 个 feat）
