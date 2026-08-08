@@ -322,14 +322,14 @@ html[data-template="saas"] .pv-btn-secondary:hover {
     border-color: var(--border-color) !important;
 }
 
-/* 头部 ghost 按钮：无边框透明 */
+/* 头部 ghost 按钮：细边框，hover 边框变蓝（明暗切换等头部图标按钮） */
 html[data-template="saas"] .pv-btn-ghost {
-    border-color: transparent !important;
+    border-color: var(--border-color) !important;
     border-radius: 6px !important;
 }
 html[data-template="saas"] .pv-btn-ghost:hover {
     background: var(--bg-hover) !important;
-    border-color: transparent !important;
+    border-color: var(--color-primary) !important;
     color: var(--color-primary) !important;
 }
 
