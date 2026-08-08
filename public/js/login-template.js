@@ -66,9 +66,14 @@
                                     <div class="register-hint">至少 8 位，包含大小写字母和特殊字符 (@#$%^&*!)</div>
                                 </div>
                                 <div class="mb-3">
+                                    <label class="form-label">确认密码</label>
+                                    <input type="password" class="form-control" v-model="registerConfirmPassword" autocomplete="new-password" placeholder="请再次输入密码">
+                                    <div v-if="registerConfirmPassword && registerConfirmPassword !== registerForm.password" class="login-field-error">两次输入的密码不一致</div>
+                                </div>
+                                <div class="mb-3">
                                     <label class="form-label">邮箱</label>
                                     <input type="email" class="form-control" v-model="registerForm.email" autocomplete="email">
-                                    <button type="button" class="send-code-btn" @click="sendCode" :disabled="codeCountdown > 0">
+                                    <button type="button" class="send-code-btn" @click="sendCode" :disabled="codeCountdown > 0 || !canSendCode">
                                         {{ codeCountdown > 0 ? codeCountdown + 's 后重发' : '发送验证码' }}
                                     </button>
                                 </div>
