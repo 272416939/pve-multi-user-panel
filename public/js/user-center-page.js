@@ -3,6 +3,9 @@ const { createApp, ref, onMounted, onUnmounted, onBeforeUnmount, watch, nextTick
 const App = {
     template: '#appTemplate',
     setup() {
+        // 模板 v-html 净化依赖（user-center-template.js 通知分组图标直接引用 DOMPurify，
+        // Vue 模板表达式不查全局变量，必须在 setup 暴露，否则渲染报 reading 'sanitize'）
+        const DOMPurify = window.DOMPurify;
         const user = ref(null);
         const activeSubTab = ref(window.location.hash ? window.location.hash.slice(1) : 'settings');
         const navItems = ref([]);
@@ -1373,6 +1376,7 @@ const App = {
 
         return {
             user,
+            DOMPurify,
             activeSubTab,
             navItems,
             currentNavId,
