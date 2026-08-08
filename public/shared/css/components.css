@@ -626,3 +626,19 @@ tr:hover td { background: var(--bg-hover); }
     font-weight: 700;
     letter-spacing: 2px;
 }
+
+/* ===== CNAME 域名单元格（VM/LXC 列表）：单行省略 + 悬停 title 全名，保持行对齐 ===== */
+.cname-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+    line-height: 1.6;
+}
+/* 移动端 CNAME 条目：名称部分单行省略（复制按钮保留） */
+.vm-mobile-card-cname-item > span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}

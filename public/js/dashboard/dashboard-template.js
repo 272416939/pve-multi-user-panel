@@ -128,7 +128,7 @@
                                 </div>
                                 <div v-if="vm._cnameOpen" class="vm-mobile-card-cname-list">
                                     <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
-                                        <span class="text-primary" style="word-break:break-all;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</span>
+                                        <span class="text-primary"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</span>
                                         <button class="cname-copy-btn" @click="copyText(cname.domain)" title="复制">
                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                         </button>
@@ -201,7 +201,7 @@
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                     <td>
                                         <template v-if="cnameDomain && !vm._provisioning">
-                                            <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname.domain" class="text-primary" style="line-height:1.5;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</div>
+                                            <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</div>
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>
@@ -299,7 +299,7 @@
                                 </div>
                                 <div v-if="ct._cnameOpen" class="vm-mobile-card-cname-list">
                                     <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
-                                        <span class="text-primary" style="word-break:break-all;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</span>
+                                        <span class="text-primary"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</span>
                                         <button class="cname-copy-btn" @click="copyText(cname.domain)" title="复制">
                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                         </button>
@@ -369,7 +369,7 @@
                                     <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
                                     <td>
                                         <template v-if="cnameDomain && !ct._provisioning">
-                                            <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname.domain" class="text-primary" style="line-height:1.5;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</div>
+                                            <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</div>
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>
