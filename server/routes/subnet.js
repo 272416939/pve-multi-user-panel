@@ -10,6 +10,8 @@ const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync'
 const { safeError } = require('../utils/safe-error');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { auditAction } = require('../utils/audit-log');
+const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 
 const VALID_IP_RE = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
 
@@ -290,6 +292,43 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         });
 
         await auditAction(req, 'subnet.create', '创建子网 ' + vlanName + ' (VLAN ' + vlanId + ', 网关 ' + gw + ', 地址池 ' + addrPool + ')', { resourceType: 'subnet', resourceId: subnet.id });
+
+        // 站内信通知：子网开通成功
+        try {
+            await db.messages.create({
+                uid: req.user.id,
+                title: '子网开通成功',
+                content: '您的私有网络子网已开通成功！\nVLAN 名称：' + vlanName + '\nVLAN ID：' + vlanId + '\n网关：' + gw + '\n地址池：' + addrPool + '\n所属接口：' + iface,
+                type: 1,
+                send_type: 1
+            });
+        } catch (msgErr) {
+            console.error('[subnet] 站内信发送失败:', msgErr.message);
+        }
+        // 邮件通知：子网开通成功（受用户通知设置 notify_subnet_provisioned 开关控制）
+        try {
+            var subnetUser = await db.users.getById(req.user.id);
+            if (subnetUser && subnetUser.email && subnetUser.emailVerified && subnetUser.email.includes('@')) {
+                var siteName = await getSiteName();
+                var emailHtml = createEmailTemplate('子网开通成功',
+                    '<p>您的私有网络子网已开通成功！</p>' +
+                    '<div class="info-box">' +
+                    '<p style="margin-bottom: 4px;">🌐 VLAN 名称：<strong>' + vlanName + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">🔢 VLAN ID：<strong>' + vlanId + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">🖧 网关：<strong>' + gw + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">📦 地址池：<strong>' + addrPool + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">🔌 所属接口：<strong>' + iface + '</strong></p>' +
+                    '<p>⏰ 开通时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                    '</div>' +
+                    '<p>您可以在「我的虚拟机 / 容器」中绑定该子网使用。</p>', siteName);
+                if (await shouldSendEmail(req.user.id, 'notify_subnet_provisioned')) {
+                    enqueueEmail(subnetUser.email, '子网开通成功 - ' + siteName, emailHtml);
+                }
+            }
+        } catch (emailErr) {
+            console.error('[subnet] 邮件发送失败:', emailErr.message);
+        }
+
         res.json(subnet);
     } catch (e) {
         console.error('[subnet] 创建子网失败:', e.message);

@@ -165,6 +165,7 @@ const userSettings = {
         notify_vm_provisioned: 1,
         notify_lxc_provisioned: 1,
         notify_account_password: 1,
+        notify_subnet_provisioned: 1,
         notify_vm_refund: 1,
         notify_lxc_refund: 1,
         notify_disk_purchase: 1,
@@ -182,6 +183,7 @@ const userSettings = {
     ALLOWED_FIELDS: [
         'email_notifications_enabled',
         'notify_vm_provisioned', 'notify_lxc_provisioned', 'notify_account_password',
+        'notify_subnet_provisioned',
         'notify_vm_refund', 'notify_lxc_refund',
         'notify_disk_purchase', 'notify_disk_resize', 'notify_disk_renewal',
         'notify_disk_refund', 'notify_disk_destroy_refund',

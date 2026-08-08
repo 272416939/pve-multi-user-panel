@@ -93,6 +93,7 @@ const App = {
             notify_vm_provisioned: 1,
             notify_lxc_provisioned: 1,
             notify_account_password: 1,
+            notify_subnet_provisioned: 1,
             notify_vm_refund: 1,
             notify_lxc_refund: 1,
             notify_disk_purchase: 1,
@@ -115,7 +116,8 @@ const App = {
                 items: [
                     { key: 'notify_vm_provisioned', label: '虚拟机开通成功' },
                     { key: 'notify_lxc_provisioned', label: '容器开通成功' },
-                    { key: 'notify_account_password', label: '服务器账号密码' }
+                    { key: 'notify_account_password', label: '服务器账号密码' },
+                    { key: 'notify_subnet_provisioned', label: '子网开通成功' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
