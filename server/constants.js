@@ -45,7 +45,7 @@ var TEMPLATE_STATUS = ['active', 'maintenance', 'deprecated'];
 // 支付方式白名单
 var PAYMENT_METHODS = ['alipay', 'wxpay'];
 
-// 界面模板（UI 模板体系）：'default' = 经典玻璃拟态（默认），'saas' = SAAS 企业风
+// 界面模板（UI 模板体系）：'default' = 赛博霓虹（默认），'saas' = SAAS 企业风
 // 用户级偏好额外允许 ''（跟随站点默认），见 db-users.js userSettings 校验
 var UI_TEMPLATES = ['default', 'saas'];
 

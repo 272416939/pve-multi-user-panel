@@ -26,7 +26,7 @@ body {
 .sidebar-toggle:hover { background: var(--glass-accent); border-color: var(--glass-accent); }
 .header-center { position: absolute; left: 50%; transform: translateX(-50%); }
 .brand-logo { font-family: 'Orbitron', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 1.5px;
-    background: linear-gradient(135deg, var(--color-primary) 0%, #8B5CF6 100%);
+    background: linear-gradient(135deg, var(--color-primary) 0%, #22d3ee 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; white-space: nowrap; }
 .header-right { display: flex; align-items: center; gap: 10px; }
 .header-btn { width: 36px; height: 36px; border: 1px solid var(--border-color); border-radius: 8px;
@@ -40,7 +40,7 @@ body {
     color: var(--glass-text); text-decoration: none;
     position: relative; }
 .user-info-dropdown:hover, .user-info-dropdown.open { border-color: var(--glass-accent); }
-.user-info-dropdown.open { background: rgba(99,102,241,0.08); }
+.user-info-dropdown.open { background: rgba(168,85,247,0.08); }
 .header-user-avatar { width: 28px; height: 28px; border-radius: 50%;
     object-fit: cover; border: 1px solid var(--border-color); flex-shrink: 0; cursor: pointer; }
 .header-username { font-size: 13px; font-weight: 600; white-space: nowrap; color: var(--text-primary);
@@ -54,7 +54,7 @@ body {
 .user-info-dropdown.open .header-user-menu { display: block; }
 .header-user-menu li a { display: flex; align-items: center; gap: 10px; padding: 9px 16px;
     font-size: 13px; color: var(--text-secondary); text-decoration: none; transition: all 0.15s ease, color 0.3s ease, background-color 0.3s ease; }
-.header-user-menu li a:hover { color: var(--text-primary); background: rgba(99,102,241,0.12); }
+.header-user-menu li a:hover { color: var(--text-primary); background: rgba(168,85,247,0.12); }
 .header-user-menu li a span { font-size: 14px; width: 18px; text-align: center; }
 .header-menu-divider { margin: 4px 12px; border: none; border-top: 1px solid var(--border-light); }
 
@@ -83,8 +83,8 @@ body {
 .nav-item::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
     background: var(--color-primary); border-radius: 0 3px 3px 0; transform: scaleY(0); transition: transform 0.25s ease; }
 .nav-item:hover { background: var(--bg-hover); color: var(--glass-text); border-color: var(--border-color); }
-.nav-item.active { background: rgba(99, 102, 241, 0.18); color: var(--color-primary); border-color: rgba(99, 102, 241, 0.3);
-    font-weight: 600; box-shadow: inset 0 0 20px rgba(99, 102, 241, 0.08); }
+.nav-item.active { background: rgba(168, 85, 247, 0.18); color: var(--color-primary); border-color: rgba(168, 85, 247, 0.3);
+    font-weight: 600; box-shadow: inset 0 0 20px rgba(168, 85, 247, 0.08); }
 .nav-item.active::before { transform: scaleY(1); }
 /* 父级菜单不显示 active 高亮，仅保留展开箭头旋转 */
 .nav-item.has-children.active { background: transparent; color: var(--glass-text-muted); border-color: transparent;

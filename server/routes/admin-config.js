@@ -574,7 +574,7 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         // 操作审计：更新站点设置（仅摘要，不含敏感内容）
         try {
             const { auditLog } = require('../utils/audit-log');
-            var templateLabel = template !== undefined ? (template === 'saas' ? 'SAAS企业风' : '默认模板') : '-';
+            var templateLabel = template !== undefined ? (template === 'saas' ? 'SAAS企业风' : '赛博霓虹') : '-';
             await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.site', resourceType: 'config', resourceId: 'site', details: '更新站点设置(站点名:' + (name !== undefined ? name : '-') + (register_enabled !== undefined ? ',开放注册:' + (register_enabled ? '是' : '否') : '') + (template !== undefined ? ',界面模板:' + templateLabel : '') + ')', req });
         } catch (e) {}
         res.json({ message: '站点配置保存成功' });

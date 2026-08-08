@@ -17,7 +17,7 @@ const App = {
         const templatePreferenceSaving = ref(false);
         // 站点全局默认模板（跟随站点默认卡需要）
         const siteDefault = ref('default');
-        const siteDefaultName = ref('默认模板');
+        const siteDefaultName = ref('赛博霓虹');
         const memos = ref([]);
         const memosLoading = ref(false);
         const editMemoForm = ref({ id: null, title: '', content: '' });
@@ -815,7 +815,7 @@ const App = {
                 templatePreference.value = (res && res.template) || '';
                 var sd = (res && res.siteDefault) || 'default';
                 siteDefault.value = sd;
-                siteDefaultName.value = sd === 'saas' ? 'SAAS 企业风' : '默认模板';
+                siteDefaultName.value = sd === 'saas' ? 'SAAS 企业风' : '赛博霓虹';
                 window.applyTemplate(templatePreference.value, sd);
             } catch (e) {
                 console.error('加载界面模板偏好失败', e);

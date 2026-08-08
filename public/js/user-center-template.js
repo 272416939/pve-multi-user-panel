@@ -158,7 +158,7 @@
                                             <small class="text-muted">当前：{{ siteDefaultName }}</small>
                                         </div>
                                     </div>
-                                    <!-- 默认模板预览卡 -->
+                                    <!-- 赛博霓虹预览卡 -->
                                     <div class="template-picker" :class="{ 'template-picker-active': templatePreference === 'default' }" @click="selectTemplate('default')" role="button" tabindex="0">
                                         <div class="template-preview template-preview-default">
                                             <div class="tp-sidebar">
@@ -178,12 +178,12 @@
                                         </div>
                                         <div class="template-picker-body">
                                             <div class="d-flex align-items-center gap-2">
-                                                <strong>默认模板</strong>
+                                                <strong>赛博霓虹</strong>
                                                 <span v-if="templatePreference === 'default'" class="template-check">
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                                                 </span>
                                             </div>
-                                            <small class="text-muted">经典玻璃拟态 · 紫色渐变</small>
+                                            <small class="text-muted">霓虹赛博 · 紫青发光</small>
                                         </div>
                                     </div>
                                     <!-- SAAS 企业风预览卡 -->

@@ -96,7 +96,7 @@ router.put('/user/template', authMiddleware, async (req, res) => {
         // 操作审计：界面模板偏好变更
         try {
             const { auditLog } = require('../utils/audit-log');
-            var label = template === 'saas' ? 'SAAS企业风' : (template === 'default' ? '默认模板' : '跟随站点默认');
+            var label = template === 'saas' ? 'SAAS企业风' : (template === 'default' ? '赛博霓虹' : '跟随站点默认');
             await auditLog({ userId: req.user.id, username: req.user.username, action: 'setting.template', resourceType: 'setting', resourceId: 'template', details: '更新界面模板偏好：' + label, req });
         } catch (_) {}
         res.json({ template: (settings && settings.template) || '', siteDefault: siteDefault });

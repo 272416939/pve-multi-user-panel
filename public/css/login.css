@@ -1,36 +1,51 @@
         :root {
-            --login-bg-card: rgba(15, 23, 42, 0.75);
+            --login-bg-card: rgba(12, 12, 29, 0.8);
             --login-bg-input: rgba(255, 255, 255, 0.06);
-            --login-border-input: rgba(255, 255, 255, 0.15);
-            --login-text-input: #e2e8f0;
-            --login-text-label: #94a3b8;
-            --login-color-primary: #667eea;
-            --login-gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --login-border-input: rgba(168, 85, 247, 0.25);
+            --login-text-input: #e6e6fa;
+            --login-text-label: #9d9db8;
+            --login-color-primary: #a855f7;
+            --login-gradient-primary: linear-gradient(135deg, #a855f7 0%, #22d3ee 100%);
             --login-color-error: #f87171;
             --login-color-success: #34d399;
-            --login-text-version: rgba(255, 255, 255, 0.35);
-            --login-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --login-text-version: rgba(230, 230, 250, 0.35);
+            --login-shadow: 0 8px 32px rgba(168, 85, 247, 0.22);
         }
         [data-theme="light"] {
-            --login-bg-card: rgba(255, 255, 255, 0.85);
+            --login-bg-card: rgba(255, 255, 255, 0.9);
             --login-bg-input: rgba(255, 255, 255, 0.9);
-            --login-border-input: rgba(99, 102, 241, 0.2);
-            --login-text-input: #334155;
-            --login-text-label: #64748b;
-            --login-color-primary: #6366f1;
-            --login-gradient-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            --login-border-input: rgba(168, 85, 247, 0.2);
+            --login-text-input: #3b3654;
+            --login-text-label: #6d6a8a;
+            --login-color-primary: #9333ea;
+            --login-gradient-primary: linear-gradient(135deg, #9333ea 0%, #a855f7 100%);
             --login-color-error: #ef4444;
             --login-color-success: #10b981;
-            --login-text-version: #94a3b8;
-            --login-shadow: 0 4px 20px rgba(99, 102, 241, 0.1);
+            --login-text-version: #9d9ab8;
+            --login-shadow: 0 4px 20px rgba(147, 51, 234, 0.12);
         }
         .login-page {
             display: flex;
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background-image: url('https://cn-img.owoser.cn/images/2022/11/08/adc63889cad0409392e7e44ac0e48fd8.png') !important;
-            background-size: cover !important;
+            /* 赛博霓虹背景：三层光晕 + 深黑蓝渐变（纯 CSS，无外链图） */
+            background-image:
+                radial-gradient(600px 400px at 20% 10%, rgba(168, 85, 247, 0.2), transparent 60%),
+                radial-gradient(700px 500px at 85% 25%, rgba(34, 211, 238, 0.14), transparent 60%),
+                radial-gradient(600px 500px at 50% 92%, rgba(244, 114, 182, 0.1), transparent 60%),
+                linear-gradient(180deg, #0a0a1c 0%, #05050f 100%) !important;
+            background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100% !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            background-attachment: fixed !important;
+        }
+        [data-theme="light"] .login-page {
+            background-image:
+                radial-gradient(600px 400px at 20% 10%, rgba(168, 85, 247, 0.12), transparent 60%),
+                radial-gradient(700px 500px at 85% 25%, rgba(34, 211, 238, 0.1), transparent 60%),
+                linear-gradient(180deg, #f7f5ff 0%, #ece9ff 100%) !important;
+            background-size: 100% 100%, 100% 100%, 100% 100% !important;
             background-position: center !important;
             background-repeat: no-repeat !important;
             background-attachment: fixed !important;
@@ -246,7 +261,7 @@
             background: rgba(255, 255, 255, 0.05);
         }
         [data-theme="light"] .login-tab-switch button:not(.active):hover {
-            background: rgba(99, 102, 241, 0.08);
+            background: rgba(168, 85, 247, 0.08);
         }
 
         /* 密码强度条 */
@@ -314,10 +329,10 @@
             transition: all 0.3s ease;
         }
         .send-code-btn:hover:not(:disabled) {
-            background: rgba(102, 126, 234, 0.1);
+            background: rgba(168, 85, 247, 0.1);
         }
         [data-theme="light"] .send-code-btn:hover:not(:disabled) {
-            background: rgba(99, 102, 241, 0.08);
+            background: rgba(168, 85, 247, 0.08);
         }
         .send-code-btn:disabled {
             border-color: var(--login-border-input);

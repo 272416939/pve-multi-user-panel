@@ -979,7 +979,7 @@ async function initDefaultConfig() {
         'site:name': 'PVE 多用户控制面板',
         'site:logo_text': 'PVE 面板',
         'site:login_title': 'PVE Panel',
-        // 界面模板（全站默认）：'default' = 经典玻璃拟态，'saas' = SAAS 企业风
+        // 界面模板（全站默认）：'default' = 赛博霓虹，'saas' = SAAS 企业风
         'site:template': 'default',
         'pve:host': '',
         'pve:api_token': '',
