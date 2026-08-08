@@ -61,6 +61,23 @@ async function verifySensitiveAction(user, body, req) {
     return { ok: false, error: '验证失败：请提供正确的当前密码或 2FA 验证码' };
 }
 
+// 改密公共逻辑：哈希更新 + 撤销全部 refresh token + 清活跃状态/资料缓存
+// 供 PUT /user/password 与 PUT /user/profile（兼容旧调用方）复用
+async function changeUserPassword(userId, newPassword) {
+    await db.users.update(userId, {
+        password: await hashPassword(newPassword),
+        password_salt: null,
+        // C-2 修复：用户主动改密后清除强制改密标记
+        must_change_password: 0
+    });
+    // H-8 修复：密码变更后撤销该用户所有 refresh token
+    await db.refreshTokens.revokeByUserId(userId);
+    // 清除用户活跃状态缓存
+    await invalidateUserActiveCache(userId);
+    // 清除资料缓存
+    await profileCache.del(String(userId));
+}
+
 router.post('/user/2fa/setup', authMiddleware, async (req, res) => {
     try {
         const user = await db.users.getById(req.user.id);
@@ -284,14 +301,7 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         }
         
         if (password) {
-            updates.password = await hashPassword(password);
-            updates.password_salt = null;
-            // C-2 修复：用户主动改密后清除强制改密标记
-            updates.must_change_password = 0;
-            // H-8 修复：密码变更后撤销该用户所有 refresh token
-            await db.refreshTokens.revokeByUserId(req.user.id);
-            // 清除用户活跃状态缓存
-            await invalidateUserActiveCache(req.user.id);
+            await changeUserPassword(req.user.id, password);
         }
         
         if (bio !== undefined) {
@@ -303,17 +313,53 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         const updatedUser = await db.users.getById(req.user.id);
         const safeUser = sanitizeUser(updatedUser);
         await profileCache.del(String(req.user.id));
-        // 操作审计：个人资料/简介编辑（含改密）
+        // 操作审计：个人资料/简介编辑（改密单独走 password.reset.self，归「重置密码」分类）
         const changed = [];
         if (username && username !== user.username) changed.push('用户名');
-        if (password) changed.push('登录密码');
         if (bio !== undefined) changed.push('个人简介');
         if (changed.length > 0) {
             await auditAction(req, 'setting.profile', '编辑个人资料：' + changed.join('、'));
         }
+        if (password) {
+            await auditAction(req, 'password.reset.self', '重置登录密码');
+        }
         res.json({ message: '资料更新成功', user: safeUser });
     } catch (error) {
         res.status(500).json({ error: '更新资料失败' });
+    }
+});
+
+// 用户主动重置密码（独立接口：密码强度校验 + 二次验证 + 独立审计）
+// 前端个人设置「修改密码」卡片专用；审计归日志页「重置密码」分类
+router.put('/user/password', authMiddleware, async (req, res) => {
+    try {
+        const { password } = req.body;
+
+        // 密码强度校验（与注册/忘记密码同款正则，auth.js 一致）
+        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/;
+        if (!password || !passwordRegex.test(password)) {
+            return res.status(400).json({ error: '密码至少 8 位，且需包含大小写字母和特殊字符 (@#$%^&*!)' });
+        }
+
+        const user = await db.users.getById(req.user.id);
+        if (!user) {
+            return res.status(404).json({ error: '用户不存在' });
+        }
+
+        // 二次验证：当前密码/2FA 动态码/恢复码（与换绑邮箱一致，防 token 泄露后改密接管账号）
+        const secondary = await verifySensitiveAction(user, req.body, req);
+        if (!secondary.ok) return res.status(403).json({ error: secondary.error });
+
+        await changeUserPassword(req.user.id, password);
+        // 操作审计：归「重置密码」分类
+        await auditAction(req, 'password.reset.self', '重置登录密码');
+
+        const updatedUser = await db.users.getById(req.user.id);
+        const safeUser = sanitizeUser(updatedUser);
+        res.json({ message: '密码重置成功，请使用新密码登录', user: safeUser });
+    } catch (error) {
+        console.error('重置密码失败', error);
+        res.status(500).json({ error: '重置密码失败' });
     }
 });
 
@@ -484,6 +530,14 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         }
         
         await db.users.update(req.user.id, { email, emailVerified: false });
+
+        // 操作审计：邮箱变更埋点（换绑/首次绑定记录，重发验证不记录）
+        // 场景显式枚举：换绑（已有邮箱且变更）→ setting.email.change；首次绑定（从未绑过）→ setting.email.bind
+        if (user.email && user.email !== email) {
+            await auditAction(req, 'setting.email.change', '换绑邮箱为：' + email);
+        } else if (!user.email) {
+            await auditAction(req, 'setting.email.bind', '绑定邮箱：' + email);
+        }
         
         const verifyToken = generateToken();
         const expiresAt = new Date(Date.now() + 3600000);

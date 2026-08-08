@@ -60,6 +60,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                 const registerEnabled = ref(false);
                 const siteLoginTitle = ref(window.__siteLoginTitle || 'PVE Panel');
                 const registerForm = ref({ username: '', password: '', email: '', code: '' });
+                const registerConfirmPassword = ref('');
                 const registerError = ref('');
                 const registerSubmitting = ref(false);
                 const codeCountdown = ref(0);
@@ -308,6 +309,12 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     return { level: 'strong', percent: 100, text: '强' };
                 });
 
+                // 注册功能：发送验证码按钮可用条件（用户名/密码/确认密码/邮箱齐全且两次密码一致）
+                const canSendCode = computed(() => {
+                    const f = registerForm.value;
+                    return !!(f.username.trim() && f.password && registerConfirmPassword.value && f.email.trim() && registerConfirmPassword.value === f.password);
+                });
+
                 // 注册功能：发送验证码
                 const sendCode = async () => {
                     const email = registerForm.value.email.trim();
@@ -340,6 +347,9 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/.test(f.password)) {
                         registerError.value = '密码必须至少 8 位，包含大小写字母和特殊字符'; return;
                     }
+                    if (f.password !== registerConfirmPassword.value) {
+                        registerError.value = '两次输入的密码不一致'; return;
+                    }
                     if (!f.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) {
                         registerError.value = '邮箱格式不正确'; return;
                     }
@@ -355,6 +365,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             loginForm.value.username = f.username;
                             alert(res.message || '注册成功，请登录');
                             registerForm.value = { username: '', password: '', email: '', code: '' };
+                            registerConfirmPassword.value = '';
                             if (codeTimer) { clearInterval(codeTimer); codeTimer = null; codeCountdown.value = 0; }
                         } else {
                             registerError.value = res.error || '注册失败';
@@ -447,10 +458,12 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     registerEnabled,
                     siteLoginTitle,
                     registerForm,
+                    registerConfirmPassword,
                     registerError,
                     registerSubmitting,
                     codeCountdown,
                     passwordStrength,
+                    canSendCode,
                     switchView,
                     sendCode,
                     submitRegister,

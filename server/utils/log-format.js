@@ -17,6 +17,7 @@ function buildDetailText(details) {
             var obj = JSON.parse(trimmed);
             if (obj && typeof obj === 'object') {
                 if (typeof obj.text === 'string') return obj.text;
+                if (obj.target_username !== undefined) return '删除用户:' + obj.target_username; // 兼容旧版删除用户记录
                 return JSON.stringify(obj);
             }
         } catch (_) { /* 非 JSON，按原文展示 */ }

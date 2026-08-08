@@ -48,8 +48,10 @@
             <div v-if="activeSubTab === 'settings'">
                 <div class="row justify-content-center">
                     <div class="col-md-8">
-                        <div class="card">
+                        <!-- 卡片1：基本资料（头像/用户名/简介） -->
+                        <div class="card mb-3">
                             <div class="card-body">
+                                <h6 class="card-subtitle mb-3 text-muted">基本资料</h6>
                                 <div class="mb-3">
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="avatar-circle">
@@ -63,11 +65,37 @@
                                     </div>
                                 </div>
 
+                                <form @submit.prevent="updateProfile">
+                                    <div class="mb-3">
+                                        <label class="form-label">用户名</label>
+                                        <input type="text" class="form-control" v-model="profileForm.username">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">个人简介</label>
+                                        <textarea class="form-control" rows="3" v-model="profileForm.bio" placeholder="介绍一下自己..."></textarea>
+                                    </div>
+                                    <pv-button type="submit" variant="primary" >保存修改</pv-button>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- 卡片2：邮箱（独立绑定/换绑） -->
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-3 text-muted">邮箱</h6>
                                 <div class="mb-3">
-                                    <label class="form-label">邮箱</label>
+                                    <label class="form-label">当前绑定邮箱</label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span>{{ user.email || '未绑定' }}</span>
+                                        <small v-if="profileForm.emailVerified" class="text-success">✓ 已验证</small>
+                                        <small v-else-if="user.email" class="text-warning">● 未验证</small>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">{{ user.email ? '换绑新邮箱' : '绑定邮箱' }}</label>
                                     <div class="d-flex gap-2">
-                                        <input type="email" class="form-control" v-model="profileForm.email" placeholder="请输入邮箱">
-                                        <pv-button v-if="!profileForm.email || profileForm.email !== user.email" type="button" variant="outline" @click="bindEmail">绑定</pv-button>
+                                        <input type="email" class="form-control" v-model="profileForm.email" :placeholder="user.email ? '输入新邮箱' : '请输入邮箱'">
+                                        <pv-button v-if="profileForm.email && profileForm.email !== user.email" type="button" variant="outline" @click="bindEmail">{{ user.email ? '换绑' : '绑定' }}</pv-button>
                                         <pv-button v-else-if="!profileForm.emailVerified" type="button" variant="secondary" @click="resendVerification">重发验证</pv-button>
                                     </div>
                                     <!-- M-1 修复：换绑邮箱需输入当前密码做二次验证 -->
@@ -75,29 +103,33 @@
                                     <div class="mt-1">
                                         <small v-if="profileForm.emailVerified" class="text-success">✓ 已验证</small>
                                         <small v-else-if="profileForm.email && profileForm.email === user.email" class="text-warning">● 未验证 - 请查收验证邮件</small>
-                                        <small v-else-if="profileForm.email" class="text-muted">点击「绑定」保存邮箱</small>
+                                        <small v-else-if="profileForm.email" class="text-muted">点击「{{ user.email ? '换绑' : '绑定' }}」保存邮箱</small>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
 
-                                <form @submit.prevent="updateProfile">
+                        <!-- 卡片3：修改密码（独立重置按钮，复用注册页确认密码交互） -->
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-3 text-muted">修改密码</h6>
+                                <form @submit.prevent="updatePassword">
                                     <div class="mb-3">
-                                        <label class="form-label">用户名</label>
-                                        <input type="text" class="form-control" v-model="profileForm.username">
+                                        <label class="form-label">新密码</label>
+                                        <input type="password" class="form-control" v-model="profileForm.password" autocomplete="new-password" placeholder="请输入新密码">
+                                        <small class="text-muted">至少 8 位，包含大小写字母和特殊字符 (@#$%^&*!)</small>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">新密码（留空则不修改）</label>
-                                        <input type="password" class="form-control" v-model="profileForm.password">
+                                        <label class="form-label">确认密码</label>
+                                        <input type="password" class="form-control" v-model="profileForm.confirmPassword" autocomplete="new-password" placeholder="请再次输入密码">
+                                        <small v-if="profileForm.confirmPassword && profileForm.confirmPassword !== profileForm.password" class="text-danger">两次输入的密码不一致</small>
                                     </div>
-                                    <!-- M-1 修复：修改密码需输入当前密码做二次验证 -->
-                                    <div v-if="profileForm.password" class="mb-3">
+                                    <div class="mb-3">
                                         <label class="form-label">当前密码（用于验证身份）</label>
-                                        <input type="password" class="form-control" v-model="profileForm.currentPassword">
+                                        <input type="password" class="form-control" v-model="profileForm.currentPassword" autocomplete="current-password" placeholder="输入当前密码以验证">
                                     </div>
-                                    <div class="mb-3">
-                                        <label class="form-label">个人简介</label>
-                                        <textarea class="form-control" rows="3" v-model="profileForm.bio" placeholder="介绍一下自己..."></textarea>
-                                    </div>
-                                    <pv-button type="submit" variant="primary" >保存修改</pv-button>
+                                    <pv-button type="submit" variant="primary" >重置密码</pv-button>
+                                    <small class="text-muted d-block mt-2">重置后所有登录设备需重新登录</small>
                                 </form>
                             </div>
                         </div>
