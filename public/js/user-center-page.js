@@ -11,7 +11,7 @@ const App = {
         const navItems = ref([]);
         const currentNavId = ref('user-center');
 
-        const profileForm = ref({ username: '', password: '', currentPassword: '', emailPassword: '', bio: '', avatar: '', email: '', emailVerified: false });
+        const profileForm = ref({ username: '', password: '', confirmPassword: '', currentPassword: '', emailPassword: '', bio: '', avatar: '', email: '', emailVerified: false });
         const memos = ref([]);
         const memosLoading = ref(false);
         const editMemoForm = ref({ id: null, title: '', content: '' });
@@ -809,24 +809,42 @@ const App = {
                     username: profileForm.value.username,
                     bio: profileForm.value.bio
                 };
-                if (profileForm.value.password) {
-                    // M-1 修复：改密必须携带当前密码做二次验证
-                    if (!profileForm.value.currentPassword) {
-                        alert('修改密码需要输入当前密码进行验证');
-                        return;
-                    }
-                    data.password = profileForm.value.password;
-                    data.current_password = profileForm.value.currentPassword;
-                }
                 const result = await api('/user/profile', {
                     method: 'PUT',
                     body: JSON.stringify(data)
                 });
                 user.value = result.user;
-                profileForm.value.password = '';
-                profileForm.value.currentPassword = '';
                 alert('资料更新成功！');
             } catch (e) {
+                alert(e.message);
+            }
+        };
+
+        // 独立修改密码卡片：新密码 + 确认密码（复用注册页交互）+ 当前密码二次验证
+        const updatePassword = async () => {
+            if (!profileForm.value.password) {
+                alert('请输入新密码');
+                return;
+            }
+            if (profileForm.value.password !== profileForm.value.confirmPassword) {
+                alert('两次输入的密码不一致');
+                return;
+            }
+            if (!profileForm.value.currentPassword) {
+                alert('重置密码需要输入当前密码进行验证');
+                return;
+            }
+            try {
+                const result = await api('/user/password', {
+                    method: 'PUT',
+                    body: JSON.stringify({ password: profileForm.value.password, current_password: profileForm.value.currentPassword })
+                });
+                profileForm.value.password = '';
+                profileForm.value.confirmPassword = '';
+                profileForm.value.currentPassword = '';
+                alert(result.message);
+            } catch (e) {
+                // 限速 429 倒计时已由 api() 统一拼接进错误文案，这里原样展示
                 alert(e.message);
             }
         };
@@ -1402,6 +1420,7 @@ const App = {
             loadProfile,
             loadMemos,
             updateProfile,
+            updatePassword,
             handleAvatarUpload,
             bindEmail,
             resendVerification,
