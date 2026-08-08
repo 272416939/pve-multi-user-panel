@@ -136,41 +136,78 @@ function createEmailTemplate(title, content, siteName) {
     `;
 }
 
-async function sendEmail(to, subject, html) {
+// ---- SMTP 配置与 transporter 缓存（发送性能优化） ----
+// 历史问题：每次发信都从 DB 读 SMTP 配置 + 新建 transporter（全新 TCP+TLS 连接）+ verify() 握手，
+// 单封邮件 1~3 秒，且全部调用点 await 同步等待，导致购买/开通/验证码等接口被拖慢。
+// 优化：单例 transporter（pool 连接复用）+ SMTP 配置内存缓存；配置变更时由 resetTransporterCache 失效。
+
+let _smtpConfig = null;   // SMTP 配置缓存（含 strict_tls）
+let _transporter = null;  // 单例 transporter（连接池复用）
+
+// 获取 SMTP 配置（带内存缓存；SMTP 配置保存/测试后由 resetTransporterCache 失效）
+async function getSmtpConfig() {
+    if (_smtpConfig) return _smtpConfig;
     // 行内懒加载避免 utils 顶层依赖 api 层（规范第七节：utils 是叶子层）
     var db = require('../api/db');
-    const config = await db.config.getSmtp();
-    
+    var config = await db.config.getSmtp();
+    // SMTP TLS 验证：默认关闭（兼容自签证书），可在 SMTP 配置中开启
+    var strictTls = false;
+    try {
+        var tlsVal = await db.config.get('smtp:strict_tls');
+        strictTls = tlsVal === '1';
+    } catch (e) {}
+    _smtpConfig = Object.assign({}, config, { strictTls });
+    return _smtpConfig;
+}
+
+// 失效 transporter 与 SMTP 配置缓存（SMTP 配置保存/测试时调用，下次发送自动重建）
+function resetTransporterCache() {
+    if (_transporter) {
+        try {
+            _transporter.close();
+        } catch (e) {
+            // 忽略关闭异常
+        }
+        _transporter = null;
+    }
+    _smtpConfig = null;
+}
+
+async function sendEmail(to, subject, html) {
+    let config;
+    try {
+        config = await getSmtpConfig();
+    } catch (e) {
+        throw new Error('邮件发送失败: ' + e.message);
+    }
+
     if (!config.enabled || !config.host || !config.user || !config.password) {
         throw new Error('SMTP 配置不完整或未启用');
     }
-    
-    try {
-        // SMTP TLS 验证：默认关闭（兼容自签证书），可在 SMTP 配置中开启
-        var strictTls = false;
-        try {
-            var tlsVal = await db.config.get('smtp:strict_tls');
-            strictTls = tlsVal === '1';
-        } catch (e) {}
 
-        const transporter = nodemailer.createTransport({
-            host: config.host,
-            port: config.port,
-            secure: config.secure,
-            auth: {
-                user: config.user,
-                pass: config.password
-            },
-            tls: {
-                rejectUnauthorized: strictTls
-            }
-        });
-        
-        await transporter.verify();
+    try {
+        if (!_transporter) {
+            _transporter = nodemailer.createTransport({
+                host: config.host,
+                port: config.port,
+                secure: config.secure,
+                auth: {
+                    user: config.user,
+                    pass: config.password
+                },
+                tls: {
+                    rejectUnauthorized: config.strictTls
+                },
+                // 连接池复用：避免每次发信新建 TCP+TLS 连接（历史上每次新建是性能瓶颈）
+                pool: true,
+                maxConnections: 3,
+                maxMessages: 100
+            });
+        }
 
         // 构造发件人地址：优先使用配置的邮箱，未配置则使用 SMTP 用户名
-        const fromEmail = config.from || config.user;
         // 若配置了发件人名称，则使用 "名称 <邮箱>" 格式
+        const fromEmail = config.from || config.user;
         const fromField = config.from_name
             ? `${config.from_name.replace(/[<>]/g, '').trim()} <${fromEmail}>`
             : fromEmail;
@@ -181,9 +218,11 @@ async function sendEmail(to, subject, html) {
             subject: subject,
             html: html
         };
-        
-        return await transporter.sendMail(mailOptions);
+
+        return await _transporter.sendMail(mailOptions);
     } catch (error) {
+        // 连接可能已失效（SMTP 重启/超时），重置 transporter 下次自动重建
+        resetTransporterCache();
         console.error('发送邮件失败:', error);
         throw new Error('邮件发送失败: ' + error.message);
     }
@@ -213,4 +252,4 @@ async function shouldSendEmail(userId, category) {
     }
 }
 
-module.exports = { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail };
+module.exports = { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail, resetTransporterCache };

@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { createEmailTemplate, sendEmail, resetTransporterCache } = require('../utils/email');
 const { loadSentRemindersFromDb, checkExpiredVms, checkExpiredLxc } = require('../services/expiry-check');
 const pkg = require('../../package.json');
 const { safeError } = require('../utils/safe-error');
@@ -63,6 +63,9 @@ router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
             enabled: !!enabled
         });
 
+        // SMTP 配置已变更：失效 transporter 与配置缓存（下次发送自动按新配置重建）
+        resetTransporterCache();
+
         const { password: _, ...configWithoutPassword } = await db.config.getSmtp();
         // 操作审计：更新 SMTP 配置（不记录密码/凭据原文）
         try {
@@ -95,11 +98,24 @@ router.post('/admin/smtp/test', authMiddleware, adminMiddleware, async (req, res
                 <li>续费提醒</li>
             </ul>
         `;
+        // 测试前失效缓存：确保用最新保存的 SMTP 配置发送（而不是旧 transporter）
+        resetTransporterCache();
         await sendEmail(testEmail, 'SMTP 配置测试', createEmailTemplate('测试邮件', emailContent));
         res.json({ message: '测试邮件发送成功' });
     } catch (error) {
         console.error('测试 SMTP 配置失败:', error);
         res.status(500).json({ error: safeError(error) });
+    }
+});
+
+router.get('/admin/email-queue/stats', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { getEmailQueueStats } = require('../queue/email-queue');
+        const stats = await getEmailQueueStats();
+        res.json(stats);
+    } catch (error) {
+        console.error('获取邮件队列状态失败:', error);
+        res.status(500).json({ error: '获取队列状态失败' });
     }
 });
 

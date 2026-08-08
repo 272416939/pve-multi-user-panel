@@ -4,7 +4,8 @@
 
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
+const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
 const { formatLocalDate } = require('../utils/date');
@@ -201,7 +202,7 @@ async function renewByBalance(opts) {
                         <p>⏰ 续费时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
                     <p>前往 <a href="${process.env.SITE_URL || ''}/">控制面板</a> 查看资源详情。</p>`, siteName);
-                await sendEmail(user.email, '资源续费成功 - ' + siteName, renewHtml);
+                enqueueEmail(user.email, '资源续费成功 - ' + siteName, renewHtml);
             }
         }
     } catch (e) {

@@ -4,7 +4,8 @@
 
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
-var { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
+var { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+var { enqueueEmail } = require('../queue/email-queue');
 var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 var { getRedisClient } = require('../api/redis');
 var logger = require('../utils/logger');
@@ -62,7 +63,7 @@ async function sendDiskReminderEmail(user, disk, stage) {
     var siteName = await getSiteName();
     var html = createEmailTemplate('硬盘到期提醒', content, siteName);
     if (await shouldSendEmail(user.id, 'notify_expiry_reminder')) {
-        await sendEmail(user.email, subject, html);
+        enqueueEmail(user.email, subject, html);
     }
   } catch (e) {
     logger.error('[disk-expiry] 发送提醒邮件失败:', e.message);
@@ -334,7 +335,7 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
     for (var i = 0; i < admins.rows.length; i++) {
       var admin = admins.rows[i];
       if (admin.email) {
-        try { await sendEmail(admin.email, subject, html); } catch (e) {}
+        try { enqueueEmail(admin.email, subject, html); } catch (e) {}
       }
     }
     logger.info('[disk-expiry] 存储容量告警邮件已发送给 ' + admins.rows.length + ' 个管理员');

@@ -3,7 +3,6 @@ const router = express.Router();
 const db = require('../api/db');
 const { pushUnreadCount } = require('../websocket/push-proxy');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
 const cacheStore = require('../utils/cache-store');
 // unreadCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
 const unreadCache = cacheStore.create('unread', 10);

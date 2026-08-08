@@ -702,6 +702,7 @@ async function initDb() {
             notify_expiry_reminder INT DEFAULT 1,
             notify_expiry_alert INT DEFAULT 1,
             notify_backup_result INT DEFAULT 1,
+            notify_subnet_provisioned INT DEFAULT 1,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_user_settings_user (user_id)
@@ -846,6 +847,9 @@ async function migrateSchema() {
 
     // os_templates 表迁移：新增 disk_format 列（目标磁盘格式，如 raw/qcow2/vmdk）
     await safeAlter('os_templates', 'disk_format', "VARCHAR(20) NOT NULL DEFAULT '' AFTER target_storage");
+
+    // user_settings 表迁移：新增子网开通通知开关
+    await safeAlter('user_settings', 'notify_subnet_provisioned', 'INT DEFAULT 1');
 
     // 修复已有 LXC 备份记录的 ct_id 和 type
     try {

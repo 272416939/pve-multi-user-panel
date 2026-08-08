@@ -10,6 +10,8 @@ const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync'
 const { safeError } = require('../utils/safe-error');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { auditAction } = require('../utils/audit-log');
+const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 
 const VALID_IP_RE = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
 
@@ -244,12 +246,28 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         const vlanName = generateVlanName(existingNames);
         if (!vlanName) return res.status(400).json({ error: 'VLAN 名称生成失败，请重试' });
 
+        // 5.5 接口有效性预校验（best-effort：枚举为空时跳过，避免误拦截）
+        // 爱快对无效接口返回 30001「写入数据失败」，这里提前给出可读提示
+        const vlanIfaces = await ikuaiApi.getVlanInterfaces();
+        if (vlanIfaces.length > 0 && !vlanIfaces.includes(iface)) {
+            // 接口清单属内网拓扑信息，仅管理员可见详情，普通用户给通用提示
+            const ifaceErr = req.user.role === 'admin'
+                ? `所属接口 ${iface} 在爱快设备上不可用（可用接口：${vlanIfaces.join(', ')}），请到系统设置-网络配置中修改`
+                : '所属接口配置无效，请联系管理员';
+            return res.status(400).json({ error: ifaceErr });
+        }
+
         // 6. 爱快创建 VLAN + DHCP 服务端
         const prefix = gw.split('.').slice(0, 3).join('.');
         const addrPool = prefix + '.2-' + prefix + '.255';
         const comment = generateVlanComment(req.user.username);
 
-        await ikuaiApi.addVlan({ vlan_id: vlanId, vlan_name: vlanName, ip_addr: gw, interface: iface, netmask: '255.255.255.0', comment });
+        try {
+            await ikuaiApi.addVlan({ vlan_id: vlanId, vlan_name: vlanName, ip_addr: gw, interface: iface, netmask: '255.255.255.0', comment });
+        } catch (e) {
+            // 爱快对「参数错误/账号无写权限」统一返回 30001 写入数据失败，附加排查指引
+            return res.status(500).json({ error: safeError(e) + '；如持续失败，请检查面板连接爱快的账号是否被限制为只读或缺少模块写权限' });
+        }
         let dhcpId = '';
         let available = 0;
         try {
@@ -290,6 +308,41 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         });
 
         await auditAction(req, 'subnet.create', '创建子网 ' + vlanName + ' (VLAN ' + vlanId + ', 网关 ' + gw + ', 地址池 ' + addrPool + ')', { resourceType: 'subnet', resourceId: subnet.id });
+
+        // 站内信通知：子网开通成功（VLAN ID/所属接口等内部细节仅管理员审计可见，不展示给用户）
+        try {
+            await db.messages.create({
+                uid: req.user.id,
+                title: '子网开通成功',
+                content: '您的私有网络子网已开通成功！\nVLAN 名称：' + vlanName + '\n网关：' + gw + '\n地址池：' + addrPool,
+                type: 1,
+                send_type: 1
+            });
+        } catch (msgErr) {
+            console.error('[subnet] 站内信发送失败:', msgErr.message);
+        }
+        // 邮件通知：子网开通成功（受用户通知设置 notify_subnet_provisioned 开关控制）
+        try {
+            var subnetUser = await db.users.getById(req.user.id);
+            if (subnetUser && subnetUser.email && subnetUser.emailVerified && subnetUser.email.includes('@')) {
+                var siteName = await getSiteName();
+                var emailHtml = createEmailTemplate('子网开通成功',
+                    '<p>您的私有网络子网已开通成功！</p>' +
+                    '<div class="info-box">' +
+                    '<p style="margin-bottom: 4px;">🌐 VLAN 名称：<strong>' + vlanName + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">🖧 网关：<strong>' + gw + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">📦 地址池：<strong>' + addrPool + '</strong></p>' +
+                    '<p>⏰ 开通时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                    '</div>' +
+                    '<p>您可以在「我的虚拟机 / 容器」中绑定该子网使用。</p>', siteName);
+                if (await shouldSendEmail(req.user.id, 'notify_subnet_provisioned')) {
+                    enqueueEmail(subnetUser.email, '子网开通成功 - ' + siteName, emailHtml);
+                }
+            }
+        } catch (emailErr) {
+            console.error('[subnet] 邮件发送失败:', emailErr.message);
+        }
+
         res.json(subnet);
     } catch (e) {
         console.error('[subnet] 创建子网失败:', e.message);

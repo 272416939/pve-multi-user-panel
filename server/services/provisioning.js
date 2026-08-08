@@ -9,7 +9,8 @@ const crypto = require('crypto');
 const cacheStore = require('../utils/cache-store');
 const { generateVmName, generateLxcName } = require('../utils/random-name');
 const { createDhcpStaticBinding } = require('../services/dhcp');
-const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
+const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 const { calculateAmount, setVmAffinity, generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
 const { takeDiskSnapshot } = require('../services/disk-audit');
@@ -84,7 +85,7 @@ async function notifyProvisionFailed(opts) {
                 '</div>' +
                 '<p>如有疑问请联系客服。</p>', siteName);
             if (await shouldSendEmail(userId, notifyKey)) {
-                await sendEmail(failUser.email, failTitle + ' - ' + siteName, emailHtml);
+                enqueueEmail(failUser.email, failTitle + ' - ' + siteName, emailHtml);
             }
         }
     } catch (emailErr) { console.error('[provisioning] ' + resourceType + ' 退款邮件发送失败:', emailErr.message); }
@@ -351,7 +352,7 @@ async function provisionVm(opts) {
                 '<p>您的新服务器已开通成功！</p><p>类型：虚拟机</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
             );
             if (await shouldSendEmail(userId, 'notify_vm_provisioned')) {
-                await sendEmail(user.email, '服务器开通成功', emailHtml);
+                enqueueEmail(user.email, '服务器开通成功', emailHtml);
             }
         }
     } catch (e) { console.error('[provisioning] VM 邮件发送失败', e); }
@@ -379,7 +380,7 @@ async function provisionVm(opts) {
                     pkgSiteName
                 );
                 if (await shouldSendEmail(userId, 'notify_account_password')) {
-                    await sendEmail(ciUser.email, '服务器账号信息 - ' + pkgSiteName, ciEmailHtml);
+                    enqueueEmail(ciUser.email, '服务器账号信息 - ' + pkgSiteName, ciEmailHtml);
                 }
             }
         } catch (e) { console.error('[provisioning] VM 密码邮件发送失败', e); }
@@ -604,7 +605,7 @@ async function provisionLxc(opts) {
                 '<p>您的新容器已开通成功！</p><p>类型：LXC 容器</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
             );
             if (await shouldSendEmail(userId, 'notify_lxc_provisioned')) {
-                await sendEmail(user.email, '容器开通成功', emailHtml);
+                enqueueEmail(user.email, '容器开通成功', emailHtml);
             }
         }
     } catch (e) { console.error('[provisioning] LXC 邮件发送失败', e); }
@@ -655,7 +656,7 @@ async function provisionLxc(opts) {
                     pkgSiteName2
                 );
                 if (await shouldSendEmail(userId, 'notify_account_password')) {
-                    await sendEmail(pwdUser.email, '容器 root 密码 - ' + pkgSiteName2, pwdEmailHtml);
+                    enqueueEmail(pwdUser.email, '容器 root 密码 - ' + pkgSiteName2, pwdEmailHtml);
                 }
             }
         } catch (e) { console.error('[provisioning] LXC 密码邮件发送失败', e); }
@@ -818,7 +819,7 @@ async function adminProvisionVm(opts) {
                 '<p>到期时间：' + (expDate || '无') + '</p>'
             );
             if (await shouldSendEmail(userId, 'notify_vm_provisioned')) {
-                await sendEmail(user.email, '服务器开通成功', emailHtml);
+                enqueueEmail(user.email, '服务器开通成功', emailHtml);
             }
         }
     } catch (e) { console.error('[provisioning] VM 邮件发送失败', e); }
@@ -846,7 +847,7 @@ async function adminProvisionVm(opts) {
                     pkgSiteName3
                 );
                 if (await shouldSendEmail(userId, 'notify_account_password')) {
-                    await sendEmail(adminCiUser.email, '服务器账号信息 - ' + pkgSiteName3, adminCiHtml);
+                    enqueueEmail(adminCiUser.email, '服务器账号信息 - ' + pkgSiteName3, adminCiHtml);
                 }
             }
         } catch (e) { console.error('[provisioning] VM 密码邮件发送失败', e); }
@@ -1007,7 +1008,7 @@ async function adminProvisionLxc(opts) {
                 '<p>到期时间：' + (expDate || '无') + '</p>'
             );
             if (await shouldSendEmail(userId, 'notify_lxc_provisioned')) {
-                await sendEmail(user.email, '服务器开通成功', emailHtml);
+                enqueueEmail(user.email, '服务器开通成功', emailHtml);
             }
         }
     } catch (e) { console.error('[provisioning] LXC 邮件发送失败', e); }
@@ -1051,7 +1052,7 @@ async function adminProvisionLxc(opts) {
                     pkgSiteName4
                 );
                 if (await shouldSendEmail(userId, 'notify_account_password')) {
-                    await sendEmail(adminPwdUser.email, '容器 root 密码 - ' + pkgSiteName4, adminPwdEmailHtml);
+                    enqueueEmail(adminPwdUser.email, '容器 root 密码 - ' + pkgSiteName4, adminPwdEmailHtml);
                 }
             }
         } catch (e) { console.error('[provisioning] LXC 密码邮件发送失败', e); }

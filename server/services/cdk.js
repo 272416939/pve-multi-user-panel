@@ -5,7 +5,8 @@
 const crypto = require('crypto');
 const db = require('../api/db');
 const { generateUniqueCdkCode } = require('../utils/cdk-generator');
-const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
+const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 const { formatLocalDate } = require('../utils/date');
 const pveApi = require('../api/pve-api');
 const dbg = require('../utils/debug');
@@ -142,7 +143,7 @@ async function redeemCdk(opts) {
                         <p>祝您使用愉快！如有问题请联系管理员。</p>
                     `;
                     var subjectSiteName2 = await getSiteName();
-                    await sendEmail(redeemer.email, 'CDK 续费成功 - ' + subjectSiteName2, createEmailTemplate('续费成功通知', emailContent, subjectSiteName2));
+                    enqueueEmail(redeemer.email, 'CDK 续费成功 - ' + subjectSiteName2, createEmailTemplate('续费成功通知', emailContent, subjectSiteName2));
                 } catch (emailError) {
                     console.error('发送 CDK 续费成功邮件失败:', emailError.message);
                 }
@@ -215,7 +216,7 @@ async function redeemCdk(opts) {
                     <p>祝您使用愉快！如有问题请联系管理员。</p>
                 `;
                 var subjectSiteName3 = await getSiteName();
-                await sendEmail(
+                enqueueEmail(
                     redeemer2.email,
                     'CDK 续费成功 - ' + subjectSiteName3,
                     createEmailTemplate('续费成功通知', emailContent2, subjectSiteName3)
@@ -367,7 +368,7 @@ async function batchGenerateCdk(opts) {
                             <p>请前往「我的虚拟机」页面点击「CDK 兑换」输入兑换码进行续费。</p>
                         `;
                         var subjectSiteName = await getSiteName();
-                        await sendEmail(
+                        enqueueEmail(
                             targetUser.email,
                             '您收到 CDK 兑换码 - ' + subjectSiteName,
                             createEmailTemplate('CDK 兑换码通知', emailContent, subjectSiteName)

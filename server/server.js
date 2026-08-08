@@ -478,7 +478,15 @@ httpServer.listen(PORT, async () => {
 		    } catch (e) {
 		        console.warn('[redis] 初始化异常:', e.message);
 		        app.locals.redis = null;
-	}
+}
+
+	    // 启动邮件队列 Worker（Redis 未配置/不可用时跳过，通知类邮件自动降级为同步发送）
+	    try {
+	        require('./queue/email-queue').startEmailWorker();
+	    } catch (e) {
+	        console.warn('[email-queue] 启动失败（邮件将走同步发送）:', e.message);
+	    }
+
 
 			    // 初始化存量 VM 磁盘快照（用于恢复后对账基线）
 		    try {

@@ -6,7 +6,8 @@ const { syncPortForwardsFromIkuai } = require('../services/ikuai-sync');
 const ikuaiApi = require('../api/ikuai-api');
 const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
-const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
+const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 const crypto = require('crypto');
 
 // 惰性获取 Redis 客户端（Redis 配置在服务启动后才从 DB 加载，不能模块级捕获）
@@ -147,7 +148,7 @@ async function recoverProvisioningTasks() {
                                     '<p>如有疑问请联系客服。</p>', siteName);
                                 var refundCategory = type === 'vm' ? 'notify_vm_refund' : 'notify_lxc_refund';
                                 if (await shouldSendEmail(recoverUser.id, refundCategory)) {
-                                    await sendEmail(recoverUser.email, resourceLabel + '开通失败已退款 - ' + siteName, emailHtml);
+                                    enqueueEmail(recoverUser.email, resourceLabel + '开通失败已退款 - ' + siteName, emailHtml);
                                 }
                             }
                         } catch (emailErr) { console.error('[recovery] 退款邮件发送失败:', emailErr.message); }

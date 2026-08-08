@@ -1,6 +1,7 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const { createEmailTemplate, sendEmail, shouldSendEmail } = require('../utils/email');
+const { createEmailTemplate, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 const { pushToUser } = require('../websocket/push-proxy');
 // 备份/恢复完成标记抽离到 services/status-cache.js（规范第七节：状态缓存单一来源）
 const { markBackupRestoreComplete } = require('./status-cache');
@@ -88,7 +89,7 @@ async function sendLxcBackupNotification(vmid, backupId, status) {
         if (user.email && user.emailVerified) {
             try {
                 if (await shouldSendEmail(user.id, 'notify_backup_result')) {
-                    await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
+                    enqueueEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
                 }
             } catch (e) {
                 console.error('LXC 备份通知邮件发送失败:', e.message);
@@ -161,7 +162,7 @@ async function sendLxcRestoreNotification(vmid, taskId, status) {
         if (user.email && user.emailVerified) {
             try {
                 if (await shouldSendEmail(user.id, 'notify_backup_result')) {
-                    await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
+                    enqueueEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
                 }
             } catch (e) {
                 console.error('LXC 恢复通知邮件发送失败:', e.message);
@@ -234,7 +235,7 @@ async function sendBackupNotification(userId, vmId, status, filename) {
     if (user.email && user.emailVerified) {
         try {
             if (await shouldSendEmail(user.id, 'notify_backup_result')) {
-                await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
+                enqueueEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
             }
         } catch (e) {
             console.error('备份通知邮件发送失败:', e.message);
@@ -336,7 +337,7 @@ async function sendRestoreNotification(userId, vmId, statusMsg) {
     if (user.email && user.emailVerified) {
         try {
             if (await shouldSendEmail(user.id, 'notify_backup_result')) {
-                await sendEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
+                enqueueEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
             }
         } catch (e) { console.error('恢复通知邮件发送失败:', e.message); }
     }

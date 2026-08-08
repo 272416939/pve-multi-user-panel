@@ -7,7 +7,8 @@ const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
 const { getStatusCache } = require('../services/status-cache');
-const { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
+const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+const { enqueueEmail } = require('../queue/email-queue');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
 const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync');
 const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
@@ -276,7 +277,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
                 `;
                 const lxcSiteName = await getSiteName();
                 if (await shouldSendEmail(assignedUser.id, 'notify_lxc_provisioned')) {
-                    await sendEmail(
+                    enqueueEmail(
                         assignedUser.email,
                         'LXC 容器已开通 - ' + lxcSiteName,
                         createEmailTemplate('容器开通通知', emailContent, lxcSiteName)
@@ -503,7 +504,7 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
                     `;
                     const lxcSiteName2 = await getSiteName();
                     if (await shouldSendEmail(removedUser.id, 'notify_lxc_provisioned')) {
-                        await sendEmail(
+                        enqueueEmail(
                             removedUser.email,
                             'LXC 容器已被移除 - ' + lxcSiteName2,
                             createEmailTemplate('容器移除通知', emailContent, lxcSiteName2)

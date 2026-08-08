@@ -219,9 +219,7 @@
                                     <div class="notification-group-header d-flex justify-content-between align-items-center p-2 rounded cursor-pointer"
                                          @click="group.expanded = !group.expanded">
                                         <div class="d-flex align-items-center gap-2">
-                                            <span class="notification-group-icon">
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" v-html="DOMPurify.sanitize(group.svg)"></svg>
-                                            </span>
+                                            <span class="notification-group-icon" v-html="DOMPurify.sanitize(group.svg)"></span>
                                             <span class="fw-bold">{{ group.label }}</span>
                                             <small class="text-muted">（{{ group.enabledCount }}/{{ group.items.length }}项已开启）</small>
                                         </div>

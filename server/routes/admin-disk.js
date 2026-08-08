@@ -5,7 +5,8 @@ var express = require('express');
 var router = express.Router();
 var { authMiddleware, adminMiddleware } = require('../middleware/auth');
 var { safeError } = require('../utils/safe-error');
-var { createEmailTemplate, sendEmail, getSiteName, shouldSendEmail } = require('../utils/email');
+var { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
+var { enqueueEmail } = require('../queue/email-queue');
 var cacheStore = require('../utils/cache-store');
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
@@ -694,7 +695,7 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
               '</div>' +
               '<p>如有疑问请联系管理员。</p>', siteName);
             if (await shouldSendEmail(disk.user_id, 'notify_disk_destroy_refund')) {
-                await sendEmail(destroyUser.email, '硬盘已被管理员销毁 - ' + siteName, emailHtml);
+                enqueueEmail(destroyUser.email, '硬盘已被管理员销毁 - ' + siteName, emailHtml);
             }
           }
         }
