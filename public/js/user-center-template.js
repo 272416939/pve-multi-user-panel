@@ -133,6 +133,24 @@
                                 </form>
                             </div>
                         </div>
+
+                        <!-- 卡片4：界面模板（个人偏好，覆盖站点全局默认） -->
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-3 text-muted">界面模板</h6>
+                                <p class="text-muted small mb-3">选择个人偏好的界面模板；「跟随站点默认」使用管理员在站点设置中配置的模板。保存后立即生效，所有设备同步。</p>
+                                <select class="form-select" v-model="templatePreference" style="max-width: 320px;">
+                                    <option value="">跟随站点默认</option>
+                                    <option value="default">默认模板（经典玻璃拟态）</option>
+                                    <option value="saas">SAAS 企业风</option>
+                                </select>
+                                <div class="mt-3 d-flex gap-2">
+                                    <pv-button type="button" variant="primary" @click="saveTemplatePreference" :disabled="templatePreferenceSaving">
+                                        {{ templatePreferenceSaving ? '保存中...' : '保存模板偏好' }}
+                                    </pv-button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

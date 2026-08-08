@@ -99,6 +99,9 @@ function toggleSidebar() {
 // 主题切换 — 统一使用 theme-init.js
 if (window.initThemeToggle) window.initThemeToggle();
 
+// 界面模板个人偏好同步（跨设备）
+if (window.syncUserTemplate) window.syncUserTemplate();
+
 // XSS-4 修复：侧边栏导航事件绑定（替换内联 onclick，CSP nonce 合规）
 document.querySelectorAll('[data-section]').forEach(function(el) {
     el.addEventListener('click', function(e) {

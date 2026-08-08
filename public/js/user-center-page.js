@@ -12,6 +12,9 @@ const App = {
         const currentNavId = ref('user-center');
 
         const profileForm = ref({ username: '', password: '', confirmPassword: '', currentPassword: '', emailPassword: '', bio: '', avatar: '', email: '', emailVerified: false });
+        // 界面模板个人偏好（'' = 跟随站点默认，'default' / 'saas' = 个人固定）
+        const templatePreference = ref('');
+        const templatePreferenceSaving = ref(false);
         const memos = ref([]);
         const memosLoading = ref(false);
         const editMemoForm = ref({ id: null, title: '', content: '' });
@@ -769,8 +772,7 @@ const App = {
             }
         };
 
-        const handleEmailVerification = () => {
-            var params = new URLSearchParams(window.location.search);
+        const handleEmailVerification = () => {            var params = new URLSearchParams(window.location.search);
             var verified = params.get('email_verified');
             if (verified === '1') {
                 setTimeout(function() { alert('邮箱验证成功！'); }, 500);
@@ -801,6 +803,34 @@ const App = {
             } finally {
                 memosLoading.value = false;
             }
+        };
+
+        // 界面模板个人偏好：载入服务端偏好并同步到 localStorage（跨设备）
+        const loadTemplatePreference = async () => {
+            try {
+                var res = await api('/user/template');
+                templatePreference.value = (res && res.template) || '';
+                window.applyTemplate(templatePreference.value, (res && res.siteDefault) || 'default');
+            } catch (e) {
+                console.error('加载界面模板偏好失败', e);
+            }
+        };
+
+        // 界面模板个人偏好：保存到服务端 + 本地立即应用
+        const saveTemplatePreference = async () => {
+            templatePreferenceSaving.value = true;
+            try {
+                var res = await api('/user/template', {
+                    method: 'PUT',
+                    body: JSON.stringify({ template: templatePreference.value })
+                });
+                templatePreference.value = (res && res.template) || '';
+                window.applyTemplate(templatePreference.value, (res && res.siteDefault) || 'default');
+                alert('模板偏好已保存');
+            } catch (e) {
+                alert('保存失败: ' + (e.message || '未知错误'));
+            }
+            templatePreferenceSaving.value = false;
         };
 
         const updateProfile = async () => {
@@ -1348,6 +1378,8 @@ const App = {
                 }
                 await loadNavItems();
                 await loadProfile();
+                await loadTemplatePreference();
+                window.syncUserTemplate && window.syncUserTemplate();
                 handleEmailVerification();
                 if (window.location.hash === '#messages' || activeSubTab.value === 'messages') {
                     activeSubTab.value = 'messages';
@@ -1402,6 +1434,9 @@ const App = {
             currentNavId,
             switchSubTab,
             profileForm,
+            templatePreference,
+            templatePreferenceSaving,
+            saveTemplatePreference,
             memos,
             memosLoading,
             editMemoForm,
