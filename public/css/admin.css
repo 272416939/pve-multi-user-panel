@@ -504,13 +504,13 @@ tr:hover td { background: var(--bg-hover); }
     background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
 }
 .template-preview-saas {
-    background: #0f172a;
+    background: #f5f6f7;
 }
 .template-preview-saas::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(59, 130, 246, 0.08) 0%, transparent 100%);
+    background: linear-gradient(180deg, rgba(37, 99, 235, 0.06) 0%, transparent 100%);
     pointer-events: none;
 }
 .tp-sidebar {
@@ -525,7 +525,7 @@ tr:hover td { background: var(--bg-hover); }
     background: rgba(15, 23, 42, 0.9);
 }
 .template-preview-saas .tp-sidebar {
-    background: #0d1526;
+    background: #ffffff;
 }
 .tp-logo {
     height: 8px;
@@ -537,18 +537,21 @@ tr:hover td { background: var(--bg-hover); }
     background: linear-gradient(135deg, #818cf8 0%, #8b5cf6 100%);
 }
 .template-preview-saas .tp-logo {
-    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+    background: #2563eb;
 }
 .tp-nav {
     height: 7px;
     border-radius: 2px;
     background: rgba(148, 163, 184, 0.25);
 }
+.template-preview-saas .tp-nav {
+    background: rgba(29, 33, 41, 0.12);
+}
 .tp-nav-active {
     background: rgba(99, 102, 241, 0.55);
 }
 .template-preview-saas .tp-nav-active {
-    background: rgba(37, 99, 235, 0.55);
+    background: rgba(37, 99, 235, 0.35);
 }
 .tp-main {
     flex: 1;
@@ -556,6 +559,9 @@ tr:hover td { background: var(--bg-hover); }
     display: flex;
     flex-direction: column;
     gap: 8px;
+}
+.template-preview-saas .tp-header {
+    background: rgba(29, 33, 41, 0.1);
 }
 .tp-header {
     height: 8px;
@@ -574,8 +580,8 @@ tr:hover td { background: var(--bg-hover); }
     border: 1px solid rgba(148, 163, 184, 0.2);
 }
 .template-preview-saas .tp-card {
-    background: #16203a;
-    border-color: rgba(148, 163, 184, 0.16);
+    background: #ffffff;
+    border-color: #e5e6eb;
 }
 .template-picker-body {
     padding: 10px 12px;
