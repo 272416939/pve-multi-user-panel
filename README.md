@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v3.0.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v3.1.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -497,7 +497,7 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 |--------|------|
 | **虚拟机管理** | 查看/分配 VM，电源控制，VNC，快照，备份，编辑 |
 | **LXC 容器管理** | 模板创建，分配/换绑，电源控制，终端，重置密码，销毁 |
-| **后台管理** | 用户管理（创建/编辑/删除/邮箱/2FA）、CDK 管理、消息管理 |
+| **后台管理** | 用户管理（创建/编辑/删除/邮箱/2FA，删除前自动盘点名下资产并拦截，v3.1.0）、CDK 管理、消息管理 |
 | **模板管理** | VM/LXC 套餐模板 + 系统模板（OS 模板，系统切换用） |
 | **套餐管理** | VM/LXC 套餐与分组管理，拖拽排序、优惠百分比、库存 |
 | **财务管理** | 交易流水查询/CSV 导出、订单管理，支付网关配置（PID/密钥/开关） |
