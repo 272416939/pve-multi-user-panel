@@ -111,8 +111,8 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     padding: 8px 24px; font-size: 14px; font-weight: 600; border-radius: 10px;
     border: 1px solid rgba(168,85,247,0.35); cursor: pointer;
     transition: all 0.25s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-    background: linear-gradient(135deg, rgba(168,85,247,0.22), rgba(34,211,238,0.16));
-    color: #d8b4fe; box-shadow: 0 2px 12px rgba(168,85,247,0.18);
+    background: linear-gradient(120deg, #a855f7 0%, #22d3ee 100%);
+    color: #fff; box-shadow: 0 0 16px rgba(168,85,247,0.4);
     display: inline-flex; align-items: center; justify-content: center; gap: 6px;
 }
 .btn-glass:hover:not(:disabled) {
@@ -130,13 +130,13 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
 }
 /* 明亮模式：加深背景确保可见 */
 [data-theme="light"] .btn-glass {
-    background: linear-gradient(135deg, rgba(168,85,247,0.78), rgba(34,211,238,0.68));
-    border-color: rgba(168,85,247,0.55); color: #fff;
-    box-shadow: 0 2px 12px rgba(168,85,247,0.22);
+    background: linear-gradient(120deg, #9333ea 0%, #a855f7 100%);
+    border-color: transparent; color: #fff;
+    box-shadow: 0 0 14px rgba(147,51,234,0.3);
 }
 [data-theme="light"] .btn-glass:hover:not(:disabled) {
-    background: linear-gradient(135deg, rgba(168,85,247,0.88), rgba(34,211,238,0.78));
-    box-shadow: 0 6px 20px rgba(168,85,247,0.32);
+    background: linear-gradient(120deg, #7e22ce 0%, #9333ea 100%);
+    box-shadow: 0 0 20px rgba(147,51,234,0.4);
 }
 
 /* ===== Modal 增强 ===== */

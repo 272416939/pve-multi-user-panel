@@ -6,11 +6,11 @@
 .btn-close:hover { opacity: 1 !important; }
 
 /* ===== Light mode: btn-glass 可见性增强 ===== */
-[data-theme="light"] .btn-glass { background: linear-gradient(135deg, rgba(168,85,247,0.75), rgba(34,211,238,0.65)); border-color: rgba(168,85,247,0.6); color: #fff; }
-[data-theme="light"] .btn-glass:hover { background: linear-gradient(135deg, rgba(168,85,247,0.85), rgba(34,211,238,0.75)); }
+[data-theme="light"] .btn-glass { background: linear-gradient(120deg, #9333ea 0%, #a855f7 100%); border-color: transparent; color: #fff; box-shadow: 0 0 14px rgba(147,51,234,0.3); }
+[data-theme="light"] .btn-glass:hover { background: linear-gradient(120deg, #7e22ce 0%, #9333ea 100%); box-shadow: 0 0 20px rgba(147,51,234,0.4); }
 
 /* Light mode: btn-glass-active */
-[data-theme="light"] .btn-glass-active { background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(34,211,238,0.12)); border-color: rgba(168,85,247,0.5); }
+[data-theme="light"] .btn-glass-active { background: rgba(147,51,234,0.1); border-color: rgba(147,51,234,0.45); color: #7e22ce; }
 
 /* Light mode: ensure secondary/outline-style buttons are visible */
 [data-theme="light"] .btn-glass[style*="0.08"],

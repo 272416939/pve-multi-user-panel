@@ -1,8 +1,5 @@
 /* ========== 通用组件样式（从 admin.css 提取） ========== */
 
-/* pv-button 按钮组件 — 纯 CSS 类驱动（所有变体样式） */
-@import url('pv-buttons.css');
-
 /* Card 玻璃态 */
 .main-wrap .card, .main-wrap .card-body { background: var(--bg-card) !important;
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);

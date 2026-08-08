@@ -42,18 +42,18 @@
   font-size: 13px !important;
   font-weight: 600 !important;
   border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(34,211,238,0.15)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(168,85,247,0.3) !important;
-  box-shadow: 0 2px 10px rgba(168,85,247,0.15) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: linear-gradient(120deg, #a855f7 0%, #22d3ee 100%) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 18px rgba(168,85,247,0.4) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .pv-btn-glass:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.32), rgba(34,211,238,0.25)) !important;
-  box-shadow: 0 4px 16px rgba(168,85,247,0.28) !important;
-  border-color: rgba(168,85,247,0.45) !important;
+  background: linear-gradient(120deg, #9333ea 0%, #06b6d4 100%) !important;
+  box-shadow: 0 0 28px rgba(34,211,238,0.55) !important;
+  border-color: transparent !important;
 }
 
 /* .pv-btn-glass-active — 激活状态玻璃按钮 */
@@ -62,18 +62,18 @@
   font-size: 12px !important;
   font-weight: 600 !important;
   border-radius: 6px !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.28), rgba(34,211,238,0.18)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(168,85,247,0.4) !important;
-  box-shadow: 0 2px 10px rgba(168,85,247,0.18) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: rgba(168,85,247,0.22) !important;
+  color: #e9d5ff !important;
+  border-color: rgba(168,85,247,0.5) !important;
+  box-shadow: inset 0 0 10px rgba(168,85,247,0.18) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .pv-btn-glass-active:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.4), rgba(34,211,238,0.28)) !important;
-  box-shadow: 0 4px 16px rgba(168,85,247,0.32) !important;
-  border-color: rgba(168,85,247,0.55) !important;
+  background: rgba(168,85,247,0.32) !important;
+  box-shadow: inset 0 0 12px rgba(168,85,247,0.25), 0 0 14px rgba(168,85,247,0.25) !important;
+  border-color: rgba(168,85,247,0.65) !important;
 }
 
 /* .pv-btn-glass-inactive — 非激活状态玻璃按钮 */
@@ -89,9 +89,9 @@
 }
 .pv-btn-glass-inactive:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.15), rgba(34,211,238,0.08)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(168,85,247,0.35) !important;
+  background: rgba(168,85,247,0.16) !important;
+  color: #d8b4fe !important;
+  border-color: rgba(168,85,247,0.4) !important;
 }
 
 /* ============================================
@@ -104,24 +104,18 @@
   font-size: 12px !important;
   font-weight: 500 !important;
   border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(192,132,252,0.12)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(192,132,252,0.25) !important;
-  box-shadow:
-    0 2px 8px rgba(168,85,247,0.12),
-    inset 0 1px 0 rgba(255,255,255,0.06)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: rgba(168,85,247,0.12) !important;
+  color: #d8b4fe !important;
+  border-color: rgba(168,85,247,0.4) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .pv-btn-table:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.34), rgba(192,132,252,0.22)) !important;
-  border-color: rgba(192,132,252,0.42) !important;
-  box-shadow:
-    0 4px 14px rgba(168,85,247,0.22),
-    inset 0 1px 0 rgba(255,255,255,0.1)
-    !important;
+  background: rgba(168,85,247,0.22) !important;
+  border-color: rgba(168,85,247,0.55) !important;
+  box-shadow: 0 0 12px rgba(168,85,247,0.3) !important;
 }
 
 /* .pv-btn-table-primary — 表格行主要操作按钮 */
@@ -130,24 +124,18 @@
   font-size: 12px !important;
   font-weight: 500 !important;
   border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.35), rgba(192,132,252,0.25)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(192,132,252,0.35) !important;
-  box-shadow:
-    0 2px 10px rgba(168,85,247,0.2),
-    inset 0 1px 0 rgba(255,255,255,0.08)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: rgba(168,85,247,0.12) !important;
+  color: #d8b4fe !important;
+  border-color: rgba(168,85,247,0.4) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .pv-btn-table-primary:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.5), rgba(192,132,252,0.38)) !important;
-  border-color: rgba(192,132,252,0.52) !important;
-  box-shadow:
-    0 4px 18px rgba(168,85,247,0.32),
-    inset 0 1px 0 rgba(255,255,255,0.12)
-    !important;
+  background: rgba(168,85,247,0.22) !important;
+  border-color: rgba(168,85,247,0.55) !important;
+  box-shadow: 0 0 12px rgba(168,85,247,0.3) !important;
 }
 
 /* .pv-btn-table-danger — 表格行危险操作按钮 */
@@ -156,24 +144,18 @@
   font-size: 12px !important;
   font-weight: 500 !important;
   border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.239), rgba(220,38,38,0.22)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
+  background: rgba(239,68,68,0.12) !important;
+  color: #fca5a5 !important;
   border-color: rgba(239,68,68,0.3) !important;
-  box-shadow:
-    0 2px 10px rgba(239,68,68,0.15),
-    inset 0 1px 0 rgba(255,255,255,0.05)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .pv-btn-table-danger:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.38), rgba(220,38,38,0.34)) !important;
+  background: rgba(239,68,68,0.22) !important;
   border-color: rgba(239,68,68,0.48) !important;
-  box-shadow:
-    0 4px 18px rgba(239,68,68,0.26),
-    inset 0 1px 0 rgba(255,255,255,0.09)
-    !important;
+  box-shadow: 0 0 12px rgba(239,68,68,0.3) !important;
 }
 
 /* ============================================
@@ -187,24 +169,18 @@
   font-size: 12px !important;
   font-weight: 500 !important;
   border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.35), rgba(192,132,252,0.25)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(192,132,252,0.35) !important;
-  box-shadow:
-    0 2px 10px rgba(168,85,247,0.2),
-    inset 0 1px 0 rgba(255,255,255,0.08)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: rgba(168,85,247,0.12) !important;
+  color: #d8b4fe !important;
+  border-color: rgba(168,85,247,0.4) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .pv-btn-primary:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.5), rgba(192,132,252,0.38)) !important;
-  border-color: rgba(192,132,252,0.52) !important;
-  box-shadow:
-    0 4px 18px rgba(168,85,247,0.32),
-    inset 0 1px 0 rgba(255,255,255,0.12)
-    !important;
+  background: rgba(168,85,247,0.22) !important;
+  border-color: rgba(168,85,247,0.55) !important;
+  box-shadow: 0 0 12px rgba(168,85,247,0.3) !important;
 }
 
 /* .pv-btn-danger — 通用危险操作按钮 */
@@ -213,24 +189,18 @@
   font-size: 12px !important;
   font-weight: 500 !important;
   border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.239), rgba(220,38,38,0.22)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
+  background: rgba(239,68,68,0.12) !important;
+  color: #fca5a5 !important;
   border-color: rgba(239,68,68,0.3) !important;
-  box-shadow:
-    0 2px 10px rgba(239,68,68,0.15),
-    inset 0 1px 0 rgba(255,255,255,0.05)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .pv-btn-danger:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.38), rgba(220,38,38,0.34)) !important;
+  background: rgba(239,68,68,0.22) !important;
   border-color: rgba(239,68,68,0.48) !important;
-  box-shadow:
-    0 4px 18px rgba(239,68,68,0.26),
-    inset 0 1px 0 rgba(255,255,255,0.09)
-    !important;
+  box-shadow: 0 0 12px rgba(239,68,68,0.3) !important;
 }
 
 /* ============================================
@@ -261,14 +231,15 @@
   font-weight: 500 !important;
   border-radius: 8px !important;
   background: transparent !important;
-  color: var(--color-primary, #c084fc) !important;
-  border-color: var(--color-primary, #c084fc) !important;
+  color: #22d3ee !important;
+  border-color: rgba(34,211,238,0.5) !important;
   box-shadow: none !important;
 }
 .pv-btn-outline:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(168,85,247,0.1), rgba(34,211,238,0.06)) !important;
-  box-shadow: 0 2px 10px rgba(168,85,247,0.12) !important;
+  background: rgba(34,211,238,0.1) !important;
+  box-shadow: 0 0 16px rgba(34,211,238,0.35) !important;
+  border-color: rgba(34,211,238,0.7) !important;
 }
 
 /* .pv-btn-outline-danger — 危险描边按钮（列表内删除/销毁） */
@@ -284,7 +255,7 @@
 }
 .pv-btn-outline-danger:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.12), rgba(220,38,38,0.08)) !important;
+  background: rgba(239,68,68,0.1) !important;
   border-color: rgba(239,68,68,0.6) !important;
   box-shadow: 0 2px 10px rgba(239,68,68,0.15) !important;
 }
@@ -314,15 +285,15 @@
   font-weight: 500 !important;
   border-radius: 8px !important;
   background: var(--bg-hover, #1e293b) !important;
-  color: var(--text-primary, #e2e8f0) !important;
+  color: #d8b4fe !important;
   border-color: var(--border-color, #334155) !important;
   box-shadow: none !important;
 }
 .pv-btn-secondary:hover {
   transform: translateY(-1px) !important;
-  background: var(--bg-hover, #334155) !important;
-  border-color: rgba(148,163,184,0.35) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  background: rgba(168,85,247,0.14) !important;
+  border-color: rgba(168,85,247,0.35) !important;
+  box-shadow: 0 0 10px rgba(168,85,247,0.2) !important;
 }
 
 /* .pv-btn-link — 链接式按钮 */
@@ -332,7 +303,7 @@
   font-weight: 400 !important;
   border-radius: 6px !important;
   background: transparent !important;
-  color: var(--text-primary, #e2e8f0) !important;
+  color: #d8b4fe !important;
   border-color: transparent !important;
   box-shadow: none !important;
 }
@@ -358,11 +329,11 @@
   -webkit-backdrop-filter: none !important;
 }
 .pv-btn-ghost:hover {
-  background: var(--glass-accent, rgba(168,85,247,0.1)) !important;
-  border-color: var(--glass-accent, rgba(168,85,247,0.3)) !important;
-  color: var(--color-primary, #c084fc) !important;
+  background: rgba(34,211,238,0.08) !important;
+  border-color: rgba(34,211,238,0.4) !important;
+  color: #22d3ee !important;
   transform: none !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 12px rgba(34,211,238,0.3) !important;
 }
 /* 触摸设备上点击后立即恢复，避免遮罩残留 */
 .pv-btn-ghost:active {
@@ -408,7 +379,7 @@
 }
 .pv-btn-close:hover {
   opacity: 1 !important;
-  color: var(--text-primary, #e2e8f0) !important;
+  color: #d8b4fe !important;
   background: rgba(239,68,68,0.1) !important;
   /* close 变体 hover 无 translateY 上浮效果 */
 }
@@ -433,4 +404,44 @@
   opacity: 0.5 !important;
   cursor: not-allowed !important;
   pointer-events: none !important;
+}
+
+/* ============================================
+   9. 亮色模式适配（赛博霓虹 Light：浅底上文字加深）
+   ============================================ */
+[data-theme="light"] .pv-btn-outline {
+  color: #0e7490 !important;
+  border-color: rgba(14, 116, 144, 0.5) !important;
+}
+[data-theme="light"] .pv-btn-outline:hover {
+  background: rgba(14, 116, 144, 0.08) !important;
+  box-shadow: 0 0 14px rgba(14, 116, 144, 0.25) !important;
+}
+[data-theme="light"] .pv-btn-table,
+[data-theme="light"] .pv-btn-table-primary,
+[data-theme="light"] .pv-btn-primary {
+  color: #7e22ce !important;
+  background: rgba(147, 51, 234, 0.08) !important;
+  border-color: rgba(147, 51, 234, 0.35) !important;
+}
+[data-theme="light"] .pv-btn-table:hover,
+[data-theme="light"] .pv-btn-table-primary:hover,
+[data-theme="light"] .pv-btn-primary:hover {
+  color: #6b21a8 !important;
+  background: rgba(147, 51, 234, 0.14) !important;
+  box-shadow: 0 0 10px rgba(147, 51, 234, 0.25) !important;
+}
+[data-theme="light"] .pv-btn-table-danger,
+[data-theme="light"] .pv-btn-danger {
+  color: #dc2626 !important;
+}
+[data-theme="light"] .pv-btn-glass-active {
+  color: #7e22ce !important;
+  background: rgba(147, 51, 234, 0.1) !important;
+}
+[data-theme="light"] .pv-btn-ghost:hover {
+  color: #0e7490 !important;
+  background: rgba(14, 116, 144, 0.08) !important;
+  border-color: rgba(14, 116, 144, 0.35) !important;
+  box-shadow: 0 0 10px rgba(14, 116, 144, 0.2) !important;
 }

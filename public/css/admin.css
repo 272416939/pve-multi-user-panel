@@ -268,10 +268,10 @@ tr:hover td { background: var(--bg-hover); }
 /* 操作按钮（CDK兑换/创建用户等） */
 .btn-glass { padding: 7px 20px; font-size: 13px; font-weight: 600; border-radius: 8px;
     border: 1px solid rgba(168,85,247,0.3); cursor: pointer; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-    background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(34,211,238,0.15));
-    color: var(--text-primary); box-shadow: 0 2px 10px rgba(168,85,247,0.15); }
-.btn-glass:hover { background: linear-gradient(135deg, rgba(168,85,247,0.3), rgba(34,211,238,0.22));
-    color: var(--text-primary); box-shadow: 0 4px 16px rgba(168,85,247,0.25); transform: translateY(-1px); }
+    background: linear-gradient(120deg, #a855f7 0%, #22d3ee 100%);
+    color: #fff; box-shadow: 0 0 16px rgba(168,85,247,0.4); }
+.btn-glass:hover { background: linear-gradient(120deg, #9333ea 0%, #06b6d4 100%);
+    color: #fff; box-shadow: 0 0 24px rgba(34,211,238,0.55); transform: translateY(-1px); }
 /* CDK时长选择按钮组（玻璃态） */
 .btn-glass-active { padding: 4px 14px; font-size: 12px; font-weight: 600; border-radius: 6px;
     border: 1px solid rgba(168,85,247,0.4); cursor: pointer; transition: all 0.2s ease;

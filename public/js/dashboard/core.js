@@ -715,11 +715,11 @@
             // 新格式: label||.domain
             var sep = domain.indexOf('||');
             if (sep > -1) {
-                return { label: domain.substring(0, sep), domain: deviceId + domain.substring(sep + 2) };
+                return { label: domain.substring(0, sep).trim(), domain: deviceId + domain.substring(sep + 2) };
             }
             // 旧格式兼容: 中文前缀 + .域名
             var match = domain.match(/^([\u4e00-\u9fa5]+)(\..+)$/);
-            if (match) return { label: match[1], domain: deviceId + match[2] };
+            if (match) return { label: match[1].trim(), domain: deviceId + match[2] };
             // 无标签，直接加 deviceId 前缀
             if (domain.startsWith('.')) return { label: '', domain: deviceId + domain };
             return { label: '', domain: deviceId + '.' + domain };
