@@ -309,12 +309,12 @@ router.post('/subnets', authMiddleware, async (req, res) => {
 
         await auditAction(req, 'subnet.create', '创建子网 ' + vlanName + ' (VLAN ' + vlanId + ', 网关 ' + gw + ', 地址池 ' + addrPool + ')', { resourceType: 'subnet', resourceId: subnet.id });
 
-        // 站内信通知：子网开通成功
+        // 站内信通知：子网开通成功（VLAN ID/所属接口等内部细节仅管理员审计可见，不展示给用户）
         try {
             await db.messages.create({
                 uid: req.user.id,
                 title: '子网开通成功',
-                content: '您的私有网络子网已开通成功！\nVLAN 名称：' + vlanName + '\nVLAN ID：' + vlanId + '\n网关：' + gw + '\n地址池：' + addrPool + '\n所属接口：' + iface,
+                content: '您的私有网络子网已开通成功！\nVLAN 名称：' + vlanName + '\n网关：' + gw + '\n地址池：' + addrPool,
                 type: 1,
                 send_type: 1
             });
@@ -330,10 +330,8 @@ router.post('/subnets', authMiddleware, async (req, res) => {
                     '<p>您的私有网络子网已开通成功！</p>' +
                     '<div class="info-box">' +
                     '<p style="margin-bottom: 4px;">🌐 VLAN 名称：<strong>' + vlanName + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">🔢 VLAN ID：<strong>' + vlanId + '</strong></p>' +
                     '<p style="margin-bottom: 4px;">🖧 网关：<strong>' + gw + '</strong></p>' +
                     '<p style="margin-bottom: 4px;">📦 地址池：<strong>' + addrPool + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">🔌 所属接口：<strong>' + iface + '</strong></p>' +
                     '<p>⏰ 开通时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                     '</div>' +
                     '<p>您可以在「我的虚拟机 / 容器」中绑定该子网使用。</p>', siteName);
