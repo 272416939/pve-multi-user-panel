@@ -92,7 +92,8 @@ function toggleSidebar() {
     var ol = document.getElementById('sidebarOverlay');
     if (sb && ol) {
         sb.classList.toggle('open');
-        ol.style.display = sb.classList.contains('open') ? 'block' : 'none';
+        // 遮罩统一走 .show class（layout.css opacity 过渡淡入淡出）
+        ol.classList.toggle('show', sb.classList.contains('open'));
     }
 }
 

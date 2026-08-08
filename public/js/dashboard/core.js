@@ -326,7 +326,7 @@
         if (window.innerWidth <= 768) {
             document.getElementById('sidebar')?.classList.remove('open');
             var overlay = document.getElementById('sidebarOverlay');
-            if (overlay) { overlay.style.display = 'none'; }
+            if (overlay) { overlay.classList.remove('show'); }
         }
         // 切换 section 时清理打开 modal 的残留 backdrop（Vue 移除 DOM 后 backdrop 会孤悬）
         document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
