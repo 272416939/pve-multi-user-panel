@@ -723,12 +723,31 @@ html[data-template="saas"][data-theme="dark"] body {
     --login-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-/* 背景：极简纯色（浅 #f6f8fb / 暗 #1b1f24），无外链图片 */
+/* 背景：腾讯云企业风（纯 CSS 多层背景，无外链图片）
+   图层：顶部蓝色光晕 + 右下微光 + 细网格纹理 + 底色渐变 */
 html[data-template="saas"] body.login-page {
-    background-image: linear-gradient(180deg, #f6f8fb 0%, #eef1f5 100%) !important;
+    background-image:
+        radial-gradient(ellipse 90% 55% at 50% -12%, rgba(37, 99, 235, 0.10) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 40% at 88% 112%, rgba(29, 78, 216, 0.07) 0%, transparent 60%),
+        linear-gradient(rgba(37, 99, 235, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(37, 99, 235, 0.05) 1px, transparent 1px),
+        linear-gradient(180deg, #f6f9fc 0%, #eef2f8 100%) !important;
+    background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px, 100% 100% !important;
+    background-position: center center !important;
+    background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat !important;
+    background-attachment: fixed !important;
 }
 html[data-template="saas"][data-theme="dark"] body.login-page {
-    background-image: linear-gradient(180deg, #1b1f24 0%, #161a1f 100%) !important;
+    background-image:
+        radial-gradient(ellipse 90% 55% at 50% -12%, rgba(37, 99, 235, 0.16) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 40% at 88% 112%, rgba(59, 130, 246, 0.09) 0%, transparent 60%),
+        linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+        linear-gradient(180deg, #171b21 0%, #101318 100%) !important;
+    background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px, 100% 100% !important;
+    background-position: center center !important;
+    background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat !important;
+    background-attachment: fixed !important;
 }
 
 /* 登录卡片：白底/深底 + 细边框 + 轻阴影，无玻璃 */
