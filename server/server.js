@@ -323,7 +323,8 @@ async function getSiteConfigCached() {
         var name = await db.config.get('site:name') || 'PVE 多用户控制面板';
         var logoText = await db.config.get('site:logo_text') || 'PVE 面板';
         var loginTitle = await db.config.get('site:login_title') || 'PVE Panel';
-        var data = { name: name, logo_text: logoText, login_title: loginTitle };
+        var template = await db.config.get('site:template') || 'default';
+        var data = { name: name, logo_text: logoText, login_title: loginTitle, template: template };
         cache.data = data;
         cache.expires = now + SITE_CONFIG_TTL * 1000;
         if (redis) {
@@ -331,7 +332,7 @@ async function getSiteConfigCached() {
         }
         return data;
     } catch (e) {
-        return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel' };
+        return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel', template: 'default' };
     }
 }
 
@@ -349,6 +350,8 @@ app.use(async (req, res, next) => {
     } catch (e) {
         res.locals.siteConfig = { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel' };
     }
+    // 界面模板（全站默认）：注入到 EJS，<html data-template="..."> 使用；个人偏好由 theme-init.js 在客户端覆盖
+    res.locals.templateStyle = res.locals.siteConfig.template || 'default';
     next();
 });
 

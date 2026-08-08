@@ -703,11 +703,15 @@ async function initDb() {
             notify_expiry_alert INT DEFAULT 1,
             notify_backup_result INT DEFAULT 1,
             notify_subnet_provisioned INT DEFAULT 1,
+            template VARCHAR(20) NOT NULL DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_user_settings_user (user_id)
         )
     `);
+
+    // 迁移：界面模板偏好列（'' = 跟随站点默认，'default' / 'saas' = 个人固定）
+    try { await execute("ALTER TABLE user_settings ADD COLUMN template VARCHAR(20) NOT NULL DEFAULT ''"); } catch (_) {}
 
     // 初始化默认配置
     await initDefaultConfig();
@@ -975,6 +979,8 @@ async function initDefaultConfig() {
         'site:name': 'PVE 多用户控制面板',
         'site:logo_text': 'PVE 面板',
         'site:login_title': 'PVE Panel',
+        // 界面模板（全站默认）：'default' = 经典玻璃拟态，'saas' = SAAS 企业风
+        'site:template': 'default',
         'pve:host': '',
         'pve:api_token': '',
         'pve:ssh_host': '',

@@ -177,7 +177,9 @@ const userSettings = {
         notify_renewal: 1,
         notify_expiry_reminder: 1,
         notify_expiry_alert: 1,
-        notify_backup_result: 1
+        notify_backup_result: 1,
+        // 界面模板偏好：'' = 跟随站点默认，'default' / 'saas' = 个人固定
+        template: ''
     },
     // 允许更新的字段白名单
     ALLOWED_FIELDS: [
@@ -189,7 +191,8 @@ const userSettings = {
         'notify_disk_refund', 'notify_disk_destroy_refund',
         'notify_recharge', 'notify_renewal',
         'notify_expiry_reminder', 'notify_expiry_alert',
-        'notify_backup_result'
+        'notify_backup_result',
+        'template'
     ],
     getByUserId: async (userId) => {
         var row = await queryOne('SELECT * FROM user_settings WHERE user_id = ?', [parseInt(userId)]);
@@ -210,8 +213,14 @@ const userSettings = {
         var safeFields = {};
         for (var key of Object.keys(fields)) {
             if (userSettings.ALLOWED_FIELDS.includes(key)) {
-                // 值校验：只能是 0 或 1
-                safeFields[key] = fields[key] ? 1 : 0;
+                if (key === 'template') {
+                    // 字符串字段：模板偏好白名单校验（'' = 跟随站点默认，'default'/'saas' = 个人固定）
+                    const { UI_TEMPLATES } = require('../constants');
+                    if (fields[key] === '' || UI_TEMPLATES.includes(fields[key])) safeFields[key] = fields[key];
+                } else {
+                    // 值校验：只能是 0 或 1
+                    safeFields[key] = fields[key] ? 1 : 0;
+                }
             }
         }
         if (Object.keys(safeFields).length === 0) return userSettings.getByUserId(userId);

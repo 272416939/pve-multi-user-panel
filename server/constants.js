@@ -45,6 +45,10 @@ var TEMPLATE_STATUS = ['active', 'maintenance', 'deprecated'];
 // 支付方式白名单
 var PAYMENT_METHODS = ['alipay', 'wxpay'];
 
+// 界面模板（UI 模板体系）：'default' = 经典玻璃拟态（默认），'saas' = SAAS 企业风
+// 用户级偏好额外允许 ''（跟随站点默认），见 db-users.js userSettings 校验
+var UI_TEMPLATES = ['default', 'saas'];
+
 // ==================== 限速规则（安全防护·限速设置单一来源） ====================
 
 // 限速规则注册表：大类（category）→ 规则列表。
@@ -220,6 +224,7 @@ module.exports = {
     ORDER_STATUS,
     TEMPLATE_STATUS,
     PAYMENT_METHODS,
+    UI_TEMPLATES,
     RATE_LIMIT_CATEGORIES,
     RATE_LIMIT_RULES,
     getPeriodDays,
