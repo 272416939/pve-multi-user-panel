@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v3.0.1-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v3.0.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -66,7 +66,7 @@
 | # | 功能 | 说明 |
 |---|------|------|
 | 22 | **站内消息系统** | 系统公告、续费提醒、客服私聊，未读角标 WS 实时推送 |
-| 23 | **SMTP 邮件** | 到期提醒、续费通知、CDK 兑换成功、扣款/退款通知邮件 |
+| 23 | **SMTP 邮件** | 到期提醒、续费通知、CDK 兑换成功、扣款/退款通知邮件；**BullMQ Redis 队列异步化发送**（40+ 调用点异步入队，SMTP 连接池复用，Redis 不可用自动降级同步，管理端可查看队列状态，v3.0.2） |
 | 24 | **到期提醒** | 自定义多个提醒时间点，持久化不重复发送 |
 
 ### 🎨 界面 & 体验
@@ -152,7 +152,7 @@
 | # | 功能 | 说明 |
 |---|------|------|
 | 68 | **MySQL 数据库** | MySQL 5.7+ 唯一驱动，utf8mb4 编码，自动建表迁移 |
-| 69 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化 |
+| 69 | **Redis 缓存** | 可选 Redis，速率限制/VNC ticket/提醒追踪持久化；**邮件队列**（BullMQ，v3.0.2） |
 | 70 | **异步连接池** | mysql2/promise 10 连接池，自动重连，utf8mb4 编码 |
 | 71 | **系统自动更新** | 管理后台检查更新、更新日志、一键更新 |
 | 72 | **EJS 模板缓存** | 编译后缓存在内存，`NODE_ENV=production` 自动启用 |
@@ -361,8 +361,10 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 	│   │   ├── redis-admin.js     # ⚙️ Redis 配置/测试/清缓存
 	│   │   ├── dhcp.js            # 🌐 DHCP 静态绑定 + 子网 IP 池工具（isIpInAddrPool/pickUnusedStaticIp）
 	│   │   └── port-forward-sync.js # 🌐 端口转发规则同步（绑定子网后重建新 IP）
-		│   ├── schedule/
-		│   │   └── tasks.js           # 定时任务
+	│   ├── schedule/
+	│   │   └── tasks.js           # 定时任务
+	│   ├── queue/
+	│   │   └── email-queue.js     # 📬 邮件发送队列（BullMQ，异步化 + 降级同步，v3.0.2）
 		│   ├── api/
 		│   │   ├── db.js              # 数据库聚合入口（按拆分前导出形状导出）
 		│   │   ├── db-core.js         # 连接池单例 + execute/queryOne/queryAll + 时间工具

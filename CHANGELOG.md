@@ -1,5 +1,36 @@
 # Changelog
 
+## [3.0.2] - 2026-08-08
+
+### Added（2 个 feat）
+- **feat(notification): 邮件发送异步化，引入 BullMQ Redis 队列**
+  - 40+ 处调用点从同步 `await sendEmail()` 改为 `enqueueEmail()` 异步入队，消除购买/开通/充值链路 1~3 秒阻塞（支付回调避免网关超时）
+  - `server/utils/email.js` 发送优化：单例 transporter + `pool: true` 连接池复用（不再每次新建 TCP+TLS）、删除每次发送前的 `verify()` 握手、SMTP 配置内存缓存
+  - 新增 `server/queue/email-queue.js`：`attempts: 3` + 指数退避（5s）；**Redis 未配置/入队失败 -> 降级同步发送（邮件不丢）**
+  - 三类调用点：A 类保持同步（注册验证码/忘记密码/换绑邮箱/SMTP 测试，需立即反馈）、B 类通知邮件异步入队（30+ 处）、C 类缓存失效（配置变更 resetTransporterCache / restartEmailWorker）
+  - 管理端 SMTP 卡片新增「邮件队列状态」行（`GET /api/admin/email-queue/stats` 只读展示）
+  - `removeOnComplete: true` 完成即删 + `removeOnFail: {count:100}`，Redis 零残留（避免已完成 job 残留明文邮箱+HTML）
+- **feat(subnet): 子网开通增加站内信与邮件通知**，支持通知设置开关（`notify_subnet_provisioned`），经 `shouldSendEmail` + `enqueueEmail` 走同一队列
+
+### Changed
+- perf(email-queue): 已完成邮件任务发送后立即删除，Redis 零残留
+
+### Fixed
+- **fix(email-queue): BullMQ 不支持 ioredis keyPrefix 导致 Worker 启动失败**
+  - 根因：Worker 复用了带 `keyPrefix: 'pve:'` 的主 Redis 连接，BullMQ 同步构造校验报 `ioredis does not support ioredis prefixes` -> Worker 起不来 -> 全部降级同步发送
+  - 修复：BullMQ 改用无 keyPrefix 的独立 ioredis 连接；key 前缀交给 BullMQ 自身 `prefix: 'pve:bull'`；`maxRetriesPerRequest: null`；Redis 可用性按 `process.env.REDIS_HOST` 判断；`restartEmailWorker()` 完整关闭/重建
+- **fix(subnet): 子网创建增加接口预校验与错误上下文**
+  - 爱快写路径故障（统一 30001 写入失败）排查加固：`getVlanInterfaces()` 枚举可用父接口，创建前预校验（无效接口 400，管理员可见详情、用户仅提示联系管理员）
+  - `addVlan` 失败错误携带上下文：`VLAN 创建失败(接口=lan2, VLAN=1004, IP=172.16.4.1): ...`
+- fix(subnet): 子网开通通知去掉 VLAN ID 与所属接口（仅管理员审计可见）
+- fix(user-center): notifications 页 `DOMPurify 未在 setup 暴露` + 通知分组 SVG 图标不渲染（svg 元素内 v-html 无命名空间）
+
+### Notes
+- **部署注意**：需 `npm install` 拉取 `bullmq` 依赖并重启服务；重启日志应出现 `[email-queue] 邮件队列 Worker 已启动`
+- 新配置 `notify_subnet_provisioned`（子网开通通知开关，默认开启）
+- 测试：**465 passing**；`check-coupling` 通过
+- 爱快故障根因：设备内部写路径故障（设备 bug），重启后自愈，非面板问题
+
 ## [3.0.1] - 2026-08-07
 
 ### Fixed
