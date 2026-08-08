@@ -88,7 +88,9 @@ async function enqueueEmail(to, subject, html) {
         await queue.add(QUEUE_NAME, { to, subject, html }, {
             attempts: 3,
             backoff: { type: 'exponential', delay: 5000 },
-            removeOnComplete: { count: 500 },
+            // 完成即删：发送成功后立即清除 job（含邮件内容），避免 Redis 残留已完成任务；
+            // 失败保留 100 个（重试耗尽后便于排查，管理端 stats 不依赖 completed 历史）
+            removeOnComplete: true,
             removeOnFail: { count: 100 }
         });
         return true;
