@@ -219,118 +219,118 @@ html[data-template="saas"] .header-user-menu li a:hover {
    ============================================ */
 /* 主操作按钮：实心蓝 + 白字 + 小圆角 */
 html[data-template="saas"] .pv-btn-glass {
-    background: var(--color-primary);
-    color: #fff;
-    border-color: var(--color-primary);
+    background: var(--color-primary) !important;
+    color: #fff !important;
+    border-color: var(--color-primary) !important;
     border-radius: 6px !important;
-    box-shadow: none;
+    box-shadow: none !important;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
 html[data-template="saas"] .pv-btn-glass:hover {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+    background: var(--color-primary-hover) !important;
+    border-color: var(--color-primary-hover) !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28) !important;
 }
 
 /* 激活/非激活态：浅蓝底蓝字 / 白底灰边 */
 html[data-template="saas"] .pv-btn-glass-active {
-    background: rgba(37, 99, 235, 0.1);
-    color: var(--color-primary);
-    border-color: rgba(37, 99, 235, 0.28);
+    background: rgba(37, 99, 235, 0.1) !important;
+    color: var(--color-primary) !important;
+    border-color: rgba(37, 99, 235, 0.28) !important;
     border-radius: 6px !important;
-    box-shadow: none;
+    box-shadow: none !important;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
 html[data-template="saas"] .pv-btn-glass-active:hover {
-    background: rgba(37, 99, 235, 0.16);
-    border-color: rgba(37, 99, 235, 0.36);
+    background: rgba(37, 99, 235, 0.16) !important;
+    border-color: rgba(37, 99, 235, 0.36) !important;
 }
 html[data-template="saas"] .pv-btn-glass-inactive {
-    background: var(--bg-input);
-    color: var(--text-secondary);
-    border-color: var(--border-color);
+    background: var(--bg-input) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border-color) !important;
     border-radius: 6px !important;
 }
 html[data-template="saas"] .pv-btn-glass-inactive:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border-color: var(--border-color);
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
 }
 
 /* 表格行按钮：浅蓝底 + 蓝字（腾讯云表格操作按钮） */
 html[data-template="saas"] .pv-btn-table,
 html[data-template="saas"] .pv-btn-table-primary,
 html[data-template="saas"] .pv-btn-primary {
-    background: rgba(37, 99, 235, 0.08);
-    color: var(--color-primary);
-    border-color: rgba(37, 99, 235, 0.18);
+    background: rgba(37, 99, 235, 0.08) !important;
+    color: var(--color-primary) !important;
+    border-color: rgba(37, 99, 235, 0.18) !important;
     border-radius: 6px !important;
-    box-shadow: none;
+    box-shadow: none !important;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
 html[data-template="saas"] .pv-btn-table:hover,
 html[data-template="saas"] .pv-btn-table-primary:hover,
 html[data-template="saas"] .pv-btn-primary:hover {
-    background: rgba(37, 99, 235, 0.14);
-    border-color: rgba(37, 99, 235, 0.3);
-    box-shadow: none;
+    background: rgba(37, 99, 235, 0.14) !important;
+    border-color: rgba(37, 99, 235, 0.3) !important;
+    box-shadow: none !important;
 }
 
 /* 表格危险按钮：浅红底红字 */
 html[data-template="saas"] .pv-btn-table-danger,
 html[data-template="saas"] .pv-btn-danger {
-    background: rgba(245, 63, 63, 0.08);
-    color: var(--color-danger);
-    border-color: rgba(245, 63, 63, 0.2);
+    background: rgba(245, 63, 63, 0.08) !important;
+    color: var(--color-danger) !important;
+    border-color: rgba(245, 63, 63, 0.2) !important;
     border-radius: 6px !important;
-    box-shadow: none;
+    box-shadow: none !important;
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
 }
 html[data-template="saas"] .pv-btn-table-danger:hover,
 html[data-template="saas"] .pv-btn-danger:hover {
-    background: rgba(245, 63, 63, 0.14);
-    border-color: rgba(245, 63, 63, 0.32);
-    box-shadow: none;
+    background: rgba(245, 63, 63, 0.14) !important;
+    border-color: rgba(245, 63, 63, 0.32) !important;
+    box-shadow: none !important;
 }
 
 /* 描边按钮：白底蓝边蓝字 */
 html[data-template="saas"] .pv-btn-outline {
-    background: var(--bg-card);
-    color: var(--color-primary);
-    border-color: rgba(37, 99, 235, 0.4);
+    background: var(--bg-card) !important;
+    color: var(--color-primary) !important;
+    border-color: rgba(37, 99, 235, 0.4) !important;
     border-radius: 6px !important;
 }
 html[data-template="saas"] .pv-btn-outline:hover {
-    background: rgba(37, 99, 235, 0.06);
-    border-color: var(--color-primary);
-    box-shadow: none;
+    background: rgba(37, 99, 235, 0.06) !important;
+    border-color: var(--color-primary) !important;
+    box-shadow: none !important;
 }
 
 /* 次要按钮：浅灰底灰字 */
 html[data-template="saas"] .pv-btn-secondary {
-    background: var(--bg-input);
-    color: var(--text-primary);
-    border-color: var(--border-color);
+    background: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
     border-radius: 6px !important;
 }
 html[data-template="saas"] .pv-btn-secondary:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-color);
+    background: var(--bg-hover) !important;
+    border-color: var(--border-color) !important;
 }
 
 /* 头部 ghost 按钮：无边框透明 */
 html[data-template="saas"] .pv-btn-ghost {
-    border-color: transparent;
+    border-color: transparent !important;
     border-radius: 6px !important;
 }
 html[data-template="saas"] .pv-btn-ghost:hover {
-    background: var(--bg-hover);
-    border-color: transparent;
-    color: var(--color-primary);
+    background: var(--bg-hover) !important;
+    border-color: transparent !important;
+    color: var(--color-primary) !important;
 }
 
 /* 警告按钮保持警示色系（微调） */
@@ -343,37 +343,37 @@ html[data-template="saas"] .pv-btn-close {
 
 /* 老 btn-glass 系列（admin.css / dashboard.css / user-center.css 里的旧按钮类） */
 html[data-template="saas"] .btn-glass {
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-    color: #fff;
+    background: var(--color-primary) !important;
+    border-color: var(--color-primary) !important;
+    color: #fff !important;
     border-radius: 6px;
-    box-shadow: none;
+    box-shadow: none !important;
 }
 html[data-template="saas"] .btn-glass:hover:not(:disabled) {
-    background: var(--color-primary-hover);
-    border-color: var(--color-primary-hover);
-    color: #fff;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+    background: var(--color-primary-hover) !important;
+    border-color: var(--color-primary-hover) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28) !important;
 }
 html[data-template="saas"] .btn-glass-active {
-    background: rgba(37, 99, 235, 0.1);
-    border-color: rgba(37, 99, 235, 0.28);
-    color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.1) !important;
+    border-color: rgba(37, 99, 235, 0.28) !important;
+    color: var(--color-primary) !important;
     border-radius: 6px;
 }
 html[data-template="saas"] .btn-glass-active:hover {
-    background: rgba(37, 99, 235, 0.16);
+    background: rgba(37, 99, 235, 0.16) !important;
 }
 html[data-template="saas"] .btn-glass-inactive {
-    background: var(--bg-input);
-    border-color: var(--border-color);
-    color: var(--text-secondary);
+    background: var(--bg-input) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
     border-radius: 6px;
 }
 html[data-template="saas"] .btn-glass-inactive:hover {
-    background: var(--bg-hover);
-    border-color: var(--border-color);
-    color: var(--text-primary);
+    background: var(--bg-hover) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-primary) !important;
 }
 /* theme.css 里按内联 style 匹配的亮色补丁，SAAS 模板整体替换为蓝系 */
 html[data-template="saas"][data-theme="light"] .btn-glass[style*="0.08"],
@@ -850,29 +850,29 @@ html[data-template="saas"] .login-card .alert-success {
    13. 暗色微调（浅蓝 rgba 在深底上提亮）
    ============================================ */
 html[data-template="saas"][data-theme="dark"] .nav-item.active {
-    background: rgba(59, 130, 246, 0.2);
+    background: rgba(59, 130, 246, 0.2) !important;
 }
 html[data-template="saas"][data-theme="dark"] .pv-btn-table,
 html[data-template="saas"][data-theme="dark"] .pv-btn-table-primary,
 html[data-template="saas"][data-theme="dark"] .pv-btn-primary {
-    background: rgba(59, 130, 246, 0.2);
-    border-color: rgba(59, 130, 246, 0.4);
+    background: rgba(59, 130, 246, 0.2) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
 }
 html[data-template="saas"][data-theme="dark"] .pv-btn-table:hover,
 html[data-template="saas"][data-theme="dark"] .pv-btn-table-primary:hover,
 html[data-template="saas"][data-theme="dark"] .pv-btn-primary:hover {
-    background: rgba(59, 130, 246, 0.3);
-    border-color: rgba(59, 130, 246, 0.55);
+    background: rgba(59, 130, 246, 0.3) !important;
+    border-color: rgba(59, 130, 246, 0.55) !important;
 }
 html[data-template="saas"][data-theme="dark"] .pv-btn-glass-active,
 html[data-template="saas"][data-theme="dark"] .btn-glass-active {
-    background: rgba(59, 130, 246, 0.24);
-    border-color: rgba(59, 130, 246, 0.45);
+    background: rgba(59, 130, 246, 0.24) !important;
+    border-color: rgba(59, 130, 246, 0.45) !important;
 }
 html[data-template="saas"][data-theme="dark"] .nav-tabs .nav-link.active,
 html[data-template="saas"][data-theme="dark"] .log-nav-tabs .nav-link.active {
-    background: rgba(59, 130, 246, 0.24);
-    color: #93c5fd;
+    background: rgba(59, 130, 246, 0.24) !important;
+    color: #93c5fd !important;
 }
 html[data-template="saas"][data-theme="dark"] .type-badge-vm,
 html[data-template="saas"][data-theme="dark"] .tag-item {
