@@ -114,11 +114,46 @@ router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) =>
         return res.status(400).json({ error: '不能删除自己的账号' });
     }
 
+    // 资产盘点：用户名下存在 虚拟机/容器/硬盘/私有网络/余额/备份/待处理订单 任一资产即拦截删除（全部参数化查询）
+    const pool = db.getPool();
+    const [userRows] = await pool.execute('SELECT username, balance FROM users WHERE id = ?', [userId]);
+    if (!userRows || userRows.length === 0) {
+        return res.status(404).json({ error: '用户不存在' });
+    }
+    const [[vmRows], [lxcRows], [diskRows], [subnetRows], [backupRows], [orderRows]] = await Promise.all([
+        pool.execute('SELECT COUNT(*) AS c FROM vms WHERE user_id = ?', [userId]),
+        pool.execute('SELECT COUNT(*) AS c FROM lxc_containers WHERE user_id = ?', [userId]),
+        pool.execute("SELECT COUNT(*) AS c FROM disks WHERE user_id = ? AND status != 'destroyed'", [userId]),
+        pool.execute('SELECT COUNT(*) AS c FROM subnets WHERE user_id = ?', [userId]),
+        pool.execute('SELECT COUNT(*) AS c FROM backups WHERE user_id = ?', [userId]),
+        pool.execute('SELECT COUNT(*) AS c FROM pending_orders WHERE user_id = ?', [userId])
+    ]);
+    const assets = {
+        vms: vmRows[0].c,
+        lxc: lxcRows[0].c,
+        disks: diskRows[0].c,
+        subnets: subnetRows[0].c,
+        backups: backupRows[0].c,
+        pendingOrders: orderRows[0].c
+    };
+    const balance = parseFloat(userRows[0].balance || '0');
+    assets.balance = balance > 0 ? balance.toFixed(2) : null;
+    const assetParts = [];
+    if (assets.vms > 0) assetParts.push('虚拟机 ' + assets.vms + ' 台');
+    if (assets.lxc > 0) assetParts.push('容器 ' + assets.lxc + ' 个');
+    if (assets.disks > 0) assetParts.push('硬盘 ' + assets.disks + ' 块');
+    if (assets.subnets > 0) assetParts.push('私有网络 ' + assets.subnets + ' 个');
+    if (assets.balance != null) assetParts.push('余额 ¥' + assets.balance);
+    if (assets.backups > 0) assetParts.push('备份记录 ' + assets.backups + ' 条');
+    if (assets.pendingOrders > 0) assetParts.push('待处理订单 ' + assets.pendingOrders + ' 笔');
+    if (assetParts.length > 0) {
+        return res.status(409).json({ error: '该用户名下仍有资产，无法删除：\n· ' + assetParts.join('\n· '), assets });
+    }
+
     // V3-14 修复：删除用户审计（对齐创建/修改/重置密码的字符串 details 规范）
     try {
         const { auditLog } = require('../utils/audit-log');
-        const targetUser = await db.users.getById(userId);
-        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.user.delete', resourceType: 'user', resourceId: userId, details: '删除用户[' + (targetUser ? targetUser.username : userId) + ']', req });
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.user.delete', resourceType: 'user', resourceId: userId, details: '删除用户[' + userRows[0].username + ']', req });
     } catch (_) {}
 
     // ARCH-11: 级联删除放入事务，保证原子性

@@ -180,7 +180,7 @@
     };
 
     $.deleteUser = async function(id) {
-        if (await window.customConfirm('确定删除此用户？')) {
+        if (await window.customConfirm('确定删除此用户？该用户名下若仍有虚拟机、容器、硬盘、私有网络、余额等资产将无法删除')) {
             try {
                 await api('/users/' + id, { method: 'DELETE' });
                 $.loadData();
