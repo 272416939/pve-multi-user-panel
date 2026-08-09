@@ -396,12 +396,12 @@ app.get('/user-center', (req, res) => res.render('pages/user-center', { title: '
 app.get('/vnc', async (req, res) => {
     const sessionId = req.query.session;
     if (!sessionId) {
-        return res.render('pages/vnc', { error: '缺少会话参数' });
+        return res.render('pages/vnc', { error: '缺少会话参数', ticket: null, vmid: '', type: 'qemu' });
     }
     const consoleSession = require('./utils/console-session');
     const sessionData = await consoleSession.getSession(sessionId);
     if (!sessionData) {
-        return res.render('pages/vnc', { error: '会话已失效，请重新打开控制台' });
+        return res.render('pages/vnc', { error: '会话已失效，请重新打开控制台', ticket: null, vmid: '', type: 'qemu' });
     }
     res.render('pages/vnc', {
         ticket: sessionData.ticket,
