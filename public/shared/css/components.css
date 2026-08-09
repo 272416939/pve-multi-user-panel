@@ -342,6 +342,11 @@ tr:hover td { background: var(--bg-hover); }
 .dropdown-menu-table li a { display: block; padding: 6px 14px; font-size: 13px; color: var(--text-primary);
     text-decoration: none; transition: background 0.15s; white-space: nowrap; }
 .dropdown-menu-table li a:hover { background: rgba(168,85,247,0.15); color: #fff; }
+/* 未绑定子网时「重置IP」等受限菜单项置灰禁用（保留 title 悬浮提示，不用 pointer-events:none）
+   第三条选择器专门压制 template-saas.css 的 hover 高亮（其规则带 !important 且特异性更高） */
+.dropdown-menu-table li a.disabled,
+.dropdown-menu-table li a.disabled:hover,
+html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .45; cursor: not-allowed; background: transparent !important; color: var(--text-muted) !important; }
 
 /* ===== Bootstrap Dropdown Menu Glass Effect ===== */
 .dropdown-menu {

@@ -68,7 +68,8 @@
                                             <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openDeviceForward(vm, 'vm')">网络</a></li>
                                             <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                             <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
-                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
+                                            <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                            <li v-else><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
                                             <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openAdminVmPasswordReset(vm)">重置密码</a></li>
                                         </ul>
                                     </div>
@@ -153,7 +154,8 @@
                                                         <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
                                                         <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                                         <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
-                                                        <li><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
+                                                        <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                                        <li v-else><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
                                                         <li><a href="#" @click.prevent="openAdminVmPasswordReset(vm)">重置密码</a></li>
                                                     </ul>
                                                 </div>

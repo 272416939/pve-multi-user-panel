@@ -314,7 +314,8 @@
                                             <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openDeviceForward(ct, 'lxc')">网络</a></li>
                                             <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
                                             <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : editLxc(ct)">编辑</a></li>
-                                            <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
+                                            <li v-if="!ct.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                            <li v-else><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
                                             <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcPasswordModal(ct)" class="text-warning">重置密码</a></li>
                                         </ul>
                                     </div>
@@ -394,7 +395,8 @@
                                                                 <li><a href="#" @click.prevent="openDeviceForward(ct, 'lxc')">网络</a></li>
                                                                 <li><a href="#" @click.prevent="openLxcTerminal(ct.ct_id)">终端</a></li>
                                                                 <li><a href="#" @click.prevent="editLxc(ct)">编辑</a></li>
-                                                                <li><a href="#" @click.prevent="openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
+                                                                <li v-if="!ct.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                                                <li v-else><a href="#" @click.prevent="openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
                                                                 <li><a href="#" @click.prevent="openResetLxcPasswordModal(ct)" class="text-warning">重置密码</a></li>
                                                             </ul>
                                                         </div>

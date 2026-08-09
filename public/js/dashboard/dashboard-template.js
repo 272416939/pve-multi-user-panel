@@ -158,7 +158,8 @@
                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openRenewModal(vm)">续费</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openVmPasswordReset(vm)">重置密码</a></li>
-                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
+                                    <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                    <li v-else><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
                                 </ul>
@@ -248,7 +249,8 @@
                                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openRenewModal(vm)">续费</a></li>
 <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openVmPasswordReset(vm)">重置密码</a></li>
-                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
+                                    <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                    <li v-else><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
                                 </ul>
@@ -330,7 +332,8 @@
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openRenewModal(ct)">续费</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : editLxc(ct)">编辑</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
-                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
+                                    <li v-if="!ct.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                    <li v-else><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -417,7 +420,8 @@
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openRenewModal(ct)">续费</a></li>
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : editLxc(ct)">编辑</a></li>
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
-                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
+                                                    <li v-if="!ct.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                    <li v-else><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
                                                 </ul>
                                             </div>
                                         </div>
