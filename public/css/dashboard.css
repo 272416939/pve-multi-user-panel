@@ -406,21 +406,9 @@
     }
     .floating-dropdown-menu .dropdown-item:hover { background: var(--glass-accent-hover); color: var(--text-primary); }
 
-    /* Form controls glass effect */
+    /* Form controls（统一走 shared/components.css，此处不再重复定义） */
     .form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
         transition: color 0.3s ease; }
-    .form-control, .form-select {
-        background: var(--bg-input) !important;
-        border-color: var(--border-color) !important;
-        color: var(--text-primary) !important;
-        border-radius: 10px !important;
-    }
-    .form-control:focus, .form-select:focus {
-        border-color: var(--color-primary) !important;
-        box-shadow: 0 0 0 3px rgba(99, 126, 234, 0.2) !important;
-    }
-    .form-select option { background: var(--bg-input); color: var(--text-primary); }
-    .form-control.bg-dark, .form-select.bg-dark { background: var(--bg-input) !important; color: var(--text-primary) !important; }
 
     /* btn-close 主题适配 */
     [data-theme="light"] .btn-close { filter: brightness(0) invert(0.4); opacity: 0.8; }

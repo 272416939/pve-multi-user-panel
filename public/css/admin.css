@@ -277,13 +277,6 @@ tr:hover td { background: var(--bg-hover); }
 .vm-detail-modal { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 20px; }
 .vm-detail-modal.show { display: flex; }
-.modal-content { width: 100%; max-width: 1200px; max-height: 90vh; overflow-y: auto;
-    background: var(--bg-modal); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    border: 1px solid var(--border-color); border-radius: 16px;
-    box-shadow: var(--shadow-lg); scrollbar-width: thin; scrollbar-color: rgba(148,163,184,0.3) transparent;
-    transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
-.modal-content::-webkit-scrollbar { width: 6px; }
-.modal-content::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 3px; }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px;
     border-bottom: 1px solid var(--border-color); position: sticky; top: 0;
     background: var(--bg-modal); z-index: 1; backdrop-filter: blur(8px);
@@ -329,18 +322,9 @@ tr:hover td { background: var(--bg-hover); }
     text-decoration: none; transition: background 0.15s; white-space: nowrap; }
 .dropdown-menu-table li a:hover { background: rgba(168,85,247,0.15); color: #fff; }
 
-/* Form controls */
+/* Form controls（统一走 shared/components.css，此处不再重复定义） */
 .form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
     transition: color 0.3s ease; }
-.form-control, .form-select { background: var(--bg-input) !important; border: 1px solid var(--border-color) !important;
-    color: var(--text-primary) !important;
-    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease; }
-.form-control:focus, .form-select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 0.2rem rgba(168,85,247,0.15); }
-.form-select option { background: var(--bg-input); color: var(--text-primary); }
-.form-control.bg-dark, .form-select.bg-dark { background: var(--bg-input) !important; color: var(--text-primary) !important; }
-.form-control.text-light, .form-select.text-light { color: var(--text-primary) !important; }
-/* 下拉框禁用选项主题适配 */
-.form-select option:disabled { color: var(--text-secondary); background: var(--bg-input); }
 .form-control::placeholder { color: var(--text-secondary) !important; opacity: 0.7; }
 
 /* Alerts */

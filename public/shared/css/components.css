@@ -279,6 +279,13 @@ tr:hover td { background: var(--bg-hover); }
 .bg-danger { color: var(--color-danger); background: rgba(248,113,113,0.12) !important;
     transition: color 0.3s ease, background-color 0.3s ease; }
 
+/* ========== 全局主题感知滚动条 ========== */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 8px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+html { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent; }
+
 /* ========== 详情弹窗样式 ========== */
 .vm-detail-modal { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 20px; }
@@ -286,10 +293,11 @@ tr:hover td { background: var(--bg-hover); }
 .modal-content { width: 100%; max-width: 1200px; max-height: 90vh; overflow-y: auto;
     background: var(--bg-modal); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--border-color); border-radius: 16px;
-    box-shadow: var(--shadow-lg); scrollbar-width: thin; scrollbar-color: rgba(148,163,184,0.3) transparent;
+    box-shadow: var(--shadow-lg); scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent;
     transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease; }
 .modal-content::-webkit-scrollbar { width: 6px; }
-.modal-content::-webkit-scrollbar-thumb { background: rgba(148,163,184,0.3); border-radius: 3px; }
+.modal-content::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+.modal-content::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px;
     border-bottom: 1px solid var(--border-color); position: sticky; top: 0;
     background: var(--bg-modal); z-index: 1; backdrop-filter: blur(8px);
@@ -372,12 +380,25 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 /* ========== Form Controls ========== */
 .form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
     transition: color 0.3s ease; }
-.form-control, .form-select { background: var(--bg-input) !important; border: 1px solid var(--border-color) !important;
+.form-control, .form-select { background-color: var(--bg-input) !important; border: 1px solid var(--border-color) !important;
     color: var(--text-primary) !important;
     transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease; }
 .form-control:focus, .form-select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 0.2rem rgba(168,85,247,0.15); }
+/* ===== 下拉框主题化：去原生外观 + 主题色箭头 + 玻璃态 ===== */
+.form-select {
+    appearance: none; -webkit-appearance: none;
+    /* 覆盖 Bootstrap 默认灰色箭头，箭头色按 4 主题（霓虹/SaaS × 明/暗）分别编码，见下 */
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23a855f7' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat; background-position: right 0.75rem center; background-size: 16px 12px;
+    border-radius: 8px;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+[data-theme="light"] .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%239333ea' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+.form-select-sm { background-position: right 0.5rem center; background-size: 14px 10px; }
 .form-select option { background: var(--bg-input); color: var(--text-primary); }
-.form-control.bg-dark, .form-select.bg-dark { background: var(--bg-input) !important; color: var(--text-primary) !important; }
+.form-control.bg-dark, .form-select.bg-dark { background-color: var(--bg-input) !important; color: var(--text-primary) !important; }
 .form-control.text-light, .form-select.text-light { color: var(--text-primary) !important; }
 /* 下拉框禁用选项主题适配 */
 .form-select option:disabled { color: var(--text-secondary); background: var(--bg-input); }

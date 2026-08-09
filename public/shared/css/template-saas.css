@@ -56,6 +56,9 @@ html[data-template="saas"][data-theme="dark"] body {
     --glass-text-muted: #a6abb5;
     --glass-surface: #20242b;
     --glass-blur: none;
+    /* 滚动条：商务蓝调 */
+    --scrollbar-thumb: rgba(59, 130, 246, 0.35);
+    --scrollbar-thumb-hover: #3b82f6;
     --accent-gradient: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
     --accent-glow: rgba(59, 130, 246, 0.22);
 }
@@ -95,6 +98,9 @@ html[data-template="saas"][data-theme="light"] body {
     --glass-text: #1d2129;
     --glass-text-muted: #86909c;
     --glass-surface: #ffffff;
+    /* 滚动条：商务蓝调（浅色） */
+    --scrollbar-thumb: rgba(37, 99, 235, 0.3);
+    --scrollbar-thumb-hover: #2563eb;
     --accent-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
     --accent-glow: rgba(37, 99, 235, 0.16);
 }
@@ -549,6 +555,15 @@ html[data-template="saas"] .form-control:focus,
 html[data-template="saas"] .form-select:focus {
     border-color: var(--color-primary);
     box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.12);
+}
+/* SaaS 扁平化：去掉下拉框玻璃模糊，箭头换商务蓝（明/暗各一条） */
+html[data-template="saas"] .form-select {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+html[data-template="saas"][data-theme="light"] .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%232563eb' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
 }
 
 /* 下拉菜单：白底细边框小圆角 */

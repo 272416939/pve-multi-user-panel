@@ -38,6 +38,9 @@
     --glass-text-muted: #9d9db8;
     --glass-surface: rgba(12, 12, 29, 0.8);
     --glass-blur: blur(12px);
+    /* 滚动条：紫色调，hover 提亮 */
+    --scrollbar-thumb: rgba(168, 85, 247, 0.35);
+    --scrollbar-thumb-hover: #a855f7;
     /* 品牌渐变：紫 → 青 */
     --accent-gradient: linear-gradient(135deg, #a855f7 0%, #22d3ee 100%);
     --accent-glow: rgba(168, 85, 247, 0.4);
@@ -78,6 +81,9 @@
     --glass-text: #3b3654;
     --glass-text-muted: #9d9ab8;
     --glass-surface: rgba(255, 255, 255, 0.9);
+    /* 滚动条：浅色深紫调 */
+    --scrollbar-thumb: rgba(147, 51, 234, 0.3);
+    --scrollbar-thumb-hover: #9333ea;
     --accent-gradient: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%);
     --accent-glow: rgba(147, 51, 234, 0.2);
 }

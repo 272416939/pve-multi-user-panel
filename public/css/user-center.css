@@ -131,13 +131,7 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
 }
 .header-user-avatar:hover { border-color: var(--color-primary); }
 
-/* ===== Form 控件 ===== */
-.form-control, .form-select {
-    background: var(--bg-input) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-primary) !important;
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
+/* ===== Form 控件（统一走 shared/components.css，此处不再重复定义） ===== */
 .form-control::placeholder { color: var(--text-muted) !important; }
 .input-group-text {
     background: var(--bg-hover) !important;
