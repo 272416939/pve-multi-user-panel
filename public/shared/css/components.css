@@ -377,6 +377,90 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 }
 .dropdown-divider { border-top-color: var(--border-color) !important; margin: 4px 8px !important; }
 
+/* ========== Custom Select 玻璃下拉组件（select-glass.js 包裹原生 select） ========== */
+[data-cdk-dropdown] { animation: dropdownFadeIn 0.18s ease-out; }
+.custom-select { position: relative; display: inline-block; vertical-align: middle; }
+.custom-select-trigger {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 7px 34px 7px 12px;
+    cursor: pointer;
+    position: relative;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    user-select: none;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background 0.2s ease, border-color 0.2s ease;
+}
+.custom-select-trigger:hover {
+    background: var(--bg-hover);
+    border-color: var(--color-primary);
+}
+.custom-select-trigger::after {
+    content: '';
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid var(--text-secondary);
+    border-bottom: 2px solid var(--text-secondary);
+    transform: translateY(-70%) rotate(45deg);
+    transition: transform 0.2s ease;
+    pointer-events: none;
+}
+.custom-select.open .custom-select-trigger::after {
+    transform: translateY(-30%) rotate(-135deg);
+}
+.custom-select-text { overflow: hidden; text-overflow: ellipsis; }
+.custom-select-trigger .custom-select-placeholder { color: var(--text-secondary); }
+.custom-select-dropdown {
+    display: none;
+    position: fixed;
+    z-index: 10000;
+    max-height: 240px;
+    overflow-y: auto;
+    background: var(--bg-modal);
+    backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: var(--shadow-md);
+    padding: 4px;
+}
+.custom-select.open .custom-select-dropdown { display: block; }
+.custom-select-dropdown .option {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--text-primary);
+    border-radius: 6px;
+    font-size: 13px;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+    user-select: none;
+}
+.custom-select-dropdown .option:hover { background: var(--bg-hover); }
+.custom-select-dropdown .option.selected { background: var(--glass-accent); font-weight: 500; }
+.custom-select-dropdown .option.selected::before { content: '✓'; margin-right: 8px; color: var(--color-primary); }
+.custom-select-dropdown .option.disabled { opacity: 0.45; cursor: not-allowed; }
+/* 小尺寸变体（对应 form-select-sm） */
+.custom-select-sm .custom-select-trigger {
+    min-height: 31px;
+    padding: 2px 30px 2px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+.custom-select-sm .custom-select-trigger::after { right: 10px; width: 7px; height: 7px; }
+.custom-select-dropdown-sm .option { padding: 6px 10px; font-size: 12.5px; }
+/* 禁用态 */
+.custom-select.disabled .custom-select-trigger { opacity: 0.5; cursor: not-allowed; }
+.custom-select.disabled .custom-select-trigger:hover { background: var(--bg-input); border-color: var(--border-color); }
+
 /* ========== Form Controls ========== */
 .form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
     transition: color 0.3s ease; }
