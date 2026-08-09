@@ -11,7 +11,8 @@ const { TEMPLATE_STATUS } = require('../constants');
 const { normalizeDateParam } = require('../utils/date');
 
 // 所有端点都需要管理员权限
-router.use(authMiddleware, adminMiddleware);
+// 路径前缀限定：只拦截 /admin/* 请求，避免拦截所有经过的 /api 请求（express 前缀挂载陷阱）
+router.use('/admin', authMiddleware, adminMiddleware);
 
 // ==================== PVE 模板配置自动填充 ====================
 

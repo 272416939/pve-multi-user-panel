@@ -16,7 +16,8 @@ const { getIpLocations } = require('../services/ip-location');
 const { buildRowDetail, csvEscape, csvTime } = require('../utils/log-format');
 
 // 所有端点都需要管理员权限
-router.use(authMiddleware, adminMiddleware);
+// 路径前缀限定：只拦截 /admin/* 请求，避免拦截所有经过的 /api 请求（express 前缀挂载陷阱）
+router.use('/admin', authMiddleware, adminMiddleware);
 
 // scope 白名单：user = 仅用户操作（排除 admin.*）/ admin = 仅后台操作 / all = 全部
 const SCOPE_WHITELIST = ['user', 'admin', 'all'];
