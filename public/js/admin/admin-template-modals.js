@@ -1453,8 +1453,8 @@
                                         <div class="modal-body" style="padding:24px 28px;text-align:center">
                                             <p style="font-size:15px;color:var(--text-primary);line-height:1.6;margin:0 0 20px">{{ confirmState?.vmId !== null ? confirmActionText : confirmLxcActionText }}</p>
                                             <div style="display:flex;gap:10px;justify-content:center">
-                                                <button class="table-btn btn-danger" style="padding:8px 28px;font-size:14px" @click="confirmState?.vmId !== null ? confirmAction(userVms.find(function(v){return v.id===confirmState.vmId})||userVms[0]) : confirmLxcAction(userLxcContainers.find(function(c){return c.ct_id===lxcConfirmState.ctId})||userLxcContainers[0])">确认执行</button>
-                                                <button class="table-btn" style="padding:8px 28px;font-size:14px" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">取消</button>
+                                                <pv-button variant="danger" size="lg" @click="confirmState?.vmId !== null ? confirmAction(userVms.find(function(v){return v.id===confirmState.vmId})||userVms[0]) : confirmLxcAction(userLxcContainers.find(function(c){return c.ct_id===lxcConfirmState.ctId})||userLxcContainers[0])">确认执行</pv-button>
+                                                <pv-button variant="secondary" size="lg" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">取消</pv-button>
                                             </div>
                                         </div>
                                     </div>

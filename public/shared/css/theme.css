@@ -5,32 +5,8 @@
 [data-theme="dark"] .btn-close { filter: brightness(0) invert(1); opacity: 0.6; }
 .btn-close:hover { opacity: 1 !important; }
 
-/* ===== Light mode: btn-glass 可见性增强 ===== */
-[data-theme="light"] .btn-glass { background: linear-gradient(120deg, #9333ea 0%, #a855f7 100%); border-color: transparent; color: #fff; box-shadow: 0 0 14px rgba(147,51,234,0.3); }
-[data-theme="light"] .btn-glass:hover { background: linear-gradient(120deg, #7e22ce 0%, #9333ea 100%); box-shadow: 0 0 20px rgba(147,51,234,0.4); }
-
-/* Light mode: btn-glass-active */
-[data-theme="light"] .btn-glass-active { background: rgba(147,51,234,0.1); border-color: rgba(147,51,234,0.45); color: #7e22ce; }
-
-/* Light mode: ensure secondary/outline-style buttons are visible */
-[data-theme="light"] .btn-glass[style*="0.08"],
-[data-theme="light"] .btn-glass[style*="0.1"] {
-    background: rgba(168, 85, 247, 0.1) !important;
-    border-color: rgba(168, 85, 247, 0.35) !important;
-    color: #9333ea !important;
-}
-[data-theme="light"] .btn-glass[style*="239,68,68"],
-[data-theme="light"] .btn-glass[style*="FCA5A5"] {
-    background: rgba(239, 68, 68, 0.08) !important;
-    border-color: rgba(239, 68, 68, 0.35) !important;
-    color: #dc2626 !important;
-}
-[data-theme="light"] .btn-glass[style*="56,189,248"],
-[data-theme="light"] .btn-glass[style*="7DD3FC"] {
-    background: rgba(56, 189, 248, 0.1) !important;
-    border-color: rgba(56, 189, 248, 0.35) !important;
-    color: #0284c7 !important;
-}
+/* 旧 .btn-glass 亮色补丁已随旧按钮体系移除（含按内联 style 匹配的死补丁），
+   亮色按钮适配统一在 pv-buttons.css 第 9 节 */
 
 /* ===== Light mode: table header ===== */
 [data-theme="light"] thead th, [data-theme="light"] .table thead th, [data-theme="light"] .table-striped thead th {

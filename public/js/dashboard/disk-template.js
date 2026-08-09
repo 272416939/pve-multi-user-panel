@@ -76,9 +76,9 @@
             </td>
             <td class="text-center">
               <div class="table-actions" style="justify-content:center;">
-                <button v-if="disk.status !== 'destroyed' && !disk.is_legacy" class="table-btn btn-info" @click="openDiskRenewModal(disk)">续费</button>
-                <button v-if="disk.status !== 'destroyed' && disk.is_legacy" class="table-btn btn-secondary" disabled title="legacy磁盘随VM管理">续费</button>
-                <button v-else-if="disk.status === 'destroyed'" class="table-btn btn-danger" @click="deleteDestroyedDisk(disk)">删除</button>
+                <pv-button v-if="disk.status !== 'destroyed' && !disk.is_legacy" variant="table-primary" @click="openDiskRenewModal(disk)">续费</pv-button>
+                <pv-button v-if="disk.status !== 'destroyed' && disk.is_legacy" variant="table" disabled title="legacy磁盘随VM管理">续费</pv-button>
+                <pv-button v-else-if="disk.status === 'destroyed'" variant="table-danger" @click="deleteDestroyedDisk(disk)">删除</pv-button>
               </div>
             </td>
           </tr>

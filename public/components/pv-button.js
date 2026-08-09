@@ -37,7 +37,10 @@
         if (!slots || !slots() || !slots().length) v = 'close';
       }
 
+      // 尺寸修饰：仅 lg 追加 pv-btn-lg 类（与 glass 主按钮同排时对齐高度）；
+      // sm/md 不追加类——变体默认即小号尺寸（5px 14px/12px），渲染保持不变
       var cls = 'pv-btn pv-btn-' + v;
+      if (this.size === 'lg') cls += ' pv-btn-lg';
       var children = v === 'close'
         ? [h('span', { 'aria-hidden': 'true' }, '\u00d7')]
         : (this.$slots.default ? this.$slots.default() : []);

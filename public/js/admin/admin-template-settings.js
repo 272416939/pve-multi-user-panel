@@ -51,7 +51,7 @@
                                     </div>
                                     <div class="d-flex gap-2">
                                         <pv-button type="submit" variant="glass" >保存配置</pv-button>
-                                        <pv-button type="button" style="border-color:rgba(99,102,241,0.25);background:rgba(99,102,241,0.08);" @click="testSmtpConfig" variant="glass">发送测试邮件</pv-button>
+                                        <pv-button type="button" variant="outline" size="lg" @click="testSmtpConfig">发送测试邮件</pv-button>
                                     </div>
                                 </form>
                             </div>
@@ -271,11 +271,11 @@
                                         <small class="text-muted">多个接口用英文逗号分隔，将作为一条规则绑定多接口</small>
                                     </div>
                                     <div class="col-md-4 d-flex align-items-center" style="padding-top: 24px;">
-                                        <pv-button style="border-color:rgba(99,102,241,0.2);background:rgba(99,102,241,0.08);color:#A5B4FC;" @click="refreshIfaceList" variant="glass">刷新接口</pv-button>
+                                        <pv-button variant="outline" size="lg" @click="refreshIfaceList">刷新接口</pv-button>
                                         <small class="text-muted" v-if="ifaceUpdateTime" style="white-space: nowrap;">最后更新: {{ ifaceUpdateTime }}</small>
                                     </div>
                                 </div>
-                                <pv-button @click="saveNetworkConfig">💾 保存配置</pv-button>
+                                <pv-button variant="glass" @click="saveNetworkConfig">💾 保存配置</pv-button>
                             </div>
                         </div>
 
@@ -296,8 +296,8 @@
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2 mt-2">
-                                    <pv-button @click="addCnameEntry" variant="outline" size="sm">+ 新增节点</pv-button>
-                                    <pv-button @click="saveNetworkConfig" variant="primary" size="sm">💾 保存 CNAME</pv-button>
+                                    <pv-button @click="addCnameEntry" variant="outline" size="lg">+ 新增节点</pv-button>
+                                    <pv-button @click="saveNetworkConfig" variant="glass">💾 保存 CNAME</pv-button>
                                 </div>
                             </div>
                         </div>
@@ -321,7 +321,7 @@
                                 <small class="text-muted">创建私有网络子网的 DHCP 服务端时将自动填入此 DNS。服务接口、网关与地址池由系统按 VLAN 设置自动生成。</small>
                                 <div class="mt-3 d-flex gap-2">
                                     <pv-button @click="saveNetworkConfig" variant="glass">保存配置</pv-button>
-                                    <pv-button style="border-color:rgba(56,189,248,0.3);background:linear-gradient(135deg, rgba(56,189,248,0.15), rgba(59,130,246,0.1));color:#7DD3FC;" @click="syncDhcpBindings" variant="glass">从爱快同步</pv-button>
+                                    <pv-button variant="outline" size="lg" @click="syncDhcpBindings">从爱快同步</pv-button>
                                 </div>
                             </div>
                         </div>

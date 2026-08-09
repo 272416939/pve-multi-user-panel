@@ -95,75 +95,19 @@
 }
 
 /* ============================================
-   4. table 系列变体 — 表格行操作按钮
+   4. table / primary / danger / table-warning 系列
+   — 表格行操作与通用操作按钮（5px 14px / 12px 标准尺寸）
+   类名语义：
+     table / table-primary = 表格行默认/主要操作
+     primary               = 弹窗确认/保存、用户端页面主操作
+     （三者视觉一致，组合选择器单一定义，勿再拷贝副本）
+     table-danger / danger = 危险操作（停止/销毁/删除确认）
+     table-warning         = 表格行警告操作（移除/解绑）
    ============================================ */
 
-/* .pv-btn-table — 默认表格行按钮 */
-.pv-btn-table {
-  padding: 5px 14px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  border-radius: 8px !important;
-  background: rgba(168,85,247,0.12) !important;
-  color: #d8b4fe !important;
-  border-color: rgba(168,85,247,0.4) !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-.pv-btn-table:hover {
-  transform: translateY(-1px) !important;
-  background: rgba(168,85,247,0.22) !important;
-  border-color: rgba(168,85,247,0.55) !important;
-  box-shadow: 0 0 12px rgba(168,85,247,0.3) !important;
-}
-
-/* .pv-btn-table-primary — 表格行主要操作按钮 */
-.pv-btn-table-primary {
-  padding: 5px 14px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  border-radius: 8px !important;
-  background: rgba(168,85,247,0.12) !important;
-  color: #d8b4fe !important;
-  border-color: rgba(168,85,247,0.4) !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-.pv-btn-table-primary:hover {
-  transform: translateY(-1px) !important;
-  background: rgba(168,85,247,0.22) !important;
-  border-color: rgba(168,85,247,0.55) !important;
-  box-shadow: 0 0 12px rgba(168,85,247,0.3) !important;
-}
-
-/* .pv-btn-table-danger — 表格行危险操作按钮 */
-.pv-btn-table-danger {
-  padding: 5px 14px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  border-radius: 8px !important;
-  background: rgba(239,68,68,0.12) !important;
-  color: #fca5a5 !important;
-  border-color: rgba(239,68,68,0.3) !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-.pv-btn-table-danger:hover {
-  transform: translateY(-1px) !important;
-  background: rgba(239,68,68,0.22) !important;
-  border-color: rgba(239,68,68,0.48) !important;
-  box-shadow: 0 0 12px rgba(239,68,68,0.3) !important;
-}
-
-/* ============================================
-   5. primary / danger — 通用操作按钮
-   （复用 table-primary / table-danger 样式）
-   ============================================ */
-
-/* .pv-btn-primary — 通用主要操作按钮 */
+/* 紫色系 — 表格行默认/主要 + 通用主要操作 */
+.pv-btn-table,
+.pv-btn-table-primary,
 .pv-btn-primary {
   padding: 5px 14px !important;
   font-size: 12px !important;
@@ -176,6 +120,8 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+.pv-btn-table:hover,
+.pv-btn-table-primary:hover,
 .pv-btn-primary:hover {
   transform: translateY(-1px) !important;
   background: rgba(168,85,247,0.22) !important;
@@ -183,7 +129,8 @@
   box-shadow: 0 0 12px rgba(168,85,247,0.3) !important;
 }
 
-/* .pv-btn-danger — 通用危险操作按钮 */
+/* 红色系 — 表格行危险 + 通用危险操作 */
+.pv-btn-table-danger,
 .pv-btn-danger {
   padding: 5px 14px !important;
   font-size: 12px !important;
@@ -196,11 +143,45 @@
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+.pv-btn-table-danger:hover,
 .pv-btn-danger:hover {
   transform: translateY(-1px) !important;
   background: rgba(239,68,68,0.22) !important;
   border-color: rgba(239,68,68,0.48) !important;
   box-shadow: 0 0 12px rgba(239,68,68,0.3) !important;
+}
+
+/* 黄色系 — 表格行警告操作（移除/解绑） */
+.pv-btn-table-warning {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: rgba(245,158,11,0.12) !important;
+  color: #fcd34d !important;
+  border-color: rgba(245,158,11,0.3) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.pv-btn-table-warning:hover {
+  transform: translateY(-1px) !important;
+  background: rgba(245,158,11,0.22) !important;
+  border-color: rgba(245,158,11,0.48) !important;
+  box-shadow: 0 0 12px rgba(245,158,11,0.3) !important;
+}
+
+/* ============================================
+   5. 尺寸修饰类（仅尺寸无颜色，模板换肤无需覆盖）
+   ============================================ */
+
+/* .pv-btn-lg — 与 glass 主按钮同排时的次要按钮尺寸对齐
+   用法：<pv-button variant="outline" size="lg">（组件按 size 追加该类）
+   注意：必须双类选择器 .pv-btn.pv-btn-lg 提升特异性——单类会与后定义的
+   变体（outline/secondary 等）同优先级而按声明顺序落败，导致尺寸被压回 */
+.pv-btn.pv-btn-lg {
+  padding: 7px 20px !important;
+  font-size: 13px !important;
 }
 
 /* ============================================

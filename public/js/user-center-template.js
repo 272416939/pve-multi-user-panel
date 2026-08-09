@@ -74,7 +74,7 @@
                                         <label class="form-label">个人简介</label>
                                         <textarea class="form-control" rows="3" v-model="profileForm.bio" placeholder="介绍一下自己..."></textarea>
                                     </div>
-                                    <pv-button type="submit" variant="primary" >保存修改</pv-button>
+                                    <pv-button type="submit" variant="glass" >保存修改</pv-button>
                                 </form>
                             </div>
                         </div>
@@ -609,7 +609,7 @@
                                         <label class="form-label">内容</label>
                                         <textarea class="form-control" rows="5" v-model="editMemoForm.content" placeholder="输入内容..."></textarea>
                                     </div>
-                                    <pv-button type="submit" variant="primary">保存</pv-button>
+                                    <pv-button type="submit" variant="glass">保存</pv-button>
                                 </form>
                             </div>
                         </div>
@@ -647,7 +647,7 @@
                                 <p class="mb-0" style="color:var(--text-secondary);font-size:13px;">充值金额：<strong style="color:var(--color-primary);">¥{{ rechargePendingAmount }}</strong></p>
                             </div>
                             <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                                <button type="button" class="btn btn-outline-light px-4" @click="cancelRecharge">取消支付</button>
+                                <pv-button type="button" variant="secondary" @click="cancelRecharge">取消支付</pv-button>
                             </div>
                         </div>
                     </div>

@@ -116,7 +116,7 @@
     .modal-dialog.modal-lg { max-width: 95vw; margin: 0.5rem auto; }
     table { min-width: 600px; font-size: 12px; }
     th, td { padding: 8px 10px !important; white-space: nowrap; }
-    .table-btn { padding: 3px 8px !important; font-size: 11px !important; }
+    .pv-btn-table, .pv-btn-table-primary, .pv-btn-table-danger, .pv-btn-table-warning { padding: 3px 8px !important; font-size: 11px !important; }
     .module-title { font-size: 16px !important; }
     .stat-card { padding: 14px 16px; }
     .stat-num { font-size: 28px !important; }
@@ -254,33 +254,8 @@ tr:hover td { background: var(--bg-hover); }
 /* 切换中（橙/琥珀）*/ .tag-switch { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
     color: #f59e0b; background: rgba(245,158,11,0.15); white-space: nowrap;
     transition: color 0.3s ease, background-color 0.3s ease; }
-.table-btn { padding: 4px 12px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px;
-    cursor: pointer !important; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-    background: var(--bg-input);
-    color: var(--text-secondary); white-space: nowrap; line-height: 1.6;
-    position: relative; z-index: 10; display: inline-flex; align-items: center; }
-.table-btn:hover { border-color: rgba(168,85,247,0.5); color: var(--text-primary); background: rgba(168,85,247,0.12); }
-.table-btn.btn-primary { color: var(--color-primary); background: rgba(192,132,252,0.1); border-color: rgba(192,132,252,0.2); }
-.table-btn.btn-primary:hover { background: rgba(192,132,252,0.2); color: var(--color-primary-hover); }
-.table-btn.btn-danger { color: var(--color-danger); background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.18); }
-.table-btn.btn-danger:hover { background: rgba(248,113,113,0.18); color: var(--color-danger); }
-
-/* 操作按钮（CDK兑换/创建用户等） */
-.btn-glass { padding: 7px 20px; font-size: 13px; font-weight: 600; border-radius: 8px;
-    border: 1px solid rgba(168,85,247,0.3); cursor: pointer; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-    background: linear-gradient(120deg, #a855f7 0%, #22d3ee 100%);
-    color: #fff; box-shadow: 0 0 16px rgba(168,85,247,0.4); }
-.btn-glass:hover { background: linear-gradient(120deg, #9333ea 0%, #06b6d4 100%);
-    color: #fff; box-shadow: 0 0 24px rgba(34,211,238,0.55); transform: translateY(-1px); }
-/* CDK时长选择按钮组（玻璃态） */
-.btn-glass-active { padding: 4px 14px; font-size: 12px; font-weight: 600; border-radius: 6px;
-    border: 1px solid rgba(168,85,247,0.4); cursor: pointer; transition: all 0.2s ease;
-    background: linear-gradient(135deg, rgba(168,85,247,0.28), rgba(34,211,238,0.18));
-    color: var(--text-primary); box-shadow: 0 2px 8px rgba(168,85,247,0.2); }
-.btn-glass-inactive { padding: 4px 14px; font-size: 12px; font-weight: 500; border-radius: 6px;
-    border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-    background: var(--bg-input); color: var(--text-secondary); }
-.btn-glass-inactive:hover { border-color: rgba(168,85,247,0.25); color: var(--text-primary); background: rgba(168,85,247,0.08); }
+/* 按钮体系统一由 public/shared/css/pv-buttons.css 接管（.pv-btn-* 类 + <pv-button> 组件），
+   旧 .table-btn / .btn-glass 定义已移除，勿在此重建 */
 
 /* Badge 玻璃态 */
 .badge { padding: 3px 10px; font-size: 11px; font-weight: 600; border-radius: 6px;

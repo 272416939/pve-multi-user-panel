@@ -14,7 +14,7 @@
                                     导出全部 CSV
                                 
 </pv-button>
-                                <pv-button style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg, rgba(239,68,68,0.2), rgba(220,38,38,0.1));color:#FCA5A5;" @click="cleanupCdk" variant="glass">
+                                <pv-button variant="outline-danger" size="lg" @click="cleanupCdk">
 
                                     清理过期/已使用
                                 
@@ -34,11 +34,11 @@
                                             <label class="form-label text-muted small mb-1">续费时长</label>
                                             <div class="d-flex gap-2 flex-wrap align-items-center">
                                                 <div class="btn-group" role="group" style="gap:4px">
-                                                    <pv-button type="button" :class="cdkForm.duration_days === 7 ? 'btn-glass-active' : 'btn-glass-inactive'" @click="cdkForm.duration_days = 7" size="sm">7天</pv-button>
-                                                    <pv-button type="button" :class="cdkForm.duration_days === 30 ? 'btn-glass-active' : 'btn-glass-inactive'" @click="cdkForm.duration_days = 30" size="sm">30天</pv-button>
-                                                    <pv-button type="button" :class="cdkForm.duration_days === 90 ? 'btn-glass-active' : 'btn-glass-inactive'" @click="cdkForm.duration_days = 90" size="sm">90天</pv-button>
-                                                    <pv-button type="button" :class="cdkForm.duration_days === 180 ? 'btn-glass-active' : 'btn-glass-inactive'" @click="cdkForm.duration_days = 180" size="sm">半年</pv-button>
-                                                    <pv-button type="button" :class="cdkForm.duration_days === 365 ? 'btn-glass-active' : 'btn-glass-inactive'" @click="cdkForm.duration_days = 365" size="sm">1年</pv-button>
+                                                    <pv-button type="button" :variant="cdkForm.duration_days === 7 ? 'glass-active' : 'glass-inactive'" @click="cdkForm.duration_days = 7">7天</pv-button>
+                                                    <pv-button type="button" :variant="cdkForm.duration_days === 30 ? 'glass-active' : 'glass-inactive'" @click="cdkForm.duration_days = 30">30天</pv-button>
+                                                    <pv-button type="button" :variant="cdkForm.duration_days === 90 ? 'glass-active' : 'glass-inactive'" @click="cdkForm.duration_days = 90">90天</pv-button>
+                                                    <pv-button type="button" :variant="cdkForm.duration_days === 180 ? 'glass-active' : 'glass-inactive'" @click="cdkForm.duration_days = 180">半年</pv-button>
+                                                    <pv-button type="button" :variant="cdkForm.duration_days === 365 ? 'glass-active' : 'glass-inactive'" @click="cdkForm.duration_days = 365">1年</pv-button>
                                                 </div>
                                                 <div class="input-group input-group-sm" style="width:100px;flex-shrink:0;">
                                                     <input type="number" class="form-control form-control-sm" v-model.number="cdkForm.duration_days" min="1" placeholder="天数">

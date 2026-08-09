@@ -341,46 +341,20 @@ html[data-template="saas"] .pv-btn-close {
     border-radius: 4px !important;
 }
 
-/* 老 btn-glass 系列（admin.css / dashboard.css / user-center.css 里的旧按钮类） */
-html[data-template="saas"] .btn-glass {
-    background: var(--color-primary) !important;
-    border-color: var(--color-primary) !important;
-    color: #fff !important;
-    border-radius: 6px;
+/* 表格警告按钮：浅黄底黄字（移除/解绑语义） */
+html[data-template="saas"] .pv-btn-table-warning {
+    background: rgba(245, 158, 11, 0.1) !important;
+    color: var(--color-warning) !important;
+    border-color: rgba(245, 158, 11, 0.28) !important;
+    border-radius: 6px !important;
     box-shadow: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
-html[data-template="saas"] .btn-glass:hover:not(:disabled) {
-    background: var(--color-primary-hover) !important;
-    border-color: var(--color-primary-hover) !important;
-    color: #fff !important;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28) !important;
-}
-html[data-template="saas"] .btn-glass-active {
-    background: rgba(37, 99, 235, 0.1) !important;
-    border-color: rgba(37, 99, 235, 0.28) !important;
-    color: var(--color-primary) !important;
-    border-radius: 6px;
-}
-html[data-template="saas"] .btn-glass-active:hover {
-    background: rgba(37, 99, 235, 0.16) !important;
-}
-html[data-template="saas"] .btn-glass-inactive {
-    background: var(--bg-input) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-secondary) !important;
-    border-radius: 6px;
-}
-html[data-template="saas"] .btn-glass-inactive:hover {
-    background: var(--bg-hover) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-primary) !important;
-}
-/* theme.css 里按内联 style 匹配的亮色补丁，SAAS 模板整体替换为蓝系 */
-html[data-template="saas"][data-theme="light"] .btn-glass[style*="0.08"],
-html[data-template="saas"][data-theme="light"] .btn-glass[style*="0.1"] {
-    background: rgba(37, 99, 235, 0.1) !important;
-    border-color: rgba(37, 99, 235, 0.35) !important;
-    color: #2563eb !important;
+html[data-template="saas"] .pv-btn-table-warning:hover {
+    background: rgba(245, 158, 11, 0.16) !important;
+    border-color: rgba(245, 158, 11, 0.4) !important;
+    box-shadow: none !important;
 }
 
 /* ============================================
@@ -883,8 +857,7 @@ html[data-template="saas"][data-theme="dark"] .pv-btn-primary:hover {
     background: rgba(59, 130, 246, 0.3) !important;
     border-color: rgba(59, 130, 246, 0.55) !important;
 }
-html[data-template="saas"][data-theme="dark"] .pv-btn-glass-active,
-html[data-template="saas"][data-theme="dark"] .btn-glass-active {
+html[data-template="saas"][data-theme="dark"] .pv-btn-glass-active {
     background: rgba(59, 130, 246, 0.24) !important;
     border-color: rgba(59, 130, 246, 0.45) !important;
 }

@@ -124,7 +124,7 @@
         .modal-dialog.modal-lg { max-width: 95vw; margin: 0.5rem auto; }
         table { min-width: 600px; font-size: 12px; }
         th, td { padding: 8px 10px !important; white-space: nowrap; }
-        .table-btn { padding: 3px 8px !important; font-size: 11px !important; }
+        .pv-btn-table, .pv-btn-table-primary, .pv-btn-table-danger, .pv-btn-table-warning { padding: 3px 8px !important; font-size: 11px !important; }
         .module-title { font-size: 16px !important; }
         .stat-card { padding: 14px 16px; }
         .stat-num { font-size: 28px !important; }
@@ -257,34 +257,9 @@
         background: linear-gradient(180deg, #a855f7, #22d3ee);
     }
 
-    /* ========== 玻璃态按钮 ========== */
-    .btn-glass { padding: 7px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;
-        border: 1px solid rgba(168,85,247,0.3); cursor: pointer; transition: all 0.2s ease;
-        background: linear-gradient(120deg, #a855f7 0%, #22d3ee 100%);
-        color: #fff; box-shadow: 0 0 16px rgba(168,85,247,0.4); }
-    .btn-glass:hover:not(:disabled) { background: linear-gradient(120deg, #9333ea 0%, #06b6d4 100%);
-        color: #fff; box-shadow: 0 0 24px rgba(34,211,238,0.55); transform: translateY(-1px); }
-    .btn-glass:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
-
-    .btn-glass-success { border-color: rgba(54,211,153,0.35);
-        background: linear-gradient(135deg, rgba(54,211,153,0.2), rgba(34,197,94,0.12)); color: #6EE7B7; }
-    .btn-glass-success:hover:not(:disabled) { background: linear-gradient(135deg, rgba(54,211,153,0.32), rgba(34,197,94,0.22));
-        color: #A7F3D0; box-shadow: 0 4px 16px rgba(54,211,153,0.25); }
-
-    .btn-glass-warning { border-color: rgba(251,191,36,0.35);
-        background: linear-gradient(135deg, rgba(251,191,36,0.18), rgba(245,158,11,0.12)); color: #FCD34D; }
-    .btn-glass-warning:hover:not(:disabled) { background: linear-gradient(135deg, rgba(251,191,36,0.30), rgba(245,158,11,0.20));
-        color: #FDE68A; box-shadow: 0 4px 16px rgba(251,191,36,0.25); }
-
-    .btn-glass-danger { border-color: rgba(239,68,68,0.35);
-        background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(220,38,38,0.12)); color: #FCA5A5; }
-    .btn-glass-danger:hover:not(:disabled) { background: linear-gradient(135deg, rgba(239,68,68,0.30), rgba(220,38,38,0.20));
-        color: #FECACA; box-shadow: 0 4px 16px rgba(239,68,68,0.25); }
-
-    .btn-glass-info { border-color: rgba(59,130,246,0.35);
-        background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(168,85,247,0.12)); color: #93C5FD; }
-    .btn-glass-info:hover:not(:disabled) { background: linear-gradient(135deg, rgba(59,130,246,0.32), rgba(168,85,247,0.22));
-        color: #BFDBFE; box-shadow: 0 4px 16px rgba(59,130,246,0.25); }
+    /* ========== 玻璃态按钮（已移除） ==========
+       按钮体系统一由 public/shared/css/pv-buttons.css 接管（.pv-btn-* 类 + <pv-button> 组件），
+       旧 .btn-glass 系列定义已移除，勿在此重建 */
 
     /* ========== 表格样式 ========== */
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
@@ -362,23 +337,7 @@
         display: inline-flex; align-items: center;
     }
 
-    .table-btn {
-        padding: 4px 12px; font-size: 12px;
-        border: 1px solid var(--border-color); border-radius: 6px;
-        cursor: pointer !important; transition: all 0.2s ease;
-        background: transparent; color: var(--text-secondary); white-space: nowrap;
-        line-height: 1.6; position: relative; z-index: 10;
-        display: inline-flex; align-items: center;
-    }
-    .table-btn:hover { border-color: rgba(192,132,252,0.4); color: var(--text-primary); background: rgba(192,132,252,0.08); }
-    .table-btn.btn-primary { color: var(--color-primary); background: rgba(192,132,252,0.1); border-color: rgba(192,132,252,0.2); }
-    .table-btn.btn-primary:hover { background: rgba(192,132,252,0.2); color: var(--color-primary-hover); }
-    .table-btn.btn-danger { color: var(--color-danger); background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.18); }
-    .table-btn.btn-danger:hover { background: rgba(239,68,68,0.18); color: var(--color-danger); }
-    .table-btn.btn-info { color: #06b6d4; background: rgba(6,182,212,0.08); border-color: rgba(6,182,212,0.2); }
-    .table-btn.btn-info:hover { background: rgba(6,182,212,0.18); color: #22d3ee; }
-    .table-btn.btn-warning { color: var(--color-warning, #f59e0b); background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); }
-    .table-btn.btn-warning:hover { background: rgba(245,158,11,0.18); color: #fbbf24; }
+    /* 旧 .table-btn 系列已移除 —— 统一由 public/shared/css/pv-buttons.css 的 .pv-btn-table-* 接管 */
 
     /* 磁盘自动续费开关：放大并居中对齐 */
     .disk-auto-renew-switch {
@@ -505,13 +464,13 @@
         border-bottom: 1px solid rgba(168,85,247,0.15) !important;
     }
 
-    /* Buttons glow effect - 仅主操作按钮，不影响表格小按钮 */
-    .btn-primary:not(.table-btn) {
+    /* Buttons glow effect - 仅 Bootstrap 主操作按钮，不影响 pv-btn 组件按钮 */
+    .btn-primary:not(.pv-btn) {
         background: var(--accent-gradient) !important;
         border: none !important;
         box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3) !important;
     }
-    .btn-primary:not(.table-btn):hover {
+    .btn-primary:not(.pv-btn):hover {
         box-shadow: 0 6px 20px rgba(168, 85, 247, 0.45) !important;
         transform: translateY(-1px);
     }

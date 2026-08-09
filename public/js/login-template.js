@@ -185,7 +185,7 @@
                     <input type="password" v-model="forceNewPassword" placeholder="新密码（至少8位）" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup.enter="submitForceChangePwd" />
                     <input type="password" v-model="forceConfirmPassword" placeholder="确认新密码" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup.enter="submitForceChangePwd" />
                     <div v-if="forcePwdError" style="color:var(--login-color-error);font-size:12px;margin-bottom:12px">{{ forcePwdError }}</div>
-                    <pv-button type="button" @click="submitForceChangePwd" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--login-gradient-primary);color:#fff;font-size:14px;cursor:pointer;font-weight:600">确认修改</pv-button>
+                    <pv-button type="button" variant="primary" size="lg" @click="submitForceChangePwd" style="width:100%">确认修改</pv-button>
                 </div>
             </div>
             </Teleport>

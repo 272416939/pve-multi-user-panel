@@ -16,7 +16,7 @@
                                         <h5 class="mb-1">当前版本</h5>
                                         <span class="fs-4 fw-bold text-primary" id="currentVersion">加载中...</span>
                                     </div>
-                                    <pv-button style="border-color:rgba(99,102,241,0.25);background:rgba(99,102,241,0.08);color:#A5B4FC;" @click="checkUpdate" :disabled="updateChecking" variant="glass">
+                                    <pv-button variant="outline" size="lg" @click="checkUpdate" :disabled="updateChecking">
 
                                         <span v-if="updateChecking" class="spinner-border spinner-border-sm me-1"></span>
                                         <span v-else>🔍</span>
