@@ -138,7 +138,7 @@
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">到期时间</span><span class="vm-mobile-card-value" :class="getExpiryColor(vm.expiration_date)">{{ vm.expiration_date ? formatDate(vm.expiration_date) + ' ' + daysUntilExpire(vm.expiration_date) : '-' }}</span></div>
-                            <div class="vm-mobile-card-row" v-if="vm.config?.ciuser"><span class="vm-mobile-card-label">账号</span><span class="vm-mobile-card-value">{{ vm.config.ciuser }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">账号</span><span class="vm-mobile-card-value">{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</span></div>
                         </div>
                         <div v-if="vm._provisioning" class="text-center text-muted py-2"><small>正在开通中，请稍后刷新</small></div>
                         <div v-else class="vm-mobile-card-actions">
@@ -198,7 +198,7 @@
                                         </template>
                                         <template v-else>{{ vm.name || ('VM ' + vm.vm_id) }}</template>
                                     </td>
-                                    <td>{{ vm.config?.ciuser || '-' }}</td>
+                                    <td>{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</td>
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                     <td>
                                         <template v-if="cnameDomain && !vm._provisioning">
