@@ -642,6 +642,11 @@ window.positionFixedDropdown = function(triggerEl, dropdownEl) {
     var rect = triggerEl.getBoundingClientRect();
     var menuWidth = dropdownEl.offsetWidth || 160;
     var menuHeight = dropdownEl.offsetHeight || 200;
+    // 移动端边界回避：弹层宽高不超过视口（保留 8px 边距），避免超出屏幕无法操作
+    var maxW = window.innerWidth - 16;
+    if (menuWidth > maxW) menuWidth = maxW;
+    var maxH = window.innerHeight - 16;
+    if (menuHeight > maxH) menuHeight = maxH;
     // 默认左对齐触发器，下拉菜单在按钮正下方
     var left = rect.left;
     var top = rect.bottom + 4;
@@ -656,8 +661,8 @@ window.positionFixedDropdown = function(triggerEl, dropdownEl) {
         // 如果向上展开也超出顶部，则回退到按钮下方并限制最大高度
         if (top < 8) {
             top = 8;
-            var maxH = window.innerHeight - top - 8;
-            dropdownEl.style.maxHeight = maxH + 'px';
+            var maxH2 = window.innerHeight - top - 8;
+            dropdownEl.style.maxHeight = maxH2 + 'px';
             dropdownEl.style.overflowY = 'auto';
         }
     } else {

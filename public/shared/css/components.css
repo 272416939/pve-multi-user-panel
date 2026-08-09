@@ -424,8 +424,11 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     display: none;
     position: fixed;
     z-index: 10000;
-    max-height: 240px;
+    /* 移动端边界回避：高度不超 60% 视口（内容超出内部滚动）、宽度不超屏、滚动不穿透页面 */
+    max-height: min(240px, 60vh);
+    max-width: calc(100vw - 16px);
     overflow-y: auto;
+    overscroll-behavior: contain;
     background: var(--bg-modal);
     backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
     border: 1px solid var(--border-color);

@@ -26,6 +26,27 @@
         if (window.releaseFixedDropdown) window.releaseFixedDropdown(a.dropdown);
     }
 
+    // ===== 全局滚动/尺寸处理（仅注册一次；禁止在 build() 里逐 wrapper 注册，
+    // 否则滚动任意弹层会触发其他 wrapper 的监听误关——历史事故）=====
+    function repositionActive() {
+        if (!active) return;
+        var tr = active.trigger.getBoundingClientRect();
+        // trigger 滚出视口（含 20px 容差）才关闭，避免弹层孤悬屏外
+        var inView = tr.top >= -20 && tr.top <= window.innerHeight + 20 &&
+                     tr.left >= -20 && tr.right <= window.innerWidth + 20;
+        if (!inView) { closeAll(); return; }
+        if (window.positionFixedDropdown) window.positionFixedDropdown(active.trigger, active.dropdown);
+        var tw = active.trigger.getBoundingClientRect().width;
+        active.dropdown.style.minWidth = Math.max(tw, 160) + 'px';
+    }
+    window.addEventListener('scroll', function (e) {
+        if (!active) return;
+        // 弹层内部滚动（滚动条操作）放行；页面/容器滚动则跟随重定位，不消失
+        if (e.target === active.dropdown) return;
+        repositionActive();
+    }, true);
+    window.addEventListener('resize', repositionActive);
+
     function build(select) {
         var isSm = select.classList.contains('form-select-sm');
         // wrapper
@@ -47,20 +68,25 @@
         document.body.appendChild(dropdown);
         wrapper.__dropdown = dropdown;
         // 隐藏原生 select：保留 DOM 语义（表单提交 / required 校验 / v-model）
-        // 注意：不覆盖 width/height（select 可能带 style="width:140px" 内联宽度，需要继承）
+        // 注意：不覆盖 width/height——但 Bootstrap .form-select 是 width:100%，
+        // 隐藏为 absolute 后会相对视口膨胀，必须在隐藏前记录原始宽度
+        var origInlineWidth = select.style.width;
+        var origCssWidth = getComputedStyle(select).width;
+        var origOffsetWidth = select.offsetWidth;
         select.style.cssText = (select.style.cssText ? select.style.cssText + ';' : '') +
             'position:absolute;opacity:0;pointer-events:none;';
         select.insertAdjacentElement('beforebegin', wrapper);
         if (select.disabled) wrapper.classList.add('disabled');
 
-        // 宽度继承原 select：优先内联 style（如 style="width:140px"），其次取渲染宽度
-        // （隐藏弹窗内 select 初始 rect 为 0，打开时再补）
+        // 宽度继承原 select：优先内联 style（如 style="width:140px"），
+        // 其次隐藏前实际宽度，再其次 CSS 100%（撑满父容器，弹窗内常见），打开时兜底再取
         function syncWidth() {
             if (wrapper.style.width) return;
-            var inline = select.style.width;
-            if (inline && inline !== 'auto') { wrapper.style.width = inline; return; }
+            if (origInlineWidth && origInlineWidth !== 'auto') { wrapper.style.width = origInlineWidth; return; }
+            if (origOffsetWidth > 0) { wrapper.style.width = origOffsetWidth + 'px'; return; }
+            if (origCssWidth === '100%') { wrapper.style.width = '100%'; return; }
             var r = select.getBoundingClientRect();
-            if (r.width > 0) wrapper.style.width = r.width + 'px';
+            if (r.width > 0 && r.width < window.innerWidth) wrapper.style.width = r.width + 'px';
         }
         syncWidth();
 
@@ -109,11 +135,8 @@
             }
             dropdown.style.display = 'block';
             wrapper.classList.add('open');
-            if (window.positionFixedDropdown) window.positionFixedDropdown(trigger, dropdown);
-            // 弹层宽度至少等于触发器宽度（positionFixedDropdown 固定 minWidth 160px，此处补足）
-            var tw = trigger.getBoundingClientRect().width;
-            dropdown.style.minWidth = Math.max(tw, 160) + 'px';
             active = { wrapper: wrapper, dropdown: dropdown, select: select, trigger: trigger };
+            repositionActive();
         }
         function close() {
             if (active && active.dropdown === dropdown) active = null;
@@ -135,11 +158,6 @@
         // Vue 重渲染 option 列表时同步 trigger 文本
         var optMo = new MutationObserver(syncText);
         optMo.observe(select, { childList: true, subtree: true, characterData: true });
-        window.addEventListener('resize', closeAll);
-        // 滚动（捕获模式覆盖弹窗内滚动）时关闭，避免 fixed 弹层错位；弹层自身滚动除外
-        window.addEventListener('scroll', function (e) {
-            if (e.target !== dropdown) closeAll();
-        }, true);
         syncText();
     }
 
