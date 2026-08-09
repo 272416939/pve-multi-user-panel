@@ -1,3 +1,6 @@
+// 启动耗时计时起点（记录整个启动过程，含模块加载）
+const APP_START_TIME = Date.now();
+
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
@@ -27,15 +30,25 @@ if (!fs.existsSync(envPath)) {
     } else {
         console.error('[提示] 请在项目根目录创建 .env 文件并填写配置\n');
     }
+    console.error('服务端启动失败，请检查！\n');
     process.exit(1);
 }
+
+// 启动完成标志：启动阶段（置位前）的致命异常统一按"启动失败"提示
+var serverStarted = false;
 
 // 注册 process 级错误处理，防止 unhandledRejection/uncaughtException 导致进程无日志退出
 process.on('unhandledRejection', (reason, promise) => {
     console.error('[unhandledRejection]', reason);
+    if (!serverStarted) {
+        console.error('服务端启动失败，请检查！');
+    }
 });
 process.on('uncaughtException', (err) => {
     console.error('[uncaughtException]', err.stack || err.message || err);
+    if (!serverStarted) {
+        console.error('服务端启动失败，请检查！');
+    }
     process.exit(1);
 });
 
@@ -269,6 +282,12 @@ const pushProxy = require('./websocket/push-proxy');
 
 const httpServer = http.createServer(app);
 
+// listen 失败（端口占用等）：统一打印启动失败提示
+httpServer.on('error', (err) => {
+    console.error('服务端启动失败，请检查！[' + (err.code || '') + ']', err.message);
+    process.exit(1);
+});
+
 httpServer.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname === '/vnc-proxy') {
@@ -455,6 +474,7 @@ httpServer.listen(PORT, async () => {
         await db.initDb();
     } catch (error) {
         console.error('[数据库] MySQL 初始化失败:', error.message);
+        console.error('服务端启动失败，请检查！');
         process.exit(1);
     }
 
@@ -538,4 +558,8 @@ httpServer.listen(PORT, async () => {
     }
 
     require('./schedule/tasks').initScheduledTasks();
+
+    // 全部初始化完成：标记启动成功并打印最终耗时
+    serverStarted = true;
+    console.log(`服务端启动完成 本次耗时${Date.now() - APP_START_TIME}ms`);
 });
