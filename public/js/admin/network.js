@@ -132,7 +132,8 @@
             // 新格式: label||.domain
             var sep = item.indexOf('||');
             if (sep > -1) {
-                return { label: item.substring(0, sep), domain: item.substring(sep + 2) };
+                // label/domain 双侧 trim：防止输入空格入库导致列表页标签错位
+                return { label: item.substring(0, sep).trim(), domain: item.substring(sep + 2).trim() };
             }
             // 旧格式兼容: 中文前缀 + .域名（如 自动.auto.mcsr.cc）
             var match = item.match(/^([\u4e00-\u9fa5]+)(\..+)$/);
@@ -159,7 +160,7 @@
             // 将 cnameEntries 拼接回 cname_domain 逗号分隔字符串
             // 新格式: label||.domain（|| 分隔，避免与域名中的 . 冲突）
             $.networkConfig.cname_domain = $.cnameEntries.value
-                .map(function(e) { return (e.label || '') + '||' + (e.domain || ''); })
+                .map(function(e) { return (e.label || '').trim() + '||' + (e.domain || '').trim(); })
                 .filter(function(s) { return s.replace(/\|\|/g, '').trim(); })
                 .join(',');
             await api('/admin/network/config', { method: 'PUT', body: $.networkConfig });

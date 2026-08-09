@@ -259,35 +259,9 @@ tr:hover td { background: var(--bg-hover); }
 .tag-dropdown-item:hover { background: rgba(168,85,247,0.1); }
 .tag-dropdown-item:first-child { border-radius: 7px 7px 0 0; }
 .tag-dropdown-item:last-child { border-radius: 0 0 7px 7px; }
-.table-btn { padding: 4px 12px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 6px;
-    cursor: pointer !important; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-    background: var(--bg-input);
-    color: var(--text-secondary); white-space: nowrap; line-height: 1.6;
-    position: relative; z-index: 10; display: inline-flex; align-items: center; }
-.table-btn:hover { border-color: rgba(168,85,247,0.5); color: var(--text-primary); background: rgba(168,85,247,0.12); }
-.table-btn.btn-primary { color: var(--color-primary); background: rgba(192,132,252,0.1); border-color: rgba(192,132,252,0.2); }
-.table-btn.btn-primary:hover { background: rgba(192,132,252,0.2); color: var(--color-primary-hover); }
-.table-btn.btn-danger { color: var(--color-danger); background: rgba(248,113,113,0.08); border-color: rgba(248,113,113,0.18); }
-.table-btn.btn-danger:hover { background: rgba(248,113,113,0.18); color: var(--color-danger); }
-
-/* ========== 按钮样式 ========== */
-/* 操作按钮（CDK兑换/创建用户等） */
-.btn-glass { padding: 7px 20px; font-size: 13px; font-weight: 600; border-radius: 8px;
-    border: 1px solid rgba(168,85,247,0.3); cursor: pointer; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-    background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(34,211,238,0.15));
-    color: var(--text-primary); box-shadow: 0 2px 10px rgba(168,85,247,0.15); }
-.btn-glass:hover { background: linear-gradient(135deg, rgba(168,85,247,0.3), rgba(34,211,238,0.22));
-    color: var(--text-primary); box-shadow: 0 4px 16px rgba(168,85,247,0.25); transform: translateY(-1px); }
-
-/* CDK时长选择按钮组（玻璃态） */
-.btn-glass-active { padding: 4px 14px; font-size: 12px; font-weight: 600; border-radius: 6px;
-    border: 1px solid rgba(168,85,247,0.4); cursor: pointer; transition: all 0.2s ease;
-    background: linear-gradient(135deg, rgba(168,85,247,0.28), rgba(34,211,238,0.18));
-    color: var(--text-primary); box-shadow: 0 2px 8px rgba(168,85,247,0.2); }
-.btn-glass-inactive { padding: 4px 14px; font-size: 12px; font-weight: 500; border-radius: 6px;
-    border: 1px solid var(--border-color); cursor: pointer; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-    background: var(--bg-input); color: var(--text-secondary); }
-.btn-glass-inactive:hover { border-color: rgba(168,85,247,0.25); color: var(--text-primary); background: rgba(168,85,247,0.08); }
+/* ========== 按钮样式（已统一） ==========
+   按钮体系统一由 public/shared/css/pv-buttons.css 接管（.pv-btn-* 类 + <pv-button> 组件），
+   旧 .table-btn / .btn-glass 系列定义已移除，勿在此重建 */
 
 /* ========== Badge 样式 ========== */
 .badge { padding: 3px 10px; font-size: 11px; font-weight: 600; border-radius: 6px;
@@ -631,6 +605,13 @@ tr:hover td { background: var(--bg-hover); }
     text-overflow: ellipsis;
     max-width: 280px;
     line-height: 1.6;
+}
+/* CNAME 运营商标签：定宽 inline-block，保证各条域名起点列对齐；
+   空标签也渲染该占位 span（模板不再用 v-if 跳过），桌面/移动端共用此类 */
+.cname-label {
+    display: inline-block;
+    min-width: 3em;
+    margin-right: .25rem;
 }
 /* 移动端 CNAME 条目：名称部分单行省略（复制按钮保留） */
 .vm-mobile-card-cname-item > span {
