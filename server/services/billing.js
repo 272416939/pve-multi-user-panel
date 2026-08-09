@@ -142,6 +142,12 @@ async function renewByBalance(opts) {
             'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [userId, orderNo, db.now(), 'balance', 'renewal', totalPrice.toFixed(2), usePeriod, qty, balance.toFixed(2), newBalance, type, resource.vm_id || resource.ct_id || resource.id, null, null, db.now()]
         );
+        // 4. 写订单记录（order_kind='renewal'：admin 订单管理 / user 我的订单可见续费记录，含资源名称与 VM/CT ID）
+        var renewResourceId = resource.vm_id || resource.ct_id || resource.id;
+        await conn.execute(
+            'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status, order_kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [orderNo, userId, type, 0, 0, usePeriod, qty, totalPrice.toFixed(2), 0, 0, 0, resource.name || '', String(renewResourceId), 'completed', 'renewal']
+        );
     });
 
     // 续费后自动开机（PVE 操作不放入事务，避免长事务）

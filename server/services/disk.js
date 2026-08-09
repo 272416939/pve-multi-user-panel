@@ -742,10 +742,10 @@ async function renewDisk(opts) {
         );
         if (deductRes.affectedRows === 0) throw new Error('余额不足');
         var balanceAfter = balanceBefore - amount;
-        // 创建续费订单（resource_name 格式：续费 diskId|xxGiB）
+        // 创建续费订单（resource_name 格式：续费 diskId|xxGiB；order_kind='renewal' 供订单列表区分续费）
         await conn.execute(
-            'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            [orderNo, userId, 'disk', disk.spec_id || 0, 0, period, periodCount, amount, 0, 0, disk.capacity_gb, '续费 ' + disk.id + '|' + disk.capacity_gb + 'GiB', disk.id, 'completed']
+            'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status, order_kind) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [orderNo, userId, 'disk', disk.spec_id || 0, 0, period, periodCount, amount, 0, 0, disk.capacity_gb, '续费 ' + disk.id + '|' + disk.capacity_gb + 'GiB', disk.id, 'completed', 'renewal']
         );
         // 流水
         await conn.execute(
