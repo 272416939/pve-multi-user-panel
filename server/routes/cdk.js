@@ -227,7 +227,8 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             userId: req.user.id,
             code: req.body.code,
             vm_id: req.body.vm_id,
-            container_id: req.body.container_id
+            container_id: req.body.container_id,
+            req: req
         });
         if (!result.ok) {
             return res.status(result.status).json({ error: result.error });
