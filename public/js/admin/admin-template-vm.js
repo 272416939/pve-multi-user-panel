@@ -87,7 +87,7 @@
                                             <th>主机名称</th>
                                             <th>默认账号</th>
                                             <th>内网IP</th>
-                                            <th>CNAME域名</th>
+                                            <th class="text-start">CNAME域名</th>
                                             <th>配置</th>
                                             <th>到期时间</th>
                                             <th>续费价格</th>

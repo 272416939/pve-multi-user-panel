@@ -716,13 +716,16 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     letter-spacing: 2px;
 }
 
-/* ===== CNAME 域名单元格（VM/LXC 列表）：单行省略 + 悬停 title 全名，保持行对齐 ===== */
+/* ===== CNAME 域名单元格（VM/LXC 列表）：单行省略 + 悬停 title 全名，保持行对齐 =====
+   表格列默认居中，行内容宽度不同会导致各行整体错位；强制左对齐后
+   配合 .cname-label 定宽，各条域名起点严格同一列对齐 */
 .cname-cell {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 280px;
     line-height: 1.6;
+    text-align: left;
 }
 /* CNAME 运营商标签：定宽 inline-block，保证各条域名起点列对齐；
    空标签也渲染该占位 span（模板不再用 v-if 跳过），桌面/移动端共用此类 */
