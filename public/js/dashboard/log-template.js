@@ -33,7 +33,7 @@
                             <option value="user_login">用户登陆</option>
                             <option value="vm_lxc">操作VM/LXC</option>
                             <option value="password">重置密码</option>
-                            <option value="order">服务开通</option>
+                            <option value="purchase">新购/续费</option>
                             <option value="disk">硬盘管理</option>
                             <option value="setting">功能设置</option>
                             <option value="security">安全设置</option>

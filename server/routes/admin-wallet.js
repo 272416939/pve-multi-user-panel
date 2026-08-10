@@ -155,10 +155,15 @@ router.get('/admin/orders/export', authMiddleware, adminMiddleware, async (req, 
             var typeName = o.type === 'vm' ? (isRenewal ? 'VM 续费' : 'VM') : o.type === 'lxc' ? (isRenewal ? 'LXC 续费' : 'LXC') : (isRenewal ? '磁盘续费' : '磁盘');
             var periodName = getPeriodName(o.period);
             var statusName = o.status === 'completed' ? '已开通' : o.status;
-            // 续费订单：套餐/产品列展示资源名称 + 类型：ID（如 my-server（VM：101））
-            var productName = isRenewal && o.resource_name
-                ? o.resource_name + '（' + (o.type === 'vm' ? 'VM' : o.type === 'lxc' ? 'LXC' : '磁盘') + '：' + o.resource_id + '）'
-                : (o.package_name || '');
+            // 续费订单：vm/lxc 显示"名称（vm：ID）"，磁盘直接显示名称；新购 vm/lxc 显示"套餐名[vm：ID]"
+            var productName;
+            if (isRenewal) {
+                productName = o.resource_name || '';
+                if (o.type === 'vm' || o.type === 'lxc') productName += '（' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + '）';
+            } else {
+                productName = o.package_name || '';
+                if (o.type === 'vm' || o.type === 'lxc') productName += '[' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + ']';
+            }
             csvRows.push([
                 escapeCsvField(o.order_no), escapeCsvField(o.username || ''), escapeCsvField(productName), escapeCsvField(typeName),
                 escapeCsvField(periodName), escapeCsvField(o.period_count), escapeCsvField(o.amount), escapeCsvField(statusName), escapeCsvField(o.created_at)

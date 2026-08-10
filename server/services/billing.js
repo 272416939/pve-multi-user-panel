@@ -38,7 +38,7 @@ async function deductBalance(userId, amount, dbInstance) {
  * @param {object} opts - { userId, isAdmin, type, vmid, ctid, quantity, periodCount, period }
  */
 async function renewByBalance(opts) {
-    var { userId, isAdmin, type, vmid, ctid, quantity, period_count, period } = opts;
+    var { userId, isAdmin, type, vmid, ctid, quantity, period_count, period, req } = opts;
 
     if (!type || !['vm', 'lxc'].includes(type)) {
         return { ok: false, status: 400, error: '无效的资源类型' };
@@ -214,6 +214,12 @@ async function renewByBalance(opts) {
     } catch (e) {
         console.error('[billing] 续费邮件发送失败:', e.message);
     }
+
+    // 审计日志（action: vm.renew / lxc.renew，归"新购/续费"分类；失败不阻断主流程）
+    try {
+        var { auditAction } = require('../utils/audit-log');
+        await auditAction(req, type === 'vm' ? 'vm.renew' : 'lxc.renew', '续费' + (type === 'vm' ? '虚拟机' : 'LXC容器') + '[' + resourceName + '] ' + periodStr + ' 金额' + totalPrice.toFixed(2) + '元', { resourceType: type, resourceId: renewResourceId });
+    } catch (auditErr) { console.error('[billing] 续费审计日志失败:', auditErr.message); }
 
     return {
         ok: true,

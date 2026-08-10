@@ -742,10 +742,10 @@ async function renewDisk(opts) {
         );
         if (deductRes.affectedRows === 0) throw new Error('余额不足');
         var balanceAfter = balanceBefore - amount;
-        // 创建续费订单（resource_name 格式：续费 diskId|xxGiB；order_kind='renewal' 供订单列表区分续费）
+        // 创建续费订单（resource_name 与磁盘新购同格式，仅"新购"改"续费"；order_kind='renewal' 供订单列表区分续费）
         await conn.execute(
             'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status, order_kind) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            [orderNo, userId, 'disk', disk.spec_id || 0, 0, period, periodCount, amount, 0, 0, disk.capacity_gb, '续费 ' + disk.id + '|' + disk.capacity_gb + 'GiB', disk.id, 'completed', 'renewal']
+            [orderNo, userId, 'disk', disk.spec_id || 0, 0, period, periodCount, amount, 0, 0, disk.capacity_gb, '续费 ' + disk.capacity_gb + 'GiB [' + (disk.disk_name || '数据盘-' + disk.id) + ']', disk.id, 'completed', 'renewal']
         );
         // 流水
         await conn.execute(
@@ -758,18 +758,32 @@ async function renewDisk(opts) {
         await conn.execute('UPDATE disks SET expire_time = ?, status = ?, updated_at = NOW() WHERE id = ?', [newExpire, newStatus, disk.id]);
     });
 
-    // 邮件通知：硬盘续费成功
+    // 站内信 + 邮件通知：硬盘续费成功（失败不阻断主流程）
+    var periodLabel = periodCount + getPeriodUnit(period);
+    var expiryDisplay = newExpire ? new Date(newExpire).toLocaleString('zh-CN') : '永久有效';
+    var newBalance = (balanceBefore - amount).toFixed(2);
+    var diskDisplayName = disk.disk_name || '数据盘-' + disk.id;
+
+    // 站内信（与 VM/LXC 续费一致：type 2 业务通知，content 由 messages.create 统一净化）
+    try {
+        await db.messages.create({
+            uid: userId,
+            title: '硬盘续费成功',
+            content: '磁盘名称：' + diskDisplayName + '\n续费详情：' + periodLabel + '\n到期时间：' + expiryDisplay + '\n实付金额：¥' + amount.toFixed(2) + '\n余额变动：¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '\n订单号：' + orderNo,
+            type: 2,
+            send_type: 1
+        });
+    } catch (msgErr) { console.error('[disk renew] 站内信发送失败:', msgErr.message); }
+
+    // 邮件通知
     try {
         var renewUser = await db.users.getById(userId);
         if (renewUser && renewUser.email && renewUser.emailVerified && renewUser.email.includes('@')) {
             var siteName = await getSiteName();
-            var periodLabel = periodCount + getPeriodUnit(period);
-            var expiryDisplay = newExpire ? new Date(newExpire).toLocaleString('zh-CN') : '永久有效';
-            var newBalance = (balanceBefore - amount).toFixed(2);
             var emailHtml = createEmailTemplate('硬盘续费成功',
                 '<p>您的数据盘已续费成功！</p>' +
                 '<div class="info-box">' +
-                '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + diskDisplayName + '</strong></p>' +
                 '<p style="margin-bottom: 4px;">📅 续费详情：<strong>' + periodLabel + '</strong></p>' +
                 '<p style="margin-bottom: 4px;">⏳ 到期时间：<strong>' + expiryDisplay + '</strong></p>' +
                 '<p style="margin-bottom: 4px;">💸 实付金额：<strong>¥' + amount.toFixed(2) + '</strong></p>' +
@@ -784,7 +798,8 @@ async function renewDisk(opts) {
         }
     } catch (emailErr) { console.error('[disk renew] 邮件发送失败:', emailErr.message); }
 
-    await auditAction(req, 'disk.renew', '续费硬盘[' + (disk.disk_name || '数据盘-' + disk.id) + '] ' + periodCount + '个' + period + ' 金额' + amount + '元', { resourceType: 'disk', resourceId: disk.id });
+    // 审计日志（周期映射中文，如 1季/1个月/1年）
+    await auditAction(req, 'disk.renew', '续费硬盘[' + diskDisplayName + '] ' + periodLabel + ' 金额' + amount + '元', { resourceType: 'disk', resourceId: disk.id });
     return { ok: true, data: { success: true, amount: amount, new_expire: newExpire } };
 }
 
