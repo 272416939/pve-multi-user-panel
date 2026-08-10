@@ -119,6 +119,8 @@ async function renewByBalance(opts) {
     var newBalance = (balance - totalPrice).toFixed(2);
     // 订单号统一：续费类与开通/扩容一致使用 DD 前缀 + 14位时间戳 + 8位随机数（24位）
     var orderNo = generateOrderNo('renewal');
+    // 资源 ID（VM 用 vm_id，LXC 用 ct_id，兜底 db id）——事务内订单与事务后审计日志共用，须在函数作用域声明
+    var renewResourceId = resource.vm_id || resource.ct_id || resource.id;
     // ARCH-10: 扣款+更新到期时间+流水记录三步放入事务，保证原子性
     await withTransaction(async (conn) => {
         // 1. 扣款（V4-02 修复：原子条件扣款，并发余额不足时回滚事务）
@@ -143,7 +145,6 @@ async function renewByBalance(opts) {
             [userId, orderNo, db.now(), 'balance', 'renewal', totalPrice.toFixed(2), usePeriod, qty, balance.toFixed(2), newBalance, type, resource.vm_id || resource.ct_id || resource.id, null, null, db.now()]
         );
         // 4. 写订单记录（order_kind='renewal'：admin 订单管理 / user 我的订单可见续费记录，含资源名称与 VM/CT ID）
-        var renewResourceId = resource.vm_id || resource.ct_id || resource.id;
         await conn.execute(
             'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status, order_kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [orderNo, userId, type, 0, 0, usePeriod, qty, totalPrice.toFixed(2), 0, 0, 0, resource.name || '', String(renewResourceId), 'completed', 'renewal']

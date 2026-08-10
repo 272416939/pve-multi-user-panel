@@ -18,7 +18,7 @@ const dbg = require('../utils/debug');
  * @param {object} opts - { userId, code, vmId, containerId }
  */
 async function redeemCdk(opts) {
-    var { userId, code, vm_id, container_id } = opts;
+    var { userId, code, vm_id, container_id, req } = opts;
 
     if (!code || (!vm_id && !container_id)) {
         return { ok: false, status: 400, error: '请提供 CDK 码和虚拟机/容器' };
@@ -161,6 +161,12 @@ async function redeemCdk(opts) {
             });
         } catch (e) {}
 
+        // 审计日志（action 复用 lxc.renew，归"新购/续费"分类；失败不阻断主流程）
+        try {
+            var { auditAction } = require('../utils/audit-log');
+            await auditAction(req, 'lxc.renew', 'CDK兑换续费LXC容器[' + targetName + '] ' + cdk.duration_days + '天，新到期时间' + newExpirationDate.toLocaleString('zh-CN'), { resourceType: 'lxc', resourceId: targetId });
+        } catch (auditErr) { console.error('[cdk] 兑换审计日志失败:', auditErr.message); }
+
         return {
             ok: true,
             data: {
@@ -248,6 +254,12 @@ async function redeemCdk(opts) {
     } catch (startError) {
         console.error(`虚拟机 ${vm.vm_id} 自动开机失败:`, startError.message);
     }
+
+    // 审计日志（action 复用 vm.renew，归"新购/续费"分类；失败不阻断主流程）
+    try {
+        var { auditAction } = require('../utils/audit-log');
+        await auditAction(req, 'vm.renew', 'CDK兑换续费虚拟机[' + targetName + '] ' + cdk.duration_days + '天，新到期时间' + newExpirationDate.toLocaleString('zh-CN'), { resourceType: 'vm', resourceId: targetId });
+    } catch (auditErr) { console.error('[cdk] 兑换审计日志失败:', auditErr.message); }
 
     return {
         ok: true,
