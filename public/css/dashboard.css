@@ -419,7 +419,7 @@
 
     /* Badge styling */
     .badge { border-radius: 8px !important; font-weight: 500 !important; }
-    .bg-warning { background: linear-gradient(135deg, #f093fb, #f5576c) !important; }
+    /* bg-warning 不覆盖：沿用 components.css 主题金色徽章（紫粉渐变+金字不可读） */
     .bg-secondary { background: rgba(108, 117, 125, 0.3) !important; }
 
     /* Message type badge */

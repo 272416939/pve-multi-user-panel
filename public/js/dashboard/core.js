@@ -1417,6 +1417,10 @@
                     // 刷新/直达链接：加载子网列表（点击路径由 registerSectionLoader 派发）
                     if ($.loadSubnets) await $.loadSubnets();
                 }
+                if ($.activeSection.value === 'disk') {
+                    // 刷新/直达链接：加载磁盘列表（点击路径由 registerSectionLoader 派发）
+                    if ($.loadDisks) await $.loadDisks();
+                }
                 $.loadUnreadCount();
                 $.loadWalletBalance();
                 initPushClient(function(msg) {
