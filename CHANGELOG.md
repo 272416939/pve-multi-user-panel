@@ -1,13 +1,57 @@
 # Changelog
 
-## [Unreleased]
+## [3.2.0] - 2026-08-09
 
-### Added
-- **feat(theme): 界面模板体系 — 新增 SAAS 企业风模板 + 全站/个人双级选择**
-  - 现有紫色玻璃拟态风格固化为「默认模板」，新增「SAAS 企业风」模板（企业蓝主色、扁平克制、去玻璃化、细边框、8px 圆角、system-ui 字体，含完整明暗两套配色），覆盖 admin/仪表盘/用户中心/登录页全站
-  - 管理员在「系统设置 → 站点设置」通过可视化预览卡选择全站默认模板（点击实时预览，`site:template` 配置持久化，`admin.config.site` 审计）
-  - 用户在「用户中心 → 个人设置」自选个人模板偏好（跟随站点默认 / 默认模板 / SAAS），跨设备同步（`user_settings.template` 列 + `setting.template` 审计），优先级：个人偏好 > 站点默认
-  - 服务端注入 `<html data-template>` + theme-init.js 首帧应用（防闪烁），template-saas.css 独立文件后置加载（`html[data-template="saas"]` 作用域隔离，对默认模板零影响）
+### 概览
+
+**重点功能：模板切换（双主题体系）**。默认模板重做为**赛博霓虹风**，新增 **SAAS 企业风**（腾讯云控制台风格）模板，支持站点级默认 + 个人级偏好双级选择。同时完成大量 UI 优化与 Bug 修复（按钮体系统一、下拉/滚动条主题适配、硬编码颜色清理、续费订单记录等）。自 v3.1.0 以来共 35 个提交（13 feat + 19 fix + 2 refactor + 1 docs），73 文件 +2626/-1547。
+
+### Added（13 个 feat）
+
+**🎨 模板切换功能（重点）**
+- **feat(theme): 双模板体系（赛博霓虹 + SAAS 企业风）**
+  - 默认模板重做为**赛博霓虹风**（01-neon-dark 参考：霓虹紫渐变/玻璃拟态/光晕效果），命名「赛博霓虹」
+  - 新增 **SAAS 企业风**模板（`template-saas.css` 911 行）：腾讯云控制台风格——企业蓝主色 `#2563eb`、扁平克制去玻璃化、细边框、8px 圆角、system-ui 字体、顶栏 52px/侧边栏 200px、完整明暗两套配色，覆盖 admin/仪表盘/用户中心/登录页全站
+  - SAAS 登录页企业风背景（纯 CSS 多层渐变，替代光秃渐变）
+- **feat(theme): 全站/个人双级模板选择**
+  - 管理员「系统设置 → 站点设置」可视化预览卡选择全站默认模板（点击实时预览，`site:template` 持久化 + 审计）
+  - 用户「用户中心 → 个人设置」3 张预览卡自选个人偏好（跟随站点默认 / 赛博霓虹 / SAAS），跨设备同步（`user_settings.template` 列），**优先级：个人偏好 > 站点默认**
+  - 服务端注入 `<html data-template>` + theme-init.js 首帧应用防闪烁；`template-saas.css` 独立文件后置加载（作用域隔离）
+  - `UI_TEMPLATES` 白名单（default/saas）+ `GET/PUT /api/user/template` + `window.applyTemplate` 三端共用
+- **feat(order): VM/LXC 续费写入订单记录，列表显示资源名称与 ID**
+  - `orders` 表新增 `order_kind` 列（new/renewal）+ 兼容 ALTER；续费事务内写订单（与扣款/流水同事务原子回滚）
+  - admin「订单管理」/ user「我的订单」显示续费记录：VM 续费/LXC 续费/磁盘续费
+- **feat(billing): 磁盘续费名称新购格式与站内信，VM/LXC 续费审计，新购/续费日志分类**
+  - 续费成功追加审计：`vm.renew` / `lxc.renew`（`续费虚拟机[名称] 3个月 金额300元`）
+  - 日志分类「服务开通」改「新购/续费」（`order` -> `purchase` 分类）
+- **feat(system): 服务端启动收尾日志** — 成功打印 `服务端启动完成 本次耗时xxms`，失败统一提示「服务端启动失败，请检查！」
+- **feat(ui): 原生 select 全站玻璃化** — select-glass 包裹器替换展开弹层为 blur(15px) 玻璃组件（v-model/表单/required 零改动兼容）
+
+### Changed
+- refactor(ui): 按钮体系统一为 pv-button 语义体系（73 处旧 `table-btn`/`btn-glass` 迁移 + 死代码清理 + size prop 修复 + pv-buttons.css 三副本合并）
+- refactor(ui): 清理前端与邮件模板 emoji 图标——按钮只留文字，图标位改 SVG
+- docs(theme): README/CHANGELOG 记录界面模板功能
+
+### Fixed（19 个 fix）
+- **fix(ui): 下拉框与滚动条主题适配** — form-select 去原生外观换主题色箭头+玻璃态，滚动条全站主题感知（`--scrollbar-thumb` 变量）
+- **fix(ui): 下拉弹层滚动误关与移动端边界** — 滚动监听全局化、视口 clamp + overscroll 防穿透
+- **fix(ui): 硬编码颜色残留主题化**（6 提交）— 紫色残留改 `color-mix` 跟随主题变量，pv-buttons 全量变量化，SaaS 下无紫色残留（Playwright 4 组合冒烟 + 像素级确认）
+- **fix(ui): CNAME 域名列标签定宽对齐**（+ 单行省略悬停全名）— `.cname-label` 定宽 3em + 空标签占位
+- **fix(ip): 未绑定子网时禁用「重置IP」菜单入口**（用户端+管理端 8 处，防 DHCP 绑定接口出错）
+- **fix(ui): dashboard 默认账号列无 cloud-init 与 admin 一致显示「未安装Cloud-init驱动」**
+- **fix(vnc): /vnc 错误分支补传占位变量，模板插值加守卫防渲染崩溃**（EJS undefined replace error）
+- **fix(auth): admin-os-template/admin-logs 的 router.use 无路径前缀误拦所有 /api 请求**（普通用户 403）
+- **fix(message): 站内信分类修正**——业务通知不再误入系统公告
+- **fix(ui): dashboard?section=disk 刷新数据不显示 + HDD 徽章紫底金字不可读**
+- **fix(theme): SAAS 模板按钮覆盖被 pv-buttons.css !important 压制，补齐 !important**
+- **fix(ui): 侧边栏遮罩三端统一 + 明暗切换按钮恢复细边框**
+- **fix(ui): 套餐周期优化**——无折扣隐藏角标、选中态色条、卡片加宽；确认订购弹窗固定无滚动条
+
+### Notes
+- `user_settings` 表自动 ALTER 增加 `template` 列；`orders` 表自动增加 `order_kind` 列（重启自动迁移）
+- 历史存量续费无法回填（transaction_records 无资源名称字段），新记录自部署生效
+- 测试：**465 passing**；`check-coupling` 8 项断言全绿；Playwright 四象限（default/saas × 明/暗）回归通过
+- 删除 `pv-button-v2.js` 死代码；新增 `public/js/shared/select-glass.js`、`public/shared/css/template-saas.css`
 
 ## [3.1.0] - 2026-08-08
 
