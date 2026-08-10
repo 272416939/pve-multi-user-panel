@@ -227,10 +227,10 @@
                     <!-- 网络管理 -->
                     <div v-if="activeTab === 'network'">
                         <div class="module-header">
-                            <h4 class="module-title">端口转发配置</h4>
+                            <h4 class="module-title">网络配置</h4>
                         </div>
                         <div class="card" style="position: relative; z-index: 3; overflow: visible;">
-                            <div class="card-header"><h5 class="mb-0">全局设置</h5></div>
+                            <div class="card-header"><h5 class="mb-0">端口转发配置</h5></div>
                             <div class="card-body">
                                 <div class="row mb-3">
                                     <div class="col-md-4">
