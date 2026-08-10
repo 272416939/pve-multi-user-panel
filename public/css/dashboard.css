@@ -371,10 +371,10 @@
     .btn-primary:not(.pv-btn) {
         background: var(--accent-gradient) !important;
         border: none !important;
-        box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3) !important;
+        box-shadow: 0 4px 15px color-mix(in srgb, var(--color-primary) 30%, transparent) !important;
     }
     .btn-primary:not(.pv-btn):hover {
-        box-shadow: 0 6px 20px rgba(168, 85, 247, 0.45) !important;
+        box-shadow: 0 6px 20px color-mix(in srgb, var(--color-primary) 45%, transparent) !important;
         transform: translateY(-1px);
     }
 
