@@ -67,7 +67,7 @@ async function notifyProvisionFailed(opts) {
         await db.messages.create({
             uid: userId, title: title,
             content: '非常抱歉，您订购的' + resourceLabel + ' ' + resourceName + ' 开通失败，钱款已原路返回。\n订单号：' + orderNo + '\n退款金额：¥' + totalAmount + '\n如有疑问请联系客服。',
-            type: 1, is_read: 0, send_type: 1
+            type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] ' + resourceType + ' 开通失败通知发送失败', e); }
     try {
@@ -342,7 +342,7 @@ async function provisionVm(opts) {
         await db.messages.create({
             uid: userId, title: '服务器开通成功',
             content: '您的虚拟机 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。',
-            type: 1, is_read: 0, send_type: 1
+            type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] VM 消息发送失败', e); }
     try {
@@ -595,7 +595,7 @@ async function provisionLxc(opts) {
         await db.messages.create({
             uid: userId, title: '容器开通成功',
             content: '您的容器 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。',
-            type: 1, is_read: 0, send_type: 1
+            type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] LXC 消息发送失败', e); }
     try {
@@ -804,7 +804,7 @@ async function adminProvisionVm(opts) {
         await db.messages.create({
             uid: userId, title: '服务器开通成功',
             content: '您的虚拟机 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。到期时间：' + (expDate || '无'),
-            type: 1, is_read: 0, send_type: 1
+            type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] VM 消息发送失败', e); }
     // 发送邮件

@@ -293,7 +293,7 @@ async function processPayCallback(params, opts) {
             uid: userId,
             title: '充值到账通知',
             content: '您已成功充值 ¥' + amount.toFixed(2) + '，当前余额 ¥' + balanceAfter.toFixed(2) + '。订单号：' + params.out_trade_no,
-            type: 1,
+            type: 2,
             send_type: 1
         });
     } catch (e) {

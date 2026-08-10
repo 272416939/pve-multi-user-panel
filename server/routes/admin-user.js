@@ -305,7 +305,7 @@ router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, 
             await db.messages.create({
                 uid: userId, title: '余额充值成功',
                 content: '管理员为您充值 ¥' + amount.toFixed(2) + '，当前余额：¥' + newBalance.toFixed(2) + '。',
-                type: 1, is_read: 0, send_type: 1
+                type: 2, is_read: 0, send_type: 1
             });
         } catch (e) { console.error('[admin] recharge message failed', e); }
 

@@ -315,7 +315,7 @@ router.post('/subnets', authMiddleware, async (req, res) => {
                 uid: req.user.id,
                 title: '子网开通成功',
                 content: '您的私有网络子网已开通成功！\nVLAN 名称：' + vlanName + '\n网关：' + gw + '\n地址池：' + addrPool,
-                type: 1,
+                type: 2,
                 send_type: 1
             });
         } catch (msgErr) {
