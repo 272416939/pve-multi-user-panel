@@ -561,7 +561,7 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr v-for="(b, idx) in backups" :key="b.id" :style="backupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
+                                                    <tr v-for="(b, idx) in backups" :key="b.id" :style="backupSelected.has(b.id) ? 'background:color-mix(in srgb, var(--color-primary) 8%, transparent)' : ''">
                                                         <td class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="backupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleBackupSelect(b.id)" style="cursor:pointer"></td>
                                                         <td class="text-muted small">{{ idx + 1 }}</td>
                                                         <td class="small">{{ formatDate(b.created_at) }}</td>
@@ -1041,7 +1041,7 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr v-for="(b, idx) in lxcBackups" :key="b.id" :style="lxcBackupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
+                                                    <tr v-for="(b, idx) in lxcBackups" :key="b.id" :style="lxcBackupSelected.has(b.id) ? 'background:color-mix(in srgb, var(--color-primary) 8%, transparent)' : ''">
                                                         <td class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="lxcBackupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleLxcBackupSelect(b.id)" style="cursor:pointer"></td>
                                                         <td class="text-muted small">{{ idx + 1 }}</td>
                                                         <td class="small">{{ formatDate(b.created_at) }}</td>
@@ -1513,7 +1513,7 @@ if (window.__sharedDialogTemplates) {
         <div class="modal-content">
             <div class="modal-body py-4 px-4">
                 <div class="custom-alert-icon mb-3 text-center">
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                     </svg>
                 </div>

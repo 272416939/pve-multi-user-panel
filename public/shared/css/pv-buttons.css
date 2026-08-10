@@ -42,17 +42,17 @@
   font-size: 13px !important;
   font-weight: 600 !important;
   border-radius: 8px !important;
-  background: linear-gradient(120deg, #a855f7 0%, #22d3ee 100%) !important;
+  background: var(--accent-gradient) !important;
   color: #fff !important;
   border-color: transparent !important;
-  box-shadow: 0 0 18px rgba(168,85,247,0.4) !important;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--color-primary) 40%, transparent) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 .pv-btn-glass:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(120deg, #9333ea 0%, #06b6d4 100%) !important;
-  box-shadow: 0 0 28px rgba(34,211,238,0.55) !important;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--color-primary) 82%, #000) 0%, color-mix(in srgb, var(--color-primary-hover) 82%, #000) 100%) !important;
+  box-shadow: 0 0 28px color-mix(in srgb, var(--color-primary-hover) 55%, transparent) !important;
   border-color: transparent !important;
 }
 
@@ -62,18 +62,18 @@
   font-size: 12px !important;
   font-weight: 600 !important;
   border-radius: 6px !important;
-  background: rgba(168,85,247,0.22) !important;
-  color: #e9d5ff !important;
-  border-color: rgba(168,85,247,0.5) !important;
-  box-shadow: inset 0 0 10px rgba(168,85,247,0.18) !important;
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent) !important;
+  color: color-mix(in srgb, var(--color-primary) 40%, #fff) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 50%, transparent) !important;
+  box-shadow: inset 0 0 10px color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
 .pv-btn-glass-active:hover {
   transform: translateY(-1px) !important;
-  background: rgba(168,85,247,0.32) !important;
-  box-shadow: inset 0 0 12px rgba(168,85,247,0.25), 0 0 14px rgba(168,85,247,0.25) !important;
-  border-color: rgba(168,85,247,0.65) !important;
+  background: color-mix(in srgb, var(--color-primary) 32%, transparent) !important;
+  box-shadow: inset 0 0 12px color-mix(in srgb, var(--color-primary) 25%, transparent), 0 0 14px color-mix(in srgb, var(--color-primary) 25%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 65%, transparent) !important;
 }
 
 /* .pv-btn-glass-inactive — 非激活状态玻璃按钮 */
@@ -89,9 +89,9 @@
 }
 .pv-btn-glass-inactive:hover {
   transform: translateY(-1px) !important;
-  background: rgba(168,85,247,0.16) !important;
-  color: #d8b4fe !important;
-  border-color: rgba(168,85,247,0.4) !important;
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent) !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 40%, transparent) !important;
 }
 
 /* ============================================
@@ -105,7 +105,7 @@
      table-warning         = 表格行警告操作（移除/解绑）
    ============================================ */
 
-/* 紫色系 — 表格行默认/主要 + 通用主要操作 */
+/* 品牌色系 — 表格行默认/主要 + 通用主要操作 */
 .pv-btn-table,
 .pv-btn-table-primary,
 .pv-btn-primary {
@@ -113,9 +113,9 @@
   font-size: 12px !important;
   font-weight: 500 !important;
   border-radius: 8px !important;
-  background: rgba(168,85,247,0.12) !important;
-  color: #d8b4fe !important;
-  border-color: rgba(168,85,247,0.4) !important;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent) !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 40%, transparent) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -124,9 +124,9 @@
 .pv-btn-table-primary:hover,
 .pv-btn-primary:hover {
   transform: translateY(-1px) !important;
-  background: rgba(168,85,247,0.22) !important;
-  border-color: rgba(168,85,247,0.55) !important;
-  box-shadow: 0 0 12px rgba(168,85,247,0.3) !important;
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 55%, transparent) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-primary) 30%, transparent) !important;
 }
 
 /* 红色系 — 表格行危险 + 通用危险操作 */
@@ -212,15 +212,15 @@
   font-weight: 500 !important;
   border-radius: 8px !important;
   background: transparent !important;
-  color: #22d3ee !important;
-  border-color: rgba(34,211,238,0.5) !important;
+  color: var(--color-primary-hover) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 50%, transparent) !important;
   box-shadow: none !important;
 }
 .pv-btn-outline:hover {
   transform: translateY(-1px) !important;
-  background: rgba(34,211,238,0.1) !important;
-  box-shadow: 0 0 16px rgba(34,211,238,0.35) !important;
-  border-color: rgba(34,211,238,0.7) !important;
+  background: color-mix(in srgb, var(--color-primary-hover) 10%, transparent) !important;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--color-primary-hover) 35%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 70%, transparent) !important;
 }
 
 /* .pv-btn-outline-danger — 危险描边按钮（列表内删除/销毁） */
@@ -266,15 +266,15 @@
   font-weight: 500 !important;
   border-radius: 8px !important;
   background: var(--bg-hover, #1e293b) !important;
-  color: #d8b4fe !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
   border-color: var(--border-color, #334155) !important;
   box-shadow: none !important;
 }
 .pv-btn-secondary:hover {
   transform: translateY(-1px) !important;
-  background: rgba(168,85,247,0.14) !important;
-  border-color: rgba(168,85,247,0.35) !important;
-  box-shadow: 0 0 10px rgba(168,85,247,0.2) !important;
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 20%, transparent) !important;
 }
 
 /* .pv-btn-link — 链接式按钮 */
@@ -284,7 +284,7 @@
   font-weight: 400 !important;
   border-radius: 6px !important;
   background: transparent !important;
-  color: #d8b4fe !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
   border-color: transparent !important;
   box-shadow: none !important;
 }
@@ -310,11 +310,11 @@
   -webkit-backdrop-filter: none !important;
 }
 .pv-btn-ghost:hover {
-  background: rgba(34,211,238,0.08) !important;
-  border-color: rgba(34,211,238,0.4) !important;
-  color: #22d3ee !important;
+  background: color-mix(in srgb, var(--color-primary-hover) 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 40%, transparent) !important;
+  color: var(--color-primary-hover) !important;
   transform: none !important;
-  box-shadow: 0 0 12px rgba(34,211,238,0.3) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-primary-hover) 30%, transparent) !important;
 }
 /* 触摸设备上点击后立即恢复，避免遮罩残留 */
 .pv-btn-ghost:active {
@@ -360,7 +360,7 @@
 }
 .pv-btn-close:hover {
   opacity: 1 !important;
-  color: #d8b4fe !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
   background: rgba(239,68,68,0.1) !important;
   /* close 变体 hover 无 translateY 上浮效果 */
 }
@@ -376,7 +376,7 @@
 
 /* 键盘焦点可见性 */
 .pv-btn:focus-visible {
-  box-shadow: 0 0 0 3px rgba(168,85,247,0.3) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent) !important;
 }
 
 /* 禁用状态 */
@@ -389,40 +389,41 @@
 
 /* ============================================
    9. 亮色模式适配（赛博霓虹 Light：浅底上文字加深）
+   注：--color-primary-hover 暗色=青、亮色=深紫，随变量自动适配
    ============================================ */
 [data-theme="light"] .pv-btn-outline {
-  color: #0e7490 !important;
-  border-color: rgba(14, 116, 144, 0.5) !important;
+  color: var(--color-primary-hover) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 50%, transparent) !important;
 }
 [data-theme="light"] .pv-btn-outline:hover {
-  background: rgba(14, 116, 144, 0.08) !important;
-  box-shadow: 0 0 14px rgba(14, 116, 144, 0.25) !important;
+  background: color-mix(in srgb, var(--color-primary-hover) 8%, transparent) !important;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--color-primary-hover) 25%, transparent) !important;
 }
 [data-theme="light"] .pv-btn-table,
 [data-theme="light"] .pv-btn-table-primary,
 [data-theme="light"] .pv-btn-primary {
-  color: #7e22ce !important;
-  background: rgba(147, 51, 234, 0.08) !important;
-  border-color: rgba(147, 51, 234, 0.35) !important;
+  color: var(--color-primary-hover) !important;
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent) !important;
 }
 [data-theme="light"] .pv-btn-table:hover,
 [data-theme="light"] .pv-btn-table-primary:hover,
 [data-theme="light"] .pv-btn-primary:hover {
-  color: #6b21a8 !important;
-  background: rgba(147, 51, 234, 0.14) !important;
-  box-shadow: 0 0 10px rgba(147, 51, 234, 0.25) !important;
+  color: color-mix(in srgb, var(--color-primary) 80%, #000) !important;
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 25%, transparent) !important;
 }
 [data-theme="light"] .pv-btn-table-danger,
 [data-theme="light"] .pv-btn-danger {
-  color: #dc2626 !important;
+  color: var(--color-danger) !important;
 }
 [data-theme="light"] .pv-btn-glass-active {
-  color: #7e22ce !important;
-  background: rgba(147, 51, 234, 0.1) !important;
+  color: var(--color-primary-hover) !important;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent) !important;
 }
 [data-theme="light"] .pv-btn-ghost:hover {
-  color: #0e7490 !important;
-  background: rgba(14, 116, 144, 0.08) !important;
-  border-color: rgba(14, 116, 144, 0.35) !important;
-  box-shadow: 0 0 10px rgba(14, 116, 144, 0.2) !important;
+  color: var(--color-primary-hover) !important;
+  background: color-mix(in srgb, var(--color-primary-hover) 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 35%, transparent) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary-hover) 20%, transparent) !important;
 }

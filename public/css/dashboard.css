@@ -217,19 +217,19 @@
     .tag-pending {
         display: inline-block; padding: 2px 10px; border-radius: 20px;
         font-size: 12px; font-weight: 600;
-        color: var(--color-primary, #a855f7); background: rgba(168, 85, 247, 0.15); white-space: nowrap;
+        color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 15%, transparent); white-space: nowrap;
     }
-    /* 备份中（蓝）*/
+    /* 备份中 */
     .tag-backup {
         display: inline-block; padding: 2px 10px; border-radius: 20px;
         font-size: 12px; font-weight: 600;
-        color: var(--color-primary, #a855f7); background: rgba(168, 85, 247, 0.15); white-space: nowrap;
+        color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 15%, transparent); white-space: nowrap;
     }
-    /* 恢复中（紫）*/
+    /* 恢复中 */
     .tag-restore {
         display: inline-block; padding: 2px 10px; border-radius: 20px;
         font-size: 12px; font-weight: 600;
-        color: #c084fc; background: rgba(192, 132, 252, 0.15); white-space: nowrap;
+        color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 15%, transparent); white-space: nowrap;
     }
     /* 切换中（橙/琥珀）*/
     .tag-switch {
@@ -241,12 +241,12 @@
     /* 开通中行：毛玻璃遮罩效果 */
     .row-provisioning td {
         position: relative;
-        background: rgba(168, 85, 247, 0.06) !important;
+        background: color-mix(in srgb, var(--color-primary) 6%, transparent) !important;
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
     }
     [data-theme="dark"] .row-provisioning td {
-        background: rgba(168, 85, 247, 0.1) !important;
+        background: color-mix(in srgb, var(--color-primary) 10%, transparent) !important;
     }
     .provisioning-cell {
         display: inline-flex; align-items: center;
