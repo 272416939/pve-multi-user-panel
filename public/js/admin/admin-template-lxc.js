@@ -73,7 +73,7 @@
                                             <label class="form-label">IPv4（留空=DHCP）</label>
                                             <div class="input-group">
                                                 <input type="text" class="form-control" v-model="lxcForm.net0Ip" placeholder="如: 192.168.1.100/24">
-                                                <pv-button type="button" @click="randomLxcCreateIp" title="随机生成 DHCP 范围内未绑定的 IP" variant="outline">🎲</pv-button>
+                                                <pv-button type="button" @click="randomLxcCreateIp" title="随机生成 DHCP 范围内未绑定的 IP" variant="outline">随机</pv-button>
                                             </div>
                                         </div>
                                         <div class="col-md-4">

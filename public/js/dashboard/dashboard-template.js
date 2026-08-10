@@ -660,7 +660,7 @@
                             <label class="form-label">外网端口</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" :class="{ 'is-invalid': deviceCheckResult === false }" v-model.number="deviceForm.external_port" min="1" max="65535">
-                                <pv-button type="button" @click="randomDevicePort" variant="outline">🎲</pv-button>
+                                <pv-button type="button" @click="randomDevicePort" variant="outline">随机</pv-button>
                             </div>
                             <small class="text-muted">可用范围: {{ forwardConfig.port_range_start }}-{{ forwardConfig.port_range_end }}</small>
                         </div>

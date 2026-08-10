@@ -36,10 +36,10 @@ class PvToast extends HTMLElement {
 
     // 设置类型样式
     const typeColors = {
-      success: { bg: 'color-mix(in srgb, var(--color-success, #28a745) 15%, transparent)', border: 'var(--color-success, #28a745)', icon: '✓' },
-      error: { bg: 'color-mix(in srgb, var(--color-danger, #dc3545) 15%, transparent)', border: 'var(--color-danger, #dc3545)', icon: '✕' },
-      warning: { bg: 'color-mix(in srgb, var(--color-warning, #ffc107) 15%, transparent)', border: 'var(--color-warning, #ffc107)', icon: '⚠' },
-      info: { bg: 'color-mix(in srgb, var(--color-info, #17a2b8) 15%, transparent)', border: 'var(--color-info, #17a2b8)', icon: 'ℹ' }
+      success: { bg: 'color-mix(in srgb, var(--color-success, #28a745) 15%, transparent)', border: 'var(--color-success, #28a745)', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-success, #28a745)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' },
+      error: { bg: 'color-mix(in srgb, var(--color-danger, #dc3545) 15%, transparent)', border: 'var(--color-danger, #dc3545)', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger, #dc3545)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' },
+      warning: { bg: 'color-mix(in srgb, var(--color-warning, #ffc107) 15%, transparent)', border: 'var(--color-warning, #ffc107)', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning, #ffc107)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' },
+      info: { bg: 'color-mix(in srgb, var(--color-info, #17a2b8) 15%, transparent)', border: 'var(--color-info, #17a2b8)', icon: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--color-info, #17a2b8)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>' }
     };
 
     const colors = typeColors[type] || typeColors.info;
@@ -47,7 +47,7 @@ class PvToast extends HTMLElement {
     toast.style.borderColor = colors.border;
 
     const iconEl = this.shadowRoot.querySelector('.toast-icon');
-    if (iconEl) iconEl.textContent = colors.icon;
+    if (iconEl) iconEl.innerHTML = colors.icon;
 
     msgEl.textContent = message;
 

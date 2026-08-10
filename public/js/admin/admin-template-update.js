@@ -19,7 +19,6 @@
                                     <pv-button variant="outline" size="lg" @click="checkUpdate" :disabled="updateChecking">
 
                                         <span v-if="updateChecking" class="spinner-border spinner-border-sm me-1"></span>
-                                        <span v-else>🔍</span>
                                         检查更新
                                     
 </pv-button>
@@ -74,7 +73,7 @@
                                     <pv-button @click="executeUpdate" :disabled="updateExecuting">
 
                                         <span v-if="updateExecuting" class="spinner-border spinner-border-sm me-1"></span>
-                                        {{ updateExecuting ? '正在更新中...' : '⚡ 立即更新' }}
+                                        {{ updateExecuting ? '正在更新中...' : '立即更新' }}
                                     
 </pv-button>
                                     <small class="text-muted ms-2">更新后服务会自动重启，请确保已保存所有操作</small>
@@ -85,7 +84,7 @@
                         <!-- 已是最新版本 -->
                         <div v-if="updateInfo && !updateInfo.has_update && !updateInfo.error" class="card mb-3">
                             <div class="card-body text-center py-4">
-                                <div class="fs-1 mb-2">✅</div>
+                                <div class="fs-1 mb-2" style="color:var(--color-success);"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
                                 <h5>已是最新版本</h5>
                                 <p class="text-muted">当前运行版本 v{{ updateInfo.current_version }} 为最新版本</p>
                             </div>

@@ -445,12 +445,12 @@
         try {
             var result = await api('/admin/redis/test', { method: 'POST', body: $.redisConfig.value });
             if (result.success) {
-                alert('✅ ' + result.message);
+                alert(result.message);
             } else {
-                alert('❌ ' + result.message);
+                alert(result.message);
             }
         } catch (e) {
-            alert('❌ 测试失败: ' + (e.message || '未知错误'));
+            alert('测试失败: ' + (e.message || '未知错误'));
         }
         $.redisTesting.value = false;
     };

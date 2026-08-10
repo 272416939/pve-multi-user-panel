@@ -199,13 +199,13 @@ async function renewByBalance(opts) {
                 var renewHtml = createEmailTemplate('资源续费成功',
                     `<p>您好，您的 <strong>${resourceTypeLabel}「${resourceName}」</strong> 已续费成功。</p>
                     <div class="info-box">
-                        <p style="margin-bottom: 4px;">📌 资源名称：<strong>${resourceName}</strong></p>
-                        <p style="margin-bottom: 4px;">📅 续费详情：<strong>${periodStr}</strong></p>
-                        <p style="margin-bottom: 4px;">⏳ 到期时间：<strong>${expiryDisplay}</strong></p>
-                        <p style="margin-bottom: 4px;">💸 实付金额：<strong>¥${totalPrice.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">💳 余额变动：<strong>¥${balance.toFixed(2)} → ¥${newBalance}</strong></p>
-                        <p style="margin-bottom: 4px;">📋 订单编号：<strong>${orderNo}</strong></p>
-                        <p>⏰ 续费时间：${new Date().toLocaleString('zh-CN')}</p>
+                        <p style="margin-bottom: 4px;">资源名称：<strong>${resourceName}</strong></p>
+                        <p style="margin-bottom: 4px;">续费详情：<strong>${periodStr}</strong></p>
+                        <p style="margin-bottom: 4px;">到期时间：<strong>${expiryDisplay}</strong></p>
+                        <p style="margin-bottom: 4px;">实付金额：<strong>¥${totalPrice.toFixed(2)}</strong></p>
+                        <p style="margin-bottom: 4px;">余额变动：<strong>¥${balance.toFixed(2)} → ¥${newBalance}</strong></p>
+                        <p style="margin-bottom: 4px;">订单编号：<strong>${orderNo}</strong></p>
+                        <p>续费时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
                     <p>前往 <a href="${process.env.SITE_URL || ''}/">控制面板</a> 查看资源详情。</p>`, siteName);
                 enqueueEmail(user.email, '资源续费成功 - ' + siteName, renewHtml);

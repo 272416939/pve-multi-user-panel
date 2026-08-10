@@ -863,7 +863,7 @@
         <div class="modal-header"><h5 class="modal-title">切换操作系统</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="alert alert-warning" style="border:1px solid var(--bs-warning-border-subtle, #ffc107);background:color-mix(in srgb, var(--bs-warning) 15%, var(--bg-card, #fff));">
-                <strong style="color:var(--bs-warning-text-emphasis, #664d00);font-size:15px;">⚠️ 重要提示：</strong>
+                <strong style="color:var(--bs-warning-text-emphasis, #664d00);font-size:15px;">重要提示：</strong>
                 <ul class="mb-0 mt-1" style="color:var(--text-primary);line-height:1.8;">
                     <li>切换系统将<strong style="color:var(--bs-danger);">清除系统盘所有数据</strong>，请提前备份重要文件</li>
                     <li>数据盘不受影响，<strong style="color:var(--bs-success);">数据不会丢失</strong></li>
@@ -1021,7 +1021,7 @@
             </div>
             <div class="modal-body">
                 <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" style="background:rgba(220,53,69,0.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(220,53,69,0.3);">
-                    <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     <div>
                         <strong>危险操作</strong><br>
                         <span style="opacity:0.9">修改 IP 需要重启容器，容器将短暂关机后自动重启。正在运行的服务会中断，请确保已保存重要数据。</span>
@@ -1044,7 +1044,7 @@
                     <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
                     <div class="input-group">
                         <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
-                        <pv-button type="button" @click="randomLxcIp" title="随机生成未绑定的 IP" variant="outline">🎲 随机</pv-button>
+                        <pv-button type="button" @click="randomLxcIp" title="随机生成未绑定的 IP" variant="outline">随机</pv-button>
                     </div>
                 </div>
                 <div v-if="lxcIpError" class="alert alert-danger py-2">{{ lxcIpError }}</div>
@@ -1072,7 +1072,7 @@
             </div>
             <div class="modal-body">
                 <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" style="background:rgba(255,193,7,0.15);backdrop-filter:blur(12px);border:1px solid rgba(255,193,7,0.3);">
-                    <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     <div>
                         <strong>注意</strong><br>
                         <span style="opacity:0.9">修改虚拟机 IP 后，需要重启虚拟机或重新获取 DHCP 才能生效。</span>

@@ -307,10 +307,10 @@ async function processPayCallback(params, opts) {
                 var rechargeHtml = createEmailTemplate('充值到账通知',
                     `<p>您好，您已成功 <strong>充值 ¥${amount.toFixed(2)}</strong>。</p>
                     <div class="info-box">
-                        <p style="margin-bottom: 4px;">💰 充值金额：<strong>¥${amount.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">💳 当前余额：<strong>¥${balanceAfter.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">📋 订单编号：<strong>${params.out_trade_no}</strong></p>
-                        <p>⏰ 充值时间：${new Date().toLocaleString('zh-CN')}</p>
+                        <p style="margin-bottom: 4px;">充值金额：<strong>¥${amount.toFixed(2)}</strong></p>
+                        <p style="margin-bottom: 4px;">当前余额：<strong>¥${balanceAfter.toFixed(2)}</strong></p>
+                        <p style="margin-bottom: 4px;">订单编号：<strong>${params.out_trade_no}</strong></p>
+                        <p>充值时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
                     <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`, siteName);
                 enqueueEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);

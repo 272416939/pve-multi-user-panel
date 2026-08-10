@@ -130,7 +130,7 @@ async function redeemCdk(opts) {
                         <p>您好 <strong>${redeemer.username}</strong>，</p>
                         <div class="info-box" style="border-left-color: #48bb78;">
                             <p style="margin-bottom: 8px; font-size: 16px;">
-                                ✅ CDK 续费成功！
+                                CDK 续费成功！
                             </p>
                         </div>
                         <div class="info-box">
@@ -203,7 +203,7 @@ async function redeemCdk(opts) {
                     <p>您好 <strong>${redeemer2.username}</strong>，</p>
                     <div class="info-box" style="border-left-color: #48bb78;">
                         <p style="margin-bottom: 8px; font-size: 16px;">
-                            ✅ CDK 续费成功！
+                            CDK 续费成功！
                         </p>
                     </div>
                     <div class="info-box">

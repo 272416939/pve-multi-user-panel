@@ -329,10 +329,10 @@ router.post('/subnets', authMiddleware, async (req, res) => {
                 var emailHtml = createEmailTemplate('子网开通成功',
                     '<p>您的私有网络子网已开通成功！</p>' +
                     '<div class="info-box">' +
-                    '<p style="margin-bottom: 4px;">🌐 VLAN 名称：<strong>' + vlanName + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">🖧 网关：<strong>' + gw + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">📦 地址池：<strong>' + addrPool + '</strong></p>' +
-                    '<p>⏰ 开通时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                    '<p style="margin-bottom: 4px;">VLAN 名称：<strong>' + vlanName + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">网关：<strong>' + gw + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">地址池：<strong>' + addrPool + '</strong></p>' +
+                    '<p>开通时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                     '</div>' +
                     '<p>您可以在「我的虚拟机 / 容器」中绑定该子网使用。</p>', siteName);
                 if (await shouldSendEmail(req.user.id, 'notify_subnet_provisioned')) {

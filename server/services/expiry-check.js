@@ -189,7 +189,7 @@ const checkExpiredVms = async () => {
                                 <p>您好 <strong>${user.username}</strong>，</p>
                                 <div class="warning-box">
                                     <p style="margin-bottom: 0; font-size: 16px;">
-                                        ⚠️ 您的虚拟机 <strong>已到期</strong>！
+                                        您的虚拟机 <strong>已到期</strong>！
                                     </p>
                                 </div>
                                 <div class="info-box">
@@ -340,7 +340,7 @@ async function checkExpiredLxc() {
                                         <p>您好 <strong>${user.username}</strong>，</p>
                                         <div class="warning-box">
                                             <p style="margin-bottom: 0; font-size: 16px;">
-                                                ⚠️ 您的 LXC 容器 <strong>已到期</strong>！
+                                                您的 LXC 容器 <strong>已到期</strong>！
                                             </p>
                                         </div>
                                         <div class="info-box">

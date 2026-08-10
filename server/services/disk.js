@@ -150,13 +150,13 @@ async function purchaseDisk(opts) {
                 var emailHtml = createEmailTemplate('硬盘购买成功',
                     '<p>您的数据盘已购买成功！</p>' +
                     '<div class="info-box">' +
-                    '<p style="margin-bottom: 4px;">💾 硬盘名称：<strong>' + diskNamesStr + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">📐 容量：<strong>' + capacityGb + ' GiB × ' + quantity + ' 块</strong></p>' +
-                    '<p style="margin-bottom: 4px;">📅 计费周期：<strong>' + periodLabel + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">💸 实付金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">📋 订单编号：<strong>' + firstOrderNo + '</strong></p>' +
-                    '<p>⏰ 购买时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                    '<p style="margin-bottom: 4px;">硬盘名称：<strong>' + diskNamesStr + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">容量：<strong>' + capacityGb + ' GiB × ' + quantity + ' 块</strong></p>' +
+                    '<p style="margin-bottom: 4px;">计费周期：<strong>' + periodLabel + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">实付金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">订单编号：<strong>' + firstOrderNo + '</strong></p>' +
+                    '<p>购买时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                     '</div>' +
                     '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
                 if (await shouldSendEmail(userId, 'notify_disk_purchase')) {
@@ -203,11 +203,11 @@ async function purchaseDisk(opts) {
             var emailHtml = createEmailTemplate('硬盘购买失败 - 已退款',
                 '<p>非常抱歉，您购买的数据盘创建失败，款项已原路退回。</p>' +
                 '<div class="warning-box">' +
-                '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + (createdOrderNos[0] || '') + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
-                '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                '<p style="margin-bottom: 4px;">退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">原订单号：<strong>' + (createdOrderNos[0] || '') + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+                '<p>退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                 '</div>' +
                 '<p>如有疑问请联系客服。</p>', siteName);
             if (await shouldSendEmail(userId, 'notify_disk_refund')) {
@@ -466,11 +466,11 @@ async function resizeDisk(opts) {
                 var emailHtml = createEmailTemplate('硬盘扩容失败 - 已退款',
                     '<p>非常抱歉，您硬盘扩容操作失败，款项已原路退回。</p>' +
                     '<div class="warning-box">' +
-                    '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + resizeAmount.toFixed(2) + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + resizeOrderNo + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
-                    '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                    '<p style="margin-bottom: 4px;">退款金额：<strong>¥' + resizeAmount.toFixed(2) + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">原订单号：<strong>' + resizeOrderNo + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+                    '<p>退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                     '</div>' +
                     '<p>如有疑问请联系客服。</p>', siteName);
                 if (await shouldSendEmail(userId, 'notify_disk_refund')) {
@@ -493,12 +493,12 @@ async function resizeDisk(opts) {
             var emailHtml = createEmailTemplate('硬盘扩容成功',
                 '<p>您的数据盘已扩容成功！</p>' +
                 '<div class="info-box">' +
-                '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">📐 扩容：<strong>' + disk.capacity_gb + ' GiB → ' + newSize + ' GiB</strong></p>' +
-                '<p style="margin-bottom: 4px;">💸 扩容费用：<strong>¥' + resizeAmount.toFixed(2) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">📋 订单编号：<strong>' + resizeOrderNo + '</strong></p>' +
-                '<p>⏰ 扩容时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                '<p style="margin-bottom: 4px;">磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">扩容：<strong>' + disk.capacity_gb + ' GiB → ' + newSize + ' GiB</strong></p>' +
+                '<p style="margin-bottom: 4px;">扩容费用：<strong>¥' + resizeAmount.toFixed(2) + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">订单编号：<strong>' + resizeOrderNo + '</strong></p>' +
+                '<p>扩容时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                 '</div>' +
                 '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
             if (await shouldSendEmail(userId, 'notify_disk_resize')) {
@@ -681,11 +681,11 @@ async function destroyDisk(opts) {
                 var emailHtml = createEmailTemplate('硬盘销毁退款',
                     '<p>您的数据盘已销毁，退款已到账。</p>' +
                     '<div class="info-box">' +
-                    '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">📝 退款说明：<strong>' + refundDesc + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceBeforeDestroy - refundAmount).toFixed(2) + ' → ¥' + balanceBeforeDestroy.toFixed(2) + '</strong></p>' +
-                    '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                    '<p style="margin-bottom: 4px;">磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">退款说明：<strong>' + refundDesc + '</strong></p>' +
+                    '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + (balanceBeforeDestroy - refundAmount).toFixed(2) + ' → ¥' + balanceBeforeDestroy.toFixed(2) + '</strong></p>' +
+                    '<p>退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                     '</div>' +
                     '<p>如有疑问请联系客服。</p>', siteName);
                 if (await shouldSendEmail(userId, 'notify_disk_destroy_refund')) {
@@ -783,13 +783,13 @@ async function renewDisk(opts) {
             var emailHtml = createEmailTemplate('硬盘续费成功',
                 '<p>您的数据盘已续费成功！</p>' +
                 '<div class="info-box">' +
-                '<p style="margin-bottom: 4px;">💾 磁盘名称：<strong>' + diskDisplayName + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">📅 续费详情：<strong>' + periodLabel + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">⏳ 到期时间：<strong>' + expiryDisplay + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">💸 实付金额：<strong>¥' + amount.toFixed(2) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">📋 订单编号：<strong>' + orderNo + '</strong></p>' +
-                '<p>⏰ 续费时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                '<p style="margin-bottom: 4px;">磁盘名称：<strong>' + diskDisplayName + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">续费详情：<strong>' + periodLabel + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">到期时间：<strong>' + expiryDisplay + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">实付金额：<strong>¥' + amount.toFixed(2) + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + balanceBefore.toFixed(2) + ' → ¥' + newBalance + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">订单编号：<strong>' + orderNo + '</strong></p>' +
+                '<p>续费时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                 '</div>' +
                 '<p>前往 <a href="' + (process.env.SITE_URL || '') + '/">控制面板</a> 查看硬盘详情。</p>', siteName);
             if (await shouldSendEmail(userId, 'notify_disk_renewal')) {

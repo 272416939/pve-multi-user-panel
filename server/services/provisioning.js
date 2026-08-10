@@ -77,11 +77,11 @@ async function notifyProvisionFailed(opts) {
             var emailHtml = createEmailTemplate(failTitle,
                 '<p>非常抱歉，您订购的' + resourceLabel + ' <strong>' + resourceName + '</strong> 开通失败，款项已原路退回。</p>' +
                 '<div class="warning-box">' +
-                '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceAfterRefund - totalAmount).toFixed(2) + ' → ¥' + balanceAfterRefund.toFixed(2) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + orderNo + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
-                '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                '<p style="margin-bottom: 4px;">退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + (balanceAfterRefund - totalAmount).toFixed(2) + ' → ¥' + balanceAfterRefund.toFixed(2) + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">原订单号：<strong>' + orderNo + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+                '<p>退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                 '</div>' +
                 '<p>如有疑问请联系客服。</p>', siteName);
             if (await shouldSendEmail(userId, notifyKey)) {

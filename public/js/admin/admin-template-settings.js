@@ -275,7 +275,7 @@
                                         <small class="text-muted" v-if="ifaceUpdateTime" style="white-space: nowrap;">最后更新: {{ ifaceUpdateTime }}</small>
                                     </div>
                                 </div>
-                                <pv-button variant="glass" @click="saveNetworkConfig">💾 保存配置</pv-button>
+                                <pv-button variant="glass" @click="saveNetworkConfig">保存配置</pv-button>
                             </div>
                         </div>
 
@@ -297,7 +297,7 @@
                                 </div>
                                 <div class="d-flex gap-2 mt-2">
                                     <pv-button @click="addCnameEntry" variant="outline" size="lg">+ 新增节点</pv-button>
-                                    <pv-button @click="saveNetworkConfig" variant="glass">💾 保存 CNAME</pv-button>
+                                    <pv-button @click="saveNetworkConfig" variant="glass">保存 CNAME</pv-button>
                                 </div>
                             </div>
                         </div>
