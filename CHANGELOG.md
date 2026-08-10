@@ -1,5 +1,26 @@
 # Changelog
 
+## [3.2.1] - 2026-08-10
+
+### Fixed
+- **fix(billing): 修复 VM/LXC 续费审计日志写入失败——renewResourceId 作用域错误**
+  - v3.2.0 的 `vm.renew`/`lxc.renew` 审计埋点引用的 `renewResourceId` 声明在 `withTransaction` 事务回调内部 -> 生产环境 `ReferenceError: renewResourceId is not defined` -> 审计从未写入（错误被 catch 吞掉）
+  - 修复：声明上移至事务外（`var renewResourceId = resource.vm_id || resource.ct_id || resource.id`）
+  - **CDK 兑换续费补审计**：`redeemCdk` 传入 `req`，VM/LXC 分支各加 `vm.renew`/`lxc.renew` 埋点（`CDK兑换续费虚拟机[名称] N天...`），失败不阻断兑换
+- **fix(ui): CNAME 域名列左对齐——修复多行域名居中错位**
+  - 根因：`.table-align-center` 列居中 + 各线路段宽度不同 -> 整组总宽度不同 -> label/域名起点错位
+  - 修复：`.cname-cell` 加 `text-align: left`（一处 CSS 覆盖用户端/管理端、VM/LXC 全部 4 个表格）+ 4 个表头加 `text-start`
+- **fix(network): 审计日志按实际变化字段记录——CNAME 修改不再误记为网络配置**
+  - 写前读旧值 + 写后逐字段 diff（`NETWORK_CHANGE_FIELDS` / `buildNetworkChanges` / `buildCnameDetail`）
+  - CNAME 变化 -> 独立 `admin.config.cname` 条目级 diff（新增/删除/修改）；网络字段变化 -> `admin.config.network` 仅含实际变化字段；无变化不写审计
+- **fix(ui): admin 网络配置页标题文案调整**
+  - 页面标题「端口转发配置」->「网络配置」；卡片标题「全局设置」->「端口转发配置」
+
+### Notes
+- 仅改 server 端 + 前端模板/CSS，无数据库变更
+- 缓存版本 v115
+- 验证：`node --check` 通过、10 个 diff 场景测试、30 个 mocha 测试全部通过
+
 ## [3.2.0] - 2026-08-09
 
 ### 概览
