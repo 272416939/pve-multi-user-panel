@@ -11,7 +11,7 @@ const { parseIkuaiIds, stringifyIkuaiIds } = require('../services/port-forward-s
 const dbg = require('../utils/debug');
 const { safeError } = require('../utils/safe-error');
 // CNAME 域名配置校验纯函数（utils/cname-validate.js，格式与前端 parseCnameEntries 对齐）
-const { validateCnameDomain } = require('../utils/cname-validate');
+const { validateCnameDomain, splitCnameEntry } = require('../utils/cname-validate');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
@@ -22,6 +22,82 @@ function portAuditDetail(action, rule, vmId, ctId) {
     if (vmId) detail += ' VM ' + vmId;
     else if (ctId) detail += ' LXC ' + ctId;
     return detail;
+}
+
+// 网络配置字段审计标签：请求字段 → 中文标签 → 默认值（db 未设置时等价于该默认值，与 GET /admin/network/config 返回一致）
+const NETWORK_CHANGE_FIELDS = {
+    port_range_start: { label: '端口段起始', fallback: '50000' },
+    port_range_end: { label: '端口段结束', fallback: '60000' },
+    default_protocol: { label: '默认协议', fallback: 'tcp' },
+    max_per_user: { label: '每用户端口上限', fallback: '10' },
+    dhcp_ip_range_start: { label: 'DHCP起始IP', fallback: '10.0.0.110' },
+    dhcp_ip_range_end: { label: 'DHCP结束IP', fallback: '10.0.0.199' },
+    dhcp_interface: { label: 'DHCP接口', fallback: 'lan2' },
+    dhcp_gateway: { label: 'DHCP网关', fallback: '10.0.0.1' },
+    dhcp_dns1: { label: 'DHCP DNS1', fallback: '180.76.76.76' },
+    dhcp_dns2: { label: 'DHCP DNS2', fallback: '223.5.5.5' },
+    vlan_ip_segment_start: { label: 'VLAN IP段', fallback: '172.16.0.1' },
+    vlan_id_start: { label: 'VLAN起始ID', fallback: '1000' },
+    vlan_interface: { label: 'VLAN接口', fallback: 'lan1' },
+    vlan_max_per_user: { label: '每用户子网上限', fallback: '5' }
+};
+
+// 按实际变化的网络配置字段生成审计详情（返回 ['中文标签:新值', ...]，无变化返回空数组）
+// 外网接口特殊处理：入库为 JSON 数组，排序后比较（顺序变化不算变更）
+function buildNetworkChanges(before, after) {
+    var changes = [];
+    Object.keys(NETWORK_CHANGE_FIELDS).forEach(function(k) {
+        var raw = before[k];
+        if (raw === null || raw === undefined || raw === '') raw = NETWORK_CHANGE_FIELDS[k].fallback;
+        var oldV = String(raw).trim();
+        var newV = String(after[k] == null ? NETWORK_CHANGE_FIELDS[k].fallback : after[k]).trim();
+        if (oldV !== newV) changes.push(NETWORK_CHANGE_FIELDS[k].label + ':' + newV);
+    });
+    var oldWan = before.wan_interface || '';
+    var oldWanArr = [];
+    try { oldWanArr = JSON.parse(oldWan); if (!Array.isArray(oldWanArr)) oldWanArr = []; } catch (_) { oldWanArr = oldWan ? oldWan.split(',') : []; }
+    var oldWanKey = oldWanArr.filter(Boolean).map(function(s) { return String(s).trim(); }).sort().join(',');
+    var newWanKey = (after.wan_interface || []).filter(Boolean).map(function(s) { return String(s).trim(); }).sort().join(',');
+    if (oldWanKey !== newWanKey) changes.push('外网接口:' + (newWanKey || '空'));
+    return changes;
+}
+
+// CNAME 域名变更审计详情：条目级 diff（新增/删除/修改），无变化返回空串
+// 条目格式 label||.domain（splitCnameEntry 解析，与前端 parseCnameEntries 对齐）
+function buildCnameDetail(oldStr, newStr) {
+    function parseCname(str) {
+        return (str || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean).map(function(entry) {
+            return splitCnameEntry(entry);
+        });
+    }
+    var oldItems = parseCname(oldStr);
+    var newItems = parseCname(newStr);
+    var oldKeys = {}, newKeys = {};
+    oldItems.forEach(function(it) { oldKeys[it.label + '||' + it.domain] = true; });
+    newItems.forEach(function(it) { newKeys[it.label + '||' + it.domain] = true; });
+    var added = [], removed = [], modified = [];
+    newItems.forEach(function(ni) {
+        var key = ni.label + '||' + ni.domain;
+        if (oldKeys[key]) return; // 条目无变化
+        var oldSameLabel = null;
+        for (var i = 0; i < oldItems.length; i++) {
+            if (oldItems[i].label === ni.label) { oldSameLabel = oldItems[i]; break; }
+        }
+        if (oldSameLabel) modified.push(ni.label + '||' + oldSameLabel.domain + '→' + ni.domain);
+        else added.push(key);
+    });
+    oldItems.forEach(function(oi) {
+        var key = oi.label + '||' + oi.domain;
+        if (newKeys[key]) return;
+        var newSameLabel = newItems.some(function(ni) { return ni.label === oi.label; });
+        if (!newSameLabel) removed.push(key);
+    });
+    var parts = [];
+    if (added.length) parts.push('新增:' + added.join(','));
+    if (removed.length) parts.push('删除:' + removed.join(','));
+    if (modified.length) parts.push('修改:' + modified.join(','));
+    if (!parts.length) return '';
+    return '更新CNAME域名(' + parts.join(',') + ')';
 }
 
 router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req, res) => {
@@ -139,10 +215,25 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
                 return res.status(400).json({ error: cnameResult.error || 'CNAME 域名格式无效或过长' });
             }
         }
-        const setConfig = db.config.set;
-        await setConfig('forward:port_range_start', String(port_range_start ?? 50000));
-        await setConfig('forward:port_range_end', String(port_range_end ?? 60000));
-        await setConfig('forward:default_protocol', default_protocol || 'tcp');
+        // 操作审计前置：读取变更前的配置值（用于按实际变化字段生成审计）
+        const before = {
+            port_range_start: await db.config.get('forward:port_range_start'),
+            port_range_end: await db.config.get('forward:port_range_end'),
+            default_protocol: await db.config.get('forward:default_protocol'),
+            wan_interface: await db.config.get('forward:wan_interface'),
+            max_per_user: await db.config.get('forward:max_per_user'),
+            dhcp_ip_range_start: await db.config.get('dhcp:ip_range_start'),
+            dhcp_ip_range_end: await db.config.get('dhcp:ip_range_end'),
+            dhcp_interface: await db.config.get('dhcp:interface'),
+            dhcp_gateway: await db.config.get('dhcp:gateway'),
+            dhcp_dns1: await db.config.get('dhcp:dns1'),
+            dhcp_dns2: await db.config.get('dhcp:dns2'),
+            vlan_ip_segment_start: await db.config.get('vlan:ip_segment_start'),
+            vlan_id_start: await db.config.get('vlan:id_start'),
+            vlan_interface: await db.config.get('vlan:interface'),
+            vlan_max_per_user: await db.config.get('vlan:max_per_user'),
+            cname_domain: await db.config.get('cname:domain')
+        };
         // wan_interface 存储为 JSON 数组，兼容前端传入逗号分隔字符串、数组或单值
         let wanIfaceToStore = [];
         if (Array.isArray(wan_interface)) {
@@ -150,23 +241,53 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         } else if (typeof wan_interface === 'string') {
             wanIfaceToStore = wan_interface.split(',').map(s => s.trim()).filter(Boolean);
         }
-        await setConfig('forward:wan_interface', JSON.stringify(wanIfaceToStore));
-        await setConfig('forward:max_per_user', String(max_per_user ?? 10));
-        await setConfig('dhcp:ip_range_start', dhcp_ip_range_start || '10.0.0.110');
-        await setConfig('dhcp:ip_range_end', dhcp_ip_range_end || '10.0.0.199');
-        await setConfig('dhcp:interface', dhcp_interface || 'lan2');
-        await setConfig('dhcp:gateway', dhcp_gateway || '10.0.0.1');
-        await setConfig('dhcp:dns1', dhcp_dns1 || '180.76.76.76');
-        await setConfig('dhcp:dns2', dhcp_dns2 || '223.5.5.5');
-        await setConfig('vlan:ip_segment_start', String(vlan_ip_segment_start || '172.16.0.1').trim());
-        await setConfig('vlan:id_start', String(vlan_id_start ?? 1000));
-        await setConfig('vlan:interface', (vlan_interface || 'lan1').trim());
-        await setConfig('vlan:max_per_user', String(vlan_max_per_user ?? 5));
-        await setConfig('cname:domain', (cname_domain || '').trim());
-        // 操作审计：更新网络/端口转发配置
+        // 归一化后的新值（入库值与审计 diff 共用，避免两处口径不一致）
+        const after = {
+            port_range_start: String(port_range_start ?? 50000),
+            port_range_end: String(port_range_end ?? 60000),
+            default_protocol: default_protocol || 'tcp',
+            wan_interface: wanIfaceToStore,
+            max_per_user: String(max_per_user ?? 10),
+            dhcp_ip_range_start: dhcp_ip_range_start || '10.0.0.110',
+            dhcp_ip_range_end: dhcp_ip_range_end || '10.0.0.199',
+            dhcp_interface: dhcp_interface || 'lan2',
+            dhcp_gateway: dhcp_gateway || '10.0.0.1',
+            dhcp_dns1: dhcp_dns1 || '180.76.76.76',
+            dhcp_dns2: dhcp_dns2 || '223.5.5.5',
+            vlan_ip_segment_start: String(vlan_ip_segment_start || '172.16.0.1').trim(),
+            vlan_id_start: String(vlan_id_start ?? 1000),
+            vlan_interface: (vlan_interface || 'lan1').trim(),
+            vlan_max_per_user: String(vlan_max_per_user ?? 5),
+            cname_domain: (cname_domain || '').trim()
+        };
+        const setConfig = db.config.set;
+        await setConfig('forward:port_range_start', after.port_range_start);
+        await setConfig('forward:port_range_end', after.port_range_end);
+        await setConfig('forward:default_protocol', after.default_protocol);
+        await setConfig('forward:wan_interface', JSON.stringify(after.wan_interface));
+        await setConfig('forward:max_per_user', after.max_per_user);
+        await setConfig('dhcp:ip_range_start', after.dhcp_ip_range_start);
+        await setConfig('dhcp:ip_range_end', after.dhcp_ip_range_end);
+        await setConfig('dhcp:interface', after.dhcp_interface);
+        await setConfig('dhcp:gateway', after.dhcp_gateway);
+        await setConfig('dhcp:dns1', after.dhcp_dns1);
+        await setConfig('dhcp:dns2', after.dhcp_dns2);
+        await setConfig('vlan:ip_segment_start', after.vlan_ip_segment_start);
+        await setConfig('vlan:id_start', after.vlan_id_start);
+        await setConfig('vlan:interface', after.vlan_interface);
+        await setConfig('vlan:max_per_user', after.vlan_max_per_user);
+        await setConfig('cname:domain', after.cname_domain);
+        // 操作审计：按实际变化的字段记录（改了什么记什么；CNAME 单独成条，不再混入网络配置）
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.network', resourceType: 'config', resourceId: 'network', details: '更新网络配置(端口段:' + (port_range_start ?? 50000) + '-' + (port_range_end ?? 60000) + ',每用户上限:' + (max_per_user ?? 10) + ',DHCP:' + (dhcp_ip_range_start || '10.0.0.110') + '-' + (dhcp_ip_range_end || '10.0.0.199') + ',VLAN段:' + (vlan_ip_segment_start || '172.16.0.1') + ',VLAN起始ID:' + (vlan_id_start ?? 1000) + ',VLAN接口:' + (vlan_interface || 'lan1') + ',每用户子网上限:' + (vlan_max_per_user ?? 5) + ')', req });
+            const changes = buildNetworkChanges(before, after);
+            const cnameDetail = buildCnameDetail(before.cname_domain, after.cname_domain);
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.network', resourceType: 'config', resourceId: 'network', details: '更新网络配置(' + changes.join(',') + ')', req });
+            }
+            if (cnameDetail) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.cname', resourceType: 'config', resourceId: 'cname', details: cnameDetail, req });
+            }
         } catch (e) {}
         res.json({ message: '网络配置已更新' });
     } catch (e) {
