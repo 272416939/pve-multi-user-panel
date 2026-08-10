@@ -9,7 +9,7 @@
     margin-bottom: 12px;
     transition: all 0.3s ease;
 }
-.vm-mobile-card:hover { border-color: rgba(168,85,247,0.3); }
+.vm-mobile-card:hover { border-color: color-mix(in srgb, var(--color-primary) 30%, transparent); }
 .vm-mobile-card-header {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 10px; padding-bottom: 10px;
@@ -26,7 +26,7 @@
 .vm-mobile-card-cname-list { margin-top: 4px; display: flex; flex-direction: column; gap: 4px; }
 .vm-mobile-card-cname-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(168,85,247,0.06); padding: 4px 8px; border-radius: 6px; }
 .cname-copy-btn { flex-shrink: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
-.cname-copy-btn:hover { color: var(--color-primary, #c084fc); background: rgba(168,85,247,0.1); }
+.cname-copy-btn:hover { color: var(--color-primary, #c084fc); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
 .vm-mobile-card-label { color: var(--text-muted); flex-shrink: 0; }
 .vm-mobile-card-value { color: var(--text-primary); text-align: right; word-break: break-all; }
 .vm-mobile-card-fullrow .vm-mobile-card-value { text-align: left; }
@@ -103,9 +103,9 @@
 .nav-tabs .nav-link { padding: 7px 18px; font-size: 13px; font-weight: 500; color: var(--text-secondary);
     background: transparent; border: none; border-radius: 7px; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease; cursor: pointer;
     white-space: nowrap; position: relative; }
-.nav-tabs .nav-link:hover { color: var(--text-primary); background: rgba(168,85,247,0.08); }
-.nav-tabs .nav-link.active { color: #fff; background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(34,211,238,0.15));
-    box-shadow: 0 2px 12px rgba(168,85,247,0.2), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600; }
+.nav-tabs .nav-link:hover { color: var(--text-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.nav-tabs .nav-link.active { color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 25%, transparent), color-mix(in srgb, var(--color-primary-hover) 15%, transparent));
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600; }
 
 /* 模块标题区域 */
 .module-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -127,9 +127,9 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     --bs-table-bg: transparent;
     --bs-table-accent-bg: transparent;
     --bs-table-color: var(--text-primary);
-    --bs-table-hover-bg: rgba(168,85,247,0.04);
+    --bs-table-hover-bg: color-mix(in srgb, var(--color-primary) 4%, transparent);
     --bs-table-striped-color: var(--text-primary);
-    --bs-table-active-bg: rgba(168,85,247,0.06);
+    --bs-table-active-bg: color-mix(in srgb, var(--color-primary) 6%, transparent);
 }
 .table > thead, .table-striped > thead, .table-sm > thead, .table-hover > thead, .table-dark > thead {
     background: transparent !important;
@@ -243,7 +243,7 @@ tr:hover td { background: var(--bg-hover); }
 .dropdown-table.open .dropdown-menu-table { display: block; }
 .dropdown-menu-table li a { display: block; padding: 6px 14px; font-size: 13px; color: var(--text-primary);
     text-decoration: none; transition: background 0.15s; white-space: nowrap; }
-.dropdown-menu-table li a:hover { background: rgba(168,85,247,0.15); color: #fff; }
+.dropdown-menu-table li a:hover { background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: #fff; }
 
 /* Form controls（统一走 shared/components.css，此处不再重复定义） */
 .form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
@@ -267,7 +267,7 @@ tr:hover td { background: var(--bg-hover); }
 /* ========== 拖拽排序 ========== */
 .sort-dragging { opacity: 0.4; transform: scale(0.95); }
 .sort-drag-over { position: relative; }
-.sort-drag-over .card { border-color: var(--color-primary) !important; box-shadow: 0 0 0 2px rgba(168,85,247,0.3), var(--shadow-md) !important; transform: translateY(4px); }
+.sort-drag-over .card { border-color: var(--color-primary) !important; box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent), var(--shadow-md) !important; transform: translateY(4px); }
 
 /* admin page 结束 */
 
@@ -342,7 +342,7 @@ tr:hover td { background: var(--bg-hover); }
 }
 .group-badge-draggable:hover {
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px rgba(168,85,247,0.3);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 .group-badge-draggable.row-dragging {
     opacity: 0.4;

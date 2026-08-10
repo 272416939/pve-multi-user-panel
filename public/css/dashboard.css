@@ -9,7 +9,7 @@
     margin-bottom: 12px;
     transition: all 0.3s ease;
 }
-.vm-mobile-card:hover { border-color: rgba(168,85,247,0.3); }
+.vm-mobile-card:hover { border-color: color-mix(in srgb, var(--color-primary) 30%, transparent); }
 .vm-mobile-card-header {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 10px; padding-bottom: 10px;
@@ -26,7 +26,7 @@
 .vm-mobile-card-cname-list { margin-top: 4px; display: flex; flex-direction: column; gap: 4px; }
 .vm-mobile-card-cname-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(168,85,247,0.06); padding: 4px 8px; border-radius: 6px; }
 .cname-copy-btn { flex-shrink: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
-.cname-copy-btn:hover { color: var(--color-primary, #c084fc); background: rgba(168,85,247,0.1); }
+.cname-copy-btn:hover { color: var(--color-primary, #c084fc); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
 .vm-mobile-card-label { color: var(--text-muted); flex-shrink: 0; }
 .vm-mobile-card-value { color: var(--text-primary); text-align: right; word-break: break-all; }
 .vm-mobile-card-fullrow .vm-mobile-card-value { text-align: left; }
@@ -277,7 +277,7 @@
         background-position: right center;
     }
     .disk-auto-renew-switch .form-check-input:focus {
-        box-shadow: 0 0 0 0.25rem rgba(168,85,247,0.25);
+        box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--color-primary) 25%, transparent);
     }
 
     .table-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; white-space: nowrap; }
@@ -303,7 +303,7 @@
     }
     .dropdown-menu-table li .dropdown-item:hover { background: var(--glass-accent-hover); color: var(--text-primary); }
     .dropdown-menu-table li a { display: block; padding: 6px 14px; font-size: 13px; color: var(--text-primary); text-decoration: none; transition: background 0.15s; white-space: nowrap; }
-    .dropdown-menu-table li a:hover { background: rgba(168,85,247,0.15); color: #fff; }
+    .dropdown-menu-table li a:hover { background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: #fff; }
 
     /* 浮动下拉菜单 */
     .floating-dropdown-menu {
@@ -340,22 +340,22 @@
     .table, .table-striped, .table-sm, .table-hover, .table-dark {
         --bs-table-bg: transparent; --bs-table-accent-bg: transparent;
         --bs-table-color: var(--text-primary);
-        --bs-table-hover-bg: rgba(168,85,247,0.04); --bs-table-active-bg: rgba(168,85,247,0.06);
+        --bs-table-hover-bg: color-mix(in srgb, var(--color-primary) 4%, transparent); --bs-table-active-bg: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
     /* 选中行高亮 - 不随鼠标移开消失 */
     table tbody tr.table-active,
     table tbody tr.table-active:hover,
     .table tbody tr.table-active,
     .table tbody tr.table-active:hover {
-        background: rgba(168,85,247,0.12) !important;
-        box-shadow: inset 0 0 0 1px rgba(168,85,247,0.3);
+        background: color-mix(in srgb, var(--color-primary) 12%, transparent) !important;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
     }
     [data-theme="light"] table tbody tr.table-active,
     [data-theme="light"] table tbody tr.table-active:hover,
     [data-theme="light"] .table tbody tr.table-active,
     [data-theme="light"] .table tbody tr.table-active:hover {
-        background: rgba(168,85,247,0.15) !important;
-        box-shadow: inset 0 0 0 1px rgba(168,85,247,0.4);
+        background: color-mix(in srgb, var(--color-primary) 15%, transparent) !important;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 40%, transparent);
     }
     .table-dark { background: var(--bg-hover) !important; border-color: var(--border-color) !important; }
     .table > thead, .table-striped > thead, .table-sm > thead, .table-hover > thead, .table-dark > thead {
@@ -481,9 +481,9 @@
     .log-nav-tabs .nav-link { padding: 7px 18px; font-size: 13px; font-weight: 500; color: var(--text-secondary);
         background: transparent; border: none; border-radius: 7px; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease; cursor: pointer;
         white-space: nowrap; position: relative; }
-    .log-nav-tabs .nav-link:hover { color: var(--text-primary); background: rgba(168,85,247,0.08); }
-    .log-nav-tabs .nav-link.active { color: #fff; background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(34,211,238,0.15));
-        box-shadow: 0 2px 12px rgba(168,85,247,0.2), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600; }
+    .log-nav-tabs .nav-link:hover { color: var(--text-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+    .log-nav-tabs .nav-link.active { color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 25%, transparent), color-mix(in srgb, var(--color-primary-hover) 15%, transparent));
+        box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600; }
 
     /* Nav pills */
     .nav-pills {
@@ -536,19 +536,19 @@
         padding: 14px 20px !important;
         border: none !important;
         border-radius: 12px !important;
-        background: linear-gradient(135deg, #a855f7, #22d3ee) !important;
+        background: var(--accent-gradient) !important;
         color: #fff !important;
         font-weight: 700 !important;
         font-size: 16px !important;
         letter-spacing: 0.5px !important;
         cursor: pointer !important;
         transition: all 0.3s ease !important;
-        box-shadow: 0 4px 16px rgba(168,85,247,0.35) !important;
+        box-shadow: 0 4px 16px color-mix(in srgb, var(--color-primary) 35%, transparent) !important;
     }
     .package-card-body .pv-btn.pv-btn-primary:hover:not(:disabled) {
         transform: translateY(-2px) !important;
-        box-shadow: 0 8px 24px rgba(168,85,247,0.5) !important;
-        background: linear-gradient(135deg, #a855f7, #22d3ee) !important;
+        box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 50%, transparent) !important;
+        background: var(--accent-gradient) !important;
     }
     .package-card-body .pv-btn.pv-btn-primary:disabled {
         opacity: 0.45 !important;
@@ -582,9 +582,9 @@
     }
     .price-tab:hover { border-color: var(--color-primary, #a855f7); transform: translateY(-1px); }
     .price-tab-active {
-        background: linear-gradient(135deg, rgba(168,85,247,0.18), rgba(34,211,238,0.18));
+        background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, transparent), color-mix(in srgb, var(--color-primary-hover) 18%, transparent));
         border-color: var(--color-primary, #a855f7);
-        box-shadow: 0 2px 8px rgba(168,85,247,0.25);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 25%, transparent);
     }
     .price-tab-badge {
         position: absolute;
@@ -679,7 +679,7 @@
     }
     .group-badge-draggable:hover {
         transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(168,85,247,0.3);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 30%, transparent);
     }
     .group-badge-draggable.row-dragging {
         opacity: 0.4;

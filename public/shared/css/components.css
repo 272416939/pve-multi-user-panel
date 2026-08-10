@@ -87,9 +87,9 @@
 .nav-tabs .nav-link { padding: 7px 18px; font-size: 13px; font-weight: 500; color: var(--text-secondary);
     background: transparent; border: none; border-radius: 7px; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease; cursor: pointer;
     white-space: nowrap; position: relative; }
-.nav-tabs .nav-link:hover { color: var(--text-primary); background: rgba(168,85,247,0.08); }
-.nav-tabs .nav-link.active { color: #fff; background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(34,211,238,0.15));
-    box-shadow: 0 2px 12px rgba(168,85,247,0.2), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600; }
+.nav-tabs .nav-link:hover { color: var(--text-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.nav-tabs .nav-link.active { color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 25%, transparent), color-mix(in srgb, var(--color-primary-hover) 15%, transparent));
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600; }
 
 /* 模块标题区域 */
 .module-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
@@ -115,9 +115,9 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     --bs-table-bg: transparent;
     --bs-table-accent-bg: transparent;
     --bs-table-color: var(--text-primary);
-    --bs-table-hover-bg: rgba(168,85,247,0.04);
+    --bs-table-hover-bg: color-mix(in srgb, var(--color-primary) 4%, transparent);
     --bs-table-striped-color: var(--text-primary);
-    --bs-table-active-bg: rgba(168,85,247,0.06);
+    --bs-table-active-bg: color-mix(in srgb, var(--color-primary) 6%, transparent);
 }
 .table > thead, .table-striped > thead, .table-sm > thead, .table-hover > thead, .table-dark > thead {
     background: transparent !important;
@@ -179,7 +179,7 @@ tr:hover td { background: var(--bg-hover); }
 }
 .tag-list:focus-within {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba(168,85,247,0.15);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 15%, transparent);
 }
 .tag-list-sm {
     padding: 4px 8px;
@@ -256,7 +256,7 @@ tr:hover td { background: var(--bg-hover); }
     cursor: pointer;
     transition: background-color 0.15s ease;
 }
-.tag-dropdown-item:hover { background: rgba(168,85,247,0.1); }
+.tag-dropdown-item:hover { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
 .tag-dropdown-item:first-child { border-radius: 7px 7px 0 0; }
 .tag-dropdown-item:last-child { border-radius: 0 0 7px 7px; }
 /* ========== 按钮样式（已统一） ==========
@@ -349,7 +349,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparen
 .dropdown-table.open .dropdown-menu-table { display: block; animation: dropdownFadeIn 0.18s ease-out; }
 .dropdown-menu-table li a { display: block; padding: 6px 14px; font-size: 13px; color: var(--text-primary);
     text-decoration: none; transition: background 0.15s; white-space: nowrap; }
-.dropdown-menu-table li a:hover { background: rgba(168,85,247,0.15); color: #fff; }
+.dropdown-menu-table li a:hover { background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: #fff; }
 /* 未绑定子网时「重置IP」等受限菜单项置灰禁用（保留 title 悬浮提示，不用 pointer-events:none）
    第三条选择器专门压制 template-saas.css 的 hover 高亮（其规则带 !important 且特异性更高） */
 .dropdown-menu-table li a.disabled,
@@ -470,7 +470,7 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 .form-control, .form-select { background-color: var(--bg-input) !important; border: 1px solid var(--border-color) !important;
     color: var(--text-primary) !important;
     transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease; }
-.form-control:focus, .form-select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 0.2rem rgba(168,85,247,0.15); }
+.form-control:focus, .form-select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--color-primary) 15%, transparent); }
 /* ===== 下拉框主题化：去原生外观 + 主题色箭头 + 玻璃态 ===== */
 .form-select {
     appearance: none; -webkit-appearance: none;
@@ -482,6 +482,13 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 }
 [data-theme="light"] .form-select {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%239333ea' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+/* SaaS 模板箭头：商务蓝（覆盖默认紫，dark/light 两套） */
+html[data-template="saas"] .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+html[data-template="saas"][data-theme="light"] .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%232563eb' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
 }
 .form-select-sm { background-position: right 0.5rem center; background-size: 14px 10px; }
 .form-select option { background: var(--bg-input); color: var(--text-primary); }

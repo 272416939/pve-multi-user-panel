@@ -15,8 +15,8 @@
 .nav-tabs .nav-link::after { display: none !important; }
 .nav-tabs .nav-link:hover { color: var(--text-primary); background: var(--bg-hover); }
 .nav-tabs .nav-link.active {
-    color: #fff; background: linear-gradient(135deg, rgba(168,85,247,0.25), rgba(34,211,238,0.15));
-    box-shadow: 0 2px 12px rgba(168,85,247,0.2), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600;
+    color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 25%, transparent), color-mix(in srgb, var(--color-primary-hover) 15%, transparent));
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600;
 }
 
 /* ===== Nav Pills 微调 ===== */
@@ -57,7 +57,7 @@ h5.card-title { color: var(--text-primary) !important; transition: color 0.3s ea
 .table { color: var(--text-primary) !important; border-collapse: separate; border-spacing: 0; transition: color 0.3s ease;
     --bs-table-bg: transparent; --bs-table-accent-bg: transparent;
     --bs-table-color: var(--text-primary);
-    --bs-table-hover-bg: rgba(168,85,247,0.04); --bs-table-active-bg: rgba(168,85,247,0.06); }
+    --bs-table-hover-bg: color-mix(in srgb, var(--color-primary) 4%, transparent); --bs-table-active-bg: color-mix(in srgb, var(--color-primary) 6%, transparent); }
 thead th, .table thead th, .table-striped thead th {
     background: linear-gradient(180deg, rgba(168,85,247,0.10) 0%, rgba(34,211,238,0.05) 100%) !important; color: var(--text-secondary) !important;
     font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px;
@@ -182,8 +182,8 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     text-decoration: none;
 }
 .message-item:hover {
-    border-color: rgba(168,85,247,0.35);
-    box-shadow: 0 4px 16px rgba(168,85,247,0.10);
+    border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-primary) 10%, transparent);
     transform: translateY(-1px);
 }
 .message-item.message-unread {
