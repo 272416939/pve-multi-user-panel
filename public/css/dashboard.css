@@ -516,7 +516,7 @@
     }
 
     /* ===== 套餐卡片 ===== */
-    .package-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+    .package-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
     .package-card { background: var(--glass-surface); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
     .package-card:hover { transform: translateY(-4px); box-shadow: 0 8px 32px rgba(192,132,252,0.2); }
     .package-card-header { padding: 18px 20px 12px; font-size: 18px; font-weight: 700; color: var(--color-primary); border-bottom: 1px solid var(--border-light); }
@@ -564,10 +564,10 @@
     .package-group-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0 0 14px 4px; padding-left: 10px; border-left: 3px solid var(--color-primary, #a855f7); }
 
     /* ===== 价格标签页（竖排：月付/季付/年付 一行一个，宽度充裕不挤压） ===== */
-    .price-tabs { display: grid; grid-template-columns: 1fr; gap: 6px; margin-top: 14px; margin-bottom: 4px; }
+    .price-tabs { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 14px; margin-bottom: 4px; }
     .price-tab {
         position: relative;
-        padding: 8px 14px;
+        padding: 10px 16px;
         text-align: left;
         background: var(--glass-accent, rgba(168,85,247,0.05));
         border: 1px solid var(--border-light, rgba(168,85,247,0.15));
@@ -578,13 +578,24 @@
         flex-direction: row;
         align-items: center;
         justify-content: space-between;
-        gap: 10px;
+        gap: 12px;
     }
     .price-tab:hover { border-color: var(--color-primary, #a855f7); transform: translateY(-1px); }
     .price-tab-active {
         background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, transparent), color-mix(in srgb, var(--color-primary-hover) 18%, transparent));
         border-color: var(--color-primary, #a855f7);
         box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 25%, transparent);
+    }
+    /* 选中态左侧主题色竖条，强化"已选"语义 */
+    .price-tab-active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 10px;
+        bottom: 10px;
+        width: 3px;
+        border-radius: 0 2px 2px 0;
+        background: var(--color-primary, #a855f7);
     }
     .price-tab-badge {
         position: absolute;
@@ -614,6 +625,8 @@
         text-decoration-color: rgba(239,68,68,0.6);
     }
     .price-tab-price { font-size: 15px; font-weight: 700; color: var(--color-primary, #a855f7); }
+    /* 选中态价格提亮，确保紫色高亮底上可读 */
+    .price-tab-active .price-tab-price { color: color-mix(in srgb, var(--color-primary) 40%, #fff); }
 
     /* ===== 订购弹窗周期显示 ===== */
     .order-period-display { padding: 8px 12px; background: var(--glass-accent, rgba(168,85,247,0.05)); border-radius: 8px; border: 1px solid var(--border-light, rgba(168,85,247,0.15)); }
