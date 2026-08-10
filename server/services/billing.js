@@ -38,7 +38,7 @@ async function deductBalance(userId, amount, dbInstance) {
  * @param {object} opts - { userId, isAdmin, type, vmid, ctid, quantity, periodCount, period }
  */
 async function renewByBalance(opts) {
-    var { userId, isAdmin, type, vmid, ctid, quantity, period_count, period } = opts;
+    var { userId, isAdmin, type, vmid, ctid, quantity, period_count, period, req } = opts;
 
     if (!type || !['vm', 'lxc'].includes(type)) {
         return { ok: false, status: 400, error: '无效的资源类型' };
@@ -142,6 +142,12 @@ async function renewByBalance(opts) {
             'INSERT INTO transaction_records (user_id, order_no, pay_time, pay_method, trade_type, amount, period, period_count, balance_before, balance_after, resource_type, resource_id, trade_no, api_trade_no, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [userId, orderNo, db.now(), 'balance', 'renewal', totalPrice.toFixed(2), usePeriod, qty, balance.toFixed(2), newBalance, type, resource.vm_id || resource.ct_id || resource.id, null, null, db.now()]
         );
+        // 4. 写订单记录（order_kind='renewal'：admin 订单管理 / user 我的订单可见续费记录，含资源名称与 VM/CT ID）
+        var renewResourceId = resource.vm_id || resource.ct_id || resource.id;
+        await conn.execute(
+            'INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status, order_kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [orderNo, userId, type, 0, 0, usePeriod, qty, totalPrice.toFixed(2), 0, 0, 0, resource.name || '', String(renewResourceId), 'completed', 'renewal']
+        );
     });
 
     // 续费后自动开机（PVE 操作不放入事务，避免长事务）
@@ -193,13 +199,13 @@ async function renewByBalance(opts) {
                 var renewHtml = createEmailTemplate('资源续费成功',
                     `<p>您好，您的 <strong>${resourceTypeLabel}「${resourceName}」</strong> 已续费成功。</p>
                     <div class="info-box">
-                        <p style="margin-bottom: 4px;">📌 资源名称：<strong>${resourceName}</strong></p>
-                        <p style="margin-bottom: 4px;">📅 续费详情：<strong>${periodStr}</strong></p>
-                        <p style="margin-bottom: 4px;">⏳ 到期时间：<strong>${expiryDisplay}</strong></p>
-                        <p style="margin-bottom: 4px;">💸 实付金额：<strong>¥${totalPrice.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">💳 余额变动：<strong>¥${balance.toFixed(2)} → ¥${newBalance}</strong></p>
-                        <p style="margin-bottom: 4px;">📋 订单编号：<strong>${orderNo}</strong></p>
-                        <p>⏰ 续费时间：${new Date().toLocaleString('zh-CN')}</p>
+                        <p style="margin-bottom: 4px;">资源名称：<strong>${resourceName}</strong></p>
+                        <p style="margin-bottom: 4px;">续费详情：<strong>${periodStr}</strong></p>
+                        <p style="margin-bottom: 4px;">到期时间：<strong>${expiryDisplay}</strong></p>
+                        <p style="margin-bottom: 4px;">实付金额：<strong>¥${totalPrice.toFixed(2)}</strong></p>
+                        <p style="margin-bottom: 4px;">余额变动：<strong>¥${balance.toFixed(2)} → ¥${newBalance}</strong></p>
+                        <p style="margin-bottom: 4px;">订单编号：<strong>${orderNo}</strong></p>
+                        <p>续费时间：${new Date().toLocaleString('zh-CN')}</p>
                     </div>
                     <p>前往 <a href="${process.env.SITE_URL || ''}/">控制面板</a> 查看资源详情。</p>`, siteName);
                 enqueueEmail(user.email, '资源续费成功 - ' + siteName, renewHtml);
@@ -208,6 +214,12 @@ async function renewByBalance(opts) {
     } catch (e) {
         console.error('[billing] 续费邮件发送失败:', e.message);
     }
+
+    // 审计日志（action: vm.renew / lxc.renew，归"新购/续费"分类；失败不阻断主流程）
+    try {
+        var { auditAction } = require('../utils/audit-log');
+        await auditAction(req, type === 'vm' ? 'vm.renew' : 'lxc.renew', '续费' + (type === 'vm' ? '虚拟机' : 'LXC容器') + '[' + resourceName + '] ' + periodStr + ' 金额' + totalPrice.toFixed(2) + '元', { resourceType: type, resourceId: renewResourceId });
+    } catch (auditErr) { console.error('[billing] 续费审计日志失败:', auditErr.message); }
 
     return {
         ok: true,

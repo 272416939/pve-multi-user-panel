@@ -1,0 +1,911 @@
+/* ============================================
+   SAAS 企业风模板 v2 — 腾讯云控制台风格
+   --------------------------------------------
+   视觉语言：扁平白/浅灰底、细边框分隔、紧凑密度、
+   表格化信息、文字导航、小圆角、商务蓝 #2563eb。
+   作用域：仅 html[data-template="saas"] 命中，
+   对默认模板（经典玻璃拟态）零影响。
+   加载顺序：必须在各端私有 CSS 之后。
+   明暗切换由 data-theme 驱动（两套变量都做）。
+   注意：theme-init.js 会把 data-theme 镜像到 <body>，
+   tokens.css 的 [data-theme] 变量块会命中 body 并在
+   继承链上更近，因此变量覆盖必须同时命中 html 与 body。
+   ============================================ */
+
+/* ============================================
+   1. 变量覆盖 — 暗色（深灰蓝，腾讯云暗色观感，默认）
+   ============================================ */
+html[data-template="saas"],
+html[data-template="saas"][data-theme="dark"],
+html[data-template="saas"] body,
+html[data-template="saas"][data-theme="dark"] body {
+    /* 布局：更紧凑的顶栏与侧边栏 */
+    --header-height: 52px;
+    --sidebar-width: 200px;
+    /* 页面底色：纯深灰蓝，无渐变无玻璃 */
+    --bg-page: #1b1f24;
+    --bg-sidebar: #161a1f;
+    --bg-card: #20242b;
+    --bg-header: #161a1f;
+    --bg-input: #262b33;
+    --bg-hover: rgba(59, 130, 246, 0.14);
+    --bg-modal: #20242b;
+    --text-primary: #e8eaee;
+    --text-secondary: #a6abb5;
+    --text-muted: #6c7280;
+    --border-color: #3a4048;
+    --border-light: #2a2f36;
+    /* 商务蓝主色（暗底提亮） */
+    --color-primary: #3b82f6;
+    --color-primary-hover: #60a5fa;
+    --color-danger: #f76560;
+    --color-success: #23c343;
+    --color-warning: #ff8b1f;
+    --color-info: #4a7dff;
+    /* 扁平克制的阴影 */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.36);
+    --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+    /* glass 系列同步为纯色系（去玻璃拟态） */
+    --glass-bg: #20242b;
+    --glass-border: #3a4048;
+    --glass-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    --glass-accent: rgba(59, 130, 246, 0.18);
+    --glass-accent-hover: rgba(59, 130, 246, 0.28);
+    --glass-text: #e8eaee;
+    --glass-text-muted: #a6abb5;
+    --glass-surface: #20242b;
+    --glass-blur: none;
+    /* 滚动条：商务蓝调 */
+    --scrollbar-thumb: rgba(59, 130, 246, 0.35);
+    --scrollbar-thumb-hover: #3b82f6;
+    --accent-gradient: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+    --accent-glow: rgba(59, 130, 246, 0.22);
+}
+
+/* ============================================
+   2. 变量覆盖 — 浅色（腾讯云控制台默认观感）
+   ============================================ */
+html[data-template="saas"][data-theme="light"],
+html[data-template="saas"][data-theme="light"] body {
+    /* 页面底色：纯浅灰，无渐变无玻璃 */
+    --bg-page: #f5f6f7;
+    --bg-sidebar: #ffffff;
+    --bg-card: #ffffff;
+    --bg-header: #ffffff;
+    --bg-input: #fafbfc;
+    --bg-hover: rgba(37, 99, 235, 0.06);
+    --bg-modal: #ffffff;
+    --text-primary: #1d2129;
+    --text-secondary: #4e5969;
+    --text-muted: #86909c;
+    --border-color: #e5e6eb;
+    --border-light: #f2f3f5;
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4ed8;
+    --color-danger: #f53f3f;
+    --color-success: #00b42a;
+    --color-warning: #ff7d00;
+    --color-info: #165dff;
+    --shadow-sm: 0 1px 2px rgba(29, 33, 41, 0.04);
+    --shadow-md: 0 4px 12px rgba(29, 33, 41, 0.08);
+    --shadow-lg: 0 8px 24px rgba(29, 33, 41, 0.1);
+    --glass-bg: #ffffff;
+    --glass-border: #e5e6eb;
+    --glass-shadow: 0 2px 8px rgba(29, 33, 41, 0.06);
+    --glass-accent: rgba(37, 99, 235, 0.08);
+    --glass-accent-hover: rgba(37, 99, 235, 0.14);
+    --glass-text: #1d2129;
+    --glass-text-muted: #86909c;
+    --glass-surface: #ffffff;
+    /* 滚动条：商务蓝调（浅色） */
+    --scrollbar-thumb: rgba(37, 99, 235, 0.3);
+    --scrollbar-thumb-hover: #2563eb;
+    --accent-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    --accent-glow: rgba(37, 99, 235, 0.16);
+}
+
+/* ============================================
+   3. 全局基础（字体 / 过渡）
+   ============================================ */
+html[data-template="saas"] body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, "PingFang SC", "Hiragino Sans GB",
+        "Microsoft YaHei", sans-serif;
+    background-attachment: scroll;
+}
+
+/* ============================================
+   4. 布局（顶栏 / 侧边栏 / 导航）
+   ============================================ */
+/* 顶栏：纯白/深底 + 细边框，无毛玻璃 */
+html[data-template="saas"] .page-header {
+    background: var(--bg-header);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: none;
+}
+
+/* 品牌 LOGO：深色文字 + 蓝点点缀（腾讯云式），放弃渐变 clip */
+html[data-template="saas"] .brand-logo {
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    background: none;
+    -webkit-background-clip: initial;
+    -webkit-text-fill-color: initial;
+    background-clip: initial;
+    color: var(--text-primary);
+    padding-left: 10px;
+    border-left: 3px solid var(--color-primary);
+    line-height: 1.2;
+}
+
+/* 侧边栏：纯白/深底 + 细右边框，无毛玻璃 */
+html[data-template="saas"] .sidebar {
+    background: var(--bg-sidebar);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-right: 1px solid var(--border-color);
+    padding: 8px 0;
+}
+
+/* 导航项：紧凑、小圆角、文字为主 */
+html[data-template="saas"] .nav-item {
+    gap: 10px;
+    padding: 8px 12px;
+    margin: 1px 8px;
+    border-radius: 6px;
+    font-size: 13.5px;
+    border: 1px solid transparent;
+}
+html[data-template="saas"] .nav-item::before {
+    width: 2px;
+    background: var(--color-primary);
+}
+html[data-template="saas"] .nav-item:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: transparent;
+}
+html[data-template="saas"] .nav-item.active {
+    background: rgba(37, 99, 235, 0.08);
+    color: var(--color-primary);
+    border-color: transparent;
+    font-weight: 600;
+    box-shadow: none;
+}
+html[data-template="saas"][data-theme="light"] .nav-item.active {
+    background: rgba(37, 99, 235, 0.1);
+    color: #2563eb;
+}
+/* 父级菜单保持无高亮 */
+html[data-template="saas"] .nav-item.has-children.active {
+    background: transparent;
+    color: var(--glass-text-muted);
+    border-color: transparent;
+    box-shadow: none;
+}
+
+/* 子菜单：更紧凑 */
+html[data-template="saas"] .nav-submenu .nav-item {
+    padding-left: 30px !important;
+    min-height: 32px;
+    font-size: 13px;
+}
+
+/* 头部用户区：扁平 */
+html[data-template="saas"] .user-info-dropdown {
+    border-radius: 6px;
+    background: transparent;
+    border-color: var(--border-color);
+}
+html[data-template="saas"] .user-info-dropdown.open {
+    background: var(--bg-hover);
+}
+html[data-template="saas"] .header-btn,
+html[data-template="saas"] .sidebar-toggle {
+    border-radius: 6px;
+}
+html[data-template="saas"] .header-user-menu {
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+html[data-template="saas"] .header-user-menu li a:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+/* ============================================
+   5. 按钮系统（扁平化，腾讯云风格）
+   ============================================ */
+/* 主操作按钮：实心蓝 + 白字 + 小圆角 */
+html[data-template="saas"] .pv-btn-glass {
+    background: var(--color-primary) !important;
+    color: #fff !important;
+    border-color: var(--color-primary) !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+html[data-template="saas"] .pv-btn-glass:hover {
+    background: var(--color-primary-hover) !important;
+    border-color: var(--color-primary-hover) !important;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28) !important;
+}
+
+/* 激活/非激活态：浅蓝底蓝字 / 白底灰边 */
+html[data-template="saas"] .pv-btn-glass-active {
+    background: rgba(37, 99, 235, 0.1) !important;
+    color: var(--color-primary) !important;
+    border-color: rgba(37, 99, 235, 0.28) !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+html[data-template="saas"] .pv-btn-glass-active:hover {
+    background: rgba(37, 99, 235, 0.16) !important;
+    border-color: rgba(37, 99, 235, 0.36) !important;
+}
+html[data-template="saas"] .pv-btn-glass-inactive {
+    background: var(--bg-input) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border-color) !important;
+    border-radius: 6px !important;
+}
+html[data-template="saas"] .pv-btn-glass-inactive:hover {
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* 表格行按钮：浅蓝底 + 蓝字（腾讯云表格操作按钮） */
+html[data-template="saas"] .pv-btn-table,
+html[data-template="saas"] .pv-btn-table-primary,
+html[data-template="saas"] .pv-btn-primary {
+    background: rgba(37, 99, 235, 0.08) !important;
+    color: var(--color-primary) !important;
+    border-color: rgba(37, 99, 235, 0.18) !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+html[data-template="saas"] .pv-btn-table:hover,
+html[data-template="saas"] .pv-btn-table-primary:hover,
+html[data-template="saas"] .pv-btn-primary:hover {
+    background: rgba(37, 99, 235, 0.14) !important;
+    border-color: rgba(37, 99, 235, 0.3) !important;
+    box-shadow: none !important;
+}
+
+/* 表格危险按钮：浅红底红字 */
+html[data-template="saas"] .pv-btn-table-danger,
+html[data-template="saas"] .pv-btn-danger {
+    background: rgba(245, 63, 63, 0.08) !important;
+    color: var(--color-danger) !important;
+    border-color: rgba(245, 63, 63, 0.2) !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+html[data-template="saas"] .pv-btn-table-danger:hover,
+html[data-template="saas"] .pv-btn-danger:hover {
+    background: rgba(245, 63, 63, 0.14) !important;
+    border-color: rgba(245, 63, 63, 0.32) !important;
+    box-shadow: none !important;
+}
+
+/* 描边按钮：白底蓝边蓝字 */
+html[data-template="saas"] .pv-btn-outline {
+    background: var(--bg-card) !important;
+    color: var(--color-primary) !important;
+    border-color: rgba(37, 99, 235, 0.4) !important;
+    border-radius: 6px !important;
+}
+html[data-template="saas"] .pv-btn-outline:hover {
+    background: rgba(37, 99, 235, 0.06) !important;
+    border-color: var(--color-primary) !important;
+    box-shadow: none !important;
+}
+
+/* 次要按钮：浅灰底灰字 */
+html[data-template="saas"] .pv-btn-secondary {
+    background: var(--bg-input) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+    border-radius: 6px !important;
+}
+html[data-template="saas"] .pv-btn-secondary:hover {
+    background: var(--bg-hover) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* 头部 ghost 按钮：细边框，hover 边框变蓝（明暗切换等头部图标按钮） */
+html[data-template="saas"] .pv-btn-ghost {
+    border-color: var(--border-color) !important;
+    border-radius: 6px !important;
+}
+html[data-template="saas"] .pv-btn-ghost:hover {
+    background: var(--bg-hover) !important;
+    border-color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
+}
+
+/* 警告按钮保持警示色系（微调） */
+html[data-template="saas"] .pv-btn-warning {
+    border-radius: 6px !important;
+}
+html[data-template="saas"] .pv-btn-close {
+    border-radius: 4px !important;
+}
+
+/* 表格警告按钮：浅黄底黄字（移除/解绑语义） */
+html[data-template="saas"] .pv-btn-table-warning {
+    background: rgba(245, 158, 11, 0.1) !important;
+    color: var(--color-warning) !important;
+    border-color: rgba(245, 158, 11, 0.28) !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+html[data-template="saas"] .pv-btn-table-warning:hover {
+    background: rgba(245, 158, 11, 0.16) !important;
+    border-color: rgba(245, 158, 11, 0.4) !important;
+    box-shadow: none !important;
+}
+
+/* ============================================
+   6. 卡片与容器（白底细边框，无阴影玻璃）
+   ============================================ */
+html[data-template="saas"] .main-wrap .card,
+html[data-template="saas"] .main-wrap .card-body,
+html[data-template="saas"] .modal-content .card {
+    background: var(--bg-card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 8px !important;
+    box-shadow: none;
+}
+html[data-template="saas"] .stat-card,
+html[data-template="saas"] .overview-chart-card {
+    background: var(--bg-card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 8px;
+    box-shadow: none;
+}
+html[data-template="saas"] .stat-card:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+}
+html[data-template="saas"] .stat-num {
+    font-size: 30px;
+    color: var(--color-primary) !important;
+}
+html[data-template="saas"] .table-container {
+    background: var(--bg-card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+/* ============================================
+   7. 表格（浅灰表头 + 细线 + 紧凑密度）
+   ============================================ */
+html[data-template="saas"] thead th,
+html[data-template="saas"] .table thead th,
+html[data-template="saas"] .table-striped thead th {
+    background: var(--bg-input) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    padding: 11px 14px !important;
+    font-size: 12px !important;
+    color: var(--text-secondary) !important;
+    letter-spacing: 0.3px;
+}
+html[data-template="saas"] thead tr:first-child th:first-child,
+html[data-template="saas"] .table thead tr:first-child th:first-child,
+html[data-template="saas"] .table-striped thead tr:first-child th:first-child {
+    border-radius: 7px 0 0 0 !important;
+}
+html[data-template="saas"] thead tr:first-child th:last-child,
+html[data-template="saas"] .table thead tr:last-child th:last-child,
+html[data-template="saas"] .table-striped thead tr:last-child th:last-child {
+    border-radius: 0 7px 0 0 !important;
+}
+html[data-template="saas"] .table td,
+html[data-template="saas"] .table-striped td {
+    padding: 9px 14px !important;
+    border-bottom: 1px solid var(--border-light);
+}
+html[data-template="saas"] .table,
+html[data-template="saas"] .table-striped,
+html[data-template="saas"] .table-sm,
+html[data-template="saas"] .table-hover,
+html[data-template="saas"] .table-dark {
+    --bs-table-hover-bg: rgba(37, 99, 235, 0.04);
+    --bs-table-active-bg: rgba(37, 99, 235, 0.07);
+}
+
+/* ============================================
+   8. 模块标题 / 导航标签页
+   ============================================ */
+html[data-template="saas"] .module-title {
+    font-size: 17px;
+    letter-spacing: 0;
+}
+html[data-template="saas"] .module-title::before,
+html[data-template="saas"] h4::before {
+    width: 3px;
+    height: 16px;
+    background: var(--color-primary);
+}
+
+/* 子标签页：白底灰边容器，激活项浅蓝底蓝字（腾讯云 tabs） */
+html[data-template="saas"] .nav-tabs {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 3px;
+    gap: 2px;
+}
+html[data-template="saas"] .nav-tabs .nav-link {
+    border-radius: 4px;
+    font-size: 13px;
+    padding: 6px 14px;
+}
+html[data-template="saas"] .nav-tabs .nav-link:hover,
+html[data-template="saas"] .log-nav-tabs .nav-link:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+html[data-template="saas"] .nav-tabs .nav-link.active,
+html[data-template="saas"] .log-nav-tabs .nav-link.active {
+    color: var(--color-primary);
+    background: rgba(37, 99, 235, 0.1);
+    box-shadow: none;
+    font-weight: 600;
+}
+html[data-template="saas"][data-theme="light"] .nav-tabs .nav-link.active,
+html[data-template="saas"][data-theme="light"] .log-nav-tabs .nav-link.active {
+    color: #2563eb;
+    background: rgba(37, 99, 235, 0.1);
+    box-shadow: none;
+}
+html[data-template="saas"] .log-nav-tabs {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 3px;
+    gap: 2px;
+}
+html[data-template="saas"] .log-nav-tabs .nav-link {
+    border-radius: 4px;
+}
+
+/* ============================================
+   9. 徽章 / 标签 / 更新横幅
+   ============================================ */
+html[data-template="saas"] .type-badge-vm {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--color-primary);
+    border-color: rgba(37, 99, 235, 0.24);
+    border-radius: 4px;
+}
+html[data-template="saas"][data-theme="light"] .type-badge-vm {
+    background: rgba(37, 99, 235, 0.08);
+    color: #1d4ed8;
+    border-color: rgba(37, 99, 235, 0.2);
+}
+html[data-template="saas"] .tag-item {
+    background: rgba(37, 99, 235, 0.1) !important;
+    color: var(--color-primary) !important;
+    border-color: rgba(37, 99, 235, 0.24) !important;
+    border-radius: 4px !important;
+}
+html[data-template="saas"][data-theme="light"] .tag-item {
+    background: rgba(37, 99, 235, 0.08) !important;
+    color: #1d4ed8 !important;
+    border-color: rgba(37, 99, 235, 0.2) !important;
+}
+html[data-template="saas"] .badge {
+    border-radius: 4px;
+}
+html[data-template="saas"] .update-banner {
+    border-color: var(--border-color) !important;
+    border-radius: 8px;
+}
+html[data-template="saas"] .update-banner-header {
+    background: var(--color-primary);
+    color: #fff;
+}
+html[data-template="saas"] .update-source-badge {
+    background: rgba(37, 99, 235, 0.1);
+    color: var(--color-primary);
+    border-color: rgba(37, 99, 235, 0.24);
+}
+
+/* ============================================
+   10. 表单 / 下拉 / 弹窗
+   ============================================ */
+html[data-template="saas"] .form-check-input:checked {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+html[data-template="saas"] .form-check-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+html[data-template="saas"] .form-control,
+html[data-template="saas"] .form-select {
+    background-color: var(--bg-input);
+    border-color: var(--border-color);
+    border-radius: 6px;
+}
+html[data-template="saas"] .form-control:focus,
+html[data-template="saas"] .form-select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+/* SaaS 扁平化：去掉下拉框玻璃模糊，箭头换商务蓝（明/暗各一条） */
+html[data-template="saas"] .form-select {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+html[data-template="saas"][data-theme="light"] .form-select {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%232563eb' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
+}
+
+/* Custom Select 玻璃组件 SaaS 扁平化：白/浅底、无模糊、蓝调 hover */
+html[data-template="saas"] .custom-select-trigger {
+    background: var(--bg-input);
+    border-color: var(--border-color);
+    border-radius: 6px;
+    box-shadow: none;
+}
+html[data-template="saas"] .custom-select-trigger:hover {
+    background: var(--bg-hover);
+    border-color: var(--color-primary);
+}
+html[data-template="saas"] .custom-select-dropdown {
+    background: var(--bg-modal);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 8px;
+    box-shadow: var(--shadow-md);
+}
+html[data-template="saas"] .custom-select-dropdown .option:hover,
+html[data-template="saas"] .custom-select-dropdown .option.selected {
+    background: var(--bg-hover);
+}
+
+/* 下拉菜单：白底细边框小圆角 */
+html[data-template="saas"] .dropdown-menu,
+html[data-template="saas"] .tag-dropdown {
+    background: var(--bg-modal) !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 8px !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-md) !important;
+}
+html[data-template="saas"] .dropdown-item:hover,
+html[data-template="saas"] .dropdown-menu-table li a:hover,
+html[data-template="saas"] .tag-dropdown-item:hover {
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+/* 弹窗：白底小圆角 */
+html[data-template="saas"] .modal-content {
+    background: var(--bg-modal);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+/* markdown 代码块蓝调 */
+html[data-template="saas"] .markdown-body code {
+    background: rgba(37, 99, 235, 0.08);
+    color: var(--color-primary);
+}
+html[data-template="saas"][data-theme="light"] .markdown-body code {
+    background: rgba(37, 99, 235, 0.06);
+    color: #1d4ed8;
+}
+
+/* ============================================
+   11. 仪表盘 / 用户中心独有组件
+   ============================================ */
+/* 移动端卡片蓝调 */
+html[data-template="saas"] .vm-mobile-card:hover {
+    border-color: var(--color-primary);
+}
+html[data-template="saas"] .vm-mobile-card-cname-item {
+    background: var(--bg-input);
+}
+/* 信息卡 / 价格标签（dashboard 订购弹窗） */
+html[data-template="saas"] .info-card {
+    background: var(--bg-input);
+}
+html[data-template="saas"] .price-item {
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.2);
+    color: var(--color-primary);
+    border-radius: 6px;
+}
+html[data-template="saas"] .price-tab:hover {
+    border-color: var(--color-primary);
+}
+html[data-template="saas"] .price-tab.active {
+    background: rgba(37, 99, 235, 0.1);
+    border-color: var(--color-primary);
+    box-shadow: none;
+}
+html[data-template="saas"] .price-tab-price,
+html[data-template="saas"] .stock-remain {
+    color: var(--color-primary);
+}
+html[data-template="saas"] .package-group-title {
+    border-left-color: var(--color-primary);
+}
+html[data-template="saas"] .order-period-display {
+    background: var(--bg-input);
+    border-color: var(--border-color);
+}
+/* 套餐卡片：白底细边框，主按钮实心蓝 */
+html[data-template="saas"] .package-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+html[data-template="saas"] .package-card:hover {
+    transform: none;
+    box-shadow: var(--shadow-md);
+    border-color: rgba(37, 99, 235, 0.4);
+}
+html[data-template="saas"] .package-card-body .pv-btn.pv-btn-primary {
+    background: var(--color-primary) !important;
+    box-shadow: none !important;
+    border-radius: 6px !important;
+}
+html[data-template="saas"] .package-card-body .pv-btn.pv-btn-primary:hover:not(:disabled) {
+    background: var(--color-primary-hover) !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 28%, transparent) !important;
+}
+
+/* ============================================
+   12. 登录页（极简企业风，参考 02-clean-light）
+   ============================================ */
+/* 变量覆盖 */
+html[data-template="saas"],
+html[data-template="saas"] body {
+    --login-bg-card: #ffffff;
+    --login-bg-input: #fafbfc;
+    --login-border-input: #e5e6eb;
+    --login-text-input: #1d2129;
+    --login-text-label: #86909c;
+    --login-color-primary: #2563eb;
+    --login-gradient-primary: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    --login-color-error: #f53f3f;
+    --login-color-success: #00b42a;
+    --login-text-version: #c9cdd4;
+    --login-shadow: 0 8px 24px rgba(29, 33, 41, 0.08);
+}
+html[data-template="saas"][data-theme="light"],
+html[data-template="saas"][data-theme="light"] body {
+    --login-bg-card: #ffffff;
+    --login-bg-input: #fafbfc;
+    --login-border-input: #e5e6eb;
+    --login-text-input: #1d2129;
+    --login-text-label: #86909c;
+    --login-color-primary: #2563eb;
+    --login-gradient-primary: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    --login-color-error: #f53f3f;
+    --login-color-success: #00b42a;
+    --login-text-version: #c9cdd4;
+    --login-shadow: 0 8px 24px rgba(29, 33, 41, 0.08);
+}
+html[data-template="saas"][data-theme="dark"],
+html[data-template="saas"][data-theme="dark"] body {
+    --login-bg-card: #20242b;
+    --login-bg-input: #262b33;
+    --login-border-input: #3a4048;
+    --login-text-input: #e8eaee;
+    --login-text-label: #a6abb5;
+    --login-color-primary: #3b82f6;
+    --login-gradient-primary: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+    --login-color-error: #f76560;
+    --login-color-success: #23c343;
+    --login-text-version: #6c7280;
+    --login-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* 背景：腾讯云企业风（纯 CSS 多层背景，无外链图片）
+   图层：顶部蓝色光晕 + 右下微光 + 细网格纹理 + 底色渐变 */
+html[data-template="saas"] body.login-page {
+    background-image:
+        radial-gradient(ellipse 90% 55% at 50% -12%, rgba(37, 99, 235, 0.10) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 40% at 88% 112%, rgba(29, 78, 216, 0.07) 0%, transparent 60%),
+        linear-gradient(rgba(37, 99, 235, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(37, 99, 235, 0.05) 1px, transparent 1px),
+        linear-gradient(180deg, #f6f9fc 0%, #eef2f8 100%) !important;
+    background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px, 100% 100% !important;
+    background-position: center center !important;
+    background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat !important;
+    background-attachment: fixed !important;
+}
+html[data-template="saas"][data-theme="dark"] body.login-page {
+    background-image:
+        radial-gradient(ellipse 90% 55% at 50% -12%, rgba(37, 99, 235, 0.16) 0%, transparent 65%),
+        radial-gradient(ellipse 60% 40% at 88% 112%, rgba(59, 130, 246, 0.09) 0%, transparent 60%),
+        linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px),
+        linear-gradient(180deg, #171b21 0%, #101318 100%) !important;
+    background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px, 100% 100% !important;
+    background-position: center center !important;
+    background-repeat: no-repeat, no-repeat, repeat, repeat, no-repeat !important;
+    background-attachment: fixed !important;
+}
+
+/* 登录卡片：白底/深底 + 细边框 + 轻阴影，无玻璃 */
+html[data-template="saas"] .login-card,
+html[data-template="saas"] [data-theme="light"] .login-card {
+    background: var(--login-bg-card);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-radius: 12px;
+    border: 1px solid var(--login-border-input);
+    box-shadow: var(--login-shadow);
+    padding: 40px 36px 32px;
+}
+/* 登录 LOGO：极简深色文字 + 蓝色竖条（企业风，不依赖 Orbitron） */
+html[data-template="saas"] .login-logo {
+    font-family: inherit;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: 0;
+    background: none;
+    -webkit-background-clip: initial;
+    -webkit-text-fill-color: initial;
+    background-clip: initial;
+    color: var(--login-text-input);
+    padding-left: 12px;
+    border-left: 4px solid var(--login-color-primary);
+    text-align: left;
+    margin-bottom: 6px;
+}
+html[data-template="saas"] .login-subtitle {
+    text-align: left;
+    font-size: 13px;
+    margin-bottom: 28px;
+    padding-left: 12px;
+}
+
+/* 表单控件：扁平 */
+html[data-template="saas"] .login-card .form-control {
+    background: var(--login-bg-input);
+    border: 1px solid var(--login-border-input);
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: var(--login-text-input);
+}
+html[data-template="saas"] .login-card .form-control:focus {
+    border-color: var(--login-color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--login-color-primary) 12%, transparent);
+}
+html[data-template="saas"] .login-card .form-label {
+    color: var(--login-text-label);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* 按钮：实心蓝（主）/ 白底灰边（次） */
+html[data-template="saas"] .login-card .btn-primary,
+html[data-template="saas"] .login-card .login-submit-btn {
+    background: var(--login-gradient-primary);
+    border-radius: 6px !important;
+    padding: 11px 16px;
+}
+html[data-template="saas"] .login-card .btn-primary:hover {
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+    transform: none;
+}
+html[data-template="saas"] .login-card .btn-outline-secondary {
+    background: transparent;
+    border: 1px solid var(--login-border-input);
+    color: var(--login-text-label);
+    border-radius: 6px;
+    padding: 11px 16px;
+}
+html[data-template="saas"] .login-card .btn-outline-secondary:hover {
+    border-color: var(--login-color-primary);
+    color: var(--login-color-primary);
+}
+/* 登录/注册切换标签：浅灰容器，激活蓝 */
+html[data-template="saas"] .login-tab-switch {
+    background: var(--login-bg-input);
+    border: 1px solid var(--login-border-input);
+    border-radius: 6px;
+    padding: 3px;
+    gap: 2px;
+}
+html[data-template="saas"] .login-tab-switch button {
+    border-radius: 4px;
+    font-size: 13px;
+    padding: 7px 12px;
+}
+html[data-template="saas"] .login-tab-switch button.active {
+    background: var(--login-color-primary);
+    color: #fff;
+}
+html[data-template="saas"] .login-tab-switch button:not(.active):hover {
+    background: rgba(37, 99, 235, 0.08);
+    color: var(--login-text-input);
+}
+/* 发送验证码按钮 */
+html[data-template="saas"] .send-code-btn {
+    border-color: var(--login-color-primary);
+    color: var(--login-color-primary);
+    border-radius: 6px;
+}
+html[data-template="saas"] .send-code-btn:hover:not(:disabled) {
+    background: rgba(37, 99, 235, 0.08);
+}
+/* 底部版本信息 */
+html[data-template="saas"] .login-version-info {
+    color: var(--login-text-version);
+}
+/* 错误/成功提示：扁平 */
+html[data-template="saas"] .login-card .alert-danger,
+html[data-template="saas"] .login-card .alert-success {
+    border-radius: 6px;
+    text-shadow: none;
+}
+
+/* ============================================
+   13. 暗色微调（浅蓝 rgba 在深底上提亮）
+   ============================================ */
+html[data-template="saas"][data-theme="dark"] .nav-item.active {
+    background: rgba(59, 130, 246, 0.2) !important;
+}
+html[data-template="saas"][data-theme="dark"] .pv-btn-table,
+html[data-template="saas"][data-theme="dark"] .pv-btn-table-primary,
+html[data-template="saas"][data-theme="dark"] .pv-btn-primary {
+    background: rgba(59, 130, 246, 0.2) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+}
+html[data-template="saas"][data-theme="dark"] .pv-btn-table:hover,
+html[data-template="saas"][data-theme="dark"] .pv-btn-table-primary:hover,
+html[data-template="saas"][data-theme="dark"] .pv-btn-primary:hover {
+    background: rgba(59, 130, 246, 0.3) !important;
+    border-color: rgba(59, 130, 246, 0.55) !important;
+}
+html[data-template="saas"][data-theme="dark"] .pv-btn-glass-active {
+    background: rgba(59, 130, 246, 0.24) !important;
+    border-color: rgba(59, 130, 246, 0.45) !important;
+}
+html[data-template="saas"][data-theme="dark"] .nav-tabs .nav-link.active,
+html[data-template="saas"][data-theme="dark"] .log-nav-tabs .nav-link.active {
+    background: rgba(59, 130, 246, 0.24) !important;
+    color: #93c5fd !important;
+}
+html[data-template="saas"][data-theme="dark"] .type-badge-vm,
+html[data-template="saas"][data-theme="dark"] .tag-item {
+    background: rgba(59, 130, 246, 0.2) !important;
+    border-color: rgba(59, 130, 246, 0.4) !important;
+}

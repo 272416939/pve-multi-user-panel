@@ -430,6 +430,9 @@ app.component('private-network-list', {
       // 统一主题切换（theme-init.js 中的 window.initThemeToggle）
       if (window.initThemeToggle) window.initThemeToggle();
 
+      // 界面模板个人偏好同步（跨设备，管理员个人偏好同样生效）
+      if (window.syncUserTemplate) window.syncUserTemplate();
+
       function syncHeaderUser() {
           if (window.__admin && window.__admin.user && window.__admin.user.value) {
               var u = window.__admin.user.value;

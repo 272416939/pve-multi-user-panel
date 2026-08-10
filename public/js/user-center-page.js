@@ -12,6 +12,12 @@ const App = {
         const currentNavId = ref('user-center');
 
         const profileForm = ref({ username: '', password: '', confirmPassword: '', currentPassword: '', emailPassword: '', bio: '', avatar: '', email: '', emailVerified: false });
+        // 界面模板个人偏好（'' = 跟随站点默认，'default' / 'saas' = 个人固定）
+        const templatePreference = ref('');
+        const templatePreferenceSaving = ref(false);
+        // 站点全局默认模板（跟随站点默认卡需要）
+        const siteDefault = ref('default');
+        const siteDefaultName = ref('赛博霓虹');
         const memos = ref([]);
         const memosLoading = ref(false);
         const editMemoForm = ref({ id: null, title: '', content: '' });
@@ -769,8 +775,7 @@ const App = {
             }
         };
 
-        const handleEmailVerification = () => {
-            var params = new URLSearchParams(window.location.search);
+        const handleEmailVerification = () => {            var params = new URLSearchParams(window.location.search);
             var verified = params.get('email_verified');
             if (verified === '1') {
                 setTimeout(function() { alert('邮箱验证成功！'); }, 500);
@@ -801,6 +806,47 @@ const App = {
             } finally {
                 memosLoading.value = false;
             }
+        };
+
+        // 界面模板个人偏好：载入服务端偏好并同步到 localStorage（跨设备）
+        const loadTemplatePreference = async () => {
+            try {
+                var res = await api('/user/template');
+                templatePreference.value = (res && res.template) || '';
+                var sd = (res && res.siteDefault) || 'default';
+                siteDefault.value = sd;
+                siteDefaultName.value = sd === 'saas' ? 'SAAS 企业风' : '赛博霓虹';
+                window.applyTemplate(templatePreference.value, sd);
+            } catch (e) {
+                console.error('加载界面模板偏好失败', e);
+            }
+        };
+
+        // 界面模板：点击卡片实时预览（仅改 documentElement，不写 localStorage，保存才持久化）
+        const selectTemplate = (v) => {
+            if (v !== '' && v !== 'default' && v !== 'saas') return;
+            templatePreference.value = v;
+            var target = v === '' ? siteDefault.value : v;
+            var html = document.documentElement;
+            html.setAttribute('data-template', target);
+            if (document.body) document.body.setAttribute('data-template', target);
+        };
+
+        // 界面模板个人偏好：保存到服务端 + 本地立即应用
+        const saveTemplatePreference = async () => {
+            templatePreferenceSaving.value = true;
+            try {
+                var res = await api('/user/template', {
+                    method: 'PUT',
+                    body: JSON.stringify({ template: templatePreference.value })
+                });
+                templatePreference.value = (res && res.template) || '';
+                window.applyTemplate(templatePreference.value, (res && res.siteDefault) || 'default');
+                alert('模板偏好已保存');
+            } catch (e) {
+                alert('保存失败: ' + (e.message || '未知错误'));
+            }
+            templatePreferenceSaving.value = false;
         };
 
         const updateProfile = async () => {
@@ -1348,6 +1394,8 @@ const App = {
                 }
                 await loadNavItems();
                 await loadProfile();
+                await loadTemplatePreference();
+                window.syncUserTemplate && window.syncUserTemplate();
                 handleEmailVerification();
                 if (window.location.hash === '#messages' || activeSubTab.value === 'messages') {
                     activeSubTab.value = 'messages';
@@ -1402,6 +1450,11 @@ const App = {
             currentNavId,
             switchSubTab,
             profileForm,
+            templatePreference,
+            templatePreferenceSaving,
+            siteDefaultName,
+            selectTemplate,
+            saveTemplatePreference,
             memos,
             memosLoading,
             editMemoForm,

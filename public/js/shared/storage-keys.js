@@ -29,6 +29,9 @@ window.__storageKeys = {
     // 主题
     THEME: 'theme',
 
+    // 界面模板（用户个人偏好，优先于站点默认；theme-init.js 首帧应用，值域 '' | 'default' | 'saas'）
+    TEMPLATE: 'template',
+
     // 开通轮询前缀（key = 前缀 + resourceId）
     PROVISIONING_PREFIX: 'provisioning_',
 

@@ -1,88 +1,3 @@
-/* 下拉菜单淡入动画 */
-@keyframes dropdownFadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-[data-cdk-dropdown] { animation: dropdownFadeIn 0.18s ease-out; }
-
-/* Custom select dropdown (CDK 兑换等) */
-.custom-select { position: relative; }
-.custom-select-trigger {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--card-border, rgba(255,255,255,0.1));
-    color: var(--text-primary, #fff);
-    border-radius: 10px;
-    padding: 10px 36px 10px 14px;
-    cursor: pointer;
-    position: relative;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    user-select: none;
-    transition: background 0.2s ease, border-color 0.2s ease;
-}
-.custom-select-trigger:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(102, 126, 234, 0.5);
-}
-.custom-select-trigger::after {
-    content: '';
-    position: absolute;
-    right: 14px;
-    top: 50%;
-    width: 8px;
-    height: 8px;
-    border-right: 2px solid currentColor;
-    border-bottom: 2px solid currentColor;
-    transform: translateY(-70%) rotate(45deg);
-    transition: transform 0.2s ease;
-    pointer-events: none;
-}
-.custom-select.open .custom-select-trigger::after {
-    transform: translateY(-30%) rotate(-135deg);
-}
-.custom-select-trigger .custom-select-placeholder {
-    color: var(--text-secondary, #aaa);
-}
-.custom-select-dropdown {
-    display: none;
-    position: fixed;
-    max-height: 240px;
-    overflow-y: auto;
-    background: rgba(15, 12, 41, 0.98);
-    border: 1px solid var(--card-border, rgba(255,255,255,0.1));
-    border-radius: 10px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(15px);
-}
-.custom-select.open .custom-select-dropdown {
-    display: block;
-    animation: dropdownFadeIn 0.18s ease-out;
-}
-.custom-select-dropdown .option {
-    padding: 10px 14px;
-    cursor: pointer;
-    color: var(--text-primary, #fff);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    transition: background 0.15s ease;
-    user-select: none;
-}
-.custom-select-dropdown .option:last-child {
-    border-bottom: none;
-}
-.custom-select-dropdown .option:hover {
-    background: rgba(102, 126, 234, 0.25);
-}
-.custom-select-dropdown .option.selected {
-    background: rgba(102, 126, 234, 0.4);
-    font-weight: 500;
-}
-.custom-select-dropdown .option.selected::before {
-    content: '✓';
-    margin-right: 8px;
-    color: #4caf50;
-}
-
 /* ===== 移动端卡片布局 ===== */
 .vm-mobile-card {
     background: var(--glass-surface);
@@ -94,7 +9,7 @@
     margin-bottom: 12px;
     transition: all 0.3s ease;
 }
-.vm-mobile-card:hover { border-color: rgba(99,102,241,0.3); }
+.vm-mobile-card:hover { border-color: color-mix(in srgb, var(--color-primary) 30%, transparent); }
 .vm-mobile-card-header {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 10px; padding-bottom: 10px;
@@ -109,9 +24,9 @@
 .vm-mobile-card-cname-toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; padding: 2px 0; }
 .vm-mobile-card-cname-toggle svg { transition: transform 0.2s ease; color: var(--text-muted); }
 .vm-mobile-card-cname-list { margin-top: 4px; display: flex; flex-direction: column; gap: 4px; }
-.vm-mobile-card-cname-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(99,102,241,0.06); padding: 4px 8px; border-radius: 6px; }
+.vm-mobile-card-cname-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: rgba(168,85,247,0.06); padding: 4px 8px; border-radius: 6px; }
 .cname-copy-btn { flex-shrink: 0; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 2px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
-.cname-copy-btn:hover { color: var(--color-primary, #818cf8); background: rgba(99,102,241,0.1); }
+.cname-copy-btn:hover { color: var(--color-primary, #c084fc); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
 .vm-mobile-card-label { color: var(--text-muted); flex-shrink: 0; }
 .vm-mobile-card-value { color: var(--text-primary); text-align: right; word-break: break-all; }
 .vm-mobile-card-fullrow .vm-mobile-card-value { text-align: left; }
@@ -124,7 +39,7 @@
         .modal-dialog.modal-lg { max-width: 95vw; margin: 0.5rem auto; }
         table { min-width: 600px; font-size: 12px; }
         th, td { padding: 8px 10px !important; white-space: nowrap; }
-        .table-btn { padding: 3px 8px !important; font-size: 11px !important; }
+        .pv-btn-table, .pv-btn-table-primary, .pv-btn-table-danger, .pv-btn-table-warning { padding: 3px 8px !important; font-size: 11px !important; }
         .module-title { font-size: 16px !important; }
         .stat-card { padding: 14px 16px; }
         .stat-num { font-size: 28px !important; }
@@ -149,8 +64,8 @@
         transition: all 0.3s ease !important;
     }
     .vm-card:hover {
-        border-color: rgba(99, 102, 241, 0.35) !important;
-        box-shadow: 0 8px 40px rgba(99, 102, 241, 0.12), var(--shadow-md) !important;
+        border-color: rgba(168, 85, 247, 0.35) !important;
+        box-shadow: 0 8px 40px rgba(168, 85, 247, 0.12), var(--shadow-md) !important;
         transform: translateY(-2px);
     }
 
@@ -254,37 +169,12 @@
     .module-title::before {
         content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
         width: 3px; height: 18px; border-radius: 2px;
-        background: linear-gradient(180deg, #667eea, #764ba2);
+        background: linear-gradient(180deg, #a855f7, #22d3ee);
     }
 
-    /* ========== 玻璃态按钮 ========== */
-    .btn-glass { padding: 7px 16px; font-size: 13px; font-weight: 600; border-radius: 8px;
-        border: 1px solid rgba(99,102,241,0.3); cursor: pointer; transition: all 0.2s ease;
-        background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15));
-        color: #C7D2FE; box-shadow: 0 2px 10px rgba(99,102,241,0.15); }
-    .btn-glass:hover:not(:disabled) { background: linear-gradient(135deg, rgba(99,102,241,0.3), rgba(139,92,246,0.22));
-        color: #E0E7FF; box-shadow: 0 4px 16px rgba(99,102,241,0.25); transform: translateY(-1px); }
-    .btn-glass:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
-
-    .btn-glass-success { border-color: rgba(54,211,153,0.35);
-        background: linear-gradient(135deg, rgba(54,211,153,0.2), rgba(34,197,94,0.12)); color: #6EE7B7; }
-    .btn-glass-success:hover:not(:disabled) { background: linear-gradient(135deg, rgba(54,211,153,0.32), rgba(34,197,94,0.22));
-        color: #A7F3D0; box-shadow: 0 4px 16px rgba(54,211,153,0.25); }
-
-    .btn-glass-warning { border-color: rgba(251,191,36,0.35);
-        background: linear-gradient(135deg, rgba(251,191,36,0.18), rgba(245,158,11,0.12)); color: #FCD34D; }
-    .btn-glass-warning:hover:not(:disabled) { background: linear-gradient(135deg, rgba(251,191,36,0.30), rgba(245,158,11,0.20));
-        color: #FDE68A; box-shadow: 0 4px 16px rgba(251,191,36,0.25); }
-
-    .btn-glass-danger { border-color: rgba(239,68,68,0.35);
-        background: linear-gradient(135deg, rgba(239,68,68,0.18), rgba(220,38,38,0.12)); color: #FCA5A5; }
-    .btn-glass-danger:hover:not(:disabled) { background: linear-gradient(135deg, rgba(239,68,68,0.30), rgba(220,38,38,0.20));
-        color: #FECACA; box-shadow: 0 4px 16px rgba(239,68,68,0.25); }
-
-    .btn-glass-info { border-color: rgba(59,130,246,0.35);
-        background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(99,102,241,0.12)); color: #93C5FD; }
-    .btn-glass-info:hover:not(:disabled) { background: linear-gradient(135deg, rgba(59,130,246,0.32), rgba(99,102,241,0.22));
-        color: #BFDBFE; box-shadow: 0 4px 16px rgba(59,130,246,0.25); }
+    /* ========== 玻璃态按钮（已移除） ==========
+       按钮体系统一由 public/shared/css/pv-buttons.css 接管（.pv-btn-* 类 + <pv-button> 组件），
+       旧 .btn-glass 系列定义已移除，勿在此重建 */
 
     /* ========== 表格样式 ========== */
     table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
@@ -292,8 +182,8 @@
         padding: 14px 18px !important; text-align: left; font-weight: 600 !important;
         color: var(--text-secondary) !important; font-size: 12px !important;
         text-transform: uppercase; letter-spacing: 0.6px;
-        border-bottom: 2px solid rgba(99,102,241,0.18) !important;
-        background: linear-gradient(180deg, rgba(99,102,241,0.10) 0%, rgba(139,92,246,0.05) 100%) !important;
+        border-bottom: 2px solid rgba(168,85,247,0.18) !important;
+        background: linear-gradient(180deg, rgba(168,85,247,0.10) 0%, rgba(34,211,238,0.05) 100%) !important;
         white-space: nowrap; transition: all 0.3s ease;
     }
     thead tr:first-child th:first-child, .table thead tr:first-child th:first-child, .table-striped thead tr:first-child th:first-child { border-radius: 12px 0 0 0 !important; }
@@ -327,19 +217,19 @@
     .tag-pending {
         display: inline-block; padding: 2px 10px; border-radius: 20px;
         font-size: 12px; font-weight: 600;
-        color: var(--color-primary, #667eea); background: rgba(102, 126, 234, 0.15); white-space: nowrap;
+        color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 15%, transparent); white-space: nowrap;
     }
-    /* 备份中（蓝）*/
+    /* 备份中 */
     .tag-backup {
         display: inline-block; padding: 2px 10px; border-radius: 20px;
         font-size: 12px; font-weight: 600;
-        color: var(--color-primary, #667eea); background: rgba(102, 126, 234, 0.15); white-space: nowrap;
+        color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 15%, transparent); white-space: nowrap;
     }
-    /* 恢复中（紫）*/
+    /* 恢复中 */
     .tag-restore {
         display: inline-block; padding: 2px 10px; border-radius: 20px;
         font-size: 12px; font-weight: 600;
-        color: #c084fc; background: rgba(192, 132, 252, 0.15); white-space: nowrap;
+        color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 15%, transparent); white-space: nowrap;
     }
     /* 切换中（橙/琥珀）*/
     .tag-switch {
@@ -351,34 +241,18 @@
     /* 开通中行：毛玻璃遮罩效果 */
     .row-provisioning td {
         position: relative;
-        background: rgba(102, 126, 234, 0.06) !important;
+        background: color-mix(in srgb, var(--color-primary) 6%, transparent) !important;
         backdrop-filter: blur(4px);
         -webkit-backdrop-filter: blur(4px);
     }
     [data-theme="dark"] .row-provisioning td {
-        background: rgba(102, 126, 234, 0.1) !important;
+        background: color-mix(in srgb, var(--color-primary) 10%, transparent) !important;
     }
     .provisioning-cell {
         display: inline-flex; align-items: center;
     }
 
-    .table-btn {
-        padding: 4px 12px; font-size: 12px;
-        border: 1px solid var(--border-color); border-radius: 6px;
-        cursor: pointer !important; transition: all 0.2s ease;
-        background: transparent; color: var(--text-secondary); white-space: nowrap;
-        line-height: 1.6; position: relative; z-index: 10;
-        display: inline-flex; align-items: center;
-    }
-    .table-btn:hover { border-color: rgba(129,140,248,0.4); color: var(--text-primary); background: rgba(129,140,248,0.08); }
-    .table-btn.btn-primary { color: var(--color-primary); background: rgba(129,140,248,0.1); border-color: rgba(129,140,248,0.2); }
-    .table-btn.btn-primary:hover { background: rgba(129,140,248,0.2); color: var(--color-primary-hover); }
-    .table-btn.btn-danger { color: var(--color-danger); background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.18); }
-    .table-btn.btn-danger:hover { background: rgba(239,68,68,0.18); color: var(--color-danger); }
-    .table-btn.btn-info { color: #06b6d4; background: rgba(6,182,212,0.08); border-color: rgba(6,182,212,0.2); }
-    .table-btn.btn-info:hover { background: rgba(6,182,212,0.18); color: #22d3ee; }
-    .table-btn.btn-warning { color: var(--color-warning, #f59e0b); background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); }
-    .table-btn.btn-warning:hover { background: rgba(245,158,11,0.18); color: #fbbf24; }
+    /* 旧 .table-btn 系列已移除 —— 统一由 public/shared/css/pv-buttons.css 的 .pv-btn-table-* 接管 */
 
     /* 磁盘自动续费开关：放大并居中对齐 */
     .disk-auto-renew-switch {
@@ -398,12 +272,12 @@
         transition: background-position 0.15s ease-in-out, background-color 0.15s ease-in-out;
     }
     .disk-auto-renew-switch .form-check-input:checked {
-        background-color: var(--color-primary, #6366f1);
-        border-color: var(--color-primary, #6366f1);
+        background-color: var(--color-primary, #a855f7);
+        border-color: var(--color-primary, #a855f7);
         background-position: right center;
     }
     .disk-auto-renew-switch .form-check-input:focus {
-        box-shadow: 0 0 0 0.25rem rgba(99,102,241,0.25);
+        box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--color-primary) 25%, transparent);
     }
 
     .table-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; white-space: nowrap; }
@@ -429,7 +303,7 @@
     }
     .dropdown-menu-table li .dropdown-item:hover { background: var(--glass-accent-hover); color: var(--text-primary); }
     .dropdown-menu-table li a { display: block; padding: 6px 14px; font-size: 13px; color: var(--text-primary); text-decoration: none; transition: background 0.15s; white-space: nowrap; }
-    .dropdown-menu-table li a:hover { background: rgba(99,102,241,0.15); color: #fff; }
+    .dropdown-menu-table li a:hover { background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: #fff; }
 
     /* 浮动下拉菜单 */
     .floating-dropdown-menu {
@@ -447,21 +321,9 @@
     }
     .floating-dropdown-menu .dropdown-item:hover { background: var(--glass-accent-hover); color: var(--text-primary); }
 
-    /* Form controls glass effect */
+    /* Form controls（统一走 shared/components.css，此处不再重复定义） */
     .form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
         transition: color 0.3s ease; }
-    .form-control, .form-select {
-        background: var(--bg-input) !important;
-        border-color: var(--border-color) !important;
-        color: var(--text-primary) !important;
-        border-radius: 10px !important;
-    }
-    .form-control:focus, .form-select:focus {
-        border-color: var(--color-primary) !important;
-        box-shadow: 0 0 0 3px rgba(99, 126, 234, 0.2) !important;
-    }
-    .form-select option { background: var(--bg-input); color: var(--text-primary); }
-    .form-control.bg-dark, .form-select.bg-dark { background: var(--bg-input) !important; color: var(--text-primary) !important; }
 
     /* btn-close 主题适配 */
     [data-theme="light"] .btn-close { filter: brightness(0) invert(0.4); opacity: 0.8; }
@@ -478,41 +340,41 @@
     .table, .table-striped, .table-sm, .table-hover, .table-dark {
         --bs-table-bg: transparent; --bs-table-accent-bg: transparent;
         --bs-table-color: var(--text-primary);
-        --bs-table-hover-bg: rgba(99,102,241,0.04); --bs-table-active-bg: rgba(99,102,241,0.06);
+        --bs-table-hover-bg: color-mix(in srgb, var(--color-primary) 4%, transparent); --bs-table-active-bg: color-mix(in srgb, var(--color-primary) 6%, transparent);
     }
     /* 选中行高亮 - 不随鼠标移开消失 */
     table tbody tr.table-active,
     table tbody tr.table-active:hover,
     .table tbody tr.table-active,
     .table tbody tr.table-active:hover {
-        background: rgba(99,102,241,0.12) !important;
-        box-shadow: inset 0 0 0 1px rgba(99,102,241,0.3);
+        background: color-mix(in srgb, var(--color-primary) 12%, transparent) !important;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
     }
     [data-theme="light"] table tbody tr.table-active,
     [data-theme="light"] table tbody tr.table-active:hover,
     [data-theme="light"] .table tbody tr.table-active,
     [data-theme="light"] .table tbody tr.table-active:hover {
-        background: rgba(99,102,241,0.15) !important;
-        box-shadow: inset 0 0 0 1px rgba(99,102,241,0.4);
+        background: color-mix(in srgb, var(--color-primary) 15%, transparent) !important;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 40%, transparent);
     }
     .table-dark { background: var(--bg-hover) !important; border-color: var(--border-color) !important; }
     .table > thead, .table-striped > thead, .table-sm > thead, .table-hover > thead, .table-dark > thead {
         background: transparent !important;
     }
     .table-dark thead th, .table-striped thead th {
-        background: linear-gradient(180deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.04) 100%) !important;
+        background: linear-gradient(180deg, rgba(168,85,247,0.08) 0%, rgba(34,211,238,0.04) 100%) !important;
         color: var(--text-secondary) !important;
-        border-bottom: 1px solid rgba(99,102,241,0.15) !important;
+        border-bottom: 1px solid rgba(168,85,247,0.15) !important;
     }
 
-    /* Buttons glow effect - 仅主操作按钮，不影响表格小按钮 */
-    .btn-primary:not(.table-btn) {
+    /* Buttons glow effect - 仅 Bootstrap 主操作按钮，不影响 pv-btn 组件按钮 */
+    .btn-primary:not(.pv-btn) {
         background: var(--accent-gradient) !important;
         border: none !important;
-        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+        box-shadow: 0 4px 15px color-mix(in srgb, var(--color-primary) 30%, transparent) !important;
     }
-    .btn-primary:not(.table-btn):hover {
-        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45) !important;
+    .btn-primary:not(.pv-btn):hover {
+        box-shadow: 0 6px 20px color-mix(in srgb, var(--color-primary) 45%, transparent) !important;
         transform: translateY(-1px);
     }
 
@@ -522,21 +384,9 @@
         backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     }
 
-    /* Custom select dropdown */
-    .custom-select-dropdown {
-        background: var(--bg-modal) !important;
-        backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-        border: 1px solid var(--border-color) !important;
-        border-radius: 10px !important;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important;
-    }
-    .custom-select .option:hover, .custom-select .option.selected {
-        background: var(--glass-accent) !important;
-    }
-
     /* Card headers in modals */
     .card-header {
-        background: rgba(102, 126, 234, 0.06) !important;
+        background: rgba(168, 85, 247, 0.06) !important;
         border-bottom: 1px solid var(--border-color) !important;
         border-radius: 12px 12px 0 0 !important;
         color: var(--text-primary) !important;
@@ -569,7 +419,7 @@
 
     /* Badge styling */
     .badge { border-radius: 8px !important; font-weight: 500 !important; }
-    .bg-warning { background: linear-gradient(135deg, #f093fb, #f5576c) !important; }
+    /* bg-warning 不覆盖：沿用 components.css 主题金色徽章（紫粉渐变+金字不可读） */
     .bg-secondary { background: rgba(108, 117, 125, 0.3) !important; }
 
     /* Message type badge */
@@ -596,7 +446,7 @@
     .modal-close:hover { background: rgba(239,68,68,0.15); color: var(--color-danger); border-color: rgba(239,68,68,0.3); }
 
     /* ========== 详情弹窗样式 ========== */
-    .info-card { background: rgba(99,102,241,0.06); border: 1px solid var(--border-color);
+    .info-card { background: rgba(168,85,247,0.06); border: 1px solid var(--border-color);
         border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; }
     .info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
     .info-item { display: flex; flex-direction: column; gap: 4px; }
@@ -631,9 +481,9 @@
     .log-nav-tabs .nav-link { padding: 7px 18px; font-size: 13px; font-weight: 500; color: var(--text-secondary);
         background: transparent; border: none; border-radius: 7px; transition: all 0.2s ease, color 0.3s ease, background-color 0.3s ease; cursor: pointer;
         white-space: nowrap; position: relative; }
-    .log-nav-tabs .nav-link:hover { color: var(--text-primary); background: rgba(99,102,241,0.08); }
-    .log-nav-tabs .nav-link.active { color: #fff; background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.15));
-        box-shadow: 0 2px 12px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600; }
+    .log-nav-tabs .nav-link:hover { color: var(--text-primary); background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+    .log-nav-tabs .nav-link.active { color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 25%, transparent), color-mix(in srgb, var(--color-primary-hover) 15%, transparent));
+        box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600; }
 
     /* Nav pills */
     .nav-pills {
@@ -651,15 +501,6 @@
     /* Custom alert message */
     .custom-alert-msg { color: var(--text-primary) !important; }
 
-    /* Custom select trigger */
-    .custom-select-trigger {
-        background: var(--bg-input) !important;
-        border: 1px solid var(--border-color) !important;
-        border-radius: 8px; color: var(--text-primary) !important;
-        transition: all 0.2s ease;
-    }
-    .custom-select-trigger:hover { background: var(--bg-hover) !important; }
-
     /* Input group text */
     .input-group-text {
         background: var(--bg-hover) !important;
@@ -669,15 +510,15 @@
 
     /* Light mode: table header */
     [data-theme="light"] thead th, [data-theme="light"] .table thead th, [data-theme="light"] .table-striped thead th {
-        background: linear-gradient(180deg, rgba(99,102,241,0.07) 0%, rgba(139,92,246,0.035) 100%) !important;
-        border-bottom: 2px solid rgba(99,102,241,0.14) !important;
+        background: linear-gradient(180deg, rgba(168,85,247,0.07) 0%, rgba(34,211,238,0.035) 100%) !important;
+        border-bottom: 2px solid rgba(168,85,247,0.14) !important;
         color: #6b7280 !important;
     }
 
     /* ===== 套餐卡片 ===== */
-    .package-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+    .package-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; }
     .package-card { background: var(--glass-surface); backdrop-filter: var(--glass-blur); border: 1px solid var(--glass-border); border-radius: 16px; overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }
-    .package-card:hover { transform: translateY(-4px); box-shadow: 0 8px 32px rgba(129,140,248,0.2); }
+    .package-card:hover { transform: translateY(-4px); box-shadow: 0 8px 32px rgba(192,132,252,0.2); }
     .package-card-header { padding: 18px 20px 12px; font-size: 18px; font-weight: 700; color: var(--color-primary); border-bottom: 1px solid var(--border-light); }
     .package-card-body { padding: 16px 20px 20px; }
     .package-spec { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--border-light); }
@@ -686,7 +527,7 @@
     .spec-value { color: var(--text-primary); font-weight: 600; font-size: 14px; }
     .package-desc { margin-top: 12px; padding: 10px 12px; background: var(--glass-accent); border-radius: 8px; font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
     .package-prices { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .price-item { padding: 5px 12px; background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); border-radius: 8px; font-size: 13px; color: var(--color-primary); font-weight: 600; }
+    .price-item { padding: 5px 12px; background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.2); border-radius: 8px; font-size: 13px; color: var(--color-primary); font-weight: 600; }
     /* 套餐卡片立即开通按钮 — 全宽紫色渐变大按钮 */
     .package-card-body .pv-btn.pv-btn-primary {
         display: block !important;
@@ -695,19 +536,19 @@
         padding: 14px 20px !important;
         border: none !important;
         border-radius: 12px !important;
-        background: linear-gradient(135deg, #6366F1, #8B5CF6) !important;
+        background: var(--accent-gradient) !important;
         color: #fff !important;
         font-weight: 700 !important;
         font-size: 16px !important;
         letter-spacing: 0.5px !important;
         cursor: pointer !important;
         transition: all 0.3s ease !important;
-        box-shadow: 0 4px 16px rgba(99,102,241,0.35) !important;
+        box-shadow: 0 4px 16px color-mix(in srgb, var(--color-primary) 35%, transparent) !important;
     }
     .package-card-body .pv-btn.pv-btn-primary:hover:not(:disabled) {
         transform: translateY(-2px) !important;
-        box-shadow: 0 8px 24px rgba(99,102,241,0.5) !important;
-        background: linear-gradient(135deg, #7C7FF7, #9D78F7) !important;
+        box-shadow: 0 8px 24px color-mix(in srgb, var(--color-primary) 50%, transparent) !important;
+        background: var(--accent-gradient) !important;
     }
     .package-card-body .pv-btn.pv-btn-primary:disabled {
         opacity: 0.45 !important;
@@ -720,30 +561,41 @@
 
     /* ===== 套餐分组标题 ===== */
     .package-group-section { margin-bottom: 28px; }
-    .package-group-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0 0 14px 4px; padding-left: 10px; border-left: 3px solid var(--color-primary, #667eea); }
+    .package-group-title { font-size: 16px; font-weight: 700; color: var(--text-primary); margin: 0 0 14px 4px; padding-left: 10px; border-left: 3px solid var(--color-primary, #a855f7); }
 
-    /* ===== 价格标签页（平铺在按钮上方） ===== */
-    .price-tabs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin-top: 14px; margin-bottom: 4px; }
+    /* ===== 价格标签页（竖排：月付/季付/年付 一行一个，宽度充裕不挤压） ===== */
+    .price-tabs { display: grid; grid-template-columns: 1fr; gap: 8px; margin-top: 14px; margin-bottom: 4px; }
     .price-tab {
         position: relative;
-        padding: 10px 6px 8px;
-        text-align: center;
-        background: var(--glass-accent, rgba(99,102,241,0.05));
-        border: 1px solid var(--border-light, rgba(99,102,241,0.15));
+        padding: 10px 16px;
+        text-align: left;
+        background: var(--glass-accent, rgba(168,85,247,0.05));
+        border: 1px solid var(--border-light, rgba(168,85,247,0.15));
         border-radius: 10px;
         cursor: pointer;
         transition: all 0.2s ease;
         display: flex;
-        flex-direction: column;
+        flex-direction: row;
         align-items: center;
-        justify-content: center;
-        gap: 2px;
+        justify-content: space-between;
+        gap: 12px;
     }
-    .price-tab:hover { border-color: var(--color-primary, #6366F1); transform: translateY(-1px); }
+    .price-tab:hover { border-color: var(--color-primary, #a855f7); transform: translateY(-1px); }
     .price-tab-active {
-        background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(139,92,246,0.18));
-        border-color: var(--color-primary, #6366F1);
-        box-shadow: 0 2px 8px rgba(99,102,241,0.25);
+        background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 18%, transparent), color-mix(in srgb, var(--color-primary-hover) 18%, transparent));
+        border-color: var(--color-primary, #a855f7);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 25%, transparent);
+    }
+    /* 选中态左侧主题色竖条，强化"已选"语义 */
+    .price-tab-active::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 10px;
+        bottom: 10px;
+        width: 3px;
+        border-radius: 0 2px 2px 0;
+        background: var(--color-primary, #a855f7);
     }
     .price-tab-badge {
         position: absolute;
@@ -763,7 +615,7 @@
         background: linear-gradient(135deg, #ef4444, #f59e0b);
         border-color: #ef4444;
     }
-    .price-tab-label { font-size: 12px; color: var(--text-muted, #6b7280); font-weight: 600; }
+    .price-tab-label { font-size: 13px; color: var(--text-muted, #6b7280); font-weight: 600; margin-right: auto; }
     .price-tab-original {
         font-size: 11px;
         line-height: 1.2;
@@ -772,11 +624,15 @@
         text-decoration: line-through;
         text-decoration-color: rgba(239,68,68,0.6);
     }
-    .price-tab-price { font-size: 15px; font-weight: 700; color: var(--color-primary, #6366F1); }
+    .price-tab-price { font-size: 15px; font-weight: 700; color: var(--color-primary, #a855f7); }
+    /* 选中态价格提亮，确保紫色高亮底上可读 */
+    .price-tab-active .price-tab-price { color: color-mix(in srgb, var(--color-primary) 40%, #fff); }
 
     /* ===== 订购弹窗周期显示 ===== */
-    .order-period-display { padding: 8px 12px; background: var(--glass-accent, rgba(99,102,241,0.05)); border-radius: 8px; border: 1px solid var(--border-light, rgba(99,102,241,0.15)); }
-    .stock-remain { color: var(--color-primary, #667eea); }
+    .order-period-display { padding: 8px 12px; background: var(--glass-accent, rgba(168,85,247,0.05)); border-radius: 8px; border: 1px solid var(--border-light, rgba(168,85,247,0.15)); }
+    /* 确认订购弹窗固定高度显示：内容自适应不出现内部滚动条（小屏由 Bootstrap 遮罩滚动兜底） */
+    #orderModal .modal-content { max-height: none; overflow: visible; }
+    .stock-remain { color: var(--color-primary, #a855f7); }
     .stock-soldout { color: #ef4444; }
     .package-btn:disabled { opacity: 0.5; cursor: not-allowed; background: linear-gradient(135deg, #9ca3af, #6b7280); }
     .package-btn:disabled:hover { opacity: 0.5; }
@@ -801,7 +657,7 @@
     }
     .drag-handle:hover {
         opacity: 1;
-        color: var(--bs-primary, #6366f1);
+        color: var(--bs-primary, #a855f7);
     }
     .drag-handle:active {
         cursor: grabbing;
@@ -819,7 +675,7 @@
     }
     .row-dragging {
         opacity: 0.25;
-        background: var(--glass-accent, rgba(99,102,241,0.06)) !important;
+        background: var(--glass-accent, rgba(168,85,247,0.06)) !important;
     }
     /* 表格行基础 transition（避让动效平滑过渡，直接操作 DOM style.transform） */
     .table tbody tr {
@@ -838,7 +694,7 @@
     }
     .group-badge-draggable:hover {
         transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 30%, transparent);
     }
     .group-badge-draggable.row-dragging {
         opacity: 0.4;

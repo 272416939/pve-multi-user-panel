@@ -59,7 +59,7 @@
                                                     {{ u.emailVerified ? '已验证' : '未验证' }}
                                                 </span>
                                             </td>
-                                            <td><span>{{ u.totp_enabled ? '✅' : '-' }}</span></td>
+                                            <td><span>{{ u.totp_enabled ? '已启用' : '-' }}</span></td>
                                             <td><span class="badge" :class="u.role === 'admin' ? 'bg-primary' : 'bg-secondary'">{{ u.role }}</span></td>
                                             <td>{{ formatDate(u.created_at) }}</td>
                                             <td>

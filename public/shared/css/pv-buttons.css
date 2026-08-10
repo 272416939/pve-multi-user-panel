@@ -42,18 +42,18 @@
   font-size: 13px !important;
   font-weight: 600 !important;
   border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.15)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(99,102,241,0.3) !important;
-  box-shadow: 0 2px 10px rgba(99,102,241,0.15) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: var(--accent-gradient) !important;
+  color: #fff !important;
+  border-color: transparent !important;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--color-primary) 40%, transparent) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .pv-btn-glass:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.32), rgba(139,92,246,0.25)) !important;
-  box-shadow: 0 4px 16px rgba(99,102,241,0.28) !important;
-  border-color: rgba(99,102,241,0.45) !important;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--color-primary) 82%, #000) 0%, color-mix(in srgb, var(--color-primary-hover) 82%, #000) 100%) !important;
+  box-shadow: 0 0 28px color-mix(in srgb, var(--color-primary-hover) 55%, transparent) !important;
+  border-color: transparent !important;
 }
 
 /* .pv-btn-glass-active — 激活状态玻璃按钮 */
@@ -62,18 +62,18 @@
   font-size: 12px !important;
   font-weight: 600 !important;
   border-radius: 6px !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.28), rgba(139,92,246,0.18)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(99,102,241,0.4) !important;
-  box-shadow: 0 2px 10px rgba(99,102,241,0.18) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent) !important;
+  color: color-mix(in srgb, var(--color-primary) 40%, #fff) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 50%, transparent) !important;
+  box-shadow: inset 0 0 10px color-mix(in srgb, var(--color-primary) 18%, transparent) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 .pv-btn-glass-active:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.4), rgba(139,92,246,0.28)) !important;
-  box-shadow: 0 4px 16px rgba(99,102,241,0.32) !important;
-  border-color: rgba(99,102,241,0.55) !important;
+  background: color-mix(in srgb, var(--color-primary) 32%, transparent) !important;
+  box-shadow: inset 0 0 12px color-mix(in srgb, var(--color-primary) 25%, transparent), 0 0 14px color-mix(in srgb, var(--color-primary) 25%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 65%, transparent) !important;
 }
 
 /* .pv-btn-glass-inactive — 非激活状态玻璃按钮 */
@@ -89,148 +89,99 @@
 }
 .pv-btn-glass-inactive:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.08)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(99,102,241,0.35) !important;
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent) !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 40%, transparent) !important;
 }
 
 /* ============================================
-   4. table 系列变体 — 表格行操作按钮
+   4. table / primary / danger / table-warning 系列
+   — 表格行操作与通用操作按钮（5px 14px / 12px 标准尺寸）
+   类名语义：
+     table / table-primary = 表格行默认/主要操作
+     primary               = 弹窗确认/保存、用户端页面主操作
+     （三者视觉一致，组合选择器单一定义，勿再拷贝副本）
+     table-danger / danger = 危险操作（停止/销毁/删除确认）
+     table-warning         = 表格行警告操作（移除/解绑）
    ============================================ */
 
-/* .pv-btn-table — 默认表格行按钮 */
-.pv-btn-table {
-  padding: 5px 14px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(129,140,248,0.12)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(129,140,248,0.25) !important;
-  box-shadow:
-    0 2px 8px rgba(99,102,241,0.12),
-    inset 0 1px 0 rgba(255,255,255,0.06)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-}
-.pv-btn-table:hover {
-  transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.34), rgba(129,140,248,0.22)) !important;
-  border-color: rgba(129,140,248,0.42) !important;
-  box-shadow:
-    0 4px 14px rgba(99,102,241,0.22),
-    inset 0 1px 0 rgba(255,255,255,0.1)
-    !important;
-}
-
-/* .pv-btn-table-primary — 表格行主要操作按钮 */
-.pv-btn-table-primary {
-  padding: 5px 14px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.35), rgba(129,140,248,0.25)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(129,140,248,0.35) !important;
-  box-shadow:
-    0 2px 10px rgba(99,102,241,0.2),
-    inset 0 1px 0 rgba(255,255,255,0.08)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-}
-.pv-btn-table-primary:hover {
-  transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.5), rgba(129,140,248,0.38)) !important;
-  border-color: rgba(129,140,248,0.52) !important;
-  box-shadow:
-    0 4px 18px rgba(99,102,241,0.32),
-    inset 0 1px 0 rgba(255,255,255,0.12)
-    !important;
-}
-
-/* .pv-btn-table-danger — 表格行危险操作按钮 */
-.pv-btn-table-danger {
-  padding: 5px 14px !important;
-  font-size: 12px !important;
-  font-weight: 500 !important;
-  border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.239), rgba(220,38,38,0.22)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(239,68,68,0.3) !important;
-  box-shadow:
-    0 2px 10px rgba(239,68,68,0.15),
-    inset 0 1px 0 rgba(255,255,255,0.05)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
-}
-.pv-btn-table-danger:hover {
-  transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.38), rgba(220,38,38,0.34)) !important;
-  border-color: rgba(239,68,68,0.48) !important;
-  box-shadow:
-    0 4px 18px rgba(239,68,68,0.26),
-    inset 0 1px 0 rgba(255,255,255,0.09)
-    !important;
-}
-
-/* ============================================
-   5. primary / danger — 通用操作按钮
-   （复用 table-primary / table-danger 样式）
-   ============================================ */
-
-/* .pv-btn-primary — 通用主要操作按钮 */
+/* 品牌色系 — 表格行默认/主要 + 通用主要操作 */
+.pv-btn-table,
+.pv-btn-table-primary,
 .pv-btn-primary {
   padding: 5px 14px !important;
   font-size: 12px !important;
   font-weight: 500 !important;
   border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.35), rgba(129,140,248,0.25)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
-  border-color: rgba(129,140,248,0.35) !important;
-  box-shadow:
-    0 2px 10px rgba(99,102,241,0.2),
-    inset 0 1px 0 rgba(255,255,255,0.08)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent) !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 40%, transparent) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
+.pv-btn-table:hover,
+.pv-btn-table-primary:hover,
 .pv-btn-primary:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.5), rgba(129,140,248,0.38)) !important;
-  border-color: rgba(129,140,248,0.52) !important;
-  box-shadow:
-    0 4px 18px rgba(99,102,241,0.32),
-    inset 0 1px 0 rgba(255,255,255,0.12)
-    !important;
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 55%, transparent) !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-primary) 30%, transparent) !important;
 }
 
-/* .pv-btn-danger — 通用危险操作按钮 */
+/* 红色系 — 表格行危险 + 通用危险操作 */
+.pv-btn-table-danger,
 .pv-btn-danger {
   padding: 5px 14px !important;
   font-size: 12px !important;
   font-weight: 500 !important;
   border-radius: 8px !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.239), rgba(220,38,38,0.22)) !important;
-  color: var(--text-primary, #e2e8f0) !important;
+  background: rgba(239,68,68,0.12) !important;
+  color: #fca5a5 !important;
   border-color: rgba(239,68,68,0.3) !important;
-  box-shadow:
-    0 2px 10px rgba(239,68,68,0.15),
-    inset 0 1px 0 rgba(255,255,255,0.05)
-    !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
+.pv-btn-table-danger:hover,
 .pv-btn-danger:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.38), rgba(220,38,38,0.34)) !important;
+  background: rgba(239,68,68,0.22) !important;
   border-color: rgba(239,68,68,0.48) !important;
-  box-shadow:
-    0 4px 18px rgba(239,68,68,0.26),
-    inset 0 1px 0 rgba(255,255,255,0.09)
-    !important;
+  box-shadow: 0 0 12px rgba(239,68,68,0.3) !important;
+}
+
+/* 黄色系 — 表格行警告操作（移除/解绑） */
+.pv-btn-table-warning {
+  padding: 5px 14px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: rgba(245,158,11,0.12) !important;
+  color: #fcd34d !important;
+  border-color: rgba(245,158,11,0.3) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.pv-btn-table-warning:hover {
+  transform: translateY(-1px) !important;
+  background: rgba(245,158,11,0.22) !important;
+  border-color: rgba(245,158,11,0.48) !important;
+  box-shadow: 0 0 12px rgba(245,158,11,0.3) !important;
+}
+
+/* ============================================
+   5. 尺寸修饰类（仅尺寸无颜色，模板换肤无需覆盖）
+   ============================================ */
+
+/* .pv-btn-lg — 与 glass 主按钮同排时的次要按钮尺寸对齐
+   用法：<pv-button variant="outline" size="lg">（组件按 size 追加该类）
+   注意：必须双类选择器 .pv-btn.pv-btn-lg 提升特异性——单类会与后定义的
+   变体（outline/secondary 等）同优先级而按声明顺序落败，导致尺寸被压回 */
+.pv-btn.pv-btn-lg {
+  padding: 7px 20px !important;
+  font-size: 13px !important;
 }
 
 /* ============================================
@@ -261,14 +212,15 @@
   font-weight: 500 !important;
   border-radius: 8px !important;
   background: transparent !important;
-  color: var(--color-primary, #818cf8) !important;
-  border-color: var(--color-primary, #818cf8) !important;
+  color: var(--color-primary-hover) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 50%, transparent) !important;
   box-shadow: none !important;
 }
 .pv-btn-outline:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(99,102,241,0.1), rgba(139,92,246,0.06)) !important;
-  box-shadow: 0 2px 10px rgba(99,102,241,0.12) !important;
+  background: color-mix(in srgb, var(--color-primary-hover) 10%, transparent) !important;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--color-primary-hover) 35%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 70%, transparent) !important;
 }
 
 /* .pv-btn-outline-danger — 危险描边按钮（列表内删除/销毁） */
@@ -284,7 +236,7 @@
 }
 .pv-btn-outline-danger:hover {
   transform: translateY(-1px) !important;
-  background: linear-gradient(135deg, rgba(239,68,68,0.12), rgba(220,38,38,0.08)) !important;
+  background: rgba(239,68,68,0.1) !important;
   border-color: rgba(239,68,68,0.6) !important;
   box-shadow: 0 2px 10px rgba(239,68,68,0.15) !important;
 }
@@ -314,15 +266,15 @@
   font-weight: 500 !important;
   border-radius: 8px !important;
   background: var(--bg-hover, #1e293b) !important;
-  color: var(--text-primary, #e2e8f0) !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
   border-color: var(--border-color, #334155) !important;
   box-shadow: none !important;
 }
 .pv-btn-secondary:hover {
   transform: translateY(-1px) !important;
-  background: var(--bg-hover, #334155) !important;
-  border-color: rgba(148,163,184,0.35) !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 20%, transparent) !important;
 }
 
 /* .pv-btn-link — 链接式按钮 */
@@ -332,7 +284,7 @@
   font-weight: 400 !important;
   border-radius: 6px !important;
   background: transparent !important;
-  color: var(--text-primary, #e2e8f0) !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
   border-color: transparent !important;
   box-shadow: none !important;
 }
@@ -358,11 +310,11 @@
   -webkit-backdrop-filter: none !important;
 }
 .pv-btn-ghost:hover {
-  background: var(--glass-accent, rgba(99,102,241,0.1)) !important;
-  border-color: var(--glass-accent, rgba(99,102,241,0.3)) !important;
-  color: var(--color-primary, #818cf8) !important;
+  background: color-mix(in srgb, var(--color-primary-hover) 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 40%, transparent) !important;
+  color: var(--color-primary-hover) !important;
   transform: none !important;
-  box-shadow: none !important;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--color-primary-hover) 30%, transparent) !important;
 }
 /* 触摸设备上点击后立即恢复，避免遮罩残留 */
 .pv-btn-ghost:active {
@@ -408,7 +360,7 @@
 }
 .pv-btn-close:hover {
   opacity: 1 !important;
-  color: var(--text-primary, #e2e8f0) !important;
+  color: color-mix(in srgb, var(--color-primary) 55%, #fff) !important;
   background: rgba(239,68,68,0.1) !important;
   /* close 变体 hover 无 translateY 上浮效果 */
 }
@@ -424,7 +376,7 @@
 
 /* 键盘焦点可见性 */
 .pv-btn:focus-visible {
-  box-shadow: 0 0 0 3px rgba(102,126,234,0.3) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 30%, transparent) !important;
 }
 
 /* 禁用状态 */
@@ -433,4 +385,45 @@
   opacity: 0.5 !important;
   cursor: not-allowed !important;
   pointer-events: none !important;
+}
+
+/* ============================================
+   9. 亮色模式适配（赛博霓虹 Light：浅底上文字加深）
+   注：--color-primary-hover 暗色=青、亮色=深紫，随变量自动适配
+   ============================================ */
+[data-theme="light"] .pv-btn-outline {
+  color: var(--color-primary-hover) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 50%, transparent) !important;
+}
+[data-theme="light"] .pv-btn-outline:hover {
+  background: color-mix(in srgb, var(--color-primary-hover) 8%, transparent) !important;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--color-primary-hover) 25%, transparent) !important;
+}
+[data-theme="light"] .pv-btn-table,
+[data-theme="light"] .pv-btn-table-primary,
+[data-theme="light"] .pv-btn-primary {
+  color: var(--color-primary-hover) !important;
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent) !important;
+}
+[data-theme="light"] .pv-btn-table:hover,
+[data-theme="light"] .pv-btn-table-primary:hover,
+[data-theme="light"] .pv-btn-primary:hover {
+  color: color-mix(in srgb, var(--color-primary) 80%, #000) !important;
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary) 25%, transparent) !important;
+}
+[data-theme="light"] .pv-btn-table-danger,
+[data-theme="light"] .pv-btn-danger {
+  color: var(--color-danger) !important;
+}
+[data-theme="light"] .pv-btn-glass-active {
+  color: var(--color-primary-hover) !important;
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent) !important;
+}
+[data-theme="light"] .pv-btn-ghost:hover {
+  color: var(--color-primary-hover) !important;
+  background: color-mix(in srgb, var(--color-primary-hover) 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--color-primary-hover) 35%, transparent) !important;
+  box-shadow: 0 0 10px color-mix(in srgb, var(--color-primary-hover) 20%, transparent) !important;
 }

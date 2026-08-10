@@ -1,3 +1,6 @@
+// 启动耗时计时起点（记录整个启动过程，含模块加载）
+const APP_START_TIME = Date.now();
+
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
@@ -27,15 +30,25 @@ if (!fs.existsSync(envPath)) {
     } else {
         console.error('[提示] 请在项目根目录创建 .env 文件并填写配置\n');
     }
+    console.error('服务端启动失败，请检查！\n');
     process.exit(1);
 }
+
+// 启动完成标志：启动阶段（置位前）的致命异常统一按"启动失败"提示
+var serverStarted = false;
 
 // 注册 process 级错误处理，防止 unhandledRejection/uncaughtException 导致进程无日志退出
 process.on('unhandledRejection', (reason, promise) => {
     console.error('[unhandledRejection]', reason);
+    if (!serverStarted) {
+        console.error('服务端启动失败，请检查！');
+    }
 });
 process.on('uncaughtException', (err) => {
     console.error('[uncaughtException]', err.stack || err.message || err);
+    if (!serverStarted) {
+        console.error('服务端启动失败，请检查！');
+    }
     process.exit(1);
 });
 
@@ -269,6 +282,12 @@ const pushProxy = require('./websocket/push-proxy');
 
 const httpServer = http.createServer(app);
 
+// listen 失败（端口占用等）：统一打印启动失败提示
+httpServer.on('error', (err) => {
+    console.error('服务端启动失败，请检查！[' + (err.code || '') + ']', err.message);
+    process.exit(1);
+});
+
 httpServer.on('upgrade', (request, socket, head) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
     if (url.pathname === '/vnc-proxy') {
@@ -323,7 +342,8 @@ async function getSiteConfigCached() {
         var name = await db.config.get('site:name') || 'PVE 多用户控制面板';
         var logoText = await db.config.get('site:logo_text') || 'PVE 面板';
         var loginTitle = await db.config.get('site:login_title') || 'PVE Panel';
-        var data = { name: name, logo_text: logoText, login_title: loginTitle };
+        var template = await db.config.get('site:template') || 'default';
+        var data = { name: name, logo_text: logoText, login_title: loginTitle, template: template };
         cache.data = data;
         cache.expires = now + SITE_CONFIG_TTL * 1000;
         if (redis) {
@@ -331,7 +351,7 @@ async function getSiteConfigCached() {
         }
         return data;
     } catch (e) {
-        return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel' };
+        return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel', template: 'default' };
     }
 }
 
@@ -349,6 +369,8 @@ app.use(async (req, res, next) => {
     } catch (e) {
         res.locals.siteConfig = { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel' };
     }
+    // 界面模板（全站默认）：注入到 EJS，<html data-template="..."> 使用；个人偏好由 theme-init.js 在客户端覆盖
+    res.locals.templateStyle = res.locals.siteConfig.template || 'default';
     next();
 });
 
@@ -393,12 +415,12 @@ app.get('/user-center', (req, res) => res.render('pages/user-center', { title: '
 app.get('/vnc', async (req, res) => {
     const sessionId = req.query.session;
     if (!sessionId) {
-        return res.render('pages/vnc', { error: '缺少会话参数' });
+        return res.render('pages/vnc', { error: '缺少会话参数', ticket: null, vmid: '', type: 'qemu' });
     }
     const consoleSession = require('./utils/console-session');
     const sessionData = await consoleSession.getSession(sessionId);
     if (!sessionData) {
-        return res.render('pages/vnc', { error: '会话已失效，请重新打开控制台' });
+        return res.render('pages/vnc', { error: '会话已失效，请重新打开控制台', ticket: null, vmid: '', type: 'qemu' });
     }
     res.render('pages/vnc', {
         ticket: sessionData.ticket,
@@ -452,6 +474,7 @@ httpServer.listen(PORT, async () => {
         await db.initDb();
     } catch (error) {
         console.error('[数据库] MySQL 初始化失败:', error.message);
+        console.error('服务端启动失败，请检查！');
         process.exit(1);
     }
 
@@ -535,4 +558,8 @@ httpServer.listen(PORT, async () => {
     }
 
     require('./schedule/tasks').initScheduledTasks();
+
+    // 全部初始化完成：标记启动成功并打印最终耗时
+    serverStarted = true;
+    console.log(`服务端启动完成 本次耗时${Date.now() - APP_START_TIME}ms`);
 });

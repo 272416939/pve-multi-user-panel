@@ -141,7 +141,7 @@
                     <div class="modal-content">
                         <div class="modal-body text-center py-4">
                             <div class="custom-alert-icon mb-3" aria-hidden="true">
-                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                                 </svg>
                             </div>
@@ -185,7 +185,7 @@
                     <input type="password" v-model="forceNewPassword" placeholder="新密码（至少8位）" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup.enter="submitForceChangePwd" />
                     <input type="password" v-model="forceConfirmPassword" placeholder="确认新密码" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup.enter="submitForceChangePwd" />
                     <div v-if="forcePwdError" style="color:var(--login-color-error);font-size:12px;margin-bottom:12px">{{ forcePwdError }}</div>
-                    <pv-button type="button" @click="submitForceChangePwd" style="width:100%;padding:10px;border:none;border-radius:8px;background:var(--login-gradient-primary);color:#fff;font-size:14px;cursor:pointer;font-weight:600">确认修改</pv-button>
+                    <pv-button type="button" variant="primary" size="lg" @click="submitForceChangePwd" style="width:100%">确认修改</pv-button>
                 </div>
             </div>
             </Teleport>

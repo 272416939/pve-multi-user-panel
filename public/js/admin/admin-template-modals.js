@@ -104,7 +104,7 @@
                                         <label class="form-check-label" for="editUserEmailVerified">激活邮箱（无需验证）</label>
                                     </div>
                                     <div v-if="editUserForm.totp_enabled" class="mb-3 d-flex align-items-center">
-                                        <span class="me-2">二次验证: ✅ 已启用</span>
+                                        <span class="me-2">二次验证: 已启用</span>
                                         <pv-button type="button" @click="disableUser2fa(editUserForm.id)" variant="outline" size="sm">禁用 2FA</pv-button>
                                     </div>
                                     <pv-button type="submit" variant="primary" >保存</pv-button>
@@ -561,7 +561,7 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr v-for="(b, idx) in backups" :key="b.id" :style="backupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
+                                                    <tr v-for="(b, idx) in backups" :key="b.id" :style="backupSelected.has(b.id) ? 'background:color-mix(in srgb, var(--color-primary) 8%, transparent)' : ''">
                                                         <td class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="backupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleBackupSelect(b.id)" style="cursor:pointer"></td>
                                                         <td class="text-muted small">{{ idx + 1 }}</td>
                                                         <td class="small">{{ formatDate(b.created_at) }}</td>
@@ -665,7 +665,7 @@
                             </div>
                             <div class="modal-body">
                                 <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" style="background:rgba(220,53,69,0.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(220,53,69,0.3);">
-                                    <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                                     <div>
                                         <strong>危险操作</strong><br>
                                         <span style="opacity:0.9">修改 IP 需要重启容器，容器将短暂关机后自动重启。正在运行的服务会中断，请确保已保存重要数据。</span>
@@ -688,7 +688,7 @@
                                     <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
                                     <div class="input-group">
                                         <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
-                                        <pv-button type="button" @click="randomLxcIp" title="随机生成未绑定的 IP" variant="outline">🎲 随机</pv-button>
+                                        <pv-button type="button" @click="randomLxcIp" title="随机生成未绑定的 IP" variant="outline">随机</pv-button>
                                     </div>
                                 </div>
                                 <div v-if="lxcIpError" class="alert alert-danger py-2">{{ lxcIpError }}</div>
@@ -767,7 +767,7 @@
                             </div>
                             <div class="modal-body">
                                 <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" style="background:rgba(255,193,7,0.15);backdrop-filter:blur(12px);border:1px solid rgba(255,193,7,0.3);">
-                                    <span style="font-size:1.2rem;line-height:1.4;">⚠️</span>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                                     <div>
                                         <strong>注意</strong><br>
                                         <span style="opacity:0.9">修改虚拟机 IP 后，需要重启虚拟机或重新获取 DHCP 才能生效。</span>
@@ -1041,7 +1041,7 @@
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    <tr v-for="(b, idx) in lxcBackups" :key="b.id" :style="lxcBackupSelected.has(b.id) ? 'background:rgba(99,102,241,0.08)' : ''">
+                                                    <tr v-for="(b, idx) in lxcBackups" :key="b.id" :style="lxcBackupSelected.has(b.id) ? 'background:color-mix(in srgb, var(--color-primary) 8%, transparent)' : ''">
                                                         <td class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="lxcBackupSelected.has(b.id)" :disabled="b.status === 'running' || b.status === 'pending'" @change="toggleLxcBackupSelect(b.id)" style="cursor:pointer"></td>
                                                         <td class="text-muted small">{{ idx + 1 }}</td>
                                                         <td class="small">{{ formatDate(b.created_at) }}</td>
@@ -1092,7 +1092,7 @@
                                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                                     </svg>
                                 </div>
-                                <h5 class="text-danger mb-3">⚠️ 销毁容器确认</h5>
+                                <h5 class="text-danger mb-3">销毁容器确认</h5>
                                 <p class="text-muted small mb-3">
                                     此操作将<strong class="text-danger">永久销毁</strong>容器 <strong>{{ editLxcForm.name || 'CT ' + editLxcForm.ct_id }}</strong> 及其所有数据，<br>
                                     包括磁盘、快照、备份等。<br>
@@ -1123,7 +1123,7 @@
                                         <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                                     </svg>
                                 </div>
-                                <h5 class="text-danger mb-3">⚠️ 销毁虚拟机确认</h5>
+                                <h5 class="text-danger mb-3">销毁虚拟机确认</h5>
                                 <p class="text-muted small mb-3">
                                     此操作将<strong class="text-danger">永久销毁</strong>虚拟机 <strong>{{ destroyVmTarget ? (destroyVmTarget.name || 'VM ' + destroyVmTarget.vm_id) : '' }}</strong> 及其所有数据，<br>
                                     包括磁盘、快照、备份等。<br>
@@ -1283,7 +1283,7 @@
                             </div>
                             <div class="modal-body">
                                 <div class="text-muted small mb-3" v-if="userRole !== 'admin'">
-                                    📊 已使用 {{ userForwardCount }} / {{ maxForwardPerUser }} 条
+                                    已使用 {{ userForwardCount }} / {{ maxForwardPerUser }} 条
                                 </div>
                                 <div class="mb-3" v-if="userRole === 'admin'">
                                     <label class="form-label">类型</label>
@@ -1336,12 +1336,12 @@
                                         <label class="form-label">外网端口</label>
                                         <div class="input-group">
                                             <input type="number" class="form-control" :class="{ 'is-invalid': checkResult === false }" v-model.number="forwardForm.external_port" min="1" max="65535">
-                                            <pv-button type="button" @click="randomPort" variant="outline">🎲</pv-button>
-                                            <pv-button type="button" @click="checkPortConflict" variant="outline">🔍</pv-button>
+                                            <pv-button type="button" @click="randomPort" variant="outline">随机</pv-button>
+                                            <pv-button type="button" @click="checkPortConflict" variant="outline">检测</pv-button>
                                         </div>
                                         <small class="text-muted">可用范围: <span v-if="userRole === 'admin'">1-65535（管理员不限）</span><span v-else>{{ networkConfig.port_range_start }}-{{ networkConfig.port_range_end }}</span></small>
-                                        <div v-if="checkResult === true" class="text-success small">✅ 端口可用</div>
-                                        <div v-else-if="checkResult === false" class="text-danger small">❌ 端口已被占用，请更换</div>
+                                        <div v-if="checkResult === true" class="text-success small">端口可用</div>
+                                        <div v-else-if="checkResult === false" class="text-danger small">端口已被占用，请更换</div>
                                     </div>
                                 </div>
                             </div>
@@ -1426,7 +1426,7 @@
                                             <label class="form-label">外网端口</label>
                                             <div class="input-group">
                                                 <input type="number" class="form-control" :class="{ 'is-invalid': deviceCheckResult === false }" v-model.number="deviceForm.external_port" min="1" max="65535">
-                                                <pv-button type="button" @click="randomDevicePort" variant="outline">🎲</pv-button>
+                                                <pv-button type="button" @click="randomDevicePort" variant="outline">随机</pv-button>
                                             </div>
                                             <small class="text-muted">可用范围: {{ networkConfig.port_range_start }}-{{ networkConfig.port_range_end }}</small>
                                         </div>
@@ -1453,8 +1453,8 @@
                                         <div class="modal-body" style="padding:24px 28px;text-align:center">
                                             <p style="font-size:15px;color:var(--text-primary);line-height:1.6;margin:0 0 20px">{{ confirmState?.vmId !== null ? confirmActionText : confirmLxcActionText }}</p>
                                             <div style="display:flex;gap:10px;justify-content:center">
-                                                <button class="table-btn btn-danger" style="padding:8px 28px;font-size:14px" @click="confirmState?.vmId !== null ? confirmAction(userVms.find(function(v){return v.id===confirmState.vmId})||userVms[0]) : confirmLxcAction(userLxcContainers.find(function(c){return c.ct_id===lxcConfirmState.ctId})||userLxcContainers[0])">确认执行</button>
-                                                <button class="table-btn" style="padding:8px 28px;font-size:14px" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">取消</button>
+                                                <pv-button variant="danger" size="lg" @click="confirmState?.vmId !== null ? confirmAction(userVms.find(function(v){return v.id===confirmState.vmId})||userVms[0]) : confirmLxcAction(userLxcContainers.find(function(c){return c.ct_id===lxcConfirmState.ctId})||userLxcContainers[0])">确认执行</pv-button>
+                                                <pv-button variant="secondary" size="lg" @click="confirmState?.vmId !== null ? cancelConfirm() : cancelLxcConfirm()">取消</pv-button>
                                             </div>
                                         </div>
                                     </div>
@@ -1513,7 +1513,7 @@ if (window.__sharedDialogTemplates) {
         <div class="modal-content">
             <div class="modal-body py-4 px-4">
                 <div class="custom-alert-icon mb-3 text-center">
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
                     </svg>
                 </div>

@@ -67,7 +67,7 @@ async function notifyProvisionFailed(opts) {
         await db.messages.create({
             uid: userId, title: title,
             content: '非常抱歉，您订购的' + resourceLabel + ' ' + resourceName + ' 开通失败，钱款已原路返回。\n订单号：' + orderNo + '\n退款金额：¥' + totalAmount + '\n如有疑问请联系客服。',
-            type: 1, is_read: 0, send_type: 1
+            type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] ' + resourceType + ' 开通失败通知发送失败', e); }
     try {
@@ -77,11 +77,11 @@ async function notifyProvisionFailed(opts) {
             var emailHtml = createEmailTemplate(failTitle,
                 '<p>非常抱歉，您订购的' + resourceLabel + ' <strong>' + resourceName + '</strong> 开通失败，款项已原路退回。</p>' +
                 '<div class="warning-box">' +
-                '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">💳 余额变动：<strong>¥' + (balanceAfterRefund - totalAmount).toFixed(2) + ' → ¥' + balanceAfterRefund.toFixed(2) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + orderNo + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">🔖 退款单号：<strong>' + refundOrderNo + '</strong></p>' +
-                '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                '<p style="margin-bottom: 4px;">退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + (balanceAfterRefund - totalAmount).toFixed(2) + ' → ¥' + balanceAfterRefund.toFixed(2) + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">原订单号：<strong>' + orderNo + '</strong></p>' +
+                '<p style="margin-bottom: 4px;">退款单号：<strong>' + refundOrderNo + '</strong></p>' +
+                '<p>退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                 '</div>' +
                 '<p>如有疑问请联系客服。</p>', siteName);
             if (await shouldSendEmail(userId, notifyKey)) {
@@ -342,7 +342,7 @@ async function provisionVm(opts) {
         await db.messages.create({
             uid: userId, title: '服务器开通成功',
             content: '您的虚拟机 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。',
-            type: 1, is_read: 0, send_type: 1
+            type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] VM 消息发送失败', e); }
     try {
@@ -595,7 +595,7 @@ async function provisionLxc(opts) {
         await db.messages.create({
             uid: userId, title: '容器开通成功',
             content: '您的容器 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。',
-            type: 1, is_read: 0, send_type: 1
+            type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] LXC 消息发送失败', e); }
     try {
@@ -804,7 +804,7 @@ async function adminProvisionVm(opts) {
         await db.messages.create({
             uid: userId, title: '服务器开通成功',
             content: '您的虚拟机 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。到期时间：' + (expDate || '无'),
-            type: 1, is_read: 0, send_type: 1
+            type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] VM 消息发送失败', e); }
     // 发送邮件

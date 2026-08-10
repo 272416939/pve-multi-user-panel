@@ -379,11 +379,15 @@ async function initDb() {
         resource_name VARCHAR(255) DEFAULT '',
         resource_id VARCHAR(50) DEFAULT '',
         status VARCHAR(20) NOT NULL DEFAULT 'completed',
+        order_kind VARCHAR(10) NOT NULL DEFAULT 'new',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_orders_user (user_id),
         INDEX idx_orders_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+    // 订单类型细分：'new'=新购, 'renewal'=续费（VM/LXC 续费订单写入 orders 用此标识）
+    try { await execute("ALTER TABLE orders ADD COLUMN order_kind VARCHAR(10) NOT NULL DEFAULT 'new'"); } catch (_) {}
 
     // vm_templates 表
     await execute(`CREATE TABLE IF NOT EXISTS vm_templates (
@@ -703,11 +707,15 @@ async function initDb() {
             notify_expiry_alert INT DEFAULT 1,
             notify_backup_result INT DEFAULT 1,
             notify_subnet_provisioned INT DEFAULT 1,
+            template VARCHAR(20) NOT NULL DEFAULT '',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX idx_user_settings_user (user_id)
         )
     `);
+
+    // 迁移：界面模板偏好列（'' = 跟随站点默认，'default' / 'saas' = 个人固定）
+    try { await execute("ALTER TABLE user_settings ADD COLUMN template VARCHAR(20) NOT NULL DEFAULT ''"); } catch (_) {}
 
     // 初始化默认配置
     await initDefaultConfig();
@@ -975,6 +983,8 @@ async function initDefaultConfig() {
         'site:name': 'PVE 多用户控制面板',
         'site:logo_text': 'PVE 面板',
         'site:login_title': 'PVE Panel',
+        // 界面模板（全站默认）：'default' = 赛博霓虹，'saas' = SAAS 企业风
+        'site:template': 'default',
         'pve:host': '',
         'pve:api_token': '',
         'pve:ssh_host': '',

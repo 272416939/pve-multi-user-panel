@@ -26,6 +26,9 @@
     $.siteLogoText = ref($.__siteLogoText || 'PVE 面板');
     $.siteConfigForm = ref({ name: '', logo_text: '', login_title: '', register_enabled: false });
     $.siteConfigSaving = ref(false);
+    // 模板样式（站点全局默认，个人偏好优先级更高）
+    $.templateStyle = ref('default');
+    $.templateStyleSaving = ref(false);
     $.redisConfig = ref({ host: '', port: 6379, password: '', db: 0, prefix: 'pve:' });
     $.redisConfigSaving = ref(false);
     $.redisTesting = ref(false);
@@ -321,9 +324,34 @@
                 login_title: res.login_title || '',
                 register_enabled: !!res.register_enabled
             };
+            // 同步模板样式选择（站点全局默认值）
+            if (res.template) $.templateStyle.value = res.template;
         } catch (e) {
             console.error('加载站点配置失败:', e);
         }
+    };
+
+    // 模板样式：点击卡片实时预览（仅改 documentElement 属性，不写 localStorage，不保存）
+    $.selectTemplate = function(v) {
+        if (v !== 'default' && v !== 'saas') return;
+        $.templateStyle.value = v;
+        document.documentElement.setAttribute('data-template', v);
+        if (document.body) document.body.setAttribute('data-template', v);
+    };
+
+    // 模板样式：保存站点全局默认
+    $.saveTemplateStyle = async function() {
+        $.templateStyleSaving.value = true;
+        try {
+            await api('/admin/site/config', {
+                method: 'PUT',
+                body: JSON.stringify({ template: $.templateStyle.value })
+            });
+            alert('模板样式保存成功，已全局生效');
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        }
+        $.templateStyleSaving.value = false;
     };
 
     $.saveSiteConfig = async function() {
@@ -417,12 +445,12 @@
         try {
             var result = await api('/admin/redis/test', { method: 'POST', body: $.redisConfig.value });
             if (result.success) {
-                alert('✅ ' + result.message);
+                alert(result.message);
             } else {
-                alert('❌ ' + result.message);
+                alert(result.message);
             }
         } catch (e) {
-            alert('❌ 测试失败: ' + (e.message || '未知错误'));
+            alert('测试失败: ' + (e.message || '未知错误'));
         }
         $.redisTesting.value = false;
     };

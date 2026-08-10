@@ -42,7 +42,7 @@
                                         </div>
                                         <div v-if="vm._cnameOpen" class="vm-mobile-card-cname-list">
                                             <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
-                                                <span class="text-primary" style="word-break:break-all;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</span>
+                                                <span class="text-primary"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</span>
                                                 <button class="cname-copy-btn" @click="copyText(cname.domain)" title="复制">
                                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                                 </button>
@@ -53,22 +53,23 @@
                                     <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
                                 </div>
                                 <div class="vm-mobile-card-actions">
-                                    <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
-                                    <button class="table-btn" @click="vmBusyBlock(vm) !== false && openVncConsole(vm.vm_id)">控制台</button>
-                                    <button v-if="vm.status && vm.status.status === 'running' && !vm._busy" class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
-                                    <button v-if="vm.status && vm.status.status === 'running' && !vm._busy" class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
-                                    <button v-if="vm.status && vm.status.status === 'running' && !vm._busy" class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
-                                    <button v-if="!vm.status || vm.status.status !== 'running'" class="table-btn btn-primary" @click="vm._busy ? vmBusyBlock(vm) : startVm(vm.vm_id)" :disabled="vm._busy">开机</button>
-                                    <button v-if="!vm.status || vm.status.status !== 'running'" class="table-btn btn-danger" @click="vm._busy ? vmBusyBlock(vm) : openDestroyVmModal(vm)" :disabled="vm._busy">销毁</button>
+                                    <pv-button variant="table-primary" @click="openVmDetail(vm)">详情</pv-button>
+                                    <pv-button variant="table" @click="vmBusyBlock(vm) !== false && openVncConsole(vm.vm_id)">控制台</pv-button>
+                                    <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table" @click="requestConfirm(vm.id, 'reboot')">重启</pv-button>
+                                    <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table" @click="requestConfirm(vm.id, 'shutdown')">关机</pv-button>
+                                    <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table-danger" @click="requestConfirm(vm.id, 'stop')">停止</pv-button>
+                                    <pv-button v-if="!vm.status || vm.status.status !== 'running'" variant="table-primary" @click="vm._busy ? vmBusyBlock(vm) : startVm(vm.vm_id)" :disabled="vm._busy">开机</pv-button>
+                                    <pv-button v-if="!vm.status || vm.status.status !== 'running'" variant="table-danger" @click="vm._busy ? vmBusyBlock(vm) : openDestroyVmModal(vm)" :disabled="vm._busy">销毁</pv-button>
                                     <div class="dropdown-table">
-                                        <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                        <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                         <ul class="dropdown-menu-table">
                                             <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openSnapshotPanel(vm)">快照</a></li>
                                             <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBackupPanel(vm)">备份</a></li>
                                             <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openDeviceForward(vm, 'vm')">网络</a></li>
                                             <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                             <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
-                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
+                                            <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                            <li v-else><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
                                             <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openAdminVmPasswordReset(vm)">重置密码</a></li>
                                         </ul>
                                     </div>
@@ -104,7 +105,7 @@
                                             <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                             <td>
                                                 <template v-if="networkConfig.cname_domain">
-                                                    <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname.domain" class="text-primary" style="line-height:1.5;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</div>
+                                                    <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
                                                 </template>
                                                 <span v-else class="text-muted">-</span>
                                             </td>
@@ -125,23 +126,23 @@
                                             </td>
                                         <td>
                                             <div v-if="vm._busy" class="table-actions">
-                                                <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
-                                                <button class="table-btn" @click="openVncConsole(vm.vm_id)">控制台</button>
+                                                <pv-button variant="table-primary" @click="openVmDetail(vm)">详情</pv-button>
+                                                <pv-button variant="table" @click="openVncConsole(vm.vm_id)">控制台</pv-button>
                                             </div>
                                             <div v-else class="table-actions">
-                                                <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
+                                                <pv-button variant="table-primary" @click="openVmDetail(vm)">详情</pv-button>
                                                 <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
-                                                    <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
-                                                    <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
-                                                    <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
+                                                    <pv-button variant="table" @click="requestConfirm(vm.id, 'reboot')">重启</pv-button>
+                                                    <pv-button variant="table" @click="requestConfirm(vm.id, 'shutdown')">关机</pv-button>
+                                                    <pv-button variant="table-danger" @click="requestConfirm(vm.id, 'stop')">停止</pv-button>
                                                 </div>
                                                 <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
-                                                    <button class="table-btn btn-primary" @click="startVm(vm.vm_id)">开机</button>
-                                                    <button class="table-btn btn-warning" @click="removeVmById(vm.id)">移除</button>
-                                                    <button class="table-btn btn-danger" @click="openDestroyVmModal(vm)">销毁</button>
+                                                    <pv-button variant="table-primary" @click="startVm(vm.vm_id)">开机</pv-button>
+                                                    <pv-button variant="table-warning" @click="removeVmById(vm.id)">移除</pv-button>
+                                                    <pv-button variant="table-danger" @click="openDestroyVmModal(vm)">销毁</pv-button>
                                                 </div>
                                                 <div class="dropdown-table">
-                                                    <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                                    <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                     <ul class="dropdown-menu-table">
                                                         <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'reboot')">重启</a></li>
                                                         <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'shutdown')">关机</a></li>
@@ -153,7 +154,8 @@
                                                         <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
                                                         <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                                         <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
-                                                        <li><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
+                                                        <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                                        <li v-else><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
                                                         <li><a href="#" @click.prevent="openAdminVmPasswordReset(vm)">重置密码</a></li>
                                                     </ul>
                                                 </div>
@@ -175,7 +177,7 @@
                     <div v-if="activeTabVm === 'assign'">
                         <div class="module-header">
                             <h4 class="module-title">分配虚拟机</h4>
-                            <pv-button style="border-color:rgba(251,191,36,0.3);background:linear-gradient(135deg, rgba(251,191,36,0.15), rgba(245,158,11,0.1));color:#FCD34D;" @click="checkExpired" variant="glass">
+                            <pv-button variant="outline-warning" size="lg" @click="checkExpired">
 
                                 立即检查过期虚拟机
                             

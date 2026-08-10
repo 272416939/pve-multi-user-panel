@@ -76,9 +76,9 @@
             </td>
             <td class="text-center">
               <div class="table-actions" style="justify-content:center;">
-                <button v-if="disk.status !== 'destroyed' && !disk.is_legacy" class="table-btn btn-info" @click="openDiskRenewModal(disk)">续费</button>
-                <button v-if="disk.status !== 'destroyed' && disk.is_legacy" class="table-btn btn-secondary" disabled title="legacy磁盘随VM管理">续费</button>
-                <button v-else-if="disk.status === 'destroyed'" class="table-btn btn-danger" @click="deleteDestroyedDisk(disk)">删除</button>
+                <pv-button v-if="disk.status !== 'destroyed' && !disk.is_legacy" variant="table-primary" @click="openDiskRenewModal(disk)">续费</pv-button>
+                <pv-button v-if="disk.status !== 'destroyed' && disk.is_legacy" variant="table" disabled title="legacy磁盘随VM管理">续费</pv-button>
+                <pv-button v-else-if="disk.status === 'destroyed'" variant="table-danger" @click="deleteDestroyedDisk(disk)">删除</pv-button>
               </div>
             </td>
           </tr>
@@ -200,7 +200,7 @@
           <div v-if="userVmsForBind.length === 0" class="text-warning small mt-1">没有可用的虚拟机</div>
           <div v-if="bindTargetVmid" class="text-success small mt-1">
             <template v-for="vm in userVmsForBind" :key="vm.id">
-              <span v-if="vm.vm_id === parseInt(bindTargetVmid) && vm.status && vm.status.status !== 'stopped'">✅ 支持热插拔，正在运行的虚拟机也可以挂载</span>
+              <span v-if="vm.vm_id === parseInt(bindTargetVmid) && vm.status && vm.status.status !== 'stopped'">支持热插拔，正在运行的虚拟机也可以挂载</span>
             </template>
           </div>
         </div>
@@ -272,7 +272,7 @@
         <!-- 提示 -->
         <p class="text-danger small mb-1"><i class="bi bi-exclamation-triangle"></i> 扩容后无法缩容</p>
         <p v-if="resizeTargetDisk && resizeTargetDisk.status === 'bound'" class="text-success small mb-0">
-          ✅ 支持热插拔扩容，无需关机
+          支持热插拔扩容，无需关机
         </p>
       </div>
       <div class="modal-footer d-flex gap-2" style="border-top:1px solid var(--border-color);">

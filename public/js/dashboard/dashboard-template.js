@@ -128,7 +128,7 @@
                                 </div>
                                 <div v-if="vm._cnameOpen" class="vm-mobile-card-cname-list">
                                     <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
-                                        <span class="text-primary" style="word-break:break-all;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</span>
+                                        <span class="text-primary"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</span>
                                         <button class="cname-copy-btn" @click="copyText(cname.domain)" title="复制">
                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                         </button>
@@ -138,18 +138,18 @@
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">到期时间</span><span class="vm-mobile-card-value" :class="getExpiryColor(vm.expiration_date)">{{ vm.expiration_date ? formatDate(vm.expiration_date) + ' ' + daysUntilExpire(vm.expiration_date) : '-' }}</span></div>
-                            <div class="vm-mobile-card-row" v-if="vm.config?.ciuser"><span class="vm-mobile-card-label">账号</span><span class="vm-mobile-card-value">{{ vm.config.ciuser }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">账号</span><span class="vm-mobile-card-value">{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</span></div>
                         </div>
                         <div v-if="vm._provisioning" class="text-center text-muted py-2"><small>正在开通中，请稍后刷新</small></div>
                         <div v-else class="vm-mobile-card-actions">
-                            <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
-                            <button class="table-btn" @click="vmBusyBlock(vm) !== false && openVncConsole(vm.vm_id)">控制台</button>
-                            <button v-if="vm.status && vm.status.status === 'running' && !vm._busy" class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
-                            <button v-if="vm.status && vm.status.status === 'running' && !vm._busy" class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
-                            <button v-if="vm.status && vm.status.status === 'running' && !vm._busy" class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
-                            <button v-if="!vm.status || vm.status.status !== 'running'" class="table-btn btn-primary" @click="startVm(vm.vm_id)" :disabled="vm._busy">开机</button>
+                            <pv-button variant="table-primary" @click="openVmDetail(vm)">详情</pv-button>
+                            <pv-button variant="table" @click="vmBusyBlock(vm) !== false && openVncConsole(vm.vm_id)">控制台</pv-button>
+                            <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table" @click="requestConfirm(vm.id, 'reboot')">重启</pv-button>
+                            <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table" @click="requestConfirm(vm.id, 'shutdown')">关机</pv-button>
+                            <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table-danger" @click="requestConfirm(vm.id, 'stop')">停止</pv-button>
+                            <pv-button v-if="!vm.status || vm.status.status !== 'running'" variant="table-primary" @click="startVm(vm.vm_id)" :disabled="vm._busy">开机</pv-button>
                             <div class="dropdown-table">
-                                <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                 <ul class="dropdown-menu-table">
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openSnapshotPanel(vm)">快照</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBackupPanel(vm)">备份</a></li>
@@ -158,7 +158,8 @@
                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openRenewModal(vm)">续费</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openVmPasswordReset(vm)">重置密码</a></li>
-                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
+                                    <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                    <li v-else><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
                                 </ul>
@@ -197,11 +198,11 @@
                                         </template>
                                         <template v-else>{{ vm.name || ('VM ' + vm.vm_id) }}</template>
                                     </td>
-                                    <td>{{ vm.config?.ciuser || '-' }}</td>
+                                    <td>{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</td>
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                     <td>
                                         <template v-if="cnameDomain && !vm._provisioning">
-                                            <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname.domain" class="text-primary" style="line-height:1.5;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</div>
+                                            <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>
@@ -225,17 +226,17 @@
                                             <small>正在开通中，请稍后刷新</small>
                                         </div>
                                         <div v-else class="table-actions">
-                                            <button class="table-btn btn-primary" @click="openVmDetail(vm)">详情</button>
+                                            <pv-button variant="table-primary" @click="openVmDetail(vm)">详情</pv-button>
                                             <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running' && !vm._busy">
-                                                <button class="table-btn" @click="requestConfirm(vm.id, 'reboot')">重启</button>
-                                                <button class="table-btn" @click="requestConfirm(vm.id, 'shutdown')">关机</button>
-                                                <button class="table-btn btn-danger" @click="requestConfirm(vm.id, 'stop')">停止</button>
+                                                <pv-button variant="table" @click="requestConfirm(vm.id, 'reboot')">重启</pv-button>
+                                                <pv-button variant="table" @click="requestConfirm(vm.id, 'shutdown')">关机</pv-button>
+                                                <pv-button variant="table-danger" @click="requestConfirm(vm.id, 'stop')">停止</pv-button>
                                             </div>
                                             <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
-                                                <button class="table-btn btn-primary" @click="vm._busy ? vmBusyBlock(vm) : startVm(vm.vm_id)" :disabled="vm._busy">开机</button>
+                                                <pv-button variant="table-primary" @click="vm._busy ? vmBusyBlock(vm) : startVm(vm.vm_id)" :disabled="vm._busy">开机</pv-button>
                                             </div>
                                             <div class="dropdown-table">
-                                                <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                                <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                 <ul class="dropdown-menu-table">
                                                     <li class="d-md-none" v-if="vm.status && vm.status.status === 'running' && !vm._busy"><a href="#" @click.prevent="requestConfirm(vm.id, 'reboot')">重启</a></li>
                                                     <li class="d-md-none" v-if="vm.status && vm.status.status === 'running' && !vm._busy"><a href="#" @click.prevent="requestConfirm(vm.id, 'shutdown')">关机</a></li>
@@ -248,7 +249,8 @@
                                                     <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
                                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openRenewModal(vm)">续费</a></li>
 <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openVmPasswordReset(vm)">重置密码</a></li>
-                                    <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
+                                    <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                    <li v-else><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)">重置IP</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : osSwitch.openOsSwitchModal(vm)">切换系统</a></li>
                                     <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
                                 </ul>
@@ -299,7 +301,7 @@
                                 </div>
                                 <div v-if="ct._cnameOpen" class="vm-mobile-card-cname-list">
                                     <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
-                                        <span class="text-primary" style="word-break:break-all;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</span>
+                                        <span class="text-primary"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</span>
                                         <button class="cname-copy-btn" @click="copyText(cname.domain)" title="复制">
                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                         </button>
@@ -313,14 +315,14 @@
                         </div>
                         <div v-if="ct._provisioning" class="text-center text-muted py-2"><small>正在开通中，请稍后刷新</small></div>
                         <div v-else class="vm-mobile-card-actions">
-                            <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
-                            <button class="table-btn" @click="vmBusyBlock(ct) !== false && openLxcTerminal(ct.ct_id)">终端</button>
-                            <button v-if="ct.status && ct.status.status === 'running' && !ct._busy" class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
-                            <button v-if="ct.status && ct.status.status === 'running' && !ct._busy" class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
-                            <button v-if="ct.status && ct.status.status === 'running' && !ct._busy" class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
-                            <button v-if="!ct.status || ct.status.status !== 'running'" class="table-btn btn-primary" @click="startLxc(ct.ct_id)" :disabled="ct._busy">启动</button>
+                            <pv-button variant="table-primary" @click="openLxcDetail(ct)">详情</pv-button>
+                            <pv-button variant="table" @click="vmBusyBlock(ct) !== false && openLxcTerminal(ct.ct_id)">终端</pv-button>
+                            <pv-button v-if="ct.status && ct.status.status === 'running' && !ct._busy" variant="table" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</pv-button>
+                            <pv-button v-if="ct.status && ct.status.status === 'running' && !ct._busy" variant="table" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</pv-button>
+                            <pv-button v-if="ct.status && ct.status.status === 'running' && !ct._busy" variant="table-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</pv-button>
+                            <pv-button v-if="!ct.status || ct.status.status !== 'running'" variant="table-primary" @click="startLxc(ct.ct_id)" :disabled="ct._busy">启动</pv-button>
                             <div class="dropdown-table">
-                                <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                 <ul class="dropdown-menu-table">
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcSnapshotPanel(ct)">快照</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcBackupPanel(ct)">备份</a></li>
@@ -330,7 +332,8 @@
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openRenewModal(ct)">续费</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : editLxc(ct)">编辑</a></li>
                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
-                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
+                                    <li v-if="!ct.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                    <li v-else><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -369,7 +372,7 @@
                                     <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
                                     <td>
                                         <template v-if="cnameDomain && !ct._provisioning">
-                                            <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname.domain" class="text-primary" style="line-height:1.5;"><span v-if="cname.label" class="text-muted me-1">{{ cname.label }}</span>{{ cname.domain }}</div>
+                                            <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>
@@ -393,17 +396,17 @@
                                             <small>正在开通中，请稍后刷新</small>
                                         </div>
                                         <div v-else class="table-actions">
-                                            <button class="table-btn btn-primary" @click="openLxcDetail(ct)">详情</button>
+                                            <pv-button variant="table-primary" @click="openLxcDetail(ct)">详情</pv-button>
                                             <div class="btn-group-table" v-if="ct.status && ct.status.status === 'running' && !ct._busy">
-                                                <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</button>
-                                                <button class="table-btn" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</button>
-                                                <button class="table-btn btn-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</button>
+                                                <pv-button variant="table" @click="requestLxcConfirm(ct.ct_id, 'reboot')">重启</pv-button>
+                                                <pv-button variant="table" @click="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</pv-button>
+                                                <pv-button variant="table-danger" @click="requestLxcConfirm(ct.ct_id, 'stop')">停止</pv-button>
                                             </div>
                                             <div class="btn-group-table" v-if="!ct.status || ct.status.status !== 'running'">
-                                                <button class="table-btn btn-primary" @click="ct._busy ? vmBusyBlock(ct) : startLxc(ct.ct_id)" :disabled="ct._busy">启动</button>
+                                                <pv-button variant="table-primary" @click="ct._busy ? vmBusyBlock(ct) : startLxc(ct.ct_id)" :disabled="ct._busy">启动</pv-button>
                                             </div>
                                             <div class="dropdown-table">
-                                                <button class="table-btn dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                                <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
                                                 <ul class="dropdown-menu-table">
                                                     <li class="d-md-none" v-if="ct.status && ct.status.status === 'running' && !ct._busy"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'reboot')">重启</a></li>
                                                     <li class="d-md-none" v-if="ct.status && ct.status.status === 'running' && !ct._busy"><a href="#" @click.prevent="requestLxcConfirm(ct.ct_id, 'shutdown')">关机</a></li>
@@ -417,7 +420,8 @@
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openRenewModal(ct)">续费</a></li>
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : editLxc(ct)">编辑</a></li>
                                                     <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openLxcPasswordReset(ct)" class="text-warning">重置密码</a></li>
-                                                    <li><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
+                                                    <li v-if="!ct.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
+                                    <li v-else><a href="#" @click.prevent="ct._busy ? vmBusyBlock(ct) : openResetLxcIpModal(ct)" class="text-warning">重置IP</a></li>
                                                 </ul>
                                             </div>
                                         </div>
@@ -514,19 +518,18 @@
                         <div class="package-stock">库存：{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</div>
                         <div class="price-tabs">
                             <div class="price-tab" :class="{ 'price-tab-active': (pkgSelectedPeriod[p.id] || 'month') === 'month' }" @click="selectPackagePeriod(p.id, 'month')">
-                                <span class="price-tab-badge">0%</span>
                                 <span class="price-tab-label">月付</span>
                                 <span class="price-tab-original" style="visibility:hidden">&nbsp;</span>
                                 <span class="price-tab-price">¥{{ p.monthly_price }}</span>
                             </div>
                             <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'quarter' }" @click="selectPackagePeriod(p.id, 'quarter')">
-                                <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.quarterly_discount > 0 }">-{{ p.quarterly_discount || 0 }}%</span>
+                                <span v-if="p.quarterly_discount > 0" class="price-tab-badge price-tab-badge-discount">-{{ p.quarterly_discount }}%</span>
                                 <span class="price-tab-label">季付</span>
                                 <span class="price-tab-original" :style="{ visibility: p.quarterly_discount > 0 ? 'visible' : 'hidden' }">¥{{ (p.monthly_price * 3).toFixed(2) }}</span>
                                 <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'quarter') }}</span>
                             </div>
                             <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'year' }" @click="selectPackagePeriod(p.id, 'year')">
-                                <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.yearly_discount > 0 }">-{{ p.yearly_discount || 0 }}%</span>
+                                <span v-if="p.yearly_discount > 0" class="price-tab-badge price-tab-badge-discount">-{{ p.yearly_discount }}%</span>
                                 <span class="price-tab-label">年付</span>
                                 <span class="price-tab-original" :style="{ visibility: p.yearly_discount > 0 ? 'visible' : 'hidden' }">¥{{ (p.monthly_price * 12).toFixed(2) }}</span>
                                 <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'year') }}</span>
@@ -557,19 +560,18 @@
                         <div class="package-stock">库存：{{ p.stock === -1 || p.stock === null ? '不限' : p.stock }}</div>
                         <div class="price-tabs">
                             <div class="price-tab" :class="{ 'price-tab-active': (pkgSelectedPeriod[p.id] || 'month') === 'month' }" @click="selectPackagePeriod(p.id, 'month')">
-                                <span class="price-tab-badge">0%</span>
                                 <span class="price-tab-label">月付</span>
                                 <span class="price-tab-original" style="visibility:hidden">&nbsp;</span>
                                 <span class="price-tab-price">¥{{ p.monthly_price }}</span>
                             </div>
                             <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'quarter' }" @click="selectPackagePeriod(p.id, 'quarter')">
-                                <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.quarterly_discount > 0 }">-{{ p.quarterly_discount || 0 }}%</span>
+                                <span v-if="p.quarterly_discount > 0" class="price-tab-badge price-tab-badge-discount">-{{ p.quarterly_discount }}%</span>
                                 <span class="price-tab-label">季付</span>
                                 <span class="price-tab-original" :style="{ visibility: p.quarterly_discount > 0 ? 'visible' : 'hidden' }">¥{{ (p.monthly_price * 3).toFixed(2) }}</span>
                                 <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'quarter') }}</span>
                             </div>
                             <div class="price-tab" :class="{ 'price-tab-active': pkgSelectedPeriod[p.id] === 'year' }" @click="selectPackagePeriod(p.id, 'year')">
-                                <span class="price-tab-badge" :class="{ 'price-tab-badge-discount': p.yearly_discount > 0 }">-{{ p.yearly_discount || 0 }}%</span>
+                                <span v-if="p.yearly_discount > 0" class="price-tab-badge price-tab-badge-discount">-{{ p.yearly_discount }}%</span>
                                 <span class="price-tab-label">年付</span>
                                 <span class="price-tab-original" :style="{ visibility: p.yearly_discount > 0 ? 'visible' : 'hidden' }">¥{{ (p.monthly_price * 12).toFixed(2) }}</span>
                                 <span class="price-tab-price">¥{{ getPackageFinalPrice(p, 'year') }}</span>
@@ -656,7 +658,7 @@
                             <label class="form-label">外网端口</label>
                             <div class="input-group">
                                 <input type="number" class="form-control" :class="{ 'is-invalid': deviceCheckResult === false }" v-model.number="deviceForm.external_port" min="1" max="65535">
-                                <pv-button type="button" @click="randomDevicePort" variant="outline">🎲</pv-button>
+                                <pv-button type="button" @click="randomDevicePort" variant="outline">随机</pv-button>
                             </div>
                             <small class="text-muted">可用范围: {{ forwardConfig.port_range_start }}-{{ forwardConfig.port_range_end }}</small>
                         </div>

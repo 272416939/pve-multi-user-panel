@@ -518,11 +518,13 @@ router.get('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         var logoText = await getConfig('site:logo_text') || 'PVE 面板';
         var loginTitle = await getConfig('site:login_title') || 'PVE Panel';
         var registerEnabled = await getConfig('register:enabled') || '0';
+        var template = await getConfig('site:template') || 'default';
         res.json({
             name: name,
             logo_text: logoText,
             login_title: loginTitle,
-            register_enabled: registerEnabled === '1'
+            register_enabled: registerEnabled === '1',
+            template: template
         });
     } catch (e) {
         console.error('[admin] site config get:', e.message);
@@ -534,7 +536,7 @@ router.get('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
 router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var setConfig = db.config.set;
-        var { name, logo_text, login_title, register_enabled } = req.body;
+        var { name, logo_text, login_title, register_enabled, template } = req.body;
         if (name !== undefined) {
             if (typeof name !== 'string' || name.length > 50 || /[<>]/.test(name)) {
                 return res.status(400).json({ error: '站点名称不能超过50字符且不能包含<>符号' });
@@ -550,10 +552,18 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
                 return res.status(400).json({ error: '登录页标题不能超过100字符且不能包含<>符号' });
             }
         }
+        if (template !== undefined) {
+            // UI_TEMPLATES 白名单校验，禁止非法值入库
+            var { UI_TEMPLATES } = require('../constants');
+            if (typeof template !== 'string' || !UI_TEMPLATES.includes(template)) {
+                return res.status(400).json({ error: '界面模板参数不合法' });
+            }
+        }
         if (name !== undefined) await setConfig('site:name', name);
         if (logo_text !== undefined) await setConfig('site:logo_text', logo_text);
         if (login_title !== undefined) await setConfig('site:login_title', login_title);
         if (register_enabled !== undefined) await setConfig('register:enabled', register_enabled ? '1' : '0');
+        if (template !== undefined) await setConfig('site:template', template);
         // 清除站点配置缓存（Redis + 进程内存），确保下次请求重新加载
         var redis = require('../api/redis').getRedisClient();
         if (redis) { try { await redis.del('site_config'); } catch (e) {} }
@@ -564,7 +574,8 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         // 操作审计：更新站点设置（仅摘要，不含敏感内容）
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.site', resourceType: 'config', resourceId: 'site', details: '更新站点设置(站点名:' + (name !== undefined ? name : '-') + (register_enabled !== undefined ? ',开放注册:' + (register_enabled ? '是' : '否') : '') + ')', req });
+            var templateLabel = template !== undefined ? (template === 'saas' ? 'SAAS企业风' : '赛博霓虹') : '-';
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.site', resourceType: 'config', resourceId: 'site', details: '更新站点设置(站点名:' + (name !== undefined ? name : '-') + (register_enabled !== undefined ? ',开放注册:' + (register_enabled ? '是' : '否') : '') + (template !== undefined ? ',界面模板:' + templateLabel : '') + ')', req });
         } catch (e) {}
         res.json({ message: '站点配置保存成功' });
     } catch (e) {

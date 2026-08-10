@@ -51,7 +51,7 @@
                                     </div>
                                     <div class="d-flex gap-2">
                                         <pv-button type="submit" variant="glass" >保存配置</pv-button>
-                                        <pv-button type="button" style="border-color:rgba(99,102,241,0.25);background:rgba(99,102,241,0.08);" @click="testSmtpConfig" variant="glass">发送测试邮件</pv-button>
+                                        <pv-button type="button" variant="outline" size="lg" @click="testSmtpConfig">发送测试邮件</pv-button>
                                     </div>
                                 </form>
                             </div>
@@ -271,11 +271,11 @@
                                         <small class="text-muted">多个接口用英文逗号分隔，将作为一条规则绑定多接口</small>
                                     </div>
                                     <div class="col-md-4 d-flex align-items-center" style="padding-top: 24px;">
-                                        <pv-button style="border-color:rgba(99,102,241,0.2);background:rgba(99,102,241,0.08);color:#A5B4FC;" @click="refreshIfaceList" variant="glass">刷新接口</pv-button>
+                                        <pv-button variant="outline" size="lg" @click="refreshIfaceList">刷新接口</pv-button>
                                         <small class="text-muted" v-if="ifaceUpdateTime" style="white-space: nowrap;">最后更新: {{ ifaceUpdateTime }}</small>
                                     </div>
                                 </div>
-                                <pv-button @click="saveNetworkConfig">💾 保存配置</pv-button>
+                                <pv-button variant="glass" @click="saveNetworkConfig">保存配置</pv-button>
                             </div>
                         </div>
 
@@ -296,8 +296,8 @@
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2 mt-2">
-                                    <pv-button @click="addCnameEntry" variant="outline" size="sm">+ 新增节点</pv-button>
-                                    <pv-button @click="saveNetworkConfig" variant="primary" size="sm">💾 保存 CNAME</pv-button>
+                                    <pv-button @click="addCnameEntry" variant="outline" size="lg">+ 新增节点</pv-button>
+                                    <pv-button @click="saveNetworkConfig" variant="glass">保存 CNAME</pv-button>
                                 </div>
                             </div>
                         </div>
@@ -321,7 +321,7 @@
                                 <small class="text-muted">创建私有网络子网的 DHCP 服务端时将自动填入此 DNS。服务接口、网关与地址池由系统按 VLAN 设置自动生成。</small>
                                 <div class="mt-3 d-flex gap-2">
                                     <pv-button @click="saveNetworkConfig" variant="glass">保存配置</pv-button>
-                                    <pv-button style="border-color:rgba(56,189,248,0.3);background:linear-gradient(135deg, rgba(56,189,248,0.15), rgba(59,130,246,0.1));color:#7DD3FC;" @click="syncDhcpBindings" variant="glass">从爱快同步</pv-button>
+                                    <pv-button variant="outline" size="lg" @click="syncDhcpBindings">从爱快同步</pv-button>
                                 </div>
                             </div>
                         </div>
@@ -475,6 +475,75 @@
                                 </div>
                                 <pv-button type="button" variant="glass" @click="saveSiteConfig" :disabled="siteConfigSaving">
                                     {{ siteConfigSaving ? '保存中...' : '保存设置' }}
+                                </pv-button>
+                            </div>
+                        </div>
+
+                        <!-- 模板样式 -->
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title mb-1">模板样式</h5>
+                                <p class="text-muted small mb-3">选择全站默认使用的界面模板，点击卡片可实时预览，保存后对所有未设置个人偏好的用户生效（用户可在「用户中心 → 个人设置」中自选覆盖）。</p>
+                                <div class="d-flex flex-wrap gap-3 mb-3">
+                                    <!-- 赛博霓虹预览卡 -->
+                                    <div class="template-picker" :class="{ 'template-picker-active': templateStyle === 'default' }" @click="selectTemplate('default')" role="button" tabindex="0">
+                                        <div class="template-preview template-preview-default">
+                                            <div class="tp-sidebar">
+                                                <div class="tp-logo"></div>
+                                                <div class="tp-nav"></div>
+                                                <div class="tp-nav tp-nav-active"></div>
+                                                <div class="tp-nav"></div>
+                                            </div>
+                                            <div class="tp-main">
+                                                <div class="tp-header"></div>
+                                                <div class="tp-cards">
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="template-picker-body">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>赛博霓虹</strong>
+                                                <span v-if="templateStyle === 'default'" class="template-check">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">霓虹赛博 · 紫青发光</small>
+                                        </div>
+                                    </div>
+                                    <!-- SAAS 企业风预览卡 -->
+                                    <div class="template-picker" :class="{ 'template-picker-active': templateStyle === 'saas' }" @click="selectTemplate('saas')" role="button" tabindex="0">
+                                        <div class="template-preview template-preview-saas">
+                                            <div class="tp-sidebar">
+                                                <div class="tp-logo"></div>
+                                                <div class="tp-nav"></div>
+                                                <div class="tp-nav tp-nav-active"></div>
+                                                <div class="tp-nav"></div>
+                                            </div>
+                                            <div class="tp-main">
+                                                <div class="tp-header"></div>
+                                                <div class="tp-cards">
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="template-picker-body">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>SAAS 企业风</strong>
+                                                <span v-if="templateStyle === 'saas'" class="template-check">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">腾讯云风格 · 扁平极简</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <pv-button type="button" variant="glass" @click="saveTemplateStyle" :disabled="templateStyleSaving">
+                                    {{ templateStyleSaving ? '保存中...' : '保存模板' }}
                                 </pv-button>
                             </div>
                         </div>

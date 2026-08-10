@@ -297,7 +297,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
                     <p>您好 <strong>${assignedUser.username}</strong>，</p>
                     <div class="info-box" style="border-left-color: #48bb78;">
                         <p style="margin-bottom: 8px; font-size: 16px;">
-                            🎉 您的虚拟机已开通！
+                            您的虚拟机已开通！
                         </p>
                     </div>
                     <div class="info-box">
@@ -527,7 +527,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
                         <p>您好 <strong>${removedUser.username}</strong>，</p>
                         <div class="warning-box">
                             <p style="margin-bottom: 8px; font-size: 16px;">
-                                ⚠️ 您的虚拟机已被移除
+                                您的虚拟机已被移除
                             </p>
                         </div>
                         <div class="info-box">

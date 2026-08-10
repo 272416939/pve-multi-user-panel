@@ -326,7 +326,7 @@
         if (window.innerWidth <= 768) {
             document.getElementById('sidebar')?.classList.remove('open');
             var overlay = document.getElementById('sidebarOverlay');
-            if (overlay) { overlay.style.display = 'none'; }
+            if (overlay) { overlay.classList.remove('show'); }
         }
         // 切换 section 时清理打开 modal 的残留 backdrop（Vue 移除 DOM 后 backdrop 会孤悬）
         document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
@@ -715,11 +715,11 @@
             // 新格式: label||.domain
             var sep = domain.indexOf('||');
             if (sep > -1) {
-                return { label: domain.substring(0, sep), domain: deviceId + domain.substring(sep + 2) };
+                return { label: domain.substring(0, sep).trim(), domain: deviceId + domain.substring(sep + 2) };
             }
             // 旧格式兼容: 中文前缀 + .域名
             var match = domain.match(/^([\u4e00-\u9fa5]+)(\..+)$/);
-            if (match) return { label: match[1], domain: deviceId + match[2] };
+            if (match) return { label: match[1].trim(), domain: deviceId + match[2] };
             // 无标签，直接加 deviceId 前缀
             if (domain.startsWith('.')) return { label: '', domain: deviceId + domain };
             return { label: '', domain: deviceId + '.' + domain };
@@ -1416,6 +1416,10 @@
                 if ($.activeSection.value === 'subnet') {
                     // 刷新/直达链接：加载子网列表（点击路径由 registerSectionLoader 派发）
                     if ($.loadSubnets) await $.loadSubnets();
+                }
+                if ($.activeSection.value === 'disk') {
+                    // 刷新/直达链接：加载磁盘列表（点击路径由 registerSectionLoader 派发）
+                    if ($.loadDisks) await $.loadDisks();
                 }
                 $.loadUnreadCount();
                 $.loadWalletBalance();

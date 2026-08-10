@@ -262,7 +262,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
                     <p>您好 <strong>${assignedUser.username}</strong>，</p>
                     <div class="info-box" style="border-left-color: #48bb78;">
                         <p style="margin-bottom: 8px; font-size: 16px;">
-                            🎉 您的 LXC 容器已开通！
+                            您的 LXC 容器已开通！
                         </p>
                     </div>
                     <div class="info-box">
@@ -491,7 +491,7 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
                         <p>您好 <strong>${removedUser.username}</strong>，</p>
                         <div class="warning-box">
                             <p style="margin-bottom: 8px; font-size: 16px;">
-                                ⚠️ 您的 LXC 容器已被移除
+                                您的 LXC 容器已被移除
                             </p>
                         </div>
                         <div class="info-box">

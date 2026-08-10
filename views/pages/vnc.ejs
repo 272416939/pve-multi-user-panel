@@ -115,9 +115,9 @@
             throw new Error(error);
         }
 
-        const ticket = <%- JSON.stringify(locals.ticket).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
-        const vmid = <%- JSON.stringify(locals.vmid).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
-        const type = <%- JSON.stringify(locals.type).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
+        const ticket = <%- JSON.stringify(typeof locals.ticket !== 'undefined' ? locals.ticket : null).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
+        const vmid = <%- JSON.stringify(typeof locals.vmid !== 'undefined' ? locals.vmid : null).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
+        const type = <%- JSON.stringify(typeof locals.type !== 'undefined' ? locals.type : null).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
         const session = new URLSearchParams(location.search).get('session');
 
         const statusText = document.getElementById('statusText');

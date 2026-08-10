@@ -128,7 +128,7 @@ async function recoverProvisioningTasks() {
                                 uid: record.user_id,
                                 title: type === 'vm' ? '虚拟机开通失败' : '容器开通失败',
                                 content: '非常抱歉，您订购的' + (type === 'vm' ? '虚拟机' : '容器') + ' ' + (record.name || '') + ' 开通失败，钱款已原路返回。如有疑问请联系客服。',
-                                type: 1, is_read: 0, send_type: 1
+                                type: 2, is_read: 0, send_type: 1
                             });
                         } catch (e) { console.error('[recovery] 失败通知发送失败', e); }
                         // 邮件通知：开通失败退款
@@ -141,9 +141,9 @@ async function recoverProvisioningTasks() {
                                 var emailHtml = createEmailTemplate(resourceLabel + '开通失败 - 已退款',
                                     '<p>非常抱歉，您订购的' + resourceLabel + ' <strong>' + (record.name || '') + '</strong> 开通失败，款项已原路退回。</p>' +
                                     '<div class="warning-box">' +
-                                    '<p style="margin-bottom: 4px;">💸 退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
-                                    '<p style="margin-bottom: 4px;">📋 原订单号：<strong>' + (matchedOrder ? matchedOrder.order_no : '') + '</strong></p>' +
-                                    '<p>⏰ 退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
+                                    '<p style="margin-bottom: 4px;">退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
+                                    '<p style="margin-bottom: 4px;">原订单号：<strong>' + (matchedOrder ? matchedOrder.order_no : '') + '</strong></p>' +
+                                    '<p>退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
                                     '</div>' +
                                     '<p>如有疑问请联系客服。</p>', siteName);
                                 var refundCategory = type === 'vm' ? 'notify_vm_refund' : 'notify_lxc_refund';

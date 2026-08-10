@@ -15,8 +15,8 @@
 .nav-tabs .nav-link::after { display: none !important; }
 .nav-tabs .nav-link:hover { color: var(--text-primary); background: var(--bg-hover); }
 .nav-tabs .nav-link.active {
-    color: #fff; background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(139,92,246,0.15));
-    box-shadow: 0 2px 12px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600;
+    color: #fff; background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 25%, transparent), color-mix(in srgb, var(--color-primary-hover) 15%, transparent));
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--color-primary) 20%, transparent), inset 0 1px 0 rgba(255,255,255,0.08); font-weight: 600;
 }
 
 /* ===== Nav Pills 微调 ===== */
@@ -49,7 +49,7 @@ h4 {
 h4::before {
     content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
     width: 3px; height: 20px; border-radius: 2px;
-    background: linear-gradient(180deg, #6366F1, #8B5CF6);
+    background: linear-gradient(180deg, #a855f7, #22d3ee);
 }
 h5.card-title { color: var(--text-primary) !important; transition: color 0.3s ease; }
 
@@ -57,11 +57,11 @@ h5.card-title { color: var(--text-primary) !important; transition: color 0.3s ea
 .table { color: var(--text-primary) !important; border-collapse: separate; border-spacing: 0; transition: color 0.3s ease;
     --bs-table-bg: transparent; --bs-table-accent-bg: transparent;
     --bs-table-color: var(--text-primary);
-    --bs-table-hover-bg: rgba(99,102,241,0.04); --bs-table-active-bg: rgba(99,102,241,0.06); }
+    --bs-table-hover-bg: color-mix(in srgb, var(--color-primary) 4%, transparent); --bs-table-active-bg: color-mix(in srgb, var(--color-primary) 6%, transparent); }
 thead th, .table thead th, .table-striped thead th {
-    background: linear-gradient(180deg, rgba(99,102,241,0.10) 0%, rgba(139,92,246,0.05) 100%) !important; color: var(--text-secondary) !important;
+    background: linear-gradient(180deg, rgba(168,85,247,0.10) 0%, rgba(34,211,238,0.05) 100%) !important; color: var(--text-secondary) !important;
     font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px;
-    border-bottom: 2px solid rgba(99,102,241,0.18) !important;
+    border-bottom: 2px solid rgba(168,85,247,0.18) !important;
     padding: 14px 18px; white-space: nowrap;
     transition: all 0.3s ease;
 }
@@ -96,48 +96,9 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
 .bg-info { color: var(--color-info) !important; background: color-mix(in srgb, var(--color-info) 12%, transparent) !important; }
 .bg-danger { color: var(--color-danger) !important; background: color-mix(in srgb, var(--color-danger) 12%, transparent) !important; }
 
-/* ===== 按钮微调 ===== */
-.btn-outline-light {
-    border: 1px solid var(--border-color); color: var(--text-secondary);
-    background: transparent;
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
-.btn-outline-light:hover {
-    background: var(--bg-hover); color: var(--text-primary);
-}
-
-/* ===== 玻璃态主按钮 ===== */
-.btn-glass {
-    padding: 8px 24px; font-size: 14px; font-weight: 600; border-radius: 10px;
-    border: 1px solid rgba(99,102,241,0.35); cursor: pointer;
-    transition: all 0.25s ease, color 0.3s ease, background-color 0.3s ease, border-color 0.3s ease;
-    background: linear-gradient(135deg, rgba(99,102,241,0.22), rgba(139,92,246,0.16));
-    color: #C7D2FE; box-shadow: 0 2px 12px rgba(99,102,241,0.18);
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-}
-.btn-glass:hover:not(:disabled) {
-    background: linear-gradient(135deg, rgba(99,102,241,0.32), rgba(139,92,246,0.24));
-    color: #E0E7FF; box-shadow: 0 6px 20px rgba(99,102,241,0.28);
-    transform: translateY(-1px);
-}
-.btn-glass:active:not(:disabled) {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(99,102,241,0.2);
-}
-.btn-glass:disabled {
-    opacity: 0.45; cursor: not-allowed; transform: none !important;
-    filter: grayscale(0.4);
-}
-/* 明亮模式：加深背景确保可见 */
-[data-theme="light"] .btn-glass {
-    background: linear-gradient(135deg, rgba(99,102,241,0.78), rgba(139,92,246,0.68));
-    border-color: rgba(99,102,241,0.55); color: #fff;
-    box-shadow: 0 2px 12px rgba(99,102,241,0.22);
-}
-[data-theme="light"] .btn-glass:hover:not(:disabled) {
-    background: linear-gradient(135deg, rgba(99,102,241,0.88), rgba(139,92,246,0.78));
-    box-shadow: 0 6px 20px rgba(99,102,241,0.32);
-}
+/* ===== 按钮（已统一） =====
+   按钮体系统一由 public/shared/css/pv-buttons.css 接管（.pv-btn-* 类 + <pv-button> 组件），
+   旧 .btn-outline-light / .btn-glass 定义已移除，勿在此重建 */
 
 /* ===== Modal 增强 ===== */
 .modal-content {
@@ -170,13 +131,7 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
 }
 .header-user-avatar:hover { border-color: var(--color-primary); }
 
-/* ===== Form 控件 ===== */
-.form-control, .form-select {
-    background: var(--bg-input) !important;
-    border-color: var(--border-color) !important;
-    color: var(--text-primary) !important;
-    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-}
+/* ===== Form 控件（统一走 shared/components.css，此处不再重复定义） ===== */
 .form-control::placeholder { color: var(--text-muted) !important; }
 .input-group-text {
     background: var(--bg-hover) !important;
@@ -205,8 +160,8 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
 
 /* ===== 明亮模式表格表头 ===== */
 [data-theme="light"] thead th, [data-theme="light"] .table thead th, [data-theme="light"] .table-striped thead th {
-    background: linear-gradient(180deg, rgba(99,102,241,0.07) 0%, rgba(139,92,246,0.035) 100%) !important;
-    border-bottom: 2px solid rgba(99,102,241,0.14) !important;
+    background: linear-gradient(180deg, rgba(168,85,247,0.07) 0%, rgba(34,211,238,0.035) 100%) !important;
+    border-bottom: 2px solid rgba(168,85,247,0.14) !important;
     color: #6b7280 !important;
 }
 
@@ -227,12 +182,12 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     text-decoration: none;
 }
 .message-item:hover {
-    border-color: rgba(99,102,241,0.35);
-    box-shadow: 0 4px 16px rgba(99,102,241,0.10);
+    border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--color-primary) 10%, transparent);
     transform: translateY(-1px);
 }
 .message-item.message-unread {
-    border-left: 3px solid var(--color-primary, #6366F1);
+    border-left: 3px solid var(--color-primary, #a855f7);
     background: color-mix(in srgb, var(--color-primary) 4%, var(--bg-card));
 }
 .message-header {

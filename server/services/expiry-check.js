@@ -189,7 +189,7 @@ const checkExpiredVms = async () => {
                                 <p>您好 <strong>${user.username}</strong>，</p>
                                 <div class="warning-box">
                                     <p style="margin-bottom: 0; font-size: 16px;">
-                                        ⚠️ 您的虚拟机 <strong>已到期</strong>！
+                                        您的虚拟机 <strong>已到期</strong>！
                                     </p>
                                 </div>
                                 <div class="info-box">
@@ -317,7 +317,7 @@ async function checkExpiredLxc() {
                                     uid: ct.user_id,
                                     title: 'LXC 容器到期提醒',
                                     content: `您的 LXC 容器 ${ct.name || 'CT ' + ct.ct_id} 将在 ${days} 天后到期（${expDate.toLocaleString('zh-CN')}），请及时续费。`,
-                                    type: 1,
+                                    type: 3,
                                     send_type: 1
                                 });
                             } catch (e) {}
@@ -340,7 +340,7 @@ async function checkExpiredLxc() {
                                         <p>您好 <strong>${user.username}</strong>，</p>
                                         <div class="warning-box">
                                             <p style="margin-bottom: 0; font-size: 16px;">
-                                                ⚠️ 您的 LXC 容器 <strong>已到期</strong>！
+                                                您的 LXC 容器 <strong>已到期</strong>！
                                             </p>
                                         </div>
                                         <div class="info-box">
@@ -369,7 +369,7 @@ async function checkExpiredLxc() {
                                 uid: ct.user_id,
                                 title: 'LXC 容器已到期',
                                 content: `您的 LXC 容器 ${ct.name || 'CT ' + ct.ct_id} 已到期，请尽快续费（${ct.renewal_price ? '续费价格：' + ct.renewal_price : ''}）。数据保留 ${3 - expiredDays - 1} 天。`,
-                                type: 1,
+                                type: 3,
                                 send_type: 1
                             });
                         } catch (e) {}

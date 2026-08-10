@@ -74,7 +74,7 @@
                                         <label class="form-label">个人简介</label>
                                         <textarea class="form-control" rows="3" v-model="profileForm.bio" placeholder="介绍一下自己..."></textarea>
                                     </div>
-                                    <pv-button type="submit" variant="primary" >保存修改</pv-button>
+                                    <pv-button type="submit" variant="glass" >保存修改</pv-button>
                                 </form>
                             </div>
                         </div>
@@ -131,6 +131,93 @@
                                     <pv-button type="submit" variant="primary" >重置密码</pv-button>
                                     <small class="text-muted d-block mt-2">重置后所有登录设备需重新登录</small>
                                 </form>
+                            </div>
+                        </div>
+
+                        <!-- 卡片4：界面模板（个人偏好，覆盖站点全局默认） -->
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-3 text-muted">界面模板</h6>
+                                <p class="text-muted small mb-3">选择个人偏好的界面模板；「跟随站点默认」使用管理员在站点设置中配置的模板。点击卡片实时预览，保存后所有设备同步。</p>
+                                <div class="d-flex flex-wrap gap-3 mb-3">
+                                    <!-- 跟随站点默认 -->
+                                    <div class="template-picker" :class="{ 'template-picker-active': templatePreference === '' }" @click="selectTemplate('')" role="button" tabindex="0">
+                                        <div class="template-preview template-preview-follow">
+                                            <div class="tp-follow-center">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15.36-6.36L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.36 6.36L3 16"/><path d="M3 21v-5h5"/></svg>
+                                                <span>AUTO</span>
+                                            </div>
+                                        </div>
+                                        <div class="template-picker-body">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>跟随站点默认</strong>
+                                                <span v-if="templatePreference === ''" class="template-check">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">当前：{{ siteDefaultName }}</small>
+                                        </div>
+                                    </div>
+                                    <!-- 赛博霓虹预览卡 -->
+                                    <div class="template-picker" :class="{ 'template-picker-active': templatePreference === 'default' }" @click="selectTemplate('default')" role="button" tabindex="0">
+                                        <div class="template-preview template-preview-default">
+                                            <div class="tp-sidebar">
+                                                <div class="tp-logo"></div>
+                                                <div class="tp-nav"></div>
+                                                <div class="tp-nav tp-nav-active"></div>
+                                                <div class="tp-nav"></div>
+                                            </div>
+                                            <div class="tp-main">
+                                                <div class="tp-header"></div>
+                                                <div class="tp-cards">
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="template-picker-body">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>赛博霓虹</strong>
+                                                <span v-if="templatePreference === 'default'" class="template-check">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">霓虹赛博 · 紫青发光</small>
+                                        </div>
+                                    </div>
+                                    <!-- SAAS 企业风预览卡 -->
+                                    <div class="template-picker" :class="{ 'template-picker-active': templatePreference === 'saas' }" @click="selectTemplate('saas')" role="button" tabindex="0">
+                                        <div class="template-preview template-preview-saas">
+                                            <div class="tp-sidebar">
+                                                <div class="tp-logo"></div>
+                                                <div class="tp-nav"></div>
+                                                <div class="tp-nav tp-nav-active"></div>
+                                                <div class="tp-nav"></div>
+                                            </div>
+                                            <div class="tp-main">
+                                                <div class="tp-header"></div>
+                                                <div class="tp-cards">
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                    <div class="tp-card"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="template-picker-body">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>SAAS 企业风</strong>
+                                                <span v-if="templatePreference === 'saas'" class="template-check">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+                                                </span>
+                                            </div>
+                                            <small class="text-muted">腾讯云风格 · 扁平极简</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <pv-button type="button" variant="primary" @click="saveTemplatePreference" :disabled="templatePreferenceSaving">
+                                    {{ templatePreferenceSaving ? '保存中...' : '保存模板偏好' }}
+                                </pv-button>
                             </div>
                         </div>
                     </div>
@@ -360,7 +447,7 @@
                                             <tr v-for="tx in txList" :key="tx.id">
                                                 <td>{{ formatDate(tx.pay_time) }}</td>
                                                 <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method === 'manual' ? '系统' : tx.pay_method === 'balance_refund' ? '余额退款' : tx.pay_method === 'alipay_refund' ? '支付宝退款' : tx.pay_method === 'wxpay_refund' ? '微信退款' : tx.pay_method }}</td>
-                                                <td><code style="font-size:11px;">{{ tx.order_no }}</code> <pv-button variant="link" size="sm" class="p-0 ms-1" @click="copyOrderNo(tx.order_no)" title="复制">📋</pv-button></td>
+                                                <td><code style="font-size:11px;">{{ tx.order_no }}</code> <pv-button variant="link" size="sm" class="p-0 ms-1" @click="copyOrderNo(tx.order_no)" title="复制">复制</pv-button></td>
                                                 <td><code style="font-size:11px;">{{ tx.trade_no || '-' }}</code></td>
                                                 <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'refund' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : tx.trade_type === 'disk_purchase' ? 'badge bg-info' : tx.trade_type === 'disk_renewal' ? 'badge bg-primary' : 'badge badge-renewal'" :style="tx.trade_type !== 'recharge' && tx.trade_type !== 'admin_recharge' && tx.trade_type !== 'refund' && tx.trade_type !== 'new_order' && tx.trade_type !== 'disk_purchase' && tx.trade_type !== 'disk_renewal' ? 'background:#0d9488;color:#fff' : ''">{{ tx.trade_type === 'recharge' ? '余额充值' : tx.trade_type === 'admin_recharge' ? '后台充值' : tx.trade_type === 'refund' ? '订单退款' : tx.trade_type === 'new_order' ? '新购服务器' : tx.trade_type === 'disk_purchase' ? '新购硬盘' : tx.trade_type === 'disk_renewal' ? '续费硬盘' : '服务器续费' }}</span></td>
                                                 <td>¥{{ tx.amount }}</td>
@@ -419,8 +506,8 @@
                                     <tbody>
                                         <tr v-for="o in myOrders" :key="o.id">
                                             <td><code style="font-size:11px;">{{ o.order_no }}</code></td>
-                                            <td>{{ o.package_name }}</td>
-                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.type === 'vm' ? 'VM' : o.type === 'lxc' ? 'LXC' : '磁盘' }}</span></td>
+                                            <td>{{ o.order_kind === 'renewal' ? (o.type === 'disk' ? (o.resource_name || '') : (o.resource_name || '') + '（' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + '）') : (o.type === 'disk' ? o.package_name : o.package_name + '[' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + ']') }}</td>
+                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.order_kind === 'renewal' ? (o.type === 'vm' ? 'VM 续费' : o.type === 'lxc' ? 'LXC 续费' : '磁盘续费') : (o.type === 'vm' ? 'VM' : o.type === 'lxc' ? 'LXC' : '磁盘') }}</span></td>
                                             <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
                                             <td>{{ o.period_count }}</td>
                                             <td>¥{{ o.amount }}</td>
@@ -522,7 +609,7 @@
                                         <label class="form-label">内容</label>
                                         <textarea class="form-control" rows="5" v-model="editMemoForm.content" placeholder="输入内容..."></textarea>
                                     </div>
-                                    <pv-button type="submit" variant="primary">保存</pv-button>
+                                    <pv-button type="submit" variant="glass">保存</pv-button>
                                 </form>
                             </div>
                         </div>
@@ -560,7 +647,7 @@
                                 <p class="mb-0" style="color:var(--text-secondary);font-size:13px;">充值金额：<strong style="color:var(--color-primary);">¥{{ rechargePendingAmount }}</strong></p>
                             </div>
                             <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                                <button type="button" class="btn btn-outline-light px-4" @click="cancelRecharge">取消支付</button>
+                                <pv-button type="button" variant="secondary" @click="cancelRecharge">取消支付</pv-button>
                             </div>
                         </div>
                     </div>

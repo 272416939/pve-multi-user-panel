@@ -161,15 +161,16 @@ const pendingOrders = {
 const orders = {
     create: async (data) => {
         const [result] = await execute(
-            `INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO orders (order_no, user_id, type, package_id, template_id, period, period_count, amount, cores, memory, disk_size, resource_name, resource_id, status, order_kind)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 data.order_no, data.user_id, data.type || 'vm',
                 data.package_id, data.template_id || 0,
                 data.period || 'month', data.period_count || 1,
                 data.amount || '0.00', data.cores || 0, data.memory || 0,
                 data.disk_size || 0, data.resource_name || '',
-                data.resource_id || '', data.status || 'completed'
+                data.resource_id || '', data.status || 'completed',
+                data.order_kind || 'new'
             ]
         );
         return queryOne('SELECT * FROM orders WHERE id = ?', [result.insertId]);

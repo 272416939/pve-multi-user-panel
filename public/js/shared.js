@@ -642,6 +642,11 @@ window.positionFixedDropdown = function(triggerEl, dropdownEl) {
     var rect = triggerEl.getBoundingClientRect();
     var menuWidth = dropdownEl.offsetWidth || 160;
     var menuHeight = dropdownEl.offsetHeight || 200;
+    // 移动端边界回避：弹层宽高不超过视口（保留 8px 边距），避免超出屏幕无法操作
+    var maxW = window.innerWidth - 16;
+    if (menuWidth > maxW) menuWidth = maxW;
+    var maxH = window.innerHeight - 16;
+    if (menuHeight > maxH) menuHeight = maxH;
     // 默认左对齐触发器，下拉菜单在按钮正下方
     var left = rect.left;
     var top = rect.bottom + 4;
@@ -656,8 +661,8 @@ window.positionFixedDropdown = function(triggerEl, dropdownEl) {
         // 如果向上展开也超出顶部，则回退到按钮下方并限制最大高度
         if (top < 8) {
             top = 8;
-            var maxH = window.innerHeight - top - 8;
-            dropdownEl.style.maxHeight = maxH + 'px';
+            var maxH2 = window.innerHeight - top - 8;
+            dropdownEl.style.maxHeight = maxH2 + 'px';
             dropdownEl.style.overflowY = 'auto';
         }
     } else {
@@ -699,5 +704,38 @@ window.closeFixedDropdownAnimated = function(dropdownEl, callback) {
     setTimeout(function() {
         if (dropdownEl.style.animation) done();
     }, 200);
+};
+
+// ============================================
+// 界面模板（个人偏好）应用与同步 — 三端共用单一实现
+// 优先级：个人偏好(localStorage 'template') > 站点全局默认(服务端注入)
+// ============================================
+
+// 应用模板：t = ''（跟随站点默认）| 'default' | 'saas'；siteDefault 为站点全局默认（跟随默认时使用）
+window.applyTemplate = function(t, siteDefault) {
+    var html = document.documentElement;
+    if (!html) return;
+    if (t === 'default' || t === 'saas') {
+        localStorage.setItem(window.__storageKeys.TEMPLATE, t);
+        html.setAttribute('data-template', t);
+    } else {
+        // 跟随站点默认：清除本地偏好，回退到站点全局默认
+        localStorage.removeItem(window.__storageKeys.TEMPLATE);
+        html.setAttribute('data-template', siteDefault || 'default');
+    }
+    if (document.body) document.body.setAttribute('data-template', html.getAttribute('data-template'));
+};
+
+// 从服务端同步用户模板偏好（跨设备）：与 localStorage 不一致时更新并应用
+window.syncUserTemplate = async function() {
+    try {
+        var res = await api('/user/template');
+        var t = (res && res.template) || '';
+        var siteDefault = (res && res.siteDefault) || 'default';
+        var cur = localStorage.getItem(window.__storageKeys.TEMPLATE) || '';
+        if (t !== cur) window.applyTemplate(t, siteDefault);
+    } catch (e) {
+        console.error('同步界面模板偏好失败:', e);
+    }
 };
 

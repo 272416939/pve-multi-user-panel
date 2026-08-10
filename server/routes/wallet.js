@@ -186,7 +186,8 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
             ctid: req.body.ctid,
             quantity: req.body.quantity,
             period_count: req.body.period_count,
-            period: req.body.period
+            period: req.body.period,
+            req: req
         });
         if (!result.ok) {
             return res.status(result.status).json({ error: result.error });
