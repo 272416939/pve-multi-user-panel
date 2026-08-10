@@ -483,13 +483,7 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 [data-theme="light"] .form-select {
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%239333ea' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
 }
-/* SaaS 模板箭头：商务蓝（覆盖默认紫，dark/light 两套） */
-html[data-template="saas"] .form-select {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%233b82f6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
-}
-html[data-template="saas"][data-theme="light"] .form-select {
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%232563eb' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M2 5l6 6 6-6'/%3e%3c/svg%3e") !important;
-}
+/* SaaS 模板箭头（商务蓝）由 template-saas.css 单一来源定义 */
 .form-select-sm { background-position: right 0.5rem center; background-size: 14px 10px; }
 .form-select option { background: var(--bg-input); color: var(--text-primary); }
 .form-control.bg-dark, .form-select.bg-dark { background-color: var(--bg-input) !important; color: var(--text-primary) !important; }

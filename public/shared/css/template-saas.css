@@ -543,7 +543,7 @@ html[data-template="saas"] .form-check-input:checked {
 }
 html[data-template="saas"] .form-check-input:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 0.25rem rgba(37, 99, 235, 0.18);
+    box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--color-primary) 18%, transparent);
 }
 html[data-template="saas"] .form-control,
 html[data-template="saas"] .form-select {
@@ -554,7 +554,7 @@ html[data-template="saas"] .form-select {
 html[data-template="saas"] .form-control:focus,
 html[data-template="saas"] .form-select:focus {
     border-color: var(--color-primary);
-    box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.12);
+    box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 /* SaaS 扁平化：去掉下拉框玻璃模糊，箭头换商务蓝（明/暗各一条） */
 html[data-template="saas"] .form-select {
@@ -685,7 +685,7 @@ html[data-template="saas"] .package-card-body .pv-btn.pv-btn-primary {
 }
 html[data-template="saas"] .package-card-body .pv-btn.pv-btn-primary:hover:not(:disabled) {
     background: var(--color-primary-hover) !important;
-    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28) !important;
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--color-primary) 28%, transparent) !important;
 }
 
 /* ============================================
@@ -806,7 +806,7 @@ html[data-template="saas"] .login-card .form-control {
 }
 html[data-template="saas"] .login-card .form-control:focus {
     border-color: var(--login-color-primary);
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--login-color-primary) 12%, transparent);
 }
 html[data-template="saas"] .login-card .form-label {
     color: var(--login-text-label);
