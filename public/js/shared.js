@@ -184,8 +184,14 @@ window.ensurePushConnected = function() {
     window._pushReconnectDelay = 1000;
     window.initPushClient(window._pushOnMessage, window._pushOnOpen);
 };
+// bfcache 恢复时：旧页面可能携带旧版 JS（表单回填/弹窗标题等修复不生效），
+// 强制刷新加载最新缓存版本；仅 persisted=true（前进/后退恢复）才刷新，普通可见性切换不刷新
 window.addEventListener('pageshow', function(e) {
-    if (e.persisted) window.ensurePushConnected();
+    if (e.persisted) {
+        window.location.reload();
+        return;
+    }
+    window.ensurePushConnected();
 });
 document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') window.ensurePushConnected();
