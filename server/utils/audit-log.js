@@ -27,7 +27,7 @@ async function auditLog(opts) {
             resource_id: opts.resourceId != null ? opts.resourceId : '',
             ip: (req && req.ip) || '',
             user_agent: (req && req.headers && req.headers['user-agent']) || '',
-            details: opts.details || {}
+            details: opts.details || ''
         });
     } catch (e) {
         // 审计失败不影响业务，仅记录服务端日志

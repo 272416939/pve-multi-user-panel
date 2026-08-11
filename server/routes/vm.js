@@ -419,10 +419,49 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
 
     await db.vms.update(vmId, updates);
 
-    // 操作审计：VM 名称编辑
-    if (name !== undefined && name !== vm.name) {
-        await auditAction(req, 'vm.rename', '编辑 VM ' + vm.vm_id + ' 名称: ' + (vm.name || '') + ' → ' + name, { resourceType: 'vm', resourceId: vm.vm_id });
-    }
+    // 操作审计：VM 编辑（仅名称 → vm.rename；含管理员字段变更 → vm.edit 字段级 diff）
+    // 管理字段（到期/续费价/续费周期/换绑用户/MAC分组）此前无审计，改到期时间≈免费续费，属资金敏感项
+    var adminEditFields = [
+        { key: 'expiration_date', label: '到期时间', fmt: function (v) { return String(v).slice(0, 10); } },
+        { key: 'renewal_price', label: '续费价', num: true, fmt: function (v) { return '¥' + v; } },
+        { key: 'renewal_period', label: '续费周期', fmt: function (v) { return v === 'month' ? '月付' : (v === 'quarter' ? '季付' : (v === 'year' ? '年付' : v)); } },
+        { key: 'user', label: '所属用户' },
+        { key: 'ikuai_mac_group_id', label: 'MAC分组', fmt: function (v) { return v ? '#' + v : '无'; } }
+    ];
+    try {
+        var newVm = await db.vms.getById(vmId);
+        if (newVm) {
+            // 所属用户显示名（用户名优先，缺失回退 #id）
+            var oldUserName = '';
+            if (vm.user_id) { try { var ou = await db.users.getById(vm.user_id); if (ou) oldUserName = ou.username; } catch (e) {} }
+            var targetUserId = user_id !== undefined ? parseInt(user_id) : vm.user_id;
+            var newUserName = '';
+            if (targetUserId) { try { var nu = await db.users.getById(targetUserId); if (nu) newUserName = nu.username; } catch (e) {} }
+            var oldView = {
+                expiration_date: vm.expiration_date,
+                renewal_price: vm.renewal_price,
+                renewal_period: vm.renewal_period,
+                user: oldUserName || (vm.user_id ? '#' + vm.user_id : '无'),
+                ikuai_mac_group_id: vm.ikuai_mac_group_id || ''
+            };
+            var newView = {
+                expiration_date: newVm.expiration_date,
+                renewal_price: newVm.renewal_price,
+                renewal_period: newVm.renewal_period,
+                user: newUserName || (newVm.user_id ? '#' + newVm.user_id : '无'),
+                ikuai_mac_group_id: newVm.ikuai_mac_group_id || ''
+            };
+            var { buildFieldDiff } = require('../utils/audit-diff');
+            var adminChanges = buildFieldDiff(oldView, newView, adminEditFields);
+            var nameChanged = name !== undefined && name !== vm.name;
+            if (adminChanges.length) {
+                if (nameChanged) adminChanges.unshift('名称 ' + (vm.name || '无') + '→' + name);
+                await auditAction(req, 'vm.edit', '编辑 VM ' + vm.vm_id + '；变更:' + adminChanges.join(', '), { resourceType: 'vm', resourceId: vm.vm_id });
+            } else if (nameChanged) {
+                await auditAction(req, 'vm.rename', '编辑 VM ' + vm.vm_id + ' 名称: ' + (vm.name || '') + ' → ' + name, { resourceType: 'vm', resourceId: vm.vm_id });
+            }
+        }
+    } catch (e) {}
     
     // 管理员延长到期时间后，如果虚拟机之前因到期停机，尝试自动开机
     if (isAdmin && expiration_date !== undefined) {

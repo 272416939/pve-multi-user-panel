@@ -67,6 +67,12 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
             }
             return res.status(result.status).json({ error: result.error });
         }
+        // 操作审计：创建充值订单（D 类缺埋点补全；到账审计在 payment.js 回调侧 order.recharge.confirm）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            var orderAmount = parseFloat(req.body.amount);
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'order.recharge', resourceType: 'order', resourceId: result.data.orderNo, details: '创建充值订单 ¥' + (isNaN(orderAmount) ? req.body.amount : orderAmount.toFixed(2)) + '(支付方式:' + (req.body.pay_method || '-') + ',订单号:' + result.data.orderNo + ')', req });
+        } catch (e) {}
         res.json({ success: true, order_no: result.data.orderNo, redirect_url: result.data.payUrl });
     } catch (e) {
         console.error('[钱包] recharge:', e.message);

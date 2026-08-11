@@ -10,6 +10,8 @@ const { safeError } = require('../utils/safe-error');
 const { maskSecret, isMasked, encrypt, decrypt } = require('../utils/crypto-utils');
 const { queryIpLocation } = require('../services/ip-location');
 const { checkRateLimit, invalidateRateLimitCache } = require('../middleware/rate-limiter');
+// 审计字段级 diff 通用工具（规范第十一节：更新类审计从 DB 新旧状态 diff 生成，不从请求体拼接）
+const { buildFieldDiff } = require('../utils/audit-diff');
 // 运维业务下沉 services/（规范第七节）：版本检查/系统更新/Redis 管理
 const { checkForUpdates } = require('../services/release-check');
 const { executeUpdate } = require('../services/system-update');
@@ -28,6 +30,11 @@ router.post('/check-expired', authMiddleware, adminMiddleware, async (req, res) 
     try {
         await checkExpiredVms();
         await checkExpiredLxc();
+        // 操作审计：手动触发到期检查（D 类缺埋点补全）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.system.check-expired', resourceType: 'system', resourceId: 'check-expired', details: '手动触发到期检查(VM+LXC)', req });
+        } catch (e) {}
         res.json({ message: '检查完成' });
     } catch (error) {
         console.error('手动检查失败:', error);
@@ -50,7 +57,9 @@ router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { host, port, secure, user, password, from, from_name, enabled } = req.body;
 
-        const existingSmtp = await db.config.getSmtp();
+        // 保存前取旧配置（审计 diff 用；密码只记「已更新」标记，不记录原文）
+        const oldSmtp = await db.config.getSmtp();
+        const smtpPasswordChanged = password !== undefined && !isMasked(password);
         await db.config.setSmtp({
             host: host || '',
             port: port || 587,
@@ -67,10 +76,22 @@ router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
         resetTransporterCache();
 
         const { password: _, ...configWithoutPassword } = await db.config.getSmtp();
-        // 操作审计：更新 SMTP 配置（不记录密码/凭据原文）
+        // 操作审计：更新 SMTP 配置（DB 新旧值字段级 diff；不记录密码原文）
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.smtp', resourceType: 'config', resourceId: 'smtp', details: '更新SMTP配置(服务器:' + (host || '') + ',启用:' + (enabled ? '是' : '否') + ')', req });
+            const changes = buildFieldDiff(oldSmtp, await db.config.getSmtp(), [
+                { key: 'host', label: '服务器' },
+                { key: 'port', label: '端口', num: true },
+                { key: 'secure', label: 'SSL', bool: true },
+                { key: 'user', label: '账号' },
+                { key: 'from', label: '发件人' },
+                { key: 'from_name', label: '发件名称' },
+                { key: 'enabled', label: '启用', bool: true }
+            ]);
+            if (smtpPasswordChanged) changes.push('密码 已更新');
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.smtp', resourceType: 'config', resourceId: 'smtp', details: '更新SMTP配置；变更:' + changes.join(', '), req });
+            }
         } catch (e) {}
         res.json({ message: '配置更新成功', config: configWithoutPassword });
     } catch (error) {
@@ -132,20 +153,30 @@ router.get('/admin/reminder', authMiddleware, adminMiddleware, async (req, res) 
 router.put('/admin/reminder', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { days1, days2, days3 } = req.body;
-        
-        db.config.setReminder({
+
+        // 保存前取旧配置（审计 diff 用）
+        const oldReminder = await db.config.getReminder();
+        await db.config.setReminder({
             days1: days1 !== undefined ? parseInt(days1) : 7,
             days2: days2 !== undefined ? parseInt(days2) : 3,
             days3: days3 !== undefined ? parseInt(days3) : 1
         });
-        
-        // 操作审计：更新到期提醒配置
+        const newReminder = await db.config.getReminder();
+
+        // 操作审计：更新到期提醒配置（字段级 diff，只记实际变化）
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.reminder', resourceType: 'config', resourceId: 'reminder', details: '更新提醒配置:' + (days1 !== undefined ? parseInt(days1) : 7) + '/' + (days2 !== undefined ? parseInt(days2) : 3) + '/' + (days3 !== undefined ? parseInt(days3) : 1) + '天', req });
+            const changes = buildFieldDiff(oldReminder, newReminder, [
+                { key: 'days1', label: '提前7天', num: true },
+                { key: 'days2', label: '提前3天', num: true },
+                { key: 'days3', label: '提前1天', num: true }
+            ]);
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.reminder', resourceType: 'config', resourceId: 'reminder', details: '更新提醒配置；变更:' + changes.join(', '), req });
+            }
         } catch (e) {}
-        
-        res.json({ message: '提醒配置更新成功', config: db.config.getReminder() });
+
+        res.json({ message: '提醒配置更新成功', config: newReminder });
     } catch (error) {
         console.error('更新提醒配置失败:', error);
         res.status(500).json({ error: '更新配置失败' });
@@ -219,6 +250,25 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         var setConfig = db.config.set;
         var { base_url, pid, md5_key, v2_public_key, v2_private_key, v1_enabled, v2_enabled, alipay_enabled, wxpay_enabled, min_amount, max_amount } = req.body;
 
+        // 保存前取旧配置（审计 diff 用；密钥类只记「已更新」标记，不记录原文）
+        var getPaySnapshot = async function () {
+            return {
+                base_url: (await db.config.get('pay:base_url')) || 'https://pay.microgg.cn/',
+                pid: (await db.config.get('pay:pid')) || '',
+                v1_enabled: (await db.config.get('pay:v1_enabled')) === '1',
+                v2_enabled: (await db.config.get('pay:v2_enabled')) === '1',
+                alipay_enabled: (await db.config.get('pay:alipay_enabled')) === '1',
+                wxpay_enabled: (await db.config.get('pay:wxpay_enabled')) === '1',
+                min_amount: parseFloat((await db.config.get('pay:min_amount')) || '0.01'),
+                max_amount: parseFloat((await db.config.get('pay:max_amount')) || '999999.99')
+            };
+        };
+        var oldPay = await getPaySnapshot();
+        var keyUpdatedParts = [];
+        if (md5_key !== undefined && !isMasked(md5_key)) keyUpdatedParts.push('MD5密钥 已更新');
+        if (v2_public_key !== undefined && !isMasked(v2_public_key)) keyUpdatedParts.push('V2公钥 已更新');
+        if (v2_private_key !== undefined && !isMasked(v2_private_key)) keyUpdatedParts.push('V2私钥 已更新');
+
         if (base_url !== undefined) {
             await setConfig('pay:base_url', base_url.trim() || 'https://pay.microgg.cn/');
         }
@@ -267,15 +317,23 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         if (minHasVal) await setConfig('pay:min_amount', String(minNum));
         if (maxHasVal) await setConfig('pay:max_amount', String(maxNum));
 
-        // 操作审计：更新支付配置（资金配置，不记录密钥/商户私钥原文）
+        // 操作审计：更新支付配置（DB 新旧值字段级 diff；资金配置不记录密钥原文）
         try {
             const { auditLog } = require('../utils/audit-log');
-            var switchParts = [];
-            if (v1_enabled !== undefined) switchParts.push('V1:' + (v1_enabled ? '开' : '关'));
-            if (v2_enabled !== undefined) switchParts.push('V2:' + (v2_enabled ? '开' : '关'));
-            if (alipay_enabled !== undefined) switchParts.push('支付宝:' + (alipay_enabled ? '开' : '关'));
-            if (wxpay_enabled !== undefined) switchParts.push('微信:' + (wxpay_enabled ? '开' : '关'));
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.pay', resourceType: 'config', resourceId: 'pay', details: '更新支付配置(商户号:' + (pid !== undefined ? pid : '-') + (switchParts.length ? ',' + switchParts.join(',') : '') + (minHasVal ? ',最低¥' + minNum : '') + (maxHasVal ? ',最高¥' + maxNum : '') + ')', req });
+            var changes = buildFieldDiff(oldPay, await getPaySnapshot(), [
+                { key: 'base_url', label: '网关地址' },
+                { key: 'pid', label: '商户号' },
+                { key: 'v1_enabled', label: 'V1支付', bool: true },
+                { key: 'v2_enabled', label: 'V2支付', bool: true },
+                { key: 'alipay_enabled', label: '支付宝', bool: true },
+                { key: 'wxpay_enabled', label: '微信', bool: true },
+                { key: 'min_amount', label: '最低充值', num: true, fmt: function (v) { return '¥' + v; } },
+                { key: 'max_amount', label: '最高充值', num: true, fmt: function (v) { return '¥' + v; } }
+            ]);
+            if (keyUpdatedParts.length) changes = changes.concat(keyUpdatedParts);
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.pay', resourceType: 'config', resourceId: 'pay', details: '更新支付配置；变更:' + changes.join(', '), req });
+            }
         } catch (e) {}
 
         res.json({ message: '支付配置保存成功' });
@@ -301,18 +359,27 @@ router.get('/admin/uapipro/config', authMiddleware, adminMiddleware, async (req,
 router.put('/admin/uapipro/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var { enabled, api_key } = req.body;
+        // 保存前取旧配置（审计 diff 用；API Key 只记「已更新」标记，不记录原文）
+        var oldUapiEnabled = (await db.config.get('uapipro:enabled')) === '1';
+        var apiKeyChanged = api_key !== undefined && !isMasked(api_key);
         if (enabled !== undefined) {
             await db.config.set('uapipro:enabled', enabled ? '1' : '0');
         }
-        if (api_key !== undefined && !isMasked(api_key)) {
+        if (apiKeyChanged) {
             await db.config.set('uapipro:api_key', encrypt(String(api_key).trim()));
         }
         // 失效 ip-location 的启用开关缓存（60s TTL），让新配置立即生效
         require('../services/ip-location').invalidateEnabledCache();
-        // 操作审计：更新 UApiPro 配置（不记录 API Key 原文）
+        // 操作审计：更新 UApiPro 配置（字段级 diff，不记录 API Key 原文）
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.uapipro', resourceType: 'config', resourceId: 'uapipro', details: '更新UApiPro配置(启用:' + (enabled !== undefined ? (enabled ? '是' : '否') : '-') + (api_key !== undefined && !isMasked(api_key) ? ',已更新API Key' : '') + ')', req });
+            var changes = buildFieldDiff({ enabled: oldUapiEnabled }, { enabled: (await db.config.get('uapipro:enabled')) === '1' }, [
+                { key: 'enabled', label: '启用', bool: true }
+            ]);
+            if (apiKeyChanged) changes.push('API Key 已更新');
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.uapipro', resourceType: 'config', resourceId: 'uapipro', details: '更新UApiPro配置；变更:' + changes.join(', '), req });
+            }
         } catch (e) {}
         res.json({ message: 'UApiPro 配置保存成功' });
     } catch (e) {
@@ -493,13 +560,20 @@ router.put('/admin/register/config', authMiddleware, adminMiddleware, async (req
     try {
         var setConfig = db.config.set;
         var { enabled } = req.body;
+        // 保存前取旧配置（审计 diff 用）
+        var oldRegisterEnabled = (await db.config.get('register:enabled')) === '1';
         if (enabled !== undefined) {
             await setConfig('register:enabled', enabled ? '1' : '0');
         }
-        // 操作审计：更新注册配置
+        // 操作审计：更新注册配置（字段级 diff）
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.register', resourceType: 'config', resourceId: 'register', details: '更新注册配置(开放注册:' + (enabled !== undefined ? (enabled ? '是' : '否') : '-') + ')', req });
+            var changes = buildFieldDiff({ enabled: oldRegisterEnabled }, { enabled: (await db.config.get('register:enabled')) === '1' }, [
+                { key: 'enabled', label: '开放注册', bool: true }
+            ]);
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.register', resourceType: 'config', resourceId: 'register', details: '更新注册配置；变更:' + changes.join(', '), req });
+            }
         } catch (e) {}
         res.json({ message: '注册配置保存成功' });
     } catch (e) {
@@ -537,6 +611,17 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
     try {
         var setConfig = db.config.set;
         var { name, logo_text, login_title, register_enabled, template } = req.body;
+        // 保存前取旧配置（审计 diff 用）
+        var getSiteSnapshot = async function () {
+            return {
+                name: (await db.config.get('site:name')) || 'PVE 多用户控制面板',
+                logo_text: (await db.config.get('site:logo_text')) || 'PVE 面板',
+                login_title: (await db.config.get('site:login_title')) || 'PVE Panel',
+                register_enabled: (await db.config.get('register:enabled')) === '1',
+                template: (await db.config.get('site:template')) || 'default'
+            };
+        };
+        var oldSite = await getSiteSnapshot();
         if (name !== undefined) {
             if (typeof name !== 'string' || name.length > 50 || /[<>]/.test(name)) {
                 return res.status(400).json({ error: '站点名称不能超过50字符且不能包含<>符号' });
@@ -571,11 +656,19 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
             req.app.locals.siteConfigCache.data = null;
             req.app.locals.siteConfigCache.expires = 0;
         }
-        // 操作审计：更新站点设置（仅摘要，不含敏感内容）
+        // 操作审计：更新站点设置（DB 新旧值字段级 diff）
         try {
             const { auditLog } = require('../utils/audit-log');
-            var templateLabel = template !== undefined ? (template === 'saas' ? 'SAAS企业风' : '赛博霓虹') : '-';
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.site', resourceType: 'config', resourceId: 'site', details: '更新站点设置(站点名:' + (name !== undefined ? name : '-') + (register_enabled !== undefined ? ',开放注册:' + (register_enabled ? '是' : '否') : '') + (template !== undefined ? ',界面模板:' + templateLabel : '') + ')', req });
+            var changes = buildFieldDiff(oldSite, await getSiteSnapshot(), [
+                { key: 'name', label: '站点名称' },
+                { key: 'logo_text', label: 'LOGO文字' },
+                { key: 'login_title', label: '登录页标题' },
+                { key: 'register_enabled', label: '开放注册', bool: true },
+                { key: 'template', label: '界面模板', fmt: function (v) { return v === 'saas' ? 'SAAS企业风' : (v === 'default' ? '赛博霓虹' : v); } }
+            ]);
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.site', resourceType: 'config', resourceId: 'site', details: '更新站点设置；变更:' + changes.join(', '), req });
+            }
         } catch (e) {}
         res.json({ message: '站点配置保存成功' });
     } catch (e) {
@@ -623,6 +716,10 @@ router.get('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
 router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var { host, api_token, ssh_host, ssh_port, ssh_user, ssh_password, strict_tls } = req.body;
+        // 保存前取旧配置（审计 diff 用；token/SSH 密码只记「已更新」标记，不记录原文）
+        var oldPve = await db.config.getPve();
+        var tokenChanged = api_token !== undefined && !isMasked(api_token);
+        var sshPwdChanged = ssh_password !== undefined && !isMasked(ssh_password);
         // 脱敏值跳过，不覆盖原值
         var configToSave = {
             host: host || '',
@@ -636,10 +733,21 @@ router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
         await db.config.setPve(configToSave);
         // 刷新 PVE API 实例的配置缓存
         await pveApi.reloadConfig();
-        // 操作审计：更新 PVE 节点配置（不记录 token/SSH 密码原文）
+        // 操作审计：更新 PVE 节点配置（DB 新旧值字段级 diff，不记录 token/SSH 密码原文）
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.pve', resourceType: 'config', resourceId: 'pve', details: '更新PVE节点配置(节点:' + (host || '') + ',SSH:' + (ssh_user || 'root') + '@' + (ssh_host || '') + ':' + (parseInt(ssh_port) || 22) + ')', req });
+            var changes = buildFieldDiff(oldPve, await db.config.getPve(), [
+                { key: 'host', label: 'PVE地址' },
+                { key: 'ssh_host', label: 'SSH地址' },
+                { key: 'ssh_port', label: 'SSH端口', num: true },
+                { key: 'ssh_user', label: 'SSH用户' },
+                { key: 'strict_tls', label: '严格TLS', bool: true }
+            ]);
+            if (tokenChanged) changes.push('API Token 已更新');
+            if (sshPwdChanged) changes.push('SSH密码 已更新');
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.pve', resourceType: 'config', resourceId: 'pve', details: '更新PVE节点配置；变更:' + changes.join(', '), req });
+            }
         } catch (e) {}
         res.json({ message: 'PVE 配置保存成功' });
     } catch (error) {
@@ -669,6 +777,9 @@ router.get('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
 router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var { host, port, password, db: redisDb, prefix } = req.body;
+        // 保存前取旧配置（审计 diff 用；密码只记「已更新」标记，不记录原文）
+        var oldRedis = await db.config.getRedis();
+        var redisPwdChanged = password !== undefined && !isMasked(password);
         // 脱敏值跳过，不覆盖原值
         var configToSave = {
             host: host || '',
@@ -682,10 +793,19 @@ router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
         // 热更新 Redis 连接（业务在 services/redis-admin.js）
         await redisAdmin.applyRedisConfig(configToSave);
 
-        // 操作审计：更新 Redis 配置（不记录密码原文）
+        // 操作审计：更新 Redis 配置（DB 新旧值字段级 diff，不记录密码原文）
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.redis', resourceType: 'config', resourceId: 'redis', details: '更新Redis配置(' + (host || '') + ':' + (parseInt(port) || 6379) + '/db' + (parseInt(redisDb) || 0) + ')', req });
+            var changes = buildFieldDiff(oldRedis, await db.config.getRedis(), [
+                { key: 'host', label: '地址' },
+                { key: 'port', label: '端口', num: true },
+                { key: 'db', label: '库号', num: true },
+                { key: 'prefix', label: '前缀' }
+            ]);
+            if (redisPwdChanged) changes.push('密码 已更新');
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.redis', resourceType: 'config', resourceId: 'redis', details: '更新Redis配置；变更:' + changes.join(', '), req });
+            }
         } catch (e) {}
 
         res.json({ message: 'Redis 配置保存成功' });
@@ -719,14 +839,28 @@ router.put('/admin/log/config', authMiddleware, adminMiddleware, async (req, res
         if (keepAdminCount !== null && (!Number.isInteger(keepAdminCount) || keepAdminCount < 100 || keepAdminCount > 100000)) {
             return res.status(400).json({ error: '后台操作日志上限须为 100-100000 的整数' });
         }
+        // 保存前取旧配置（审计 diff 用）
+        var oldLogConfig = {
+            keep_count: parseInt(await db.config.get('log:keep_count')) || 5000,
+            keep_admin_count: parseInt(await db.config.get('log:keep_admin_count')) || 5000
+        };
         await db.config.set('log:keep_count', String(keepCount));
         if (keepAdminCount !== null) {
             await db.config.set('log:keep_admin_count', String(keepAdminCount));
         }
-        // 操作审计：更新日志保留上限
+        // 操作审计：更新日志保留上限（字段级 diff）
         try {
             const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.log', resourceType: 'config', resourceId: 'log', details: '更新日志上限(每用户:' + keepCount + ',后台操作全站:' + (keepAdminCount !== null ? keepAdminCount : '不变') + ')', req });
+            var changes = buildFieldDiff(oldLogConfig, {
+                keep_count: parseInt(await db.config.get('log:keep_count')) || 5000,
+                keep_admin_count: parseInt(await db.config.get('log:keep_admin_count')) || 5000
+            }, [
+                { key: 'keep_count', label: '每用户上限', num: true },
+                { key: 'keep_admin_count', label: '后台全站上限', num: true }
+            ]);
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.log', resourceType: 'config', resourceId: 'log', details: '更新日志上限；变更:' + changes.join(', '), req });
+            }
         } catch (e) {}
         res.json({ message: '日志配置保存成功' });
     } catch (error) {

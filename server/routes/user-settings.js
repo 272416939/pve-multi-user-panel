@@ -28,12 +28,16 @@ router.put('/user/notification-settings', authMiddleware, async (req, res) => {
     try {
         const db = require('../api/db');
         // B-1: 只操作 req.user.id 的记录，不接受 user_id 参数
+        // 保存前取旧设置（审计 diff 用）
+        const oldSettings = await db.userSettings.getByUserId(req.user.id);
         const settings = await db.userSettings.upsert(req.user.id, req.body);
-        // 操作审计：通知设置变更（打开/关闭具体通知）
+        const newSettings = await db.userSettings.getByUserId(req.user.id);
+        // 操作审计：通知设置变更（旧 vs 新 diff，只记实际变化的开关，如「邮件通知: 开→关」）
         try {
             const FIELD_LABELS = {
                 email_notifications_enabled: '邮件通知', notify_vm_provisioned: 'VM开通通知',
                 notify_lxc_provisioned: 'LXC开通通知', notify_account_password: '账号密码通知',
+                notify_subnet_provisioned: '子网开通通知',
                 notify_vm_refund: 'VM退款通知', notify_lxc_refund: 'LXC退款通知',
                 notify_disk_purchase: '硬盘购买通知', notify_disk_resize: '硬盘扩容通知',
                 notify_disk_renewal: '硬盘续费通知', notify_disk_refund: '硬盘退款通知',
@@ -41,14 +45,14 @@ router.put('/user/notification-settings', authMiddleware, async (req, res) => {
                 notify_renewal: '续费通知', notify_expiry_reminder: '到期提醒通知',
                 notify_expiry_alert: '到期预警通知', notify_backup_result: '备份结果通知'
             };
-            const changed = [];
-            for (var key of Object.keys(req.body || {})) {
-                if (!FIELD_LABELS[key]) continue;
-                changed.push((req.body[key] ? '打开' : '关闭') + '[' + FIELD_LABELS[key] + ']');
-            }
-            if (changed.length > 0) {
-                const { auditLog } = require('../utils/audit-log');
-                await auditLog({ userId: req.user.id, username: req.user.username, action: 'setting.notification', details: '更新通知设置：' + changed.join('、'), req });
+            const { auditLog } = require('../utils/audit-log');
+            const { buildFieldDiff } = require('../utils/audit-diff');
+            const fieldDefs = Object.keys(FIELD_LABELS).map(function (k) {
+                return { key: k, label: FIELD_LABELS[k], bool: true };
+            });
+            const changes = buildFieldDiff(oldSettings, newSettings, fieldDefs);
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'setting.notification', details: '更新通知设置；变更:' + changes.join(', '), req });
             }
         } catch (_) {}
         res.json(settings);

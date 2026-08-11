@@ -335,15 +335,26 @@ router.get('/admin/snapshot-config', authMiddleware, adminMiddleware, async (req
 
 router.put('/admin/snapshot-config', authMiddleware, adminMiddleware, async (req, res) => {
     const { max_per_vm, daily_create_limit, daily_restore_limit } = req.body;
-    db.snapshotConfig.set({
+    // 保存前取旧配置（审计 diff 用；原 set 未 await 属 fire-and-forget，一并修正）
+    const oldCfg = await db.snapshotConfig.get();
+    await db.snapshotConfig.set({
         max_per_vm: Math.max(1, parseInt(max_per_vm) || 5),
         daily_create_limit: Math.max(1, parseInt(daily_create_limit) || 20),
         daily_restore_limit: Math.max(1, parseInt(daily_restore_limit) || 10)
     });
-    // 操作审计：更新快照配置
+    const newCfg = await db.snapshotConfig.get();
+    // 操作审计：更新快照配置（字段级 diff）
     try {
         const { auditLog } = require('../utils/audit-log');
-        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.snapshot', resourceType: 'config', resourceId: 'snapshot', details: '更新快照配置(每机上限:' + Math.max(1, parseInt(max_per_vm) || 5) + ',每日创建:' + Math.max(1, parseInt(daily_create_limit) || 20) + ',每日恢复:' + Math.max(1, parseInt(daily_restore_limit) || 10) + ')', req });
+        const { buildFieldDiff } = require('../utils/audit-diff');
+        const changes = buildFieldDiff(oldCfg, newCfg, [
+            { key: 'max_per_vm', label: '每机上限', num: true },
+            { key: 'daily_create_limit', label: '每日创建', num: true },
+            { key: 'daily_restore_limit', label: '每日恢复', num: true }
+        ]);
+        if (changes.length) {
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.snapshot', resourceType: 'config', resourceId: 'snapshot', details: '更新快照配置；变更:' + changes.join(', '), req });
+        }
     } catch (e) {}
     res.json({ message: '快照配置已保存' });
 });

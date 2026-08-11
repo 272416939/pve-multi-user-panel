@@ -400,10 +400,49 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
  
     await db.lxcContainers.update(ctId, updates);
 
-    // 操作审计：LXC 名称编辑
-    if (name !== undefined && name !== ct.name) {
-        await auditAction(req, 'lxc.rename', '编辑 LXC ' + ct.ct_id + ' 名称: ' + (ct.name || '') + ' → ' + name, { resourceType: 'lxc', resourceId: ct.ct_id });
-    }
+    // 操作审计：LXC 编辑（仅名称 → lxc.rename；含管理员字段变更 → lxc.edit 字段级 diff）
+    // 管理字段（到期/续费价/续费周期/换绑用户/MAC分组）此前无审计，改到期时间≈免费续费，属资金敏感项
+    var adminEditFields = [
+        { key: 'expiration_date', label: '到期时间', fmt: function (v) { return String(v).slice(0, 10); } },
+        { key: 'renewal_price', label: '续费价', num: true, fmt: function (v) { return '¥' + v; } },
+        { key: 'renewal_period', label: '续费周期', fmt: function (v) { return v === 'month' ? '月付' : (v === 'quarter' ? '季付' : (v === 'year' ? '年付' : v)); } },
+        { key: 'user', label: '所属用户' },
+        { key: 'ikuai_mac_group_id', label: 'MAC分组', fmt: function (v) { return v ? '#' + v : '无'; } }
+    ];
+    try {
+        var newCt = await db.lxcContainers.getById(ctId);
+        if (newCt) {
+            // 所属用户显示名（用户名优先，缺失回退 #id）
+            var oldUserName = '';
+            if (ct.user_id) { try { var ou = await db.users.getById(ct.user_id); if (ou) oldUserName = ou.username; } catch (e) {} }
+            var targetUserId = user_id !== undefined ? parseInt(user_id) : ct.user_id;
+            var newUserName = '';
+            if (targetUserId) { try { var nu = await db.users.getById(targetUserId); if (nu) newUserName = nu.username; } catch (e) {} }
+            var oldView = {
+                expiration_date: ct.expiration_date,
+                renewal_price: ct.renewal_price,
+                renewal_period: ct.renewal_period,
+                user: oldUserName || (ct.user_id ? '#' + ct.user_id : '无'),
+                ikuai_mac_group_id: ct.ikuai_mac_group_id || ''
+            };
+            var newView = {
+                expiration_date: newCt.expiration_date,
+                renewal_price: newCt.renewal_price,
+                renewal_period: newCt.renewal_period,
+                user: newUserName || (newCt.user_id ? '#' + newCt.user_id : '无'),
+                ikuai_mac_group_id: newCt.ikuai_mac_group_id || ''
+            };
+            var { buildFieldDiff } = require('../utils/audit-diff');
+            var adminChanges = buildFieldDiff(oldView, newView, adminEditFields);
+            var nameChanged = name !== undefined && name !== ct.name;
+            if (adminChanges.length) {
+                if (nameChanged) adminChanges.unshift('名称 ' + (ct.name || '无') + '→' + name);
+                await auditAction(req, 'lxc.edit', '编辑 LXC ' + ct.ct_id + '；变更:' + adminChanges.join(', '), { resourceType: 'lxc', resourceId: ct.ct_id });
+            } else if (nameChanged) {
+                await auditAction(req, 'lxc.rename', '编辑 LXC ' + ct.ct_id + ' 名称: ' + (ct.name || '') + ' → ' + name, { resourceType: 'lxc', resourceId: ct.ct_id });
+            }
+        }
+    } catch (e) {}
  
     // 换绑后尝试自动开机
     if (isAdmin && user_id !== undefined && user_id !== ct.user_id) {

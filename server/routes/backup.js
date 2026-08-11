@@ -282,15 +282,26 @@ router.get('/admin/backup-config', authMiddleware, adminMiddleware, async (req, 
 
 router.put('/admin/backup-config', authMiddleware, adminMiddleware, async (req, res) => {
     const { default_storage, max_per_vm, daily_limit } = req.body;
+    // 保存前取旧配置（审计 diff 用）
+    const oldCfg = await db.backupConfig.get();
     await db.backupConfig.set({
         default_storage: default_storage || 'local',
         max_per_vm: Math.max(1, parseInt(max_per_vm) || 3),
         daily_limit: Math.max(1, parseInt(daily_limit) || 3)
     });
-    // 操作审计：更新备份配置
+    const newCfg = await db.backupConfig.get();
+    // 操作审计：更新备份配置（字段级 diff）
     try {
         const { auditLog } = require('../utils/audit-log');
-        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.backup', resourceType: 'config', resourceId: 'backup', details: '更新备份配置(存储:' + (default_storage || 'local') + ',每机上限:' + Math.max(1, parseInt(max_per_vm) || 3) + ',每日上限:' + Math.max(1, parseInt(daily_limit) || 3) + ')', req });
+        const { buildFieldDiff } = require('../utils/audit-diff');
+        const changes = buildFieldDiff(oldCfg, newCfg, [
+            { key: 'default_storage', label: '默认存储' },
+            { key: 'max_per_vm', label: '每机上限', num: true },
+            { key: 'daily_limit', label: '每日上限', num: true }
+        ]);
+        if (changes.length) {
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.backup', resourceType: 'config', resourceId: 'backup', details: '更新备份配置；变更:' + changes.join(', '), req });
+        }
     } catch (e) {}
     res.json({ message: '备份配置已保存' });
 });

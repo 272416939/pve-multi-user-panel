@@ -458,7 +458,13 @@ router.post('/auth/reset-password', async (req, res) => {
 
         // 删除已使用的 token
         await tokenStore.delResetToken(token);
-        
+
+        // 操作审计：重置密码（未登录场景，userId 记被重置用户；D 类缺埋点补全）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: userId, username: user.username || '', action: 'password.reset', resourceType: 'user', resourceId: userId, details: '重置密码(账号:' + (user.username || '') + ')', req });
+        } catch (e) {}
+
         res.json({ message: '密码重置成功，请使用新密码登录' });
     } catch (error) {
         res.status(500).json({ error: '重置失败' });
@@ -610,6 +616,12 @@ router.post('/register', async (req, res) => {
 
         // 删除已使用的验证码
         await tokenStore.delRegisterCode(email);
+
+        // 操作审计：用户自助注册（D 类缺埋点补全；action 映射见 db-messaging.js user_login 分类）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: newUser.id, username: username, action: 'user.register', resourceType: 'user', resourceId: newUser.id, details: '注册账号:' + username, req });
+        } catch (e) {}
 
         res.json({ success: true, message: '注册成功，请登录' });
     } catch (error) {
