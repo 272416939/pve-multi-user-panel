@@ -140,12 +140,12 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             return;
                         }
 
-                        // 获取用户信息，判断角色
+                        // 获取用户信息，判断角色（保留 URL query，如 ?section=templates-os 登录后直达）
                         const userData = await api('/user/profile');
                         if (userData.role === 'admin') {
-                            window.location.href = 'admin.html';
+                            window.location.href = 'admin.html' + (location.search || '');
                         } else {
-                            window.location.href = 'dashboard.html';
+                            window.location.href = 'dashboard.html' + (location.search || '');
                         }
                     } catch (e) {
                         if (e.message.includes('网络') || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
@@ -399,7 +399,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     // 检查是否已登录
                     const token = localStorage.getItem(window.__storageKeys.TOKEN);
                     if (token) {
-                        window.location.href = 'dashboard.html';
+                        window.location.href = 'dashboard.html' + (location.search || '');
                         return;
                     }
 
