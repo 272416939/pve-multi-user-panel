@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.2.2] - 2026-08-10
+
+### Fixed
+- **fix(ui): 修复所有编辑弹窗底部横向滚动条**
+  - **根因**：公共 `.modal-content` 规则含 `overflow-y: auto`，按 CSS 规范 overflow-y 非 visible 时 overflow-x 被强制计算为 `auto`，内容比弹窗宽 1px 即出现底部横向滚动条；该规则三端（admin/dashboard/user-center）共用，故所有编辑弹窗都受影响
+  - **修复**：`.modal-content` 追加 `overflow-x: hidden`（一处生效全局三端）+ 追加 `.modal-dialog-scrollable .modal-body { overflow-x: hidden; }` 覆盖 Bootstrap 同类根因弹窗
+  - 纵向滚动保留（长表单仍可上下滚动）
+- 缓存版本 v115 -> v116
+
+### Notes
+- 验证：Playwright 真实 CSS 计算值确认 overflow-x=hidden、overflow-y=auto 保留、页面无横向滚动条
+- `overflow-x: hidden` 会裁剪真正超宽内容而非滚动（预期行为）；如个别弹窗存在真实超宽布局需按弹窗补 `flex-wrap` 调整
+
 ## [3.2.1] - 2026-08-10
 
 ### Fixed
