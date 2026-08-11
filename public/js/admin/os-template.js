@@ -18,7 +18,8 @@ window.__admin.osTemplatePage = (function () {
         allowed_package_ids: '', enabled: 1, status: 'active'
     });
     const saving = ref(false);
-    let editId = null;
+    // 编辑/新增模式由 formData.id 判断（reactive 引用，模板可响应；
+    // 曾用模块级 let editId 返回给模板，但对象字面量只拷贝原始值，永远为 null → 标题恒显"新增"）
     // 请求序号保护：PVE 模板配置异步加载只采纳最后一次请求，防止旧响应覆盖新打开的表单
     // （用户关闭弹窗后旧请求才返回，会把上次模板的数据写进新表单——同 admin.js userLoadSeq 模式）
     let vmidConfigSeq = 0;
@@ -64,13 +65,13 @@ window.__admin.osTemplatePage = (function () {
             if (seq !== vmidConfigSeq) return; // 已有更新的请求/已打开新表单，丢弃过期响应
             if (res && res.success && res.data) {
                 var d = res.data;
-                if (!editId) {
+                if (!formData.id) {
                     formData.name = d.name || '';
                 }
                 formData.os_type = d.os_type || '';
                 formData.os_version = d.os_version || '';
                 formData.arch = d.arch || 'x86_64';
-                if (!editId) {
+                if (!formData.id) {
                     formData.target_storage = d.target_storage || 'local-lvm';
                 }
                 formData.ciuser = d.ciuser || '';
@@ -99,7 +100,6 @@ window.__admin.osTemplatePage = (function () {
         loadAllStorages();
         if (row) {
             Object.assign(formData, row);
-            editId = row.id;
         } else {
             Object.keys(formData).forEach(k => {
                 if (k === 'enabled') formData[k] = 1;
@@ -109,7 +109,6 @@ window.__admin.osTemplatePage = (function () {
                 else if (k === 'sort_order') formData[k] = 0;
                 else formData[k] = '';
             });
-            editId = null;
         }
         formVisible.value = true;
         const el = document.getElementById('osTemplateFormModal');
@@ -131,13 +130,13 @@ window.__admin.osTemplatePage = (function () {
     async function save() {
         saving.value = true;
         try {
-            const url = editId ? '/admin/os-templates/' + editId : '/admin/os-templates';
-            const method = editId ? 'PUT' : 'POST';
+            const url = formData.id ? '/admin/os-templates/' + formData.id : '/admin/os-templates';
+            const method = formData.id ? 'PUT' : 'POST';
             const res = await api(url, { method, body: JSON.stringify(formData) });
             if (res.success) {
                 closeForm();
                 await load();
-                alert(editId ? '已更新' : '已创建');
+                alert(formData.id ? '已更新' : '已创建');
             } else {
                 alert(res.error || '操作失败');
             }
@@ -159,5 +158,5 @@ window.__admin.osTemplatePage = (function () {
         }
     }
 
-    return { osTemplates, formVisible, formData, saving, editId, pveTemplateVms, pveConfigLoading, allStorages, load, openForm, closeForm, save, deleteRow, onTemplateVmidChange, loadPveTemplates, loadAllStorages };
+    return { osTemplates, formVisible, formData, saving, pveTemplateVms, pveConfigLoading, allStorages, load, openForm, closeForm, save, deleteRow, onTemplateVmidChange, loadPveTemplates, loadAllStorages };
 })();

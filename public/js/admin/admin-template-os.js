@@ -42,7 +42,7 @@
         <!-- 新增/编辑模态框 -->
         <div class="modal fade" id="osTemplateFormModal" tabindex="-1">
             <div class="modal-dialog modal-lg"><div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">{{ osTemplatePage.editId ? '编辑系统模板' : '新增系统模板' }}</h5>
+                <div class="modal-header"><h5 class="modal-title">{{ osTemplatePage.formData.id ? '编辑系统模板' : '新增系统模板' }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
                 <div class="modal-body">
                     <div class="row g-3">
