@@ -290,7 +290,7 @@ html { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparen
 .vm-detail-modal { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 20px; }
 .vm-detail-modal.show { display: flex; }
-.modal-content { width: 100%; max-width: 1200px; max-height: 90vh; overflow-y: auto;
+.modal-content { width: 100%; max-width: 1200px; max-height: 90vh; overflow-y: auto; overflow-x: hidden;
     background: var(--bg-modal); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     border: 1px solid var(--border-color); border-radius: 16px;
     box-shadow: var(--shadow-lg); scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparent;
@@ -298,6 +298,8 @@ html { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) transparen
 .modal-content::-webkit-scrollbar { width: 6px; }
 .modal-content::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
 .modal-content::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
+/* modal-dialog-scrollable 弹窗的 body 同样因 overflow-y: auto 诱发横向滚动条，一并隐藏 */
+.modal-dialog-scrollable .modal-body { overflow-x: hidden; }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px;
     border-bottom: 1px solid var(--border-color); position: sticky; top: 0;
     background: var(--bg-modal); z-index: 1; backdrop-filter: blur(8px);
