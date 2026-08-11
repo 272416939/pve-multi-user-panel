@@ -112,6 +112,22 @@
         // 数据加载由 core.js watch($.logTab) 统一处理（点击与刷新路径一致）
     };
 
+    // ===== 详情弹窗（logDetailModal 共享弹窗，展示完整 detail_text 含字段级变更明细） =====
+    $.logDetailTitle = ref('');
+    $.logDetailMeta = ref('');
+    $.logDetailText = ref('');
+    $.showLogDetail = function(row) {
+        if (!row) return;
+        $.logDetailTitle.value = '日志 #' + row.id + ' · ' + (row.category_name || row.action || '');
+        $.logDetailMeta.value = (row.username || '-') + ' | ' + (row.created_at || '');
+        $.logDetailText.value = row.detail_text || '（无详情）';
+        var el = document.getElementById('logDetailModal');
+        if (el) {
+            var modal = new bootstrap.Modal(el);
+            modal.show();
+        }
+    };
+
     // ===== 刷新 =====
     $.refreshLogs = function() {
         if ($.logTab.value === 'operation') {

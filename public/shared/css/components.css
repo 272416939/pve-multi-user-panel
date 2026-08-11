@@ -743,3 +743,11 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     text-overflow: ellipsis;
     min-width: 0;
 }
+/* 日志详情列单行截断（admin 日志中心 / dashboard 日志页共用；悬浮 title 看全文，点「详情」弹窗看完整 diff） */
+.log-detail-truncate {
+    display: block;
+    max-width: 520px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

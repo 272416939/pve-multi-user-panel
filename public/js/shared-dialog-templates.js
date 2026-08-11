@@ -45,4 +45,25 @@ window.__sharedDialogTemplates = `
     </div>
 </div>
 </Teleport>
+
+<!-- 日志详情弹窗（三端共享：admin 日志中心 / dashboard 日志页「详情」按钮，展示完整 detail_text 含字段级变更明细） -->
+<Teleport to="body">
+<div class="modal fade" id="logDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header py-2">
+                <h6 class="modal-title mb-0">{{ logDetailTitle }}</h6>
+                <pv-button type="button" variant="close" data-bs-dismiss="modal" aria-label="关闭"></pv-button>
+            </div>
+            <div class="modal-body" style="overflow-y:auto;overflow-x:hidden;">
+                <p class="small text-muted mb-2" style="white-space:pre-line;">{{ logDetailMeta }}</p>
+                <p class="mb-0" style="white-space:pre-line;word-break:break-all;color:var(--text-primary);font-size:13px;line-height:1.7;">{{ logDetailText }}</p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <pv-button type="button" variant="primary" data-bs-dismiss="modal">关闭</pv-button>
+            </div>
+        </div>
+    </div>
+</div>
+</Teleport>
 `;
