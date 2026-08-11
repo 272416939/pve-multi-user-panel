@@ -65,7 +65,9 @@ window.__admin.osTemplatePage = (function () {
         formData.os_type = d.os_type || '';
         formData.os_version = d.os_version || '';
                 formData.arch = d.arch || 'x86_64';
-                formData.target_storage = d.target_storage || 'local-lvm';
+                if (!editId) {
+                    formData.target_storage = d.target_storage || 'local-lvm';
+                }
                 formData.ciuser = d.ciuser || '';
             }
         } catch (e) {

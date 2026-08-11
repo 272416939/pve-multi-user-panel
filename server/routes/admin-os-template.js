@@ -184,6 +184,7 @@ router.post('/admin/os-templates', async (req, res) => {
             os_version: String(data.os_version || '').slice(0, 50),
             ostype: String(data.ostype || '').slice(0, 20),
             arch: ['x86_64', 'aarch64'].includes(data.arch) ? data.arch : 'x86_64',
+            disk_format: ['', 'raw', 'qcow2', 'vmdk'].includes(data.disk_format) ? data.disk_format : '',
             target_storage: String(data.target_storage || 'local-lvm').slice(0, 100),
             ciuser: String(data.ciuser || '').slice(0, 100),
             description: String(data.description || '').slice(0, 5000),
@@ -224,6 +225,10 @@ router.put('/admin/os-templates/:id', async (req, res) => {
             if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
                 return res.status(400).json({ error: '无效的模板 VMID' });
             }
+        }
+        // 目标磁盘格式白名单（跨存储切换时作为 PVE move_disk 的 format 参数，非法值会导致切换失败）
+        if (updates.disk_format !== undefined && !['', 'raw', 'qcow2', 'vmdk'].includes(updates.disk_format)) {
+            return res.status(400).json({ error: '无效的目标磁盘格式' });
         }
         const result = await db.osTemplates.update(id, updates);
         // 操作审计：更新 OS 模板
