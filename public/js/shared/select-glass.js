@@ -113,6 +113,7 @@
             closeAll();
             if (select.disabled) return;
             syncWidth();
+            syncText(); // 打开前同步 trigger 文本（Vue 回填后未触发的场景）
             // 打开时重建选项（select.options 实时来源，支持 Vue 动态选项/回填）
             dropdown.innerHTML = '';
             for (var i = 0; i < select.options.length; i++) {
@@ -159,6 +160,19 @@
         var optMo = new MutationObserver(syncText);
         optMo.observe(select, { childList: true, subtree: true, characterData: true });
         syncText();
+
+        // Vue 程序化回填 select.value（v-model 赋值，如弹窗 openForm 回填）不触发
+        // change/MutationObserver，trigger 文本会残留上次选中项。轮询兜底：
+        // 仅值变化时更新 DOM（字符串比较，开销可忽略）；select 被移除时自清理
+        var lastValue = select.value;
+        var syncTimer = setInterval(function () {
+            if (!document.contains(select)) { clearInterval(syncTimer); return; }
+            if (select.value !== lastValue) {
+                lastValue = select.value;
+                syncText();
+            }
+        }, 400);
+        wrapper.__syncTimer = syncTimer;
     }
 
     function scan(root) {
@@ -193,6 +207,7 @@
                 var w = rn.matches && rn.matches('.custom-select') ? rn : (rn.querySelectorAll ? rn.querySelector('.custom-select') : null);
                 if (w && w.__dropdown) {
                     try { w.__dropdown.remove(); } catch (e) {}
+                    if (w.__syncTimer) { clearInterval(w.__syncTimer); w.__syncTimer = null; }
                     if (active && active.wrapper === w) active = null;
                 }
             }
