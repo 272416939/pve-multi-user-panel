@@ -15,6 +15,29 @@
     if (window.__selectGlassBound) return;
     window.__selectGlassBound = true;
 
+    // ===== 彻底修复：Vue 程序化回填 select 选中值不同步 =====
+    // Vue 3 的 select v-model patch 通过设置 el.selectedIndex（runtime-dom setSelected），
+    // 它是 IDL property，不触发 change/input/MutationObserver 任何事件，导致 trigger
+    // 文本残留上次选中项。拦截 selectedIndex setter：任何赋值（Vue 回填、业务代码、
+    // 用户选择）都派发 glass-change 事件，由各 wrapper 监听后即时同步文本。
+    // 无轮询、零延迟、幂等（syncText 相同值不写 DOM）。
+    if (!window.__selectGlassSelectedIndexPatched) {
+        window.__selectGlassSelectedIndexPatched = true;
+        var _idxDesc = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'selectedIndex');
+        if (_idxDesc && _idxDesc.set) {
+            Object.defineProperty(HTMLSelectElement.prototype, 'selectedIndex', {
+                configurable: true,
+                get: function () { return _idxDesc.get.call(this); },
+                set: function (v) {
+                    _idxDesc.set.call(this, v);
+                    if (this.dataset && this.dataset.glassBound && typeof this.dispatchEvent === 'function') {
+                        this.dispatchEvent(new CustomEvent('glass-change', { bubbles: false }));
+                    }
+                }
+            });
+        }
+    }
+
     var active = null; // 当前打开的 { wrapper, dropdown, select, trigger }
 
     function closeAll() {
@@ -156,23 +179,12 @@
             else if (e.key === 'Escape') { e.preventDefault(); close(); }
         });
         select.addEventListener('change', syncText);
+        // selectedIndex setter 拦截派发的事件：Vue v-model 回填等程序化赋值即时同步
+        select.addEventListener('glass-change', syncText);
         // Vue 重渲染 option 列表时同步 trigger 文本
         var optMo = new MutationObserver(syncText);
         optMo.observe(select, { childList: true, subtree: true, characterData: true });
         syncText();
-
-        // Vue 程序化回填 select.value（v-model 赋值，如弹窗 openForm 回填）不触发
-        // change/MutationObserver，trigger 文本会残留上次选中项。轮询兜底：
-        // 仅值变化时更新 DOM（字符串比较，开销可忽略）；select 被移除时自清理
-        var lastValue = select.value;
-        var syncTimer = setInterval(function () {
-            if (!document.contains(select)) { clearInterval(syncTimer); return; }
-            if (select.value !== lastValue) {
-                lastValue = select.value;
-                syncText();
-            }
-        }, 400);
-        wrapper.__syncTimer = syncTimer;
     }
 
     function scan(root) {
@@ -207,7 +219,6 @@
                 var w = rn.matches && rn.matches('.custom-select') ? rn : (rn.querySelectorAll ? rn.querySelector('.custom-select') : null);
                 if (w && w.__dropdown) {
                     try { w.__dropdown.remove(); } catch (e) {}
-                    if (w.__syncTimer) { clearInterval(w.__syncTimer); w.__syncTimer = null; }
                     if (active && active.wrapper === w) active = null;
                 }
             }
