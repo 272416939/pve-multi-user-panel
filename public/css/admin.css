@@ -246,7 +246,7 @@ tr:hover td { background: var(--bg-hover); }
 .dropdown-menu-table li a:hover { background: color-mix(in srgb, var(--color-primary) 15%, transparent); color: #fff; }
 
 /* Form controls（统一走 shared/components.css，此处不再重复定义） */
-.form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
+.form-label { display: block; color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
     transition: color 0.3s ease; }
 .form-control::placeholder { color: var(--text-secondary) !important; opacity: 0.7; }
 

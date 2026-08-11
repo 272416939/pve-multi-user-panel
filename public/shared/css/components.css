@@ -467,7 +467,7 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 .custom-select.disabled .custom-select-trigger:hover { background: var(--bg-input); border-color: var(--border-color); }
 
 /* ========== Form Controls ========== */
-.form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
+.form-label { display: block; color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
     transition: color 0.3s ease; }
 .form-control, .form-select { background-color: var(--bg-input) !important; border: 1px solid var(--border-color) !important;
     color: var(--text-primary) !important;

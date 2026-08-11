@@ -314,7 +314,7 @@
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label" id="cdk-vm-label">选择要续费的{{ cdkRedeemForm.type === 'vm' ? '虚拟机' : 'LXC 容器' }}</label>
-                                        <div class="custom-select" :class="{ open: cdkVmDropdownOpen }" @click.stop>
+                                        <div class="custom-select" style="width:100%;" :class="{ open: cdkVmDropdownOpen }" @click.stop>
                                             <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-vm-label"
                                                  @click="cdkVmDropdownOpen = !cdkVmDropdownOpen"
                                                  @keydown.enter.prevent="cdkVmDropdownOpen = !cdkVmDropdownOpen"

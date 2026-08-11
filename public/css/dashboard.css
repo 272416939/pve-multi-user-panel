@@ -322,7 +322,7 @@
     .floating-dropdown-menu .dropdown-item:hover { background: var(--glass-accent-hover); color: var(--text-primary); }
 
     /* Form controls（统一走 shared/components.css，此处不再重复定义） */
-    .form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
+    .form-label { display: block; color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
         transition: color 0.3s ease; }
 
     /* btn-close 主题适配 */
