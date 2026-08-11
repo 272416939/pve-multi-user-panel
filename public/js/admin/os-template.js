@@ -19,6 +19,9 @@ window.__admin.osTemplatePage = (function () {
     });
     const saving = ref(false);
     let editId = null;
+    // 请求序号保护：PVE 模板配置异步加载只采纳最后一次请求，防止旧响应覆盖新打开的表单
+    // （用户关闭弹窗后旧请求才返回，会把上次模板的数据写进新表单——同 admin.js userLoadSeq 模式）
+    let vmidConfigSeq = 0;
     const allStorages = ref([]);  // PVE 存储列表（目标存储下拉用）
 
     // 加载 PVE 模板 VM 列表（仅 template=1）
@@ -54,16 +57,18 @@ window.__admin.osTemplatePage = (function () {
     // 选择 PVE 模板后自动填充字段
     async function onTemplateVmidChange(newVmid) {
         if (!newVmid) return;
+        var seq = ++vmidConfigSeq;
         pveConfigLoading.value = true;
         try {
             var res = await api('/admin/pve-template-config/' + newVmid);
+            if (seq !== vmidConfigSeq) return; // 已有更新的请求/已打开新表单，丢弃过期响应
             if (res && res.success && res.data) {
                 var d = res.data;
                 if (!editId) {
                     formData.name = d.name || '';
                 }
-        formData.os_type = d.os_type || '';
-        formData.os_version = d.os_version || '';
+                formData.os_type = d.os_type || '';
+                formData.os_version = d.os_version || '';
                 formData.arch = d.arch || 'x86_64';
                 if (!editId) {
                     formData.target_storage = d.target_storage || 'local-lvm';
@@ -71,9 +76,10 @@ window.__admin.osTemplatePage = (function () {
                 formData.ciuser = d.ciuser || '';
             }
         } catch (e) {
+            if (seq !== vmidConfigSeq) return;
             console.error('加载 PVE 模板配置失败', e);
         } finally {
-            pveConfigLoading.value = false;
+            if (seq === vmidConfigSeq) pveConfigLoading.value = false;
         }
     }
 
@@ -87,6 +93,8 @@ window.__admin.osTemplatePage = (function () {
     }
 
     function openForm(row) {
+        // 使所有挂起的 PVE 配置请求失效，防止旧响应污染新打开的表单
+        vmidConfigSeq++;
         loadPveTemplates();
         loadAllStorages();
         if (row) {
