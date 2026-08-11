@@ -126,8 +126,13 @@ function ensureValidToken() {
 window._pushClient = null;
 window._pushSubscribeQueue = [];
 window._pushReconnectDelay = 1000;
+window._pushReconnectTimer = null;      // 排队中的延迟重连定时器
+window._pushOnMessage = null;           // 消息回调（供页面恢复可见时重连复用）
+window._pushOnOpen = null;              // 打开回调
 window.initPushClient = function(onMessage, onOpen) {
     if (window._pushClient && window._pushClient.readyState === WebSocket.OPEN) return;
+    window._pushOnMessage = onMessage;
+    window._pushOnOpen = onOpen;
     window._pushClient = null;
     api('/user/push-ticket').then(function(r) {
         if (!r.ticket) return;
@@ -151,7 +156,10 @@ window.initPushClient = function(onMessage, onOpen) {
             var delay = window._pushReconnectDelay;
             delay += Math.floor(Math.random() * 1000);
             window._pushReconnectDelay = Math.min(window._pushReconnectDelay * 2, 60000);
-            setTimeout(function() { window.initPushClient(onMessage, onOpen); }, delay);
+            window._pushReconnectTimer = setTimeout(function() {
+                window._pushReconnectTimer = null;
+                window.initPushClient(onMessage, onOpen);
+            }, delay);
         });
         ws.addEventListener('error', function() {
             window._pushClient = null;
@@ -164,6 +172,24 @@ window.sendPush = function(msg) {
         window._pushClient.send(JSON.stringify(msg));
     }
 };
+
+// 页面从 bfcache/后台恢复可见时，若连接已断开则立即重连，
+// 避免干等 close 事件 + 指数退避（最长 60 秒推送空窗期）
+window.ensurePushConnected = function() {
+    if (window._pushClient && (window._pushClient.readyState === WebSocket.OPEN || window._pushClient.readyState === WebSocket.CONNECTING)) return;
+    if (window._pushReconnectTimer) {
+        clearTimeout(window._pushReconnectTimer);
+        window._pushReconnectTimer = null;
+    }
+    window._pushReconnectDelay = 1000;
+    window.initPushClient(window._pushOnMessage, window._pushOnOpen);
+};
+window.addEventListener('pageshow', function(e) {
+    if (e.persisted) window.ensurePushConnected();
+});
+document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') window.ensurePushConnected();
+});
 
 const getGeekAvatar = (username) => {
     const name = username || '?';
