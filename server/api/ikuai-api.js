@@ -480,7 +480,8 @@ class IkuaiApi {
                 return [];
             }
             return list.map(item => ({
-                id: item.id || '',
+                // id 统一转字符串：与 DB TEXT 列（mysql2 返回字符串）及前端 v-model 严格比较保持一致
+                id: String(item.id || ''),
                 group_name: item.group_name || '',
                 comment: item.comment || '',
                 enabled: item.enabled || 'yes',

@@ -190,7 +190,8 @@
             expiration_date: formatDateTimeLocal(ct.expiration_date),
             renewal_price: ct.renewal_price || '',
             renewal_period: ct.renewal_period || 'month',
-            user_id: ct.user_id || null
+            user_id: ct.user_id || null,
+            mac_group_id: ct.ikuai_mac_group_id != null ? String(ct.ikuai_mac_group_id) : ''
         };
         $.bsModalShow('editLxcModal');
     };
@@ -205,7 +206,8 @@
                     expiration_date: expDate,
                     renewal_price: $.editLxcForm.value.renewal_price,
                     renewal_period: $.editLxcForm.value.renewal_period,
-                    user_id: $.editLxcForm.value.user_id
+                    user_id: $.editLxcForm.value.user_id,
+                    mac_group_id: $.editLxcForm.value.mac_group_id || null
                 })
             });
             $.bsModalHide('editLxcModal');

@@ -153,7 +153,8 @@
             expiration_date: formatDateTimeLocal(vm.expiration_date),
             renewal_price: vm.renewal_price || '',
             renewal_period: vm.renewal_period || 'month',
-            user_id: vm.user_id || null
+            user_id: vm.user_id || null,
+            mac_group_id: vm.ikuai_mac_group_id != null ? String(vm.ikuai_mac_group_id) : ''
         };
         $.bsModalShow('editVmModal');
     };
@@ -168,7 +169,8 @@
                     expiration_date: expDate,
                     renewal_price: $.editVmForm.value.renewal_price,
                     renewal_period: $.editVmForm.value.renewal_period,
-                    user_id: $.editVmForm.value.user_id
+                    user_id: $.editVmForm.value.user_id,
+                    mac_group_id: $.editVmForm.value.mac_group_id || null
                 })
             });
             $.bsModalHide('editVmModal');
