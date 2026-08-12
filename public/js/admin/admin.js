@@ -498,6 +498,68 @@
             $.emailTemplateSource.value = html;
         });
         window.__emailTemplateQuill = quill;
+        $.applyEmailToolbarTitles();
+    };
+
+    // 工具栏按钮/下拉中文提示（Quill 默认只有图标，悬浮 title 说明功能）
+    $.applyEmailToolbarTitles = function() {
+        try {
+            var tb = document.querySelector('.email-template-quill-wrap .ql-toolbar');
+            if (!tb) return;
+            // 普通按钮
+            var BTN_TITLES = {
+                '.ql-bold': '加粗',
+                '.ql-italic': '斜体',
+                '.ql-underline': '下划线',
+                '.ql-strike': '删除线',
+                '.ql-blockquote': '引用',
+                '.ql-link': '插入链接',
+                '.ql-code-block': '代码块',
+                '.ql-clean': '清除格式',
+                '.ql-list[value="ordered"]': '有序列表',
+                '.ql-list[value="bullet"]': '无序列表'
+            };
+            Object.keys(BTN_TITLES).forEach(function(sel) {
+                var el = tb.querySelector(sel);
+                if (el) el.setAttribute('title', BTN_TITLES[sel]);
+            });
+            // 下拉选择器（标题/文字颜色/背景颜色）
+            var PICKER_TITLES = {
+                '.ql-header': '标题级别',
+                '.ql-color': '文字颜色',
+                '.ql-background': '背景颜色'
+            };
+            Object.keys(PICKER_TITLES).forEach(function(sel) {
+                var el = tb.querySelector(sel + ' .ql-picker-label');
+                if (el) el.setAttribute('title', PICKER_TITLES[sel]);
+            });
+            // 下拉选项提示（色板/标题选项在 Quill 初始化时已生成（隐藏），直接补一次 title；
+            // MutationObserver 兜底后续新增节点）
+            if (!tb.__qlPickerTitleBound) {
+                tb.__qlPickerTitleBound = true;
+                var applyItemTitles = function() {
+                    tb.querySelectorAll('.ql-header .ql-picker-options .ql-picker-item').forEach(function(item) {
+                        if (!item.getAttribute('title')) {
+                            var v = item.getAttribute('data-value');
+                            item.setAttribute('title', v === 'false' || v === null ? '正文' : '标题 ' + v);
+                        }
+                    });
+                    tb.querySelectorAll('.ql-color .ql-picker-options .ql-picker-item, .ql-background .ql-picker-options .ql-picker-item').forEach(function(item) {
+                        if (!item.getAttribute('title')) {
+                            var v = item.getAttribute('data-value');
+                            item.setAttribute('title', v ? '颜色 ' + v : '清除颜色格式');
+                        }
+                    });
+                };
+                applyItemTitles();
+                var mo = new MutationObserver(function() {
+                    applyItemTitles();
+                });
+                mo.observe(tb, { childList: true, subtree: true });
+            }
+        } catch (e) {
+            console.warn('工具栏提示设置失败:', e.message);
+        }
     };
 
     $.destroyEmailTemplateQuill = function() {
