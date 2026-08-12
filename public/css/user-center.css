@@ -340,53 +340,8 @@ thead tr:first-child th:last-child, .table thead tr:last-child th:last-child, .t
     background: var(--bg-input);
     transition: background-color 0.3s ease;
 }
-.notification-group {
-    border: 1px solid var(--border-color);
-    border-radius: 10px;
-    overflow: hidden;
-}
-.notification-group-header {
-    cursor: pointer;
-    background: var(--bg-input);
-    border: 1px solid var(--border-color);
-    transition: background-color 0.2s ease, border-color 0.3s ease;
-}
-.notification-group-header:hover {
-    background: var(--bg-hover);
-}
-.notification-group-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 6px;
-    color: var(--color-primary);
-    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-}
-.notification-group-icon svg {
-    display: block;
-}
-.notification-chevron {
-    color: var(--text-muted);
-}
-.notification-group-items {
-    border-top: 1px solid var(--border-color);
-}
-.notification-item-row {
-    border-bottom: 1px solid var(--border-color);
-}
-.notification-item-row:last-child {
-    border-bottom: none;
-}
-.transition-transform {
-    transition: transform 0.2s ease;
-    font-size: 12px;
-    color: var(--text-muted);
-}
-.cursor-pointer {
-    cursor: pointer;
-}
+/* notification-group 系列（分类折叠卡片）已上移至 shared/css/components.css 共享，
+   admin 邮件模板分类与用户中心通知设置共用同一套类（单一来源，勿在本地重复定义） */
 
 /* Toast 提示 */
 .toast-notification {

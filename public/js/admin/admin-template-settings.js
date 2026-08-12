@@ -144,15 +144,18 @@
                                     <p class="text-muted small mb-0">编辑系统自动发送的邮件模板，点击「编辑」展开编辑器，支持富文本/源码两种模式；「可用变量」点击即可插入光标处，变量值在发送时自动替换。保存后立即生效，可随时「恢复默认」。</p>
                                     <pv-button variant="table" @click="toggleEmailTemplateAll">{{ emailTemplateAllExpanded ? '全部收起' : '全部展开' }}</pv-button>
                                 </div>
-                                <div v-for="cat in emailTemplateCategories" :key="cat.key" class="mb-3">
-                                    <h6 class="mb-2 d-flex align-items-center gap-2" style="font-weight:600;color:var(--color-primary);cursor:pointer;user-select:none;" @click="toggleEmailTemplateCategory(cat.key)">
-                                        <span style="font-size:12px;color:var(--text-muted);">{{ emailTemplateCategoryCollapsed[cat.key] ? '▸' : '▾' }}</span>
-                                        {{ cat.label }}
-                                        <span class="text-muted" style="font-size:12px;font-weight:400;">（{{ emailTemplatesByCategory(cat.key).length }} 个模板）</span>
-                                    </h6>
-                                    <div v-if="!emailTemplateCategoryCollapsed[cat.key]">
-                                    <div v-for="tpl in emailTemplatesByCategory(cat.key)" :key="tpl.code" class="border rounded mb-2" style="border-color:var(--border-color) !important;">
-                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-2">
+                                <div v-for="cat in emailTemplateCategories" :key="cat.key" class="notification-group mb-3">
+                                    <div class="notification-group-header d-flex justify-content-between align-items-center px-3 py-2 cursor-pointer" @click="toggleEmailTemplateCategory(cat.key)">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="notification-group-icon" v-html="cat.svg"></span>
+                                            <span class="fw-bold">{{ cat.label }}</span>
+                                            <small class="text-muted">（{{ emailTemplatesByCategory(cat.key).length }} 个模板）</small>
+                                        </div>
+                                        <svg class="notification-chevron transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: emailTemplateCategoryCollapsed[cat.key] ? 'rotate(0deg)' : 'rotate(90deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
+                                    </div>
+                                    <div v-if="!emailTemplateCategoryCollapsed[cat.key]" class="notification-group-items">
+                                    <div v-for="tpl in emailTemplatesByCategory(cat.key)" :key="tpl.code">
+                                        <div class="notification-item-row d-flex align-items-center justify-content-between flex-wrap gap-2 px-3 py-2">
                                             <div class="d-flex align-items-center gap-2">
                                                 <strong>{{ tpl.name }}</strong>
                                                 <span class="text-muted" style="font-size:12px;">{{ tpl.code }}</span>

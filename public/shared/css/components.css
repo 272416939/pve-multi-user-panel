@@ -812,3 +812,54 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     border-radius: 0 0 12px 12px;
     padding: 20px;
 }
+
+/* ===== 分类折叠卡片（notification-group）=====
+   用户中心通知设置 + admin 邮件模板分类共用（单一来源，勿在单端 css 重复定义）
+   全 CSS 变量主题自适应（tokens.css 暗/亮），无需 theme.css 覆盖 */
+.notification-group {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.notification-group-header {
+    cursor: pointer;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    transition: background-color 0.2s ease, border-color 0.3s ease;
+}
+.notification-group-header:hover {
+    background: var(--bg-hover);
+}
+.notification-group-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+.notification-group-icon svg {
+    display: block;
+}
+.notification-chevron {
+    color: var(--text-muted);
+}
+.notification-group-items {
+    border-top: 1px solid var(--border-color);
+}
+.notification-item-row {
+    border-bottom: 1px solid var(--border-color);
+}
+.notification-item-row:last-child {
+    border-bottom: none;
+}
+.transition-transform {
+    transition: transform 0.2s ease;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.cursor-pointer {
+    cursor: pointer;
+}

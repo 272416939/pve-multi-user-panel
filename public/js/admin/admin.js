@@ -442,7 +442,10 @@
         try {
             var res = await api('/admin/email-templates');
             $.emailTemplates.value = res.templates || [];
-            $.emailTemplateCategories.value = res.categories || [];
+            // 分类补充图标（前端映射；与用户中心通知设置分组图标风格一致）
+            $.emailTemplateCategories.value = (res.categories || []).map(function(c) {
+                return Object.assign({}, c, { svg: EMAIL_CATEGORY_SVG[c.key] || '' });
+            });
             $.emailTemplateGlobalVariables.value = res.globalVariables || [];
             // 分类分组默认收起（每次进入页面收起，便于浏览）
             var collapsed = {};
@@ -455,6 +458,15 @@
 
     // 分类分组折叠状态（key=分类，true=收起；默认收起）
     $.emailTemplateCategoryCollapsed = ref({});
+
+    // 邮件模板分类图标（与用户中心通知设置分组图标风格一致：16px 线性 stroke=currentColor）
+    var EMAIL_CATEGORY_SVG = {
+        auth: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+        notice: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h20v11H2z"/><polyline points="12 17 12 20"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="7" y1="8" x2="17" y2="8"/></svg>',
+        billing: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>',
+        reminder: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+        system: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>'
+    };
 
     // 点击分组标题切换展开/收起
     $.toggleEmailTemplateCategory = function(catKey) {
