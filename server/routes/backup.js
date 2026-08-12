@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
+const { restoreLxcBySSH } = require('../api/ssh-exec');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const dbg = require('../utils/debug');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
