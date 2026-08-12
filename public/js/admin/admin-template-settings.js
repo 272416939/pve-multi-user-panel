@@ -101,7 +101,7 @@
                         </div>
 
                         <!-- 邮件外壳样式（参数化 + 高级自定义 CSS，作用于所有系统邮件） -->
-                        <div class="module-header">
+                        <div class="module-header mt-4">
                             <h4 class="module-title">邮件外壳样式</h4>
                         </div>
                         <div class="card">
@@ -135,7 +135,7 @@
                         </div>
 
                         <!-- 邮件模板管理（可编辑系统邮件模板：主题/副标题/正文，支持 {变量} 占位符，可恢复默认） -->
-                        <div class="module-header">
+                        <div class="module-header mt-4">
                             <h4 class="module-title">邮件模板</h4>
                         </div>
                         <div class="card">
