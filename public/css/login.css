@@ -129,6 +129,27 @@
             font-weight: 500;
             transition: color 0.3s ease;
         }
+        /* 「7天内无需登录」复选框：主题色勾选 + 玻璃态标签（明暗两套变量自适应） */
+        .login-card .form-check-input {
+            accent-color: var(--login-color-primary);
+            cursor: pointer;
+            background-color: var(--login-bg-input);
+            border: 1px solid var(--login-border-input);
+        }
+        .login-card .form-check-input:checked {
+            background-color: var(--login-color-primary);
+            border-color: var(--login-color-primary);
+        }
+        .login-card .form-check-label {
+            color: var(--login-text-label);
+            font-size: 13px;
+            cursor: pointer;
+            user-select: none;
+            transition: color 0.3s ease;
+        }
+        .login-card .form-check-label:hover {
+            color: var(--login-text-input);
+        }
         .login-card .btn-primary {
             background: var(--login-gradient-primary);
             border: none;

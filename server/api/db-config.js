@@ -206,8 +206,8 @@ const config = {
 const refreshTokens = {
     create: async (data) => {
         const [result] = await execute(
-            `INSERT INTO refresh_tokens (user_id, token, device_name, ip, user_agent, created_at, expires_at, revoked)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+            `INSERT INTO refresh_tokens (user_id, token, device_name, ip, user_agent, created_at, expires_at, revoked, remember, session_deadline, last_active_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
             [
                 data.user_id,
                 data.token,
@@ -215,13 +215,19 @@ const refreshTokens = {
                 data.ip || '',
                 data.user_agent || '',
                 data.created_at || mysqlNow(),
-                data.expires_at
+                data.expires_at,
+                data.remember ? 1 : 0,
+                data.session_deadline || null,
+                data.last_active_at || null
             ]
         );
         return queryOne('SELECT * FROM refresh_tokens WHERE id = ?', [result.insertId]);
     },
     getByToken: (token) => queryOne('SELECT * FROM refresh_tokens WHERE token = ?', [token]),
     getById: (id) => queryOne('SELECT * FROM refresh_tokens WHERE id = ?', [id]),
+    // 更新最后活跃时间（authMiddleware 节流调用；只写活跃时间，不触碰其他字段）
+    // 注意：mysqlNow() 是 JS 函数，必须在 JS 侧调用后作为参数传入，不能写进 SQL（MySQL 无此存储函数）
+    touchActivity: (id) => execute('UPDATE refresh_tokens SET last_active_at = ? WHERE id = ?', [mysqlNow(), id]),
     getByUserId: (userId) => queryAll(
         `SELECT * FROM refresh_tokens WHERE user_id = ? AND revoked = 0 AND expires_at > NOW()
          ORDER BY created_at DESC`,

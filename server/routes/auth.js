@@ -6,6 +6,8 @@ const jwt = require('jsonwebtoken');
 const otplib = require('otplib');
 const db = require('../api/db');
 const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateAccessToken, generateRefreshToken, generatePartialToken, generateCode } = require('../utils/token');
+// 会话策略：勾选「7天内无需登录」→ 7天固定倒计时（登录时刻起算，刷新不顺延）；未勾选 → 2小时无操作退出
+const { computeSessionDeadlineMs, isRefreshAllowed, computeNextExpiryMs, INACTIVITY_MS } = require('../utils/session-policy');
 const getSiteUrl = require('../utils/site-url');
 const { sendTemplateEmail } = require('../services/email-template');
 const { isUsernameBlacklisted } = require('../utils/username-blacklist');
@@ -53,7 +55,9 @@ async function logLoginSuccess(user, req, deviceName) {
 }
 
 router.post('/login', async (req, res) => {
-    const { username, password, device_name } = req.body;
+    const { username, password, device_name, remember: rememberRaw } = req.body;
+    // 勾选「7天内无需登录」标记（兼容 boolean / 1 / '1' 三种入参形态）
+    const remember = (rememberRaw === true || rememberRaw === 1 || rememberRaw === '1') ? 1 : 0;
     // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
     const ip = req.ip;
 
@@ -107,7 +111,10 @@ if (passwordMatch && needsUpgrade(user.password)) {
     const ua = req.headers['user-agent'] || '';
     const deviceName = (device_name || ua.substring(0, 100));
     await db.refreshTokens.revokeByUserAndDevice(user.id, deviceName);
-    
+
+    // 会话策略：勾选 → 7天固定倒计时（锚点 login+7d，刷新不顺延）；未勾选 → 2小时无操作退出
+    const nowMs = Date.now();
+    const sessionDeadline = remember ? formatLocalDate(new Date(computeSessionDeadlineMs(nowMs))) : null;
     const record = await db.refreshTokens.create({
         user_id: user.id,
         token: refreshToken,
@@ -115,7 +122,10 @@ if (passwordMatch && needsUpgrade(user.password)) {
         ip,
         user_agent: ua,
         created_at: formatLocalDate(new Date()),
-        expires_at: formatLocalDate(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
+        expires_at: remember ? sessionDeadline : formatLocalDate(new Date(nowMs + INACTIVITY_MS)),
+        remember,
+        session_deadline: sessionDeadline,
+        last_active_at: formatLocalDate(new Date())
     });
 
     if (await db.twofa.isEnabled(user.id)) {
@@ -160,6 +170,8 @@ router.post('/login/2fa', async (req, res) => {
     if (!partial_token || !code) {
         return res.status(400).json({ error: '缺少参数' });
     }
+    // 2FA 第二步重建记录时沿用第一步勾选的「7天内无需登录」标记（前端 verifyTwofa 会带 remember）
+    const remember = (req.body.remember === true || req.body.remember === 1 || req.body.remember === '1') ? 1 : 0;
 
     let decoded;
     try {
@@ -199,6 +211,9 @@ router.post('/login/2fa', async (req, res) => {
             const deviceName = ua.substring(0, 100);
             await db.refreshTokens.revokeByUserAndDevice(user.id, deviceName);
             refreshToken = generateRefreshToken();
+            // 会话策略：勾选 → 7天固定倒计时；未勾选 → 2小时无操作退出
+            const nowMs = Date.now();
+            const sessionDeadline = remember ? formatLocalDate(new Date(computeSessionDeadlineMs(nowMs))) : null;
             record = await db.refreshTokens.create({
                 user_id: user.id,
                 token: refreshToken,
@@ -206,7 +221,10 @@ router.post('/login/2fa', async (req, res) => {
                 ip,
                 user_agent: ua,
                 created_at: formatLocalDate(new Date()),
-                expires_at: formatLocalDate(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
+                expires_at: remember ? sessionDeadline : formatLocalDate(new Date(nowMs + INACTIVITY_MS)),
+                remember,
+                session_deadline: sessionDeadline,
+                last_active_at: formatLocalDate(new Date())
             });
         }
 
@@ -276,6 +294,12 @@ router.post('/auth/refresh', async (req, res) => {
             return res.status(401).json({ error: 'refreshToken 已失效' });
         }
 
+        // 会话策略门禁：未勾选且 2 小时无操作 / 勾选但已超 7 天且 2 小时无操作 → 拒绝续期，要求重新登录
+        // （不区分勾选状态返回同一文案，防枚举会话类型）
+        if (!isRefreshAllowed(record, Date.now())) {
+            return res.status(401).json({ error: '登录已过期，请重新登录', code: 'TOKEN_EXPIRED' });
+        }
+
         // 立即撤销旧 refresh token（防重放）
         await db.refreshTokens.deleteByToken(refreshToken);
 
@@ -287,8 +311,10 @@ router.post('/auth/refresh', async (req, res) => {
         // 签发新的 access token + 新的 refresh token
         const newRefreshToken = generateRefreshToken();
 
-        // 存储新的 refresh token
-        const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000);
+        // 勾选会话续期不延长 7 天锚点（固定倒计时，computeNextExpiryMs 恒返回原 deadline）；
+        // 新记录继承旧记录的 remember / session_deadline / last_active_at——
+        // last_active_at 不更新为当前时间（自动保活刷新不计活跃，2 小时无操作以真实业务请求为准）
+        const nextExpiryMs = computeNextExpiryMs(record, Date.now());
         const newRecord = await db.refreshTokens.create({
             user_id: user.id,
             device_name: record.device_name,
@@ -296,7 +322,10 @@ router.post('/auth/refresh', async (req, res) => {
             ip: req.ip,
             user_agent: req.headers['user-agent'] || '',
             created_at: formatLocalDate(new Date()),
-            expires_at: formatLocalDate(expiresAt)
+            expires_at: formatLocalDate(new Date(nextExpiryMs)),
+            remember: record.remember,
+            session_deadline: record.session_deadline,
+            last_active_at: record.last_active_at
         });
 
         // 用新记录的 id 生成 access token，确保设备校验通过

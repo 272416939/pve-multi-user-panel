@@ -153,6 +153,9 @@ async function initDb() {
     `);
 
     // 创建刷新令牌表
+    // remember: 是否勾选「7天内无需登录」（1=勾选，7天固定倒计时；0=未勾选，2小时无操作退出）
+    // session_deadline: 7天锚点（仅 remember=1 时有值，登录时刻+7天，刷新时原样带过，永不顺延）
+    // last_active_at: 最后活跃时间（真实业务请求由 authMiddleware 节流更新；自动刷新不计活跃）
     await execute(`
         CREATE TABLE IF NOT EXISTS refresh_tokens (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -163,9 +166,18 @@ async function initDb() {
             user_agent VARCHAR(500) DEFAULT '',
             created_at DATETIME NOT NULL,
             expires_at DATETIME NOT NULL,
-            revoked INT DEFAULT 0
+            revoked INT DEFAULT 0,
+            remember INT DEFAULT 0,
+            session_deadline DATETIME NULL,
+            last_active_at DATETIME NULL
         )
     `);
+    // 幂等迁移：老库补列（重复执行捕获 duplicate column 错误）
+    try { await execute('ALTER TABLE refresh_tokens ADD COLUMN remember INT DEFAULT 0'); } catch (_) {}
+    try { await execute('ALTER TABLE refresh_tokens ADD COLUMN session_deadline DATETIME NULL'); } catch (_) {}
+    try { await execute('ALTER TABLE refresh_tokens ADD COLUMN last_active_at DATETIME NULL'); } catch (_) {}
+    // 存量会话回填：last_active_at 置为当前时间，部署后给 2 小时宽限，之后按新策略执行
+    try { await execute('UPDATE refresh_tokens SET last_active_at = NOW() WHERE last_active_at IS NULL'); } catch (_) {}
 
     // 创建快照操作日志表
     await execute(`

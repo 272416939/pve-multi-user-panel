@@ -1,5 +1,7 @@
 const api = (endpoint, options = {}) => {
     return ensureValidToken().then(token => {
+        // 会话已失效（ensureValidToken 已触发带参跳转）：短路，避免无 token 请求与兜底跳转覆盖参数
+        if (window.__sessionExpired) throw new Error('登录已过期，请重新登录');
         const fetchOptions = {
             ...options,
             headers: {
@@ -51,6 +53,15 @@ const api = (endpoint, options = {}) => {
                             }
                             return d;
                         });
+                    }
+                    // 会话策略拒绝续期（2小时无操作/7天到期/设备下线）：带参数跳登录页提示重新登录
+                    const refreshErr = await refreshRes.json().catch(() => ({}));
+                    if (refreshErr.code === 'TOKEN_EXPIRED') {
+                        localStorage.removeItem(window.__storageKeys.TOKEN);
+                        localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
+                        window.__sessionExpired = true;
+                        window.location.href = 'login?expired=1';
+                        throw new Error(refreshErr.error || '登录已过期，请重新登录');
                     }
                 }
             }
@@ -104,7 +115,12 @@ function ensureValidToken() {
         body: JSON.stringify({ refreshToken: refreshToken })
     }).then(function(res) {
         if (res.ok) return res.json();
-        return res.json().then(function(d) { throw new Error(d.error || '刷新失败'); });
+        return res.json().then(function(d) {
+            // 附带服务端错误码：会话策略拒绝续期（2小时无操作/7天到期）时 code=TOKEN_EXPIRED，跳登录页提示重新登录
+            var err = new Error(d.error || '刷新失败');
+            err.code = d.code;
+            throw err;
+        });
     }).then(function(data) {
         if (data.token) {
             localStorage.setItem(window.__storageKeys.TOKEN, data.token);
@@ -113,10 +129,16 @@ function ensureValidToken() {
             return data.token;
         }
         throw new Error('无token');
-    }).catch(function() {
+    }).catch(function(err) {
         _refreshPromise = null;
         localStorage.removeItem(window.__storageKeys.TOKEN);
         localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
+        if (err && err.code === 'TOKEN_EXPIRED') {
+            // 会话已失效（2小时无操作/7天到期/设备下线）：跳登录页提示重新登录。
+            // 标记防竞态：后续 authGuard 等兜底跳转会覆盖 location.href，需保留 ?expired=1
+            window.__sessionExpired = true;
+            window.location.href = 'login?expired=1';
+        }
         return null;
     });
     return _refreshPromise;
@@ -520,7 +542,8 @@ const authGuard = async () => {
         return userData;
     } catch (e) {
         localStorage.removeItem(window.__storageKeys.TOKEN);
-        window.location.href = 'login.html';
+        // 会话已失效时 ensureValidToken/api() 已带 ?expired=1 跳转，兜底跳转需保留参数（防止覆盖竞态）
+        window.location.href = window.__sessionExpired ? 'login?expired=1' : 'login.html';
         return null;
     }
 };
