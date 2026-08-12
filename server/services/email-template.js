@@ -109,6 +109,32 @@ async function invalidateTemplateCache() {
 }
 
 /**
+ * Quill 2 列表输出规范化（纯函数，可测试）
+ *
+ * Quill 2 无论有序/无序均输出 `<ol>` 标签 + `<li data-list="bullet"/"ordered">` 属性区分，
+ * 而邮件客户端（QQ 邮箱/Outlook 等）不支持属性选择器，CSS 兼容方案（ol > li[data-list=bullet]）在真实邮件中失效，
+ * 无序列表会按 <ol> 显示数字。渲染时统一转换为标准标签（所有客户端原生支持）：
+ * - 整块 li 均为 data-list="bullet" 的 <ol> → <ul>，移除 data-list 属性
+ * - data-list="ordered" 的 <ol> 保持，移除 data-list 属性
+ * - 同时清除 Quill 列表标记 UI span（.ql-ui，编辑器内显示圆点/数字用，邮件里为空节点）
+ * @param {string} html 正文 HTML
+ * @returns {string} 规范化后的 HTML
+ */
+function normalizeQuillLists(html) {
+    return String(html || '')
+        .replace(/<ol>([\s\S]*?)<\/ol>/g, function (match, inner) {
+            if (/data-list="bullet"/.test(inner) && !/data-list="ordered"/.test(inner)) {
+                // 无序：<ol> → <ul>，移除 data-list 属性
+                return '<ul>' + inner.replace(/data-list="bullet"/g, '') + '</ul>';
+            }
+            // 有序：保留 <ol>，移除 data-list 属性
+            return '<ol>' + inner.replace(/data-list="ordered"/g, '') + '</ol>';
+        })
+        // 清除 Quill 列表标记 UI span（邮件中为空节点）
+        .replace(/<span class="ql-ui"[^>]*><\/span>/g, '');
+}
+
+/**
  * 用模板对象渲染（不读 DB/缓存；预览接口复用：传入注册表变量定义 + 前端编辑的 subject/title/content）
  * @param {object} tpl { subject, title, content, variables[] }
  * @param {object} vars 变量值
@@ -153,8 +179,8 @@ async function renderRaw(tpl, vars) {
 
     var subject = renderText(tpl.subject, true);
     var title = renderText(tpl.title || '', true);
-    // 先折叠（基于原始模板 + 声明白名单），再替换变量
-    var content = renderText(foldEmptyLines(tpl.content, variables, allowed), false);
+    // 先折叠（基于原始模板 + 声明白名单），再替换变量，最后规范化 Quill 列表输出（标准 ul/ol，邮件客户端兼容）
+    var content = normalizeQuillLists(renderText(foldEmptyLines(tpl.content, variables, allowed), false));
 
     return { subject: subject, title: title, content: content, site_name: variables.site_name };
 }
@@ -193,4 +219,4 @@ async function sendTemplateEmail(to, code, vars, opts) {
     return true;
 }
 
-module.exports = { getTemplate, renderTemplate, renderRaw, sendTemplateEmail, invalidateTemplateCache, foldEmptyLines };
+module.exports = { getTemplate, renderTemplate, renderRaw, sendTemplateEmail, invalidateTemplateCache, foldEmptyLines, normalizeQuillLists };
