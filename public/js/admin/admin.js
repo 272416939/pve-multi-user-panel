@@ -466,6 +466,10 @@
         $.destroyEmailTemplateQuill();
         var el = document.getElementById('emailTemplateQuill');
         if (!el || typeof Quill === 'undefined') return;
+        // 自定义色板：Quill 2 默认色板无纯黑（最深仅 #444444 深灰），且首项为「清除格式」，
+        // 用户选「黑色」会点到深灰、选「灰色」会误触清除格式 → 颜色错乱。
+        // 显式提供 黑/深灰/中灰/浅灰/白 + 常用色，第一个色块即纯黑，便于准确选择。
+        var EMAIL_COLORS = ['#000000', '#333333', '#666666', '#999999', '#cccccc', '#ffffff', '#e60000', '#ff9900', '#ffff00', '#008a00', '#0066cc', '#9933ff', '#facccc', '#ffebcc', '#ffffcc', '#cce8cc', '#cce0f5', '#ebd6ff', '#888888', '#444444'];
         var quill = new Quill(el, {
             theme: 'snow',
             placeholder: '编辑邮件正文…',
@@ -473,7 +477,7 @@
                 toolbar: [
                     [{ header: [2, 3, false] }],
                     ['bold', 'italic', 'underline', 'strike'],
-                    [{ color: [] }, { background: [] }],
+                    [{ color: EMAIL_COLORS.slice() }, { background: EMAIL_COLORS.slice() }],
                     [{ list: 'ordered' }, { list: 'bullet' }],
                     ['blockquote', 'link', 'code-block'],
                     ['clean']

@@ -162,6 +162,16 @@ async function createEmailTemplate(title, content, siteName, shell) {
         .ql-size-huge { font-size: 2.5em; }
         .email-content ol, .email-content ul { margin-left: 20px; }
         .email-content li { margin-bottom: 6px; }
+        /* Quill 2 列表兼容：无论有序/无序均输出 <ol> 标签，靠 li[data-list] 区分；
+           邮件无 quill.snow.css 时无序列表会按有序显示数字，需显式还原 disc */
+        .email-content ol > li[data-list="bullet"] { list-style-type: disc; }
+        .email-content ol > li[data-list="checked"] { list-style-type: none; position: relative; }
+        .email-content ol > li[data-list="checked"]::before { content: '☑'; position: absolute; left: -1.4em; }
+        .email-content ol > li[data-list="unchecked"] { list-style-type: none; position: relative; }
+        .email-content ol > li[data-list="unchecked"]::before { content: '☐'; position: absolute; left: -1.4em; }
+        .email-content ol > li[data-list="bullet"].ql-indent-1,
+        .email-content ol > li[data-list="bullet"].ql-indent-2,
+        .email-content ol > li[data-list="bullet"].ql-indent-3 { list-style-type: disc; }
         ${s.custom_css || ''}
     `;
 
