@@ -1,5 +1,62 @@
 # Changelog
 
+## [3.3.0] - 2026-08-11
+
+### 概览
+
+本次发布核心为**邮件模板在线编辑系统**（43 个模板在线编辑 + 外壳样式编辑）、**登录免登录选项**（7 天勾选 / 2 小时无操作）、**系统模板拖拽排序**，并完成大量审计/UI/稳定性修复。自 v3.2.2 以来共 30 个提交（7 feat + 18 fix + 3 style + 1 refactor + 1 chore），69 文件 +4315/-964。
+
+### Added（7 个 feat）
+- **feat(email-template): 邮件模板在线编辑系统**
+  - SMTP 配置内新增「邮件模板」卡片：43 个默认模板按 5 类分组（认证类/资源通知/账单类/到期提醒/系统通知），默认收起点击展开
+  - Quill 2.0.3 富文本编辑（+ 源码双模式），「可用变量」面板点击插入（snake_case 白名单按模板校验）
+  - 「恢复默认」从代码常量覆盖；存储只持久化 subject/title/content 三字段（邮件外壳固定不入库）
+  - 邮件外壳样式编辑（渐变头部/按钮/footer 参数化），预览与实际发送一致
+  - 17 文件 41 处调用点迁移为 `sendTemplateEmail`（认证类 4 处同步发送，其余异步队列）
+  - 新文件：`server/constants/email-templates.js`（1059 行注册表）、`db-email-templates.js`、`admin-email-template.js`、`services/email-template.js`
+  - 数据库：`email_templates` 表，启动 `INSERT IGNORE` 幂等初始化（不覆盖管理员内容）
+- **feat(auth): 登录页新增「7天内无需登录」勾选，未勾选 2 小时无操作退出**
+  - 勾选：7 天固定倒计时（刷新/操作不顺延），7 天内绝不因闲置踢出，超期转 2 小时规则
+  - 未勾选：2 小时无操作退出（真实业务 API 计活跃，前端 10 分钟保活刷新不计）
+  - `session-policy.js` 纯函数（isRefreshAllowed/computeNextExpiryMs）+ `refresh_tokens` 3 列（remember/session_deadline/last_active_at）
+  - 被踢跳 `login?expired=1` 提示；审计保留 deleteByToken 防重放
+- **feat(os-template): 可切换系统模板支持拖拽排序**
+  - 管理后台系统模板表格拖拽手柄排序（整行镜像/避让动画/触屏支持），保存后用户端切换系统弹窗/购机选系统自动同步
+  - `POST /admin/os-templates/reorder` + `batchUpdateSortOrder`（sort_order 大在前）+ 审计
+- **feat(logs): 日志中心详情弹窗展示完整变更明细**
+  - 操作日志详情列单行截断 + 悬浮 title + 「详情」按钮弹窗展示字段级变更明细（标题/分类/action/用户 meta）
+
+### Changed
+- refactor(email-shell): 正文文字颜色移除外壳控制，由模板正文内容决定
+- style(email-template): 模板分类折叠改为卡片分组样式（对齐通知设置）+ 间距优化 + Quill 中文提示
+- chore(cache): cache-version 145 绕过 nginx/浏览器双缓存
+
+### Fixed（18 个 fix）
+- **fix(logs): 更新类操作审计改字段级 diff，补缺失敏感操作埋点**
+  - 16 处更新/配置保存接口字段级 diff（`audit-diff.js` 通用工具，数值/布尔归一，敏感凭据只记「已更新」）
+  - 补齐 6 处缺失埋点：vm/lxc 编辑、支付到账、充值下单、注册、重置密码、手动到期检查
+  - 修复 audit-log 空串落库 `'{}'` + 网络配置 diff 漏读字段
+- **fix(port-forward): 删除加 deleting 中间状态 + 启动收敛，爱快失败不再删 DB，孤儿自动清理**
+  - 删除链路先置 `deleting` 意图 -> 爱快删除成功才删 DB（失败不删并提示重试）
+  - 启动对账收敛 deleting 残留（爱快无规则->清理+系统审计，仍有->重试/回滚）
+  - 孤儿自动清理 + `deleteIkuaiRuleStrict` 幂等核对（修复 allGone 判断写反 bug）
+  - 真实环境启动清理 46 条历史孤儿数据
+- **fix(uapipro): 补上 checkConfiguredRateLimit 导入**，修复 IP 测试 400（+ backup.js restoreLxcBySSH 同类遗漏）
+- **fix(ws): bfcache 恢复后推送通道延迟重连**（ensurePushConnected + pageshow/visibilitychange，退避重置）
+- **fix(os-template): 编辑弹窗标题恒显新增及编辑保护失效**（editId 原始值拷贝 -> formData.id reactive）
+- **fix(os-template): PVE 模板配置异步响应竞态覆盖新表单**（vmidConfigSeq 请求序号）
+- **fix(ui): select-glass 下拉文本同步改事件驱动**（selectedIndex setter 拦截 + glass-change 事件，移除轮询兜底）
+- **fix(login): 登录后保留 section 参数直达目标页面** + 右上角用户名按登录用户显示
+- **fix(email-template): Quill 色板无纯黑/无序列表显示成有序**（渲染时转换标准 ul/ol + normalizeQuillLists）
+- **fix(mac-group): MAC 分组 id 类型归一化及用户中心加载回填**
+- style(ui): 表单标签 block 显示及 CDK 弹窗下拉宽度修复
+
+### Notes
+- 新增表 `email_templates` 启动自动建表 + 幂等初始化；`refresh_tokens` 3 列自动 ALTER
+- 存量已登录会话部署后获得 2 小时宽限，之后按新会话策略执行（预期收紧）
+- 测试：**517 passing**（+session-policy 17 用例 + audit-diff 5 用例 + port-forward-delete 10 用例）
+- 新增文件：`server/constants/email-templates.js`、`server/utils/session-policy.js`、`server/utils/audit-diff.js`、`server/services/email-template.js`、`server/routes/admin-email-template.js`、`server/api/db-email-templates.js`
+
 ## [3.2.2] - 2026-08-10
 
 ### Fixed
