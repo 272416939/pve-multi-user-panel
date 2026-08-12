@@ -140,9 +140,17 @@
                         </div>
                         <div class="card">
                             <div class="card-body">
-                                <p class="text-muted small mb-3">编辑系统自动发送的邮件模板，点击「编辑」展开编辑器，支持富文本/源码两种模式；「可用变量」点击即可插入光标处，变量值在发送时自动替换。保存后立即生效，可随时「恢复默认」。</p>
+                                <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+                                    <p class="text-muted small mb-0">编辑系统自动发送的邮件模板，点击「编辑」展开编辑器，支持富文本/源码两种模式；「可用变量」点击即可插入光标处，变量值在发送时自动替换。保存后立即生效，可随时「恢复默认」。</p>
+                                    <pv-button variant="table" @click="toggleEmailTemplateAll">{{ emailTemplateAllExpanded ? '全部收起' : '全部展开' }}</pv-button>
+                                </div>
                                 <div v-for="cat in emailTemplateCategories" :key="cat.key" class="mb-3">
-                                    <h6 class="mb-2" style="font-weight:600;color:var(--color-primary);">{{ cat.label }}</h6>
+                                    <h6 class="mb-2 d-flex align-items-center gap-2" style="font-weight:600;color:var(--color-primary);cursor:pointer;user-select:none;" @click="toggleEmailTemplateCategory(cat.key)">
+                                        <span style="font-size:12px;color:var(--text-muted);">{{ emailTemplateCategoryCollapsed[cat.key] ? '▸' : '▾' }}</span>
+                                        {{ cat.label }}
+                                        <span class="text-muted" style="font-size:12px;font-weight:400;">（{{ emailTemplatesByCategory(cat.key).length }} 个模板）</span>
+                                    </h6>
+                                    <div v-if="!emailTemplateCategoryCollapsed[cat.key]">
                                     <div v-for="tpl in emailTemplatesByCategory(cat.key)" :key="tpl.code" class="border rounded mb-2" style="border-color:var(--border-color) !important;">
                                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-2">
                                             <div class="d-flex align-items-center gap-2">
@@ -192,6 +200,7 @@
                                                 <pv-button variant="outline" size="lg" @click="toggleEmailTemplateEdit(tpl.code)">取消</pv-button>
                                             </div>
                                         </div>
+                                    </div>
                                     </div>
                                 </div>
                             </div>

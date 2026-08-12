@@ -444,9 +444,41 @@
             $.emailTemplates.value = res.templates || [];
             $.emailTemplateCategories.value = res.categories || [];
             $.emailTemplateGlobalVariables.value = res.globalVariables || [];
+            // 分类分组默认收起（每次进入页面收起，便于浏览）
+            var collapsed = {};
+            (res.categories || []).forEach(function(c) { collapsed[c.key] = true; });
+            $.emailTemplateCategoryCollapsed.value = collapsed;
         } catch (e) {
             console.warn('邮件模板加载失败:', e.message || e);
         }
+    };
+
+    // 分类分组折叠状态（key=分类，true=收起；默认收起）
+    $.emailTemplateCategoryCollapsed = ref({});
+
+    // 点击分组标题切换展开/收起
+    $.toggleEmailTemplateCategory = function(catKey) {
+        var collapsed = Object.assign({}, $.emailTemplateCategoryCollapsed.value);
+        collapsed[catKey] = !collapsed[catKey];
+        $.emailTemplateCategoryCollapsed.value = collapsed;
+    };
+
+    // 是否全部分组都已展开（「全部展开/全部收起」按钮文案）
+    $.emailTemplateAllExpanded = computed(function() {
+        var collapsed = $.emailTemplateCategoryCollapsed.value || {};
+        var keys = Object.keys(collapsed);
+        if (keys.length === 0) return false;
+        return keys.every(function(k) { return !collapsed[k]; });
+    });
+
+    // 全部展开 / 全部收起（与按钮文案一致：未全展开 → 全部展开；已全展开 → 全部收起）
+    $.toggleEmailTemplateAll = function() {
+        var keys = Object.keys($.emailTemplateCategoryCollapsed.value);
+        if (keys.length === 0) return;
+        var allExpanded = $.emailTemplateAllExpanded.value;
+        var collapsed = {};
+        keys.forEach(function(k) { collapsed[k] = allExpanded; });  // 已全展开 → 收起；否则 → 全部展开
+        $.emailTemplateCategoryCollapsed.value = collapsed;
     };
 
     // 按分类取模板（模板列表分组展示）
