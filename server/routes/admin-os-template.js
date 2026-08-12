@@ -161,6 +161,31 @@ router.get('/admin/os-templates/:id', async (req, res) => {
     }
 });
 
+// POST /api/admin/os-templates/reorder — 拖拽排序批量保存（ids 顺序即新排序，第一个最靠前）
+router.post('/admin/os-templates/reorder', async (req, res) => {
+    try {
+        const ids = req.body.ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ids 参数无效' });
+        }
+        for (let i = 0; i < ids.length; i++) {
+            ids[i] = parseInt(ids[i]);
+            if (!Number.isInteger(ids[i]) || ids[i] <= 0) {
+                return res.status(400).json({ error: 'ids 必须为正整数' });
+            }
+        }
+        await db.osTemplates.batchUpdateSortOrder(ids);
+        // 操作审计：调整系统模板排序
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.os-template.reorder', resourceType: 'os-template', details: '调整系统模板排序 ' + ids.length + ' 个', req });
+        } catch (e) {}
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
 // POST /api/admin/os-templates — 创建
 router.post('/admin/os-templates', async (req, res) => {
     try {
@@ -184,6 +209,7 @@ router.post('/admin/os-templates', async (req, res) => {
             os_version: String(data.os_version || '').slice(0, 50),
             ostype: String(data.ostype || '').slice(0, 20),
             arch: ['x86_64', 'aarch64'].includes(data.arch) ? data.arch : 'x86_64',
+            disk_format: ['', 'raw', 'qcow2', 'vmdk'].includes(data.disk_format) ? data.disk_format : '',
             target_storage: String(data.target_storage || 'local-lvm').slice(0, 100),
             ciuser: String(data.ciuser || '').slice(0, 100),
             description: String(data.description || '').slice(0, 5000),
@@ -205,6 +231,25 @@ router.post('/admin/os-templates', async (req, res) => {
 });
 
 // PUT /api/admin/os-templates/:id — 更新
+// OS 模板审计字段定义（单一来源）：15 个可编辑字段全部纳入 diff，只记实际变更
+const OS_TEMPLATE_DIFF_FIELDS = [
+    { key: 'name', label: '名称' },
+    { key: 'template_vmid', label: '模板VMID', num: true },
+    { key: 'os_type', label: '系统类型' },
+    { key: 'os_version', label: '系统版本' },
+    { key: 'ostype', label: 'PVE类型' },
+    { key: 'arch', label: '架构' },
+    { key: 'target_storage', label: '存储位置' },
+    { key: 'disk_format', label: '磁盘格式', fmt: function (v) { return v ? v : '默认'; } },
+    { key: 'ciuser', label: '云初始化用户' },
+    { key: 'description', label: '描述', fmt: function (v) { return String(v).length > 30 ? String(v).slice(0, 30) + '…' : v; } },
+    { key: 'icon', label: '图标' },
+    { key: 'sort_order', label: '排序', num: true },
+    { key: 'allowed_package_ids', label: '允许套餐', fmt: function (v) { return v ? v : '全部'; } },
+    { key: 'enabled', label: '启用', bool: true },
+    { key: 'status', label: '状态', fmt: function (v) { return v === 'active' ? '启用' : (v || '无'); } }
+];
+
 router.put('/admin/os-templates/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
@@ -225,11 +270,21 @@ router.put('/admin/os-templates/:id', async (req, res) => {
                 return res.status(400).json({ error: '无效的模板 VMID' });
             }
         }
+        // 目标磁盘格式白名单（跨存储切换时作为 PVE move_disk 的 format 参数，非法值会导致切换失败）
+        if (updates.disk_format !== undefined && !['', 'raw', 'qcow2', 'vmdk'].includes(updates.disk_format)) {
+            return res.status(400).json({ error: '无效的目标磁盘格式' });
+        }
         const result = await db.osTemplates.update(id, updates);
-        // 操作审计：更新 OS 模板
+        // 操作审计：更新 OS 模板（DB 新旧记录字段级 diff，只记实际变更字段；空更新/无变化不写）
         try {
-            const { auditLog } = require('../utils/audit-log');
-            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.os-template.update', resourceType: 'os-template', resourceId: id, details: '更新OS模板:' + (existing.name || id) + (updates.enabled !== undefined ? '(启用:' + (updates.enabled ? '是' : '否') + ')' : ''), req });
+            if (result) {
+                const { auditLog } = require('../utils/audit-log');
+                const { buildFieldDiff } = require('../utils/audit-diff');
+                const changes = buildFieldDiff(existing, result, OS_TEMPLATE_DIFF_FIELDS);
+                if (changes.length) {
+                    await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.os-template.update', resourceType: 'os-template', resourceId: id, details: '更新OS模板:' + (result.name || id) + '；变更:' + changes.join(', '), req });
+                }
+            }
         } catch (e) {}
         res.json({ success: true, data: result });
     } catch (e) {

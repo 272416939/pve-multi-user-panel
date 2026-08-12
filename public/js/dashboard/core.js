@@ -26,6 +26,14 @@
     $.navItems = ref([]);
     $.users = ref([]);
     $.macGroups = ref([]);
+    // 爱快 MAC 分组列表（管理员编辑 VM/LXC 弹窗使用）
+    $.loadMacGroups = async function() {
+        try {
+            $.macGroups.value = await api('/mac-groups');
+        } catch (e) {
+            $.macGroups.value = [];
+        }
+    };
     $.openDropdownId = ref(null); // 当前打开的下拉菜单ID，格式 'vm-123' 或 'lxc-456'
     $.dropdownItems = ref([]); // 当前下拉菜单的 [{label, action, cls}]
     $.dropdownPos = ref({ top: 0, left: 0 });
@@ -1398,7 +1406,9 @@
                     $.loadNavItems(),
                     $.loadData(),
                     $.loadLxcContainers(),
-                    $.loadCnameDomain()
+                    $.loadCnameDomain(),
+                    // MAC 分组仅管理员编辑弹窗使用；接口已有认证+限速，未配置爱快时返回 []
+                    (userData.role === 'admin' ? $.loadMacGroups() : Promise.resolve())
                 ]);
                 // 恢复开通中状态（依赖 loadData/loadLxcContainers 完成后的列表，需在并行之后）
                 $.restoreProvisioningState();

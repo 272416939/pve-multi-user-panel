@@ -153,6 +153,9 @@ async function initDb() {
     `);
 
     // 创建刷新令牌表
+    // remember: 是否勾选「7天内无需登录」（1=勾选，7天固定倒计时；0=未勾选，2小时无操作退出）
+    // session_deadline: 7天锚点（仅 remember=1 时有值，登录时刻+7天，刷新时原样带过，永不顺延）
+    // last_active_at: 最后活跃时间（真实业务请求由 authMiddleware 节流更新；自动刷新不计活跃）
     await execute(`
         CREATE TABLE IF NOT EXISTS refresh_tokens (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -163,9 +166,18 @@ async function initDb() {
             user_agent VARCHAR(500) DEFAULT '',
             created_at DATETIME NOT NULL,
             expires_at DATETIME NOT NULL,
-            revoked INT DEFAULT 0
+            revoked INT DEFAULT 0,
+            remember INT DEFAULT 0,
+            session_deadline DATETIME NULL,
+            last_active_at DATETIME NULL
         )
     `);
+    // 幂等迁移：老库补列（重复执行捕获 duplicate column 错误）
+    try { await execute('ALTER TABLE refresh_tokens ADD COLUMN remember INT DEFAULT 0'); } catch (_) {}
+    try { await execute('ALTER TABLE refresh_tokens ADD COLUMN session_deadline DATETIME NULL'); } catch (_) {}
+    try { await execute('ALTER TABLE refresh_tokens ADD COLUMN last_active_at DATETIME NULL'); } catch (_) {}
+    // 存量会话回填：last_active_at 置为当前时间，部署后给 2 小时宽限，之后按新策略执行
+    try { await execute('UPDATE refresh_tokens SET last_active_at = NOW() WHERE last_active_at IS NULL'); } catch (_) {}
 
     // 创建快照操作日志表
     await execute(`
@@ -717,6 +729,30 @@ async function initDb() {
     // 迁移：界面模板偏好列（'' = 跟随站点默认，'default' / 'saas' = 个人固定）
     try { await execute("ALTER TABLE user_settings ADD COLUMN template VARCHAR(20) NOT NULL DEFAULT ''"); } catch (_) {}
 
+    // 邮件模板表（邮件模板在线编辑；默认模板由 constants/email-templates.js 注册表初始化，DB 可编辑 + 恢复默认）
+    await execute(`
+        CREATE TABLE IF NOT EXISTS email_templates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            code VARCHAR(64) NOT NULL UNIQUE,
+            name VARCHAR(100) NOT NULL DEFAULT '',
+            category VARCHAR(32) NOT NULL DEFAULT 'system',
+            subject TEXT NOT NULL,
+            title TEXT,
+            content TEXT NOT NULL,
+            variables JSON,
+            is_system INT DEFAULT 1,
+            version INT DEFAULT 1,
+            status VARCHAR(16) DEFAULT 'active',
+            updated_by INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_email_templates_category (category)
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 初始化默认邮件模板（INSERT IGNORE：已存在不覆盖，保留管理员修改）
+    await initEmailTemplates();
+
     // 初始化默认配置
     await initDefaultConfig();
 
@@ -930,6 +966,24 @@ async function migrateSchema() {
     // 如需修改类型，请管理员在端口转发管理界面手动编辑
 }
 
+// 初始化默认邮件模板（异步）
+// 默认模板定义单一来源：server/constants/email-templates.js（与 RATE_LIMIT_RULES 同模式）
+// INSERT IGNORE 按 code 幂等：已存在（管理员改过）不覆盖
+async function initEmailTemplates() {
+    const { EMAIL_TEMPLATES } = require('../constants/email-templates');
+    for (const code of Object.keys(EMAIL_TEMPLATES)) {
+        const tpl = EMAIL_TEMPLATES[code];
+        try {
+            await execute(
+                'INSERT IGNORE INTO email_templates (code, name, category, subject, title, content, variables, is_system, version) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)',
+                [tpl.code, tpl.name, tpl.category, tpl.subject, tpl.title, tpl.content, JSON.stringify(tpl.variables || [])]
+            );
+        } catch (e) {
+            console.error('[db] 初始化邮件模板失败: ' + code + ' - ' + e.message);
+        }
+    }
+}
+
 // 初始化默认配置（异步）
 async function initDefaultConfig() {
     const defaultConfigs = {
@@ -1011,6 +1065,17 @@ async function initDefaultConfig() {
             [key, value]
         );
     }
+
+    // 邮件外壳样式默认参数（邮件样式编辑；默认值与 EMAIL_SHELL_PARAMS 注册表一致）
+    const { EMAIL_SHELL_PARAMS } = require('../constants/email-templates');
+    for (const p of EMAIL_SHELL_PARAMS) {
+        await execute(
+            'INSERT IGNORE INTO config (`key`, value) VALUES (?, ?)',
+            ['mail:shell_' + p.key, String(p.default)]
+        );
+    }
+    // 清理已废弃的正文文字色键（正文颜色由模板正文决定，不再由外壳控制；历史库残留无害键一并删除）
+    try { await execute("DELETE FROM config WHERE `key` = 'mail:shell_content_text'"); } catch (_) {}
 
     // 私有网络迁移：DHCP DNS1 旧默认值 119.29.29.29 → 180.76.76.76（仅迁移未修改过的旧默认值）
     await execute("UPDATE config SET value = '180.76.76.76' WHERE `key` = 'dhcp:dns1' AND value = '119.29.29.29'");

@@ -45,6 +45,60 @@ async function deleteIkuaiRule(rule) {
     }
 }
 
+// 严格删除爱快侧规则（删除端点用，区别于 deleteIkuaiRule 的尽力而为）：
+// - 任一步删除报错 → 回查爱快全量列表核对目标是否实际已删（幂等，防重试死循环：
+//   爱快已删成但响应异常时，重试会报"规则不存在"，回查后视为已删除）
+// - 返回 { deleted: true } 表示爱快侧已无目标规则（含未配置/无匹配），可继续删 DB；
+//   返回 { deleted: false, error } 表示删除失败，调用方不得删 DB
+async function deleteIkuaiRuleStrict(rule) {
+    if (!ikuaiApi.isConfigured()) return { deleted: true }; // 未配置：无爱快侧可删
+    const oldIds = parseIkuaiIds(rule.ikuai_id);
+    let failed = null;
+    if (oldIds.length > 0) {
+        for (const old of oldIds) {
+            if (!old.id) continue;
+            try {
+                await ikuaiApi.deletePortForward(old.id);
+            } catch (e) {
+                failed = e.message;
+            }
+        }
+    } else {
+        // 无 ikuai_id：按 端口+IP 匹配删除（兼容旧数据，尽力而为）
+        let ikuaiRules;
+        try {
+            ikuaiRules = await ikuaiApi.getPortForwards();
+        } catch (e) {
+            return { deleted: false, error: e.message };
+        }
+        const matches = ikuaiRules.filter(r =>
+            String(r.wan_port) === String(rule.external_port) &&
+            String(r.lan_port) === String(rule.internal_port) &&
+            (r.lan_ip || r.lan_addr) === rule.ip
+        );
+        for (const m of matches) {
+            try { await ikuaiApi.deletePortForward(m.id); } catch (_) {}
+        }
+    }
+    if (failed) {
+        // 删除报错后回查爱快列表：目标规则已不在则视为删除成功
+        try {
+            const ikuaiRules = await ikuaiApi.getPortForwards();
+            const idSet = new Set(ikuaiRules.map(r => String(r.id || r._id || '')));
+            // 全部目标 id 均已不在爱快 → 视为已删除
+            const allGone = oldIds.length > 0 && oldIds.every(o => !o.id || !idSet.has(String(o.id)));
+            const keyGone = !ikuaiRules.some(r =>
+                String(r.wan_port) === String(rule.external_port) &&
+                String(r.lan_port) === String(rule.internal_port) &&
+                (r.lan_ip || r.lan_addr) === rule.ip
+            );
+            if (allGone || keyGone) return { deleted: true };
+        } catch (_) {}
+        return { deleted: false, error: failed };
+    }
+    return { deleted: true };
+}
+
 // 设备 IP 变化后，重建其全部端口转发规则（爱快删旧建新 + DB 回写新 IP）
 // 绑定子网 / 开机兜底重绑时调用；解绑不删规则（重绑时自动更新闭环）
 // 返回成功处理的规则条数（失败不影响其他规则与主流程）
@@ -107,4 +161,4 @@ async function rebuildPortForwardsForDevice(type, vmid, newIp) {
     return rebuilt;
 }
 
-module.exports = { parseIkuaiIds, stringifyIkuaiIds, rebuildPortForwardsForDevice };
+module.exports = { parseIkuaiIds, stringifyIkuaiIds, deleteIkuaiRuleStrict, rebuildPortForwardsForDevice };

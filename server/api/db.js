@@ -23,6 +23,7 @@ const dbMessaging = require('./db-messaging');
 const dbConfig = require('./db-config');
 const dbBilling = require('./db-billing');
 const dbIp = require('./db-ip');
+const dbEmailTemplates = require('./db-email-templates');
 
 module.exports = {
     // 数据库连接
@@ -151,4 +152,7 @@ module.exports = {
 
     // IP 归属地持久化缓存（ip_locations）
     ipLocations: dbIp.ipLocations,
+
+    // 邮件模板（email_templates）
+    emailTemplates: dbEmailTemplates.emailTemplates,
 };

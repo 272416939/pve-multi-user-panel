@@ -131,6 +131,36 @@ const config = {
     get: async (key) => (await queryOne('SELECT value FROM config WHERE `key` = ?', [key]))?.value,
     set: (key, value) => execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', [key, value]),
 
+    // ========== 邮件外壳样式（邮件样式编辑） ==========
+    // 键规则：mail:shell_<key>，参数定义与默认值单一来源 constants/email-templates.js 的 EMAIL_SHELL_PARAMS
+    getEmailShell: async () => {
+        const { EMAIL_SHELL_PARAMS } = require('../constants/email-templates');
+        const keys = EMAIL_SHELL_PARAMS.map(p => 'mail:shell_' + p.key);
+        const placeholders = keys.map(() => '?').join(',');
+        const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+        const map = {};
+        rows.forEach(r => { map[r.key] = r.value; });
+        const shell = {};
+        EMAIL_SHELL_PARAMS.forEach(p => {
+            const raw = map['mail:shell_' + p.key];
+            const def = p.default;
+            if (p.type === 'number') {
+                shell[p.key] = raw !== undefined && raw !== '' ? parseInt(raw) : def;
+            } else {
+                shell[p.key] = raw !== undefined && raw !== '' ? raw : def;
+            }
+        });
+        return shell;
+    },
+    setEmailShell: async (shell) => {
+        const { EMAIL_SHELL_PARAMS } = require('../constants/email-templates');
+        for (const p of EMAIL_SHELL_PARAMS) {
+            const val = shell[p.key];
+            if (val === undefined || val === null) continue;
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['mail:shell_' + p.key, String(val)]);
+        }
+    },
+
     // ========== 限速配置（安全防护·限速设置） ==========
     // 键规则：ratelimit:master_enabled（总开关）+ ratelimit:<ruleKey>:enabled/max/window，
     // 规则白名单与默认值单一来源 server/constants.js 的 RATE_LIMIT_RULES
@@ -176,8 +206,8 @@ const config = {
 const refreshTokens = {
     create: async (data) => {
         const [result] = await execute(
-            `INSERT INTO refresh_tokens (user_id, token, device_name, ip, user_agent, created_at, expires_at, revoked)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+            `INSERT INTO refresh_tokens (user_id, token, device_name, ip, user_agent, created_at, expires_at, revoked, remember, session_deadline, last_active_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
             [
                 data.user_id,
                 data.token,
@@ -185,13 +215,19 @@ const refreshTokens = {
                 data.ip || '',
                 data.user_agent || '',
                 data.created_at || mysqlNow(),
-                data.expires_at
+                data.expires_at,
+                data.remember ? 1 : 0,
+                data.session_deadline || null,
+                data.last_active_at || null
             ]
         );
         return queryOne('SELECT * FROM refresh_tokens WHERE id = ?', [result.insertId]);
     },
     getByToken: (token) => queryOne('SELECT * FROM refresh_tokens WHERE token = ?', [token]),
     getById: (id) => queryOne('SELECT * FROM refresh_tokens WHERE id = ?', [id]),
+    // 更新最后活跃时间（authMiddleware 节流调用；只写活跃时间，不触碰其他字段）
+    // 注意：mysqlNow() 是 JS 函数，必须在 JS 侧调用后作为参数传入，不能写进 SQL（MySQL 无此存储函数）
+    touchActivity: (id) => execute('UPDATE refresh_tokens SET last_active_at = ? WHERE id = ?', [mysqlNow(), id]),
     getByUserId: (userId) => queryAll(
         `SELECT * FROM refresh_tokens WHERE user_id = ? AND revoked = 0 AND expires_at > NOW()
          ORDER BY created_at DESC`,

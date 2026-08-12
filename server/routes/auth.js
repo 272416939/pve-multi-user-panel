@@ -6,8 +6,10 @@ const jwt = require('jsonwebtoken');
 const otplib = require('otplib');
 const db = require('../api/db');
 const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateAccessToken, generateRefreshToken, generatePartialToken, generateCode } = require('../utils/token');
+// 会话策略：勾选「7天内无需登录」→ 7天固定倒计时（登录时刻起算，刷新不顺延）；未勾选 → 2小时无操作退出
+const { computeSessionDeadlineMs, isRefreshAllowed, computeNextExpiryMs, INACTIVITY_MS } = require('../utils/session-policy');
 const getSiteUrl = require('../utils/site-url');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('../services/email-template');
 const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 const tokenStore = require('../utils/token-store');
 const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
@@ -53,7 +55,9 @@ async function logLoginSuccess(user, req, deviceName) {
 }
 
 router.post('/login', async (req, res) => {
-    const { username, password, device_name } = req.body;
+    const { username, password, device_name, remember: rememberRaw } = req.body;
+    // 勾选「7天内无需登录」标记（兼容 boolean / 1 / '1' 三种入参形态）
+    const remember = (rememberRaw === true || rememberRaw === 1 || rememberRaw === '1') ? 1 : 0;
     // R3-2 修复：使用 req.ip（基于 TCP 连接，不可伪造）替代 x-forwarded-for
     const ip = req.ip;
 
@@ -107,7 +111,10 @@ if (passwordMatch && needsUpgrade(user.password)) {
     const ua = req.headers['user-agent'] || '';
     const deviceName = (device_name || ua.substring(0, 100));
     await db.refreshTokens.revokeByUserAndDevice(user.id, deviceName);
-    
+
+    // 会话策略：勾选 → 7天固定倒计时（锚点 login+7d，刷新不顺延）；未勾选 → 2小时无操作退出
+    const nowMs = Date.now();
+    const sessionDeadline = remember ? formatLocalDate(new Date(computeSessionDeadlineMs(nowMs))) : null;
     const record = await db.refreshTokens.create({
         user_id: user.id,
         token: refreshToken,
@@ -115,7 +122,10 @@ if (passwordMatch && needsUpgrade(user.password)) {
         ip,
         user_agent: ua,
         created_at: formatLocalDate(new Date()),
-        expires_at: formatLocalDate(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
+        expires_at: remember ? sessionDeadline : formatLocalDate(new Date(nowMs + INACTIVITY_MS)),
+        remember,
+        session_deadline: sessionDeadline,
+        last_active_at: formatLocalDate(new Date())
     });
 
     if (await db.twofa.isEnabled(user.id)) {
@@ -160,6 +170,8 @@ router.post('/login/2fa', async (req, res) => {
     if (!partial_token || !code) {
         return res.status(400).json({ error: '缺少参数' });
     }
+    // 2FA 第二步重建记录时沿用第一步勾选的「7天内无需登录」标记（前端 verifyTwofa 会带 remember）
+    const remember = (req.body.remember === true || req.body.remember === 1 || req.body.remember === '1') ? 1 : 0;
 
     let decoded;
     try {
@@ -199,6 +211,9 @@ router.post('/login/2fa', async (req, res) => {
             const deviceName = ua.substring(0, 100);
             await db.refreshTokens.revokeByUserAndDevice(user.id, deviceName);
             refreshToken = generateRefreshToken();
+            // 会话策略：勾选 → 7天固定倒计时；未勾选 → 2小时无操作退出
+            const nowMs = Date.now();
+            const sessionDeadline = remember ? formatLocalDate(new Date(computeSessionDeadlineMs(nowMs))) : null;
             record = await db.refreshTokens.create({
                 user_id: user.id,
                 token: refreshToken,
@@ -206,7 +221,10 @@ router.post('/login/2fa', async (req, res) => {
                 ip,
                 user_agent: ua,
                 created_at: formatLocalDate(new Date()),
-                expires_at: formatLocalDate(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
+                expires_at: remember ? sessionDeadline : formatLocalDate(new Date(nowMs + INACTIVITY_MS)),
+                remember,
+                session_deadline: sessionDeadline,
+                last_active_at: formatLocalDate(new Date())
             });
         }
 
@@ -276,6 +294,12 @@ router.post('/auth/refresh', async (req, res) => {
             return res.status(401).json({ error: 'refreshToken 已失效' });
         }
 
+        // 会话策略门禁：未勾选且 2 小时无操作 / 勾选但已超 7 天且 2 小时无操作 → 拒绝续期，要求重新登录
+        // （不区分勾选状态返回同一文案，防枚举会话类型）
+        if (!isRefreshAllowed(record, Date.now())) {
+            return res.status(401).json({ error: '登录已过期，请重新登录', code: 'TOKEN_EXPIRED' });
+        }
+
         // 立即撤销旧 refresh token（防重放）
         await db.refreshTokens.deleteByToken(refreshToken);
 
@@ -287,8 +311,10 @@ router.post('/auth/refresh', async (req, res) => {
         // 签发新的 access token + 新的 refresh token
         const newRefreshToken = generateRefreshToken();
 
-        // 存储新的 refresh token
-        const expiresAt = new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000);
+        // 勾选会话续期不延长 7 天锚点（固定倒计时，computeNextExpiryMs 恒返回原 deadline）；
+        // 新记录继承旧记录的 remember / session_deadline / last_active_at——
+        // last_active_at 不更新为当前时间（自动保活刷新不计活跃，2 小时无操作以真实业务请求为准）
+        const nextExpiryMs = computeNextExpiryMs(record, Date.now());
         const newRecord = await db.refreshTokens.create({
             user_id: user.id,
             device_name: record.device_name,
@@ -296,7 +322,10 @@ router.post('/auth/refresh', async (req, res) => {
             ip: req.ip,
             user_agent: req.headers['user-agent'] || '',
             created_at: formatLocalDate(new Date()),
-            expires_at: formatLocalDate(expiresAt)
+            expires_at: formatLocalDate(new Date(nextExpiryMs)),
+            remember: record.remember,
+            session_deadline: record.session_deadline,
+            last_active_at: record.last_active_at
         });
 
         // 用新记录的 id 生成 access token，确保设备校验通过
@@ -368,28 +397,9 @@ router.post('/auth/forgot-password', async (req, res) => {
         }
 
         const resetUrl = `${siteUrl}?resetPassword=${token}`;
-        const emailContent = `
-            <p>您好 <strong>${user.username}</strong>，</p>
-            <p>我们收到了您的密码重置请求。</p>
-            <p>请点击下方按钮重置您的密码：</p>
-            <p style="text-align: center;">
-                <a href="${resetUrl}" class="btn" target="_blank">重置密码</a>
-            </p>
-            <div class="divider"></div>
-            <p style="color: #718096; font-size: 14px;">
-                如果按钮无法点击，请复制以下链接到浏览器：<br>
-                <a href="${resetUrl}" style="word-break: break-all;">${resetUrl}</a>
-            </p>
-            <div class="info-box">
-                <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快操作。</p>
-            </div>
-            <div class="divider"></div>
-            <p style="color: #718096; font-size: 14px;">
-                <strong>如果您没有请求重置密码</strong>，请忽略此邮件，您的密码不会被修改。
-            </p>
-        `;
-        
-        await sendEmail(user.email, '密码重置', createEmailTemplate('密码重置请求', emailContent));
+
+        // 密码重置邮件（模板: password_reset，同步发送保证反馈）
+        await sendTemplateEmail(user.email, 'password_reset', { username: user.username, link: resetUrl }, { sync: true });
         res.json({ message: '如果邮箱已绑定，重置链接已发送' });
     } catch (error) {
         res.status(500).json({ error: '请求失败' });
@@ -458,7 +468,13 @@ router.post('/auth/reset-password', async (req, res) => {
 
         // 删除已使用的 token
         await tokenStore.delResetToken(token);
-        
+
+        // 操作审计：重置密码（未登录场景，userId 记被重置用户；D 类缺埋点补全）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: userId, username: user.username || '', action: 'password.reset', resourceType: 'user', resourceId: userId, details: '重置密码(账号:' + (user.username || '') + ')', req });
+        } catch (e) {}
+
         res.json({ message: '密码重置成功，请使用新密码登录' });
     } catch (error) {
         res.status(500).json({ error: '重置失败' });
@@ -520,18 +536,9 @@ router.post('/register/send-code', async (req, res) => {
         // 使用 token-store 存储验证码（优先 Redis，回退数据库，10 分钟有效期）
         await tokenStore.setRegisterCode(email, code, 600);
 
-        // 生成邮件 HTML
-        var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
-        var html = createEmailTemplate('注册验证码 - ' + siteName,
-            '<p>您好，您正在进行账号注册，验证码为：</p>' +
-            '<div style="text-align:center;margin:20px 0;">' +
-            '<span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#7c3aed;background:#f5f3ff;padding:12px 24px;border-radius:8px;display:inline-block;">' + code + '</span>' +
-            '</div>' +
-            '<p style="color:#666;">验证码有效期为 10 分钟，请尽快使用。</p>' +
-            '<p style="color:#999;font-size:12px;">如非本人操作，请忽略此邮件。</p>', siteName);
-
         try {
-            await sendEmail(email, '注册验证码 - ' + siteName, html);
+            // 注册验证码邮件（模板: register_code，同步发送保证反馈；{site_name} 由渲染引擎注入）
+            await sendTemplateEmail(email, 'register_code', { code: code }, { sync: true });
         } catch (sendErr) {
             console.error('[register] 邮件发送失败:', sendErr.message);
             return res.status(500).json({ error: '邮件发送失败，请检查邮箱配置或联系管理员' });
@@ -610,6 +617,12 @@ router.post('/register', async (req, res) => {
 
         // 删除已使用的验证码
         await tokenStore.delRegisterCode(email);
+
+        // 操作审计：用户自助注册（D 类缺埋点补全；action 映射见 db-messaging.js user_login 分类）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: newUser.id, username: username, action: 'user.register', resourceType: 'user', resourceId: newUser.id, details: '注册账号:' + username, req });
+        } catch (e) {}
 
         res.json({ success: true, message: '注册成功，请登录' });
     } catch (error) {

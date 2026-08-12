@@ -20,7 +20,7 @@ const AUDIT_CATEGORY_NAMES = {
 // 新购/续费统一分类：开通VM/LXC(order.*)、购买硬盘(disk.purchase)、续费(disk.renew/auto-renew/vm.renew/lxc.renew)
 function actionToCategory(action) {
     action = String(action || '');
-    if (action === 'user.login') return 'user_login';
+    if (action === 'user.login' || action === 'user.register') return 'user_login';
     if (/^(order\.|disk\.(purchase|renew|auto-renew)|vm\.renew|lxc\.renew)/.test(action)) return 'purchase';
     if (/^(vm|lxc|backup|snapshot|network|subnet)\./.test(action)) return 'vm_lxc';
     if (/^password\./.test(action)) return 'password';
@@ -59,7 +59,7 @@ const ADMIN_SUB_CATEGORIES = {
 // category -> SQL 条件（参数化），返回 [whereSql, args]
 function buildAuditCategoryWhere(category) {
     switch (category) {
-        case 'user_login': return ['action = ?', ['user.login']];
+        case 'user_login': return ['action IN (?, ?)', ['user.login', 'user.register']];
         case 'vm_lxc': return ['(action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ? OR action LIKE ?)', ['vm.%', 'lxc.%', 'backup.%', 'snapshot.%', 'network.%', 'subnet.%']];
         case 'password': return ['action LIKE ?', ['password.%']];
         case 'purchase': return ['action IN (?, ?, ?, ?, ?, ?, ?)', ['order.vm', 'order.lxc', 'disk.purchase', 'disk.renew', 'disk.auto-renew', 'vm.renew', 'lxc.renew']];

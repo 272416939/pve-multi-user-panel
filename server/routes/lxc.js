@@ -7,8 +7,8 @@ const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
 const { getStatusCache } = require('../services/status-cache');
-const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
-const { enqueueEmail } = require('../queue/email-queue');
+const { shouldSendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('../services/email-template');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
 const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync');
 const { execSSH, execSSHWithStdin, restoreLxcBySSH, createTerminalPty } = require('../api/ssh-exec');
@@ -257,38 +257,20 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         if (await shouldSendEmail(assignedUser.id, 'notify_lxc_provisioned')) {
             try {
                 const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
-                const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
-                const emailContent = `
-                    <p>您好 <strong>${assignedUser.username}</strong>，</p>
-                    <div class="info-box" style="border-left-color: #48bb78;">
-                        <p style="margin-bottom: 8px; font-size: 16px;">
-                            您的 LXC 容器已开通！
-                        </p>
-                    </div>
-                    <div class="info-box">
-                        <p style="margin-bottom: 8px;"><strong>容器信息：</strong></p>
-                        <p style="margin-bottom: 4px;">名称：${name || 'CT ' + ct_id}</p>
-                        <p style="margin-bottom: 4px;">CT ID：${ct_id}</p>
-                        <p style="margin-bottom: 4px;">到期时间：${expiryStr}</p>
-                        ${priceStr}
-                    </div>
-                    <div class="divider"></div>
-                    <p>您可以前往「我的 LXC 容器」页面开始使用。如有问题请联系管理员。</p>
-                `;
-                const lxcSiteName = await getSiteName();
-                if (await shouldSendEmail(assignedUser.id, 'notify_lxc_provisioned')) {
-                    enqueueEmail(
-                        assignedUser.email,
-                        'LXC 容器已开通 - ' + lxcSiteName,
-                        createEmailTemplate('容器开通通知', emailContent, lxcSiteName)
-                    );
-                }
+                // LXC 开通通知（模板: lxc_provisioned）
+                await sendTemplateEmail(assignedUser.email, 'lxc_provisioned', {
+                    username: assignedUser.username,
+                    resource_name: name || 'CT ' + ct_id,
+                    resource_id: ct_id,
+                    expire_time: expiryStr,
+                    renewal_price: renewal_price
+                });
             } catch (emailError) {
                 console.error(`发送 LXC 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
             }
         }
     }
- 
+
     // 私有网络要求：admin 手动分配不自动开机，以关机状态交付，用户开机时需先绑定子网
 
     // DHCP 静态绑定：分配 IP
@@ -400,10 +382,49 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
  
     await db.lxcContainers.update(ctId, updates);
 
-    // 操作审计：LXC 名称编辑
-    if (name !== undefined && name !== ct.name) {
-        await auditAction(req, 'lxc.rename', '编辑 LXC ' + ct.ct_id + ' 名称: ' + (ct.name || '') + ' → ' + name, { resourceType: 'lxc', resourceId: ct.ct_id });
-    }
+    // 操作审计：LXC 编辑（仅名称 → lxc.rename；含管理员字段变更 → lxc.edit 字段级 diff）
+    // 管理字段（到期/续费价/续费周期/换绑用户/MAC分组）此前无审计，改到期时间≈免费续费，属资金敏感项
+    var adminEditFields = [
+        { key: 'expiration_date', label: '到期时间', fmt: function (v) { return String(v).slice(0, 10); } },
+        { key: 'renewal_price', label: '续费价', num: true, fmt: function (v) { return '¥' + v; } },
+        { key: 'renewal_period', label: '续费周期', fmt: function (v) { return v === 'month' ? '月付' : (v === 'quarter' ? '季付' : (v === 'year' ? '年付' : v)); } },
+        { key: 'user', label: '所属用户' },
+        { key: 'ikuai_mac_group_id', label: 'MAC分组', fmt: function (v) { return v ? '#' + v : '无'; } }
+    ];
+    try {
+        var newCt = await db.lxcContainers.getById(ctId);
+        if (newCt) {
+            // 所属用户显示名（用户名优先，缺失回退 #id）
+            var oldUserName = '';
+            if (ct.user_id) { try { var ou = await db.users.getById(ct.user_id); if (ou) oldUserName = ou.username; } catch (e) {} }
+            var targetUserId = user_id !== undefined ? parseInt(user_id) : ct.user_id;
+            var newUserName = '';
+            if (targetUserId) { try { var nu = await db.users.getById(targetUserId); if (nu) newUserName = nu.username; } catch (e) {} }
+            var oldView = {
+                expiration_date: ct.expiration_date,
+                renewal_price: ct.renewal_price,
+                renewal_period: ct.renewal_period,
+                user: oldUserName || (ct.user_id ? '#' + ct.user_id : '无'),
+                ikuai_mac_group_id: ct.ikuai_mac_group_id || ''
+            };
+            var newView = {
+                expiration_date: newCt.expiration_date,
+                renewal_price: newCt.renewal_price,
+                renewal_period: newCt.renewal_period,
+                user: newUserName || (newCt.user_id ? '#' + newCt.user_id : '无'),
+                ikuai_mac_group_id: newCt.ikuai_mac_group_id || ''
+            };
+            var { buildFieldDiff } = require('../utils/audit-diff');
+            var adminChanges = buildFieldDiff(oldView, newView, adminEditFields);
+            var nameChanged = name !== undefined && name !== ct.name;
+            if (adminChanges.length) {
+                if (nameChanged) adminChanges.unshift('名称 ' + (ct.name || '无') + '→' + name);
+                await auditAction(req, 'lxc.edit', '编辑 LXC ' + ct.ct_id + '；变更:' + adminChanges.join(', '), { resourceType: 'lxc', resourceId: ct.ct_id });
+            } else if (nameChanged) {
+                await auditAction(req, 'lxc.rename', '编辑 LXC ' + ct.ct_id + ' 名称: ' + (ct.name || '') + ' → ' + name, { resourceType: 'lxc', resourceId: ct.ct_id });
+            }
+        }
+    } catch (e) {}
  
     // 换绑后尝试自动开机
     if (isAdmin && user_id !== undefined && user_id !== ct.user_id) {
@@ -487,29 +508,12 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
         if (removedUser && removedUser.email && removedUser.emailVerified) {
             if (await shouldSendEmail(removedCtInfo.user_id, 'notify_lxc_provisioned')) {
                 try {
-                    const emailContent = `
-                        <p>您好 <strong>${removedUser.username}</strong>，</p>
-                        <div class="warning-box">
-                            <p style="margin-bottom: 8px; font-size: 16px;">
-                                您的 LXC 容器已被移除
-                            </p>
-                        </div>
-                        <div class="info-box">
-                            <p style="margin-bottom: 8px;"><strong>容器信息：</strong></p>
-                            <p style="margin-bottom: 4px;">名称：${removedCtInfo.name || 'CT ' + removedCtInfo.ct_id}</p>
-                            <p style="margin-bottom: 4px;">CT ID：${removedCtInfo.ct_id}</p>
-                        </div>
-                        <div class="divider"></div>
-                        <p>如果对此操作有疑问，请联系管理员。</p>
-                    `;
-                    const lxcSiteName2 = await getSiteName();
-                    if (await shouldSendEmail(removedUser.id, 'notify_lxc_provisioned')) {
-                        enqueueEmail(
-                            removedUser.email,
-                            'LXC 容器已被移除 - ' + lxcSiteName2,
-                            createEmailTemplate('容器移除通知', emailContent, lxcSiteName2)
-                        );
-                    }
+                    // LXC 移除通知（模板: lxc_removed）
+                    await sendTemplateEmail(removedUser.email, 'lxc_removed', {
+                        username: removedUser.username,
+                        resource_name: removedCtInfo.name || 'CT ' + removedCtInfo.ct_id,
+                        resource_id: removedCtInfo.ct_id
+                    });
                 } catch (emailError) {
                     console.error(`发送 LXC 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
                 }

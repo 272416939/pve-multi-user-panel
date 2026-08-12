@@ -24,6 +24,10 @@
                                         <input type="password" class="form-control" id="login-password" name="password" autocomplete="current-password" v-model="loginForm.password" @input="clearLoginErrors" required>
                                         <span class="login-field-error" v-if="loginPasswordError">{{ loginPasswordError }}</span>
                                     </div>
+                                    <div class="form-check mt-1 mb-2">
+                                        <input type="checkbox" class="form-check-input" id="login-remember" v-model="loginForm.remember">
+                                        <label class="form-check-label" for="login-remember">7天内无需登录</label>
+                                    </div>
                                     <div class="login-form-error" v-if="loginError">{{ loginError }}</div>
                                     <div class="d-flex gap-2 mt-2">
                                         <button type="submit" class="btn btn-primary login-submit-btn" style="flex:1">登录</button>

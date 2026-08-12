@@ -7,7 +7,7 @@ const ikuaiApi = require('../api/ikuai-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, getWanInterface, getWanInterfaces } = require('../services/dhcp');
 // ikuai_id 解析/序列化单一来源（services/port-forward-sync.js，禁止本地双份拷贝）
-const { parseIkuaiIds, stringifyIkuaiIds } = require('../services/port-forward-sync');
+const { parseIkuaiIds, stringifyIkuaiIds, deleteIkuaiRuleStrict } = require('../services/port-forward-sync');
 const dbg = require('../utils/debug');
 const { safeError } = require('../utils/safe-error');
 // CNAME 域名配置校验纯函数（utils/cname-validate.js，格式与前端 parseCnameEntries 对齐）
@@ -736,31 +736,14 @@ router.delete('/port-forwards/:id', authMiddleware, async (req, res) => {
             await auditAction(req, 'network.port.delete', portAuditDetail('删除', rule, rule.vm_id, rule.ct_id), { resourceType: 'port-forward', resourceId: id });
             return res.json({ message: '规则已删除' });
         }
-        // 正常规则同步删除（多接口）
-        try {
-            const oldIds = parseIkuaiIds(rule.ikuai_id);
-            if (oldIds.length > 0) {
-                for (const old of oldIds) {
-                    try {
-                        if (old.id) await ikuaiApi.deletePortForward(old.id);
-                    } catch (e) {
-                        console.error(`[端口转发] ikuai 删除 ${old.id} 失败:`, e.message);
-                    }
-                }
-            } else if (ikuaiApi.isConfigured()) {
-                // 如果没有 ikuai_id，尝试按端口匹配删除（兼容旧数据）
-                const ikuaiRules = await ikuaiApi.getPortForwards();
-                const matches = ikuaiRules.filter(r =>
-                    String(r.wan_port) === String(rule.external_port) &&
-                    String(r.lan_port) === String(rule.internal_port) &&
-                    (r.lan_ip || r.lan_addr) === rule.ip
-                );
-                for (const m of matches) {
-                    try { await ikuaiApi.deletePortForward(m.id); } catch (_) {}
-                }
-            }
-        } catch (e) {
-            console.error('[端口转发] ikuai 删除失败:', e.message);
+        // 记录删除意图（防止删除过程中服务重启：残留 deleting 记录由启动对账收敛）
+        await db.portForwards.update(id, { sync_status: 'deleting' });
+        // 同步删除爱快侧（失败不删 DB，恢复原状态，前端提示重试）
+        const delResult = await deleteIkuaiRuleStrict(rule);
+        if (!delResult.deleted) {
+            await db.portForwards.update(id, { sync_status: rule.sync_status || 'synced' });
+            await auditAction(req, 'network.port.delete', portAuditDetail('删除', rule, rule.vm_id, rule.ct_id) + '（失败：爱快删除失败）', { resourceType: 'port-forward', resourceId: id });
+            return res.status(500).json({ error: '爱快删除失败: ' + delResult.error });
         }
         await db.portForwards.delete(id);
         await auditAction(req, 'network.port.delete', portAuditDetail('删除', rule, rule.vm_id, rule.ct_id), { resourceType: 'port-forward', resourceId: id });
@@ -782,13 +765,15 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
                 const rule = await db.portForwards.getById(id);
                 if (!rule) continue;
                 if (rule.sync_status !== 'orphan') {
-                    const oldIds = parseIkuaiIds(rule.ikuai_id);
-                    for (const old of oldIds) {
-                        try {
-                            if (old.id) await ikuaiApi.deletePortForward(old.id);
-                        } catch (e) {
-                            console.error(`[批量删除] ikuai 删除 ${old.id} 失败:`, e.message);
-                        }
+                    // 记录删除意图（防重启中断残留 synced 记录被对账误标孤儿）
+                    await db.portForwards.update(id, { sync_status: 'deleting' });
+                    // 同步删除爱快侧（失败不删 DB，恢复原状态并计入 failed）
+                    const delResult = await deleteIkuaiRuleStrict(rule);
+                    if (!delResult.deleted) {
+                        await db.portForwards.update(id, { sync_status: rule.sync_status || 'synced' });
+                        await auditAction(req, 'network.port.delete', portAuditDetail('删除', rule, rule.vm_id, rule.ct_id) + '（失败：爱快删除失败）', { resourceType: 'port-forward', resourceId: id });
+                        results.failed++;
+                        continue;
                     }
                 }
                 await db.portForwards.delete(id);

@@ -10,6 +10,8 @@ const deviceCache = cacheStore.create('device', 60);
 const userActiveCache = cacheStore.create('user_active', 30);
 // JWT 黑名单缓存（默认 24h TTL，实际按 token 剩余有效期设置）
 const jwtBlacklistCache = cacheStore.create('jwt_blacklist', 86400);
+// 活跃时间更新节流（60s TTL）— 避免每个请求都写 refresh_tokens.last_active_at
+const activityThrottleCache = cacheStore.create('activity_throttle', 60);
 
 /**
  * 计算 token 的 SHA256 哈希（作为黑名单 key）
@@ -93,6 +95,17 @@ const authMiddleware = async (req, res, next) => {
         }
         if (!isActive) {
             return res.status(401).json({ error: '账号已被禁用', code: 'ACCOUNT_DISABLED' });
+        }
+
+        // 3.1 更新最后活跃时间（60s 节流，失败静默不影响主流程）
+        //     /auth/refresh 端点不走本中间件，前端自动保活刷新不计活跃——
+        //     「2 小时无操作」以真实业务请求为准（见 utils/session-policy.js）
+        if (decoded.deviceId) {
+            const throttleKey = String(decoded.deviceId);
+            if (await activityThrottleCache.get(throttleKey) === null) {
+                await activityThrottleCache.set(throttleKey, 1);
+                db.refreshTokens.touchActivity(decoded.deviceId).catch(() => {});
+            }
         }
 
         req.user = decoded;

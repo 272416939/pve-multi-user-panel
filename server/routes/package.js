@@ -438,9 +438,21 @@ router.post('/admin/package-groups', authMiddleware, adminMiddleware, async (req
 
 router.put('/admin/package-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        // 保存前取旧记录（审计 diff 用）
+        var oldGroup = await db.packageGroups.getById(parseInt(req.params.id));
         var r = await db.packageGroups.update(parseInt(req.params.id), req.body);
-        // 操作审计：更新套餐分组
-        await adminAudit(req, 'admin.package-group.update', '更新套餐分组 #' + parseInt(req.params.id) + ':' + (req.body.name || ''));
+        // 操作审计：更新套餐分组（字段级 diff）
+        if (oldGroup) {
+            const { buildFieldDiff } = require('../utils/audit-diff');
+            var changes = buildFieldDiff(oldGroup, r, [
+                { key: 'name', label: '名称' },
+                { key: 'type', label: '类型', fmt: function (v) { return v === 'vm' ? 'VM' : (v === 'lxc' ? 'LXC' : v); } },
+                { key: 'sort_order', label: '排序', num: true }
+            ]);
+            if (changes.length) {
+                await adminAudit(req, 'admin.package-group.update', '更新套餐分组 #' + parseInt(req.params.id) + '；变更:' + changes.join(', '));
+            }
+        }
         res.json(r);
     } catch (e) { console.error('[package] update group error:', e.message); res.status(500).json({ error: safeError(e) }); }
 });

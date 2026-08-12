@@ -5,14 +5,15 @@ var express = require('express');
 var router = express.Router();
 var { authMiddleware, adminMiddleware } = require('../middleware/auth');
 var { safeError } = require('../utils/safe-error');
-var { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
-var { enqueueEmail } = require('../queue/email-queue');
+var { shouldSendEmail } = require('../utils/email');
 var cacheStore = require('../utils/cache-store');
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
 var { importExistingDisks } = require('../services/disk-expiry-check');
 // 单一来源：磁盘类型白名单统一走 constants（规范第七节）
 var { DISK_TYPES } = require('../constants');
+// 审计字段级 diff 通用工具（规范第十一节：更新类审计从 DB 新旧状态 diff 生成，不从请求体拼接）
+var { buildFieldDiff } = require('../utils/audit-diff');
 
 // 规格列表缓存（5 分钟 TTL）
 var specCache = cacheStore.create('disk_specs', 300);
@@ -168,12 +169,21 @@ router.put('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, r
     if (!name) return res.status(400).json({ error: '请输入分组名称' });
     if (name.length > 50) return res.status(400).json({ error: '分组名称不能超过 50 字符' });
 
+    // 保存前取旧记录（审计 diff 用）
+    var oldGroup = await db.storageGroups.getById(id);
+    if (!oldGroup) return res.status(404).json({ error: '存储分组不存在' });
     var group = await db.storageGroups.update(id, { name: name, sort_order: sortOrder });
     clearDiskCache();
-    // 操作审计：编辑存储分组
+    // 操作审计：编辑存储分组（字段级 diff）
     try {
       const { auditLog } = require('../utils/audit-log');
-      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.storage-group.update', resourceType: 'storage-group', resourceId: id, details: '编辑存储分组:' + name, req });
+      var changes = buildFieldDiff(oldGroup, group, [
+        { key: 'name', label: '名称' },
+        { key: 'sort_order', label: '排序', num: true }
+      ]);
+      if (changes.length) {
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.storage-group.update', resourceType: 'storage-group', resourceId: id, details: '编辑存储分组；变更:' + changes.join(', '), req });
+      }
     } catch (e) {}
     res.json(group);
   } catch (e) {
@@ -288,6 +298,9 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
     var fmtResult2 = await validateDiskFormat(data.storage_pool.trim(), data.disk_format);
     if (!fmtResult2.ok) return res.status(400).json({ error: fmtResult2.error });
 
+    // 保存前取旧记录（审计 diff 用；资金面定价字段全量纳入）
+    var oldSpec = await db.diskSpecs.getById(id);
+    if (!oldSpec) return res.status(404).json({ error: '磁盘规格不存在' });
     var spec = await db.diskSpecs.update(id, {
       name: data.name.trim(),
       disk_type: data.disk_type,
@@ -307,10 +320,34 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
       description: data.description || null
     });
     clearDiskCache();
-    // 操作审计：编辑磁盘规格（资金面定价，含单价）
+    // 操作审计：编辑磁盘规格（字段级 diff，资金面定价含单价）
     try {
       const { auditLog } = require('../utils/audit-log');
-      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.spec.update', resourceType: 'disk-spec', resourceId: id, details: '编辑磁盘规格:' + data.name.trim() + '(单价¥' + pricePerGbVal2.toFixed(2) + '/G)', req });
+      var changes = buildFieldDiff(oldSpec, spec, [
+        { key: 'name', label: '名称' },
+        { key: 'disk_type', label: '类型' },
+        { key: 'storage_group_id', label: '存储分组', fmt: function (v) { return v ? '#' + v : '无'; } },
+        { key: 'enabled', label: '启用', bool: true },
+        { key: 'min_size_gb', label: '最低容量', num: true, fmt: function (v) { return v + 'G'; } },
+        { key: 'max_size_gb', label: '最高容量', num: true, fmt: function (v) { return v + 'G'; } },
+        { key: 'price_per_gb', label: '单价', num: true, fmt: function (v) { return '¥' + v + '/G'; } },
+        { key: 'quarterly_discount', label: '季付优惠', num: true, fmt: function (v) { return v + '%'; } },
+        { key: 'yearly_discount', label: '年付优惠', num: true, fmt: function (v) { return v + '%'; } },
+        { key: 'mbps_rd', label: '读带宽', num: true, fmt: function (v) { return v + 'Mbps'; } },
+        { key: 'mbps_rd_max', label: '读带宽峰值', num: true, fmt: function (v) { return v + 'Mbps'; } },
+        { key: 'mbps_wr', label: '写带宽', num: true, fmt: function (v) { return v + 'Mbps'; } },
+        { key: 'mbps_wr_max', label: '写带宽峰值', num: true, fmt: function (v) { return v + 'Mbps'; } },
+        { key: 'iops_rd', label: '读IOPS', num: true, fmt: function (v) { return v + 'IOPS'; } },
+        { key: 'iops_rd_max', label: '读IOPS峰值', num: true, fmt: function (v) { return v + 'IOPS'; } },
+        { key: 'iops_wr', label: '写IOPS', num: true, fmt: function (v) { return v + 'IOPS'; } },
+        { key: 'iops_wr_max', label: '写IOPS峰值', num: true, fmt: function (v) { return v + 'IOPS'; } },
+        { key: 'storage_pool', label: '存储位置' },
+        { key: 'disk_format', label: '磁盘格式' },
+        { key: 'description', label: '描述', fmt: function (v) { return String(v).length > 30 ? String(v).slice(0, 30) + '…' : v; } }
+      ]);
+      if (changes.length) {
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.spec.update', resourceType: 'disk-spec', resourceId: id, details: '编辑磁盘规格；变更:' + changes.join(', '), req });
+      }
     } catch (e) {}
     res.json(spec);
   } catch (e) {
@@ -371,11 +408,24 @@ router.put('/lifecycle-config', authMiddleware, adminMiddleware, async (req, res
       auto_renew_days: parseInt(req.body.auto_renew_days) || 1
     };
 
+    // 保存前取旧配置（审计 diff 用）
+    var oldConfig = await db.diskLifecycleConfig.get();
     var config = await db.diskLifecycleConfig.upsert(data);
-    // 操作审计：更新磁盘生命周期配置
+    // 操作审计：更新磁盘生命周期配置（字段级 diff）
     try {
       const { auditLog } = require('../utils/audit-log');
-      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.lifecycle-config', resourceType: 'config', resourceId: 'disk-lifecycle', details: '更新磁盘生命周期配置(提醒' + data.warn_days + '天,宽限' + data.grace_days + '天,保留' + data.retention_days + '天,自动续费前' + data.auto_renew_days + '天)', req });
+      var freqFmt = function (v) { return v === 'twice_daily' ? '每天两次' : (v === 'daily' ? '每天' : v); };
+      var changes = buildFieldDiff(oldConfig, config, [
+        { key: 'warn_days', label: '提醒天数', num: true },
+        { key: 'warn_frequency', label: '提醒频率', fmt: freqFmt },
+        { key: 'grace_days', label: '宽限天数', num: true },
+        { key: 'grace_frequency', label: '宽限频率', fmt: freqFmt },
+        { key: 'retention_days', label: '保留天数', num: true },
+        { key: 'auto_renew_days', label: '自动续费提前', num: true }
+      ]);
+      if (changes.length) {
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.lifecycle-config', resourceType: 'config', resourceId: 'disk-lifecycle', details: '更新磁盘生命周期配置；变更:' + changes.join(', '), req });
+      }
     } catch (e) {}
     res.json(config);
   } catch (e) {
@@ -447,6 +497,11 @@ router.put('/admin/disks/:id', authMiddleware, adminMiddleware, async (req, res)
       if (!spec) return res.status(400).json({ error: '规格不存在' });
     }
 
+    // 审计 diff 用：补查旧分组/旧规格名称（disks.getById 无 JOIN，手动补名称便于日志可读）
+    var oldGroup = null, oldSpec = null;
+    if (disk.storage_group_id) { try { oldGroup = await db.storageGroups.getById(disk.storage_group_id); } catch (e) {} }
+    if (disk.spec_id) { try { oldSpec = await db.diskSpecs.getById(disk.spec_id); } catch (e) {} }
+
     // 更新磁盘
     await db.disks.update(id, {
       disk_name: diskName,
@@ -456,10 +511,27 @@ router.put('/admin/disks/:id', authMiddleware, adminMiddleware, async (req, res)
 
     // 重新获取完整信息
     var updated = await db.disks.getById(id);
-    // 操作审计：编辑磁盘（名称/分组/规格）
+    // 操作审计：编辑磁盘（名称/分组/规格，分组规格按名称显示，字段级 diff）
     try {
       const { auditLog } = require('../utils/audit-log');
-      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.update', resourceType: 'disk', resourceId: id, details: '编辑磁盘 #' + id + '(名称:' + diskName + ')', req });
+      var oldView = {
+        disk_name: disk.disk_name,
+        storage_group: (oldGroup && oldGroup.name) || (disk.storage_group_id ? '#' + disk.storage_group_id : '无'),
+        spec: (oldSpec && oldSpec.name) || (disk.spec_id ? '#' + disk.spec_id : '无')
+      };
+      var newView = {
+        disk_name: diskName,
+        storage_group: (group && group.name) || '#' + storageGroupId,
+        spec: (spec && spec.name) || (specId ? '#' + specId : '无')
+      };
+      var changes = buildFieldDiff(oldView, newView, [
+        { key: 'disk_name', label: '名称' },
+        { key: 'storage_group', label: '存储分组' },
+        { key: 'spec', label: '磁盘规格' }
+      ]);
+      if (changes.length) {
+        await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.update', resourceType: 'disk', resourceId: id, details: '编辑磁盘 #' + id + '；变更:' + changes.join(', '), req });
+      }
     } catch (e) {}
     res.json(updated);
   } catch (e) {
@@ -682,21 +754,16 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
         var destroyUser = await db.users.getById(disk.user_id);
         if (destroyUser && destroyUser.email && destroyUser.emailVerified && destroyUser.email.includes('@')) {
           if (await shouldSendEmail(disk.user_id, 'notify_disk_destroy_refund')) {
-            var siteName = await getSiteName();
             var balanceBeforeDestroy = parseFloat(destroyUser.balance || '0');
-            var emailHtml = createEmailTemplate('硬盘已被管理员销毁 - 退款到账',
-              '<p>您的数据盘已被管理员销毁，退款已到账。</p>' +
-              '<div class="warning-box">' +
-              '<p style="margin-bottom: 4px;">磁盘名称：<strong>' + (disk.disk_name || '数据盘-' + disk.id) + '</strong></p>' +
-              '<p style="margin-bottom: 4px;">退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
-              '<p style="margin-bottom: 4px;">退款说明：<strong>' + refundDesc + '</strong></p>' +
-              '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + (balanceBeforeDestroy - refundAmount).toFixed(2) + ' → ¥' + balanceBeforeDestroy.toFixed(2) + '</strong></p>' +
-              '<p>退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
-              '</div>' +
-              '<p>如有疑问请联系管理员。</p>', siteName);
-            if (await shouldSendEmail(disk.user_id, 'notify_disk_destroy_refund')) {
-                enqueueEmail(destroyUser.email, '硬盘已被管理员销毁 - ' + siteName, emailHtml);
-            }
+            // 硬盘管理员销毁退款（模板: disk_admin_destroy）
+            var { sendTemplateEmail } = require('../services/email-template');
+            await sendTemplateEmail(destroyUser.email, 'disk_admin_destroy', {
+              disk_name: disk.disk_name || '数据盘-' + disk.id,
+              amount: refundAmount.toFixed(2),
+              refund_desc: refundDesc,
+              balance_before: (balanceBeforeDestroy - refundAmount).toFixed(2),
+              balance_after: balanceBeforeDestroy.toFixed(2)
+            });
           }
         }
       } catch (emailErr) { console.error('[admin disk destroy] 退款邮件发送失败:', emailErr.message); }

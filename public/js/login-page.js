@@ -23,7 +23,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
         const App = {
             template: '#appTemplate',
             setup() {
-                const loginForm = ref({ username: '', password: '' });
+                const loginForm = ref({ username: '', password: '', remember: false });
                 const loginError = ref('');
                 const loginUsernameError = ref('');
                 const loginPasswordError = ref('');
@@ -140,12 +140,12 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             return;
                         }
 
-                        // 获取用户信息，判断角色
+                        // 获取用户信息，判断角色（保留 URL query，如 ?section=templates-os 登录后直达）
                         const userData = await api('/user/profile');
                         if (userData.role === 'admin') {
-                            window.location.href = 'admin.html';
+                            window.location.href = 'admin.html' + (location.search || '');
                         } else {
-                            window.location.href = 'dashboard.html';
+                            window.location.href = 'dashboard.html' + (location.search || '');
                         }
                     } catch (e) {
                         if (e.message.includes('网络') || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
@@ -175,7 +175,8 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             body: JSON.stringify({
                                 partial_token: partialToken.value,
                                 code: code,
-                                refresh_token: pendingRefreshToken.value
+                                refresh_token: pendingRefreshToken.value,
+                                remember: loginForm.value.remember === true
                             })
                         });
                         localStorage.setItem(window.__storageKeys.TOKEN, data.token);
@@ -380,6 +381,14 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     const urlParams = new URLSearchParams(window.location.search);
                     const resetTokenParam = urlParams.get('resetPassword');
 
+                    // 会话过期回跳（?expired=1，见 shared.js）：清理残留令牌并提示重新登录
+                    if (urlParams.get('expired') === '1') {
+                        localStorage.removeItem(window.__storageKeys.TOKEN);
+                        localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
+                        loginError.value = '登录状态已过期，请重新登录';
+                        window.history.replaceState({}, document.title, window.location.pathname);
+                    }
+
                     if (resetTokenParam) {
                         showResetPassword.value = true;
                         resetToken.value = resetTokenParam;
@@ -399,7 +408,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     // 检查是否已登录
                     const token = localStorage.getItem(window.__storageKeys.TOKEN);
                     if (token) {
-                        window.location.href = 'dashboard.html';
+                        window.location.href = 'dashboard.html' + (location.search || '');
                         return;
                     }
 

@@ -194,9 +194,14 @@
                                 <td class="small">{{ row.id }}</td>
                                 <td class="small">{{ row.username ? row.username + '[' + row.user_id + ']' : (row.user_id || '-') }}</td>
                                 <td class="small">{{ row.category_name }}</td>
-                                <td class="small text-start text-break">{{ row.detail_text }}</td>
+                                <td class="small text-start"><span class="log-detail-truncate" :title="row.detail_text">{{ row.detail_text }}</span></td>
                                 <td class="small text-nowrap">{{ row.created_at }}</td>
-                                <td><pv-button size="sm" variant="danger" @click="deleteLogRow(row)">删除</pv-button></td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <pv-button size="sm" @click="showLogDetail(row)">详情</pv-button>
+                                        <pv-button size="sm" variant="danger" @click="deleteLogRow(row)">删除</pv-button>
+                                    </div>
+                                </td>
                             </tr>
                             <tr v-if="!currentLogList || currentLogList.length === 0">
                                 <td colspan="7" class="text-center text-muted py-3">暂无操作日志</td>
@@ -224,9 +229,14 @@
                                 <td class="small">{{ row.id }}</td>
                                 <td class="small">{{ row.username ? row.username + '[' + row.user_id + ']' : (row.user_id || '-') }}</td>
                                 <td class="small text-break">{{ row.sub_category_name || row.action }}</td>
-                                <td class="small text-start text-break">{{ row.detail_text }}</td>
+                                <td class="small text-start"><span class="log-detail-truncate" :title="row.detail_text">{{ row.detail_text }}</span></td>
                                 <td class="small text-nowrap">{{ row.created_at }}</td>
-                                <td><pv-button size="sm" variant="danger" @click="deleteLogRow(row)">删除</pv-button></td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        <pv-button size="sm" @click="showLogDetail(row)">详情</pv-button>
+                                        <pv-button size="sm" variant="danger" @click="deleteLogRow(row)">删除</pv-button>
+                                    </div>
+                                </td>
                             </tr>
                             <tr v-if="!currentLogList || currentLogList.length === 0">
                                 <td colspan="7" class="text-center text-muted py-3">暂无后台操作日志</td>

@@ -4,8 +4,8 @@
 
 const db = require('../api/db');
 const { createPayClient } = require('../sdk/pay');
-const { createEmailTemplate, shouldSendEmail } = require('../utils/email');
-const { enqueueEmail } = require('../queue/email-queue');
+const { shouldSendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('./email-template');
 const dbg = require('../utils/debug');
 const { generateOrderNo } = require('../utils/order-utils');
 const { PAYMENT_METHODS } = require('../constants');
@@ -300,20 +300,31 @@ async function processPayCallback(params, opts) {
         console.error('[payment] 站内信发送失败:', e.message);
     }
 
+    // 操作审计：在线充值到账（余额为最高敏感项，人工充值有审计而在线充值此前无；action 归 purchase 分类）
+    try {
+        const { auditLog } = require('../utils/audit-log');
+        await auditLog({
+            userId: userId,
+            username: user.username || '',
+            action: 'order.recharge.confirm',
+            resourceType: 'order',
+            resourceId: params.out_trade_no,
+            details: '充值到账 ¥' + amount.toFixed(2) + '(订单:' + params.out_trade_no + ',余额:¥' + balanceBefore.toFixed(2) + '→¥' + balanceAfter.toFixed(2) + ')',
+            req: null
+        });
+    } catch (e) {
+        console.error('[payment] 充值到账审计日志失败:', e.message);
+    }
+
     try {
         if (user.email && user.emailVerified && user.email.includes('@')) {
             if (await shouldSendEmail(userId, 'notify_recharge')) {
-                var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
-                var rechargeHtml = createEmailTemplate('充值到账通知',
-                    `<p>您好，您已成功 <strong>充值 ¥${amount.toFixed(2)}</strong>。</p>
-                    <div class="info-box">
-                        <p style="margin-bottom: 4px;">充值金额：<strong>¥${amount.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">当前余额：<strong>¥${balanceAfter.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">订单编号：<strong>${params.out_trade_no}</strong></p>
-                        <p>充值时间：${new Date().toLocaleString('zh-CN')}</p>
-                    </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/user-center">用户中心</a> 查看余额详情。</p>`, siteName);
-                enqueueEmail(user.email, '充值到账通知 - ' + siteName, rechargeHtml);
+                // 充值到账通知（模板: recharge_notify）
+                await sendTemplateEmail(user.email, 'recharge_notify', {
+                    amount: amount.toFixed(2),
+                    balance_after: balanceAfter.toFixed(2),
+                    order_no: params.out_trade_no
+                });
             }
         }
     } catch (e) {

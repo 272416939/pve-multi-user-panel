@@ -63,17 +63,19 @@
                                 <th style="width:130px">操作类型</th>
                                 <th class="text-start">详情</th>
                                 <th style="width:170px">操作时间</th>
+                                <th style="width:70px">操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr v-for="row in opLogList" :key="row.id">
                                 <td>{{ row.username || '-' }}</td>
                                 <td>{{ row.category_name }}</td>
-                                <td class="small text-start text-break">{{ row.detail_text }}</td>
+                                <td class="small text-start"><span class="log-detail-truncate" :title="row.detail_text">{{ row.detail_text }}</span></td>
                                 <td class="small text-nowrap">{{ row.created_at }}</td>
+                                <td><pv-button size="sm" @click="showLogDetail(row)">详情</pv-button></td>
                             </tr>
                             <tr v-if="!opLogList || opLogList.length === 0">
-                                <td colspan="4" class="text-center text-muted py-3">暂无操作日志</td>
+                                <td colspan="5" class="text-center text-muted py-3">暂无操作日志</td>
                             </tr>
                         </tbody>
                     </table>

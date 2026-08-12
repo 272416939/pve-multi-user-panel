@@ -7,8 +7,8 @@ const ikuaiApi = require('../api/ikuai-api');
 const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
 const { getStatusCache } = require('../services/status-cache');
-const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
-const { enqueueEmail } = require('../queue/email-queue');
+const { shouldSendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('../services/email-template');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
 const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync');
 const dbg = require('../utils/debug');
@@ -292,32 +292,14 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         if (await shouldSendEmail(assignedUser.id, 'notify_vm_provisioned')) {
             try {
                 const expiryStr = expiration_date ? new Date(expiration_date).toLocaleString('zh-CN') : '永久有效';
-                const priceStr = renewal_price ? `<p style="margin-bottom: 4px;">续费价格：${renewal_price}</p>` : '';
-                const emailContent = `
-                    <p>您好 <strong>${assignedUser.username}</strong>，</p>
-                    <div class="info-box" style="border-left-color: #48bb78;">
-                        <p style="margin-bottom: 8px; font-size: 16px;">
-                            您的虚拟机已开通！
-                        </p>
-                    </div>
-                    <div class="info-box">
-                        <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
-                        <p style="margin-bottom: 4px;">名称：${name || 'VM ' + vm_id}</p>
-                        <p style="margin-bottom: 4px;">VMID：${vm_id}</p>
-                        <p style="margin-bottom: 4px;">到期时间：${expiryStr}</p>
-                        ${priceStr}
-                    </div>
-                    <div class="divider"></div>
-                    <p>您可以前往「我的虚拟机」页面开始使用。如有问题请联系管理员。</p>
-                `;
-                const vmSiteName = await getSiteName();
-                if (await shouldSendEmail(assignedUser.id, 'notify_vm_provisioned')) {
-                    enqueueEmail(
-                        assignedUser.email,
-                        '虚拟机已开通 - ' + vmSiteName,
-                        createEmailTemplate('虚拟机开通通知', emailContent, vmSiteName)
-                    );
-                }
+                // VM 开通通知（模板: vm_provisioned）
+                await sendTemplateEmail(assignedUser.email, 'vm_provisioned', {
+                    username: assignedUser.username,
+                    resource_name: name || 'VM ' + vm_id,
+                    resource_id: vm_id,
+                    expire_time: expiryStr,
+                    renewal_price: renewal_price
+                });
             } catch (emailError) {
                 console.error(`发送 VM 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
             }
@@ -419,10 +401,49 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
 
     await db.vms.update(vmId, updates);
 
-    // 操作审计：VM 名称编辑
-    if (name !== undefined && name !== vm.name) {
-        await auditAction(req, 'vm.rename', '编辑 VM ' + vm.vm_id + ' 名称: ' + (vm.name || '') + ' → ' + name, { resourceType: 'vm', resourceId: vm.vm_id });
-    }
+    // 操作审计：VM 编辑（仅名称 → vm.rename；含管理员字段变更 → vm.edit 字段级 diff）
+    // 管理字段（到期/续费价/续费周期/换绑用户/MAC分组）此前无审计，改到期时间≈免费续费，属资金敏感项
+    var adminEditFields = [
+        { key: 'expiration_date', label: '到期时间', fmt: function (v) { return String(v).slice(0, 10); } },
+        { key: 'renewal_price', label: '续费价', num: true, fmt: function (v) { return '¥' + v; } },
+        { key: 'renewal_period', label: '续费周期', fmt: function (v) { return v === 'month' ? '月付' : (v === 'quarter' ? '季付' : (v === 'year' ? '年付' : v)); } },
+        { key: 'user', label: '所属用户' },
+        { key: 'ikuai_mac_group_id', label: 'MAC分组', fmt: function (v) { return v ? '#' + v : '无'; } }
+    ];
+    try {
+        var newVm = await db.vms.getById(vmId);
+        if (newVm) {
+            // 所属用户显示名（用户名优先，缺失回退 #id）
+            var oldUserName = '';
+            if (vm.user_id) { try { var ou = await db.users.getById(vm.user_id); if (ou) oldUserName = ou.username; } catch (e) {} }
+            var targetUserId = user_id !== undefined ? parseInt(user_id) : vm.user_id;
+            var newUserName = '';
+            if (targetUserId) { try { var nu = await db.users.getById(targetUserId); if (nu) newUserName = nu.username; } catch (e) {} }
+            var oldView = {
+                expiration_date: vm.expiration_date,
+                renewal_price: vm.renewal_price,
+                renewal_period: vm.renewal_period,
+                user: oldUserName || (vm.user_id ? '#' + vm.user_id : '无'),
+                ikuai_mac_group_id: vm.ikuai_mac_group_id || ''
+            };
+            var newView = {
+                expiration_date: newVm.expiration_date,
+                renewal_price: newVm.renewal_price,
+                renewal_period: newVm.renewal_period,
+                user: newUserName || (newVm.user_id ? '#' + newVm.user_id : '无'),
+                ikuai_mac_group_id: newVm.ikuai_mac_group_id || ''
+            };
+            var { buildFieldDiff } = require('../utils/audit-diff');
+            var adminChanges = buildFieldDiff(oldView, newView, adminEditFields);
+            var nameChanged = name !== undefined && name !== vm.name;
+            if (adminChanges.length) {
+                if (nameChanged) adminChanges.unshift('名称 ' + (vm.name || '无') + '→' + name);
+                await auditAction(req, 'vm.edit', '编辑 VM ' + vm.vm_id + '；变更:' + adminChanges.join(', '), { resourceType: 'vm', resourceId: vm.vm_id });
+            } else if (nameChanged) {
+                await auditAction(req, 'vm.rename', '编辑 VM ' + vm.vm_id + ' 名称: ' + (vm.name || '') + ' → ' + name, { resourceType: 'vm', resourceId: vm.vm_id });
+            }
+        }
+    } catch (e) {}
     
     // 管理员延长到期时间后，如果虚拟机之前因到期停机，尝试自动开机
     if (isAdmin && expiration_date !== undefined) {
@@ -523,29 +544,12 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
         if (removedUser && removedUser.email && removedUser.emailVerified) {
             if (await shouldSendEmail(removedVmInfo.user_id, 'notify_vm_provisioned')) {
                 try {
-                    const emailContent = `
-                        <p>您好 <strong>${removedUser.username}</strong>，</p>
-                        <div class="warning-box">
-                            <p style="margin-bottom: 8px; font-size: 16px;">
-                                您的虚拟机已被移除
-                            </p>
-                        </div>
-                        <div class="info-box">
-                            <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
-                            <p style="margin-bottom: 4px;">名称：${removedVmInfo.name || 'VM ' + removedVmInfo.vm_id}</p>
-                            <p style="margin-bottom: 4px;">VMID：${removedVmInfo.vm_id}</p>
-                        </div>
-                        <div class="divider"></div>
-                        <p>如果对此操作有疑问，请联系管理员。</p>
-                    `;
-                    const vmSiteName2 = await getSiteName();
-                    if (await shouldSendEmail(removedUser.id, 'notify_vm_provisioned')) {
-                        enqueueEmail(
-                            removedUser.email,
-                            '虚拟机已被移除 - ' + vmSiteName2,
-                            createEmailTemplate('虚拟机移除通知', emailContent, vmSiteName2)
-                        );
-                    }
+                    // VM 移除通知（模板: vm_removed）
+                    await sendTemplateEmail(removedUser.email, 'vm_removed', {
+                        username: removedUser.username,
+                        resource_name: removedVmInfo.name || 'VM ' + removedVmInfo.vm_id,
+                        resource_id: removedVmInfo.vm_id
+                    });
                 } catch (emailError) {
                     console.error(`发送 VM 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
                 }

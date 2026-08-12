@@ -10,8 +10,8 @@ const { rebuildPortForwardsForDevice } = require('../services/port-forward-sync'
 const { safeError } = require('../utils/safe-error');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { auditAction } = require('../utils/audit-log');
-const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
-const { enqueueEmail } = require('../queue/email-queue');
+const { shouldSendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('../services/email-template');
 
 const VALID_IP_RE = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
 
@@ -321,22 +321,16 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         } catch (msgErr) {
             console.error('[subnet] 站内信发送失败:', msgErr.message);
         }
-        // 邮件通知：子网开通成功（受用户通知设置 notify_subnet_provisioned 开关控制）
+        // 邮件通知：子网开通成功（受用户通知设置 notify_subnet_provisioned 开关控制；模板: subnet_provisioned）
         try {
             var subnetUser = await db.users.getById(req.user.id);
             if (subnetUser && subnetUser.email && subnetUser.emailVerified && subnetUser.email.includes('@')) {
-                var siteName = await getSiteName();
-                var emailHtml = createEmailTemplate('子网开通成功',
-                    '<p>您的私有网络子网已开通成功！</p>' +
-                    '<div class="info-box">' +
-                    '<p style="margin-bottom: 4px;">VLAN 名称：<strong>' + vlanName + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">网关：<strong>' + gw + '</strong></p>' +
-                    '<p style="margin-bottom: 4px;">地址池：<strong>' + addrPool + '</strong></p>' +
-                    '<p>开通时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
-                    '</div>' +
-                    '<p>您可以在「我的虚拟机 / 容器」中绑定该子网使用。</p>', siteName);
                 if (await shouldSendEmail(req.user.id, 'notify_subnet_provisioned')) {
-                    enqueueEmail(subnetUser.email, '子网开通成功 - ' + siteName, emailHtml);
+                    await sendTemplateEmail(subnetUser.email, 'subnet_provisioned', {
+                        vlan_name: vlanName,
+                        gateway: gw,
+                        address_pool: addrPool
+                    });
                 }
             }
         } catch (emailErr) {

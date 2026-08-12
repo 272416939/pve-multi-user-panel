@@ -6,8 +6,7 @@ const { syncPortForwardsFromIkuai } = require('../services/ikuai-sync');
 const ikuaiApi = require('../api/ikuai-api');
 const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
-const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
-const { enqueueEmail } = require('../queue/email-queue');
+const { shouldSendEmail } = require('../utils/email');
 const crypto = require('crypto');
 
 // 惰性获取 Redis 客户端（Redis 配置在服务启动后才从 DB 加载，不能模块级捕获）
@@ -131,24 +130,20 @@ async function recoverProvisioningTasks() {
                                 type: 2, is_read: 0, send_type: 1
                             });
                         } catch (e) { console.error('[recovery] 失败通知发送失败', e); }
-                        // 邮件通知：开通失败退款
+                        // 邮件通知：开通失败退款（恢复补偿，模板: provision_failed_restore）
                         try {
                             var recoverUser = await db.users.getById(record.user_id);
                             if (recoverUser && recoverUser.email && recoverUser.emailVerified && recoverUser.email.includes('@')) {
-                                var siteName = await getSiteName();
                                 var resourceLabel = type === 'vm' ? '虚拟机' : '容器';
-                                var refundOrderNoForEmail = generateOrderNo('refund');
-                                var emailHtml = createEmailTemplate(resourceLabel + '开通失败 - 已退款',
-                                    '<p>非常抱歉，您订购的' + resourceLabel + ' <strong>' + (record.name || '') + '</strong> 开通失败，款项已原路退回。</p>' +
-                                    '<div class="warning-box">' +
-                                    '<p style="margin-bottom: 4px;">退款金额：<strong>¥' + refundAmount.toFixed(2) + '</strong></p>' +
-                                    '<p style="margin-bottom: 4px;">原订单号：<strong>' + (matchedOrder ? matchedOrder.order_no : '') + '</strong></p>' +
-                                    '<p>退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
-                                    '</div>' +
-                                    '<p>如有疑问请联系客服。</p>', siteName);
                                 var refundCategory = type === 'vm' ? 'notify_vm_refund' : 'notify_lxc_refund';
                                 if (await shouldSendEmail(recoverUser.id, refundCategory)) {
-                                    enqueueEmail(recoverUser.email, resourceLabel + '开通失败已退款 - ' + siteName, emailHtml);
+                                    var { sendTemplateEmail } = require('../services/email-template');
+                                    await sendTemplateEmail(recoverUser.email, 'provision_failed_restore', {
+                                        resource_label: resourceLabel,
+                                        resource_name: record.name || '',
+                                        amount: refundAmount.toFixed(2),
+                                        order_no: matchedOrder ? matchedOrder.order_no : ''
+                                    });
                                 }
                             }
                         } catch (emailErr) { console.error('[recovery] 退款邮件发送失败:', emailErr.message); }

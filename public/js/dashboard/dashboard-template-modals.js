@@ -603,7 +603,7 @@
                     </div>
                     <div class="mb-3" v-if="cdkRedeemType === 'vm'">
                         <label class="form-label" id="cdk-vm-label">选择要续费的虚拟机</label>
-                        <div class="custom-select" @click.stop>
+                        <div class="custom-select" style="width:100%;" @click.stop>
                             <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-vm-label"
                                  data-cdk-select="vm"
                                  @click="toggleCdkDropdown('vm', !cdkVmDropdownOpen)"
@@ -629,7 +629,7 @@
                     </div>
                     <div class="mb-3" v-if="cdkRedeemType === 'lxc'">
                         <label class="form-label" id="cdk-lxc-label">选择要续费的LXC容器</label>
-                        <div class="custom-select" @click.stop>
+                        <div class="custom-select" style="width:100%;" @click.stop>
                             <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-lxc-label"
                                  data-cdk-select="lxc"
                                  @click="toggleCdkDropdown('lxc', !cdkLxcDropdownOpen)"

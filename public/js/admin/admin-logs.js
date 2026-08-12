@@ -260,6 +260,22 @@
         }
     };
 
+    // ===== 详情弹窗（logDetailModal 共享弹窗，展示完整 detail_text 含字段级变更明细） =====
+    $.logDetailTitle = ref('');
+    $.logDetailMeta = ref('');
+    $.logDetailText = ref('');
+    $.showLogDetail = function(row) {
+        if (!row) return;
+        $.logDetailTitle.value = '日志 #' + row.id + ' · ' + (row.category_name || row.sub_category_name || row.action || '');
+        $.logDetailMeta.value = (row.username ? row.username + '[' + row.user_id + ']' : (row.user_id || '-')) + ' | ' + (row.created_at || '');
+        $.logDetailText.value = row.detail_text || '（无详情）';
+        var el = document.getElementById('logDetailModal');
+        if (el) {
+            var modal = new bootstrap.Modal(el);
+            modal.show();
+        }
+    };
+
     // ===== 单条删除（系统切换 tab 走现有 $.deleteOsSwitchLog） =====
     $.deleteLogRow = async function(row) {
         if ($.logTab.value === 'os-switch') {

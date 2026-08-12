@@ -1,6 +1,8 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const ikuaiApi = require('../api/ikuai-api');
+const { parseIkuaiIds, deleteIkuaiRuleStrict } = require('./port-forward-sync');
+const { auditLog } = require('../utils/audit-log');
 
 async function syncPortForwardsFromIkuai() {
     console.log('[ikuai] 启动同步: 正在从 ikuai 拉取端口映射...');
@@ -96,7 +98,7 @@ async function syncPortForwardsFromIkuai() {
             }
         }
         if (reassociated > 0) console.log(`[ikuai] 重新关联 ${reassociated} 条孤立规则`);
-        let imported = 0, skipped = 0, orphaned = 0;
+        let imported = 0, skipped = 0, cleaned = 0, recovered = 0, orphaned = 0;
         const matchedLocalIds = new Set();
         for (const rule of ikuaiRules) {
             const rIp = rule.lan_ip || rule.lan_addr || '';
@@ -147,13 +149,56 @@ async function syncPortForwardsFromIkuai() {
                 console.error('[端口转发] 导入规则失败:', e.message);
             }
         }
+        // 判断本地规则是否仍存在于爱快（ikuai_id 精确匹配优先，端口 key 兜底）
+        const ikuaiIdSet = new Set(ikuaiRules.map(r => String(r.id || r._id || '')));
+        function ikuaiRuleExists(r) {
+            const ids = parseIkuaiIds(r.ikuai_id);
+            if (ids.some(o => o.id && ikuaiIdSet.has(String(o.id)))) return true;
+            return ikuaiRules.some(x =>
+                String(x.lan_ip || x.lan_addr || '') === String(r.ip) &&
+                String(x.lan_port || '') === String(r.internal_port) &&
+                String(x.wan_port || '') === String(r.external_port) &&
+                String(x.protocol || '').toLowerCase() === String(r.protocol || '').toLowerCase()
+            );
+        }
+        // 中断删除收敛：删除流程加了 deleting 标记后服务重启（爱快已删、DB 未删）的残留记录
         for (const r of localRules) {
-            if (!matchedLocalIds.has(r.id)) {
-                await db.portForwards.update(r.id, { sync_status: 'orphan' });
-                orphaned++;
+            if (r.sync_status !== 'deleting') continue;
+            if (!ikuaiRuleExists(r)) {
+                // 爱快已无此规则 → 删除意图已完成，收敛物理删除
+                await db.portForwards.delete(r.id);
+                await auditLog({ userId: 0, username: 'system', action: 'network.port.delete', resourceType: 'port-forward', resourceId: r.id, details: `对账收敛删除中断的端口转发规则[${r.internal_port}]→[${r.external_port}]` });
+                cleaned++;
+                continue;
+            }
+            // 爱快仍有 → 重试删除一次；失败回滚为 synced 并显式告警（不静默、不伪造删除）
+            try {
+                const retry = await deleteIkuaiRuleStrict(r);
+                if (retry.deleted) {
+                    await db.portForwards.delete(r.id);
+                    await auditLog({ userId: 0, username: 'system', action: 'network.port.delete', resourceType: 'port-forward', resourceId: r.id, details: `对账重试删除中断的端口转发规则[${r.internal_port}]→[${r.external_port}]` });
+                    cleaned++;
+                } else {
+                    await db.portForwards.update(r.id, { sync_status: 'synced' });
+                    recovered++;
+                    console.warn(`[ikuai] 中断删除规则 ${r.id} 重试失败(${retry.error})，已回滚为 synced，请人工检查`);
+                }
+            } catch (e) {
+                await db.portForwards.update(r.id, { sync_status: 'synced' });
+                recovered++;
+                console.warn(`[ikuai] 中断删除规则 ${r.id} 重试异常(${e.message})，已回滚为 synced`);
             }
         }
-        console.log(`[ikuai] 启动同步: ikuai=${ikuaiRules.length}条, 本地=${localRules.length}条, 导入=${imported}, 跳过=${skipped}, 标记孤立=${orphaned}`);
+        // 孤儿清理：DB 有、爱快确认无的 synced/orphan 记录直接物理删除（爱快侧已无规则，删除安全）
+        // pending/failed（创建中间态）不自动清理，保留给用户处理
+        for (const r of localRules) {
+            if (matchedLocalIds.has(r.id)) continue;
+            if (r.sync_status !== 'synced' && r.sync_status !== 'orphan') continue;
+            await db.portForwards.delete(r.id);
+            await auditLog({ userId: 0, username: 'system', action: 'network.port.delete', resourceType: 'port-forward', resourceId: r.id, details: `对账清理孤儿端口转发规则[${r.internal_port}]→[${r.external_port}]（爱快侧已无此规则）` });
+            orphaned++;
+        }
+        console.log(`[ikuai] 启动同步: ikuai=${ikuaiRules.length}条, 本地=${localRules.length}条, 导入=${imported}, 跳过=${skipped}, 收敛中断删除=${cleaned}${recovered ? `(回滚${recovered})` : ''}, 清理孤儿=${orphaned}`);
     } catch (e) {
         console.error('[ikuai] 启动同步失败:', e.message);
     }

@@ -467,7 +467,7 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 .custom-select.disabled .custom-select-trigger:hover { background: var(--bg-input); border-color: var(--border-color); }
 
 /* ========== Form Controls ========== */
-.form-label { color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
+.form-label { display: block; color: var(--text-primary) !important; font-size: 13px; margin-bottom: 6px; font-weight: 500;
     transition: color 0.3s ease; }
 .form-control, .form-select { background-color: var(--bg-input) !important; border: 1px solid var(--border-color) !important;
     color: var(--text-primary) !important;
@@ -742,4 +742,124 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     overflow: hidden;
     text-overflow: ellipsis;
     min-width: 0;
+}
+/* 日志详情列单行截断（admin 日志中心 / dashboard 日志页共用；悬浮 title 看全文，点「详情」弹窗看完整 diff） */
+.log-detail-truncate {
+    display: block;
+    max-width: 520px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ===== 邮件模板 Quill 富文本编辑器（暗色默认；亮色覆盖在 theme.css） ===== */
+/* 注意：quill.snow.css 在 head 中加载晚于 components.css，同类特异性规则需加 .ql-snow 双类提升（0-3-0） */
+.email-template-quill-wrap {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.email-template-quill-wrap .ql-toolbar.ql-snow {
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0;
+}
+.email-template-quill-wrap .ql-container.ql-snow {
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+}
+.email-template-quill-wrap .ql-toolbar .ql-stroke {
+    stroke: var(--text-secondary);
+}
+.email-template-quill-wrap .ql-toolbar .ql-fill {
+    fill: var(--text-secondary);
+}
+.email-template-quill-wrap .ql-toolbar .ql-picker {
+    color: var(--text-secondary);
+}
+.email-template-quill-wrap .ql-toolbar .ql-picker-options {
+    background: var(--bg-modal);
+    border-color: var(--border-color);
+}
+.email-template-quill-wrap .ql-toolbar button:hover .ql-stroke,
+.email-template-quill-wrap .ql-toolbar button.ql-active .ql-stroke {
+    stroke: var(--color-primary);
+}
+.email-template-quill-wrap .ql-toolbar button:hover .ql-fill,
+.email-template-quill-wrap .ql-toolbar button.ql-active .ql-fill {
+    fill: var(--color-primary);
+}
+.email-template-quill-wrap .ql-toolbar .ql-picker:hover .ql-picker-label,
+.email-template-quill-wrap .ql-toolbar .ql-picker-label:hover {
+    color: var(--color-primary);
+}
+.email-template-quill-wrap .ql-editor {
+    color: var(--text-primary);
+    min-height: 200px;
+}
+.email-template-quill-wrap .ql-editor.ql-blank::before {
+    color: var(--text-muted);
+    font-style: normal;
+}
+/* 邮件模板预览弹窗：背景模拟常见邮件客户端（QQ 邮箱等）浅灰页面，与真实发送效果一致 */
+.email-template-preview-body {
+    background: #f5f5f5;
+    border-radius: 0 0 12px 12px;
+    padding: 20px;
+}
+
+/* ===== 分类折叠卡片（notification-group）=====
+   用户中心通知设置 + admin 邮件模板分类共用（单一来源，勿在单端 css 重复定义）
+   全 CSS 变量主题自适应（tokens.css 暗/亮），无需 theme.css 覆盖 */
+.notification-group {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    overflow: hidden;
+}
+.notification-group-header {
+    cursor: pointer;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    transition: background-color 0.2s ease, border-color 0.3s ease;
+}
+.notification-group-header:hover {
+    background: var(--bg-hover);
+}
+.notification-group-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+.notification-group-icon svg {
+    display: block;
+}
+.notification-chevron {
+    color: var(--text-muted);
+}
+.notification-group-items {
+    border-top: 1px solid var(--border-color);
+}
+.notification-item-row {
+    border-bottom: 1px solid var(--border-color);
+}
+.notification-item-row:last-child {
+    border-bottom: none;
+}
+.transition-transform {
+    transition: transform 0.2s ease;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+.cursor-pointer {
+    cursor: pointer;
 }

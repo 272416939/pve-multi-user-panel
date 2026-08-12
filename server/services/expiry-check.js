@@ -1,7 +1,7 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const { createEmailTemplate, shouldSendEmail } = require('../utils/email');
-const { enqueueEmail } = require('../queue/email-queue');
+const { shouldSendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('./email-template');
 const dbg = require('../utils/debug');
 const { getRedisClient } = require('../api/redis');
 
@@ -120,25 +120,16 @@ const checkExpiredVms = async () => {
                 }
                 
                 try {
-                    const emailContent = `
-                        <p>您好 <strong>${user.username}</strong>，</p>
-                        <div class="warning-box">
-                            <p style="margin-bottom: 0;">
-                                您的虚拟机将在 <strong style="font-size: 18px;">${days} 天</strong> 后到期！
-                            </p>
-                        </div>
-                        <div class="info-box">
-                            <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
-                            <p style="margin-bottom: 4px;">名称：${vm.name || 'VM ' + vm.vm_id}</p>
-                            <p style="margin-bottom: 4px;">VMID：${vm.vm_id}</p>
-                            <p style="margin-bottom: 4px;">到期时间：${expDate.toLocaleString('zh-CN')}</p>
-                            ${vm.renewal_price ? `<p style="margin-bottom: 0;">续费价格：${vm.renewal_price}</p>` : ''}
-                        </div>
-                        <div class="divider"></div>
-                        <p>请及时续费或联系管理员，以免影响您的使用！</p>
-                    `;
+                    // VM 到期前提醒（模板: vm_expiry_reminder）
                     if (await shouldSendEmail(user.id, 'notify_expiry_reminder')) {
-                        enqueueEmail(user.email, '虚拟机到期提醒', createEmailTemplate(`虚拟机将在${days}天后到期`, emailContent));
+                        await sendTemplateEmail(user.email, 'vm_expiry_reminder', {
+                            username: user.username,
+                            days: days,
+                            resource_name: vm.name || 'VM ' + vm.vm_id,
+                            resource_id: vm.vm_id,
+                            expire_time: expDate.toLocaleString('zh-CN'),
+                            renewal_price: vm.renewal_price
+                        });
                     }
 
                     await markReminderSent(vm.vm_id, days, today);
@@ -185,30 +176,17 @@ const checkExpiredVms = async () => {
                         try {
                             const dayNum = expiredDaysCount + 1;
                             const remainingDays = 3 - dayNum;
-                            const emailContent = `
-                                <p>您好 <strong>${user.username}</strong>，</p>
-                                <div class="warning-box">
-                                    <p style="margin-bottom: 0; font-size: 16px;">
-                                        您的虚拟机 <strong>已到期</strong>！
-                                    </p>
-                                </div>
-                                <div class="info-box">
-                                    <p style="margin-bottom: 8px;"><strong>虚拟机信息：</strong></p>
-                                    <p style="margin-bottom: 4px;">名称：${vm.name || 'VM ' + vm.vm_id}</p>
-                                    <p style="margin-bottom: 4px;">VMID：${vm.vm_id}</p>
-                                    <p style="margin-bottom: 4px;">到期时间：${expDate.toLocaleString('zh-CN')}</p>
-                                    ${vm.renewal_price ? `<p style="margin-bottom: 0;">续费价格：${vm.renewal_price}</p>` : ''}
-                                </div>
-                                <div class="divider"></div>
-                                <div class="warning-box">
-                                    <p style="margin-bottom: 0;">
-                                        续费提醒（${dayNum}/3）— 数据保留还剩 <strong style="color: #ed6463; font-size: 18px;">${remainingDays} 天</strong>，请尽快续费，以免数据丢失！
-                                    </p>
-                                </div>
-                                <p style="margin-top: 16px;">如有问题，请联系管理员。</p>
-                            `;
+                            // VM 已到期续费提醒（模板: vm_expiry_alert）
                             if (await shouldSendEmail(user.id, 'notify_expiry_alert')) {
-                                enqueueEmail(user.email, '虚拟机已到期 - 请及时续费', createEmailTemplate('虚拟机已到期', emailContent));
+                                await sendTemplateEmail(user.email, 'vm_expiry_alert', {
+                                    username: user.username,
+                                    resource_name: vm.name || 'VM ' + vm.vm_id,
+                                    resource_id: vm.vm_id,
+                                    expire_time: expDate.toLocaleString('zh-CN'),
+                                    renewal_price: vm.renewal_price,
+                                    reminder_count: dayNum,
+                                    remaining_days: remainingDays
+                                });
                             }
                             await markReminderSent(vm.vm_id, 0, today);
                             await db.vms.reminders.add(vm.id, 0);
@@ -289,25 +267,16 @@ async function checkExpiredLxc() {
                                 const user = userMap[ct.user_id];
                                 if (user && user.email && user.emailVerified) {
                                     try {
-                                        const emailContent = `
-                                            <p>您好 <strong>${user.username}</strong>，</p>
-                                            <div class="warning-box">
-                                                <p style="margin-bottom: 0;">
-                                                    您的 LXC 容器将在 <strong style="font-size: 18px;">${days} 天</strong> 后到期！
-                                                </p>
-                                            </div>
-                                            <div class="info-box">
-                                                <p style="margin-bottom: 8px;"><strong>容器信息：</strong></p>
-                                                <p style="margin-bottom: 4px;">名称：${ct.name || 'CT ' + ct.ct_id}</p>
-                                                <p style="margin-bottom: 4px;">CT ID：${ct.ct_id}</p>
-                                                <p style="margin-bottom: 4px;">到期时间：${expDate.toLocaleString('zh-CN')}</p>
-                                                ${ct.renewal_price ? `<p style="margin-bottom: 0;">续费价格：${ct.renewal_price}</p>` : ''}
-                                            </div>
-                                            <div class="divider"></div>
-                                            <p>请及时续费或联系管理员，以免影响您的使用！</p>
-                                        `;
+                                        // LXC 到期前提醒（模板: lxc_expiry_reminder）
                                         if (await shouldSendEmail(user.id, 'notify_expiry_reminder')) {
-                                            enqueueEmail(user.email, 'LXC 容器到期提醒', createEmailTemplate(`LXC 容器将在${days}天后到期`, emailContent));
+                                            await sendTemplateEmail(user.email, 'lxc_expiry_reminder', {
+                                                username: user.username,
+                                                days: days,
+                                                resource_name: ct.name || 'CT ' + ct.ct_id,
+                                                resource_id: ct.ct_id,
+                                                expire_time: expDate.toLocaleString('zh-CN'),
+                                                renewal_price: ct.renewal_price
+                                            });
                                         }
                                     } catch (e) {
                                         console.error('发送 LXC 到期提醒邮件失败:', e.message);
@@ -336,30 +305,17 @@ async function checkExpiredLxc() {
                                 try {
                                     const dayNum = expiredDays + 1;
                                     const remainingDays = 3 - dayNum;
-                                    const emailContent = `
-                                        <p>您好 <strong>${user.username}</strong>，</p>
-                                        <div class="warning-box">
-                                            <p style="margin-bottom: 0; font-size: 16px;">
-                                                您的 LXC 容器 <strong>已到期</strong>！
-                                            </p>
-                                        </div>
-                                        <div class="info-box">
-                                            <p style="margin-bottom: 8px;"><strong>容器信息：</strong></p>
-                                            <p style="margin-bottom: 4px;">名称：${ct.name || 'CT ' + ct.ct_id}</p>
-                                            <p style="margin-bottom: 4px;">CT ID：${ct.ct_id}</p>
-                                            <p style="margin-bottom: 4px;">到期时间：${expDate.toLocaleString('zh-CN')}</p>
-                                            ${ct.renewal_price ? `<p style="margin-bottom: 0;">续费价格：${ct.renewal_price}</p>` : ''}
-                                        </div>
-                                        <div class="divider"></div>
-                                        <div class="warning-box">
-                                            <p style="margin-bottom: 0;">
-                                                续费提醒（${dayNum}/3）— 数据保留还剩 <strong style="color: #ed6463; font-size: 18px;">${remainingDays} 天</strong>，请尽快续费，以免数据丢失！
-                                            </p>
-                                        </div>
-                                        <p style="margin-top: 16px;">如有问题，请联系管理员。</p>
-                                    `;
+                                    // LXC 已到期续费提醒（模板: lxc_expiry_alert）
                                     if (await shouldSendEmail(user.id, 'notify_expiry_alert')) {
-                                        enqueueEmail(user.email, 'LXC 容器已到期 - 请及时续费', createEmailTemplate('LXC 容器已到期', emailContent));
+                                        await sendTemplateEmail(user.email, 'lxc_expiry_alert', {
+                                            username: user.username,
+                                            resource_name: ct.name || 'CT ' + ct.ct_id,
+                                            resource_id: ct.ct_id,
+                                            expire_time: expDate.toLocaleString('zh-CN'),
+                                            renewal_price: ct.renewal_price,
+                                            reminder_count: dayNum,
+                                            remaining_days: remainingDays
+                                        });
                                     }
                                 } catch (e) {
                                     console.error('发送 LXC 到期续费邮件失败:', e.message);

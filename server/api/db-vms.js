@@ -312,7 +312,16 @@ const osTemplates = {
         return queryOne('SELECT * FROM os_templates WHERE id = ?', [parseInt(id)]);
     },
     delete: (id) => execute('DELETE FROM os_templates WHERE id = ?', [parseInt(id)]),
-    countByTemplateVmid: (vmid) => queryOne('SELECT COUNT(*) AS c FROM os_templates WHERE template_vmid = ? AND enabled = 1', [parseInt(vmid)])
+    countByTemplateVmid: (vmid) => queryOne('SELECT COUNT(*) AS c FROM os_templates WHERE template_vmid = ? AND enabled = 1', [parseInt(vmid)]),
+    // 批量保存拖拽排序：sort_order 值越大越靠前，与查询 ORDER BY sort_order DESC 语义一致（第一个 id 最大）
+    batchUpdateSortOrder: async function(ids) {
+        if (!Array.isArray(ids) || ids.length === 0) return;
+        var total = ids.length;
+        for (var i = 0; i < ids.length; i++) {
+            var sortOrder = (total - i) * 10;
+            await execute('UPDATE os_templates SET sort_order = ?, updated_at = ? WHERE id = ?', [sortOrder, mysqlNow(), parseInt(ids[i])]);
+        }
+    }
 };
 
 // 系统切换日志（vm_os_switch_logs）

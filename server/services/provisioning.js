@@ -9,8 +9,8 @@ const crypto = require('crypto');
 const cacheStore = require('../utils/cache-store');
 const { generateVmName, generateLxcName } = require('../utils/random-name');
 const { createDhcpStaticBinding } = require('../services/dhcp');
-const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
-const { enqueueEmail } = require('../queue/email-queue');
+const { shouldSendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('./email-template');
 const { calculateAmount, setVmAffinity, generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
 const { takeDiskSnapshot } = require('../services/disk-audit');
@@ -73,19 +73,17 @@ async function notifyProvisionFailed(opts) {
     try {
         var failUser = await db.users.getById(userId);
         if (failUser && failUser.email && failUser.emailVerified && failUser.email.includes('@')) {
-            var siteName = await getSiteName();
-            var emailHtml = createEmailTemplate(failTitle,
-                '<p>非常抱歉，您订购的' + resourceLabel + ' <strong>' + resourceName + '</strong> 开通失败，款项已原路退回。</p>' +
-                '<div class="warning-box">' +
-                '<p style="margin-bottom: 4px;">退款金额：<strong>¥' + totalAmount.toFixed(2) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">余额变动：<strong>¥' + (balanceAfterRefund - totalAmount).toFixed(2) + ' → ¥' + balanceAfterRefund.toFixed(2) + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">原订单号：<strong>' + orderNo + '</strong></p>' +
-                '<p style="margin-bottom: 4px;">退款单号：<strong>' + refundOrderNo + '</strong></p>' +
-                '<p>退款时间：' + new Date().toLocaleString('zh-CN') + '</p>' +
-                '</div>' +
-                '<p>如有疑问请联系客服。</p>', siteName);
             if (await shouldSendEmail(userId, notifyKey)) {
-                enqueueEmail(failUser.email, failTitle + ' - ' + siteName, emailHtml);
+                // 开通失败退款（模板: provision_failed，{resource_label} 区分 VM/容器）
+                await sendTemplateEmail(failUser.email, 'provision_failed', {
+                    resource_label: resourceLabel,
+                    resource_name: resourceName,
+                    amount: totalAmount.toFixed(2),
+                    balance_before: (balanceAfterRefund - totalAmount).toFixed(2),
+                    balance_after: balanceAfterRefund.toFixed(2),
+                    order_no: orderNo,
+                    refund_order_no: refundOrderNo
+                });
             }
         }
     } catch (emailErr) { console.error('[provisioning] ' + resourceType + ' 退款邮件发送失败:', emailErr.message); }
@@ -348,11 +346,12 @@ async function provisionVm(opts) {
     try {
         var user = await db.users.getById(userId);
         if (user && user.email && user.emailVerified) {
-            var emailHtml = createEmailTemplate('服务器开通成功',
-                '<p>您的新服务器已开通成功！</p><p>类型：虚拟机</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
-            );
             if (await shouldSendEmail(userId, 'notify_vm_provisioned')) {
-                enqueueEmail(user.email, '服务器开通成功', emailHtml);
+                // 服务器开通成功（用户侧 VM，模板: server_provisioned）
+                await sendTemplateEmail(user.email, 'server_provisioned', {
+                    resource_name: randomName,
+                    order_no: orderNo
+                });
             }
         }
     } catch (e) { console.error('[provisioning] VM 邮件发送失败', e); }
@@ -369,18 +368,13 @@ async function provisionVm(opts) {
         try {
             var ciUser = await db.users.getById(userId);
             if (ciUser && ciUser.email && ciUser.emailVerified) {
-                var pkgSiteName = await getSiteName();
-                var ciEmailHtml = createEmailTemplate('服务器账号信息',
-                    '<div class="info-box" style="border-left-color: #667eea;">' +
-                    '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
-                    '<p style="margin-bottom: 4px;">账号：' + osTemplate.ciuser + '</p>' +
-                    '<p style="margin-bottom: 4px;">密码：' + vmUpdateCfg.cipassword + '</p>' +
-                    '</div><div class="divider"></div>' +
-                    '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
-                    pkgSiteName
-                );
                 if (await shouldSendEmail(userId, 'notify_account_password')) {
-                    enqueueEmail(ciUser.email, '服务器账号信息 - ' + pkgSiteName, ciEmailHtml);
+                    // 服务器账号信息（VM cloud-init，模板: server_account）
+                    await sendTemplateEmail(ciUser.email, 'server_account', {
+                        resource_name: randomName,
+                        account: osTemplate.ciuser,
+                        password: vmUpdateCfg.cipassword
+                    });
                 }
             }
         } catch (e) { console.error('[provisioning] VM 密码邮件发送失败', e); }
@@ -601,11 +595,12 @@ async function provisionLxc(opts) {
     try {
         var user = await db.users.getById(userId);
         if (user && user.email && user.emailVerified) {
-            var emailHtml = createEmailTemplate('容器开通成功',
-                '<p>您的新容器已开通成功！</p><p>类型：LXC 容器</p><p>名称：' + randomName + '</p><p>订单号：' + orderNo + '</p>'
-            );
             if (await shouldSendEmail(userId, 'notify_lxc_provisioned')) {
-                enqueueEmail(user.email, '容器开通成功', emailHtml);
+                // 容器开通成功（用户侧 LXC，模板: lxc_provisioned_user）
+                await sendTemplateEmail(user.email, 'lxc_provisioned_user', {
+                    resource_name: randomName,
+                    order_no: orderNo
+                });
             }
         }
     } catch (e) { console.error('[provisioning] LXC 邮件发送失败', e); }
@@ -645,18 +640,12 @@ async function provisionLxc(opts) {
         try {
             var pwdUser = await db.users.getById(userId);
             if (pwdUser && pwdUser.email && pwdUser.emailVerified) {
-                var pkgSiteName2 = await getSiteName();
-                var pwdEmailHtml = createEmailTemplate('容器 root 密码',
-                    '<div class="info-box" style="border-left-color: #667eea;">' +
-                    '<p style="margin-bottom: 8px;"><strong>您的容器 ' + randomName + ' 已开通</strong></p>' +
-                    '<p style="margin-bottom: 4px;">Root 账号：root</p>' +
-                    '<p style="margin-bottom: 4px;">密码：' + lxcPassword + '</p>' +
-                    '</div><div class="divider"></div>' +
-                    '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
-                    pkgSiteName2
-                );
                 if (await shouldSendEmail(userId, 'notify_account_password')) {
-                    enqueueEmail(pwdUser.email, '容器 root 密码 - ' + pkgSiteName2, pwdEmailHtml);
+                    // 容器 root 密码（用户侧 LXC，模板: lxc_root_password）
+                    await sendTemplateEmail(pwdUser.email, 'lxc_root_password', {
+                        resource_name: randomName,
+                        password: lxcPassword
+                    });
                 }
             }
         } catch (e) { console.error('[provisioning] LXC 密码邮件发送失败', e); }
@@ -811,15 +800,13 @@ async function adminProvisionVm(opts) {
     try {
         var user = await db.users.getById(userId);
         if (user && user.email && user.emailVerified) {
-            var emailHtml = createEmailTemplate('服务器开通成功',
-                '<p>您的新服务器已开通成功！</p>' +
-                '<p>类型：虚拟机</p>' +
-                '<p>名称：' + randomName + '</p>' +
-                '<p>订单号：' + orderNo + '</p>' +
-                '<p>到期时间：' + (expDate || '无') + '</p>'
-            );
             if (await shouldSendEmail(userId, 'notify_vm_provisioned')) {
-                enqueueEmail(user.email, '服务器开通成功', emailHtml);
+                // 服务器开通成功（管理员代开 VM，模板: server_provisioned_admin）
+                await sendTemplateEmail(user.email, 'server_provisioned_admin', {
+                    resource_name: randomName,
+                    order_no: orderNo,
+                    expire_time: expDate || '无'
+                });
             }
         }
     } catch (e) { console.error('[provisioning] VM 邮件发送失败', e); }
@@ -836,18 +823,13 @@ async function adminProvisionVm(opts) {
         try {
             var adminCiUser = await db.users.getById(userId);
             if (adminCiUser && adminCiUser.email && adminCiUser.emailVerified) {
-                var pkgSiteName3 = await getSiteName();
-                var adminCiHtml = createEmailTemplate('服务器账号信息',
-                    '<div class="info-box" style="border-left-color: #667eea;">' +
-                    '<p style="margin-bottom: 8px;"><strong>您的服务器 ' + randomName + ' 已开通</strong></p>' +
-                    '<p style="margin-bottom: 4px;">账号：' + template.ciuser + '</p>' +
-                    '<p style="margin-bottom: 4px;">密码：' + adminVmCfg.cipassword + '</p>' +
-                    '</div><div class="divider"></div>' +
-                    '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
-                    pkgSiteName3
-                );
                 if (await shouldSendEmail(userId, 'notify_account_password')) {
-                    enqueueEmail(adminCiUser.email, '服务器账号信息 - ' + pkgSiteName3, adminCiHtml);
+                    // 服务器账号信息（admin 代开 VM cloud-init，模板: server_account）
+                    await sendTemplateEmail(adminCiUser.email, 'server_account', {
+                        resource_name: randomName,
+                        account: template.ciuser,
+                        password: adminVmCfg.cipassword
+                    });
                 }
             }
         } catch (e) { console.error('[provisioning] VM 密码邮件发送失败', e); }
@@ -1000,15 +982,13 @@ async function adminProvisionLxc(opts) {
     try {
         var user = await db.users.getById(userId);
         if (user && user.email && user.emailVerified) {
-            var emailHtml = createEmailTemplate('服务器开通成功',
-                '<p>您的新服务器已开通成功！</p>' +
-                '<p>类型：容器</p>' +
-                '<p>名称：' + randomName + '</p>' +
-                '<p>订单号：' + orderNo + '</p>' +
-                '<p>到期时间：' + (expDate || '无') + '</p>'
-            );
             if (await shouldSendEmail(userId, 'notify_lxc_provisioned')) {
-                enqueueEmail(user.email, '服务器开通成功', emailHtml);
+                // 容器开通成功（管理员代开 LXC，模板: lxc_provisioned_admin）
+                await sendTemplateEmail(user.email, 'lxc_provisioned_admin', {
+                    resource_name: randomName,
+                    order_no: orderNo,
+                    expire_time: expDate || '无'
+                });
             }
         }
     } catch (e) { console.error('[provisioning] LXC 邮件发送失败', e); }
@@ -1041,18 +1021,12 @@ async function adminProvisionLxc(opts) {
         try {
             var adminPwdUser = await db.users.getById(userId);
             if (adminPwdUser && adminPwdUser.email && adminPwdUser.emailVerified) {
-                var pkgSiteName4 = await getSiteName();
-                var adminPwdEmailHtml = createEmailTemplate('容器 root 密码',
-                    '<div class="info-box" style="border-left-color: #667eea;">' +
-                    '<p style="margin-bottom: 8px;"><strong>您的容器 ' + randomName + ' 已开通</strong></p>' +
-                    '<p style="margin-bottom: 4px;">Root 账号：root</p>' +
-                    '<p style="margin-bottom: 4px;">密码：' + adminLxcPwd + '</p>' +
-                    '</div><div class="divider"></div>' +
-                    '<p>请尽快修改密码。此密码仅此一封邮件发送，如需重置请在控制台操作。</p>',
-                    pkgSiteName4
-                );
                 if (await shouldSendEmail(userId, 'notify_account_password')) {
-                    enqueueEmail(adminPwdUser.email, '容器 root 密码 - ' + pkgSiteName4, adminPwdEmailHtml);
+                    // 容器 root 密码（admin 代开 LXC，模板: lxc_root_password）
+                    await sendTemplateEmail(adminPwdUser.email, 'lxc_root_password', {
+                        resource_name: randomName,
+                        password: adminLxcPwd
+                    });
                 }
             }
         } catch (e) { console.error('[provisioning] LXC 密码邮件发送失败', e); }

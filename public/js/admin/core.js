@@ -257,6 +257,13 @@ watch($.user, function(u) {
                 return false;
             }
             $.user.value = userData;
+            // 同步 Header 头像/用户名（静态模板默认值 Admin，需按登录用户覆盖，与 dashboard 一致）
+            var avatarEl = document.getElementById('headerAvatar');
+            var nameEl = document.getElementById('headerUsername');
+            if (avatarEl) {
+                avatarEl.src = userData.avatar || getGeekAvatar(userData.username || '用户');
+            }
+            if (nameEl) nameEl.textContent = userData.username || '用户';
             return true;
         } catch (e) {
             console.error('加载用户数据失败', e);
@@ -303,6 +310,8 @@ watch($.user, function(u) {
                     console.error('加载 SMTP 配置失败', e);
                 }),
                 $.loadEmailQueueStats ? $.loadEmailQueueStats() : Promise.resolve(),
+                $.loadEmailTemplates ? $.loadEmailTemplates() : Promise.resolve(),
+                $.loadEmailShell ? $.loadEmailShell() : Promise.resolve(),
                 $.loadPveConfig(),
                 $.loadRedisConfig(),
                 $.loadLogConfig ? $.loadLogConfig() : Promise.resolve(),
