@@ -806,9 +806,9 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     color: var(--text-muted);
     font-style: normal;
 }
-/* 邮件模板预览弹窗：背景模拟邮件外壳 body 渐变（与真实发送一致） */
+/* 邮件模板预览弹窗：背景模拟常见邮件客户端（QQ 邮箱等）浅灰页面，与真实发送效果一致 */
 .email-template-preview-body {
-    background: linear-gradient(135deg, #1a143a 0%, #2d1b4e 50%, #1a143a 100%);
+    background: #f5f5f5;
     border-radius: 0 0 12px 12px;
     padding: 20px;
 }

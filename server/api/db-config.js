@@ -131,6 +131,36 @@ const config = {
     get: async (key) => (await queryOne('SELECT value FROM config WHERE `key` = ?', [key]))?.value,
     set: (key, value) => execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', [key, value]),
 
+    // ========== 邮件外壳样式（邮件样式编辑） ==========
+    // 键规则：mail:shell_<key>，参数定义与默认值单一来源 constants/email-templates.js 的 EMAIL_SHELL_PARAMS
+    getEmailShell: async () => {
+        const { EMAIL_SHELL_PARAMS } = require('../constants/email-templates');
+        const keys = EMAIL_SHELL_PARAMS.map(p => 'mail:shell_' + p.key);
+        const placeholders = keys.map(() => '?').join(',');
+        const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+        const map = {};
+        rows.forEach(r => { map[r.key] = r.value; });
+        const shell = {};
+        EMAIL_SHELL_PARAMS.forEach(p => {
+            const raw = map['mail:shell_' + p.key];
+            const def = p.default;
+            if (p.type === 'number') {
+                shell[p.key] = raw !== undefined && raw !== '' ? parseInt(raw) : def;
+            } else {
+                shell[p.key] = raw !== undefined && raw !== '' ? raw : def;
+            }
+        });
+        return shell;
+    },
+    setEmailShell: async (shell) => {
+        const { EMAIL_SHELL_PARAMS } = require('../constants/email-templates');
+        for (const p of EMAIL_SHELL_PARAMS) {
+            const val = shell[p.key];
+            if (val === undefined || val === null) continue;
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['mail:shell_' + p.key, String(val)]);
+        }
+    },
+
     // ========== 限速配置（安全防护·限速设置） ==========
     // 键规则：ratelimit:master_enabled（总开关）+ ratelimit:<ruleKey>:enabled/max/window，
     // 规则白名单与默认值单一来源 server/constants.js 的 RATE_LIMIT_RULES

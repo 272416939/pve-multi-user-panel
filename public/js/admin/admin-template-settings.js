@@ -100,6 +100,40 @@
                             </div>
                         </div>
 
+                        <!-- 邮件外壳样式（参数化 + 高级自定义 CSS，作用于所有系统邮件） -->
+                        <div class="module-header">
+                            <h4 class="module-title">邮件外壳样式</h4>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">自定义系统邮件的统一外观（头部横幅/卡片/按钮/页脚）。保存后立即生效，所有新发送邮件按新样式生成。</p>
+                                <div v-for="g in emailShellGroups" :key="g" class="mb-3">
+                                    <h6 class="mb-2" style="font-weight:600;color:var(--color-primary);">{{ g }}</h6>
+                                    <div class="row g-3">
+                                        <div v-for="p in emailShellParamsByGroup(g)" :key="p.key" class="col-md-3">
+                                            <label class="form-label">{{ p.label }}</label>
+                                            <input v-if="p.type === 'color'" type="color" class="form-control form-control-color" style="height:38px;padding:4px;cursor:pointer;" :title="p.default" v-model="emailShellForm[p.key]">
+                                            <input v-else-if="p.type === 'number'" type="number" class="form-control" v-model.number="emailShellForm[p.key]" :min="p.min" :max="p.max">
+                                            <input v-else type="text" class="form-control" v-model="emailShellForm[p.key]">
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- 高级：自定义 CSS 源码（追加到邮件 <style> 末尾，可覆盖任意内置规则） -->
+                                <div class="mb-2">
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <h6 class="mb-0" style="font-weight:600;color:var(--color-primary);">高级：自定义样式</h6>
+                                        <small class="text-muted">追加到邮件 <code>&lt;style&gt;</code> 末尾的 CSS 源码</small>
+                                    </div>
+                                    <textarea class="form-control font-monospace" rows="6" v-model="emailShellForm.custom_css" placeholder="如：.email-header { padding: 40px 20px; }"></textarea>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <pv-button variant="glass" @click="saveEmailShell" :disabled="emailShellSaving">{{ emailShellSaving ? '保存中...' : '保存样式' }}</pv-button>
+                                    <pv-button variant="outline" size="lg" @click="previewEmailShell">预览邮件</pv-button>
+                                    <pv-button variant="outline-danger" size="lg" @click="resetEmailShell">恢复默认</pv-button>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- 邮件模板管理（可编辑系统邮件模板：主题/副标题/正文，支持 {变量} 占位符，可恢复默认） -->
                         <div class="module-header">
                             <h4 class="module-title">邮件模板</h4>

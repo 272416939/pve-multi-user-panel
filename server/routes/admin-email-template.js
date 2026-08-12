@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-const { EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES, GLOBAL_VARIABLES } = require('../constants/email-templates');
+const { EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES, GLOBAL_VARIABLES, EMAIL_SHELL_PARAMS } = require('../constants/email-templates');
 const { invalidateTemplateCache } = require('../services/email-template');
+const { invalidateEmailShellCache } = require('../utils/email');
 const { safeError } = require('../utils/safe-error');
 // 审计字段级 diff 通用工具（规范第十一节：更新类审计从 DB 新旧状态 diff 生成，不从请求体拼接）
 const { buildFieldDiff } = require('../utils/audit-diff');
@@ -152,7 +153,9 @@ router.post('/admin/email-templates/:code/preview', authMiddleware, adminMiddlew
         const { renderRaw } = require('../services/email-template');
         const { createEmailTemplate } = require('../utils/email');
         const rendered = await renderRaw({ code: code, subject: subject, title: title || '', content: content, variables: def.variables || [] }, exampleVars);
-        const html = createEmailTemplate(rendered.title, rendered.content, rendered.site_name);
+        // shell 覆盖：预览「邮件外壳样式」编辑中的未保存参数（部分字段与 DB 值合并，缺省回退默认）
+        const shell = (req.body && req.body.shell) || undefined;
+        const html = await createEmailTemplate(rendered.title, rendered.content, rendered.site_name, shell);
         res.json({ subject: rendered.subject, html: html });
     } catch (error) {
         console.error('预览邮件模板失败:', error.message);
@@ -180,6 +183,110 @@ router.post('/admin/email-templates/:code/reset', authMiddleware, adminMiddlewar
         res.json({ message: '已恢复默认模板', template: parseVariables(await db.emailTemplates.getByCode(code)) });
     } catch (error) {
         console.error('恢复邮件模板默认失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
+// ==================== 邮件外壳样式（参数化 + 高级自定义 CSS） ====================
+
+// 校验单个 shell 参数（颜色/数字/文案长度），返回错误文案或 null
+function validateShellParam(p, value) {
+    if (value === undefined || value === null) return null;
+    if (p.type === 'color') {
+        if (!/^#[0-9a-fA-F]{6}$/.test(String(value))) {
+            return p.label + ' 须为 #RRGGBB 格式颜色';
+        }
+    } else if (p.type === 'number') {
+        var num = parseInt(value);
+        if (!Number.isInteger(num) || num < (p.min != null ? p.min : 0) || num > (p.max != null ? p.max : 100000)) {
+            return p.label + ' 须为 ' + (p.min != null ? p.min : 0) + '-' + (p.max != null ? p.max : 100000) + ' 的整数';
+        }
+    } else {
+        var str = String(value || '');
+        var maxLen = p.maxLen || 200;
+        if (str.length > maxLen) {
+            return p.label + ' 不能超过 ' + maxLen + ' 字符';
+        }
+    }
+    return null;
+}
+
+// GET /admin/email-shell - 获取外壳样式（参数定义含默认值 + 当前值，前端面板展示）
+router.get('/admin/email-shell', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const values = await db.config.getEmailShell();
+        res.json({ params: EMAIL_SHELL_PARAMS, values: values });
+    } catch (error) {
+        console.error('获取邮件外壳样式失败:', error.message);
+        res.status(500).json({ error: '获取邮件外壳样式失败' });
+    }
+});
+
+// PUT /admin/email-shell - 保存外壳样式（参数白名单校验 + 缓存失效 + 字段级审计）
+router.put('/admin/email-shell', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const body = req.body || {};
+        // 参数白名单：只接受 EMAIL_SHELL_PARAMS 声明的键
+        const toSave = {};
+        const errors = [];
+        EMAIL_SHELL_PARAMS.forEach(function (p) {
+            const val = body[p.key];
+            if (val === undefined || val === null) return;
+            const err = validateShellParam(p, val);
+            if (err) {
+                errors.push(err);
+            } else {
+                toSave[p.key] = p.type === 'number' ? parseInt(val) : String(val).trim();
+            }
+        });
+        if (errors.length > 0) {
+            return res.status(400).json({ error: errors.join('；') });
+        }
+
+        // 保存前取旧配置（审计 diff 用）
+        const oldShell = await db.config.getEmailShell();
+        await db.config.setEmailShell(toSave);
+        // 失效外壳缓存，让新样式立即生效
+        await invalidateEmailShellCache();
+
+        // 操作审计：字段级 diff（自定义 CSS 源码不记入日志防刷屏，只记「已更新」标记）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            const newShell = await db.config.getEmailShell();
+            const changes = buildFieldDiff(oldShell, newShell, EMAIL_SHELL_PARAMS.filter(function (p) { return p.type !== 'css'; }).map(function (p) {
+                if (p.type === 'number') return { key: p.key, label: p.label, num: true };
+                return { key: p.key, label: p.label };
+            }));
+            if (oldShell.custom_css !== newShell.custom_css) changes.push('自定义样式 已更新');
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.email-shell', resourceType: 'config', resourceId: 'email-shell', details: '更新邮件外壳样式；变更:' + changes.join(', '), req });
+            }
+        } catch (e) {}
+
+        res.json({ message: '邮件外壳样式保存成功', values: await db.config.getEmailShell() });
+    } catch (error) {
+        console.error('保存邮件外壳样式失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
+// POST /admin/email-shell/reset - 恢复默认外壳样式（注册表默认值覆盖 + 缓存失效 + 审计）
+router.post('/admin/email-shell/reset', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const defaults = {};
+        EMAIL_SHELL_PARAMS.forEach(function (p) { defaults[p.key] = p.default; });
+        await db.config.setEmailShell(defaults);
+        await invalidateEmailShellCache();
+
+        // 操作审计：恢复默认
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.email-shell', resourceType: 'config', resourceId: 'email-shell', details: '恢复邮件外壳样式默认', req });
+        } catch (e) {}
+
+        res.json({ message: '已恢复默认邮件外壳样式', values: await db.config.getEmailShell() });
+    } catch (error) {
+        console.error('恢复邮件外壳样式失败:', error.message);
         res.status(500).json({ error: safeError(error) });
     }
 });

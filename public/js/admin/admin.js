@@ -314,6 +314,88 @@
         }
     };
 
+    // ==================== 邮件外壳样式（参数化 + 高级自定义 CSS） ====================
+    $.emailShellParams = ref([]);
+    $.emailShellForm = ref({});
+    $.emailShellSaving = ref(false);
+
+    // 加载外壳样式（参数定义 + 当前值）
+    $.loadEmailShell = async function() {
+        try {
+            var res = await api('/admin/email-shell');
+            $.emailShellParams.value = res.params || [];
+            var form = {};
+            (res.params || []).forEach(function(p) {
+                var val = res.values && res.values[p.key];
+                form[p.key] = (val !== undefined && val !== null && val !== '') ? val : p.default;
+            });
+            $.emailShellForm.value = form;
+        } catch (e) {
+            console.warn('邮件外壳样式加载失败:', e.message || e);
+        }
+    };
+
+    // 参数分组（按 EMAIL_SHELL_PARAMS 的 group 顺序去重）
+    $.emailShellGroups = computed(function() {
+        var groups = [];
+        ($.emailShellParams.value || []).forEach(function(p) {
+            if (groups.indexOf(p.group) === -1) groups.push(p.group);
+        });
+        return groups;
+    });
+
+    // 某组参数（custom_css 单独在「高级」区渲染，不在参数网格重复）
+    $.emailShellParamsByGroup = function(g) {
+        return ($.emailShellParams.value || []).filter(function(p) { return p.group === g && p.type !== 'css'; });
+    };
+
+    // 保存外壳样式（服务端校验 + 失效缓存，立即生效）
+    $.saveEmailShell = async function() {
+        $.emailShellSaving.value = true;
+        try {
+            var res = await api('/admin/email-shell', {
+                method: 'PUT',
+                body: JSON.stringify($.emailShellForm.value)
+            });
+            $.emailShellForm.value = res.values || $.emailShellForm.value;
+            alert(res.message || '样式已保存');
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            $.emailShellSaving.value = false;
+        }
+    };
+
+    // 恢复默认外壳样式
+    $.resetEmailShell = async function() {
+        if (!(await window.customConfirm('确认将邮件外壳样式恢复为系统默认？当前修改将被覆盖。'))) return;
+        try {
+            var res = await api('/admin/email-shell/reset', { method: 'POST' });
+            $.emailShellForm.value = res.values || $.emailShellForm.value;
+            alert(res.message || '已恢复默认');
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
+    // 预览外壳样式：用 SMTP 测试模板 + 当前编辑的 shell 参数渲染（未保存也可预览）
+    $.previewEmailShell = async function() {
+        var tpl = ($.emailTemplates.value || []).find(function(t) { return t.code === 'smtp_test'; });
+        if (!tpl) { alert('邮件模板尚未加载'); return; }
+        try {
+            var res = await api('/admin/email-templates/smtp_test/preview', {
+                method: 'POST',
+                body: JSON.stringify({ subject: tpl.subject, title: tpl.title, content: tpl.content, shell: $.emailShellForm.value })
+            });
+            $.emailTemplatePreviewSubject.value = res.subject || '';
+            // 外壳 CSS 可信直接保留，正文过 DOMPurify（见 setEmailPreviewHtml 注释）
+            $.setEmailPreviewHtml(res.html || '');
+            $.emailTemplatePreviewShow.value = true;
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
     // ==================== 邮件模板管理 ====================
     $.emailTemplates = ref([]);
     $.emailTemplateCategories = ref([]);
@@ -326,6 +408,20 @@
     $.emailTemplatePreviewShow = ref(false);
     $.emailTemplatePreviewHtml = ref('');
     $.emailTemplatePreviewSubject = ref('');
+
+    /**
+     * 设置预览 HTML：邮件外壳 <style> 为服务端生成（可信），直接保留；
+     * 模板正文（管理员编辑内容）过 DOMPurify 净化后重组。
+     * 注：DOMPurify 会硬剥离 <style> 标签（ADD_TAGS 无效），不能整体 sanitize，否则外壳样式全丢。
+     */
+    $.setEmailPreviewHtml = function(html) {
+        var raw = html || '';
+        var styleMatch = raw.match(/<style>([\s\S]*?)<\/style>/);
+        var shellCss = styleMatch ? styleMatch[1] : '';
+        var bodyHtml = raw.replace(/<style>[\s\S]*?<\/style>/, '');
+        var safeBody = window.DOMPurify ? DOMPurify.sanitize(bodyHtml, { ADD_ATTR: ['target'] }) : bodyHtml;
+        $.emailTemplatePreviewHtml.value = shellCss ? '<style>' + shellCss + '</style>' + safeBody : safeBody;
+    };
 
     // 预览弹窗 z-index 管理（非 Bootstrap 弹窗，参照 rechargeModalWrap 模式）
     var emailTemplatePreviewZIndex = null;
@@ -513,7 +609,8 @@
                 body: JSON.stringify(form)
             });
             $.emailTemplatePreviewSubject.value = res.subject || '';
-            $.emailTemplatePreviewHtml.value = window.DOMPurify ? DOMPurify.sanitize(res.html || '') : (res.html || '');
+            // 外壳 CSS 可信直接保留，正文过 DOMPurify（见 setEmailPreviewHtml 注释）
+            $.setEmailPreviewHtml(res.html || '');
             $.emailTemplatePreviewShow.value = true;
         } catch (e) {
             alert(e.message);

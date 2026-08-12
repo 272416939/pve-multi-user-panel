@@ -1054,6 +1054,15 @@ async function initDefaultConfig() {
         );
     }
 
+    // 邮件外壳样式默认参数（邮件样式编辑；默认值与 EMAIL_SHELL_PARAMS 注册表一致）
+    const { EMAIL_SHELL_PARAMS } = require('../constants/email-templates');
+    for (const p of EMAIL_SHELL_PARAMS) {
+        await execute(
+            'INSERT IGNORE INTO config (`key`, value) VALUES (?, ?)',
+            ['mail:shell_' + p.key, String(p.default)]
+        );
+    }
+
     // 私有网络迁移：DHCP DNS1 旧默认值 119.29.29.29 → 180.76.76.76（仅迁移未修改过的旧默认值）
     await execute("UPDATE config SET value = '180.76.76.76' WHERE `key` = 'dhcp:dns1' AND value = '119.29.29.29'");
 

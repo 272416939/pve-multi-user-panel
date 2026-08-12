@@ -35,6 +35,30 @@ const EMAIL_TEMPLATE_CATEGORIES = [
     { key: 'system', label: '系统通知' }
 ];
 
+/**
+ * 邮件外壳样式参数（单一来源）
+ * - 管理端「邮件外壳样式」参数化面板展示与校验
+ * - initDb() 时写入 config 表默认键（mail:shell_<key>）
+ * - createEmailTemplate 渲染时按参数生成 <style>（缺省回退 default）
+ * - custom_css 为高级模式：追加到 <style> 末尾的 CSS 源码
+ */
+const EMAIL_SHELL_PARAMS = [
+    { key: 'header_from', label: '头部渐变起始色', group: '头部', type: 'color', default: '#667eea' },
+    { key: 'header_to', label: '头部渐变结束色', group: '头部', type: 'color', default: '#764ba2' },
+    { key: 'header_text', label: '头部标题文字色', group: '头部', type: 'color', default: '#ffffff' },
+    { key: 'card_bg', label: '卡片背景色', group: '卡片', type: 'color', default: '#ffffff' },
+    { key: 'card_radius', label: '卡片圆角（px）', group: '卡片', type: 'number', default: 16, min: 0, max: 40 },
+    { key: 'btn_from', label: '按钮渐变起始色', group: '按钮', type: 'color', default: '#667eea' },
+    { key: 'btn_to', label: '按钮渐变结束色', group: '按钮', type: 'color', default: '#764ba2' },
+    { key: 'btn_text', label: '按钮文字色', group: '按钮', type: 'color', default: '#ffffff' },
+    { key: 'content_text', label: '正文文字色', group: '正文', type: 'color', default: '#2d3748' },
+    { key: 'footer_bg', label: '页脚背景色', group: '页脚', type: 'color', default: '#f7fafc' },
+    { key: 'footer_text', label: '页脚文字色', group: '页脚', type: 'color', default: '#718096' },
+    { key: 'footer_note', label: '页脚第一行文案', group: '页脚', type: 'text', default: '此邮件由系统自动发送，请勿直接回复。', maxLen: 100 },
+    { key: 'footer_contact', label: '页脚第二行文案', group: '页脚', type: 'text', default: '如有问题，请联系管理员。', maxLen: 100 },
+    { key: 'custom_css', label: '自定义样式（高级）', group: '高级', type: 'css', default: '', maxLen: 8000 }
+];
+
 // 通用变量（渲染自动注入；前端变量面板统一展示）
 const GLOBAL_VARIABLES = [
     { name: 'site_name', label: '站点名称', example: '云服务控制台', group: '系统' },
@@ -1033,4 +1057,4 @@ const EMAIL_TEMPLATES = {
     }
 };
 
-module.exports = { EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES, GLOBAL_VARIABLES };
+module.exports = { EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES, GLOBAL_VARIABLES, EMAIL_SHELL_PARAMS };

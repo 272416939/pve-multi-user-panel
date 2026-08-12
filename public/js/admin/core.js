@@ -311,6 +311,7 @@ watch($.user, function(u) {
                 }),
                 $.loadEmailQueueStats ? $.loadEmailQueueStats() : Promise.resolve(),
                 $.loadEmailTemplates ? $.loadEmailTemplates() : Promise.resolve(),
+                $.loadEmailShell ? $.loadEmailShell() : Promise.resolve(),
                 $.loadPveConfig(),
                 $.loadRedisConfig(),
                 $.loadLogConfig ? $.loadLogConfig() : Promise.resolve(),

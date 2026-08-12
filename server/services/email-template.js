@@ -184,7 +184,7 @@ async function sendTemplateEmail(to, code, vars, opts) {
     opts = opts || {};
     var rendered = await renderTemplate(code, vars);
     var { createEmailTemplate } = require('../utils/email');
-    var html = createEmailTemplate(rendered.title, rendered.content, rendered.site_name);
+    var html = await createEmailTemplate(rendered.title, rendered.content, rendered.site_name);
     if (opts.sync) {
         await require('../utils/email').sendEmail(to, rendered.subject, html);
         return true;
