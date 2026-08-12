@@ -161,6 +161,31 @@ router.get('/admin/os-templates/:id', async (req, res) => {
     }
 });
 
+// POST /api/admin/os-templates/reorder — 拖拽排序批量保存（ids 顺序即新排序，第一个最靠前）
+router.post('/admin/os-templates/reorder', async (req, res) => {
+    try {
+        const ids = req.body.ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ids 参数无效' });
+        }
+        for (let i = 0; i < ids.length; i++) {
+            ids[i] = parseInt(ids[i]);
+            if (!Number.isInteger(ids[i]) || ids[i] <= 0) {
+                return res.status(400).json({ error: 'ids 必须为正整数' });
+            }
+        }
+        await db.osTemplates.batchUpdateSortOrder(ids);
+        // 操作审计：调整系统模板排序
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.os-template.reorder', resourceType: 'os-template', details: '调整系统模板排序 ' + ids.length + ' 个', req });
+        } catch (e) {}
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
 // POST /api/admin/os-templates — 创建
 router.post('/admin/os-templates', async (req, res) => {
     try {

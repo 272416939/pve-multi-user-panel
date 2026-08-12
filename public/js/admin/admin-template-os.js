@@ -8,15 +8,31 @@
             <pv-button variant="primary" @click="osTemplatePage.openForm()">新增模板</pv-button>
         </div>
         <div class="table-container mb-4" style="padding:12px;">
+            <div class="text-muted mb-2" style="font-size:0.85rem;">拖动 <span class="drag-handle">⠿</span> 手柄调整排序，用户切换系统时按此顺序展示</div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle table-align-center">
+                <table id="osTemplateTable" class="table table-hover align-middle table-align-center">
                     <thead class="table-light">
                         <tr>
-                            <th>ID</th><th>名称</th><th>OS 类型</th><th>版本</th><th>PVE 模板 VMID</th><th>目标存储</th><th>磁盘格式</th><th>状态</th><th>操作</th>
+                            <th class="drag-handle-th"></th><th>ID</th><th>名称</th><th>OS 类型</th><th>版本</th><th>PVE 模板 VMID</th><th>目标存储</th><th>磁盘格式</th><th>状态</th><th>操作</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr v-for="t in (osTemplatePage?.osTemplates?.value) || []" :key="t.id">
+                    <tbody @dragover="osTemplatePage.handleContainerDragOver($event)" @drop="osTemplatePage.handleDropOnContainer($event)">
+                        <tr v-for="t in (osTemplatePage?.osTemplates?.value) || []" :key="t.id"
+                            :data-drag-id="t.id"
+                            :class="{ 'row-dragging': osTemplatePage.dragState.draggingId === t.id }"
+                            @dragover="osTemplatePage.handleDragOver($event, t.id)"
+                            @dragleave="osTemplatePage.handleDragLeave($event, t.id)"
+                            @drop="osTemplatePage.handleDrop($event, t.id)">
+                            <td class="drag-handle-cell">
+                                <span class="drag-handle"
+                                    draggable="true"
+                                    @dragstart="osTemplatePage.handleDragStart($event, t.id)"
+                                    @dragend="osTemplatePage.handleDragEnd()"
+                                    @touchstart="osTemplatePage.handleTouchStart($event, t.id)"
+                                    @touchmove="osTemplatePage.handleTouchMove($event)"
+                                    @touchend="osTemplatePage.handleTouchEnd()"
+                                    @touchcancel="osTemplatePage.handleTouchEnd()">⠿</span>
+                            </td>
                             <td>{{ t.id }}</td>
                             <td>{{ t.name }}</td>
                             <td>{{ t.os_type }}</td>
@@ -33,7 +49,7 @@
                             </td>
                         </tr>
                         <tr v-if="(osTemplatePage?.osTemplates?.value || []).length === 0">
-                            <td colspan="9" class="text-center text-muted">暂无系统模板</td>
+                            <td colspan="10" class="text-center text-muted">暂无系统模板</td>
                         </tr>
                     </tbody>
                 </table>
