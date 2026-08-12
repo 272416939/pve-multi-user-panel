@@ -594,6 +594,7 @@
     };
 
     // 预览：用示例变量值渲染完整邮件（服务端渲染，复用渲染引擎）
+    // 注意：必须带上外壳样式表单（emailShellForm），否则未保存的样式参数（如正文文字色改黑）不生效，预览与发送不一致
     $.previewEmailTemplate = async function() {
         var code = $.emailTemplateEditing.value;
         if (!code) return;
@@ -606,7 +607,7 @@
         try {
             var res = await api('/admin/email-templates/' + code + '/preview', {
                 method: 'POST',
-                body: JSON.stringify(form)
+                body: JSON.stringify(Object.assign({}, form, { shell: $.emailShellForm.value }))
             });
             $.emailTemplatePreviewSubject.value = res.subject || '';
             // 外壳 CSS 可信直接保留，正文过 DOMPurify（见 setEmailPreviewHtml 注释）
