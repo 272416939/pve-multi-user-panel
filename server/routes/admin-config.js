@@ -9,7 +9,7 @@ const pkg = require('../../package.json');
 const { safeError } = require('../utils/safe-error');
 const { maskSecret, isMasked, encrypt, decrypt } = require('../utils/crypto-utils');
 const { queryIpLocation } = require('../services/ip-location');
-const { checkRateLimit, invalidateRateLimitCache } = require('../middleware/rate-limiter');
+const { checkConfiguredRateLimit, invalidateRateLimitCache } = require('../middleware/rate-limiter');
 // 审计字段级 diff 通用工具（规范第十一节：更新类审计从 DB 新旧状态 diff 生成，不从请求体拼接）
 const { buildFieldDiff } = require('../utils/audit-diff');
 // 运维业务下沉 services/（规范第七节）：版本检查/系统更新/Redis 管理
