@@ -89,7 +89,7 @@ async function createEmailTemplate(title, content, siteName, shell) {
         }
         .email-content {
             padding: 30px;
-            color: ${s.content_text || '#2d3748'};
+            /* 正文文字颜色由模板正文内容决定（Quill 内联颜色），外壳不接管，避免与正文内联样式冲突 */
             line-height: 1.8;
             font-size: 16px;
         }

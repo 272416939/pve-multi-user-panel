@@ -51,7 +51,6 @@ const EMAIL_SHELL_PARAMS = [
     { key: 'btn_from', label: '按钮渐变起始色', group: '按钮', type: 'color', default: '#667eea' },
     { key: 'btn_to', label: '按钮渐变结束色', group: '按钮', type: 'color', default: '#764ba2' },
     { key: 'btn_text', label: '按钮文字色', group: '按钮', type: 'color', default: '#ffffff' },
-    { key: 'content_text', label: '正文文字色', group: '正文', type: 'color', default: '#2d3748' },
     { key: 'footer_bg', label: '页脚背景色', group: '页脚', type: 'color', default: '#f7fafc' },
     { key: 'footer_text', label: '页脚文字色', group: '页脚', type: 'color', default: '#718096' },
     { key: 'footer_note', label: '页脚第一行文案', group: '页脚', type: 'text', default: '此邮件由系统自动发送，请勿直接回复。', maxLen: 100 },

@@ -1062,6 +1062,8 @@ async function initDefaultConfig() {
             ['mail:shell_' + p.key, String(p.default)]
         );
     }
+    // 清理已废弃的正文文字色键（正文颜色由模板正文决定，不再由外壳控制；历史库残留无害键一并删除）
+    try { await execute("DELETE FROM config WHERE `key` = 'mail:shell_content_text'"); } catch (_) {}
 
     // 私有网络迁移：DHCP DNS1 旧默认值 119.29.29.29 → 180.76.76.76（仅迁移未修改过的旧默认值）
     await execute("UPDATE config SET value = '180.76.76.76' WHERE `key` = 'dhcp:dns1' AND value = '119.29.29.29'");
