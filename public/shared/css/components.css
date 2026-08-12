@@ -751,3 +751,64 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* ===== 邮件模板 Quill 富文本编辑器（暗色默认；亮色覆盖在 theme.css） ===== */
+/* 注意：quill.snow.css 在 head 中加载晚于 components.css，同类特异性规则需加 .ql-snow 双类提升（0-3-0） */
+.email-template-quill-wrap {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
+}
+.email-template-quill-wrap .ql-toolbar.ql-snow {
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0;
+}
+.email-template-quill-wrap .ql-container.ql-snow {
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+}
+.email-template-quill-wrap .ql-toolbar .ql-stroke {
+    stroke: var(--text-secondary);
+}
+.email-template-quill-wrap .ql-toolbar .ql-fill {
+    fill: var(--text-secondary);
+}
+.email-template-quill-wrap .ql-toolbar .ql-picker {
+    color: var(--text-secondary);
+}
+.email-template-quill-wrap .ql-toolbar .ql-picker-options {
+    background: var(--bg-modal);
+    border-color: var(--border-color);
+}
+.email-template-quill-wrap .ql-toolbar button:hover .ql-stroke,
+.email-template-quill-wrap .ql-toolbar button.ql-active .ql-stroke {
+    stroke: var(--color-primary);
+}
+.email-template-quill-wrap .ql-toolbar button:hover .ql-fill,
+.email-template-quill-wrap .ql-toolbar button.ql-active .ql-fill {
+    fill: var(--color-primary);
+}
+.email-template-quill-wrap .ql-toolbar .ql-picker:hover .ql-picker-label,
+.email-template-quill-wrap .ql-toolbar .ql-picker-label:hover {
+    color: var(--color-primary);
+}
+.email-template-quill-wrap .ql-editor {
+    color: var(--text-primary);
+    min-height: 200px;
+}
+.email-template-quill-wrap .ql-editor.ql-blank::before {
+    color: var(--text-muted);
+    font-style: normal;
+}
+/* 邮件模板预览弹窗：背景模拟邮件外壳 body 渐变（与真实发送一致） */
+.email-template-preview-body {
+    background: linear-gradient(135deg, #1a143a 0%, #2d1b4e 50%, #1a143a 100%);
+    border-radius: 0 0 12px 12px;
+    padding: 20px;
+}

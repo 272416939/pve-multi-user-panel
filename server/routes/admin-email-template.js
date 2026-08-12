@@ -142,9 +142,12 @@ router.post('/admin/email-templates/:code/preview', authMiddleware, adminMiddlew
         }
 
         // 用示例值构建预览变量（模板声明变量 + 通用变量）
+        // 注意：site_name 不预设 example（渲染引擎自动读取 DB 站点名），保证预览与真实发送一致
         const exampleVars = {};
         (def.variables || []).forEach(function (v) { exampleVars[v.name] = v.example || '【' + v.label + '】'; });
-        GLOBAL_VARIABLES.forEach(function (v) { exampleVars[v.name] = v.example || ''; });
+        GLOBAL_VARIABLES.forEach(function (v) {
+            if (v.name !== 'site_name') exampleVars[v.name] = v.example || '';
+        });
 
         const { renderRaw } = require('../services/email-template');
         const { createEmailTemplate } = require('../utils/email');

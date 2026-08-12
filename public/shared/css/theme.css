@@ -118,3 +118,44 @@
     color: #7e22ce !important;
     background: rgba(168,85,247,0.10) !important;
 }
+/* ===== 邮件模板 Quill 编辑器亮色覆盖（默认暗色见 components.css） ===== */
+[data-theme="light"] .email-template-quill-wrap {
+    background: #fff;
+    border-color: #e2e0ec;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar {
+    background: #f8f7fc;
+    border-bottom-color: #e2e0ec;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar .ql-stroke {
+    stroke: #6d6a8a;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar .ql-fill {
+    fill: #6d6a8a;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar .ql-picker {
+    color: #6d6a8a;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar .ql-picker-options {
+    background: #fff;
+    border-color: #e2e0ec;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar button:hover .ql-stroke,
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar button.ql-active .ql-stroke {
+    stroke: #9333ea;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar button:hover .ql-fill,
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar button.ql-active .ql-fill {
+    fill: #9333ea;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar .ql-picker:hover .ql-picker-label,
+[data-theme="light"] .email-template-quill-wrap .ql-toolbar .ql-picker-label:hover {
+    color: #9333ea;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-container,
+[data-theme="light"] .email-template-quill-wrap .ql-editor {
+    color: #3b3654;
+}
+[data-theme="light"] .email-template-quill-wrap .ql-editor.ql-blank::before {
+    color: #9d9ab8;
+}

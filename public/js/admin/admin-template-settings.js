@@ -139,8 +139,8 @@
                                                 </div>
                                                 <small class="text-muted">变量格式：<code>{变量名}</code>，仅支持小写字母、数字、下划线</small>
                                             </div>
-                                            <div class="mb-2" style="background:#fff;border-radius:8px;overflow:hidden;" v-show="emailTemplateMode === 'rich'">
-                                                <div id="emailTemplateQuill" style="min-height:200px;color:#333;"></div>
+                                            <div class="email-template-quill-wrap mb-2" v-show="emailTemplateMode === 'rich'">
+                                                <div id="emailTemplateQuill" style="min-height:200px;"></div>
                                             </div>
                                             <div class="mb-2" v-show="emailTemplateMode === 'source'">
                                                 <textarea id="emailTemplateSource" class="form-control font-monospace" rows="10" v-model="emailTemplateSource" placeholder="粘贴或编辑 HTML 源码，支持 {变量} 占位符"></textarea>
@@ -171,7 +171,7 @@
                                         <h5 class="modal-title">邮件预览：{{ emailTemplatePreviewSubject }}</h5>
                                         <pv-button variant="close" @click="emailTemplatePreviewShow = false">×</pv-button>
                                     </div>
-                                    <div class="modal-body" style="overflow-y:auto;overflow-x:hidden;background:#eef0f6;border-radius:0 0 12px 12px;">
+                                    <div class="modal-body email-template-preview-body" style="overflow-y:auto;overflow-x:hidden;">
                                         <div v-html="emailTemplatePreviewHtml"></div>
                                     </div>
                                     <div class="modal-footer">

@@ -115,6 +115,20 @@ function createEmailTemplate(title, content, siteName) {
                     border-radius: 8px;
                     margin: 20px 0;
                 }
+                /* 富文本编辑器（Quill）输出类兼容：真实邮件环境无 quill.snow.css，补齐对齐/缩进/字号类保证预览与发送一致 */
+                .ql-align-center { text-align: center; }
+                .ql-align-right { text-align: right; }
+                .ql-align-justify { text-align: justify; }
+                .ql-indent-1 { margin-left: 2em; }
+                .ql-indent-2 { margin-left: 4em; }
+                .ql-indent-3 { margin-left: 6em; }
+                .ql-indent-4 { margin-left: 8em; }
+                .ql-indent-5 { margin-left: 10em; }
+                .ql-size-small { font-size: 0.75em; }
+                .ql-size-large { font-size: 1.5em; }
+                .ql-size-huge { font-size: 2.5em; }
+                .email-content ol, .email-content ul { margin-left: 20px; }
+                .email-content li { margin-bottom: 6px; }
             </style>
         </head>
         <body>
