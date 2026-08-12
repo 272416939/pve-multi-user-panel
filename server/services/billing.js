@@ -4,8 +4,8 @@
 
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
-const { enqueueEmail } = require('../queue/email-queue');
+const { shouldSendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('./email-template');
 const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
 const { formatLocalDate } = require('../utils/date');
@@ -196,20 +196,17 @@ async function renewByBalance(opts) {
     try {
         if (user.email && user.emailVerified && user.email.includes('@')) {
             if (await shouldSendEmail(userId, 'notify_renewal')) {
-                var siteName = await getSiteName();
-                var renewHtml = createEmailTemplate('资源续费成功',
-                    `<p>您好，您的 <strong>${resourceTypeLabel}「${resourceName}」</strong> 已续费成功。</p>
-                    <div class="info-box">
-                        <p style="margin-bottom: 4px;">资源名称：<strong>${resourceName}</strong></p>
-                        <p style="margin-bottom: 4px;">续费详情：<strong>${periodStr}</strong></p>
-                        <p style="margin-bottom: 4px;">到期时间：<strong>${expiryDisplay}</strong></p>
-                        <p style="margin-bottom: 4px;">实付金额：<strong>¥${totalPrice.toFixed(2)}</strong></p>
-                        <p style="margin-bottom: 4px;">余额变动：<strong>¥${balance.toFixed(2)} → ¥${newBalance}</strong></p>
-                        <p style="margin-bottom: 4px;">订单编号：<strong>${orderNo}</strong></p>
-                        <p>续费时间：${new Date().toLocaleString('zh-CN')}</p>
-                    </div>
-                    <p>前往 <a href="${process.env.SITE_URL || ''}/">控制面板</a> 查看资源详情。</p>`, siteName);
-                enqueueEmail(user.email, '资源续费成功 - ' + siteName, renewHtml);
+                // 资源续费成功（模板: resource_renewal，{resource_label} 区分 VM/容器）
+                await sendTemplateEmail(user.email, 'resource_renewal', {
+                    resource_label: resourceTypeLabel,
+                    resource_name: resourceName,
+                    period: periodStr,
+                    expire_time: expiryDisplay,
+                    amount: totalPrice.toFixed(2),
+                    balance_before: balance.toFixed(2),
+                    balance_after: newBalance,
+                    order_no: orderNo
+                });
             }
         }
     } catch (e) {

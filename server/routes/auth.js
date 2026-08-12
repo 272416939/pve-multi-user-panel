@@ -7,7 +7,7 @@ const otplib = require('otplib');
 const db = require('../api/db');
 const { JWT_SECRET, JWT_EXPIRES_IN, REFRESH_TOKEN_DAYS, generateToken, generateAccessToken, generateRefreshToken, generatePartialToken, generateCode } = require('../utils/token');
 const getSiteUrl = require('../utils/site-url');
-const { createEmailTemplate, sendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('../services/email-template');
 const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 const tokenStore = require('../utils/token-store');
 const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
@@ -368,28 +368,9 @@ router.post('/auth/forgot-password', async (req, res) => {
         }
 
         const resetUrl = `${siteUrl}?resetPassword=${token}`;
-        const emailContent = `
-            <p>您好 <strong>${user.username}</strong>，</p>
-            <p>我们收到了您的密码重置请求。</p>
-            <p>请点击下方按钮重置您的密码：</p>
-            <p style="text-align: center;">
-                <a href="${resetUrl}" class="btn" target="_blank">重置密码</a>
-            </p>
-            <div class="divider"></div>
-            <p style="color: #718096; font-size: 14px;">
-                如果按钮无法点击，请复制以下链接到浏览器：<br>
-                <a href="${resetUrl}" style="word-break: break-all;">${resetUrl}</a>
-            </p>
-            <div class="info-box">
-                <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快操作。</p>
-            </div>
-            <div class="divider"></div>
-            <p style="color: #718096; font-size: 14px;">
-                <strong>如果您没有请求重置密码</strong>，请忽略此邮件，您的密码不会被修改。
-            </p>
-        `;
-        
-        await sendEmail(user.email, '密码重置', createEmailTemplate('密码重置请求', emailContent));
+
+        // 密码重置邮件（模板: password_reset，同步发送保证反馈）
+        await sendTemplateEmail(user.email, 'password_reset', { username: user.username, link: resetUrl }, { sync: true });
         res.json({ message: '如果邮箱已绑定，重置链接已发送' });
     } catch (error) {
         res.status(500).json({ error: '请求失败' });
@@ -526,18 +507,9 @@ router.post('/register/send-code', async (req, res) => {
         // 使用 token-store 存储验证码（优先 Redis，回退数据库，10 分钟有效期）
         await tokenStore.setRegisterCode(email, code, 600);
 
-        // 生成邮件 HTML
-        var siteName = await db.config.get('site:name') || 'PVE 多用户控制面板';
-        var html = createEmailTemplate('注册验证码 - ' + siteName,
-            '<p>您好，您正在进行账号注册，验证码为：</p>' +
-            '<div style="text-align:center;margin:20px 0;">' +
-            '<span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#7c3aed;background:#f5f3ff;padding:12px 24px;border-radius:8px;display:inline-block;">' + code + '</span>' +
-            '</div>' +
-            '<p style="color:#666;">验证码有效期为 10 分钟，请尽快使用。</p>' +
-            '<p style="color:#999;font-size:12px;">如非本人操作，请忽略此邮件。</p>', siteName);
-
         try {
-            await sendEmail(email, '注册验证码 - ' + siteName, html);
+            // 注册验证码邮件（模板: register_code，同步发送保证反馈；{site_name} 由渲染引擎注入）
+            await sendTemplateEmail(email, 'register_code', { code: code }, { sync: true });
         } catch (sendErr) {
             console.error('[register] 邮件发送失败:', sendErr.message);
             return res.status(500).json({ error: '邮件发送失败，请检查邮箱配置或联系管理员' });

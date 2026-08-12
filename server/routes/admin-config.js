@@ -3,7 +3,8 @@ const router = express.Router();
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-const { createEmailTemplate, sendEmail, resetTransporterCache } = require('../utils/email');
+const { resetTransporterCache } = require('../utils/email');
+const { sendTemplateEmail } = require('../services/email-template');
 const { loadSentRemindersFromDb, checkExpiredVms, checkExpiredLxc } = require('../services/expiry-check');
 const pkg = require('../../package.json');
 const { safeError } = require('../utils/safe-error');
@@ -107,21 +108,10 @@ router.post('/admin/smtp/test', authMiddleware, adminMiddleware, async (req, res
             return res.status(400).json({ error: '请提供测试邮箱' });
         }
         
-        const emailContent = `
-            <p>您好，</p>
-            <p>恭喜！您的 SMTP 配置测试成功！</p>
-            <div class="divider"></div>
-            <p>现在您可以正常使用邮件功能了，包括：</p>
-            <ul style="margin-left: 20px; color: #4a5568;">
-                <li>邮箱验证</li>
-                <li>密码重置</li>
-                <li>虚拟机到期提醒</li>
-                <li>续费提醒</li>
-            </ul>
-        `;
         // 测试前失效缓存：确保用最新保存的 SMTP 配置发送（而不是旧 transporter）
         resetTransporterCache();
-        await sendEmail(testEmail, 'SMTP 配置测试', createEmailTemplate('测试邮件', emailContent));
+        // SMTP 测试邮件（模板: smtp_test，同步发送保证反馈）
+        await sendTemplateEmail(testEmail, 'smtp_test', {}, { sync: true });
         res.json({ message: '测试邮件发送成功' });
     } catch (error) {
         console.error('测试 SMTP 配置失败:', error);

@@ -717,6 +717,30 @@ async function initDb() {
     // 迁移：界面模板偏好列（'' = 跟随站点默认，'default' / 'saas' = 个人固定）
     try { await execute("ALTER TABLE user_settings ADD COLUMN template VARCHAR(20) NOT NULL DEFAULT ''"); } catch (_) {}
 
+    // 邮件模板表（邮件模板在线编辑；默认模板由 constants/email-templates.js 注册表初始化，DB 可编辑 + 恢复默认）
+    await execute(`
+        CREATE TABLE IF NOT EXISTS email_templates (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            code VARCHAR(64) NOT NULL UNIQUE,
+            name VARCHAR(100) NOT NULL DEFAULT '',
+            category VARCHAR(32) NOT NULL DEFAULT 'system',
+            subject TEXT NOT NULL,
+            title TEXT,
+            content TEXT NOT NULL,
+            variables JSON,
+            is_system INT DEFAULT 1,
+            version INT DEFAULT 1,
+            status VARCHAR(16) DEFAULT 'active',
+            updated_by INT DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            INDEX idx_email_templates_category (category)
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 初始化默认邮件模板（INSERT IGNORE：已存在不覆盖，保留管理员修改）
+    await initEmailTemplates();
+
     // 初始化默认配置
     await initDefaultConfig();
 
@@ -928,6 +952,24 @@ async function migrateSchema() {
 
     // 注：孤立端口转发规则（vm_id 和 ct_id 均为 NULL）不再自动迁移为 general 类型
     // 如需修改类型，请管理员在端口转发管理界面手动编辑
+}
+
+// 初始化默认邮件模板（异步）
+// 默认模板定义单一来源：server/constants/email-templates.js（与 RATE_LIMIT_RULES 同模式）
+// INSERT IGNORE 按 code 幂等：已存在（管理员改过）不覆盖
+async function initEmailTemplates() {
+    const { EMAIL_TEMPLATES } = require('../constants/email-templates');
+    for (const code of Object.keys(EMAIL_TEMPLATES)) {
+        const tpl = EMAIL_TEMPLATES[code];
+        try {
+            await execute(
+                'INSERT IGNORE INTO email_templates (code, name, category, subject, title, content, variables, is_system, version) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)',
+                [tpl.code, tpl.name, tpl.category, tpl.subject, tpl.title, tpl.content, JSON.stringify(tpl.variables || [])]
+            );
+        } catch (e) {
+            console.error('[db] 初始化邮件模板失败: ' + code + ' - ' + e.message);
+        }
+    }
 }
 
 // 初始化默认配置（异步）

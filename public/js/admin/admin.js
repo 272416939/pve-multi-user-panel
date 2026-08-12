@@ -314,6 +314,232 @@
         }
     };
 
+    // ==================== 邮件模板管理 ====================
+    $.emailTemplates = ref([]);
+    $.emailTemplateCategories = ref([]);
+    $.emailTemplateGlobalVariables = ref([]);
+    $.emailTemplateEditing = ref('');                    // 当前展开编辑的模板 code（'' = 全部收起）
+    $.emailTemplateForm = ref({ subject: '', title: '', content: '' });
+    $.emailTemplateMode = ref('rich');                   // rich | source
+    $.emailTemplateSource = ref('');
+    $.emailTemplateSaving = ref(false);
+    $.emailTemplatePreviewShow = ref(false);
+    $.emailTemplatePreviewHtml = ref('');
+    $.emailTemplatePreviewSubject = ref('');
+
+    // 预览弹窗 z-index 管理（非 Bootstrap 弹窗，参照 rechargeModalWrap 模式）
+    var emailTemplatePreviewZIndex = null;
+    watch($.emailTemplatePreviewShow, function(val) {
+        if (val) {
+            Vue.nextTick(function() {
+                var el = document.getElementById('emailTemplatePreviewWrap');
+                if (el) emailTemplatePreviewZIndex = $.applyModalZIndex(el);
+            });
+        } else if (emailTemplatePreviewZIndex != null) {
+            window.ModalZIndexManager.release(emailTemplatePreviewZIndex);
+            emailTemplatePreviewZIndex = null;
+        }
+    });
+
+    // 加载模板列表（含分类/通用变量定义）
+    $.loadEmailTemplates = async function() {
+        try {
+            var res = await api('/admin/email-templates');
+            $.emailTemplates.value = res.templates || [];
+            $.emailTemplateCategories.value = res.categories || [];
+            $.emailTemplateGlobalVariables.value = res.globalVariables || [];
+        } catch (e) {
+            console.warn('邮件模板加载失败:', e.message || e);
+        }
+    };
+
+    // 按分类取模板（模板列表分组展示）
+    $.emailTemplatesByCategory = function(catKey) {
+        return ($.emailTemplates.value || []).filter(function(t) { return t.category === catKey; });
+    };
+
+    // 模板可用变量 = 模板声明变量 + 全局通用变量（site_name/now/site_url）
+    $.emailTemplateAllVariables = function(tpl) {
+        var list = (tpl.variables || []).slice();
+        ($.emailTemplateGlobalVariables.value || []).forEach(function(v) { list.push(v); });
+        return list;
+    };
+
+    // 初始化 Quill 富文本编辑器（模板编辑区展开后调用；DOM 由 v-if/v-show 控制）
+    $.initEmailTemplateQuill = function() {
+        $.destroyEmailTemplateQuill();
+        var el = document.getElementById('emailTemplateQuill');
+        if (!el || typeof Quill === 'undefined') return;
+        var quill = new Quill(el, {
+            theme: 'snow',
+            placeholder: '编辑邮件正文…',
+            modules: {
+                toolbar: [
+                    [{ header: [2, 3, false] }],
+                    ['bold', 'italic', 'underline', 'strike'],
+                    [{ color: [] }, { background: [] }],
+                    [{ list: 'ordered' }, { list: 'bullet' }],
+                    ['blockquote', 'link', 'code-block'],
+                    ['clean']
+                ]
+            }
+        });
+        var content = $.emailTemplateForm.value.content || '';
+        if (content) {
+            try {
+                quill.clipboard.dangerouslyPasteHTML(content);
+            } catch (e) {
+                quill.root.innerHTML = content;
+            }
+        }
+        quill.on('text-change', function() {
+            var html = quill.root.innerHTML;
+            $.emailTemplateForm.value.content = html;
+            $.emailTemplateSource.value = html;
+        });
+        window.__emailTemplateQuill = quill;
+    };
+
+    $.destroyEmailTemplateQuill = function() {
+        if (window.__emailTemplateQuill) {
+            try { window.__emailTemplateQuill = null; } catch (e) {}
+        }
+    };
+
+    // 展开/收起模板编辑区（一次只展开一个）
+    $.toggleEmailTemplateEdit = async function(code) {
+        if ($.emailTemplateEditing.value === code) {
+            $.emailTemplateEditing.value = '';
+            $.destroyEmailTemplateQuill();
+            return;
+        }
+        var tpl = ($.emailTemplates.value || []).find(function(t) { return t.code === code; });
+        if (!tpl) return;
+        $.emailTemplateEditing.value = code;
+        $.emailTemplateForm.value = { subject: tpl.subject || '', title: tpl.title || '', content: tpl.content || '' };
+        $.emailTemplateSource.value = tpl.content || '';
+        $.emailTemplateMode.value = 'rich';
+        await Vue.nextTick();
+        $.initEmailTemplateQuill();
+    };
+
+    // 富文本/源码模式切换（双向同步，DOM 用 v-show 保留不销毁）
+    $.switchEmailTemplateMode = function(mode) {
+        if (mode === $.emailTemplateMode.value) return;
+        var quill = window.__emailTemplateQuill;
+        if (mode === 'source') {
+            if (quill) $.emailTemplateSource.value = quill.root.innerHTML;
+        } else {
+            // 切回富文本：把源码写回编辑器
+            if (quill && $.emailTemplateSource.value) {
+                try {
+                    var delta = quill.clipboard.convert({ html: $.emailTemplateSource.value });
+                    quill.setContents(delta, 'silent');
+                } catch (e) {}
+            }
+        }
+        $.emailTemplateMode.value = mode;
+    };
+
+    // 插入变量到光标处（富文本用 Quill 选区，源码用 textarea 选区）
+    $.insertEmailTemplateVar = function(name) {
+        var varStr = '{' + name + '}';
+        if ($.emailTemplateMode.value === 'source') {
+            var ta = document.getElementById('emailTemplateSource');
+            if (!ta) return;
+            var start = ta.selectionStart;
+            var end = ta.selectionEnd;
+            var val = ta.value;
+            ta.value = val.slice(0, start) + varStr + val.slice(end);
+            $.emailTemplateSource.value = ta.value;
+            ta.selectionStart = ta.selectionEnd = start + varStr.length;
+            ta.focus();
+        } else {
+            var quill = window.__emailTemplateQuill;
+            if (!quill) return;
+            var sel = quill.getSelection();
+            var index = sel ? sel.index : quill.getLength();
+            quill.insertText(index, varStr);
+            quill.setSelection(index + varStr.length);
+            quill.focus();
+        }
+    };
+
+    // 保存模板（当前模式内容 → PUT → 更新本地列表）
+    $.saveEmailTemplate = async function() {
+        var code = $.emailTemplateEditing.value;
+        if (!code) return;
+        var form = $.emailTemplateForm.value;
+        if ($.emailTemplateMode.value === 'source') {
+            form.content = $.emailTemplateSource.value;
+        } else if (window.__emailTemplateQuill) {
+            form.content = window.__emailTemplateQuill.root.innerHTML;
+        }
+        $.emailTemplateSaving.value = true;
+        try {
+            var res = await api('/admin/email-templates/' + code, {
+                method: 'PUT',
+                body: JSON.stringify(form)
+            });
+            var tpl = ($.emailTemplates.value || []).find(function(t) { return t.code === code; });
+            if (tpl && res.template) {
+                tpl.subject = res.template.subject;
+                tpl.title = res.template.title;
+                tpl.content = res.template.content;
+                tpl.version = res.template.version;
+                tpl.updated_at = res.template.updated_at;
+            }
+            alert(res.message || '模板已保存');
+        } catch (e) {
+            alert(e.message);
+        } finally {
+            $.emailTemplateSaving.value = false;
+        }
+    };
+
+    // 预览：用示例变量值渲染完整邮件（服务端渲染，复用渲染引擎）
+    $.previewEmailTemplate = async function() {
+        var code = $.emailTemplateEditing.value;
+        if (!code) return;
+        var form = $.emailTemplateForm.value;
+        if ($.emailTemplateMode.value === 'source') {
+            form.content = $.emailTemplateSource.value;
+        } else if (window.__emailTemplateQuill) {
+            form.content = window.__emailTemplateQuill.root.innerHTML;
+        }
+        try {
+            var res = await api('/admin/email-templates/' + code + '/preview', {
+                method: 'POST',
+                body: JSON.stringify(form)
+            });
+            $.emailTemplatePreviewSubject.value = res.subject || '';
+            $.emailTemplatePreviewHtml.value = window.DOMPurify ? DOMPurify.sanitize(res.html || '') : (res.html || '');
+            $.emailTemplatePreviewShow.value = true;
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
+    // 恢复默认（常量注册表覆盖；正在编辑时同步刷新表单）
+    $.resetEmailTemplate = async function(code) {
+        var tpl = ($.emailTemplates.value || []).find(function(t) { return t.code === code; });
+        if (!(await window.customConfirm('确认将「' + (tpl ? tpl.name : code) + '」恢复为系统默认模板？当前修改将被覆盖。'))) return;
+        try {
+            var res = await api('/admin/email-templates/' + code + '/reset', {
+                method: 'POST'
+            });
+            if ($.emailTemplateEditing.value === code) {
+                $.emailTemplateForm.value = { subject: (res.template && res.template.subject) || '', title: (res.template && res.template.title) || '', content: (res.template && res.template.content) || '' };
+                $.emailTemplateSource.value = (res.template && res.template.content) || '';
+                Vue.nextTick(function() { $.initEmailTemplateQuill(); });
+            }
+            await $.loadEmailTemplates();
+            alert(res.message || '已恢复默认');
+        } catch (e) {
+            alert(e.message);
+        }
+    };
+
     // 站点配置
     $.loadSiteConfig = async function() {
         try {

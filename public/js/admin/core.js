@@ -310,6 +310,7 @@ watch($.user, function(u) {
                     console.error('加载 SMTP 配置失败', e);
                 }),
                 $.loadEmailQueueStats ? $.loadEmailQueueStats() : Promise.resolve(),
+                $.loadEmailTemplates ? $.loadEmailTemplates() : Promise.resolve(),
                 $.loadPveConfig(),
                 $.loadRedisConfig(),
                 $.loadLogConfig ? $.loadLogConfig() : Promise.resolve(),

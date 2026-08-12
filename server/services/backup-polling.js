@@ -1,7 +1,7 @@
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
-const { createEmailTemplate, shouldSendEmail } = require('../utils/email');
-const { enqueueEmail } = require('../queue/email-queue');
+const { shouldSendEmail } = require('../utils/email');
+const { sendTemplateEmail } = require('./email-template');
 const { pushToUser } = require('../websocket/push-proxy');
 // 备份/恢复完成标记抽离到 services/status-cache.js（规范第七节：状态缓存单一来源）
 const { markBackupRestoreComplete } = require('./status-cache');
@@ -89,7 +89,13 @@ async function sendLxcBackupNotification(vmid, backupId, status) {
         if (user.email && user.emailVerified) {
             try {
                 if (await shouldSendEmail(user.id, 'notify_backup_result')) {
-                    enqueueEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
+                    // LXC 备份结果通知（模板: lxc_backup_result，{status} 区分完成/失败）
+                    await sendTemplateEmail(user.email, 'lxc_backup_result', {
+                        username: user.username,
+                        vmid: vmid,
+                        status: status === 'completed' ? '完成' : '失败',
+                        detail: status === 'completed' ? '' : '原因：' + (backup.error_msg || '未知错误')
+                    });
                 }
             } catch (e) {
                 console.error('LXC 备份通知邮件发送失败:', e.message);
@@ -162,7 +168,13 @@ async function sendLxcRestoreNotification(vmid, taskId, status) {
         if (user.email && user.emailVerified) {
             try {
                 if (await shouldSendEmail(user.id, 'notify_backup_result')) {
-                    enqueueEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p>`));
+                    // LXC 恢复结果通知（模板: lxc_restore_result）
+                    await sendTemplateEmail(user.email, 'lxc_restore_result', {
+                        username: user.username,
+                        vmid: vmid,
+                        status: status === 'completed' ? '完成' : '失败',
+                        detail: status === 'completed' ? '' : '原因：' + (task.error_msg || '未知错误')
+                    });
                 }
             } catch (e) {
                 console.error('LXC 恢复通知邮件发送失败:', e.message);
@@ -235,7 +247,14 @@ async function sendBackupNotification(userId, vmId, status, filename) {
     if (user.email && user.emailVerified) {
         try {
             if (await shouldSendEmail(user.id, 'notify_backup_result')) {
-                enqueueEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
+                // VM 备份结果通知（模板: vm_backup_result，{status} 区分完成/失败）
+                var isSuccess = status === 'completed';
+                await sendTemplateEmail(user.email, 'vm_backup_result', {
+                    username: user.username,
+                    vm_name: vmName,
+                    status: isSuccess ? '完成' : '失败',
+                    detail: isSuccess ? (filename ? '备份文件：' + filename : '') : (filename ? '原因：' + filename : '')
+                });
             }
         } catch (e) {
             console.error('备份通知邮件发送失败:', e.message);
@@ -337,7 +356,13 @@ async function sendRestoreNotification(userId, vmId, statusMsg) {
     if (user.email && user.emailVerified) {
         try {
             if (await shouldSendEmail(user.id, 'notify_backup_result')) {
-                enqueueEmail(user.email, title, createEmailTemplate(title, `<p>您好，${user.username}！</p><p>${content.replace(/\*\*/g, '<strong>')}</p><p>如非本人操作，请忽略此邮件。</p>`));
+                // VM 恢复结果通知（模板: vm_restore_result）
+                await sendTemplateEmail(user.email, 'vm_restore_result', {
+                    username: user.username,
+                    vm_name: vmName,
+                    status: isSuccess ? '完成' : '失败',
+                    detail: isSuccess ? '' : (statusMsg ? '原因：' + statusMsg : '')
+                });
             }
         } catch (e) { console.error('恢复通知邮件发送失败:', e.message); }
     }

@@ -99,6 +99,87 @@
                                 </form>
                             </div>
                         </div>
+
+                        <!-- 邮件模板管理（可编辑系统邮件模板：主题/副标题/正文，支持 {变量} 占位符，可恢复默认） -->
+                        <div class="module-header">
+                            <h4 class="module-title">邮件模板</h4>
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <p class="text-muted small mb-3">编辑系统自动发送的邮件模板，点击「编辑」展开编辑器，支持富文本/源码两种模式；「可用变量」点击即可插入光标处，变量值在发送时自动替换。保存后立即生效，可随时「恢复默认」。</p>
+                                <div v-for="cat in emailTemplateCategories" :key="cat.key" class="mb-3">
+                                    <h6 class="mb-2" style="font-weight:600;color:var(--color-primary);">{{ cat.label }}</h6>
+                                    <div v-for="tpl in emailTemplatesByCategory(cat.key)" :key="tpl.code" class="border rounded mb-2" style="border-color:var(--border-color) !important;">
+                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 p-2">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <strong>{{ tpl.name }}</strong>
+                                                <span class="text-muted" style="font-size:12px;">{{ tpl.code }}</span>
+                                                <span class="text-muted" style="font-size:12px;">v{{ tpl.version }}</span>
+                                            </div>
+                                            <div class="d-flex gap-1">
+                                                <pv-button variant="table" @click="toggleEmailTemplateEdit(tpl.code)">{{ tpl.code === emailTemplateEditing ? '收起' : '编辑' }}</pv-button>
+                                                <pv-button variant="table-danger" @click="resetEmailTemplate(tpl.code)">恢复默认</pv-button>
+                                            </div>
+                                        </div>
+                                        <div v-if="tpl.code === emailTemplateEditing" class="border-top p-3" style="border-color:var(--border-color) !important;">
+                                            <div class="row g-3 mb-3">
+                                                <div class="col-md-6">
+                                                    <label class="form-label">邮件主题</label>
+                                                    <input type="text" class="form-control" v-model="emailTemplateForm.subject" placeholder="主题支持变量，如：虚拟机到期提醒">
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <label class="form-label">邮件副标题（头部标题下方）</label>
+                                                    <input type="text" class="form-control" v-model="emailTemplateForm.title" placeholder="如：虚拟机将在{days}天后到期">
+                                                </div>
+                                            </div>
+                                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                                <div class="d-flex gap-1">
+                                                    <pv-button :variant="emailTemplateMode === 'rich' ? 'glass-active' : 'glass-inactive'" size="lg" @click="switchEmailTemplateMode('rich')">富文本</pv-button>
+                                                    <pv-button :variant="emailTemplateMode === 'source' ? 'glass-active' : 'glass-inactive'" size="lg" @click="switchEmailTemplateMode('source')">源码</pv-button>
+                                                </div>
+                                                <small class="text-muted">变量格式：<code>{变量名}</code>，仅支持小写字母、数字、下划线</small>
+                                            </div>
+                                            <div class="mb-2" style="background:#fff;border-radius:8px;overflow:hidden;" v-show="emailTemplateMode === 'rich'">
+                                                <div id="emailTemplateQuill" style="min-height:200px;color:#333;"></div>
+                                            </div>
+                                            <div class="mb-2" v-show="emailTemplateMode === 'source'">
+                                                <textarea id="emailTemplateSource" class="form-control font-monospace" rows="10" v-model="emailTemplateSource" placeholder="粘贴或编辑 HTML 源码，支持 {变量} 占位符"></textarea>
+                                            </div>
+                                            <!-- 可用变量面板 -->
+                                            <div class="mb-2 p-2 rounded" style="background:rgba(255,255,255,0.04);border:1px solid var(--border-color);">
+                                                <small class="text-muted d-block mb-1">可用变量（点击插入光标处）</small>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    <span v-for="v in emailTemplateAllVariables(tpl)" :key="v.name" class="badge" style="cursor:pointer;background:color-mix(in srgb, var(--color-primary) 18%, transparent);color:var(--color-primary);border:1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);font-weight:500;" :title="v.label + '（示例：' + (v.example || '') + '）'" @click="insertEmailTemplateVar(v.name)">{{ '{' + v.name + '}' }}</span>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex gap-2">
+                                                <pv-button variant="glass" @click="saveEmailTemplate" :disabled="emailTemplateSaving">{{ emailTemplateSaving ? '保存中...' : '保存模板' }}</pv-button>
+                                                <pv-button variant="outline" size="lg" @click="previewEmailTemplate">预览</pv-button>
+                                                <pv-button variant="outline" size="lg" @click="toggleEmailTemplateEdit(tpl.code)">取消</pv-button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 邮件模板预览弹窗（非 Bootstrap，v-if + 动态 v-html，z-index 由 ModalZIndexManager 管理） -->
+                        <div v-if="emailTemplatePreviewShow" id="emailTemplatePreviewWrap" class="modal" style="display:block;background:rgba(0,0,0,0.5);" @click.self="emailTemplatePreviewShow = false">
+                            <div class="modal-dialog modal-lg modal-dialog-scrollable" @click.stop>
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">邮件预览：{{ emailTemplatePreviewSubject }}</h5>
+                                        <pv-button variant="close" @click="emailTemplatePreviewShow = false">×</pv-button>
+                                    </div>
+                                    <div class="modal-body" style="overflow-y:auto;overflow-x:hidden;background:#eef0f6;border-radius:0 0 12px 12px;">
+                                        <div v-html="emailTemplatePreviewHtml"></div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <pv-button variant="outline" size="lg" @click="emailTemplatePreviewShow = false">关闭</pv-button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                 </div>

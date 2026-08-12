@@ -4,8 +4,8 @@
 
 var db = require('../api/db');
 var pveApi = require('../api/pve-api');
-var { createEmailTemplate, getSiteName, shouldSendEmail } = require('../utils/email');
-var { enqueueEmail } = require('../queue/email-queue');
+var { shouldSendEmail } = require('../utils/email');
+var { sendTemplateEmail } = require('./email-template');
 var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 var { getRedisClient } = require('../api/redis');
 var logger = require('../utils/logger');
@@ -48,22 +48,15 @@ function todayStr() {
 async function sendDiskReminderEmail(user, disk, stage) {
   if (!user || !user.email) return;
   try {
-    var subject = '【硬盘到期提醒】' + (disk.disk_name || disk.volume_id);
-    var content = '';
-    if (stage === 'warn') {
-      content = '<p>您的数据盘 <strong>' + (disk.disk_name || disk.volume_id) + '</strong>（' + disk.capacity_gb + ' GiB）将在 ' + disk.expire_time + ' 到期。</p>';
-      content += '<p>请及时续费以免影响使用。</p>';
-    } else if (stage === 'grace') {
-      content = '<p>您的数据盘 <strong>' + (disk.disk_name || disk.volume_id) + '</strong>（' + disk.capacity_gb + ' GiB）已到期，当前处于宽限期。</p>';
-      content += '<p>请尽快续费，宽限期结束后磁盘将从虚拟机分离。</p>';
-    } else if (stage === 'expired') {
-      content = '<p>您的数据盘 <strong>' + (disk.disk_name || disk.volume_id) + '</strong>（' + disk.capacity_gb + ' GiB）已到期分离，进入保留期。</p>';
-      content += '<p>保留期内续费可重新挂载，逾期将自动销毁。</p>';
-    }
-    var siteName = await getSiteName();
-    var html = createEmailTemplate('硬盘到期提醒', content, siteName);
+    // 硬盘到期提醒（模板: disk_expiry_warn / disk_expiry_grace / disk_expiry_expired，按阶段区分文案）
+    var tplCode = stage === 'warn' ? 'disk_expiry_warn' : (stage === 'grace' ? 'disk_expiry_grace' : 'disk_expiry_expired');
+    var diskName = disk.disk_name || disk.volume_id;
     if (await shouldSendEmail(user.id, 'notify_expiry_reminder')) {
-        enqueueEmail(user.email, subject, html);
+        await sendTemplateEmail(user.email, tplCode, {
+            disk_name: diskName,
+            capacity_gb: disk.capacity_gb,
+            expire_time: disk.expire_time || ''
+        });
     }
   } catch (e) {
     logger.error('[disk-expiry] 发送提醒邮件失败:', e.message);
@@ -322,20 +315,18 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
     var totalTb = (totalGb / 1024).toFixed(2);
     var usedTb = (usedGb / 1024).toFixed(2);
 
-    var subject = '【存储容量告警】' + storage.storage + ' 使用率 ' + usedPct + '%';
-    var content = '<h3>存储容量告警</h3>';
-    content += '<p><strong>存储名：</strong>' + storage.storage + '</p>';
-    content += '<p><strong>当前使用率：</strong>' + usedPct + '%</p>';
-    content += '<p><strong>已用容量 / 总容量：</strong>' + usedTb + ' TiB / ' + totalTb + ' TiB</p>';
-    content += '<p style="color:#dc3545;"><strong>请及时扩容存储池或清理闲置磁盘。</strong></p>';
-
-    var siteName = await getSiteName();
-    var html = createEmailTemplate('存储容量告警', content, siteName);
-
+    // 存储容量告警（模板: storage_alert，发送给所有管理员）
     for (var i = 0; i < admins.rows.length; i++) {
       var admin = admins.rows[i];
       if (admin.email) {
-        try { enqueueEmail(admin.email, subject, html); } catch (e) {}
+        try {
+          await sendTemplateEmail(admin.email, 'storage_alert', {
+            storage_name: storage.storage,
+            used_pct: usedPct,
+            used_tb: usedTb,
+            total_tb: totalTb
+          });
+        } catch (e) {}
       }
     }
     logger.info('[disk-expiry] 存储容量告警邮件已发送给 ' + admins.rows.length + ' 个管理员');
