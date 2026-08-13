@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.3.1] - 2026-08-12
+
+### Changed
+- **perf(logs): 日志首次加载提速（连接池预热 + IP 归属地时间预算）**
+  - **根因（两层叠加）**：
+    1. MySQL 连接池按需建连：服务器启动后首个请求承担远程库 TCP 握手+认证（本地实测 2.4~3.7s，热查询仅 81ms）
+    2. 清 Redis 后 IP 归属地外呼阻塞：`getIpLocations` 对未命中缓存的 IP 并发外呼 UApiPro（单次最多 5s 超时），同步阻塞列表/导出响应
+  - **修复**：
+    - **连接池启动预热**：`db-core.js` 新增 `ping()`，`server.js` 在 `initDb()` 后调用（启动日志 `[mysql] 连接池预热完成`）——首请求延迟 **1.636s -> 0.291s**
+    - **IP 归属地时间预算**：`getIpLocations(ipList, { timeBudgetMs })` 用 `Promise.race([Promise.allSettled(外呼任务), delay(预算)])`；列表 500ms / 导出 2000ms；超预算外呼**不取消**、后台继续执行并写回 Redis/DB 缓存（本次留空、下次命中），0/缺省 = 原行为
+    - **uapipro api_key 60s 内存缓存**：避免并发外呼时每个外呼各查一次 DB
+    - 9 处调用点传预算（admin-logs.js / log.js 列表 x4 500ms、导出 x4 2000ms、user.js 设备列表）
+
+### Notes
+- **需服务器重启生效**（连接池预热在启动时执行）：`pm2 restart` 一次，后续新部署自动受益
+- 测试：**519 passing**（新增列表/导出预算值 + `Promise.race` 模式断言）；`check-coupling` 通过
+
 ## [3.3.0] - 2026-08-11
 
 ### 概览
