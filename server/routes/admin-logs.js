@@ -113,8 +113,9 @@ router.get('/admin/logs/operation', async (req, res) => {
             endDate: filters.endDate
         });
 
-        // 操作者 IP 归属地批量解析（全部行）
-        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }));
+        // 操作者 IP 归属地批量解析（全部行；500ms 预算：缓存命中即回填，
+        // 未命中的外呼后台继续写回缓存，不阻塞列表首屏——清 Redis 后首次打开不再卡 1-5 秒）
+        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }), { timeBudgetMs: 500 });
 
         result.rows = result.rows.map(function(r) {
             return {
@@ -156,7 +157,7 @@ router.get('/admin/logs/login', async (req, res) => {
             endDate: filters.endDate
         });
 
-        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }));
+        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }), { timeBudgetMs: 500 });
 
         result.rows = result.rows.map(function(r) {
             return {
@@ -200,7 +201,8 @@ router.get('/admin/logs/operation/export', async (req, res) => {
         });
         var rows = result.rows;
 
-        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }));
+        // 导出给 2s 预算：归属地尽量完整，但避免大量未命中 IP 串行外呼把导出拖到分钟级
+        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }), { timeBudgetMs: 2000 });
 
         // 操作类型列与列表一致：后台操作显示子域中文名（如 admin.config.log → 配置管理），
         // 具体动作在详情列；非后台操作显示完整 action
@@ -241,7 +243,8 @@ router.get('/admin/logs/login/export', async (req, res) => {
         });
         var rows = result.rows;
 
-        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }));
+        // 导出给 2s 预算：归属地尽量完整，但避免大量未命中 IP 串行外呼把导出拖到分钟级
+        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }), { timeBudgetMs: 2000 });
 
         var csvRows = ['用户,IP地址,归属地,用户代理,登陆状态,时间'];
         for (var i = 0; i < rows.length; i++) {

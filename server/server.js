@@ -479,6 +479,15 @@ httpServer.listen(PORT, async () => {
         process.exit(1);
     }
 
+    // 预热 MySQL 连接池：mysql2 按需建连，远程库握手可达数秒，
+    // 不预热则启动后首个用户请求（如首次打开日志中心）全额承担该延迟
+    try {
+        await db.ping();
+        console.log('[mysql] 连接池预热完成');
+    } catch (e) {
+        console.warn('[mysql] 连接池预热失败（不影响启动，首次请求自动建立连接）:', e.message);
+    }
+
 	    // 从 DB 加载 Redis 配置，写入 process.env 后初始化连接
 	    try {
 	        var redisConfig = await db.config.getRedis();

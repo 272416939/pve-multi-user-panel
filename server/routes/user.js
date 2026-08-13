@@ -205,8 +205,8 @@ router.post('/admin/user/:id/disable-2fa', authMiddleware, adminMiddleware, asyn
 
 router.get('/user/devices', authMiddleware, async (req, res) => {
     const devices = await db.refreshTokens.getByUserId(req.user.id);
-    // UApiPro IP 归属地：批量查询（services/ip-location.js 统一实现，去重+缓存+容错）
-    const locMap = await getIpLocations(devices.map(d => d.ip));
+    // UApiPro IP 归属地：批量查询（services/ip-location.js 统一实现，去重+缓存+容错；500ms 预算不阻塞列表）
+    const locMap = await getIpLocations(devices.map(d => d.ip), { timeBudgetMs: 500 });
     devices.forEach(d => { d.ip_location = locMap[d.ip] || ''; });
     res.json(devices);
 });

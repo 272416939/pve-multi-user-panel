@@ -52,6 +52,13 @@ async function queryAll(sql, params = []) {
     const [rows] = await getPool().query(sql, sanitizeParams(params));
     return Array.isArray(rows) ? rows : [];
 }
+// 连接池预热：启动时调用一次，提前建立第一条连接。
+// mysql2 连接池按需建连，远程库的 TCP 握手 + 认证可达数秒，
+// 若不做预热，服务器启动后首个用户请求会全额承担该延迟
+async function ping() {
+    await getPool().query('SELECT 1');
+    return true;
+}
 
 module.exports = {
     getPool,
@@ -61,4 +68,5 @@ module.exports = {
     execute,
     queryOne,
     queryAll,
+    ping,
 };

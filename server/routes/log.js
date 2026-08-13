@@ -30,8 +30,8 @@ router.get('/logs/operation', authMiddleware, async (req, res) => {
             keyword: keyword
         });
 
-        // 操作者 IP 归属地批量解析（全部行）
-        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }));
+        // 操作者 IP 归属地批量解析（全部行；500ms 预算不阻塞首屏，未命中外呼后台写回缓存）
+        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }), { timeBudgetMs: 500 });
 
         result.rows = result.rows.map(function(r) {
             return {
@@ -71,7 +71,7 @@ router.get('/logs/login', authMiddleware, async (req, res) => {
             keyword: keyword
         });
 
-        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }));
+        var locMap = await getIpLocations(result.rows.map(function(r) { return r.ip; }), { timeBudgetMs: 500 });
 
         result.rows = result.rows.map(function(r) {
             return {
@@ -117,8 +117,8 @@ router.get('/logs/operation/export', authMiddleware, async (req, res) => {
         });
         var rows = result.rows;
 
-        // 操作者 IP 归属地批量解析（全部行，详情含 IP 归属地前缀）
-        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }));
+        // 操作者 IP 归属地批量解析（全部行，详情含 IP 归属地前缀；2s 预算防大量未命中外呼拖慢导出）
+        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }), { timeBudgetMs: 2000 });
 
         var csvRows = ['用户,操作类型,详情,操作时间'];
         for (var i = 0; i < rows.length; i++) {
@@ -158,7 +158,7 @@ router.get('/logs/login/export', authMiddleware, async (req, res) => {
         });
         var rows = result.rows;
 
-        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }));
+        var locMap = await getIpLocations(rows.map(function(r) { return r.ip; }), { timeBudgetMs: 2000 });
 
         var csvRows = ['IP地址,归属地,用户代理,登陆状态,时间'];
         for (var i = 0; i < rows.length; i++) {
