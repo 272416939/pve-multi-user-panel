@@ -148,6 +148,9 @@
             $.loginLogTotal.value = res.total || 0;
             $.loginLogPage.value = res.page || 1;
             if (res.keep_count) $.logKeepCount.value = res.keep_count;
+            // 登录日志接口与操作日志对称返回 keep_admin_count：
+            // 浏览器原地刷新落在登录 tab 时 Tips 的后台操作上限同样正确（曾显示 0）
+            if (res.keep_admin_count) $.logKeepAdminCount.value = res.keep_admin_count;
         } catch (e) {
             console.error('加载登录日志失败', e);
         } finally {

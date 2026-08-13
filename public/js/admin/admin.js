@@ -1405,6 +1405,10 @@
                 $.osSwitchLogList.value = res.data || [];
                 $.osSwitchLogTotal.value = res.total || 0;
                 $.osSwitchLogSelected.value = [];
+                // 日志中心 Tips 保留上限：接口与操作/登录日志对称返回，
+                // 页面刷新落在系统切换 tab 时 Tips 同样正确（曾显示 0；判空容错防 admin-logs.js 未加载）
+                if ($.logKeepCount && res.keep_count) $.logKeepCount.value = res.keep_count;
+                if ($.logKeepAdminCount && res.keep_admin_count) $.logKeepAdminCount.value = res.keep_admin_count;
             } else {
                 $.osSwitchLogList.value = [];
                 $.osSwitchLogTotal.value = 0;
