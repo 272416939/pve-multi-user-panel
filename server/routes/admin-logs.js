@@ -174,7 +174,9 @@ router.get('/admin/logs/login', async (req, res) => {
         });
 
         var keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
-        res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit, keep_count: keepCount });
+        var keepAdminCount = parseInt(await db.config.get('log:keep_admin_count')) || 5000;
+        // 登录日志与操作日志对称返回两个上限：页面刷新落在登录 tab 时 Tips 同样完整（曾缺字段显示 0）
+        res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit, keep_count: keepCount, keep_admin_count: keepAdminCount });
     } catch (e) {
         console.error('[admin-logs] 登录日志查询失败:', e.message);
         res.status(500).json({ error: safeError(e) });

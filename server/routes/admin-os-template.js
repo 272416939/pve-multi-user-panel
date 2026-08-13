@@ -371,7 +371,10 @@ router.get('/admin/os-switch-logs', async (req, res) => {
         const logs = await db.vmOsSwitchLogs.getListWithPaging(filters);
         // countWithFilters 返回 { c: N } 行对象，转数字 total（接口契约：total 为数字，供前端分页/条数统计）
         const countRow = await db.vmOsSwitchLogs.countWithFilters(filters);
-        res.json({ success: true, data: logs, total: countRow ? (countRow.c || 0) : 0, page: filters.page, limit: filters.limit });
+        // 日志中心 Tips 保留上限：页面刷新落在系统切换 tab 时同样完整（与操作/登录日志接口对称，曾缺字段显示 0）
+        const keepCount = parseInt(await db.config.get('log:keep_count')) || 5000;
+        const keepAdminCount = parseInt(await db.config.get('log:keep_admin_count')) || 5000;
+        res.json({ success: true, data: logs, total: countRow ? (countRow.c || 0) : 0, page: filters.page, limit: filters.limit, keep_count: keepCount, keep_admin_count: keepAdminCount });
     } catch (e) {
         res.status(500).json({ error: safeError(e) });
     }
