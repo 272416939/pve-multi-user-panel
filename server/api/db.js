@@ -36,6 +36,9 @@ module.exports = {
     now: dbCore.mysqlNow,
     today: dbCore.mysqlToday,
 
+    // 连接池预热（启动时调用，消除首个请求的建连延迟）
+    ping: dbCore.ping,
+
     // V3-14 修复：敏感操作审计日志
     auditLogs: dbMessaging.auditLogs,
 

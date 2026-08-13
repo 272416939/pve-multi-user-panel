@@ -29,6 +29,10 @@ const ENABLED_CACHE_TTL = 60 * 1000;
 let enabledCache = null;
 let enabledCacheTime = 0;
 
+// uapipro API Key 缓存（60s TTL）：外呼并发时避免每个外呼各查一次 DB（解密开销亦省）
+let apiKeyCache = null;
+let apiKeyCacheTime = 0;
+
 /** 读取 uapipro 启用开关（60s 内存缓存，保存配置时调用 invalidateEnabledCache 失效） */
 async function isUapiProEnabled() {
     var now = Date.now();
@@ -44,10 +48,27 @@ async function isUapiProEnabled() {
     return enabledCache;
 }
 
-/** 保存 UApiPro 配置后失效开关缓存（admin-config.js 调用） */
+/** 读取 uapipro API Key（60s 内存缓存，与启用开关共用失效入口） */
+async function getApiKeyCached() {
+    var now = Date.now();
+    if (apiKeyCache !== null && now - apiKeyCacheTime < ENABLED_CACHE_TTL) {
+        return apiKeyCache;
+    }
+    try {
+        apiKeyCache = decrypt(await db.config.get('uapipro:api_key') || '');
+    } catch (e) {
+        apiKeyCache = '';
+    }
+    apiKeyCacheTime = now;
+    return apiKeyCache;
+}
+
+/** 保存 UApiPro 配置后失效开关/Key 缓存（admin-config.js 调用） */
 function invalidateEnabledCache() {
     enabledCache = null;
     enabledCacheTime = 0;
+    apiKeyCache = null;
+    apiKeyCacheTime = 0;
 }
 
 // 同一 IP 的进行中外呼（single-flight 去重）：
@@ -140,7 +161,7 @@ function stripAdminSuffix(seg) {
 
 /** 从 uapis.cn 查询（真实外呼，无缓存） */
 async function loadFromUapi(ip) {
-    var apiKey = decrypt(await db.config.get('uapipro:api_key') || '');
+    var apiKey = await getApiKeyCached();
     var headers = {};
     if (apiKey) headers['X-API-Key'] = apiKey;
     var resp = await axios.get(API_URL, {
@@ -222,9 +243,15 @@ async function queryIpLocation(ip) {
  * 批量获取 IP 归属地（去重 + 先批量读 DB 持久缓存 + 未命中并发外呼写回，失败返回空串）
  * 供列表类接口（日志页/设备列表）使用，避免 N 次串行外呼
  * @param {string[]} ipList
+ * @param {Object} [opts] - { timeBudgetMs }：外呼阶段的耗时预算（毫秒），0/缺省 = 无限制（等待全部完成）。
+ *   清 Redis 后缓存未命中的 IP 需外呼（每个最多 5s 超时）——列表接口传预算保证首屏不阻塞；
+ *   超预算未完成的外呼不取消，后台继续执行并写回 Redis/DB 缓存（getIpLocation 内部完成），
+ *   本次响应归属地留空，下次加载命中缓存零外呼
  * @returns {Promise<Object>} { ip: location } 映射
  */
-async function getIpLocations(ipList) {
+async function getIpLocations(ipList, opts) {
+    var timeBudgetMs = (opts && opts.timeBudgetMs > 0) ? opts.timeBudgetMs : 0;
+    var startedAt = Date.now();
     var locMap = {};
     var unique = Array.from(new Set((ipList || []).filter(Boolean)));
     if (unique.length === 0) return locMap;
@@ -240,12 +267,28 @@ async function getIpLocations(ipList) {
     // 未命中的 IP 走单查链路（Redis → 外呼 → 写回 DB）
     var missing = unique.filter(function (ip) { return !locMap[ip]; });
     if (missing.length > 0) {
-        var results = await Promise.allSettled(missing.map(function (ip) { return getIpLocation(ip); }));
-        missing.forEach(function (ip, i) {
-            if (results[i].status === 'fulfilled' && results[i].value) locMap[ip] = results[i].value;
-        });
+        // 每个任务完成后写入共享 locMap（JS 单线程无竞态）；
+        // getIpLocation 内部已把成功结果写回 Redis/DB 缓存
+        var settled = Promise.allSettled(missing.map(function (ip) {
+            return getIpLocation(ip).then(function (loc) { if (loc) locMap[ip] = loc; });
+        }));
+        if (timeBudgetMs > 0) {
+            var remaining = timeBudgetMs - (Date.now() - startedAt);
+            if (remaining > 0) {
+                await Promise.race([settled, delay(remaining)]);
+            }
+            // 预算耗尽即返回：未完成的外呼继续后台执行并写回缓存，
+            // 本次响应归属地留空，下次加载命中缓存零外呼（不丢数据、不增费用）
+        } else {
+            await settled;
+        }
     }
     return locMap;
+}
+
+/** 延迟工具（时间预算用） */
+function delay(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
 }
 
 module.exports = { getIpLocation, queryIpLocation, getIpLocations, normalizeIp, invalidateEnabledCache };
