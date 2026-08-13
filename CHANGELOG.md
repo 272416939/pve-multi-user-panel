@@ -1,5 +1,22 @@
 # Changelog
 
+## [3.3.2] - 2026-08-13
+
+### Fixed
+- **fix(logs): 页面刷新落在登录/系统切换 tab 时 Tips 后台操作上限显示 0**
+  - **问题**：日志中心 Tips 两个保留上限（用户操作 5000 / 后台操作 5000）由「当前激活 tab 的接口」回填、前端初始 `ref(0)`。浏览器原地刷新后 tab 从 localStorage 恢复、只加载该 tab 接口，导致：
+    - 「登录日志」tab 刷新 -> 后台操作上限显示 0（接口缺 `keep_admin_count`）
+    - 「系统切换」tab 刷新 -> 两个上限都显示 0（接口两个值都不返）
+  - **修复（前后端对称）**：
+    - 后端 `/admin/logs/login` 补返 `keep_admin_count`；`/admin/os-switch-logs` 补返 `keep_count` + `keep_admin_count`
+    - 前端 `loadLoginLogs` / `loadOsSwitchLogs` 同步更新两个上限（truthy 判空容错）
+  - 缓存版本 v145 -> v146
+- 新增三接口（operation/login/os-switch）keep 字段对称断言
+
+### Notes
+- 验证：全量测试 **520 passing**；浏览器冒烟三场景（操作日志初始 / 登录日志刷新 / 系统切换刷新）Tips 均显示 `5000/5000`
+- 经验沉淀：多 tab 页面共享展示区字段，所有 tab 接口必须对称返回；验证需覆盖「每个 tab 点击 -> 浏览器刷新」路径
+
 ## [3.3.1] - 2026-08-12
 
 ### Changed
