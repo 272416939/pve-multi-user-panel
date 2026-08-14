@@ -232,6 +232,57 @@
                 <!-- end settings(smtp) -->
 <div v-if="activeSection === 'settings'">
 
+                <!-- 爱快节点设置 -->
+                <div v-if="activeTab === 'ikuai'">
+                    <div class="module-header">
+                        <h4 class="module-title">爱快节点设置</h4>
+                    </div>
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">配置爱快软路由连接信息（用于 DHCP 租约查询、端口映射同步、接口列表、VLAN/子网）。支持 http 与 https，密码加密存储，保存后显示为打码值；保存后立即生效，无需重启。</p>
+                            <form @submit.prevent="saveIkuaiConfig">
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">爱快地址</label>
+                                        <input type="text" class="form-control" v-model="ikuaiConfig.host" placeholder="http://192.168.1.1:80 或 https://192.168.1.1:443">
+                                        <small class="text-muted">需包含协议（http:// 或 https://）与端口；留空表示停用爱快同步</small>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">用户名</label>
+                                        <input type="text" class="form-control" v-model="ikuaiConfig.username" placeholder="路由器登录用户名" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">密码</label>
+                                        <input type="password" class="form-control" v-model="ikuaiConfig.password" placeholder="留空则不修改" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" id="ikuaiStrictTls" v-model="ikuaiConfig.strict_tls">
+                                            <label class="form-check-label" for="ikuaiStrictTls">TLS 严格证书验证</label>
+                                        </div>
+                                        <small class="text-muted">爱快使用自签证书时请关闭（默认关闭）。开启后将验证 HTTPS 连接的 TLS 证书。</small>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <pv-button type="button" variant="outline" @click="testIkuaiConfig" :disabled="ikuaiTesting">
+                                        {{ ikuaiTesting ? '测试中...' : '测试连接' }}
+                                    </pv-button>
+                                    <pv-button type="submit" variant="glass" :disabled="ikuaiConfigSaving">
+                                        {{ ikuaiConfigSaving ? '保存中...' : '保存配置' }}
+                                    </pv-button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <!-- end settings(ikuai) -->
+
                 <!-- PVE 节点设置 -->
                 <div v-if="activeTab === 'pve'">
                     <div class="module-header">

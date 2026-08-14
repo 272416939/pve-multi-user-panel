@@ -18,6 +18,9 @@
     $.smtpConfig = ref({ host: '', port: 587, secure: false, user: '', password: '', from: '', from_name: '', enabled: false });
     $.emailQueueStats = ref(null);
     $.pveConfig = ref({ host: '', api_token: '', ssh_host: '', ssh_port: 22, ssh_user: 'root', ssh_password: '', strict_tls: false });
+    $.ikuaiConfig = ref({ host: '', username: '', password: '', strict_tls: false });
+    $.ikuaiTesting = ref(false);
+    $.ikuaiConfigSaving = ref(false);
     $.reminderConfig = ref({ days1: 7, days2: 3, days3: 1 });
     $.snapshotConfig = ref({ max_per_vm: 5, daily_create_limit: 20, daily_restore_limit: 10 });
     $.storageList = ref([]);
@@ -283,6 +286,39 @@
         } catch (e) {
             alert('保存失败: ' + (e.message || '未知错误'));
         }
+    };
+
+    // 爱快节点配置（保存后服务端热加载，立即生效）
+    $.loadIkuaiConfig = async function() {
+        try {
+            var config = await api('/admin/ikuai/config');
+            $.ikuaiConfig.value = config;
+        } catch (e) {
+            console.warn('爱快配置加载失败（服务可能需要重启）:', e.message || e);
+        }
+    };
+
+    $.saveIkuaiConfig = async function() {
+        $.ikuaiConfigSaving.value = true;
+        try {
+            await api('/admin/ikuai/config', { method: 'PUT', body: $.ikuaiConfig.value });
+            alert('爱快配置保存成功');
+            await $.loadIkuaiConfig();
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        }
+        $.ikuaiConfigSaving.value = false;
+    };
+
+    $.testIkuaiConfig = async function() {
+        $.ikuaiTesting.value = true;
+        try {
+            var result = await api('/admin/ikuai/test', { method: 'POST', body: {} });
+            alert(result.message || '连接成功');
+        } catch (e) {
+            alert('测试失败: ' + (e.message || '未知错误'));
+        }
+        $.ikuaiTesting.value = false;
     };
 
     $.testSmtpConfig = async function() {

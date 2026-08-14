@@ -2,31 +2,102 @@ const db = require('./db');
 
 class IkuaiApi {
     constructor() {
-        this.baseUrl = process.env.IKUAI_HOST;
-        this.username = process.env.IKUAI_USER || '';
-        this.password = process.env.IKUAI_PASSWORD || '';
+        // 配置不再于模块加载时读 .env，改为惰性从面板 DB 加载（60s 内存缓存）；
+        // 保存配置后 reloadConfig() 清缓存立即生效，无需重启
+        this.config = null;          // { host, username, password, strict_tls }
+        this._configLoadedAt = 0;
+        this._configTTL = 60000;
         this.client = null;
+        this._clientConfigKey = '';  // 当前 client 对应的配置签名，变化时重建 client
     }
 
     isConfigured() {
-        return !!(this.username && this.password);
+        // 同步语义：判断已加载的内存配置（启动预热/调用前需先 await ensureConfig()）
+        var c = this.config;
+        if (!c) {
+            // 兜底：冷启动未预热时异步补载（本轮返回未配置，下次调用生效）
+            this.ensureConfig().catch(function () {});
+            return false;
+        }
+        return !!(c.host && c.username && c.password);
+    }
+
+    // 配置加载：面板 DB 优先；仅当从未在面板配置过（DB 无 ikuai:host 行）且 .env 存在 IKUAI_* 时，
+    // 用 .env 一次性迁移入 DB。面板显式清空地址 = 停用，不回退 .env（绝不覆盖面板已有配置）。
+    async ensureConfig() {
+        var now = Date.now();
+        if (this.config && (now - this._configLoadedAt) < this._configTTL) return this.config;
+        try {
+            var cfg = await db.config.getIkuai();
+            var hostRow = await db.config.get('ikuai:host'); // undefined = 从未在面板保存过
+            if (!cfg.host && hostRow === undefined) {
+                var envHost = process.env.IKUAI_HOST || '';
+                var envUser = process.env.IKUAI_USER || '';
+                var envPass = process.env.IKUAI_PASSWORD || '';
+                if (envHost && envUser && envPass) {
+                    cfg = { host: envHost, username: envUser, password: envPass, strict_tls: false };
+                    try {
+                        await db.config.setIkuai(cfg);
+                        console.log(`[ikuai] 已从 .env 迁移配置到面板 DB (${envHost})`);
+                    } catch (e) {
+                        console.error('[ikuai] .env 配置迁移写入 DB 失败（本次继续使用 env 兜底）:', e.message);
+                    }
+                } else {
+                    cfg = null;
+                }
+            } else if (!cfg.host) {
+                cfg = null; // 面板已显式清空地址：保持停用
+            }
+            this.config = cfg;
+            this._configLoadedAt = Date.now();
+            return cfg;
+        } catch (e) {
+            console.error('[ikuai] 读取配置失败:', e.message);
+            return this.config; // DB 故障时沿用旧缓存（若有），避免配置丢失
+        }
+    }
+
+    // 热加载：清空配置缓存 + 重置登录态，下次调用自动重读 DB 并重建连接
+    async reloadConfig() {
+        this.config = null;
+        this._configLoadedAt = 0;
+        this._clientConfigKey = '';
+        if (this.client) {
+            try { this.client.logout(); } catch (e) {}
+            this.client = null;
+        }
+        await this.ensureConfig();
     }
 
     async _ensureLogin() {
+        var cfg = await this.ensureConfig();
+        if (!cfg || !cfg.host || !cfg.username || !cfg.password) {
+            throw new Error('爱快未配置（请在 系统设置 → 爱快节点设置 中配置）');
+        }
+        var key = cfg.host + '|' + cfg.username + '|' + cfg.password + '|' + (cfg.strict_tls ? '1' : '0');
+        if (this._clientConfigKey !== key) {
+            // 配置变化：丢弃旧会话并重建 client
+            if (this.client) {
+                try { this.client.logout(); } catch (e) {}
+                this.client = null;
+            }
+            this._clientConfigKey = key;
+        }
         if (this.client && this.client.isLoggedIn) return;
-        await this._login();
+        await this._login(cfg);
     }
 
-    async _login() {
+    async _login(cfg) {
         if (!this.client) {
             const { IKuaiClient } = await import('../sdk/ikuai-sdk/ikuai-sdk.mjs');
-            this.client = new IKuaiClient(this.baseUrl, {
-                debug: process.env.DEBUG === 'true'
+            this.client = new IKuaiClient(cfg.host, {
+                debug: process.env.DEBUG === 'true',
+                insecure: !cfg.strict_tls // 默认容忍自签证书；开启严格验证后校验证书
             });
         }
         try {
-            await this.client.login(this.username, this.password);
-            console.log(`[ikuai] 登录成功 (${this.baseUrl})`);
+            await this.client.login(cfg.username, cfg.password);
+            console.log(`[ikuai] 登录成功 (${cfg.host})`);
         } catch (e) {
             console.error('[ikuai] 登录失败:', e.message);
             throw e;
@@ -44,10 +115,10 @@ class IkuaiApi {
             }
             throw new Error(result?.ErrMsg || `Result=${result?.Result}`);
         } catch (e) {
-            // 重新登录前先清空旧会话状态，防止过期 cookie 干扰
+            // 重新登录前先清空旧会话状态，防止过期 cookie 干扰（logout 后 isLoggedIn=false，_ensureLogin 会重新登录）
             try {
-                this.client.logout();
-                await this.client.login(this.username, this.password);
+                if (this.client) this.client.logout();
+                await this._ensureLogin();
                 const retryResult = await this.client.call(funcName, action, param);
                 if (retryResult?.Result === 30000) return retryResult.Data;
                 throw new Error(retryResult?.ErrMsg || `Result=${retryResult?.Result}`);
@@ -56,6 +127,13 @@ class IkuaiApi {
                 throw retryErr;
             }
         }
+    }
+
+    // 测试连接（只读验证：登录 + 拉取 DHCP 租约；设备不支持 system/sysstat 等函数名，用业务只读接口验证连通性）
+    async testConnection() {
+        var data = await this._call('dhcp_lease', 'show', { TYPE: 'total,data', ORDER_BY: 'timeout', ORDER: 'desc', limit: '0,1000' });
+        var total = (data && data.total !== undefined) ? data.total : (data && Array.isArray(data.data) ? data.data.length : 0);
+        return { leaseCount: total };
     }
 
     async getPortForwards() {
