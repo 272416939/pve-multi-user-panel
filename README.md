@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v3.3.2-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v3.3.3-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -255,11 +255,14 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 
 ### ikuai 软路由配置
 
-| 变量 | 说明 | 示例 |
-|------|------|------|
-| `IKUAI_HOST` | ikuai 软路由地址 | `http://10.10.10.1` |
-| `IKUAI_USER` | ikuai 用户名 | — |
-| `IKUAI_PASSWORD` | ikuai 密码 | — |
+> **v3.3.3 起：ikuai 配置已迁移到面板管理**，在 **系统设置 > 爱快节点设置** 中在线配置（地址/用户名/密码/TLS 开关），密码 AES-256-GCM 加密存储，**保存后立即生效，无需重启**（支持 http/https + 自签证书）。`.env` 中的 `IKUAI_*` 变量已废弃，仅首次启动时一次性迁移入 DB（DB 从未配置时）。**请勿再往 .env 添加爱快配置。**
+
+| 配置项 | 说明 |
+|--------|------|
+| `ikuai:host` | ikuai 软路由地址（http/https） |
+| `ikuai:username` | ikuai 用户名 |
+| `ikuai:password` | ikuai 密码（AES-256-GCM 加密存储，掩码回显） |
+| `ikuai:strict_tls` | TLS 严格证书校验开关（默认关，容忍自签证书） |
 
 > **注意:** `SITE_URL` 部署在反向代理环境中必填，否则邮件链接会使用内网 IP。ikuai 配置仅后端使用，不会在前端展示。
 

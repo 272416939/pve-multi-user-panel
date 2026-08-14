@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.3.3] - 2026-08-13
+
+### Added
+- **feat(ikuai): 爱快配置迁移面板在线管理，支持 http/https 与热加载**
+  - 爱快软路由配置从 `.env` 环境变量迁移至面板 MySQL DB（`ikuai:host` / `ikuai:username` / `ikuai:password` / `ikuai:strict_tls`）
+  - 密码 AES-256-GCM 加密存储（掩码回显 + `isMasked` 防回写）；`.env.example` 删除爱快配置块
+  - `ikuai-api.js` 重构：构造函数不再读 process.env，改为**惰性 DB 加载 + 60s 内存 TTL 缓存**；面板 DB 优先，`.env` 仅在 DB 从未配置时一次性迁移
+  - **保存后热加载**（`reloadConfig()` 清缓存 + 重置 client 登录态，立即生效无需重启）；面板显式清空 host = 停用，绝不回退 .env
+  - 新增「爱快节点设置」表单（PVE 节点设置上方）：地址/用户名/密码/TLS 开关/测试连接按钮，说明「保存后立即生效，无需重启」
+  - 新增 `GET/PUT /admin/ikuai/config` + `POST /admin/ikuai/test`（限速 + 审计 diff + safeError 不泄露第三方错误）
+  - SDK 支持 **http/https**（按 url.protocol 选 node:http/https）+ 自签证书容忍（严格校验开关默认关）+ keepAlive + 8s 超时
+  - 删除 `ikuai-sdk.js` 死副本（-222 行，零引用）
+
+### Notes
+- **重要：勿再往 .env 添加爱快配置**（面板 DB 为唯一来源，env 仅首次迁移）
+- 部署注意：存量环境重启后自动从 .env 一次性迁移入 DB（仅当 DB 无 `ikuai:host` 行）；之后以面板配置为准
+- 真实设备不支持 https / system/sysstat；测试连接走 dhcp_lease 只读
+- 测试：**520 passing**；`check-coupling` 通过；真实设备冒烟（迁移/加密/热加载/端口转发写入回滚）全 PASS
+
 ## [3.3.2] - 2026-08-13
 
 ### Fixed
