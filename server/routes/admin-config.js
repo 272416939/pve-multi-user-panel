@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
 const pveApi = require('../api/pve-api');
+const ikuaiApi = require('../api/ikuai-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { resetTransporterCache } = require('../utils/email');
 const { sendTemplateEmail } = require('../services/email-template');
@@ -680,6 +681,84 @@ router.post('/admin/cache/clear', authMiddleware, adminMiddleware, async (req, r
     } catch (e) {
         console.error('[admin] cache clear:', e.message);
         res.status(500).json({ error: '清除缓存失败' });
+    }
+});
+
+// ==================== 爱快节点配置（面板在线管理，支持热加载） ====================
+
+router.get('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var config = await db.config.getIkuai();
+        res.json({
+            host: config.host || '',
+            username: config.username || '',
+            password: maskSecret(config.password),
+            strict_tls: config.strict_tls || false
+        });
+    } catch (error) {
+        console.error('获取爱快配置失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
+router.put('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var { host, username, password, strict_tls } = req.body;
+        host = String(host || '').trim();
+        // 协议白名单 + 长度校验（SSRF 防护：仅 http/https；留空表示停用爱快）
+        if (host && !/^https?:\/\/\S+$/i.test(host)) {
+            return res.status(400).json({ error: '爱快地址必须以 http:// 或 https:// 开头' });
+        }
+        if (host.length > 200) return res.status(400).json({ error: '爱快地址过长' });
+        username = String(username || '').trim();
+        if (username.length > 64) return res.status(400).json({ error: '用户名过长' });
+        // 保存前取旧配置（审计 diff 用；密码只记「已更新」标记，不记录原文）
+        var oldIkuai = await db.config.getIkuai();
+        var pwdChanged = password !== undefined && !isMasked(password);
+        // 脱敏值跳过，不覆盖原值
+        var configToSave = {
+            host: host,
+            username: username,
+            password: (password !== undefined && !isMasked(password)) ? password : undefined,
+            strict_tls: !!strict_tls
+        };
+        await db.config.setIkuai(configToSave);
+        // 热加载：清空配置缓存并重置登录态，下次调用立即使用新配置（无需重启）
+        await ikuaiApi.reloadConfig();
+        // 操作审计：更新爱快节点配置（DB 新旧值字段级 diff，不记录密码原文）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            var changes = buildFieldDiff(oldIkuai, await db.config.getIkuai(), [
+                { key: 'host', label: '爱快地址' },
+                { key: 'username', label: '用户名' },
+                { key: 'strict_tls', label: '严格TLS', bool: true }
+            ]);
+            if (pwdChanged) changes.push('密码 已更新');
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.ikuai', resourceType: 'config', resourceId: 'ikuai', details: '更新爱快节点配置；变更:' + changes.join(', '), req });
+            }
+        } catch (e) {}
+        res.json({ message: '爱快配置保存成功' });
+    } catch (error) {
+        console.error('更新爱快配置失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
+// 测试连接：真实登录爱快并执行只读查询验证连通性（不产生任何写操作）
+router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        // 外呼真实设备：走可配置限速（与 ikuai_query 同规则，独立 key）
+        var rateLimitResult = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-test:' + req.user.id);
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ error: '测试过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+        }
+        var info = await ikuaiApi.testConnection();
+        res.json({ message: '连接成功', info: info || null });
+    } catch (e) {
+        console.error('[ikuai] 测试连接失败:', e.message);
+        // 不透传第三方错误原文，统一走 safeError（详情见服务端日志）
+        res.status(400).json({ error: safeError(e) });
     }
 });
 

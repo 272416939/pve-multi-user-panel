@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { request } from 'node:http';
+import https from 'node:https';
 
 /**
  * 爱快软路由 API SDK
@@ -10,15 +11,18 @@ export class IKuaiClient {
   #cookie = '';
   #loggedIn = false;
   #debug = false;
+  #insecure = true;
 
   /**
-   * @param {string} baseUrl  路由器地址，如 http://10.10.10.1
+   * @param {string} baseUrl  路由器地址，如 http://10.10.10.1 或 https://10.10.10.1:8443
    * @param {object} [options]
    * @param {boolean} [options.debug]  是否打印请求日志
+   * @param {boolean} [options.insecure]  https 时是否容忍自签证书（默认 true；false = 严格验证）
    */
   constructor(baseUrl, options = {}) {
     this.#baseUrl = baseUrl.replace(/\/+$/, '');
     this.#debug = options.debug ?? false;
+    this.#insecure = options.insecure !== false;
   }
 
   /** MD5 工具 */
@@ -52,12 +56,16 @@ export class IKuaiClient {
 
     this.#log(`→ ${method} ${url.pathname}`, isFormData ? '(form)' : body);
 
+    // http/https 按协议自动选择请求模块；https 容忍自签证书时挂 rejectUnauthorized:false 的 Agent
+    const isHttps = url.protocol === 'https:';
+    const reqFn = isHttps ? https.request : request;
+    const reqOptions = { method, headers, timeout: 8000 };
+    if (isHttps && this.#insecure) {
+      reqOptions.agent = new https.Agent({ rejectUnauthorized: false, keepAlive: true });
+    }
+
     return new Promise((resolve, reject) => {
-      const req = request(url, {
-        method,
-        headers,
-        timeout: 8000,
-      }, (res) => {
+      const req = reqFn(url, reqOptions, (res) => {
         // 保存 cookie（同名 cookie 替换，避免旧过期 session 干扰新登录）
         const setCookie = res.headers['set-cookie'];
         if (setCookie) {

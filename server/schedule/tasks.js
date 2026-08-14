@@ -288,6 +288,8 @@ function initScheduledTasks() {
     });
 
     setTimeout(async () => {
+        // 配置已迁移到面板 DB：先加载（含 .env 首次迁移），再判断是否配置
+        await ikuaiApi.ensureConfig();
         if (ikuaiApi.isConfigured()) {
             try {
                 await syncPortForwardsFromIkuai();

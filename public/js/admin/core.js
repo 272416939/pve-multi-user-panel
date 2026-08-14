@@ -313,6 +313,7 @@ watch($.user, function(u) {
                 $.loadEmailTemplates ? $.loadEmailTemplates() : Promise.resolve(),
                 $.loadEmailShell ? $.loadEmailShell() : Promise.resolve(),
                 $.loadPveConfig(),
+                $.loadIkuaiConfig(),
                 $.loadRedisConfig(),
                 $.loadLogConfig ? $.loadLogConfig() : Promise.resolve(),
                 $.loadSnapshotConfig(),
@@ -680,7 +681,7 @@ watch($.user, function(u) {
     $.switchAdminTab = function(tab) {
         // Determine which group this tab belongs to
         var manageTabs = ['users', 'cdk', 'messages'];
-        var settingsTabs = ['smtp', 'pve', 'snapshot-backup', 'network', 'pay', 'site', 'uapipro'];
+        var settingsTabs = ['smtp', 'ikuai', 'pve', 'snapshot-backup', 'network', 'pay', 'site', 'uapipro'];
         var section;
         var submenuId;
 
@@ -712,6 +713,7 @@ watch($.user, function(u) {
             'cdk': 'manage-cdk',
             'messages': 'manage-messages',
             'smtp': 'settings-smtp',
+            'ikuai': 'settings-ikuai',
             'pve': 'settings-pve',
             'snapshot-backup': 'settings-snapshot-backup',
             'network': 'settings-network',

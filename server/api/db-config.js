@@ -95,6 +95,36 @@ const config = {
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:ssh_password', sshPassword]);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['pve:strict_tls', pveConfig.strict_tls ? '1' : '0']);
     },
+    // 爱快路由器配置（面板在线管理；.env 仅作首次迁移种子，迁移后即清空）
+    getIkuai: async () => {
+        const keys = ['ikuai:host', 'ikuai:username', 'ikuai:password', 'ikuai:strict_tls'];
+        const placeholders = keys.map(() => '?').join(',');
+        const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
+        const map = {};
+        rows.forEach(r => { map[r.key] = r.value; });
+        const { decrypt } = require('../utils/crypto-utils');
+        return {
+            host: map['ikuai:host'] || '',
+            username: map['ikuai:username'] || '',
+            password: decrypt(map['ikuai:password'] || ''),
+            strict_tls: map['ikuai:strict_tls'] === '1'
+        };
+    },
+    setIkuai: async (ikuaiConfig) => {
+        const { encrypt, isMasked } = require('../utils/crypto-utils');
+        const current = await config.getIkuai();
+        // 加密敏感字段，脱敏值跳过（保留旧值）
+        var password = ikuaiConfig.password;
+        if (password !== undefined && !isMasked(password)) {
+            password = encrypt(String(password).trim());
+        } else {
+            password = encrypt(current.password); // 保留旧值（重新加密）
+        }
+        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:host', ikuaiConfig.host ?? '']);
+        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:username', ikuaiConfig.username ?? '']);
+        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:password', password]);
+        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:strict_tls', ikuaiConfig.strict_tls ? '1' : '0']);
+    },
     getRedis: async () => {
         const keys = ['redis:host', 'redis:port', 'redis:password', 'redis:db', 'redis:prefix'];
         const placeholders = keys.map(() => '?').join(',');

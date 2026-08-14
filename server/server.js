@@ -488,6 +488,19 @@ httpServer.listen(PORT, async () => {
         console.warn('[mysql] 连接池预热失败（不影响启动，首次请求自动建立连接）:', e.message);
     }
 
+    // 预热爱快配置（面板 DB 优先 + .env 首次迁移）：启动后首个爱快请求前配置已就绪
+    try {
+        const ikuaiApi = require('./api/ikuai-api');
+        await ikuaiApi.ensureConfig();
+        if (ikuaiApi.isConfigured()) {
+            console.log('[ikuai] 配置已加载（面板在线管理，支持热加载）');
+        } else {
+            console.log('[ikuai] 未配置爱快（系统设置 → 爱快节点设置）');
+        }
+    } catch (e) {
+        console.warn('[ikuai] 配置预热失败（首次调用时自动加载）:', e.message);
+    }
+
 	    // 从 DB 加载 Redis 配置，写入 process.env 后初始化连接
 	    try {
 	        var redisConfig = await db.config.getRedis();
