@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.3.4] - 2026-08-14
+
+### Fixed
+- **fix(log): 邮件模板子域未映射致操作类型显示原始 action**
+  - **问题**：日志中心后台操作「操作类型」列显示原始 action 字符串（`admin.email-template.update`）
+  - **根因**：`admin.email-template.update/reset` 审计埋点未注册进 `ADMIN_SUB_CATEGORIES` 白名单 -> `subCategoryName` 返回空串 -> 前端 `sub_category_name || action` 与 CSV 导出双处兜底直显原始 action
+  - **修复**：`ADMIN_SUB_CATEGORIES` 补 `email-template` -> 「邮件模板」；`admin-template-logs.js` 后台操作筛选下拉手动补 `<option value="email-template">邮件模板</option>`（两处同步）
+  - 缓存版本 v147 -> v148
+
+### Notes
+- 验证：70 项测试通过（含子域白名单断言）、`check-coupling` 通过、冒烟映射确认 `email-template` -> 「邮件模板」
+- 经验沉淀：新增 `admin.<子域>.<动作>` 埋点后必须核对 `ADMIN_SUB_CATEGORIES` 键 + 前端下拉 option 两处同步
+
 ## [3.3.3] - 2026-08-13
 
 ### Added
