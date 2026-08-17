@@ -78,6 +78,7 @@
                             <option value="disk">磁盘管理</option>
                             <option value="vm,lxc">虚拟机管理</option>
                             <option value="package,template,os-template">套餐模板</option>
+                            <option value="email-template">邮件模板</option>
                             <option value="package-group">套餐分组</option>
                             <option value="cdk">CDK管理</option>
                             <option value="backup">备份管理</option>
