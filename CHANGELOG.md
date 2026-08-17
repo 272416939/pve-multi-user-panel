@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.3.5] - 2026-08-17
+
+### Fixed
+- **fix(auth): 接入 refresh_tokens 过期清理定时任务，批量撤销补设备缓存失效**
+  - **问题 1**：`refreshTokens.cleanup()` 定义了却从未被调度（死代码），`refresh_tokens` 表只增不减，长期运行导致表无限膨胀
+  - **修复 1**：`server/schedule/tasks.js` 新增 `cleanupExpiredRefreshTokens()` 定时任务，每日凌晨 3 点 + 服务启动时各执行一次（复用分布式锁 `lock:refresh-tokens-cleanup`），实测首轮清理积压 **204 条**过期/已撤销记录
+  - **问题 2**：批量撤销路径（改密/下线其他/全部设备/admin 强制改密下线/找回密码重置）不失效设备缓存，旧 token 最长 60s 内仍能通过设备校验
+  - **修复 2**：`server/middleware/auth.js` 新增并导出 `clearDeviceCache()`（deviceCache 全量清空），补齐 4 处批量撤销路径（`user.js` 改密 + 下线设备、`admin-user.js` 强制下线、`auth.js` 重置密码）
+
+### Notes
+- 验证：`node --check` × 5 文件、`check-coupling` 8 项断言、全量测试 **520 passing, 0 failing**、冒烟确认过期删/未过期留
+- **线上生效需 `pm2 restart`**（启动时自动执行一次清理，存量积压一次性清掉）
+- 架构结论：维持「MySQL 主存 + Redis 可选缓存」方案，不迁移纯 Redis（Redis 宕机=全站无法登录）
+
 ## [3.3.4] - 2026-08-14
 
 ### Fixed
