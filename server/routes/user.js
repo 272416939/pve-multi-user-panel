@@ -17,7 +17,7 @@ const { sendTemplateEmail } = require('../services/email-template');
 const { hashPassword, verifyPassword } = require('../utils/password-hash');
 const cacheStore = require('../utils/cache-store');
 const { getIpLocation, getIpLocations } = require('../services/ip-location');
-const { invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
+const { invalidateDeviceCache, invalidateUserActiveCache, clearDeviceCache } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/safe-error');
 // 本地时间格式化统一走 utils/date.js（规范第八节：禁止 toISOString 直写）
 const { formatLocalDate } = require('../utils/date');
@@ -72,6 +72,8 @@ async function changeUserPassword(userId, newPassword) {
     });
     // H-8 修复：密码变更后撤销该用户所有 refresh token
     await db.refreshTokens.revokeByUserId(userId);
+    // 批量撤销后清空设备缓存，否则旧 token 最长 60s 内仍能通过设备校验
+    await clearDeviceCache();
     // 清除用户活跃状态缓存
     await invalidateUserActiveCache(userId);
     // 清除资料缓存
@@ -231,11 +233,13 @@ router.delete('/user/devices', authMiddleware, async (req, res) => {
         const current = await db.refreshTokens.getByToken(refreshToken);
         if (current) {
             await db.refreshTokens.revokeByUserId(req.user.id, current.id);
+            await clearDeviceCache();
             await auditAction(req, 'security.device.logout', '下线其他设备');
             return res.json({ message: '其他设备已下线' });
         }
     }
     await db.refreshTokens.revokeByUserId(req.user.id);
+    await clearDeviceCache();
     await auditAction(req, 'security.device.logout', '下线全部设备');
     res.json({ message: '所有设备已下线' });
 });

@@ -12,7 +12,7 @@ const getSiteUrl = require('../utils/site-url');
 const { sendTemplateEmail } = require('../services/email-template');
 const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 const tokenStore = require('../utils/token-store');
-const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache } = require('../middleware/auth');
+const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache, clearDeviceCache } = require('../middleware/auth');
 
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { sanitizeUser } = require('../utils/safe-error');
@@ -463,6 +463,8 @@ router.post('/auth/reset-password', async (req, res) => {
 
         // H-8 修复：密码重置后撤销该用户所有 refresh token
         await db.refreshTokens.revokeByUserId(userId);
+        // 批量撤销后清空设备缓存，旧 token 立即失效
+        await clearDeviceCache();
         // 清除用户活跃状态缓存，确保被禁用状态立即生效
         await invalidateUserActiveCache(userId);
 

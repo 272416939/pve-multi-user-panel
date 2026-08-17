@@ -42,6 +42,15 @@ async function invalidateDeviceCache(deviceId) {
 }
 
 /**
+ * 清空全部设备缓存（批量撤销场景：改密/下线全部设备/admin 强制下线/reset-password）
+ * 副作用：60s 内设备校验回源 MySQL（量级可控），换取"撤销立即生效"的语义
+ * 不用逐设备 del——批量撤销点拿不到完整受影响 id 列表，全量清最简单可靠
+ */
+async function clearDeviceCache() {
+    await deviceCache.clear();
+}
+
+/**
  * 清除用户活跃状态缓存（禁用/启用用户时调用）
  */
 async function invalidateUserActiveCache(userId) {
@@ -130,5 +139,6 @@ module.exports = {
     adminMiddleware,
     blacklistToken,
     invalidateDeviceCache,
+    clearDeviceCache,
     invalidateUserActiveCache
 };

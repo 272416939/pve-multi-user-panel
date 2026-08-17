@@ -242,7 +242,33 @@ async function trimLogsKeepLatest() {
     }
 }
 
+// refresh_tokens 清理：删除过期（expires_at <= NOW()）与已撤销（revoked=1）的记录，
+// 与 trimLogsKeepLatest 同模式——登录/刷新只 INSERT、登出只置 revoked，无清理会无限膨胀
+async function cleanupExpiredRefreshTokens() {
+    try {
+        var db = require('../api/db');
+        var [result] = await db.refreshTokens.cleanup();
+        var deleted = result && result.affectedRows ? result.affectedRows : 0;
+        if (deleted > 0) {
+            console.log('[token清理] 清理过期/已撤销 refresh_tokens ' + deleted + ' 条');
+        }
+    } catch (e) {
+        console.error('[token清理] 失败:', e.message);
+    }
+}
+
 function initScheduledTasks() {
+    // 过期/已撤销 refresh_tokens 清理（每日凌晨 3 点：登录/刷新/登出只增不删，防表无限膨胀）
+    schedule.scheduleJob('0 3 * * *', async () => {
+        if (await tryAcquireLock('lock:refresh-tokens-cleanup')) {
+            try {
+                await cleanupExpiredRefreshTokens();
+            } finally {
+                await releaseLock('lock:refresh-tokens-cleanup');
+            }
+        }
+    });
+
     schedule.scheduleJob('*/5 * * * *', async () => {
         if (await tryAcquireLock('lock:expiry-check')) {
             try {
@@ -326,6 +352,8 @@ function initScheduledTasks() {
     checkStorageCapacityAlert();
     // 日志容量清理（启动时执行一次，存量超限数据即刻清理）
     trimLogsKeepLatest();
+    // 过期/已撤销 refresh_tokens 清理（启动时执行一次）
+    cleanupExpiredRefreshTokens();
 }
 
 module.exports = { initScheduledTasks, recoverProvisioningTasks, recoverOsSwitchTasks };
