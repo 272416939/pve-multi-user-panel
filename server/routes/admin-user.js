@@ -3,7 +3,7 @@ const router = express.Router();
 const crypto = require('crypto');
 const CryptoJS = require('crypto-js');
 const db = require('../api/db');
-const { authMiddleware, adminMiddleware, invalidateUserActiveCache } = require('../middleware/auth');
+const { authMiddleware, adminMiddleware, invalidateUserActiveCache, clearDeviceCache } = require('../middleware/auth');
 const cacheStore = require('../utils/cache-store');
 const { isUsernameBlacklisted } = require('../utils/username-blacklist');
 const { generateOrderNo } = require('../utils/order-utils');
@@ -202,6 +202,8 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
         updates.password = await hashPassword(password);
         updates.password_salt = null;
         await db.refreshTokens.revokeByUserId(parseInt(req.params.id));
+        // 批量撤销后清空设备缓存，强制下线/改密立即生效（否则旧 token 最长 60s 内仍可用）
+        await clearDeviceCache();
     }
 
     if (role && !['admin', 'user'].includes(role)) {
