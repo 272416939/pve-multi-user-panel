@@ -277,17 +277,24 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             method: 'PUT',
                             body: JSON.stringify({ password: newPwd, current_password: currentPwd })
                         });
-                        // 改密成功，获取角色信息后跳转
-                        const userData = await api('/user/profile');
+                        // 改密成功：服务端已撤销全部 refresh token 并清设备缓存，本地会话随之失效——
+                        // 主动清理 token 并回登录页用新密码重新登录（避免后续请求 401 误提示「登录已过期」）
+                        localStorage.removeItem(window.__storageKeys.TOKEN);
+                        localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
                         showForceChangePwd.value = false;
-                        if (userData.role === 'admin') {
-                            window.location.href = 'admin.html';
-                        } else {
-                            window.location.href = 'dashboard.html';
-                        }
+                        forcePwdError.value = '';
+                        alert('密码修改成功，请使用新密码重新登录');
+                        setTimeout(() => {
+                            window.location.href = 'login.html';
+                        }, 1600);
                     } catch (e) {
                         forcePwdError.value = e.message || '修改失败，请重试';
                     }
+                };
+
+                // 强制改密弹窗输入框回车提交（无事件修饰符，Vue 运行时模板编译的 @keyup.enter 不可靠）
+                const handleForceKeyup = (e) => {
+                    if (e.key === 'Enter') submitForceChangePwd();
                 };
 
                 // 注册功能：切换视图
@@ -405,10 +412,24 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                         return;
                     }
 
-                    // 检查是否已登录
+                    // 检查是否已登录（先查强制改密状态：刷新页面不能绕过强制改密弹窗）
                     const token = localStorage.getItem(window.__storageKeys.TOKEN);
                     if (token) {
-                        window.location.href = 'dashboard.html' + (location.search || '');
+                        try {
+                            const userData = await api('/user/profile');
+                            // 服务端兜底：强制改密未完成时刷新登录页，恢复弹窗而非跳转
+                            if (userData.must_change_password) {
+                                showForceChangePwd.value = true;
+                                forceNewPassword.value = '';
+                                forceConfirmPassword.value = '';
+                                forceCurrentPassword.value = '';
+                                forcePwdError.value = '';
+                                return;
+                            }
+                            window.location.href = 'dashboard.html' + (location.search || '');
+                        } catch (e) {
+                            // token 已失效：api() 内部已清 token 并跳登录页，此处留在登录页即可
+                        }
                         return;
                     }
 
@@ -453,6 +474,8 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     showForceChangePwd,
                     forceNewPassword,
                     forceConfirmPassword,
+                    // M-1 修复：当前密码输入框 v-model 绑定（漏返回导致输入写不进 ref，首登改密必报「请输入当前密码」）
+                    forceCurrentPassword,
                     forcePwdError,
                     login,
                     clearLoginErrors,
@@ -462,6 +485,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     requestPasswordReset,
                     resetPassword,
                     submitForceChangePwd,
+                    handleForceKeyup,
                     // 注册功能
                     currentView,
                     registerEnabled,

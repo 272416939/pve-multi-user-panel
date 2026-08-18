@@ -47,6 +47,8 @@ function generateToken() {
 
 function generateAccessToken(user, deviceId) {
     const payload = { id: user.id, username: user.username, role: user.role };
+    // 首登强制改密：token 自带 claim，refresh 后不丢失；authMiddleware 据此拦截未改密用户
+    if (user.must_change_password) payload.mustChangePassword = true;
     if (deviceId) payload.deviceId = deviceId;
     return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
 }
