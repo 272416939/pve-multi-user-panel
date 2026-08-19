@@ -244,7 +244,7 @@ async function provisionVm(opts) {
                     var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
                     var sshConfig = await getPveSshConfig();
                     await execSSH(sshConfig.host, sshConfig.username, sshConfig.password,
-                        'qm resize ' + newVmid + ' ' + resizeCmd + ' ' + targetSizeGb + 'G', 60000);
+                        'qm resize ' + newVmid + ' ' + resizeCmd + ' ' + targetSizeGb + 'G', 60000, sshConfig.port);
                     console.log('[provisioning] VM ' + newVmid + ' 系统盘已扩容到 ' + targetSizeGb + 'G');
                 }
             } catch (resizeErr) {
@@ -623,7 +623,7 @@ async function provisionLxc(opts) {
             var { execSSHWithStdin } = require('../api/ssh-exec');
             await execSSHWithStdin(sshConfig.host, sshConfig.username, sshConfig.password,
                 'lxc-attach -n ' + newVmid + ' -- chpasswd',
-                'root:' + lxcPassword + '\n', 30000
+                'root:' + lxcPassword + '\n', 30000, sshConfig.port
             );
         }
     } catch (pwdErr) { console.error('[provisioning] LXC 设置密码失败:', pwdErr.message); }
@@ -1004,7 +1004,7 @@ async function adminProvisionLxc(opts) {
         if (sshConfig.host && sshConfig.password) {
             await execSSHWithStdin(sshConfig.host, sshConfig.username, sshConfig.password,
                 'lxc-attach -n ' + newVmid + ' -- chpasswd',
-                'root:' + adminLxcPwd + '\n', 30000
+                'root:' + adminLxcPwd + '\n', 30000, sshConfig.port
             );
         }
     } catch (pwdErr) { console.error('[provisioning] LXC 设置密码失败:', pwdErr.message); }

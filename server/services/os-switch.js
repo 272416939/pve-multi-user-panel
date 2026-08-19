@@ -17,7 +17,7 @@ const logger = require('../utils/logger');
 async function runSsh(cmd) {
     const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
     const sshConfig = await getPveSshConfig();
-    const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 60000);
+    const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 60000, sshConfig.port);
     if (result.code !== 0) {
         const errDetail = (result.stderr || result.stdout || '').trim();
         throw new Error(`SSH 命令执行失败 [exit ${result.code}]\n${errDetail}`);
@@ -146,7 +146,7 @@ async function getStorageType(storage) {
 async function runSshWithTimeout(cmd, timeout = 60000) {
     const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
     const sshConfig = await getPveSshConfig();
-    const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, timeout);
+    const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, timeout, sshConfig.port);
     if (result.code !== 0) {
         const errDetail = (result.stderr || result.stdout || '').trim();
         throw new Error(`SSH 命令执行失败 [exit ${result.code}]\n${errDetail}`);

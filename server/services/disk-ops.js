@@ -15,7 +15,7 @@ async function runSshCommand(cmd) {
   if (!sshConfig.host || !sshConfig.password) {
     throw new Error('PVE SSH 配置不完整');
   }
-  var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
+  var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 600000, sshConfig.port);
   if (result.code !== 0) {
     throw new Error('SSH 命令执行失败: ' + (result.stderr || result.stdout || '未知错误'));
   }
@@ -342,7 +342,7 @@ const _internal = {
     // 使用 execSSH 直接调用以便对"卷不存在"做容错
     var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
     var cfg = await getPveSshConfig();
-    var result = await execSSH(cfg.host, cfg.username, cfg.password, cmd);
+    var result = await execSSH(cfg.host, cfg.username, cfg.password, cmd, 600000, cfg.port);
     if (result.code !== 0) {
       var errMsg = (result.stderr || result.stdout || '').toLowerCase();
       // 卷不存在视为已清理，不抛异常

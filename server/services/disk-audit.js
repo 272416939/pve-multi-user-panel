@@ -181,7 +181,7 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
 
           // 第一步：用 qm unlink 彻底 detach（比 qm set --delete 更干净）
           var unlinkCmd = 'qm unlink ' + vmId + ' --idlist ' + slotKey;
-          var unlinkResult = await execSSH(sshCfg.host, sshCfg.username, sshCfg.password, unlinkCmd);
+          var unlinkResult = await execSSH(sshCfg.host, sshCfg.username, sshCfg.password, unlinkCmd, 600000, sshCfg.port);
           if (unlinkResult.code !== 0) {
             console.log('[盘审计] qm unlink ' + slotKey + ' 结果: ' + (unlinkResult.stderr || unlinkResult.stdout || ''));
           } else {
@@ -198,7 +198,7 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
           for (var ui = 0; ui <= 9; ui++) {
             var unusedKey = 'unused' + ui;
             var cleanCmd = 'qm set ' + vmId + ' --delete ' + unusedKey;
-            var cleanResult = await execSSH(sshCfg.host, sshCfg.username, sshCfg.password, cleanCmd);
+            var cleanResult = await execSSH(sshCfg.host, sshCfg.username, sshCfg.password, cleanCmd, 600000, sshCfg.port);
             if (cleanResult.code === 0) {
               console.log('[盘审计] 已清理残留配置 ' + unusedKey);
             }

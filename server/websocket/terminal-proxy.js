@@ -89,7 +89,8 @@ terminalProxy.on('connection', async (clientWs, request) => {
             if (clientWs.readyState === WebSocket.OPEN) {
                 clientWs.close();
             }
-        }
+        },
+        sshConfig.port
     );
 
     // 空闲超时检测：30 分钟无数据自动断开，防止连接泄漏
