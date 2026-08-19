@@ -7,9 +7,10 @@ const { Client } = require('ssh2');
 	 * @param {string} password - SSH 密码
 	 * @param {string} command - 要执行的命令
 	 * @param {number} timeout - 超时时间（毫秒），默认 10 分钟
+	 * @param {number} port - SSH 端口，默认 22
 	 * @returns {Promise<{stdout: string, stderr: string, code: number}>}
 	 */
-	function execSSH(host, username, password, command, timeout = 600000) {
+	function execSSH(host, username, password, command, timeout = 600000, port = 22) {
 	    return new Promise((resolve, reject) => {
 	        const conn = new Client();
 	        let stdout = '';
@@ -50,6 +51,7 @@ const { Client } = require('ssh2');
 
         conn.connect({
             host,
+            port,
             username,
             password,
             readyTimeout: 10000,

@@ -152,6 +152,7 @@ var RATE_LIMIT_CATEGORIES = [
             { key: 'port_check', label: '端口占用检查', hint: '按用户，外呼爱快全量端口表', max: 10, windowSec: 60 },
             { key: 'port_extract_ips', label: '提取设备可用IP', hint: '按用户，外呼爱快+PVE（N+1）', max: 5, windowSec: 60 },
             { key: 'ikuai_query', label: '爱快信息查询', hint: '按用户，外呼爱快接口', max: 20, windowSec: 60 },
+            { key: 'pve_test', label: 'PVE测试连接', hint: '按用户，外呼PVE API+SSH', max: 10, windowSec: 60 },
             { key: 'random_ip', label: '随机IP申请', hint: '按用户', max: 30, windowSec: 60 },
             { key: 'cdk_redeemable', label: 'CDK可兑换资源查询', hint: '按用户，外呼PVE', max: 10, windowSec: 60 },
             { key: 'terminal_open', label: '打开终端/VNC会话', hint: '按用户，消耗SSH/VNC连接', max: 10, windowSec: 60 }
