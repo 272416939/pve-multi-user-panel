@@ -643,15 +643,29 @@
                         ['clean']
                     ],
                     handlers: {
-                        // 插入按钮链接：选中文字变按钮 / 光标处插入默认文案按钮（专用弹窗支持变量快捷插入）
+                        // 插入/编辑按钮链接：选区或光标落在已有按钮上 → 编辑模式（回显 URL，原位更新 href）；
+                        // 选中普通文字 → 转按钮；光标在空白处 → 插入默认文案按钮
                         'btn-link': async function() {
                             var q = window.__emailTemplateQuill;
                             if (!q) return;
                             var range = q.getSelection(true) || { index: Math.max(0, q.getLength() - 1), length: 0 };
-                            var url = await $.openEmailBtnLinkPrompt();
+                            // 编辑探测：光标（length=0 取所在字符）或选区含 btn-link 格式，且确实落在某个按钮 op 内
+                            var probe = range.length > 0 ? range.index : Math.min(range.index, Math.max(0, q.getLength() - 1));
+                            var fmt = {};
+                            try { fmt = q.getFormat(probe, Math.max(1, range.length)) || {}; } catch (e) {}
+                            var existing = null;
+                            if (fmt['btn-link'] !== undefined) {
+                                existing = $.findEmailBtnLinkRange(q, probe);
+                            }
+                            var currentUrl = existing ? String(fmt['btn-link'] || '') : '';
+                            var url = await $.openEmailBtnLinkPrompt(currentUrl);
                             if (url == null || !String(url).trim()) return;
                             url = String(url).trim();
-                            if (range.length > 0) {
+                            if (existing) {
+                                // 编辑已有按钮：原位更新 href，按钮文字不动（不新增）
+                                q.formatText(existing.index, existing.length, 'btn-link', url, 'user');
+                                q.setSelection(existing.index, existing.length);
+                            } else if (range.length > 0) {
                                 q.formatText(range.index, range.length, 'btn-link', url, 'user');
                             } else {
                                 var text = '点击按钮';
@@ -835,15 +849,18 @@
         return $.emailTemplateGlobalVariables.value || [];
     });
 
-    // 打开弹窗（返回 Promise：确定 → URL 字符串，取消 → null）
-    $.openEmailBtnLinkPrompt = function() {
-        $.emailBtnLinkUrl.value = '';
+    // 打开弹窗（返回 Promise：确定 → URL 字符串，取消 → null；initialUrl 回显已有按钮的链接）
+    $.openEmailBtnLinkPrompt = function(initialUrl) {
+        $.emailBtnLinkUrl.value = initialUrl || '';
         $.emailBtnLinkShow.value = true;
         return new Promise(function(resolve) {
             $.emailBtnLinkResolve.value = resolve;
             Vue.nextTick(function() {
                 var input = document.getElementById('emailBtnLinkInput');
-                if (input) input.focus();
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
             });
         });
     };
@@ -875,6 +892,26 @@
         $.emailBtnLinkUrl.value = input.value;
         input.focus();
         input.setSelectionRange(start + varStr.length, start + varStr.length);
+    };
+
+    // 定位包含指定位置的按钮链接完整范围（遍历 Delta ops 找 btn-link 属性的 op）：
+    // 编辑已有按钮时用——光标落在按钮文字内时找到整段 op 范围，提交后原位更新 href
+    $.findEmailBtnLinkRange = function(quill, index) {
+        try {
+            var ops = quill.getContents().ops;
+            var pos = 0;
+            for (var i = 0; i < ops.length; i++) {
+                var op = ops[i];
+                var len = typeof op.insert === 'string' ? op.insert.length : 1;
+                if (op.attributes && op.attributes['btn-link'] !== undefined) {
+                    if (index >= pos && index < pos + len) {
+                        return { index: pos, length: len };
+                    }
+                }
+                pos += len;
+            }
+        } catch (e) {}
+        return null;
     };
 
     // 当前编辑内容是否未被用户改动：
