@@ -566,15 +566,20 @@
         // 用户选「黑色」会点到深灰、选「灰色」会误触清除格式 → 颜色错乱。
         // 显式提供 黑/深灰/中灰/浅灰/白 + 常用色，第一个色块即纯黑，便于准确选择。
         var EMAIL_COLORS = ['#000000', '#333333', '#666666', '#999999', '#cccccc', '#ffffff', '#e60000', '#ff9900', '#ffff00', '#008a00', '#0066cc', '#9933ff', '#facccc', '#ffebcc', '#ffffcc', '#cce8cc', '#cce0f5', '#ebd6ff', '#888888', '#444444'];
+        // 对齐/缩进/字号按钮输出的 ql-align-*/ql-indent-*/ql-size-* 类依赖邮件外壳兼容样式
+        // （server/utils/email.js createEmailTemplate 内 <style>），新增这三类之外的格式需同步补外壳规则
         var quill = new Quill(el, {
             theme: 'snow',
             placeholder: '编辑邮件正文…',
             modules: {
                 toolbar: [
                     [{ header: [2, 3, false] }],
+                    [{ size: ['small', false, 'large', 'huge'] }],
                     ['bold', 'italic', 'underline', 'strike'],
                     [{ color: EMAIL_COLORS.slice() }, { background: EMAIL_COLORS.slice() }],
+                    [{ align: '' }, { align: 'center' }, { align: 'right' }, { align: 'justify' }],
                     [{ list: 'ordered' }, { list: 'bullet' }],
+                    [{ indent: '-1' }, { indent: '+1' }],
                     ['blockquote', 'link', 'code-block'],
                     ['clean']
                 ]
@@ -613,15 +618,25 @@
                 '.ql-code-block': '代码块',
                 '.ql-clean': '清除格式',
                 '.ql-list[value="ordered"]': '有序列表',
-                '.ql-list[value="bullet"]': '无序列表'
+                '.ql-list[value="bullet"]': '无序列表',
+                '.ql-indent[value="-1"]': '减少缩进',
+                '.ql-indent[value="+1"]': '增加缩进'
             };
             Object.keys(BTN_TITLES).forEach(function(sel) {
                 var el = tb.querySelector(sel);
                 if (el) el.setAttribute('title', BTN_TITLES[sel]);
             });
+            // 对齐按钮组（4 个独立按钮：左对齐按钮可能无 value 属性，逐个按 value 映射补 title）
+            var ALIGN_TITLES = { '': '左对齐', center: '居中对齐', right: '右对齐', justify: '两端对齐' };
+            tb.querySelectorAll('button.ql-align').forEach(function(el) {
+                if (!el.getAttribute('title')) {
+                    el.setAttribute('title', ALIGN_TITLES[el.getAttribute('value') || ''] || '对齐');
+                }
+            });
             // 下拉选择器（标题/文字颜色/背景颜色）
             var PICKER_TITLES = {
                 '.ql-header': '标题级别',
+                '.ql-size': '字号',
                 '.ql-color': '文字颜色',
                 '.ql-background': '背景颜色'
             };
@@ -644,6 +659,13 @@
                         if (!item.getAttribute('title')) {
                             var v = item.getAttribute('data-value');
                             item.setAttribute('title', v ? '颜色 ' + v : '清除颜色格式');
+                        }
+                    });
+                    var SIZE_TITLES = { small: '小字号', large: '大字号', huge: '特大字号' };
+                    tb.querySelectorAll('.ql-size .ql-picker-options .ql-picker-item').forEach(function(item) {
+                        if (!item.getAttribute('title')) {
+                            var v = item.getAttribute('data-value');
+                            item.setAttribute('title', (v && SIZE_TITLES[v]) ? SIZE_TITLES[v] : '标准字号');
                         }
                     });
                 };

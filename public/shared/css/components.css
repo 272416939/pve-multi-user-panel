@@ -806,6 +806,22 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     color: var(--text-muted);
     font-style: normal;
 }
+/* 字号/标题下拉标签中文化（quill.snow.css 默认英文 Normal/Small/Large/Huge/Heading N，
+   加 .email-template-quill-wrap 前缀提升特异性覆盖，明暗主题通用） */
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-label::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-item::before { content: '标准'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='small']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='small']::before { content: '小'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='large']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='large']::before { content: '大'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='huge']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='huge']::before { content: '特大'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-label::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-item::before { content: '正文'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='2']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='2']::before { content: '标题2'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='3']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='3']::before { content: '标题3'; }
 /* 邮件模板预览弹窗：背景模拟常见邮件客户端（QQ 邮箱等）浅灰页面，与真实发送效果一致 */
 .email-template-preview-body {
     background: #f5f5f5;
