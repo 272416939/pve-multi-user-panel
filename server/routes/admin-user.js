@@ -10,6 +10,7 @@ const { generateOrderNo } = require('../utils/order-utils');
 const { withTransaction } = require('../utils/with-transaction');
 const { safeError } = require('../utils/safe-error');
 const { hashPassword, verifyPassword } = require('../utils/password-hash');
+const { isValidEmail } = require('../utils/email-validate');
 // 用户列表缓存（30s TTL，低频变更场景）
 const userListCache = cacheStore.create('admin_users', 30);
 
@@ -62,12 +63,9 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
         return res.status(400).json({ error: '密码至少8位' });
     }
 
-    // AUTH-14 修复：邮箱格式校验
-    if (email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json({ error: '邮箱格式不正确' });
-        }
+    // AUTH-14 修复：邮箱格式校验（单一来源 email-validate.js）
+    if (email && !isValidEmail(email)) {
+        return res.status(400).json({ error: '邮箱格式不正确' });
     }
 
     const hashedPassword = await hashPassword(password);
@@ -218,6 +216,10 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     
     if (email !== undefined) {
         if (email && email !== user.email) {
+            // 邮箱格式校验（单一来源 email-validate.js，与创建用户一致——同功能多路径规则必须一致）
+            if (!isValidEmail(email)) {
+                return res.status(400).json({ error: '邮箱格式不正确' });
+            }
             const allUsers = await db.users.getAll();
             if (allUsers.find(u => u.email === email && u.id !== userId)) {
                 return res.status(400).json({ error: '该邮箱已被使用' });

@@ -11,6 +11,7 @@ const { computeSessionDeadlineMs, isRefreshAllowed, computeNextExpiryMs, INACTIV
 const getSiteUrl = require('../utils/site-url');
 const { sendTemplateEmail } = require('../services/email-template');
 const { isUsernameBlacklisted } = require('../utils/username-blacklist');
+const { isValidEmail } = require('../utils/email-validate');
 const tokenStore = require('../utils/token-store');
 const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache, clearDeviceCache } = require('../middleware/auth');
 
@@ -394,7 +395,11 @@ router.post('/auth/forgot-password', async (req, res) => {
         if (!email) {
             return res.status(400).json({ error: '请提供邮箱地址' });
         }
-        
+        // 邮箱格式校验（单一来源 email-validate.js；格式非法直接 400，不进入用户枚举查询）
+        if (!isValidEmail(email)) {
+            return res.status(400).json({ error: '邮箱格式不正确' });
+        }
+
         const allUsers = await db.users.getAll();
         const user = allUsers.find(u => u.email === email && u.emailVerified);
         
@@ -520,8 +525,8 @@ router.post('/register/send-code', async (req, res) => {
             return res.status(400).json({ error: '请提供邮箱地址' });
         }
 
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        // 邮箱格式校验（单一来源 email-validate.js）
+        if (!isValidEmail(email)) {
             return res.status(400).json({ error: '邮箱格式不正确' });
         }
 
@@ -607,9 +612,8 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: '密码必须至少 8 位，包含大小写字母和特殊字符' });
         }
 
-        // 校验邮箱
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!email || !emailRegex.test(email)) {
+        // 校验邮箱（单一来源 email-validate.js）
+        if (!email || !isValidEmail(email)) {
             return res.status(400).json({ error: '邮箱格式不正确' });
         }
         const existingEmail = await db.users.getByEmail(email);

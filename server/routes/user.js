@@ -21,6 +21,7 @@ const { invalidateDeviceCache, invalidateUserActiveCache, clearDeviceCache } = r
 const { sanitizeUser } = require('../utils/safe-error');
 // 本地时间格式化统一走 utils/date.js（规范第八节：禁止 toISOString 直写）
 const { formatLocalDate } = require('../utils/date');
+const { isValidEmail } = require('../utils/email-validate');
 // profileCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
 const profileCache = cacheStore.create('profile', 60);
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
@@ -509,8 +510,8 @@ router.put('/user/email', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '请提供邮箱地址' });
         }
         
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        // 邮箱格式校验（单一来源 email-validate.js：收紧正则，拒绝末尾句点等 SMTP 不兼容格式）
+        if (!isValidEmail(email)) {
             return res.status(400).json({ error: '邮箱格式不正确' });
         }
         

@@ -220,7 +220,14 @@ async function sendTemplateEmail(to, code, vars, opts) {
     var { createEmailTemplate } = require('../utils/email');
     var html = await createEmailTemplate(rendered.title, rendered.content, rendered.site_name);
     if (opts.sync) {
-        await require('../utils/email').sendEmail(to, rendered.subject, html);
+        try {
+            await require('../utils/email').sendEmail(to, rendered.subject, html);
+        } catch (e) {
+            // 同步路径（验证码/换绑/SMTP 测试）不进 BullMQ 队列，失败计入队列模块统计，
+            // 否则管理端「重试后失败」恒为 0、同步失败完全不可见（2026-08-20 排查教训）
+            try { require('../queue/email-queue').recordSyncFailure(e); } catch (_) {}
+            throw e;
+        }
         return true;
     }
     await require('../queue/email-queue').enqueueEmail(to, rendered.subject, html);

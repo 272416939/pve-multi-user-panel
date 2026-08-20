@@ -9,6 +9,7 @@ const { sendTemplateEmail } = require('../services/email-template');
 const { loadSentRemindersFromDb, checkExpiredVms, checkExpiredLxc } = require('../services/expiry-check');
 const pkg = require('../../package.json');
 const { safeError } = require('../utils/safe-error');
+const { isValidEmail } = require('../utils/email-validate');
 const { maskSecret, isMasked, encrypt, decrypt } = require('../utils/crypto-utils');
 const { queryIpLocation } = require('../services/ip-location');
 const { checkConfiguredRateLimit, invalidateRateLimitCache } = require('../middleware/rate-limiter');
@@ -112,6 +113,10 @@ router.post('/admin/smtp/test', authMiddleware, adminMiddleware, async (req, res
         const { testEmail } = req.body;
         if (!testEmail) {
             return res.status(400).json({ error: '请提供测试邮箱' });
+        }
+        // 测试邮箱格式校验（单一来源 email-validate.js：防 SMTP RCPT 拒收浪费外呼配额）
+        if (!isValidEmail(testEmail)) {
+            return res.status(400).json({ error: '邮箱格式不正确' });
         }
         
         // 测试前失效缓存：确保用最新保存的 SMTP 配置发送（而不是旧 transporter）

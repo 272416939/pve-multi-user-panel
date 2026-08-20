@@ -332,7 +332,8 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                 const sendCode = async () => {
                     const email = registerForm.value.email.trim();
                     if (!email) { registerError.value = '请输入邮箱'; return; }
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { registerError.value = '邮箱格式不正确'; return; }
+                    // 与后端 email-validate.js 同源收紧（拒绝末尾句点等 SMTP 不兼容格式，曾致 RCPT 500 bad syntax）
+                    if (!/^[A-Za-z0-9]([A-Za-z0-9._+-]{0,62}[A-Za-z0-9])?@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(email)) { registerError.value = '邮箱格式不正确'; return; }
                     if (codeCountdown.value > 0) return;
                     try {
                         registerError.value = '';
@@ -363,7 +364,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     if (f.password !== registerConfirmPassword.value) {
                         registerError.value = '两次输入的密码不一致'; return;
                     }
-                    if (!f.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) {
+                    if (!f.email || !/^[A-Za-z0-9]([A-Za-z0-9._+-]{0,62}[A-Za-z0-9])?@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(f.email.trim())) {
                         registerError.value = '邮箱格式不正确'; return;
                     }
                     if (!f.code || f.code.length !== 6) {
