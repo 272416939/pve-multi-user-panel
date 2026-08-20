@@ -119,6 +119,31 @@ const EMAIL_TEMPLATES = {
         ])
     },
 
+    password_reset_not_found: {
+        code: 'password_reset_not_found',
+        name: '密码重置（邮箱未注册提示）',
+        category: 'auth',
+        subject: '密码重置请求 - {site_name}',
+        title: '未找到使用此邮箱的账号',
+        content: `
+            <p>您好，</p>
+            <p>我们收到了使用此邮箱地址重置密码的请求，但<strong>该邮箱未绑定任何账号，或尚未完成邮箱验证</strong>。</p>
+            <p>可能的原因：</p>
+            <ul style="margin-left: 20px; color: #4a5568;">
+                <li>注册时使用的是其他邮箱地址（常见于有多个邮箱、记混了绑定邮箱的情况）</li>
+                <li>绑定了此邮箱但未完成邮箱验证</li>
+            </ul>
+            <div class="info-box">
+                <p style="margin-bottom: 0;">请返回密码重置页面，<strong>确认注册时使用的邮箱地址后重试</strong>。</p>
+            </div>
+            <div class="divider"></div>
+            <p style="color: #999; font-size: 12px;">
+                如果您没有发起过密码重置请求，请忽略此邮件。<br>
+                为保护账号隐私，我们不会在网页上提示邮箱是否已注册，特以此邮件说明。
+            </p>`,
+        variables: []
+    },
+
     register_code: {
         code: 'register_code',
         name: '注册验证码',

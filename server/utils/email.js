@@ -267,9 +267,11 @@ async function sendEmail(to, subject, html) {
                     rejectUnauthorized: config.strictTls
                 },
                 // 连接池复用：避免每次发信新建 TCP+TLS 连接（历史上每次新建是性能瓶颈）
+                // maxConnections/maxMessages 平衡：并发吞吐 vs 服务商每分钟发信限额
+                // （QQ 邮箱等常见限额约 30-60 封/分钟，单连接连发过多会被限流拒收）
                 pool: true,
-                maxConnections: 3,
-                maxMessages: 100
+                maxConnections: 5,
+                maxMessages: 30
             });
         }
 
@@ -289,11 +291,38 @@ async function sendEmail(to, subject, html) {
 
         return await _transporter.sendMail(mailOptions);
     } catch (error) {
-        // 连接可能已失效（SMTP 重启/超时），重置 transporter 下次自动重建
-        resetTransporterCache();
+        // 失败分类（2026-08-20 1000 并发推演）：只有「连接/认证类错误」才重置连接池——
+        // 「收件人被拒」（RCPT 阶段 4xx/5xx，如地址不存在/服务商限流拒收）与当前连接无关，
+        // 一律关池会导致池内其他正在排队的邮件集体失败，并发场景下形成「重建池→撞限额→再关池」
+        // 的抖动循环；连接类错误（ECONNECTION/EAUTH/超时/TLS）才是池已不可用的信号。
+        if (!isRecipientRejection(error)) {
+            resetTransporterCache();
+        }
         console.error('发送邮件失败:', error);
         throw new Error('邮件发送失败: ' + error.message);
     }
+}
+
+/**
+ * 判断 SMTP 错误是否为「收件人被拒」（RCPT TO 阶段拒绝，连接本身仍健康）
+ * nodemailer 对 RCPT 拒绝的表现：responseCode 4xx/5xx（如 500 bad syntax、550 unknown user、
+ * 452 空间/限流），或 all recipients were rejected 汇总错误；不含 EAUTH/ECONNECTION 等连接字样。
+ * @param {Error} err
+ * @returns {boolean} true = 收件人问题（不关池，下个收件人继续用当前连接）
+ */
+function isRecipientRejection(err) {
+    var msg = String((err && err.message) || err || '');
+    // 连接/认证/TLS 类错误 → 不是收件人问题
+    if (/EAUTH|ECONNECTION|ETIMEDOUT|EPROTO|EENVELOPE|cert|socket hang up|Connection closed|Greeting never received/i.test(msg)) {
+        return false;
+    }
+    // nodemailer 汇总错误：Can't send mail - all recipients were rejected（本次事故形态）
+    if (/recipients were rejected/i.test(msg)) return true;
+    // SMTP 响应码 4xx/5xx（RCPT 阶段服务器拒绝）
+    var code = err && (err.responseCode || (err.response && err.response.match(/\b(\d{3})\b/)));
+    code = typeof code === 'string' ? parseInt(code, 10) : code;
+    if (code >= 400 && code < 600) return true;
+    return false;
 }
 
 /**

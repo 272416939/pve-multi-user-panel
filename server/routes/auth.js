@@ -402,8 +402,17 @@ router.post('/auth/forgot-password', async (req, res) => {
 
         const allUsers = await db.users.getAll();
         const user = allUsers.find(u => u.email === email && u.emailVerified);
-        
+
         if (!user) {
+            // 防枚举对称设计（AUTH-9 不回退）：HTTP 响应保持统一，但向该地址发送
+            // 「未找到账号」通知邮件（模板: password_reset_not_found，走队列）——
+            // 手误输错邮箱（如把 1@qq.com 记成 2@qq.com）的用户在收件箱得到明确反馈，
+            // 而探测者从响应仍无法分辨邮箱是否注册。滥发风险由 forgot 限速（1次/10分钟/IP）约束。
+            try {
+                await sendTemplateEmail(email, 'password_reset_not_found', {});
+            } catch (e) {
+                console.error('[forgot-password] 未注册通知邮件发送失败:', e.message);
+            }
             return res.json({ message: '如果邮箱已绑定，重置链接已发送' });
         }
         
@@ -520,7 +529,18 @@ router.get('/register/status', async (req, res) => {
 });
 
 // PUBLIC: 发送注册验证码
+// 全局并发闸（2026-08-20 1000 并发注册推演）：同步 SMTP 发送占用连接池，无界放行时
+// 1000 个请求排队 3-8 分钟挂着不返回。在途发送超上限直接快速 429（提示稍后再试），
+// 比无限挂起体验好且保护 SMTP 服务商限额。上限取限速注册表 register_code_global 的 max。
+let _registerCodeInflight = 0;
 router.post('/register/send-code', async (req, res) => {
+    // 并发闸放在最前（零 DB/Redis 开销，洪峰下不放大后端压力）
+    const { RATE_LIMIT_RULES } = require('../constants');
+    const inflightLimit = (RATE_LIMIT_RULES['register_code_global'] && RATE_LIMIT_RULES['register_code_global'].max) || 20;
+    if (_registerCodeInflight >= inflightLimit) {
+        return res.status(429).json({ error: '当前注册请求较多，请稍后再试', retryAfter: 30 });
+    }
+    _registerCodeInflight++;
     try {
         const { email } = req.body;
         if (!email) {
@@ -574,6 +594,9 @@ router.post('/register/send-code', async (req, res) => {
     } catch (error) {
         console.error('[register/send-code] 错误:', error.message);
         res.status(500).json({ error: '操作失败，请稍后重试' });
+    } finally {
+        // 无论成败释放并发闸（防止泄漏后永久 429）
+        _registerCodeInflight--;
     }
 });
 

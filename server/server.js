@@ -1,6 +1,12 @@
 // 启动耗时计时起点（记录整个启动过程，含模块加载）
 const APP_START_TIME = Date.now();
 
+// libuv 线程池扩容（必须在任何异步任务创建前设置）：默认 4 线程偏保守，多核机器上
+// 原生 bcrypt（密码哈希）、DNS 等线程池任务会排队——16 核实测 1000 并发哈希 52s 中
+// 大部分在排队。按逻辑核数扩容（上限 8，兼顾每线程约 1MB 栈内存）显著提升吞吐。
+// 注意：UV_THREADPOOL_SIZE 只影响线程池任务，不改变事件循环模型。
+process.env.UV_THREADPOOL_SIZE = String(Math.min(require('os').cpus().length || 4, 8));
+
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');

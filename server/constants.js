@@ -81,6 +81,7 @@ var RATE_LIMIT_CATEGORIES = [
         rules: [
             { key: 'register_code', label: '注册验证码发送', hint: '按邮箱', max: 1, windowSec: 60 },
             { key: 'register_code_ip', label: '注册验证码发送', hint: '按 IP，1 小时', max: 5, windowSec: 3600 },
+            { key: 'register_code_global', label: '注册验证码发送', hint: '全局并发在途上限（突发洪峰快速 429，防 SMTP 池排队拖死）', max: 20, windowSec: 60 },
             { key: 'register', label: '注册提交', hint: '按 IP，1 小时', max: 3, windowSec: 3600 }
         ]
     },
