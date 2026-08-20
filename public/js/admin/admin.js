@@ -460,6 +460,9 @@
     $.emailTemplatePreviewShow = ref(false);
     $.emailTemplatePreviewHtml = ref('');
     $.emailTemplatePreviewSubject = ref('');
+    // 打开模板时的原文快照：Quill 打开即洗版（btn/info-box/复杂内联样式等不支持的格式被丢弃），
+    // 保存/预览时若内容未被用户改动则回退此原文，防止洗版内容被动写库或预览失真
+    $.emailTemplateOriginalContent = ref('');
 
     /**
      * 设置预览 HTML：邮件外壳 <style> 为服务端生成（可信），直接保留；
@@ -472,6 +475,16 @@
         var shellCss = styleMatch ? styleMatch[1] : '';
         var bodyHtml = raw.replace(/<style>[\s\S]*?<\/style>/, '');
         var safeBody = window.DOMPurify ? DOMPurify.sanitize(bodyHtml, { ADD_ATTR: ['target'] }) : bodyHtml;
+        // 外壳全局选择器作用域化（防泄漏污染控制台页面——曾致预览后整站背景变邮件深紫渐变、全局 margin 归零）：
+        // - 裸 body 规则整体丢弃：真实邮件客户端（QQ 邮箱等）同样忽略 body 背景，预览以弹窗浅灰容器
+        //   模拟客户端阅读区，与实发所见一致；
+        // - 裸 * 全局重置收窄到预览容器内：真实邮件中该重置生效，需保留等效效果（不动规则顺序，
+        //   与邮件内级联一致）
+        if (shellCss) {
+            shellCss = shellCss
+                .replace(/(^|\})\s*body\s*\{[^}]*\}/g, '$1')
+                .replace(/(^|\})\s*\*\s*\{/g, '$1.email-template-preview-body * {');
+        }
         $.emailTemplatePreviewHtml.value = shellCss ? '<style>' + shellCss + '</style>' + safeBody : safeBody;
     };
 
@@ -598,6 +611,9 @@
             $.emailTemplateForm.value.content = html;
             $.emailTemplateSource.value = html;
         });
+        // 记录打开时快照：原文 + Quill 洗版后 Delta 基线（供 isEmailTemplateUntouched 判定「未被用户改动」）
+        $.emailTemplateOriginalContent.value = content;
+        window.__emailTemplateQuillBaseline = JSON.stringify(quill.getContents());
         window.__emailTemplateQuill = quill;
         $.applyEmailToolbarTitles();
     };
@@ -684,6 +700,29 @@
         if (window.__emailTemplateQuill) {
             try { window.__emailTemplateQuill = null; } catch (e) {}
         }
+        window.__emailTemplateQuillBaseline = null;
+    };
+
+    // 当前编辑内容是否未被用户改动：
+    // 富文本模式 = Quill 当前 Delta 与打开时基线一致；源码模式 = 源码文本与原文一致
+    $.isEmailTemplateUntouched = function() {
+        var original = $.emailTemplateOriginalContent.value;
+        if ($.emailTemplateMode.value === 'source') {
+            return $.emailTemplateSource.value === original;
+        }
+        var quill = window.__emailTemplateQuill;
+        return !!quill && !!window.__emailTemplateQuillBaseline &&
+            JSON.stringify(quill.getContents()) === window.__emailTemplateQuillBaseline;
+    };
+
+    // 取当前生效的正文内容（保存/预览统一入口）：
+    // 未被用户改动时回退打开时的原文——Quill 打开模板即洗版（按钮类/提示块/复杂内联样式被丢弃），
+    // 直接用 Quill 输出会造成「预览与实发不一致」甚至原文样式被动丢失写库
+    $.getEmailTemplateCurrentContent = function() {
+        if ($.emailTemplateMode.value === 'source') return $.emailTemplateSource.value;
+        if ($.isEmailTemplateUntouched()) return $.emailTemplateOriginalContent.value;
+        if (window.__emailTemplateQuill) return window.__emailTemplateQuill.root.innerHTML;
+        return $.emailTemplateForm.value.content || '';
     };
 
     // 展开/收起模板编辑区（一次只展开一个）
@@ -750,11 +789,7 @@
         var code = $.emailTemplateEditing.value;
         if (!code) return;
         var form = $.emailTemplateForm.value;
-        if ($.emailTemplateMode.value === 'source') {
-            form.content = $.emailTemplateSource.value;
-        } else if (window.__emailTemplateQuill) {
-            form.content = window.__emailTemplateQuill.root.innerHTML;
-        }
+        form.content = $.getEmailTemplateCurrentContent();
         $.emailTemplateSaving.value = true;
         try {
             var res = await api('/admin/email-templates/' + code, {
@@ -783,11 +818,7 @@
         var code = $.emailTemplateEditing.value;
         if (!code) return;
         var form = $.emailTemplateForm.value;
-        if ($.emailTemplateMode.value === 'source') {
-            form.content = $.emailTemplateSource.value;
-        } else if (window.__emailTemplateQuill) {
-            form.content = window.__emailTemplateQuill.root.innerHTML;
-        }
+        form.content = $.getEmailTemplateCurrentContent();
         try {
             var res = await api('/admin/email-templates/' + code + '/preview', {
                 method: 'POST',

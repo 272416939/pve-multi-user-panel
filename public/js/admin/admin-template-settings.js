@@ -188,6 +188,7 @@
                                             <div class="email-template-quill-wrap mb-2" v-show="emailTemplateMode === 'rich'">
                                                 <div id="emailTemplateQuill" style="min-height:200px;"></div>
                                             </div>
+                                            <small v-if="emailTemplateMode === 'rich'" class="text-muted d-block mb-2">提示：富文本模式不支持按钮、提示块等复杂样式（打开时部分样式会被简化显示，未改动保存不受影响）；需要保留或编辑复杂排版时请切换「源码」模式。</small>
                                             <div class="mb-2" v-show="emailTemplateMode === 'source'">
                                                 <textarea id="emailTemplateSource" class="form-control font-monospace" rows="10" v-model="emailTemplateSource" placeholder="粘贴或编辑 HTML 源码，支持 {变量} 占位符"></textarea>
                                             </div>
