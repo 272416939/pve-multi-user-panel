@@ -583,8 +583,10 @@ router.put('/user/email', authMiddleware, async (req, res) => {
             } else {
                 tplCode = 'email_verify_first';
             }
-            // 邮箱验证邮件（模板: email_verify_*，同步发送保证反馈；{site_name} 由渲染引擎注入）
-            await sendTemplateEmail(email, tplCode, { username: user.username, email: email, link: verifyUrl }, { sync: true });
+            // 邮箱验证邮件（模板: email_verify_*）走队列异步发送：
+            // 发送失败本来就被下方 catch 吞掉（邮箱已保存，仍提示查收），同步等待无反馈价值；
+            // 队列 3 次重试反而提升送达率，失败计入管理端队列统计。{site_name} 由渲染引擎注入
+            await sendTemplateEmail(email, tplCode, { username: user.username, email: email, link: verifyUrl });
         } catch (emailError) {
             console.error('发送验证邮件失败，但邮箱已保存', emailError);
         }

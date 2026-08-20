@@ -420,8 +420,10 @@ router.post('/auth/forgot-password', async (req, res) => {
 
         const resetUrl = `${siteUrl}?resetPassword=${token}`;
 
-        // 密码重置邮件（模板: password_reset，同步发送保证反馈）
-        await sendTemplateEmail(user.email, 'password_reset', { username: user.username, link: resetUrl }, { sync: true });
+        // 密码重置邮件（模板: password_reset）走队列异步发送：
+        // 响应文案统一防枚举、发送失败不反馈给用户，同步等待 SMTP 1-3s 纯拖慢接口无反馈价值；
+        // 队列 3 次重试反而提升送达率，失败计入管理端队列统计
+        await sendTemplateEmail(user.email, 'password_reset', { username: user.username, link: resetUrl });
         res.json({ message: '如果邮箱已绑定，重置链接已发送' });
     } catch (error) {
         res.status(500).json({ error: '请求失败' });

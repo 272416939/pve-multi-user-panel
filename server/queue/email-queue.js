@@ -14,8 +14,10 @@
  * - ioredis 的 maxRetriesPerRequest 必须为 null，否则 Worker 的阻塞命令在
  *   重连时会抛 "Reached the max retries per request limit"
  *
- * 调用约定：通知类邮件用 enqueueEmail（永不抛异常）；验证码/换绑等需要
- * 立即反馈发送结果的场景仍直接调 utils/email.js 的 sendEmail（同步）。
+ * 调用约定（sendTemplateEmail 默认走本队列，仅 { sync: true } 直发）：
+ * - 队列（默认）：通知类 + 密码重置 + 邮箱验证（换绑/绑定）——失败无需即时反馈给用户，
+ *   队列 3 次重试提升送达率，失败计入 stats（failed / syncFailed）
+ * - 同步（sync: true）：注册验证码、SMTP 测试——用户/管理员需要立即知道发送成败
  */
 
 const { Queue, Worker } = require('bullmq');

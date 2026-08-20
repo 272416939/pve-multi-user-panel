@@ -69,7 +69,7 @@
                                     <span v-if="emailQueueStats && emailQueueStats.syncFailedCount > 0" style="color:#ed6463;">同步发送失败：{{ emailQueueStats.syncFailedCount }}</span>
                                     <span v-if="emailQueueStats && emailQueueStats.lastError" style="color:#ed6463;">最近失败：{{ emailQueueStats.lastError }}（{{ emailQueueStats.lastFailedAt }}）</span>
                                 </div>
-                                <small class="text-muted">通知类邮件通过 Redis 队列异步发送，不阻塞购买/开通等请求；Redis 未启用时自动降级为同步发送。验证码/换绑/测试邮件为同步直发，其失败计入「同步发送失败」。</small>
+                                <small class="text-muted">通知、密码重置、邮箱验证等邮件通过 Redis 队列异步发送（失败自动重试 3 次），不阻塞用户请求；注册验证码与 SMTP 测试邮件为同步直发（需即时反馈），其失败计入「同步发送失败」。Redis 未启用时自动降级为同步发送。</small>
                             </div>
                         </div>
 
