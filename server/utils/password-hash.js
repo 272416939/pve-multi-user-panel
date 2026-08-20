@@ -54,4 +54,15 @@ function needsUpgrade(hash) {
     return !hash || !hash.startsWith('$2');
 }
 
-module.exports = { hashPassword, verifyPassword, needsUpgrade, BCRYPT_COST };
+/**
+ * 密码强度校验（V6-M2 收敛为单一来源：注册 / 找回密码 / 独立改密 / profile 改密共用）
+ * 规则：至少 8 位，包含小写字母、大写字母和特殊字符 (@#$%^&*!)
+ * @param {string} plain - 明文密码
+ * @returns {boolean}
+ */
+const PASSWORD_STRENGTH_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/;
+function isStrongPassword(plain) {
+    return typeof plain === 'string' && PASSWORD_STRENGTH_RE.test(plain);
+}
+
+module.exports = { hashPassword, verifyPassword, needsUpgrade, isStrongPassword, BCRYPT_COST };

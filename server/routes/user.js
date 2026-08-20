@@ -14,7 +14,7 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const getSiteUrl = require('../utils/site-url');
 const { sendTemplateEmail } = require('../services/email-template');
-const { hashPassword, verifyPassword } = require('../utils/password-hash');
+const { hashPassword, verifyPassword, isStrongPassword } = require('../utils/password-hash');
 const cacheStore = require('../utils/cache-store');
 const { getIpLocation, getIpLocations } = require('../services/ip-location');
 const { invalidateDeviceCache, invalidateUserActiveCache, clearDeviceCache } = require('../middleware/auth');
@@ -287,9 +287,20 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         }
         
         const { username, password, bio } = req.body;
-        
+
+        // V6-L4 修复：强制改密未完成期间仅放行改密操作（authMiddleware 白名单放行本端点
+        // 用于提交新密码），先改用户名/简介会绕过强制改密意图
+        if (user.must_change_password && !password) {
+            return res.status(403).json({ error: '请先完成强制修改密码后再修改个人资料', code: 'MUST_CHANGE_PASSWORD' });
+        }
+
         // M-1 修复：修改密码必须二次验证（当前密码/2FA 动态码/恢复码）
         if (password) {
+            // V6-M2 修复：改密必须过强度校验（首登强制改密弹窗走本端点，此前仅 /user/password
+            // 有校验——同功能两条路径规则不一致，弱密码即可清除 must_change_password 标记）
+            if (!isStrongPassword(password)) {
+                return res.status(400).json({ error: '密码至少 8 位，且需包含大小写字母和特殊字符 (@#$%^&*!)' });
+            }
             const secondary = await verifySensitiveAction(user, req.body, req);
             if (!secondary.ok) return res.status(403).json({ error: secondary.error });
         }
@@ -339,9 +350,8 @@ router.put('/user/password', authMiddleware, async (req, res) => {
     try {
         const { password } = req.body;
 
-        // 密码强度校验（与注册/忘记密码同款正则，auth.js 一致）
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/;
-        if (!password || !passwordRegex.test(password)) {
+        // 密码强度校验（V6-M2 收敛：与注册/忘记密码共用 utils/password-hash 公共函数）
+        if (!isStrongPassword(password)) {
             return res.status(400).json({ error: '密码至少 8 位，且需包含大小写字母和特殊字符 (@#$%^&*!)' });
         }
 

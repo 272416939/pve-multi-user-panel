@@ -155,7 +155,9 @@ var RATE_LIMIT_CATEGORIES = [
             { key: 'pve_test', label: 'PVE测试连接', hint: '按用户，外呼PVE API+SSH', max: 10, windowSec: 60 },
             { key: 'random_ip', label: '随机IP申请', hint: '按用户', max: 30, windowSec: 60 },
             { key: 'cdk_redeemable', label: 'CDK可兑换资源查询', hint: '按用户，外呼PVE', max: 10, windowSec: 60 },
-            { key: 'terminal_open', label: '打开终端/VNC会话', hint: '按用户，消耗SSH/VNC连接', max: 10, windowSec: 60 }
+            { key: 'terminal_open', label: '打开终端/VNC会话', hint: '按用户，消耗SSH/VNC连接', max: 10, windowSec: 60 },
+            { key: 'smtp_test', label: 'SMTP测试发送', hint: '按用户，外呼SMTP真实发信', max: 5, windowSec: 60 },
+            { key: 'email_template_op', label: '邮件模板预览/保存', hint: '按用户，渲染+外呼预览', max: 20, windowSec: 60 }
         ]
     },
     {

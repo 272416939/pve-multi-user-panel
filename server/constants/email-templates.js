@@ -748,7 +748,7 @@ const EMAIL_TEMPLATES = {
             { name: 'cdk_count', label: '生成张数', example: '2', group: '资源' },
             { name: 'duration', label: '续费时长', example: '30天', group: '时间' },
             { name: 'expire_time', label: '有效期至', example: '2026-12-31', group: '时间' },
-            { name: 'cdk_list', label: '兑换码列表（≤5 张时显示，传 HTML 或留空）', example: '<p style="margin-bottom: 4px;">兑换码：<br>CDK-XXXX<br>CDK-YYYY</p>', group: '资源' }
+            { name: 'cdk_list', label: '兑换码列表（≤5 张时显示，传 HTML 或留空）', example: '<p style="margin-bottom: 4px;">兑换码：<br>CDK-XXXX<br>CDK-YYYY</p>', group: '资源', html: true }
         ])
     },
 

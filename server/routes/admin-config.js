@@ -104,6 +104,11 @@ router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.post('/admin/smtp/test', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        // V6-M4 修复：真外呼 SMTP 发信端点必须专项限速（防会话被窃后当 SPAM 放大器；先例 pve_test）
+        const smtpTestLimit = await checkConfiguredRateLimit('smtp_test', 'ratelimit:smtp-test:' + req.user.id);
+        if (!smtpTestLimit.allowed) {
+            return res.status(429).json({ error: '测试邮件发送过于频繁，请稍后再试', retryAfter: smtpTestLimit.retryAfter });
+        }
         const { testEmail } = req.body;
         if (!testEmail) {
             return res.status(400).json({ error: '请提供测试邮箱' });
@@ -714,12 +719,13 @@ router.put('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, r
         if (username.length > 64) return res.status(400).json({ error: '用户名过长' });
         // 保存前取旧配置（审计 diff 用；密码只记「已更新」标记，不记录原文）
         var oldIkuai = await db.config.getIkuai();
-        var pwdChanged = password !== undefined && !isMasked(password);
+        // V6-I4 修复：空字符串视为未修改（保留旧密码），与 PVE 配置对称
+        var pwdChanged = password !== undefined && password !== '' && !isMasked(password);
         // 脱敏值跳过，不覆盖原值
         var configToSave = {
             host: host,
             username: username,
-            password: (password !== undefined && !isMasked(password)) ? password : undefined,
+            password: (password !== undefined && password !== '' && !isMasked(password)) ? password : undefined,
             strict_tls: !!strict_tls
         };
         await db.config.setIkuai(configToSave);
@@ -785,18 +791,23 @@ router.get('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
 router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var { host, api_token, ssh_host, ssh_port, ssh_user, ssh_password, strict_tls } = req.body;
+        // V6-I3 修复：SSH 端口范围校验（1-65535，非法/缺省回退 22）
+        var parsedPort = parseInt(ssh_port);
+        if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65535) parsedPort = 22;
         // 保存前取旧配置（审计 diff 用；token/SSH 密码只记「已更新」标记，不记录原文）
         var oldPve = await db.config.getPve();
-        var tokenChanged = api_token !== undefined && !isMasked(api_token);
-        var sshPwdChanged = ssh_password !== undefined && !isMasked(ssh_password);
+        // V6-I4 修复：空字符串视为未修改（保留旧凭据）——isMasked('') 为 false，此前空串会
+        // 加密空值入库覆盖原密码导致连接失败；显式清空应走其他途径而非空串覆盖
+        var tokenChanged = api_token !== undefined && api_token !== '' && !isMasked(api_token);
+        var sshPwdChanged = ssh_password !== undefined && ssh_password !== '' && !isMasked(ssh_password);
         // 脱敏值跳过，不覆盖原值
         var configToSave = {
             host: host || '',
-            api_token: (api_token !== undefined && !isMasked(api_token)) ? api_token : undefined,
+            api_token: (api_token !== undefined && api_token !== '' && !isMasked(api_token)) ? api_token : undefined,
             ssh_host: ssh_host || '',
-            ssh_port: parseInt(ssh_port) || 22,
+            ssh_port: parsedPort,
             ssh_user: ssh_user || 'root',
-            ssh_password: (ssh_password !== undefined && !isMasked(ssh_password)) ? ssh_password : undefined,
+            ssh_password: (ssh_password !== undefined && ssh_password !== '' && !isMasked(ssh_password)) ? ssh_password : undefined,
             strict_tls: !!strict_tls
         };
         await db.config.setPve(configToSave);

@@ -10,7 +10,9 @@
  * 变量规则：
  * - 占位符 {snake_case}；只替换模板 variables 声明 + 通用变量，未知变量保留原文 + console.warn
  * - 通用变量自动注入：{site_name} / {now} / {site_url}
- * - subject/title 中的变量值做 HTML 实体转义（防用户数据注入主题）；content 原样插入（调用方传已处理 HTML）
+ * - subject/title 与 content 中的变量值默认做 HTML 实体转义（防用户可控值注入邮件 HTML）；
+ *   仅 variables 注册表中显式标记 html: true 的变量（调用方传入完整 HTML 片段，如 {cdk_list}）
+ *   在 content 中原样插入（V6-M3）
  * - 值为空的变量所在行自动折叠：独占行或行内唯一变量、无嵌套标签的行整行删除（如"续费价格："行）
  */
 const { create } = require('../utils/cache-store');
@@ -159,7 +161,11 @@ async function renderRaw(tpl, vars) {
 
     // 白名单：模板声明变量 + 通用变量
     var allowed = {};
-    (tpl.variables || []).forEach(function (v) { allowed[v.name] = true; });
+    var htmlAllowed = {}; // 允许原样插入 HTML 的变量（注册表 html: true 标记，如 cdk_list）
+    (tpl.variables || []).forEach(function (v) {
+        allowed[v.name] = true;
+        if (v.html) htmlAllowed[v.name] = true;
+    });
     GLOBAL_VAR_NAMES.forEach(function (n) { allowed[n] = true; });
 
     function renderText(text, escapeValues) {
@@ -173,6 +179,8 @@ async function renderRaw(tpl, vars) {
                 console.warn('[email-template] 模板 ' + tpl.code + ' 变量 ' + m + ' 未传值，按空处理');
                 return '';
             }
+            // V6-M3：content 中仅 html 标记变量原样插入（调用方传完整 HTML 片段），其余一律转义
+            if (!escapeValues && !htmlAllowed[name]) return escapeHtml(val);
             return escapeValues ? escapeHtml(val) : String(val);
         });
     }

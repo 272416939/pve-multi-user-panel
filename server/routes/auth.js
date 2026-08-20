@@ -16,7 +16,7 @@ const { blacklistToken, invalidateDeviceCache, invalidateUserActiveCache, clearD
 
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { sanitizeUser } = require('../utils/safe-error');
-const { hashPassword, verifyPassword, needsUpgrade } = require('../utils/password-hash');
+const { hashPassword, verifyPassword, needsUpgrade, isStrongPassword } = require('../utils/password-hash');
 // 本地时间格式化统一走 utils/date.js（规范第八节：禁止自写/复用 toISOString 直写）
 const { formatLocalDate } = require('../utils/date');
 const RATELIMIT_PREFIX = 'ratelimit:login:';
@@ -107,6 +107,20 @@ if (passwordMatch && needsUpgrade(user.password)) {
         return res.status(403).json({ error: '账号已被禁用' });
     }
 
+    // V6-H2 修复：2FA 开启的用户在第一步（仅验证密码）不下发任何可用会话凭证——
+    // 此前第一步就创建并返回 refresh_token，仅持密码者可直接调 /auth/refresh 换取完整
+    // 会话绕过 2FA；会话记录改到第二步验证通过后创建（同设备旧会话撤销也随之后移，
+    // 避免仅持密码者用伪造 device_name 提前踢掉用户同设备会话）
+    if (await db.twofa.isEnabled(user.id)) {
+        const partialToken = generatePartialToken(user);
+        const safeUser = sanitizeUser(user);
+        return res.json({
+            twofa_required: true,
+            partial_token: partialToken,
+            user: safeUser
+        });
+    }
+
     const refreshToken = generateRefreshToken();
     const ua = req.headers['user-agent'] || '';
     const deviceName = (device_name || ua.substring(0, 100));
@@ -128,17 +142,6 @@ if (passwordMatch && needsUpgrade(user.password)) {
         last_active_at: formatLocalDate(new Date())
     });
 
-    if (await db.twofa.isEnabled(user.id)) {
-        const partialToken = generatePartialToken(user);
-        const safeUser = sanitizeUser(user);
-        return res.json({
-            twofa_required: true,
-            partial_token: partialToken,
-            refresh_token: refreshToken,
-            user: safeUser
-        });
-    }
-    
     const token = generateAccessToken(user, record.id);
 
     const safeUser = sanitizeUser(user);
@@ -205,7 +208,8 @@ router.post('/login/2fa', async (req, res) => {
         if (refreshToken) {
             record = await db.refreshTokens.getByToken(refreshToken);
         }
-        if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
+        // V6-H2 修复：仅接受本用户的会话记录（防借用他人 token 顶替 device_id 签发访问令牌）
+        if (!record || record.user_id !== user.id || record.revoked || new Date(record.expires_at) <= new Date()) {
             const ip = req.ip;
             const ua = req.headers['user-agent'] || '';
             const deviceName = ua.substring(0, 100);
@@ -248,12 +252,17 @@ router.post('/login/2fa', async (req, res) => {
             if (refreshToken) {
                 record = await db.refreshTokens.getByToken(refreshToken);
             }
-            if (!record || record.revoked || new Date(record.expires_at) <= new Date()) {
+            // V6-H2 修复：仅接受本用户的会话记录（与 TOTP 路径一致）
+            if (!record || record.user_id !== user.id || record.revoked || new Date(record.expires_at) <= new Date()) {
                 const ip = req.ip;
                 const ua = req.headers['user-agent'] || '';
                 const deviceName = ua.substring(0, 100);
                 await db.refreshTokens.revokeByUserAndDevice(user.id, deviceName);
                 refreshToken = generateRefreshToken();
+                // V6-M1 修复：恢复码路径补全会话策略三字段（此前漏写致 last_active_at=NULL，
+                // isRefreshAllowed 回退 created_at 又被每次刷新重置 → 2 小时无操作规则对该路径永不触发）
+                const nowMs = Date.now();
+                const sessionDeadline = remember ? formatLocalDate(new Date(computeSessionDeadlineMs(nowMs))) : null;
                 record = await db.refreshTokens.create({
                     user_id: user.id,
                     token: refreshToken,
@@ -261,7 +270,10 @@ router.post('/login/2fa', async (req, res) => {
                     ip,
                     user_agent: ua,
                     created_at: formatLocalDate(new Date()),
-                    expires_at: formatLocalDate(new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000))
+                    expires_at: remember ? sessionDeadline : formatLocalDate(new Date(nowMs + INACTIVITY_MS)),
+                    remember,
+                    session_deadline: sessionDeadline,
+                    last_active_at: formatLocalDate(new Date())
                 });
             }
             // 恢复码验证通过：登录成功埋点
@@ -290,7 +302,9 @@ router.post('/auth/refresh', async (req, res) => {
 
         // R3-1 修复：refreshToken 是纯随机字符串（非 JWT），直接用 DB 查询校验，移除无效的 jwt.verify
         const record = await db.refreshTokens.getByToken(refreshToken);
-        if (!record || !record.user_id) {
+        // V6-H1 修复：已撤销（revoked）的 token 一律拒绝——登出/改密/管理员强制下线均只置
+        // revoked=1 保留行至每日清理，此前漏检该项导致被撤销 token 仍可续期「复活」会话
+        if (!record || !record.user_id || record.revoked) {
             return res.status(401).json({ error: 'refreshToken 已失效' });
         }
 
@@ -315,17 +329,20 @@ router.post('/auth/refresh', async (req, res) => {
         // 新记录继承旧记录的 remember / session_deadline / last_active_at——
         // last_active_at 不更新为当前时间（自动保活刷新不计活跃，2 小时无操作以真实业务请求为准）
         const nextExpiryMs = computeNextExpiryMs(record, Date.now());
+        // V6-M1 修复：created_at 保留登录锚点不被刷新重置（设备页「登录时间」语义）；
+        // last_active_at 为 NULL 的存量记录（恢复码路径历史数据）以旧 created_at 治愈，
+        // 消除「回退 created_at + 刷新重置」叠加导致 2 小时无操作规则永不触发的旁路
         const newRecord = await db.refreshTokens.create({
             user_id: user.id,
             device_name: record.device_name,
             token: newRefreshToken,
             ip: req.ip,
             user_agent: req.headers['user-agent'] || '',
-            created_at: formatLocalDate(new Date()),
+            created_at: record.created_at || formatLocalDate(new Date()),
             expires_at: formatLocalDate(new Date(nextExpiryMs)),
             remember: record.remember,
             session_deadline: record.session_deadline,
-            last_active_at: record.last_active_at
+            last_active_at: record.last_active_at || record.created_at
         });
 
         // 用新记录的 id 生成 access token，确保设备校验通过
@@ -439,8 +456,8 @@ router.post('/auth/reset-password', async (req, res) => {
             return res.status(400).json({ error: '缺少必要参数' });
         }
         
-        var passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/;
-        if (!passwordRegex.test(newPassword)) {
+        // V6-M2 收敛：公共强度校验函数（与注册/改密一致）
+        if (!isStrongPassword(newPassword)) {
             return res.status(400).json({ error: '密码至少8位，需包含大小写字母和特殊字符' });
         }
         
@@ -585,9 +602,8 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ error: '注册失败，请检查输入信息' });
         }
 
-        // 校验密码强度
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/;
-        if (!passwordRegex.test(password || '')) {
+        // 校验密码强度（V6-M2 收敛：公共校验函数）
+        if (!isStrongPassword(password)) {
             return res.status(400).json({ error: '密码必须至少 8 位，包含大小写字母和特殊字符' });
         }
 

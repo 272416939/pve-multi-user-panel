@@ -267,6 +267,11 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                         forcePwdError.value = '密码长度至少8位';
                         return;
                     }
+                    // V6-M2：与后端强度规则一致（大小写字母 + 特殊字符），提前提示防提交被 400
+                    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!])/.test(newPwd)) {
+                        forcePwdError.value = '密码需包含大小写字母和特殊字符 (@#$%^&*!)';
+                        return;
+                    }
                     if (newPwd !== confirmPwd) {
                         forcePwdError.value = '两次输入的密码不一致';
                         return;

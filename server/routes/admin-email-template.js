@@ -6,6 +6,7 @@ const { EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES, GLOBAL_VARIABLES, EMAIL_SHEL
 const { invalidateTemplateCache } = require('../services/email-template');
 const { invalidateEmailShellCache } = require('../utils/email');
 const { safeError } = require('../utils/safe-error');
+const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 // 审计字段级 diff 通用工具（规范第十一节：更新类审计从 DB 新旧状态 diff 生成，不从请求体拼接）
 const { buildFieldDiff } = require('../utils/audit-diff');
 
@@ -71,6 +72,11 @@ router.get('/admin/email-templates', authMiddleware, adminMiddleware, async (req
 // PUT /admin/email-templates/:code - 保存模板（版本自增 + 缓存失效 + 字段级审计）
 router.put('/admin/email-templates/:code', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        // V6-M4 修复：写操作端点专项限速（渲染/审计链路防刷）
+        const opLimit = await checkConfiguredRateLimit('email_template_op', 'ratelimit:email-template-op:' + req.user.id);
+        if (!opLimit.allowed) {
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: opLimit.retryAfter });
+        }
         const code = String(req.params.code || '');
         if (!isKnownCode(code)) {
             return res.status(400).json({ error: '未知的邮件模板: ' + code });
@@ -125,6 +131,11 @@ router.put('/admin/email-templates/:code', authMiddleware, adminMiddleware, asyn
 // 入参为当前编辑内容（未保存），服务端复用渲染引擎（renderRaw）保证与真实发送一致
 router.post('/admin/email-templates/:code/preview', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        // V6-M4 修复：预览走完整渲染链路，挂与保存同规则的专项限速
+        const opLimit = await checkConfiguredRateLimit('email_template_op', 'ratelimit:email-template-op:' + req.user.id);
+        if (!opLimit.allowed) {
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: opLimit.retryAfter });
+        }
         const code = String(req.params.code || '');
         const def = EMAIL_TEMPLATES[code];
         if (!def) {
@@ -154,7 +165,17 @@ router.post('/admin/email-templates/:code/preview', authMiddleware, adminMiddlew
         const { createEmailTemplate } = require('../utils/email');
         const rendered = await renderRaw({ code: code, subject: subject, title: title || '', content: content, variables: def.variables || [] }, exampleVars);
         // shell 覆盖：预览「邮件外壳样式」编辑中的未保存参数（部分字段与 DB 值合并，缺省回退默认）
-        const shell = (req.body && req.body.shell) || undefined;
+        // V6-L1 修复：覆盖参数走与保存路径相同的 validateShellParam 白名单校验，防绕过入库校验注入任意值
+        var shell = undefined;
+        if (req.body && req.body.shell && typeof req.body.shell === 'object') {
+            shell = {};
+            EMAIL_SHELL_PARAMS.forEach(function (p) {
+                var val = req.body.shell[p.key];
+                if (val === undefined || val === null) return;
+                if (validateShellParam(p, val)) return; // 非法值直接忽略（预览不中断）
+                shell[p.key] = p.type === 'number' ? parseInt(val) : String(val).trim();
+            });
+        }
         const html = await createEmailTemplate(rendered.title, rendered.content, rendered.site_name, shell);
         res.json({ subject: rendered.subject, html: html });
     } catch (error) {
