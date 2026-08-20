@@ -336,7 +336,14 @@
                                         <small class="text-muted">PVE 使用自签证书时请关闭。开启后将验证 PVE API 和 VNC 连接的 TLS 证书。</small>
                                     </div>
                                 </div>
-                                <pv-button type="submit" variant="glass">保存配置</pv-button>
+                                <div class="d-flex gap-2">
+                                    <pv-button type="button" variant="outline" @click="testPveConfig" :disabled="pveTesting">
+                                        {{ pveTesting ? '测试中...' : '测试连接' }}
+                                    </pv-button>
+                                    <pv-button type="submit" variant="glass" :disabled="pveConfigSaving">
+                                        {{ pveConfigSaving ? '保存中...' : '保存配置' }}
+                                    </pv-button>
+                                </div>
                             </form>
                         </div>
                     </div>

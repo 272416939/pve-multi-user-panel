@@ -39,7 +39,7 @@ async function setVmAffinity(vmid, affinityValue) {
     throw new Error('无效的 CPU 亲和性值');
   }
   var cmd = 'qm set ' + parseInt(vmid) + ' --affinity ' + affinityValue;
-  var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
+  var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 600000, sshConfig.port);
   if (result.code !== 0) {
     throw new Error('SSH 设置 CPU 亲和性失败: ' + (result.stderr || result.stdout));
   }

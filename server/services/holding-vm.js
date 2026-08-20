@@ -37,7 +37,7 @@ async function ensureHoldingVm(holdingVmid) {
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
     // qm create <vmid> --name holding-disk --memory 64 --cores 1 --net0 none --scsihw virtio-scsi-pci
     var cmd = 'qm create ' + vmid + ' --name holding-disk --memory 64 --cores 1 --scsihw virtio-scsi-pci';
-    var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
+    var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 600000, sshConfig.port);
     if (result.code !== 0) {
       // 可能并发创建，已存在则忽略
       try {

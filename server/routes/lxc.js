@@ -957,7 +957,8 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
             sshConfig.host, sshConfig.username, sshConfig.password,
             `lxc-attach -n ${vmid} -- chpasswd`,
             `root:${password}\n`,
-            30000
+            30000,
+            sshConfig.port
         );
         if (code !== 0) {
             // V3-06 修复：不回显 SSH stderr（防内部信息泄露），详情仅记服务端日志

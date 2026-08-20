@@ -1,3 +1,9 @@
+// 判断当前是否已在登录页（防强制改密 403 跳转形成页面循环）
+function isLoginPage() {
+    const p = location.pathname.replace(/\/+$/, '');
+    return p === '/login' || p === '/login.html' || p === '';
+}
+
 const api = (endpoint, options = {}) => {
     return ensureValidToken().then(token => {
         // 会话已失效（ensureValidToken 已触发带参跳转）：短路，避免无 token 请求与兜底跳转覆盖参数
@@ -43,6 +49,13 @@ const api = (endpoint, options = {}) => {
                         return fetch(`/api${endpoint}`, retryOptions).then(async r => {
                             const d = await r.json();
                             if (!r.ok) {
+                                // 首登强制改密未完成：回登录页恢复改密弹窗（登录页内不重复跳转防循环）
+                                if (d.code === 'MUST_CHANGE_PASSWORD') {
+                                    if (!isLoginPage()) {
+                                        window.location.href = 'login.html';
+                                    }
+                                    throw new Error(d.error || '首次登录请先修改密码');
+                                }
                                 // 限速 429：错误文案统一拼接剩余等待秒数（全局倒计时提示，所有页面生效）
                                 const err = new Error(d.error || '请求失败');
                                 if (d.retryAfter != null) {
@@ -75,6 +88,14 @@ const api = (endpoint, options = {}) => {
         }
         const data = await res.json();
         if (!res.ok) {
+            // 首登强制改密未完成：非登录页收到该 403 回登录页（登录页会调 profile 恢复改密弹窗）
+            // 已在登录页时不重复跳转——登录页自身的 push-ticket 等请求也会 403，跳转会形成页面循环刷新
+            if (data.code === 'MUST_CHANGE_PASSWORD') {
+                if (!isLoginPage()) {
+                    window.location.href = 'login.html';
+                }
+                throw new Error(data.error || '首次登录请先修改密码');
+            }
             // 限速 429：错误文案统一拼接剩余等待秒数（全局倒计时提示，所有页面生效）
             const err = new Error(data.error || '请求失败');
             if (data.retryAfter != null) {

@@ -7,9 +7,10 @@ const { Client } = require('ssh2');
 	 * @param {string} password - SSH 密码
 	 * @param {string} command - 要执行的命令
 	 * @param {number} timeout - 超时时间（毫秒），默认 10 分钟
+	 * @param {number} port - SSH 端口，默认 22
 	 * @returns {Promise<{stdout: string, stderr: string, code: number}>}
 	 */
-	function execSSH(host, username, password, command, timeout = 600000) {
+	function execSSH(host, username, password, command, timeout = 600000, port = 22) {
 	    return new Promise((resolve, reject) => {
 	        const conn = new Client();
 	        let stdout = '';
@@ -50,6 +51,7 @@ const { Client } = require('ssh2');
 
         conn.connect({
             host,
+            port,
             username,
             password,
             readyTimeout: 10000,
@@ -82,6 +84,7 @@ async function restoreLxcBySSH(vmid, volid, storage) {
     const host = sshConfig.host;
     const username = sshConfig.username;
     const password = sshConfig.password;
+    const port = sshConfig.port;
 
     if (!host || !password) {
         throw new Error('SSH 配置不完整：请在面板管理后台 > 系统设置 > PVE节点设置 中配置 SSH 连接信息');
@@ -105,7 +108,7 @@ async function restoreLxcBySSH(vmid, volid, storage) {
         cmd += ` --storage ${storage}`;
     }
 
-    return await execSSH(host, username, password, cmd);
+    return await execSSH(host, username, password, cmd, 600000, port);
 }
 
 /**
@@ -120,9 +123,10 @@ async function restoreLxcBySSH(vmid, volid, storage) {
  * @param {function} onData - 数据回调 (buffer)
  * @param {function} onError - 错误回调 (err)
  * @param {function} onClose - 关闭回调 ()
+ * @param {number} port - SSH 端口，默认 22
  * @returns {object} - { conn, resize, write, close }
  */
-function createTerminalPty(host, username, password, vmid, pty, onData, onError, onClose) {
+function createTerminalPty(host, username, password, vmid, pty, onData, onError, onClose, port = 22) {
     // R3-6 修复：vmid 严格白名单校验，与 lxc-attach 保持一致
     vmid = parseInt(vmid);
     if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
@@ -164,6 +168,7 @@ function createTerminalPty(host, username, password, vmid, pty, onData, onError,
 
     conn.connect({
         host,
+        port,
         username,
         password,
         readyTimeout: 10000,
@@ -198,9 +203,10 @@ function createTerminalPty(host, username, password, vmid, pty, onData, onError,
  * @param {string} command - 要执行的命令（不包含用户输入）
  * @param {string} stdinData - 通过 stdin 传入的数据
  * @param {number} timeout - 超时时间（毫秒），默认 30 秒
+ * @param {number} port - SSH 端口，默认 22
  * @returns {Promise<{stdout: string, stderr: string, code: number}>}
  */
-function execSSHWithStdin(host, username, password, command, stdinData, timeout = 30000) {
+function execSSHWithStdin(host, username, password, command, stdinData, timeout = 30000, port = 22) {
     return new Promise((resolve, reject) => {
         const conn = new Client();
         let stdout = '';
@@ -246,6 +252,7 @@ const timer = setTimeout(() => {
 
         conn.connect({
             host,
+            port,
             username,
             password,
             readyTimeout: 10000,

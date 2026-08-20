@@ -825,6 +825,30 @@ router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
     }
 });
 
+// 测试连接：校验 PVE API + SSH 连通性（对表单当前值测试；Token/SSH 密码打码值回退读库，不修改已保存配置）
+router.post('/admin/pve/test', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        // 外呼真实 PVE/SSH：走可配置限速（独立 key）
+        var rateLimitResult = await checkConfiguredRateLimit('pve_test', 'ratelimit:pve-test:' + req.user.id);
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ error: '测试过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+        }
+        var { host, api_token, ssh_host, ssh_port, ssh_user, ssh_password, strict_tls } = req.body || {};
+        // 脱敏值回退读库（用户未改密码/Tok 时表单回显的是打码串）
+        var saved = await db.config.getPve();
+        if (isMasked(api_token)) api_token = saved.api_token || '';
+        if (isMasked(ssh_password)) ssh_password = saved.ssh_password || '';
+        var result = await pveApi.testConnection({ host, api_token, strict_tls: !!strict_tls, ssh_host, ssh_port, ssh_user, ssh_password });
+        if (!result.success) {
+            return res.status(400).json({ error: result.message, info: result.info || null });
+        }
+        res.json({ message: result.message, info: result.info || null });
+    } catch (error) {
+        console.error('[pve] 测试连接失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
 // ==================== Redis 缓存配置 ====================
 
 router.get('/admin/redis/config', authMiddleware, adminMiddleware, async (req, res) => {

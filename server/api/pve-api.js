@@ -724,6 +724,55 @@ class PveApi {
     clearPveCache();
     return response.data;
   }
+
+  /**
+   * 测试 PVE API 与 SSH 连通性（对表单当前值测试，不依赖已保存配置，不做任何写操作）
+   * 返回 { success: boolean, message: string, info } 结构（redis-admin 测试连接同款模式，友好中文文案）
+   * @param {object} params - { host, api_token, strict_tls, ssh_host, ssh_port, ssh_user, ssh_password }
+   * @returns {Promise<{success: boolean, message: string, info?: {nodes: number, ssh: boolean|null}}>}
+   */
+  async testConnection(params) {
+    var { safeError } = require('../utils/safe-error');
+    var host = String(params.host || '').trim().replace(/\/+$/, '');
+    if (!host) return { success: false, message: '请填写 PVE API 地址再测试' };
+    // SSRF 防护：仅允许 http/https 协议（与保存接口校验一致）
+    if (!/^https?:\/\/\S+$/i.test(host)) return { success: false, message: 'PVE API 地址必须以 http:// 或 https:// 开头' };
+    var apiToken = String(params.api_token || '').trim();
+    if (!apiToken) return { success: false, message: '请填写 API Token 再测试' };
+    var agent = new https.Agent({ keepAlive: true, rejectUnauthorized: !!params.strict_tls });
+    var response;
+    try {
+      response = await axios.get(host + '/api2/json/nodes', {
+        headers: { Authorization: 'PVEAPIToken=' + apiToken },
+        httpsAgent: agent,
+        timeout: 10000
+      });
+    } catch (e) {
+      return { success: false, message: 'PVE API 连接失败: ' + safeError(e) };
+    }
+    var nodes = response.data && response.data.data;
+    if (!Array.isArray(nodes)) return { success: false, message: 'PVE API 响应格式异常' };
+    // SSH 校验：仅当填写了 SSH 地址时才测试（测试连接以 API 连通性为主，SSH 为附加项）
+    var ssh = null;
+    if (String(params.ssh_host || '').trim()) {
+      if (!params.ssh_password) return { success: false, message: '已填写 SSH 地址，请同时填写 SSH 密码' };
+      try {
+        var { execSSH } = require('./ssh-exec');
+        var r = await execSSH(String(params.ssh_host).trim(), String(params.ssh_user || '').trim() || 'root', params.ssh_password, 'echo ok', 15000, parseInt(params.ssh_port) || 22);
+        if (r.code !== 0) {
+          return { success: false, message: 'SSH 命令执行失败: ' + String(r.stderr || r.stdout || ('退出码 ' + r.code)).trim() };
+        }
+        ssh = true;
+      } catch (e) {
+        return { success: false, message: 'SSH 连接失败: ' + safeError(e) };
+      }
+    }
+    return {
+      success: true,
+      message: 'PVE API 连接成功（' + nodes.length + ' 个节点），SSH ' + (ssh ? '连接成功' : '未配置跳过'),
+      info: { nodes: nodes.length, ssh }
+    };
+  }
 }
 
 module.exports = new PveApi();

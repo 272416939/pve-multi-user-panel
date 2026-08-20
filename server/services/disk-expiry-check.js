@@ -85,14 +85,14 @@ async function detachDiskFromVm(disk) {
     // qm unlink 卸载磁盘（不留划线状态，Linux VM 完全清理）
     // Windows VM 首次可能报 busy，但 guest 内磁盘已卸载，自动重试一次即可成功
     var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + disk.bind_bus + safeDev;
-    var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
+    var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 600000, sshConfig.port);
     if (result.code !== 0) {
       var errMsg = (result.stderr || result.stdout || '');
       // hotplug busy 错误（Windows VM 常见）：guest 内磁盘已卸载，等待 1 秒后重试一次
       if (errMsg.indexOf('still busy') !== -1 || errMsg.indexOf('hotplug') !== -1) {
         logger.debug('[disk-expiry] 磁盘 ' + disk.id + ' 首次 unlink 报 busy，等待 1 秒后重试...');
         await new Promise(function(resolve) { setTimeout(resolve, 1000); });
-        var retryResult = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
+        var retryResult = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 600000, sshConfig.port);
         if (retryResult.code !== 0) {
           // 重试仍失败：guest 内磁盘已卸载，仅 PVE 配置留划线状态，不阻塞流程
           logger.warn('[disk-expiry] 磁盘 ' + disk.id + ' 重试 unlink 仍报错（guest 内已卸载，PVE 留划线状态），继续标记 expired');
@@ -158,7 +158,7 @@ async function destroyExpiredDisk(disk) {
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
 
     var cmd = 'pvesm free ' + disk.volume_id;
-    var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
+    var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 600000, sshConfig.port);
     if (result.code !== 0) {
       throw new Error('销毁磁盘失败: ' + (result.stderr || result.stdout));
     }
@@ -486,7 +486,7 @@ async function importExistingDisks() {
         // pvesm list <storage> 列出该存储所有卷
         // 输出为表格格式，volume_id 是每行第一个字段（到第一个空格为止）
         var cmd = 'pvesm list ' + poolName + ' 2>&1';
-        var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd);
+        var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 600000, sshConfig.port);
         logger.debug('[disk-import] 存储池 ' + poolName + ' 卷列表 code=' + result.code +
           ' stdout=' + JSON.stringify(result.stdout));
 

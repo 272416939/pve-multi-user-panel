@@ -106,6 +106,15 @@ const authMiddleware = async (req, res, next) => {
             return res.status(401).json({ error: '账号已被禁用', code: 'ACCOUNT_DISABLED' });
         }
 
+        // 3.2 首登强制改密服务端兜底：未改密用户只放行改密/资料端点，其余一律 403
+        //     （防刷新页面/直达 URL 绕过前端弹窗；改密成功后 claim 随重新登录消失）
+        if (decoded.mustChangePassword) {
+            const allowedPaths = ['/user/profile', '/user/password'];
+            if (!allowedPaths.includes(req.path)) {
+                return res.status(403).json({ error: '首次登录请先修改密码', code: 'MUST_CHANGE_PASSWORD' });
+            }
+        }
+
         // 3.1 更新最后活跃时间（60s 节流，失败静默不影响主流程）
         //     /auth/refresh 端点不走本中间件，前端自动保活刷新不计活跃——
         //     「2 小时无操作」以真实业务请求为准（见 utils/session-policy.js）

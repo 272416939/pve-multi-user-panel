@@ -21,6 +21,8 @@
     $.ikuaiConfig = ref({ host: '', username: '', password: '', strict_tls: false });
     $.ikuaiTesting = ref(false);
     $.ikuaiConfigSaving = ref(false);
+    $.pveTesting = ref(false);
+    $.pveConfigSaving = ref(false);
     $.reminderConfig = ref({ days1: 7, days2: 3, days3: 1 });
     $.snapshotConfig = ref({ max_per_vm: 5, daily_create_limit: 20, daily_restore_limit: 10 });
     $.storageList = ref([]);
@@ -279,6 +281,7 @@
     };
 
     $.savePveConfig = async function() {
+        $.pveConfigSaving.value = true;
         try {
             await api('/admin/pve/config', { method: 'PUT', body: $.pveConfig.value });
             alert('PVE 配置保存成功');
@@ -286,6 +289,19 @@
         } catch (e) {
             alert('保存失败: ' + (e.message || '未知错误'));
         }
+        $.pveConfigSaving.value = false;
+    };
+
+    // PVE 测试连接（对表单当前值测试；Token/SSH 密码为打码值时后端自动回退读库）
+    $.testPveConfig = async function() {
+        $.pveTesting.value = true;
+        try {
+            var result = await api('/admin/pve/test', { method: 'POST', body: $.pveConfig.value });
+            alert(result.message || '连接成功');
+        } catch (e) {
+            alert('测试失败: ' + (e.message || '未知错误'));
+        }
+        $.pveTesting.value = false;
     };
 
     // 爱快节点配置（保存后服务端热加载，立即生效）
