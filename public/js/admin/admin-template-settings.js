@@ -235,10 +235,12 @@
                             <div class="modal-dialog" style="max-width:520px;" @click.stop>
                                 <div class="modal-content">
                                     <div class="modal-header">
-                                        <h5 class="modal-title">插入按钮链接</h5>
+                                        <h5 class="modal-title">{{ emailBtnLinkTitle }}</h5>
                                         <pv-button variant="close" @click="closeEmailBtnLinkPrompt(false)">&times;</pv-button>
                                     </div>
                                     <div class="modal-body">
+                                        <label class="form-label">{{ emailBtnLinkMode === 'link' ? '链接文字' : '按钮文字' }}（支持 {变量} 占位符）</label>
+                                        <input type="text" class="form-control mb-2" id="emailBtnLinkTextInput" v-model="emailBtnLinkText" :placeholder="emailBtnLinkMode === 'link' ? '如：查看详情' : '如：确认换绑邮箱'" maxlength="50" autocomplete="off" @keydown="emailBtnLinkKeydown">
                                         <label class="form-label">按钮跳转链接（支持 {变量} 占位符）</label>
                                         <input type="text" class="form-control" id="emailBtnLinkInput" v-model="emailBtnLinkUrl" placeholder="https://… 或 {link}" autocomplete="off" @keydown="emailBtnLinkKeydown">
                                         <div class="mt-2 p-2 rounded" style="background:rgba(255,255,255,0.04);border:1px solid var(--border-color);">

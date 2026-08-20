@@ -643,38 +643,13 @@
                         ['clean']
                     ],
                     handlers: {
-                        // 插入/编辑按钮链接：选区或光标落在已有按钮上 → 编辑模式（回显 URL，原位更新 href）；
-                        // 选中普通文字 → 转按钮；光标在空白处 → 插入默认文案按钮
-                        'btn-link': async function() {
-                            var q = window.__emailTemplateQuill;
-                            if (!q) return;
-                            var range = q.getSelection(true) || { index: Math.max(0, q.getLength() - 1), length: 0 };
-                            // 编辑探测：光标（length=0 取所在字符）或选区含 btn-link 格式，且确实落在某个按钮 op 内
-                            var probe = range.length > 0 ? range.index : Math.min(range.index, Math.max(0, q.getLength() - 1));
-                            var fmt = {};
-                            try { fmt = q.getFormat(probe, Math.max(1, range.length)) || {}; } catch (e) {}
-                            var existing = null;
-                            if (fmt['btn-link'] !== undefined) {
-                                existing = $.findEmailBtnLinkRange(q, probe);
-                            }
-                            var currentUrl = existing ? String(fmt['btn-link'] || '') : '';
-                            var url = await $.openEmailBtnLinkPrompt(currentUrl);
-                            if (url == null || !String(url).trim()) return;
-                            url = String(url).trim();
-                            if (existing) {
-                                // 编辑已有按钮：原位更新 href，按钮文字不动（不新增）
-                                q.formatText(existing.index, existing.length, 'btn-link', url, 'user');
-                                q.setSelection(existing.index, existing.length);
-                            } else if (range.length > 0) {
-                                q.formatText(range.index, range.length, 'btn-link', url, 'user');
-                            } else {
-                                var text = '点击按钮';
-                                q.insertText(range.index, text, 'user');
-                                q.formatText(range.index, text.length, 'btn-link', url, 'user');
-                                q.setSelection(range.index, text.length);
-                            }
-                            q.focus();
-                        }
+                        // 插入/编辑按钮链接：选区或光标落在已有按钮上 → 编辑模式（回显文字+URL，原位更新）；
+                        // 选中普通文字 → 转按钮（文字预填选中文本）；光标在空白处 → 插入默认文案按钮。
+                        // 文字与链接均可在弹窗中修改
+                        'btn-link': function() { $.emailLinkHandler('btn-link'); },
+                        // 原生「插入链接」接管：与按钮链接同一弹窗/同一三分支逻辑，仅格式不同
+                        // （原生行为空白光标不可插入，必须先选中文字——接管后支持空白插入+变量）
+                        'link': function() { $.emailLinkHandler('link'); }
                     }
                 }
             }
@@ -838,9 +813,12 @@
         window.__emailTemplateQuillBaseline = null;
     };
 
-    // ==================== 按钮链接编辑弹窗（URL 输入 + 变量快捷插入） ====================
+    // ==================== 按钮链接编辑弹窗（按钮文字 + URL 输入 + 变量快捷插入） ====================
     $.emailBtnLinkShow = ref(false);
     $.emailBtnLinkUrl = ref('');
+    $.emailBtnLinkText = ref('');
+    $.emailBtnLinkTitle = ref('插入按钮链接');
+    $.emailBtnLinkMode = ref('btn');        // btn = 按钮链接 | link = 普通链接（共用弹窗）
     $.emailBtnLinkResolve = ref(null);
     // 可用变量 = 当前编辑模板声明变量 + 全局通用变量（与正文编辑区变量面板同源）
     $.emailBtnLinkVariables = computed(function() {
@@ -849,9 +827,14 @@
         return $.emailTemplateGlobalVariables.value || [];
     });
 
-    // 打开弹窗（返回 Promise：确定 → URL 字符串，取消 → null；initialUrl 回显已有按钮的链接）
-    $.openEmailBtnLinkPrompt = function(initialUrl) {
+    // 打开弹窗（返回 Promise：确定 → { url, text }，取消 → null）
+    // initialUrl 非空视为编辑已有按钮（标题「编辑」），文字/链接均回显；mode: btn=按钮链接 link=普通链接
+    $.openEmailBtnLinkPrompt = function(initialUrl, initialText, mode) {
+        $.emailBtnLinkMode.value = mode || 'btn';
         $.emailBtnLinkUrl.value = initialUrl || '';
+        $.emailBtnLinkText.value = initialText || '';
+        var noun = $.emailBtnLinkMode.value === 'link' ? '链接' : '按钮链接';
+        $.emailBtnLinkTitle.value = initialUrl ? '编辑' + noun : '插入' + noun;
         $.emailBtnLinkShow.value = true;
         return new Promise(function(resolve) {
             $.emailBtnLinkResolve.value = resolve;
@@ -870,7 +853,12 @@
         var resolve = $.emailBtnLinkResolve.value;
         $.emailBtnLinkResolve.value = null;
         $.emailBtnLinkShow.value = false;
-        if (resolve) resolve(ok ? ($.emailBtnLinkUrl.value || '').trim() : null);
+        if (resolve) {
+            resolve(ok ? {
+                url: ($.emailBtnLinkUrl.value || '').trim(),
+                text: ($.emailBtnLinkText.value || '').trim()
+            } : null);
+        }
     };
 
     // 弹窗内 Enter 提交（禁止模板事件修饰符，JS 内判断 key）
@@ -881,15 +869,19 @@
         }
     };
 
-    // 弹窗内点变量插入到 URL 输入框光标处（mousedown.prevent 保焦维持光标位置）
+    // 弹窗内点变量插入到当前聚焦的输入框（文字框或 URL 框）光标处
+    // （mousedown.prevent 保焦维持光标位置；未聚焦任一框时默认插 URL 框）
     $.insertEmailBtnLinkVar = function(name) {
-        var input = document.getElementById('emailBtnLinkInput');
-        if (!input) return;
         var varStr = '{' + name + '}';
+        var active = document.activeElement;
+        var input = (active && (active.id === 'emailBtnLinkInput' || active.id === 'emailBtnLinkTextInput'))
+            ? active : document.getElementById('emailBtnLinkInput');
+        if (!input) return;
         var start = input.selectionStart != null ? input.selectionStart : input.value.length;
         var end = input.selectionEnd != null ? input.selectionEnd : start;
         input.value = input.value.slice(0, start) + varStr + input.value.slice(end);
-        $.emailBtnLinkUrl.value = input.value;
+        if (input.id === 'emailBtnLinkInput') $.emailBtnLinkUrl.value = input.value;
+        else $.emailBtnLinkText.value = input.value;
         input.focus();
         input.setSelectionRange(start + varStr.length, start + varStr.length);
     };
@@ -912,6 +904,57 @@
             }
         } catch (e) {}
         return null;
+    };
+
+    // 链接类插入/编辑统一 handler（'btn-link' 按钮格式 / 'link' 普通链接共用）：
+    // 选区或光标落在已有链接上 → 编辑模式（回显文字+URL，原位更新，文字可改）；
+    // 选中普通文字 → 转链接（文字预填）；光标空白处 → 弹窗输入文字+链接插入（原生 link 无此能力）
+    $.emailLinkHandler = async function(format) {
+        var q = window.__emailTemplateQuill;
+        if (!q) return;
+        var range = q.getSelection(true) || { index: Math.max(0, q.getLength() - 1), length: 0 };
+        var probe = range.length > 0 ? range.index : Math.min(range.index, Math.max(0, q.getLength() - 1));
+        var fmt = {};
+        try { fmt = q.getFormat(probe, Math.max(1, range.length)) || {}; } catch (e) {}
+        // 编辑探测：目标格式命中 + 定位到完整 op 范围（btn-link 用专用定位，link 用 getFormat 命中即可）
+        var existing = null;
+        var currentUrl = '';
+        if (fmt[format] !== undefined) {
+            currentUrl = String(fmt[format] || '');
+            if (format === 'btn-link') {
+                existing = $.findEmailBtnLinkRange(q, probe);
+            } else {
+                // 普通链接：光标在链接内或选中链接片段——定位完整范围（遍历 ops 找 link 属性）
+                try {
+                    var ops = q.getContents().ops;
+                    var pos = 0;
+                    for (var i = 0; i < ops.length; i++) {
+                        var op = ops[i];
+                        var len = typeof op.insert === 'string' ? op.insert.length : 1;
+                        if (op.attributes && op.attributes[format] !== undefined) {
+                            if (probe >= pos && probe < pos + len) { existing = { index: pos, length: len }; break; }
+                        }
+                        pos += len;
+                    }
+                } catch (e) {}
+            }
+        }
+        var currentText = existing ? q.getText(existing.index, existing.length)
+            : (range.length > 0 ? q.getText(range.index, range.length) : '');
+        var res = await $.openEmailBtnLinkPrompt(currentUrl, currentText, format === 'btn-link' ? 'btn' : 'link');
+        if (!res || !res.url) return;
+        var url = res.url;
+        var text = res.text || '点击链接';
+        var target = existing || range;
+        if (target.length > 0) {
+            q.deleteText(target.index, target.length, 'user');
+            q.insertText(target.index, text, 'user');
+        } else {
+            q.insertText(target.index, text, 'user');
+        }
+        q.formatText(target.index, text.length, format, url, 'user');
+        q.setSelection(target.index, text.length);
+        q.focus();
     };
 
     // 当前编辑内容是否未被用户改动：
