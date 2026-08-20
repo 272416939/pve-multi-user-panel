@@ -1,5 +1,28 @@
 # Changelog
 
+## [3.3.6] - 2026-08-19
+
+### Added
+- **feat(settings): PVE 节点设置新增「测试连接」按钮**
+  - 系统设置 > PVE 节点设置表单底部新增「测试连接」按钮（同爱快/Redis 测试按钮模式），点击后一键校验 PVE API 连通性（拉取 `/nodes` 节点列表）+ SSH 连通性（执行 `echo ok`）
+  - **支持未保存即可测试**：后端按表单当前值测试；Token/SSH 密码为打码值时自动回退读库
+  - 新增 `POST /api/admin/pve/test` 接口（auth + admin 中间件 + `pve_test` 限速 10 次/分钟/用户），`server/api/pve-api.js` 新增 `testConnection()`（含 host 协议白名单 SSRF 防护）
+  - 错误返回统一脱敏（`系统运行错误，请联系管理人员`），不泄露第三方连接细节
+
+### Fixed
+- **fix(auth): 首登强制改密绕过与密码错误排查**
+  - **Bug 1**：`forceCurrentPassword` ref 在 setup 定义但 `return` 漏暴露，提交时 currentPwd 恒空，前端守卫报「请输入当前密码验证身份」且请求未发出 —— 补 return 暴露
+  - **Bug 2**：此前仅前端标志、服务端零强制，刷新/直达 URL 可绕过强制改密 —— `token.js` JWT 增加 `mustChangePassword` claim（login/2FA/refresh 全链路携带）+ `authMiddleware` 检查 claim，未改密用户仅放行 `/user/profile`、`/user/password`，其余 403 `MUST_CHANGE_PASSWORD`；登录页 `onMounted` 改为先查 profile 恢复弹窗，直达 `dashboard.html` 被踢回
+  - **Bug 3**：登录页自身 push-ticket 也被 403 拦截 → 死循环打满全局限速致 429 假象 —— `shared.js` 403 跳转加 `isLoginPage()` 判断 + `@keyup.enter` 修饰符兼容修复
+- **fix(ssh): 全链路透传 ssh_port，修复非 22 端口节点运维操作失败**
+  - 既有缺陷：保存的 `ssh_port` 对终端/备份/磁盘/订单等运维操作静默失效（连接固定 22 端口）
+  - `ssh-exec.js` 三入口函数补 port：`execSSH`（第 6 参）、`execSSHWithStdin`（第 7 参）、`createTerminalPty`（第 9 参）；全量 14 处调用点透传 `sshConfig.port`
+
+### Notes
+- 验证：`node --check`、`check-coupling`、mocha 全量 **520 passing**；API 冒烟 8 步 + 浏览器 UI 三路径全过；真实 PVE 测试连接成功（1 节点 + SSH 正常）
+- 缓存版本 v148 -> v151（强制改密、测试连接按钮前端改动）
+- **线上生效需 `pm2 restart`**
+
 ## [3.3.5] - 2026-08-17
 
 ### Fixed
