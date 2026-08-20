@@ -192,11 +192,12 @@
                                             <div class="mb-2" v-show="emailTemplateMode === 'source'">
                                                 <textarea id="emailTemplateSource" class="form-control font-monospace" rows="10" v-model="emailTemplateSource" placeholder="粘贴或编辑 HTML 源码，支持 {变量} 占位符"></textarea>
                                             </div>
-                                            <!-- 可用变量面板 -->
+                                            <!-- 可用变量面板（mousedown.prevent 防点击夺焦：链接气泡编辑态点变量时
+                                                 焦点保持气泡输入框，否则 Quill 检测失焦关闭气泡、变量插不进去） -->
                                             <div class="mb-2 p-2 rounded" style="background:rgba(255,255,255,0.04);border:1px solid var(--border-color);">
                                                 <small class="text-muted d-block mb-1">可用变量（点击插入光标处）</small>
                                                 <div class="d-flex flex-wrap gap-1">
-                                                    <span v-for="v in emailTemplateAllVariables(tpl)" :key="v.name" class="badge" style="cursor:pointer;background:color-mix(in srgb, var(--color-primary) 18%, transparent);color:var(--color-primary);border:1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);font-weight:500;" :title="v.label + '（示例：' + (v.example || '') + '）'" @click="insertEmailTemplateVar(v.name)">{{ '{' + v.name + '}' }}</span>
+                                                    <span v-for="v in emailTemplateAllVariables(tpl)" :key="v.name" class="badge" style="cursor:pointer;background:color-mix(in srgb, var(--color-primary) 18%, transparent);color:var(--color-primary);border:1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);font-weight:500;" :title="v.label + '（示例：' + (v.example || '') + '）'" @mousedown.prevent @click="insertEmailTemplateVar(v.name)">{{ '{' + v.name + '}' }}</span>
                                                 </div>
                                             </div>
                                             <div class="d-flex gap-2">
@@ -224,6 +225,32 @@
                                     </div>
                                     <div class="modal-footer">
                                         <pv-button variant="outline" size="lg" @click="emailTemplatePreviewShow = false">关闭</pv-button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 按钮链接编辑弹窗（插入按钮链接：URL 输入 + 变量快捷插入，z-index 由 ModalZIndexManager 管理） -->
+                        <div v-if="emailBtnLinkShow" id="emailBtnLinkWrap" class="modal" style="display:block;background:rgba(0,0,0,0.5);" @click.self="closeEmailBtnLinkPrompt(false)">
+                            <div class="modal-dialog" style="max-width:520px;" @click.stop>
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">插入按钮链接</h5>
+                                        <pv-button variant="close" @click="closeEmailBtnLinkPrompt(false)">&times;</pv-button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <label class="form-label">按钮跳转链接（支持 {变量} 占位符）</label>
+                                        <input type="text" class="form-control" id="emailBtnLinkInput" v-model="emailBtnLinkUrl" placeholder="https://… 或 {link}" autocomplete="off" @keydown="emailBtnLinkKeydown">
+                                        <div class="mt-2 p-2 rounded" style="background:rgba(255,255,255,0.04);border:1px solid var(--border-color);">
+                                            <small class="text-muted d-block mb-1">可用变量（点击插入光标处）</small>
+                                            <div class="d-flex flex-wrap gap-1">
+                                                <span v-for="v in emailBtnLinkVariables" :key="v.name" class="badge" style="cursor:pointer;background:color-mix(in srgb, var(--color-primary) 18%, transparent);color:var(--color-primary);border:1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);font-weight:500;" :title="v.label + '（示例：' + (v.example || '') + '）'" @mousedown.prevent @click="insertEmailBtnLinkVar(v.name)">{{ '{' + v.name + '}' }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <pv-button variant="outline" size="lg" @click="closeEmailBtnLinkPrompt(false)">取消</pv-button>
+                                        <pv-button variant="primary" @click="closeEmailBtnLinkPrompt(true)">确定</pv-button>
                                     </div>
                                 </div>
                             </div>

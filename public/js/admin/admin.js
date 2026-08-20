@@ -502,6 +502,20 @@
         }
     });
 
+    // 按钮链接编辑弹窗 z-index 管理（同预览弹窗模式）
+    var emailBtnLinkZIndex = null;
+    watch($.emailBtnLinkShow, function(val) {
+        if (val) {
+            Vue.nextTick(function() {
+                var el = document.getElementById('emailBtnLinkWrap');
+                if (el) emailBtnLinkZIndex = $.applyModalZIndex(el);
+            });
+        } else if (emailBtnLinkZIndex != null) {
+            window.ModalZIndexManager.release(emailBtnLinkZIndex);
+            emailBtnLinkZIndex = null;
+        }
+    });
+
     // 加载模板列表（含分类/通用变量定义）
     $.loadEmailTemplates = async function() {
         try {
@@ -629,12 +643,12 @@
                         ['clean']
                     ],
                     handlers: {
-                        // 插入按钮链接：选中文字变按钮 / 光标处插入默认文案按钮（实发邮件渲染为实心渐变按钮）
+                        // 插入按钮链接：选中文字变按钮 / 光标处插入默认文案按钮（专用弹窗支持变量快捷插入）
                         'btn-link': async function() {
                             var q = window.__emailTemplateQuill;
                             if (!q) return;
                             var range = q.getSelection(true) || { index: Math.max(0, q.getLength() - 1), length: 0 };
-                            var url = await window.customPrompt('请输入按钮跳转链接（支持 {link} 等变量占位符）：');
+                            var url = await $.openEmailBtnLinkPrompt();
                             if (url == null || !String(url).trim()) return;
                             url = String(url).trim();
                             if (range.length > 0) {
@@ -810,6 +824,59 @@
         window.__emailTemplateQuillBaseline = null;
     };
 
+    // ==================== 按钮链接编辑弹窗（URL 输入 + 变量快捷插入） ====================
+    $.emailBtnLinkShow = ref(false);
+    $.emailBtnLinkUrl = ref('');
+    $.emailBtnLinkResolve = ref(null);
+    // 可用变量 = 当前编辑模板声明变量 + 全局通用变量（与正文编辑区变量面板同源）
+    $.emailBtnLinkVariables = computed(function() {
+        var tpl = ($.emailTemplates.value || []).find(function(t) { return t.code === $.emailTemplateEditing.value; });
+        if (tpl) return $.emailTemplateAllVariables(tpl);
+        return $.emailTemplateGlobalVariables.value || [];
+    });
+
+    // 打开弹窗（返回 Promise：确定 → URL 字符串，取消 → null）
+    $.openEmailBtnLinkPrompt = function() {
+        $.emailBtnLinkUrl.value = '';
+        $.emailBtnLinkShow.value = true;
+        return new Promise(function(resolve) {
+            $.emailBtnLinkResolve.value = resolve;
+            Vue.nextTick(function() {
+                var input = document.getElementById('emailBtnLinkInput');
+                if (input) input.focus();
+            });
+        });
+    };
+
+    // 关闭（ok=true 确定 / false 取消）
+    $.closeEmailBtnLinkPrompt = function(ok) {
+        var resolve = $.emailBtnLinkResolve.value;
+        $.emailBtnLinkResolve.value = null;
+        $.emailBtnLinkShow.value = false;
+        if (resolve) resolve(ok ? ($.emailBtnLinkUrl.value || '').trim() : null);
+    };
+
+    // 弹窗内 Enter 提交（禁止模板事件修饰符，JS 内判断 key）
+    $.emailBtnLinkKeydown = function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            $.closeEmailBtnLinkPrompt(true);
+        }
+    };
+
+    // 弹窗内点变量插入到 URL 输入框光标处（mousedown.prevent 保焦维持光标位置）
+    $.insertEmailBtnLinkVar = function(name) {
+        var input = document.getElementById('emailBtnLinkInput');
+        if (!input) return;
+        var varStr = '{' + name + '}';
+        var start = input.selectionStart != null ? input.selectionStart : input.value.length;
+        var end = input.selectionEnd != null ? input.selectionEnd : start;
+        input.value = input.value.slice(0, start) + varStr + input.value.slice(end);
+        $.emailBtnLinkUrl.value = input.value;
+        input.focus();
+        input.setSelectionRange(start + varStr.length, start + varStr.length);
+    };
+
     // 当前编辑内容是否未被用户改动：
     // 富文本模式 = Quill 当前 Delta 与打开时基线一致；源码模式 = 源码文本与原文一致
     $.isEmailTemplateUntouched = function() {
@@ -867,9 +934,21 @@
         $.emailTemplateMode.value = mode;
     };
 
-    // 插入变量到光标处（富文本用 Quill 选区，源码用 textarea 选区）
+    // 插入变量到光标处（链接气泡编辑态→气泡输入框，源码→textarea 选区，富文本→Quill 选区）
     $.insertEmailTemplateVar = function(name) {
         var varStr = '{' + name + '}';
+        // 链接气泡编辑态：焦点在气泡 URL 输入框（点变量经 mousedown.prevent 保焦不关气泡），
+        // 变量应插入气泡输入框光标处而非正文
+        var tooltip = document.querySelector('.email-template-quill-wrap .ql-tooltip.ql-editing');
+        var tipInput = tooltip ? tooltip.querySelector('input[type=text]') : null;
+        if (tipInput && getComputedStyle(tipInput).display !== 'none') {
+            var tStart = tipInput.selectionStart != null ? tipInput.selectionStart : tipInput.value.length;
+            var tEnd = tipInput.selectionEnd != null ? tipInput.selectionEnd : tStart;
+            tipInput.value = tipInput.value.slice(0, tStart) + varStr + tipInput.value.slice(tEnd);
+            tipInput.focus();
+            tipInput.setSelectionRange(tStart + varStr.length, tStart + varStr.length);
+            return;
+        }
         if ($.emailTemplateMode.value === 'source') {
             var ta = document.getElementById('emailTemplateSource');
             if (!ta) return;
