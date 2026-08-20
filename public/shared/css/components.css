@@ -822,6 +822,27 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 .email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='2']::before { content: '标题2'; }
 .email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='3']::before,
 .email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='3']::before { content: '标题3'; }
+/* 按钮链接（btn-link blot）编辑器内实时预览：复用邮件外壳 .btn 同款外观。
+   外壳渐变色是 DB 可配置参数（mail:shell_btn_from/to），编辑器内用默认渐变近似，
+   真实效果以预览弹窗/实发邮件为准 */
+.email-template-quill-wrap .ql-editor a.btn {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff !important;
+    padding: 14px 32px;
+    border-radius: 8px;
+    text-decoration: none !important;
+    font-weight: 600;
+    margin: 10px 0;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+/* 链接编辑气泡文案中文化（quill.snow.css 默认英文 Visit URL:/Edit/Remove/Save/Enter link，
+   ::before/::after content 渲染，加前缀提升特异性覆盖，明暗主题通用——气泡本身白底深字） */
+.email-template-quill-wrap .ql-snow .ql-tooltip::before { content: '访问链接：'; }
+.email-template-quill-wrap .ql-snow .ql-tooltip[data-mode=link]::before { content: '输入链接：'; }
+.email-template-quill-wrap .ql-snow .ql-tooltip a.ql-action::after { content: '编辑'; border-right: 1px solid #ccc; margin-left: 16px; padding-right: 8px; }
+.email-template-quill-wrap .ql-snow .ql-tooltip a.ql-remove::before { content: '移除'; margin-left: 8px; }
+.email-template-quill-wrap .ql-snow .ql-tooltip.ql-editing a.ql-action::after { content: '保存'; border-right: 0; padding-right: 0; }
 /* 邮件模板预览弹窗：背景模拟常见邮件客户端（QQ 邮箱等）浅灰页面，与真实发送效果一致 */
 .email-template-preview-body {
     background: #f5f5f5;

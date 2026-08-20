@@ -570,12 +570,42 @@
         return list;
     };
 
+    // 注册「邮件按钮链接」自定义 Blot（输出 <a class="btn">）：
+    // 邮件外壳 .btn 类承载实心渐变按钮样式（server/utils/email.js createEmailTemplate），
+    // Quill 原生 Link blot 不保留 class 属性——打开模板时 <a class="btn"> 会被洗成普通链接丢样式。
+    // 注册后按钮成为 Quill 可表达的格式，编辑含按钮的模板再保存按钮不再丢失。
+    // 必须在首个 Quill 实例创建前注册一次（Quill.import 全局注册，重复注册幂等）。
+    $.registerEmailBtnLinkBlot = function() {
+        if (window.__emailBtnLinkBlotRegistered || typeof Quill === 'undefined') return;
+        var Link = Quill.import('formats/link');
+        class BtnLink extends Link {
+            static create(value) {
+                var node = super.create(value);
+                node.setAttribute('target', '_blank');
+                return node;
+            }
+        }
+        BtnLink.blotName = 'btn-link';
+        BtnLink.tagName = 'A';
+        // 关键：className 区分同 tagName 的两个 blot——不设时 BtnLink 会抢先匹配所有 <a>，
+        // 模板里的普通链接（备用链接 {link} 等）被误转成按钮（Quill 官方「克隆 blot 匹配 DOM」方案）
+        BtnLink.className = 'btn';
+        Quill.register(BtnLink, true);
+        // 工具栏按钮图标：Quill 无内置 btn-link 图标，注册自定义 SVG（ql-stroke 走主题色，hover 联动）
+        var icons = Quill.import('ui/icons');
+        if (icons && !icons['btn-link']) {
+            icons['btn-link'] = '<svg viewBox="0 0 18 18"><rect class="ql-stroke" x="2.5" y="5.5" width="13" height="7" rx="2"></rect><line class="ql-stroke" x1="6" y1="9" x2="12" y2="9"></line></svg>';
+        }
+        window.__emailBtnLinkBlotRegistered = true;
+    };
+
     // 初始化 Quill 富文本编辑器（模板编辑区展开后调用；DOM 由 v-if/v-show 控制）
     $.initEmailTemplateQuill = function() {
         $.destroyEmailTemplateQuill();
         var el = document.getElementById('emailTemplateQuill');
         if (!el || typeof Quill === 'undefined') return;
-        // 自定义色板：Quill 2 默认色板无纯黑（最深仅 #444444 深灰），且首项为「清除格式」，
+        $.registerEmailBtnLinkBlot();
+        // 自定义色板：Quill 2 默认色板无纯黑（最深仅 #444444 深灰），且色板首项是「清除格式」（无色块），
         // 用户选「黑色」会点到深灰、选「灰色」会误触清除格式 → 颜色错乱。
         // 显式提供 黑/深灰/中灰/浅灰/白 + 常用色，第一个色块即纯黑，便于准确选择。
         var EMAIL_COLORS = ['#000000', '#333333', '#666666', '#999999', '#cccccc', '#ffffff', '#e60000', '#ff9900', '#ffff00', '#008a00', '#0066cc', '#9933ff', '#facccc', '#ffebcc', '#ffffcc', '#cce8cc', '#cce0f5', '#ebd6ff', '#888888', '#444444'];
@@ -585,20 +615,55 @@
             theme: 'snow',
             placeholder: '编辑邮件正文…',
             modules: {
-                toolbar: [
-                    [{ header: [2, 3, false] }],
-                    [{ size: ['small', false, 'large', 'huge'] }],
-                    ['bold', 'italic', 'underline', 'strike'],
-                    [{ color: EMAIL_COLORS.slice() }, { background: EMAIL_COLORS.slice() }],
-                    [{ align: '' }, { align: 'center' }, { align: 'right' }, { align: 'justify' }],
-                    [{ list: 'ordered' }, { list: 'bullet' }],
-                    [{ indent: '-1' }, { indent: '+1' }],
-                    ['blockquote', 'link', 'code-block'],
-                    ['clean']
-                ]
+                toolbar: {
+                    container: [
+                        [{ header: [2, 3, false] }],
+                        [{ size: ['small', false, 'large', 'huge'] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ color: EMAIL_COLORS.slice() }, { background: EMAIL_COLORS.slice() }],
+                        [{ align: '' }, { align: 'center' }, { align: 'right' }, { align: 'justify' }],
+                        [{ list: 'ordered' }, { list: 'bullet' }],
+                        [{ indent: '-1' }, { indent: '+1' }],
+                        ['blockquote', 'link', 'code-block'],
+                        ['btn-link'],
+                        ['clean']
+                    ],
+                    handlers: {
+                        // 插入按钮链接：选中文字变按钮 / 光标处插入默认文案按钮（实发邮件渲染为实心渐变按钮）
+                        'btn-link': async function() {
+                            var q = window.__emailTemplateQuill;
+                            if (!q) return;
+                            var range = q.getSelection(true) || { index: Math.max(0, q.getLength() - 1), length: 0 };
+                            var url = await window.customPrompt('请输入按钮跳转链接（支持 {link} 等变量占位符）：');
+                            if (url == null || !String(url).trim()) return;
+                            url = String(url).trim();
+                            if (range.length > 0) {
+                                q.formatText(range.index, range.length, 'btn-link', url, 'user');
+                            } else {
+                                var text = '点击按钮';
+                                q.insertText(range.index, text, 'user');
+                                q.formatText(range.index, text.length, 'btn-link', url, 'user');
+                                q.setSelection(range.index, text.length);
+                            }
+                            q.focus();
+                        }
+                    }
+                }
             }
         });
         var content = $.emailTemplateForm.value.content || '';
+        // 剪贴板 matcher：模板 HTML 中的 <a class="btn"> 解析归入 btn-link 格式
+        // （Quill 默认 A matcher 归入 link 格式会丢弃 class="btn"，addMatcher 追加在默认之后运行，改写属性即可）
+        quill.clipboard.addMatcher('A', function(node, delta) {
+            if (node.classList && node.classList.contains('btn')) {
+                delta.ops.forEach(function(op) {
+                    if (op.attributes) delete op.attributes.link;
+                    op.attributes = op.attributes || {};
+                    op.attributes['btn-link'] = node.getAttribute('href') || '';
+                });
+            }
+            return delta;
+        });
         if (content) {
             try {
                 quill.clipboard.dangerouslyPasteHTML(content);
@@ -616,6 +681,47 @@
         window.__emailTemplateQuillBaseline = JSON.stringify(quill.getContents());
         window.__emailTemplateQuill = quill;
         $.applyEmailToolbarTitles();
+        $.clampEmailTooltipBounds(quill);
+    };
+
+    // 链接编辑气泡边界避让：Quill 把气泡 absolute 定位到光标处，光标在编辑器左缘时
+    // 气泡左半截溢出容器（.email-template-quill-wrap overflow:hidden 圆角裁剪）被吞掉。
+    // 每次 Quill 重设气泡位置后横向 clamp 到编辑器可视区内。
+    $.clampEmailTooltipBounds = function(quill) {
+        if (!quill || quill.__tooltipClampBound) return;
+        quill.__tooltipClampBound = true;
+        var tooltip = quill.root.closest('.email-template-quill-wrap') && quill.root.closest('.email-template-quill-wrap').querySelector('.ql-tooltip');
+        if (!tooltip) return;
+        var clamp = function() {
+            // 气泡隐藏时不处理；Quill 用 style.left（px）定位，读当前值后夹取
+            if (tooltip.classList.contains('ql-hidden') || tooltip.style.visibility === 'hidden') return;
+            var wrap = quill.root.closest('.email-template-quill-wrap');
+            if (!wrap) return;
+            var left = parseFloat(tooltip.style.left);
+            if (isNaN(left)) return;
+            var wrapRect = wrap.getBoundingClientRect();
+            var tipRect = tooltip.getBoundingClientRect();
+            // 修正量：相对当前 style.left 的偏移（容器宽度差 - 气泡实际宽度）
+            var margin = 4; // 距边缘留 4px
+            var minLeft = margin - (wrapRect.left - tooltip.parentElement.getBoundingClientRect().left) - 0;
+            // 直接以父容器（ql-container，与 wrap 同宽）坐标系计算：wrap 与 ql-container 左缘基本重合
+            var container = tooltip.parentElement;
+            var containerRect = container.getBoundingClientRect();
+            var shift = 0;
+            if (tipRect.left < wrapRect.left + margin) {
+                shift = (wrapRect.left + margin) - tipRect.left;      // 左溢出 → 右移
+            } else if (tipRect.right > wrapRect.right - margin) {
+                shift = (wrapRect.right - margin) - tipRect.right;    // 右溢出 → 左移
+            }
+            if (shift !== 0) {
+                tooltip.style.left = (left + shift) + 'px';
+                containerRect = null; // 已用完
+            }
+        };
+        // Quill tooltip 定位发生在 selection-change / 编辑动作后；MutationObserver 监听 style 变化最可靠
+        var mo = new MutationObserver(function() { clamp(); });
+        mo.observe(tooltip, { attributes: true, attributeFilter: ['style', 'class'] });
+        clamp();
     };
 
     // 工具栏按钮/下拉中文提示（Quill 默认只有图标，悬浮 title 说明功能）
@@ -636,7 +742,8 @@
                 '.ql-list[value="ordered"]': '有序列表',
                 '.ql-list[value="bullet"]': '无序列表',
                 '.ql-indent[value="-1"]': '减少缩进',
-                '.ql-indent[value="+1"]': '增加缩进'
+                '.ql-indent[value="+1"]': '增加缩进',
+                '.ql-btn-link': '插入按钮链接（选中文字转为按钮）'
             };
             Object.keys(BTN_TITLES).forEach(function(sel) {
                 var el = tb.querySelector(sel);
