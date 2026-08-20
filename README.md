@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v3.3.5-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v3.3.6-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -228,7 +228,7 @@ npm run dev
 | `GITEE_REPO` | Gitee 仓库地址（自动更新检查，国内优先） | `Allen0528/pve-multi-user-panel` |
 | `ENCRYPTION_KEY` | 独立加密密钥（AES-256-GCM 加密库内 PVE SSH 密码/Token/SMTP 密码，与 JWT_SECRET 分离） | `openssl rand -hex 32` |
 | `TRUST_PROXY` | 反向代理信任（存在可信 Nginx/宝塔等前置代理时设 `true`，用于真实 IP 限速） | `false` |
-> **PVE 节点配置**（API 地址、Token、SSH 连接）已迁移到面板内管理，首次部署后在 **管理后台 > 系统设置 > PVE节点设置** 中配置。Token 和 SSH 密码使用 AES-256-GCM 加密存储。
+> **PVE 节点配置**（API 地址、Token、SSH 连接）已迁移到面板内管理，首次部署后在 **管理后台 > 系统设置 > PVE节点设置** 中配置。Token 和 SSH 密码使用 AES-256-GCM 加密存储。表单底部提供 **「测试连接」按钮**（v3.3.6 新增）：一键同时校验 PVE API 连通性（拉取节点列表）与 SSH 连通性（执行 `echo ok`），支持**未保存即可测试**（按表单当前值，Token/SSH 密码为打码值时自动回退读库）；同时修复非 22 端口节点 `ssh_port` 全链路透传，异常端口运维操作不再静默失败。
 >
 > **⚠️ ENCRYPTION_KEY 注意事项**：一旦设置并写入加密数据后不可随意更换，否则历史密文无法解密。即使 JWT_SECRET 泄露，库内密文也无法解密。
 
