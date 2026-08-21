@@ -6,47 +6,47 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">编辑虚拟机</h5>
+                <h5 class="modal-title">{{ t('dash.vm.editVm') }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body">
                 <form @submit.prevent="updateVm" novalidate>
                     <div class="mb-3">
-                        <label class="form-label">名称</label>
+                        <label class="form-label">{{ t('common.name') }}</label>
                         <input type="text" class="form-control" v-model="editVmForm.name">
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">分配给</label>
+                        <label class="form-label">{{ t('dash.assignTo') }}</label>
                         <select class="form-select" v-model="editVmForm.user_id">
                             <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
                         </select>
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">到期时间</label>
+                        <label class="form-label">{{ t('dash.expiry') }}</label>
                         <input type="datetime-local" class="form-control" v-model="editVmForm.expiration_date" step="1">
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">续费价格</label>
+                        <label class="form-label">{{ t('dash.renewPrice') }}</label>
                         <input type="number" step="0.01" min="0" class="form-control" v-model="editVmForm.renewal_price" placeholder="如: 50.00">
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">计费周期</label>
+                        <label class="form-label">{{ t('dash.billingPeriod') }}</label>
                         <select class="form-select" v-model="editVmForm.renewal_period">
-                            <option value="month">月（30天计）</option>
-                            <option value="quarter">季（90天计）</option>
-                            <option value="year">年（365天计）</option>
+                            <option value="month">{{ t('dash.month30') }}</option>
+                            <option value="quarter">{{ t('dash.quarter90') }}</option>
+                            <option value="year">{{ t('dash.year365') }}</option>
                         </select>
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">MAC分组</label>
+                        <label class="form-label">{{ t('dash.macGroup') }}</label>
                         <select class="form-select" v-model="editVmForm.mac_group_id">
-                            <option value="">不加入分组</option>
-                            <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                            <option value="">{{ t('dash.noGroup') }}</option>
+                            <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || t('dash.groupPrefix') + ' ' + g.id }}</option>
                         </select>
                     </div>
                     <div class="d-flex gap-2">
-                        <pv-button type="submit" variant="primary" formnovalidate>保存</pv-button>
-                        <pv-button v-if="user && user.role === 'admin'" type="button" @click="removeVm" variant="outline-warning">移除（仅解绑）</pv-button>
+                        <pv-button type="submit" variant="primary" formnovalidate>{{ t('common.save') }}</pv-button>
+                        <pv-button v-if="user && user.role === 'admin'" type="button" @click="removeVm" variant="outline-warning">{{ t('dash.detachOnly') }}</pv-button>
                     </div>
                 </form>
             </div>
@@ -60,20 +60,20 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">快照管理 - {{ snapshotVmName }}</h5>
+                <h5 class="modal-title">{{ tFormat('dash.snap.manageVm', snapshotVmName) }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body">
                 <div v-if="snapshotLoading" class="text-center py-3">
                     <div class="spinner-border spinner-border-sm text-primary" role="status">
-                        <span class="visually-hidden">加载中...</span>
+                        <span class="visually-hidden">{{ t('common.loading') }}</span>
                     </div>
-                    <p class="mt-2 text-muted small">加载快照列表...</p>
+                    <p class="mt-2 text-muted small">{{ t('dash.snap.loadingList') }}</p>
                 </div>
                 <div v-else>
                     <div class="card mb-3">
                         <div class="card-header">
-                            <h6 class="mb-0">创建快照</h6>
+                            <h6 class="mb-0">{{ t('dash.snap.create') }}</h6>
                         </div>
                         <div class="card-body">
                             <div class="mb-2">
@@ -91,14 +91,14 @@
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <div class="d-flex align-items-center gap-2">
                                 <input type="checkbox" class="form-check-input m-0" :checked="isAllSnapshotsSelected" @change="toggleSelectAllSnapshots" :disabled="snapshots.length === 0" style="cursor:pointer">
-                                <h6 class="mb-0">现有快照</h6>
+                                <h6 class="mb-0">{{ t('dash.snap.existing') }}</h6>
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <pv-button v-if="isAnySnapshotSelected" @click="batchDeleteSnapshots(snapshotVmId)" :disabled="snapshotDeleting" variant="outline-danger" size="sm">
                                     <span v-if="snapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                     批量删除 ({{ snapshotSelected.size }})
                                 </pv-button>
-                                <span class="badge bg-secondary">{{ snapshots.length }} 个</span>
+                                <span class="badge bg-secondary">{{ tFormat('dash.count.snapshot', snapshots.length) }}</span>
                             </div>
                         </div>
                         <div class="card-body p-0">
@@ -118,8 +118,8 @@
                                         </div>
                                     </div>
                                     <div class="d-flex gap-1 flex-shrink-0">
-                                        <pv-button @click="rollbackSnapshot(snapshotVmId, snap.name)" title="回滚到此快照" variant="outline" size="sm">回滚</pv-button>
-                                        <pv-button @click="deleteSnapshot(snapshotVmId, snap.name)" title="删除快照" variant="outline-danger" size="sm">删除</pv-button>
+                                        <pv-button @click="rollbackSnapshot(snapshotVmId, snap.name)" title="回滚到此快照" variant="outline" size="sm">{{ t('dash.snap.rollback') }}</pv-button>
+                                        <pv-button @click="deleteSnapshot(snapshotVmId, snap.name)" title="删除快照" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
                                     </div>
                                 </div>
                             </div>
@@ -127,25 +127,25 @@
                     </div>
                     <div class="card">
                         <div class="card-header">
-                            <h6 class="mb-0">快照限制信息</h6>
+                            <h6 class="mb-0">{{ t('dash.snap.limitInfo') }}</h6>
                         </div>
                         <div class="card-body">
                             <div class="row text-center g-2">
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-muted">当前快照数</div>
+                                        <div class="small text-muted">{{ t('dash.snap.currentCount') }}</div>
                                         <div class="fw-bold" :class="snapshotLimits.current >= snapshotLimits.max ? 'text-danger' : ''">{{ snapshotLimits.current }} / {{ snapshotLimits.max }}</div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-muted">今日创建</div>
+                                        <div class="small text-muted">{{ t('dash.snap.todayCreate') }}</div>
                                         <div class="fw-bold" :class="snapshotLimits.today_creates >= snapshotLimits.max_creates ? 'text-danger' : ''">{{ snapshotLimits.today_creates }} / {{ snapshotLimits.max_creates }}</div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-muted">今日恢复</div>
+                                        <div class="small text-muted">{{ t('dash.snap.todayRestore') }}</div>
                                         <div class="fw-bold" :class="snapshotLimits.today_rollbacks >= snapshotLimits.max_rollbacks ? 'text-danger' : ''">{{ snapshotLimits.today_rollbacks }} / {{ snapshotLimits.max_rollbacks }}</div>
                                     </div>
                                 </div>
@@ -164,29 +164,29 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">备份管理 - {{ backupVmName }}</h5>
+                <h5 class="modal-title">{{ tFormat('dash.backup.manageVm', backupVmName) }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body">
                 <div class="card mb-3">
                     <div class="card-header">
-                        <h6 class="mb-0">备份限制信息</h6>
+                        <h6 class="mb-0">{{ t('dash.backup.limitInfo') }}</h6>
                     </div>
                     <div class="card-body">
                         <div v-if="backupLimits.current >= backupLimits.max_per_vm || backupLimits.today_creates >= backupLimits.daily_limit" class="alert alert-warning py-2 mb-2 small">
-                            <span v-if="backupLimits.current >= backupLimits.max_per_vm">已达到最大备份数上限，请先删除旧备份后再创建</span>
-                            <span v-else>今日备份创建次数已达上限，请明日再试</span>
+                            <span v-if="backupLimits.current >= backupLimits.max_per_vm">{{ t('dash.backup.maxReached') }}</span>
+                            <span v-else>{{ t('dash.backup.dailyLimit') }}</span>
                         </div>
                         <div class="row text-center g-2">
                             <div class="col-6">
                                 <div class="border rounded p-2">
-                                    <div class="small text-muted">当前备份数</div>
+                                    <div class="small text-muted">{{ t('dash.backup.currentCount') }}</div>
                                     <div class="fw-bold" :class="backupLimits.current >= backupLimits.max_per_vm ? 'text-danger' : ''">{{ backupLimits.current }} / {{ backupLimits.max_per_vm }}</div>
                                 </div>
                             </div>
                             <div class="col-6">
                                 <div class="border rounded p-2">
-                                    <div class="small text-muted">今日创建</div>
+                                    <div class="small text-muted">{{ t('dash.snap.todayCreate') }}</div>
                                     <div class="fw-bold" :class="backupLimits.today_creates >= backupLimits.daily_limit ? 'text-danger' : ''">{{ backupLimits.today_creates }} / {{ backupLimits.daily_limit }}</div>
                                 </div>
                             </div>
@@ -194,14 +194,14 @@
                     </div>
                 </div>
                 <div class="card mb-3">
-                    <div class="card-header"><h6 class="mb-0">创建备份</h6></div>
+                    <div class="card-header"><h6 class="mb-0">{{ t('dash.backup.create') }}</h6></div>
                     <div class="card-body">
                         <div class="mb-2">
                             <textarea class="form-control form-control-sm" v-model="backupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
                             <small class="text-muted">{{ (backupForm.notes || '').length }}/50</small>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">停止模式备份 · zstd 压缩</small>
+                            <small class="text-muted">{{ t('dash.backup.stopMode') }}</small>
                             <pv-button @click="createBackup(backupVmId)" :disabled="backupCreating" size="sm">
                                 <span v-if="backupCreating" class="spinner-border spinner-border-sm me-1"></span>
                                 立即备份
@@ -213,30 +213,30 @@
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-2">
                             <input type="checkbox" class="form-check-input m-0" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer">
-                            <h6 class="mb-0">备份历史</h6>
+                            <h6 class="mb-0">{{ t('dash.backup.history') }}</h6>
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <pv-button v-if="isAnyBackupSelected" @click="batchDeleteBackups(backupVmId)" :disabled="backupDeleting" variant="outline-danger" size="sm">
                                 <span v-if="backupDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                 批量删除 ({{ backupSelected.size }})
                             </pv-button>
-                            <span class="badge bg-secondary">{{ backups.length }} 个</span>
+                            <span class="badge bg-secondary">{{ tFormat('dash.count.backup', backups.length) }}</span>
                         </div>
                     </div>
                     <div class="card-body p-0">
-                        <div v-if="backups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
+                        <div v-if="backups.length === 0" class="text-center text-muted py-4 small">{{ t('dash.backup.empty') }}</div>
                         <div v-else class="table-container" style="padding:12px;"><div class="table-responsive" style="max-height:360px;overflow-y:auto;">
                             <table class="table table-hover mb-0 table-sm table-align-center">
                                 <thead style="position:sticky;top:0;">
                                     <tr>
                                         <th class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="isAllBackupsSelected" @change="toggleSelectAllBackups" :disabled="backups.length === 0" style="cursor:pointer"></th>
                                         <th style="width:40px;">#</th>
-                                        <th>备份时间</th>
-                                        <th>大小</th>
-                                        <th>备注</th>
-                                        <th style="width:100px;">状态</th>
-                                        <th>存储</th>
-                                        <th style="width:120px;">操作</th>
+                                        <th>{{ t('dash.backup.time') }}</th>
+                                        <th>{{ t('common.size') }}</th>
+                                        <th>{{ t('common.description') }}</th>
+                                        <th style="width:100px;">{{ t('common.status') }}</th>
+                                        <th>{{ t('common.storage') }}</th>
+                                        <th style="width:120px;">{{ t('common.actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -247,16 +247,16 @@
                                         <td class="small">{{ b.size ? formatBytes(b.size) : '-' }}</td>
                                         <td class="small text-muted">{{ b.notes ? b.notes.substring(0, 50) : '-' }}</td>
                                         <td>
-                                            <span v-if="b.status === 'completed'" class="badge bg-success">完成</span>
+                                            <span v-if="b.status === 'completed'" class="badge bg-success">{{ t('dash.statusDone') }}</span>
                                             <span v-else-if="b.status === 'running'" class="badge bg-warning text-dark">{{ b.progress }}%</span>
-                                            <span v-else-if="b.status === 'pending'" class="badge bg-info">等待中</span>
-                                            <span v-else class="badge bg-danger">失败</span>
+                                            <span v-else-if="b.status === 'pending'" class="badge bg-info">{{ t('dash.statusPending') }}</span>
+                                            <span v-else class="badge bg-danger">{{ t('dash.statusFailed') }}</span>
                                         </td>
                                         <td class="small">{{ b.storage }}</td>
                                         <td>
                                             <div class="d-flex gap-1">
-                                                <pv-button v-if="b.status === 'completed'" @click="restoreBackup(b)" title="恢复此备份" variant="outline" size="sm">恢复</pv-button>
-                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline-danger" size="sm">删除</pv-button>
+                                                <pv-button v-if="b.status === 'completed'" @click="restoreBackup(b)" title="恢复此备份" variant="outline" size="sm">{{ t('dash.backup.restore') }}</pv-button>
+                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
                                             </div>
                                         </td>
                                     </tr>
@@ -277,13 +277,13 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">重置容器密码</h5>
+                <h5 class="modal-title">{{ t('dash.resetPwd.ctTitle') }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body">
                 <form @submit.prevent="submitLxcPasswordReset">
                     <div class="mb-3">
-                        <label class="form-label">新密码 <span class="small text-muted">{{ (lxcPasswordForm.password || '').length }}/13</span></label>
+                        <label class="form-label">{{ t('dash.resetPwd.newPwd') }}<span class="small text-muted">{{ (lxcPasswordForm.password || '').length }}/13</span></label>
                         <div class="input-group">
                             <input :type="lxcPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="lxcPasswordForm.password" maxlength="13" required autocomplete="new-password" placeholder="8-13位，需包含英文+数字+符号" @input="lxcPasswordForm.password = lxcPasswordForm.password.slice(0,13)">
                             <button class="btn btn-outline-secondary" type="button" @click="lxcPwdShowPwd = !lxcPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
@@ -293,7 +293,7 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">确认密码</label>
+                        <label class="form-label">{{ t('dash.resetPwd.confirmPwd') }}</label>
                         <div class="input-group">
                             <input :type="lxcPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="lxcPasswordForm.confirm" required autocomplete="new-password" placeholder="请再次输入密码">
                             <button class="btn btn-outline-secondary" type="button" @click="lxcPwdShowPwd = !lxcPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
@@ -302,7 +302,7 @@
                             </button>
                         </div>
                     </div>
-                    <pv-button type="submit" variant="primary">重置密码</pv-button>
+                    <pv-button type="submit" variant="primary">{{ t('dash.resetPwd.title') }}</pv-button>
                 </form>
             </div>
         </div>
@@ -315,47 +315,47 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">编辑 LXC 容器</h5>
+                <h5 class="modal-title">{{ t('dash.editLxc') }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body">
                 <form @submit.prevent="updateLxc" novalidate>
                     <div class="mb-3">
-                        <label class="form-label">名称</label>
+                        <label class="form-label">{{ t('common.name') }}</label>
                         <input type="text" class="form-control" v-model="editLxcForm.name">
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">分配给</label>
+                        <label class="form-label">{{ t('dash.assignTo') }}</label>
                         <select class="form-select" v-model="editLxcForm.user_id">
                             <option v-for="u in users" :key="u.id" :value="u.id">{{ u.username }}</option>
                         </select>
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">到期时间</label>
+                        <label class="form-label">{{ t('dash.expiry') }}</label>
                         <input type="datetime-local" class="form-control" v-model="editLxcForm.expiration_date" step="1">
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">续费价格</label>
+                        <label class="form-label">{{ t('dash.renewPrice') }}</label>
                         <input type="number" step="0.01" min="0" class="form-control" v-model="editLxcForm.renewal_price" placeholder="如: 50.00">
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">计费周期</label>
+                        <label class="form-label">{{ t('dash.billingPeriod') }}</label>
                         <select class="form-select" v-model="editLxcForm.renewal_period">
-                            <option value="month">月（30天计）</option>
-                            <option value="quarter">季（90天计）</option>
-                            <option value="year">年（365天计）</option>
+                            <option value="month">{{ t('dash.month30') }}</option>
+                            <option value="quarter">{{ t('dash.quarter90') }}</option>
+                            <option value="year">{{ t('dash.year365') }}</option>
                         </select>
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
-                        <label class="form-label">MAC分组</label>
+                        <label class="form-label">{{ t('dash.macGroup') }}</label>
                         <select class="form-select" v-model="editLxcForm.mac_group_id">
-                            <option value="">不加入分组</option>
-                            <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                            <option value="">{{ t('dash.noGroup') }}</option>
+                            <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || t('dash.groupPrefix') + ' ' + g.id }}</option>
                         </select>
                     </div>
                     <div class="d-flex gap-2">
-                        <pv-button type="submit" variant="primary" formnovalidate>保存</pv-button>
-                        <pv-button v-if="user && user.role === 'admin'" type="button" @click="removeLxc" variant="warning">移除（仅解绑）</pv-button>
+                        <pv-button type="submit" variant="primary" formnovalidate>{{ t('common.save') }}</pv-button>
+                        <pv-button v-if="user && user.role === 'admin'" type="button" @click="removeLxc" variant="warning">{{ t('dash.detachOnly') }}</pv-button>
                     </div>
                 </form>
             </div>
@@ -369,19 +369,19 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">快照管理 - {{ lxcSnapshotCtName }}</h5>
+                <h5 class="modal-title">{{ tFormat('dash.snap.manageCt', lxcSnapshotCtName) }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body">
                 <div v-if="lxcSnapshotLoading" class="text-center py-3">
                     <div class="spinner-border spinner-border-sm text-primary" role="status">
-                        <span class="visually-hidden">加载中...</span>
+                        <span class="visually-hidden">{{ t('common.loading') }}</span>
                     </div>
-                    <p class="mt-2 text-muted small">加载快照列表...</p>
+                    <p class="mt-2 text-muted small">{{ t('dash.snap.loadingList') }}</p>
                 </div>
                 <div v-else>
                     <div class="card mb-3">
-                        <div class="card-header"><h6 class="mb-0">创建快照</h6></div>
+                        <div class="card-header"><h6 class="mb-0">{{ t('dash.snap.create') }}</h6></div>
                         <div class="card-body">
                             <div class="mb-2">
                                 <textarea class="form-control form-control-sm" v-model="lxcSnapshotForm.description" rows="2" placeholder="备注（可选）"></textarea>
@@ -398,18 +398,18 @@
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <div class="d-flex align-items-center gap-2">
                                 <input type="checkbox" class="form-check-input m-0" :checked="isAllLxcSnapshotsSelected" @change="toggleSelectAllLxcSnapshots" :disabled="lxcSnapshots.length === 0" style="cursor:pointer">
-                                <h6 class="mb-0">现有快照</h6>
+                                <h6 class="mb-0">{{ t('dash.snap.existing') }}</h6>
                             </div>
                             <div class="d-flex align-items-center gap-2">
                                 <pv-button v-if="isAnyLxcSnapshotSelected" @click="batchDeleteLxcSnapshots()" :disabled="lxcSnapshotDeleting" variant="outline-danger" size="sm">
                                     <span v-if="lxcSnapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                     批量删除 ({{ lxcSnapshotSelected.size }})
                                 </pv-button>
-                                <span class="badge bg-secondary">{{ lxcSnapshots.length }} 个</span>
+                                <span class="badge bg-secondary">{{ tFormat('dash.count.snapshot', lxcSnapshots.length) }}</span>
                             </div>
                         </div>
                         <div class="card-body p-0">
-                            <div v-if="lxcSnapshots.length === 0" class="text-center text-muted py-4 small">暂无快照</div>
+                            <div v-if="lxcSnapshots.length === 0" class="text-center text-muted py-4 small">{{ t('dash.snap.empty') }}</div>
                             <div v-else class="list-group list-group-flush">
                                 <div v-for="snap in lxcSnapshots" :key="snap.name" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" :class="lxcSnapshotSelected.has(snap.name) ? 'list-group-item-primary' : ''">
                                     <div class="d-flex align-items-center gap-2 me-3" style="min-width:0">
@@ -423,32 +423,32 @@
                                         </div>
                                     </div>
                                     <div class="d-flex gap-1 flex-shrink-0">
-                                        <pv-button @click="rollbackLxcSnapshot(snap.name)" title="回滚到此快照" variant="outline" size="sm">回滚</pv-button>
-                                        <pv-button @click="deleteLxcSnapshot(snap.name)" title="删除快照" variant="outline-danger" size="sm">删除</pv-button>
+                                        <pv-button @click="rollbackLxcSnapshot(snap.name)" title="回滚到此快照" variant="outline" size="sm">{{ t('dash.snap.rollback') }}</pv-button>
+                                        <pv-button @click="deleteLxcSnapshot(snap.name)" title="删除快照" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="card">
-                        <div class="card-header"><h6 class="mb-0">快照限制信息</h6></div>
+                        <div class="card-header"><h6 class="mb-0">{{ t('dash.snap.limitInfo') }}</h6></div>
                         <div class="card-body">
                             <div class="row text-center g-2">
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-muted">当前快照数</div>
+                                        <div class="small text-muted">{{ t('dash.snap.currentCount') }}</div>
                                         <div class="fw-bold" :class="lxcSnapshotLimits.current >= lxcSnapshotLimits.max ? 'text-danger' : ''">{{ lxcSnapshotLimits.current }} / {{ lxcSnapshotLimits.max }}</div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-muted">今日创建</div>
+                                        <div class="small text-muted">{{ t('dash.snap.todayCreate') }}</div>
                                         <div class="fw-bold" :class="lxcSnapshotLimits.today_creates >= lxcSnapshotLimits.max_creates ? 'text-danger' : ''">{{ lxcSnapshotLimits.today_creates }} / {{ lxcSnapshotLimits.max_creates }}</div>
                                     </div>
                                 </div>
                                 <div class="col-4">
                                     <div class="border rounded p-2">
-                                        <div class="small text-muted">今日恢复</div>
+                                        <div class="small text-muted">{{ t('dash.snap.todayRestore') }}</div>
                                         <div class="fw-bold" :class="lxcSnapshotLimits.today_rollbacks >= lxcSnapshotLimits.max_rollbacks ? 'text-danger' : ''">{{ lxcSnapshotLimits.today_rollbacks }} / {{ lxcSnapshotLimits.max_rollbacks }}</div>
                                     </div>
                                 </div>
@@ -467,29 +467,29 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">备份管理 - {{ lxcBackupCtName }}</h5>
+                <h5 class="modal-title">{{ tFormat('dash.backup.manageCt', lxcBackupCtName) }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body">
                 <div class="card mb-3">
                     <div class="card-header">
-                        <h6 class="mb-0">备份限制信息</h6>
+                        <h6 class="mb-0">{{ t('dash.backup.limitInfo') }}</h6>
                     </div>
                     <div class="card-body">
                         <div v-if="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm || lxcBackupLimits.today_creates >= lxcBackupLimits.daily_limit" class="alert alert-warning py-2 mb-2 small">
-                            <span v-if="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm">已达到最大备份数上限，请先删除旧备份后再创建</span>
-                            <span v-else>今日备份创建次数已达上限，请明日再试</span>
+                            <span v-if="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm">{{ t('dash.backup.maxReached') }}</span>
+                            <span v-else>{{ t('dash.backup.dailyLimit') }}</span>
                         </div>
                         <div class="row text-center g-2">
                             <div class="col-6">
                                 <div class="border rounded p-2">
-                                    <div class="small text-muted">当前备份数</div>
+                                    <div class="small text-muted">{{ t('dash.backup.currentCount') }}</div>
                                     <div class="fw-bold" :class="lxcBackupLimits.current >= lxcBackupLimits.max_per_vm ? 'text-danger' : ''">{{ lxcBackupLimits.current }} / {{ lxcBackupLimits.max_per_vm }}</div>
                                 </div>
                             </div>
                             <div class="col-6">
                                 <div class="border rounded p-2">
-                                    <div class="small text-muted">今日创建</div>
+                                    <div class="small text-muted">{{ t('dash.snap.todayCreate') }}</div>
                                     <div class="fw-bold" :class="lxcBackupLimits.today_creates >= lxcBackupLimits.daily_limit ? 'text-danger' : ''">{{ lxcBackupLimits.today_creates }} / {{ lxcBackupLimits.daily_limit }}</div>
                                 </div>
                             </div>
@@ -497,14 +497,14 @@
                     </div>
                 </div>
                 <div class="card mb-3">
-                    <div class="card-header"><h6 class="mb-0">创建备份</h6></div>
+                    <div class="card-header"><h6 class="mb-0">{{ t('dash.backup.create') }}</h6></div>
                     <div class="card-body">
                         <div class="mb-2">
                             <textarea class="form-control form-control-sm" v-model="lxcBackupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
                             <small class="text-muted">{{ (lxcBackupForm.notes || '').length }}/50</small>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">停止模式备份 · zstd 压缩</small>
+                            <small class="text-muted">{{ t('dash.backup.stopMode') }}</small>
                             <pv-button @click="createLxcBackup()" :disabled="lxcBackupCreating" size="sm">
                                 <span v-if="lxcBackupCreating" class="spinner-border spinner-border-sm me-1"></span>
                                 立即备份
@@ -516,30 +516,30 @@
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-2">
                             <input type="checkbox" class="form-check-input m-0" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer">
-                            <h6 class="mb-0">备份历史</h6>
+                            <h6 class="mb-0">{{ t('dash.backup.history') }}</h6>
                         </div>
                         <div class="d-flex align-items-center gap-2">
                             <pv-button v-if="isAnyLxcBackupSelected" @click="batchDeleteLxcBackups()" :disabled="lxcBackupDeleting" variant="outline-danger" size="sm">
                                 <span v-if="lxcBackupDeleting" class="spinner-border spinner-border-sm me-1"></span>
                                 批量删除 ({{ lxcBackupSelected.size }})
                             </pv-button>
-                            <span class="badge bg-secondary">{{ lxcBackups.length }} 个</span>
+                            <span class="badge bg-secondary">{{ tFormat('dash.count.backup', lxcBackups.length) }}</span>
                         </div>
                     </div>
                     <div class="card-body p-0">
-                        <div v-if="lxcBackups.length === 0" class="text-center text-muted py-4 small">暂无备份</div>
+                        <div v-if="lxcBackups.length === 0" class="text-center text-muted py-4 small">{{ t('dash.backup.empty') }}</div>
                         <div v-else class="table-container" style="padding:12px;"><div class="table-responsive" style="max-height:360px;overflow-y:auto;">
                             <table class="table table-hover mb-0 table-sm table-align-center">
                                 <thead style="position:sticky;top:0;">
                                     <tr>
                                         <th class="checkbox-col"><input type="checkbox" class="form-check-input" :checked="isAllLxcBackupsSelected" @change="toggleSelectAllLxcBackups" :disabled="lxcBackups.length === 0" style="cursor:pointer"></th>
                                         <th style="width:40px;">#</th>
-                                        <th>备份时间</th>
-                                        <th>大小</th>
-                                        <th>备注</th>
-                                        <th style="width:100px;">状态</th>
-                                        <th>存储</th>
-                                        <th style="width:120px;">操作</th>
+                                        <th>{{ t('dash.backup.time') }}</th>
+                                        <th>{{ t('common.size') }}</th>
+                                        <th>{{ t('common.description') }}</th>
+                                        <th style="width:100px;">{{ t('common.status') }}</th>
+                                        <th>{{ t('common.storage') }}</th>
+                                        <th style="width:120px;">{{ t('common.actions') }}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -550,15 +550,15 @@
                                         <td class="small">{{ b.size ? formatBytes(b.size) : '-' }}</td>
                                         <td class="small text-muted">{{ b.notes ? b.notes.substring(0, 50) : '-' }}</td>
                                         <td>
-                                            <span v-if="b.status === 'completed'" class="badge bg-success">完成</span>
+                                            <span v-if="b.status === 'completed'" class="badge bg-success">{{ t('dash.statusDone') }}</span>
                                             <span v-else-if="b.status === 'running'" class="badge bg-warning text-dark">{{ b.progress }}%</span>
-                                            <span v-else-if="b.status === 'pending'" class="badge bg-info">等待中</span>
-                                            <span v-else class="badge bg-danger">失败</span>
+                                            <span v-else-if="b.status === 'pending'" class="badge bg-info">{{ t('dash.statusPending') }}</span>
+                                            <span v-else class="badge bg-danger">{{ t('dash.statusFailed') }}</span>
                                         </td>
                                         <td class="small">{{ b.storage }}</td>
                                         <td>
-                                            <pv-button v-if="b.status === 'completed'" @click="restoreLxcBackup(b)" title="恢复此备份" variant="outline" size="sm">恢复</pv-button>
-                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteLxcBackup(b.id, lxcBackupCtId)" title="删除备份" variant="outline-danger" size="sm">删除</pv-button>
+                                            <pv-button v-if="b.status === 'completed'" @click="restoreLxcBackup(b)" title="恢复此备份" variant="outline" size="sm">{{ t('dash.backup.restore') }}</pv-button>
+                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteLxcBackup(b.id, lxcBackupCtId)" title="删除备份" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -579,17 +579,17 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">CDK 兑换</h5>
+                <h5 class="modal-title">{{ t('dash.overview.cdk') }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body" @click="toggleCdkDropdown('vm', false); toggleCdkDropdown('lxc', false)">
                 <div v-if="cdkRedeemStep === 'input'">
                     <div class="mb-3">
-                        <label class="form-label">CDK 兑换码</label>
+                        <label class="form-label">{{ t('dash.cdk.code') }}</label>
                         <input type="text" class="form-control" v-model="cdkRedeemForm.code" placeholder="输入 CDK 码，如 PVE-XXXX-XXXX-XXXX" style="text-transform: uppercase;" @input="cdkRedeemForm.code = cdkRedeemForm.code.toUpperCase()">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">资源类型</label>
+                        <label class="form-label">{{ t('dash.cdk.resType') }}</label>
                         <div class="d-flex gap-3">
                             <label class="form-check-label d-flex align-items-center gap-1" style="cursor:pointer;">
                                 <input type="radio" class="form-check-input" value="vm" v-model="cdkRedeemType">
@@ -602,7 +602,7 @@
                         </div>
                     </div>
                     <div class="mb-3" v-if="cdkRedeemType === 'vm'">
-                        <label class="form-label" id="cdk-vm-label">选择要续费的虚拟机</label>
+                        <label class="form-label" id="cdk-vm-label">{{ t('dash.cdk.selectVm') }}</label>
                         <div class="custom-select" style="width:100%;" @click.stop>
                             <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-vm-label"
                                  data-cdk-select="vm"
@@ -613,7 +613,7 @@
                                 <span v-if="cdkRedeemForm.vm_id">
                                     {{ getRedeemableVmName(cdkRedeemForm.vm_id) }}
                                 </span>
-                                <span v-else class="custom-select-placeholder">请选择要续费的虚拟机</span>
+                                <span v-else class="custom-select-placeholder">{{ t('dash.cdk.selectVm') }}</span>
                             </div>
                         </div>
                         <!-- 下拉菜单 Teleport 到 body，绕过 modal-content 的 backdrop-filter 导致 fixed 降级 -->
@@ -628,7 +628,7 @@
                         </Teleport>
                     </div>
                     <div class="mb-3" v-if="cdkRedeemType === 'lxc'">
-                        <label class="form-label" id="cdk-lxc-label">选择要续费的LXC容器</label>
+                        <label class="form-label" id="cdk-lxc-label">{{ t('dash.cdk.selectLxc') }}</label>
                         <div class="custom-select" style="width:100%;" @click.stop>
                             <div class="custom-select-trigger" role="button" tabindex="0" aria-labelledby="cdk-lxc-label"
                                  data-cdk-select="lxc"
@@ -639,7 +639,7 @@
                                 <span v-if="cdkRedeemForm.container_id">
                                     {{ getRedeemableLxcName(cdkRedeemForm.container_id) }}
                                 </span>
-                                <span v-else class="custom-select-placeholder">请选择要续费的LXC容器</span>
+                                <span v-else class="custom-select-placeholder">{{ t('dash.cdk.selectLxc') }}</span>
                             </div>
                         </div>
                         <Teleport to="body">
@@ -656,17 +656,17 @@
                 </div>
                 <div v-if="cdkRedeemStep === 'result'">
                     <div class="alert alert-success">
-                        <strong>兑换成功！</strong>
+                        <strong>{{ t('dash.cdk.success') }}</strong>
                         <p class="mb-0 mt-2">{{ cdkRedeemMessage }}</p>
                     </div>
                 </div>
             </div>
             <div class="modal-footer d-flex gap-2" v-if="cdkRedeemStep === 'input'">
-                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-                <pv-button type="button" @click="redeemCdk" :disabled="!cdkRedeemForm.code || (cdkRedeemType === 'vm' && !cdkRedeemForm.vm_id) || (cdkRedeemType === 'lxc' && !cdkRedeemForm.container_id)" variant="primary">确认兑换</pv-button>
+                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">{{ t('common.cancel') }}</pv-button>
+                <pv-button type="button" @click="redeemCdk" :disabled="!cdkRedeemForm.code || (cdkRedeemType === 'vm' && !cdkRedeemForm.vm_id) || (cdkRedeemType === 'lxc' && !cdkRedeemForm.container_id)" variant="primary">{{ t('dash.cdk.confirm') }}</pv-button>
             </div>
             <div class="modal-footer" v-if="cdkRedeemStep === 'result'">
-                <pv-button type="button" data-bs-dismiss="modal" @click="cdkRedeemStep = 'input'">完成</pv-button>
+                <pv-button type="button" data-bs-dismiss="modal" @click="cdkRedeemStep = 'input'">{{ t('dash.statusDone') }}</pv-button>
             </div>
         </div>
     </div>
@@ -679,44 +679,44 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">余额抵扣续费</h5>
+                <h5 class="modal-title">{{ t('dash.renew.balanceDeduct') }}</h5>
                 <pv-button type="button" variant="close" @click="renewShow = false"></pv-button>
             </div>
             <div class="modal-body">
-                <p v-if="renewResource">续费资源：{{ renewResource.name || (renewResource.vm_id ? 'VM ' + renewResource.vm_id : 'CT ' + renewResource.ct_id) }} <span class="text-muted">(ID: {{ renewResource.vm_id || renewResource.ct_id }})</span></p>
-                <p v-if="renewResource">续费价格：¥{{ parseFloat(renewResource.renewal_price||0).toFixed(2) }} / {{ renewPeriodLabel(renewResource.renewal_period) }}</p>
-                <p v-if="renewResource && renewResource.expiration_date">到期时间：{{ formatDate(renewResource.expiration_date) }} <span :class="getExpiryColor(renewResource.expiration_date) + ' small'">({{ daysUntilExpire(renewResource.expiration_date) }})</span></p>
+                <p v-if="renewResource">{{ t('dash.renew.resource') }} {{ renewResource.name || (renewResource.vm_id ? 'VM ' + renewResource.vm_id : 'CT ' + renewResource.ct_id) }} <span class="text-muted">(ID: {{ renewResource.vm_id || renewResource.ct_id }})</span></p>
+                <p v-if="renewResource">{{ t('dash.renew.priceLabel') }} ¥{{ parseFloat(renewResource.renewal_price||0).toFixed(2) }} / {{ renewPeriodLabel(renewResource.renewal_period) }}</p>
+                <p v-if="renewResource && renewResource.expiration_date">{{ t('dash.renew.expiryLabel') }} {{ formatDate(renewResource.expiration_date) }} <span :class="getExpiryColor(renewResource.expiration_date) + ' small'">({{ daysUntilExpire(renewResource.expiration_date) }})</span></p>
                 <!-- 关联数据盘续费（仅 VM） -->
                 <div v-if="renewResource && renewResource.vm_id !== undefined && diskListForRenew && diskListForRenew.length > 0" class="mb-3">
-                    <label class="form-label">关联数据盘续费</label>
+                    <label class="form-label">{{ t('dash.renew.diskRenew') }}</label>
                     <div v-for="disk in diskListForRenew" :key="disk.id" class="form-check mb-1">
                         <input type="checkbox" :id="'disk-renew-' + disk.id" v-model="disk._selected" class="form-check-input">
                         <label :for="'disk-renew-' + disk.id" class="form-check-label">
                             {{ disk.disk_name || disk.volume_id }}（{{ disk.capacity_gb }} GiB）
-                            <span class="text-muted small">到期 {{ formatDate(disk.expire_time) }} +￥{{ calcDiskRenewPrice(disk).toFixed(2) }}</span>
+                            <span class="text-muted small">{{ t('dash.renew.expiry') }} {{ formatDate(disk.expire_time) }} +￥{{ calcDiskRenewPrice(disk).toFixed(2) }}</span>
                         </label>
                     </div>
-                    <div v-if="selectedDiskRenewTotal > 0" class="text-muted small mt-1">磁盘续费小计：¥{{ selectedDiskRenewTotal.toFixed(2) }}</div>
+                    <div v-if="selectedDiskRenewTotal > 0" class="text-muted small mt-1">{{ t('dash.renew.diskTotal') }} ¥{{ selectedDiskRenewTotal.toFixed(2) }}</div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">计费周期</label>
+                    <label class="form-label">{{ t('dash.billingPeriod') }}</label>
                     <select class="form-select" v-model="renewFormPeriod" style="max-width:200px;">
-                        <option value="month">月付（30天）</option>
-                        <option value="quarter">季付（90天）</option>
-                        <option value="year">年付（365天）</option>
+                        <option value="month">{{ t('dash.monthly30') }}</option>
+                        <option value="quarter">{{ t('dash.quarterly90') }}</option>
+                        <option value="year">{{ t('dash.yearly365') }}</option>
                     </select>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">续费数量({{ renewPeriodLabel(renewFormPeriod) }})</label>
+                    <label class="form-label">{{ t('dash.renew.qty') }}({{ renewPeriodLabel(renewFormPeriod) }})</label>
                     <input type="number" class="form-control" v-model.number="renewQuantity" min="1" step="1" style="max-width:120px;" @change="renewQuantity = Math.max(1, Math.floor(Math.abs(renewQuantity || 1)))">
                 </div>
-                <p v-if="renewResource">应付金额：¥{{ calcRenewTotal().toFixed(2) }}</p>
-                <p>当前余额：¥{{ walletBalance }}</p>
+                <p v-if="renewResource">{{ t('dash.renew.payable') }} ¥{{ calcRenewTotal().toFixed(2) }}</p>
+                <p>{{ t('dash.renew.balance') }} ¥{{ walletBalance }}</p>
                 <div v-if="renewError" class="alert alert-danger py-2">{{ renewError }}</div>
             </div>
             <div class="modal-footer d-flex gap-2">
-                <pv-button type="button" @click="renewShow = false" variant="secondary">取消</pv-button>
-                <pv-button type="button" @click="submitRenew" variant="primary">确认续费</pv-button>
+                <pv-button type="button" @click="renewShow = false" variant="secondary">{{ t('common.cancel') }}</pv-button>
+                <pv-button type="button" @click="submitRenew" variant="primary">{{ t('dash.renew.confirm') }}</pv-button>
             </div>
         </div>
     </div>
@@ -729,16 +729,16 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">重置密码</h5>
+                <h5 class="modal-title">{{ t('dash.resetPwd.title') }}</h5>
                 <pv-button type="button" variant="close" @click="vmPwdShow = false"></pv-button>
             </div>
             <div class="modal-body">
-                <div v-if="vmPwdCiuser === false" class="alert alert-danger py-2 mb-0">当前虚拟机未配置Cloud-init驱动，请联系管理员！</div>
+                <div v-if="vmPwdCiuser === false" class="alert alert-danger py-2 mb-0">{{ t('dash.resetPwd.noCloudInit') }}</div>
                 <div v-else>
-                    <p v-if="vmPwdResource">资源：{{ vmPwdResource.name || ('VM ' + vmPwdResource.vm_id) }}</p>
-                    <p v-if="vmPwdResource">账号：{{ vmPwdCiuser }}</p>
+                    <p v-if="vmPwdResource">{{ t('dash.resetPwd.resource') }} {{ vmPwdResource.name || ('VM ' + vmPwdResource.vm_id) }}</p>
+                    <p v-if="vmPwdResource">{{ t('dash.resetPwd.account') }}: {{ vmPwdCiuser }}</p>
                     <div class="mb-3">
-                        <label class="form-label">新密码 <span class="small text-muted">{{ (vmPwdNewPassword || '').length }}/13</span></label>
+                        <label class="form-label">{{ t('dash.resetPwd.newPwd') }}<span class="small text-muted">{{ (vmPwdNewPassword || '').length }}/13</span></label>
                         <div class="input-group">
                             <input :type="vmPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="vmPwdNewPassword" maxlength="13" placeholder="8-13位，需包含英文+数字+符号" @input="vmPwdNewPassword = vmPwdNewPassword.slice(0,13)">
                             <button class="btn btn-outline-secondary" type="button" @click="vmPwdShowPwd = !vmPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
@@ -748,7 +748,7 @@
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">确认密码</label>
+                        <label class="form-label">{{ t('dash.resetPwd.confirmPwd') }}</label>
                         <div class="input-group">
                             <input :type="vmPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="vmPwdConfirm" placeholder="请再次输入密码" autocomplete="new-password">
                             <button class="btn btn-outline-secondary" type="button" @click="vmPwdShowPwd = !vmPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
@@ -761,11 +761,11 @@
                 </div>
             </div>
             <div class="modal-footer d-flex gap-2" v-if="vmPwdCiuser !== false">
-                <pv-button type="button" @click="vmPwdShow = false" variant="secondary">取消</pv-button>
-                <pv-button type="button" @click="submitVmPasswordReset" :disabled="!vmPwdNewPassword || vmPwdNewPassword.length < 8" variant="primary">确认重置</pv-button>
+                <pv-button type="button" @click="vmPwdShow = false" variant="secondary">{{ t('common.cancel') }}</pv-button>
+                <pv-button type="button" @click="submitVmPasswordReset" :disabled="!vmPwdNewPassword || vmPwdNewPassword.length < 8" variant="primary">{{ t('dash.resetPwd.confirm') }}</pv-button>
             </div>
             <div class="modal-footer" v-if="vmPwdCiuser === false">
-                <pv-button type="button" @click="vmPwdShow = false" variant="secondary">关闭</pv-button>
+                <pv-button type="button" @click="vmPwdShow = false" variant="secondary">{{ t('common.close') }}</pv-button>
             </div>
         </div>
     </div>
@@ -776,54 +776,54 @@
 <Teleport to="body">
 <div class="modal fade" id="orderModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
-        <div class="modal-header"><h5 class="modal-title">确认订购</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-header"><h5 class="modal-title">{{ t('dash.order.confirmOrder') }}</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="mb-3"><strong>{{ orderPackage.name }}</strong></div>
             <!-- 私有网络：子网选择（VM/LXC 下单必选，放在操作系统上方） -->
             <div class="mb-3">
-                <label class="form-label">网络（子网）<span class="text-danger">*</span></label>
+                <label class="form-label">{{ t('dash.order.network') }}<span class="text-danger">*</span></label>
                 <select class="form-select" v-model="orderForm.subnet_id" :disabled="orderSubnetsLoading">
-                    <option :value="0">请选择网络</option>
+                    <option :value="0">{{ t('dash.order.selectNetwork') }}</option>
                     <option v-for="s in orderSubnets" :key="s.id" :value="s.id">
                         {{ s.vlan_name }}（{{ s.cidr }}）
                     </option>
                 </select>
-                <div class="form-text text-muted" v-if="orderSubnetsLoading">加载中...</div>
-                <div class="form-text text-muted" v-else-if="orderSubnets.length === 0">暂无子网，请先在「私有网络」中新建子网后再购买</div>
+                <div class="form-text text-muted" v-if="orderSubnetsLoading">{{ t('common.loading') }}</div>
+                <div class="form-text text-muted" v-else-if="orderSubnets.length === 0">{{ t('dash.order.noSubnet') }}</div>
             </div>
             <!-- v1.3 新增：操作系统选择（仅 VM 套餐显示） -->
             <div class="mb-3" v-if="orderType === 'vm'">
-                <label class="form-label">操作系统<span class="text-danger">*</span></label>
+                <label class="form-label">{{ t('dash.order.os') }}<span class="text-danger">*</span></label>
                 <select class="form-select" v-model="orderForm.os_template_id" :disabled="orderOsLoading">
-                    <option :value="0">请选择系统</option>
+                    <option :value="0">{{ t('dash.order.selectOs') }}</option>
                     <option v-for="t in orderOsTemplates" :key="t.id" :value="t.id">
                         {{ t.name }}
                     </option>
                 </select>
-                <div class="form-text text-muted" v-if="orderOsLoading">加载中...</div>
+                <div class="form-text text-muted" v-if="orderOsLoading">{{ t('common.loading') }}</div>
                 <div class="form-text text-muted" v-else-if="orderOsTemplates.length === 0">
                     该套餐暂无可选系统，请选择其他套餐
                 </div>
             </div>
             <div class="mb-3">
-                <label class="form-label">计费周期</label>
+                <label class="form-label">{{ t('dash.billingPeriod') }}</label>
                 <div class="order-period-display">
-                    <span class="badge bg-primary">{{ orderForm.period === 'month' ? '月付' : (orderForm.period === 'quarter' ? '季付' : '年付') }}</span>
-                    <span class="text-muted ms-2" v-if="orderPackage.monthly_price">¥{{ getPackageFinalPrice(orderPackage, orderForm.period) }} / {{ orderForm.period === 'month' ? '月' : (orderForm.period === 'quarter' ? '季' : '年') }}</span>
+                    <span class="badge bg-primary">{{ orderForm.period === 'month' ? t('dash.order.monthPay') : (orderForm.period === 'quarter' ? t('dash.order.quarterPay') : t('dash.order.yearPay')) }}</span>
+                    <span class="text-muted ms-2" v-if="orderPackage.monthly_price">¥{{ getPackageFinalPrice(orderPackage, orderForm.period) }} / {{ orderForm.period === 'month' ? t('dash.period.month') : (orderForm.period === 'quarter' ? t('dash.period.quarter') : t('dash.period.year')) }}</span>
                 </div>
             </div>
-            <div class="mb-3"><label class="form-label">数量</label>
+            <div class="mb-3"><label class="form-label">{{ t('common.quantity') }}</label>
                 <input type="number" class="form-control" v-model="orderForm.quantity" min="1" max="10">
             </div>
             <div class="d-flex justify-content-between mb-2">
-                <span>当前余额：</span>
+                <span>{{ t('dash.order.balance') }}</span>
                 <strong>¥{{ walletBalance }}</strong>
             </div>
-            <div class="alert alert-info">应付：<strong>{{ orderTotal }} 元</strong></div>
+            <div class="alert alert-info">{{ t('dash.order.total') }}<strong>{{ tFormat('dash.order.totalYuan', orderTotal) }}</strong></div>
         </div>
         <div class="modal-footer d-flex gap-2">
-            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-            <pv-button type="button" @click="confirmOrder" :disabled="orderLoading || (orderType === 'vm' && (!orderForm.os_template_id || !orderForm.subnet_id)) || (orderType === 'lxc' && !orderForm.subnet_id)" variant="primary">{{ orderLoading ? '处理中...' : '确认开通' }}</pv-button>
+            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">{{ t('common.cancel') }}</pv-button>
+            <pv-button type="button" @click="confirmOrder" :disabled="orderLoading || (orderType === 'vm' && (!orderForm.os_template_id || !orderForm.subnet_id)) || (orderType === 'lxc' && !orderForm.subnet_id)" variant="primary">{{ orderLoading ? t('dash.processing') : t('dash.order.orderNow') }}</pv-button>
         </div>
     </div></div>
 </div>
@@ -848,8 +848,8 @@
                 <div class="message-detail-content" style="line-height:1.7;white-space:pre-wrap;">{{ currentMsg.content }}</div>
             </div>
             <div class="modal-footer d-flex gap-2">
-                <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger">删除</pv-button>
-                <pv-button type="button" data-bs-dismiss="modal">关闭</pv-button>
+                <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger">{{ t('common.delete') }}</pv-button>
+                <pv-button type="button" data-bs-dismiss="modal">{{ t('common.close') }}</pv-button>
             </div>
         </div>
     </div>
@@ -860,19 +860,19 @@
 <Teleport to="body">
 <div class="modal fade" id="osSwitchModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content" style="background:var(--bg-modal)">
-        <div class="modal-header"><h5 class="modal-title">切换操作系统</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-header"><h5 class="modal-title">{{ t('dash.osSwitch.title') }}</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="alert alert-warning" style="border:1px solid var(--bs-warning-border-subtle, #ffc107);background:color-mix(in srgb, var(--bs-warning) 15%, var(--bg-card, #fff));">
-                <strong style="color:var(--bs-warning-text-emphasis, #664d00);font-size:15px;">重要提示：</strong>
+                <strong style="color:var(--bs-warning-text-emphasis, #664d00);font-size:15px;">{{ t('dash.osSwitch.warn') }}</strong>
                 <ul class="mb-0 mt-1" style="color:var(--text-primary);line-height:1.8;">
-                    <li>切换系统将<strong style="color:var(--bs-danger);">清除系统盘所有数据</strong>，请提前备份重要文件</li>
-                    <li>数据盘不受影响，<strong style="color:var(--bs-success);">数据不会丢失</strong></li>
-                    <li>切换过程约 3-10 分钟，期间虚拟机将停机</li>
-                    <li>切换完成后将获得新的初始密码</li>
+                    <li>{{ t('dash.osSwitch.willClear') }}<strong style="color:var(--bs-danger);">{{ t('dash.osSwitch.clearDisk') }}</strong>{{ t('dash.osSwitch.backupFirst') }}</li>
+                    <li>{{ t('dash.osSwitch.diskSafe') }}<strong style="color:var(--bs-success);">{{ t('dash.osSwitch.noLoss') }}</strong></li>
+                    <li>{{ t('dash.osSwitch.duration') }}</li>
+                    <li>{{ t('dash.osSwitch.newPwd') }}</li>
                 </ul>
             </div>
             <div class="mb-3">
-                <label class="form-label fw-bold" style="color:var(--bs-primary)">选择目标系统</label>
+                <label class="form-label fw-bold" style="color:var(--bs-primary)">{{ t('dash.osSwitch.selectTarget') }}</label>
                 <div class="row g-2">
                     <div class="col-md-6" v-for="t in osSwitchList" :key="t.id">
                         <div class="card border" @click="osSwitchSelectedId = t.id"
@@ -903,19 +903,19 @@
                         </div>
                     </div>
                 </div>
-                <div v-if="osSwitchList.length === 0" class="text-muted small py-3 text-center">暂无可切换的系统</div>
+                <div v-if="osSwitchList.length === 0" class="text-muted small py-3 text-center">{{ t('dash.osSwitch.none') }}</div>
             </div>
             <div class="current-os text-muted small mb-2" v-if="osSwitchCurrentName">
                 当前系统：{{ osSwitchCurrentName }}
             </div>
             <div class="form-check" v-if="osSwitchSelectedId">
                 <input class="form-check-input" type="checkbox" id="osSwitchConfirm" v-model="osSwitchConfirm">
-                <label class="form-check-label" for="osSwitchConfirm">我已知晓切换将清除系统盘数据，并已备份重要文件</label>
+                <label class="form-check-label" for="osSwitchConfirm">{{ t('dash.osSwitch.acknowledge') }}</label>
             </div>
         </div>
         <div class="modal-footer d-flex gap-2">
-            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-            <pv-button type="button" variant="danger" :disabled="!osSwitchConfirm || osSwitchSubmitting" :loading="osSwitchSubmitting" @click="submitOsSwitch()">确认切换系统</pv-button>
+            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">{{ t('common.cancel') }}</pv-button>
+            <pv-button type="button" variant="danger" :disabled="!osSwitchConfirm || osSwitchSubmitting" :loading="osSwitchSubmitting" @click="submitOsSwitch()">{{ t('dash.osSwitch.confirm') }}</pv-button>
         </div>
     </div></div>
 </div>
@@ -925,25 +925,25 @@
 <Teleport to="body">
 <div class="modal fade" id="createSubnetModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
-        <div class="modal-header"><h5 class="modal-title">新建子网</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-header"><h5 class="modal-title">{{ t('dash.subnet.create') }}</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-muted small">已创建 <strong>{{ subnetQuota.used }}</strong> / <strong>{{ subnetQuota.max > 0 ? subnetQuota.max : '∞' }}</strong> 个子网</span>
-                <span v-if="subnetQuota.max > 0" class="text-muted small">剩余 {{ Math.max(0, subnetQuota.max - subnetQuota.used) }} 个</span>
-                <span v-else class="text-muted small">管理员不受限</span>
+                <span class="text-muted small">{{ t('dash.subnet.created') }}<strong>{{ subnetQuota.used }}</strong> / <strong>{{ subnetQuota.max > 0 ? subnetQuota.max : '∞' }}</strong {{ t('dash.subnet.subnetUnit') }}</span>
+                <span v-if="subnetQuota.max > 0" class="text-muted small">{{ tFormat('dash.subnet.remaining', Math.max(0, subnetQuota.max - subnetQuota.used)) }}</span>
+                <span v-else class="text-muted small">{{ t('dash.subnet.adminUnlimited') }}</span>
             </div>
             <div v-if="subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max" class="alert alert-warning py-2 small mb-3">
                 子网数量已达上限，无法继续创建，如需更多请联系管理员
             </div>
-            <p class="text-muted small">创建后系统将自动完成网段分配，无需手动配置：</p>
+            <p class="text-muted small">{{ t('dash.subnet.autoAssignHint') }}</p>
             <ul class="small text-muted mb-3">
-                <li>网段自动分配，依次递增</li>
-                <li>网关为网段起始地址（如 172.16.0.1）</li>
-                <li>名称由系统自动生成，不可编辑</li>
+                <li>{{ t('dash.subnet.autoInc') }}</li>
+                <li>{{ t('dash.subnet.gatewayHint') }}</li>
+                <li>{{ t('dash.subnet.nameAuto') }}</li>
             </ul>
             <div class="alert alert-info mb-0">
-                <div>创建完成后可在列表中查看分配的 <strong>网段 / 网关</strong></div>
-                <div class="mt-1">删除子网前需先解绑其下所有服务器</div>
+                <div>{{ t('dash.subnet.viewHint') }}<strong>{{ t('dash.subnet.segmentGateway') }}</strong></div>
+                <div class="mt-1">{{ t('dash.subnet.unbindFirst') }}</div>
             </div>
             <div v-if="subnetCreating" class="text-center text-muted py-3">
                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
@@ -951,8 +951,8 @@
             </div>
         </div>
         <div class="modal-footer d-flex gap-2">
-            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-            <pv-button type="button" @click="createSubnet" :disabled="subnetCreating || (subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max)" :loading="subnetCreating" variant="primary">确认创建</pv-button>
+            <pv-button type="button" data-bs-dismiss="modal" variant="secondary">{{ t('common.cancel') }}</pv-button>
+            <pv-button type="button" @click="createSubnet" :disabled="subnetCreating || (subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max)" :loading="subnetCreating" variant="primary">{{ t('dash.subnet.confirmCreate') }}</pv-button>
         </div>
     </div></div>
 </div>
@@ -962,16 +962,16 @@
 <Teleport to="body">
 <div class="modal fade" id="bindSubnetModal" tabindex="-1" data-bs-focus="false">
     <div class="modal-dialog modal-dialog-centered"><div class="modal-content" style="background:var(--bg-modal)">
-        <div class="modal-header"><h5 class="modal-title">绑定子网</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
+        <div class="modal-header"><h5 class="modal-title">{{ t('dash.subnet.bind') }}</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="mb-3">
                 <strong>{{ bindSubnetDevice.name || (bindSubnetDevice.type === 'vm' ? ('VM ' + bindSubnetDevice.vm_id) : ('CT ' + bindSubnetDevice.ct_id)) }}</strong>
-                <span v-if="bindSubnetDevice.status && bindSubnetDevice.status.status === 'running'" class="badge bg-success ms-2">运行中</span>
-                <span v-else class="badge bg-secondary ms-2">已停止</span>
+                <span v-if="bindSubnetDevice.status && bindSubnetDevice.status.status === 'running'" class="badge bg-success ms-2">{{ t('dash.vm.running') }}</span>
+                <span v-else class="badge bg-secondary ms-2">{{ t('dash.vm.stopped') }}</span>
             </div>
             <div class="alert alert-warning small" v-if="bindSubnetDevice.status && bindSubnetDevice.status.status === 'running'">
-                <template v-if="user && user.role === 'admin'">服务器正在运行，绑定后将热更新网卡并短暂断网，需重新获取 IP</template>
-                <template v-else>服务器正在运行，请先关机后再进行子网操作</template>
+                <template v-if="user && user.role === 'admin'">{{ t('dash.subnet.runningBindHint') }}</template>
+                <template v-else>{{ t('dash.subnet.runningHint') }}</template>
             </div>
             <div class="alert alert-warning small" v-else-if="bindSubnetDevice.status && bindSubnetDevice.status.status !== 'running'">
                 解绑子网后需重新绑定才能开机
@@ -979,27 +979,27 @@
             <!-- 已绑定：显示当前子网 + 解绑按钮 -->
             <template v-if="bindSubnetCurrentSubnet">
                 <div class="mb-3">
-                    <label class="form-label">当前绑定子网</label>
+                    <label class="form-label">{{ t('dash.subnet.currentBound') }}</label>
                     <div class="form-control" readonly>
                         {{ bindSubnetCurrentSubnet.vlan_name }}（{{ bindSubnetCurrentSubnet.cidr }}）· 可用 IP：{{ bindSubnetCurrentSubnet.available }}
                     </div>
-                    <div class="form-text text-muted" v-if="bindSubnetDevice.dhcp_static_ip">已分配 IP：{{ bindSubnetDevice.dhcp_static_ip }}</div>
+                    <div class="form-text text-muted" v-if="bindSubnetDevice.dhcp_static_ip">{{ t('dash.subnet.assignedIp') }}: {{ bindSubnetDevice.dhcp_static_ip }}</div>
                 </div>
-                <pv-button type="button" variant="outline-danger" :disabled="bindSubnetSubmitting || (bindSubnetDevice.status && bindSubnetDevice.status.status === 'running')" :loading="bindSubnetSubmitting" @click="unbindSubnet">解绑子网</pv-button>
+                <pv-button type="button" variant="outline-danger" :disabled="bindSubnetSubmitting || (bindSubnetDevice.status && bindSubnetDevice.status.status === 'running')" :loading="bindSubnetSubmitting" @click="unbindSubnet">{{ t('dash.subnet.unbind') }}</pv-button>
             </template>
             <!-- 未绑定：选择子网 + 绑定按钮 -->
             <template v-else>
                 <div class="mb-3">
-                    <label class="form-label">选择子网<span class="text-danger">*</span></label>
+                    <label class="form-label">{{ t('dash.subnet.select') }}<span class="text-danger">*</span></label>
                     <select class="form-select" v-model="bindSubnetForm.subnet_id">
-                        <option :value="0">请选择子网</option>
+                        <option :value="0">{{ t('dash.subnet.select') }}</option>
                         <option v-for="s in subnets" :key="s.id" :value="s.id">
                             {{ s.vlan_name }}（{{ s.cidr }}）· 可用 IP：{{ s.available }}
                         </option>
                     </select>
-                    <div class="form-text text-muted" v-if="subnets.length === 0">暂无子网，请先在「私有网络」中新建子网</div>
+                    <div class="form-text text-muted" v-if="subnets.length === 0">{{ t('dash.subnet.noSubnet') }}</div>
                 </div>
-                <pv-button type="button" @click="bindSubnet" :disabled="bindSubnetSubmitting || !bindSubnetForm.subnet_id || (bindSubnetDevice.status && bindSubnetDevice.status.status === 'running' && !(user && user.role === 'admin'))" :loading="bindSubnetSubmitting" variant="primary">确认绑定</pv-button>
+                <pv-button type="button" @click="bindSubnet" :disabled="bindSubnetSubmitting || !bindSubnetForm.subnet_id || (bindSubnetDevice.status && bindSubnetDevice.status.status === 'running' && !(user && user.role === 'admin'))" :loading="bindSubnetSubmitting" variant="primary">{{ t('dash.subnet.confirmBind') }}</pv-button>
             </template>
             <div v-if="bindSubnetSubmitting" class="text-center text-muted py-3">
                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
@@ -1016,41 +1016,41 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">重置 IP - CT {{ lxcPasswordResetCtId }}</h5>
+                <h5 class="modal-title">{{ tFormat('dash.resetIpCt', lxcPasswordResetCtId) }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-danger d-flex align-items-start gap-2 mb-3" style="background:rgba(220,53,69,0.15);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(220,53,69,0.3);">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-danger)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     <div>
-                        <strong>危险操作</strong><br>
-                        <span style="opacity:0.9">修改 IP 需要重启容器，容器将短暂关机后自动重启。正在运行的服务会中断，请确保已保存重要数据。</span>
+                        <strong>{{ t('dash.danger') }}</strong><br>
+                        <span style="opacity:0.9">{{ t('dash.resetIp.ctHint') }}</span>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">IP 模式</label>
+                    <label class="form-label">{{ t('dash.resetIp.mode') }}</label>
                     <div class="d-flex gap-3">
                         <div class="form-check">
                             <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="static" id="lxcIpStatic">
-                            <label class="form-check-label" for="lxcIpStatic">手动输入</label>
+                            <label class="form-check-label" for="lxcIpStatic">{{ t('dash.resetIp.manual') }}</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" v-model="lxcIpForm.ip_mode" value="dhcp" id="lxcIpDhcp">
-                            <label class="form-check-label" for="lxcIpDhcp">DHCP 自动获取</label>
+                            <label class="form-check-label" for="lxcIpDhcp">{{ t('dash.resetIp.dhcp') }}</label>
                         </div>
                     </div>
                 </div>
                 <div v-if="lxcIpForm?.ip_mode === 'static'" class="mb-3">
-                    <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
+                    <label class="form-label">{{ t('dash.resetIp.cidr') }}</label>
                     <div class="input-group">
                         <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
-                        <pv-button type="button" @click="randomLxcIp" title="随机生成未绑定的 IP" variant="outline">随机</pv-button>
+                        <pv-button type="button" @click="randomLxcIp" title="随机生成未绑定的 IP" variant="outline">{{ t('dash.random') }}</pv-button>
                     </div>
                 </div>
                 <div v-if="lxcIpError" class="alert alert-danger py-2">{{ lxcIpError }}</div>
             </div>
             <div class="modal-footer d-flex gap-2">
-                <pv-button type="button" data-bs-dismiss="modal">取消</pv-button>
+                <pv-button type="button" data-bs-dismiss="modal">{{ t('common.cancel') }}</pv-button>
                 <pv-button type="button" @click="confirmResetLxcIp" :disabled="lxcIpLoading">
                     <span v-if="lxcIpLoading" class="spinner-border spinner-border-sm me-1"></span>
                     保存
@@ -1067,41 +1067,41 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">重置 IP - VM {{ resetVmIpVm?.vm_id }}</h5>
+                <h5 class="modal-title">{{ tFormat('dash.resetIpVm', resetVmIpVm?.vm_id) }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body">
                 <div class="alert alert-warning d-flex align-items-start gap-2 mb-3" style="background:rgba(255,193,7,0.15);backdrop-filter:blur(12px);border:1px solid rgba(255,193,7,0.3);">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--color-warning)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                     <div>
-                        <strong>注意</strong><br>
-                        <span style="opacity:0.9">修改虚拟机 IP 后，需要重启虚拟机或重新获取 DHCP 才能生效。</span>
+                        <strong>{{ t('dash.note') }}</strong><br>
+                        <span style="opacity:0.9">{{ t('dash.resetIp.vmHint') }}</span>
                     </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">IP 模式</label>
+                    <label class="form-label">{{ t('dash.resetIp.mode') }}</label>
                     <div class="d-flex gap-3">
                         <div class="form-check">
                             <input class="form-check-input" type="radio" v-model="vmIpForm.ip_mode" value="static" id="vmIpStatic">
-                            <label class="form-check-label" for="vmIpStatic">手动输入</label>
+                            <label class="form-check-label" for="vmIpStatic">{{ t('dash.resetIp.manual') }}</label>
                         </div>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" v-model="vmIpForm.ip_mode" value="dhcp" id="vmIpDhcp">
-                            <label class="form-check-label" for="vmIpDhcp">DHCP 自动获取</label>
+                            <label class="form-check-label" for="vmIpDhcp">{{ t('dash.resetIp.dhcp') }}</label>
                         </div>
                     </div>
                 </div>
                 <div v-if="vmIpForm?.ip_mode === 'static'" class="mb-3">
-                    <label class="form-label">IP 地址（CIDR 格式，如 10.0.0.150/24）</label>
+                    <label class="form-label">{{ t('dash.resetIp.cidr') }}</label>
                     <div class="input-group">
                         <input type="text" class="form-control" v-model="vmIpForm.ip" placeholder="10.0.0.150/24">
-                        <pv-button type="button" @click="randomVmIp" title="随机生成未绑定的 IP" variant="outline">随机</pv-button>
+                        <pv-button type="button" @click="randomVmIp" title="随机生成未绑定的 IP" variant="outline">{{ t('dash.random') }}</pv-button>
                     </div>
                 </div>
                 <div v-if="vmIpError" class="alert alert-danger py-2">{{ vmIpError }}</div>
             </div>
             <div class="modal-footer d-flex gap-2">
-                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
+                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">{{ t('common.cancel') }}</pv-button>
                 <pv-button type="button" @click="confirmResetVmIp" :disabled="vmIpLoading" variant="warning">
                     <span v-if="vmIpLoading" class="spinner-border spinner-border-sm me-1"></span>
                     确认修改
