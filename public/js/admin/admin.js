@@ -34,6 +34,9 @@
     // 模板样式（站点全局默认，个人偏好优先级更高）
     $.templateStyle = ref('default');
     $.templateStyleSaving = ref(false);
+    // 系统默认语言
+    $.langForm = ref('zh-CN');
+    $.langSaving = ref(false);
     $.redisConfig = ref({ host: '', port: 6379, password: '', db: 0, prefix: 'pve:' });
     $.redisConfigSaving = ref(false);
     $.redisTesting = ref(false);
@@ -1131,6 +1134,8 @@
             };
             // 同步模板样式选择（站点全局默认值）
             if (res.template) $.templateStyle.value = res.template;
+            // 同步系统默认语言
+            if (res.lang) $.langForm.value = res.lang;
         } catch (e) {
             console.error('加载站点配置失败:', e);
         }
@@ -1157,6 +1162,23 @@
             alert('保存失败: ' + (e.message || '未知错误'));
         }
         $.templateStyleSaving.value = false;
+    };
+
+    // 系统默认语言：保存站点全局默认
+    $.saveLang = async function() {
+        $.langSaving.value = true;
+        try {
+            await api('/admin/site/config', {
+                method: 'PUT',
+                body: JSON.stringify({ lang: $.langForm.value })
+            });
+            // 立即应用语言（触发全站重渲染）
+            await window.__i18n.setLocale($.langForm.value);
+            alert(window.__i18n.t('settings.language.save') + ' ' + window.__i18n.t('common.success'));
+        } catch (e) {
+            alert('保存失败: ' + (e.message || '未知错误'));
+        }
+        $.langSaving.value = false;
     };
 
     $.saveSiteConfig = async function() {

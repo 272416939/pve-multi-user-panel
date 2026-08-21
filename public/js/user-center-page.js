@@ -18,6 +18,11 @@ const App = {
         // 站点全局默认模板（跟随站点默认卡需要）
         const siteDefault = ref('default');
         const siteDefaultName = ref('赛博霓虹');
+        // 语言偏好（'' = 跟随站点默认）
+        const langPreference = ref('');
+        const langPreferenceSaving = ref(false);
+        const siteDefaultLang = ref('zh-CN');
+        const siteDefaultLangName = ref('简体中文');
         const memos = ref([]);
         const memosLoading = ref(false);
         const editMemoForm = ref({ id: null, title: '', content: '' });
@@ -849,6 +854,49 @@ const App = {
             templatePreferenceSaving.value = false;
         };
 
+        // 语言偏好：载入服务端偏好
+        const loadLangPreference = async () => {
+            try {
+                var res = await api('/user/lang');
+                langPreference.value = (res && res.lang) || '';
+                var sd = (res && res.siteDefault) || 'zh-CN';
+                siteDefaultLang.value = sd;
+                var names = { 'zh-CN': '简体中文', 'zh-TW': '繁體中文', 'en': 'English', 'de': 'Deutsch', 'ja': '日本語', 'ko': '한국어', 'fr': 'Français' };
+                siteDefaultLangName.value = names[sd] || sd;
+                // 应用用户实际语言（个人偏好优先，其次站点默认）
+                var resolved = langPreference.value || sd;
+                if (window.__i18n && window.__i18n.getLocale() !== resolved) {
+                    await window.__i18n.setLocale(resolved);
+                }
+            } catch (e) {
+                console.error('加载语言偏好失败', e);
+            }
+        };
+
+        // 语言偏好：保存到服务端 + 本地立即应用
+        const saveLangPreference = async () => {
+            langPreferenceSaving.value = true;
+            try {
+                var res = await api('/user/lang', {
+                    method: 'PUT',
+                    body: JSON.stringify({ lang: langPreference.value })
+                });
+                langPreference.value = (res && res.lang) || '';
+                // 立即应用语言（触发全站重渲染；跟随站点默认时用返回的 siteDefault）
+                var target = langPreference.value || (res && res.siteDefault) || 'zh-CN';
+                await window.__i18n.setLocale(target);
+                // 更新站点默认显示
+                var sd = (res && res.siteDefault) || 'zh-CN';
+                siteDefaultLang.value = sd;
+                var names = { 'zh-CN': '简体中文', 'zh-TW': '繁體中文', 'en': 'English', 'de': 'Deutsch', 'ja': '日本語', 'ko': '한국어', 'fr': 'Français' };
+                siteDefaultLangName.value = names[sd] || sd;
+                alert(window.__i18n.t('user.language.save') + ' ' + window.__i18n.t('common.success'));
+            } catch (e) {
+                alert('保存失败: ' + (e.message || '未知错误'));
+            }
+            langPreferenceSaving.value = false;
+        };
+
         const updateProfile = async () => {
             try {
                 const data = {
@@ -1395,6 +1443,7 @@ const App = {
                 await loadNavItems();
                 await loadProfile();
                 await loadTemplatePreference();
+                await loadLangPreference();
                 window.syncUserTemplate && window.syncUserTemplate();
                 handleEmailVerification();
                 if (window.location.hash === '#messages' || activeSubTab.value === 'messages') {
@@ -1443,6 +1492,9 @@ const App = {
         }, { deep: true });
 
         return {
+            // i18n 翻译函数（响应式：语言切换时自动重渲染）
+            t: window.__i18n.t,
+            tFormat: window.__i18n.tFormat,
             user,
             DOMPurify,
             activeSubTab,
@@ -1455,6 +1507,11 @@ const App = {
             siteDefaultName,
             selectTemplate,
             saveTemplatePreference,
+            langPreference,
+            langPreferenceSaving,
+            siteDefaultLangName,
+            loadLangPreference,
+            saveLangPreference,
             memos,
             memosLoading,
             editMemoForm,
@@ -1532,8 +1589,14 @@ const App = {
     }
 };
 
-var app = createApp(App);
-app.mount('#app');
+// i18n：先加载当前语言翻译，再挂载 Vue（确保首次渲染即为目标语言）
+(async function () {
+    if (window.__i18n && !window.__i18n.isLoaded()) {
+        await window.__i18n.init(window.__initialLocale || 'zh-CN');
+    }
+    var app = createApp(App);
+    app.mount('#app');
+})();
 
 /* ===== Sidebar Toggle & Theme Switch ===== */
 function toggleSidebar() {

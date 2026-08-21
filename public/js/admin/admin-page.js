@@ -180,6 +180,9 @@ var app = Vue.createApp(App);
   app.config.globalProperties.vmBusyText = $.vmBusyText;
   app.config.globalProperties.vmBusyBlock = $.vmBusyBlock;
   app.config.globalProperties.formatDate = $.formatDate;
+  // i18n 翻译函数（响应式：语言切换时自动重渲染）
+  app.config.globalProperties.t = window.__i18n.t;
+  app.config.globalProperties.tFormat = window.__i18n.tFormat;
 // Global error handler — catch render errors and show on screen
 app.config.errorHandler = function(err, instance, info) {
     console.error('[Vue Error]', err, instance, info);
@@ -417,7 +420,13 @@ app.component('private-network-list', {
     }
 });
 
-  app.mount('#app');
+  // i18n：异步初始化语录 + 挂载前确保翻译已加载
+  (async function () {
+      if (window.__i18n && !window.__i18n.isLoaded()) {
+          await window.__i18n.init(window.__initialLocale || 'zh-CN');
+      }
+      app.mount('#app');
+  })();
 
   // ===== Bottom inline script (DOM utilities) =====
   function toggleSidebar() {

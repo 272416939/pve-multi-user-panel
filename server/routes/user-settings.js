@@ -110,4 +110,52 @@ router.put('/user/template', authMiddleware, async (req, res) => {
     }
 });
 
+// 获取用户语言偏好（'' = 跟随站点默认）+ 站点全局默认
+router.get('/user/lang', authMiddleware, async (req, res) => {
+    try {
+        const db = require('../api/db');
+        var { SUPPORTED_LOCALES } = require('../constants');
+        var settings = await db.userSettings.getByUserId(req.user.id);
+        var lang = settings.lang;
+        // 兼容旧数据：非法值归一为跟随站点默认
+        if (lang !== '' && !SUPPORTED_LOCALES.includes(lang)) lang = '';
+        var siteDefault = await db.config.get('site:lang') || 'zh-CN';
+        if (!SUPPORTED_LOCALES.includes(siteDefault)) siteDefault = 'zh-CN';
+        res.json({ lang: lang || '', siteDefault: siteDefault });
+    } catch (e) {
+        console.error('[user-settings] 获取语言偏好失败:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
+// 更新用户语言偏好（'' = 跟随站点默认，'zh-CN'/'zh-TW'/'en'/'de'/'ja'/'ko'/'fr' = 个人固定）
+router.put('/user/lang', authMiddleware, async (req, res) => {
+    // SEC-02: 速率限制 - 每用户 60 秒 30 次
+    var limit = await checkConfiguredRateLimit('notification_settings', 'settings:' + req.user.id);
+    if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+
+    try {
+        const db = require('../api/db');
+        var { SUPPORTED_LOCALES, LOCALE_NAMES } = require('../constants');
+        var lang = req.body && req.body.lang;
+        // B-1: 只操作 req.user.id 的记录，不接受 user_id 参数；白名单校验
+        if (typeof lang !== 'string' || (lang !== '' && !SUPPORTED_LOCALES.includes(lang))) {
+            return res.status(400).json({ error: '语言参数不合法' });
+        }
+        var settings = await db.userSettings.upsert(req.user.id, { lang: lang });
+        var siteDefault = await db.config.get('site:lang') || 'zh-CN';
+        if (!SUPPORTED_LOCALES.includes(siteDefault)) siteDefault = 'zh-CN';
+        // 操作审计：语言偏好变更
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            var label = lang === '' ? '跟随站点默认' : (LOCALE_NAMES[lang] || lang);
+            await auditLog({ userId: req.user.id, username: req.user.username, action: 'setting.language', resourceType: 'setting', resourceId: 'language', details: '更新语言偏好：' + label, req });
+        } catch (_) {}
+        res.json({ lang: (settings && settings.lang) || '', siteDefault: siteDefault });
+    } catch (e) {
+        console.error('[user-settings] 更新语言偏好失败:', e.message);
+        res.status(500).json({ error: safeError(e) });
+    }
+});
+
 module.exports = router;

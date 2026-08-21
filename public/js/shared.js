@@ -632,9 +632,9 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             var res = await api('/wallet/balance');
             var bal = parseFloat(res.balance || '0.00');
-            el.textContent = '余额：' + bal.toFixed(2) + ' 元';
+            el.textContent = bal.toFixed(2) + ' ' + (window.__i18n ? window.__i18n.t('common.currencyUnit') : '元');
         } catch (e) {
-            el.textContent = '余额：--';
+            el.textContent = '--';
         }
     };
     window.loadHeaderBalance();

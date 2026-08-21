@@ -729,6 +729,9 @@ async function initDb() {
     // 迁移：界面模板偏好列（'' = 跟随站点默认，'default' / 'saas' = 个人固定）
     try { await execute("ALTER TABLE user_settings ADD COLUMN template VARCHAR(20) NOT NULL DEFAULT ''"); } catch (_) {}
 
+    // 迁移：用户语言偏好列（'' = 跟随站点默认，'zh-CN'/'zh-TW'/'en'/'de'/'ja'/'ko'/'fr' = 个人固定）
+    try { await execute("ALTER TABLE user_settings ADD COLUMN lang VARCHAR(10) NOT NULL DEFAULT ''"); } catch (_) {}
+
     // 邮件模板表（邮件模板在线编辑；默认模板由 constants/email-templates.js 注册表初始化，DB 可编辑 + 恢复默认）
     await execute(`
         CREATE TABLE IF NOT EXISTS email_templates (
@@ -1039,6 +1042,8 @@ async function initDefaultConfig() {
         'site:login_title': 'PVE Panel',
         // 界面模板（全站默认）：'default' = 赛博霓虹，'saas' = SAAS 企业风
         'site:template': 'default',
+        // 系统默认语言（i18n）：zh-CN/zh-TW/en/de/ja/ko/fr
+        'site:lang': 'zh-CN',
         'pve:host': '',
         'pve:api_token': '',
         'pve:ssh_host': '',

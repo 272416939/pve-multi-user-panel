@@ -4,52 +4,52 @@
     <!-- OS 模板管理 -->
     <div v-if="activeSection === 'templates-os'">
         <div class="module-header">
-            <h4 class="module-title">可切换系统模板</h4>
-            <pv-button variant="primary" @click="osTemplatePage.openForm()">新增模板</pv-button>
+            <h4 class="module-title">{{ t('admin.ostemplate.title') }}</h4>
+            <pv-button variant="primary" @click="osTemplatePage.openForm()">{{ t('admin.ostemplate.addTemplate') }}</pv-button>
         </div>
         <div class="table-container mb-4" style="padding:12px;">
-            <div class="text-muted mb-2" style="font-size:0.85rem;">拖动 <span class="drag-handle">⠿</span> 手柄调整排序，用户切换系统时按此顺序展示</div>
+            <div class="text-muted mb-2" style="font-size:0.85rem;">{{ t('admin.ostemplate.dragPrefix') }} <span class="drag-handle">⠿</span> {{ t('admin.ostemplate.dragSuffix') }}</div>
             <div class="table-responsive">
                 <table id="osTemplateTable" class="table table-hover align-middle table-align-center">
                     <thead class="table-light">
                         <tr>
-                            <th class="drag-handle-th"></th><th>ID</th><th>名称</th><th>OS 类型</th><th>版本</th><th>PVE 模板 VMID</th><th>目标存储</th><th>磁盘格式</th><th>状态</th><th>操作</th>
+                            <th class="drag-handle-th"></th><th>ID</th><th>{{ t('common.name') }}</th><th>{{ t('admin.ostemplate.osType') }}</th><th>{{ t('admin.ostemplate.osVersion') }}</th><th>{{ t('admin.ostemplate.pveTemplateVmid') }}</th><th>{{ t('admin.ostemplate.targetStorage') }}</th><th>{{ t('admin.ostemplate.diskFormat') }}</th><th>{{ t('common.status') }}</th><th>{{ t('common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody @dragover="osTemplatePage.handleContainerDragOver($event)" @drop="osTemplatePage.handleDropOnContainer($event)">
-                        <tr v-for="t in (osTemplatePage?.osTemplates?.value) || []" :key="t.id"
-                            :data-drag-id="t.id"
-                            :class="{ 'row-dragging': osTemplatePage.dragState.draggingId === t.id }"
-                            @dragover="osTemplatePage.handleDragOver($event, t.id)"
-                            @dragleave="osTemplatePage.handleDragLeave($event, t.id)"
-                            @drop="osTemplatePage.handleDrop($event, t.id)">
+                        <tr v-for="row in (osTemplatePage?.osTemplates?.value) || []" :key="row.id"
+                            :data-drag-id="row.id"
+                            :class="{ 'row-dragging': osTemplatePage.dragState.draggingId === row.id }"
+                            @dragover="osTemplatePage.handleDragOver($event, row.id)"
+                            @dragleave="osTemplatePage.handleDragLeave($event, row.id)"
+                            @drop="osTemplatePage.handleDrop($event, row.id)">
                             <td class="drag-handle-cell">
                                 <span class="drag-handle"
                                     draggable="true"
-                                    @dragstart="osTemplatePage.handleDragStart($event, t.id)"
+                                    @dragstart="osTemplatePage.handleDragStart($event, row.id)"
                                     @dragend="osTemplatePage.handleDragEnd()"
-                                    @touchstart="osTemplatePage.handleTouchStart($event, t.id)"
+                                    @touchstart="osTemplatePage.handleTouchStart($event, row.id)"
                                     @touchmove="osTemplatePage.handleTouchMove($event)"
                                     @touchend="osTemplatePage.handleTouchEnd()"
                                     @touchcancel="osTemplatePage.handleTouchEnd()">⠿</span>
                             </td>
-                            <td>{{ t.id }}</td>
-                            <td>{{ t.name }}</td>
-                            <td>{{ t.os_type }}</td>
-                            <td>{{ t.os_version }}</td>
-                            <td>{{ t.template_vmid }}</td>
-                            <td>{{ t.target_storage }}</td>
-                            <td>{{ t.disk_format || '自动' }}</td>
-                            <td><span :class="t.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ t.status === 'active' ? '启用' : (t.status === 'maintenance' ? '维护' : '已弃用') }}</span></td>
+                            <td>{{ row.id }}</td>
+                            <td>{{ row.name }}</td>
+                            <td>{{ row.os_type }}</td>
+                            <td>{{ row.os_version }}</td>
+                            <td>{{ row.template_vmid }}</td>
+                            <td>{{ row.target_storage }}</td>
+                            <td>{{ row.disk_format || t('admin.ostemplate.auto') }}</td>
+                            <td><span :class="row.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ row.status === 'active' ? t('admin.common.enabled') : (row.status === 'maintenance' ? t('admin.common.maintenance') : t('admin.common.deprecated')) }}</span></td>
                             <td>
                                 <div class="d-flex gap-2">
-                                    <pv-button size="sm" @click="osTemplatePage.openForm(t)">编辑</pv-button>
-                                    <pv-button size="sm" variant="danger" @click="osTemplatePage.deleteRow(t)">删除</pv-button>
+                                    <pv-button size="sm" @click="osTemplatePage.openForm(row)">{{ t('common.edit') }}</pv-button>
+                                    <pv-button size="sm" variant="danger" @click="osTemplatePage.deleteRow(row)">{{ t('common.delete') }}</pv-button>
                                 </div>
                             </td>
                         </tr>
                         <tr v-if="(osTemplatePage?.osTemplates?.value || []).length === 0">
-                            <td colspan="10" class="text-center text-muted">暂无系统模板</td>
+                            <td colspan="10" class="text-center text-muted">{{ t('admin.ostemplate.noTemplates') }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -58,91 +58,91 @@
         <!-- 新增/编辑模态框 -->
         <div class="modal fade" id="osTemplateFormModal" tabindex="-1">
             <div class="modal-dialog modal-lg"><div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title">{{ osTemplatePage.formData.id ? '编辑系统模板' : '新增系统模板' }}</h5>
+                <div class="modal-header"><h5 class="modal-title">{{ osTemplatePage.formData.id ? t('admin.ostemplate.editTitle') : t('admin.ostemplate.newTitle') }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
                 <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">名称 <span class="text-danger">*</span></label>
+                            <label class="form-label">{{ t('common.name') }} <span class="text-danger">*</span></label>
                             <input class="form-control" v-model="osTemplatePage.formData.name">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">PVE 模板 VM <span class="text-danger">*</span></label>
+                            <label class="form-label">{{ t('admin.ostemplate.pveTemplateVm') }} <span class="text-danger">*</span></label>
                             <select class="form-select" v-model.number="osTemplatePage.formData.template_vmid" @change="osTemplatePage.onTemplateVmidChange(osTemplatePage.formData.template_vmid)" :disabled="osTemplatePage.pveConfigLoading.value">
-                                <option value="">请选择 PVE 模板 VM</option>
+                                <option value="">{{ t('admin.ostemplate.selectVmPlaceholder') }}</option>
                                 <option v-for="v in osTemplatePage.pveTemplateVms.value" :key="v.vmid" :value="v.vmid">{{ v.name || 'VM ' + v.vmid }} ({{ v.vmid }})</option>
                             </select>
-                            <div class="form-text text-muted" v-if="osTemplatePage.pveConfigLoading.value">正在读取模板配置...</div>
+                            <div class="form-text text-muted" v-if="osTemplatePage.pveConfigLoading.value">{{ t('admin.ostemplate.readingPveConfig') }}</div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">OS 类型</label>
+                            <label class="form-label">{{ t('admin.ostemplate.osType') }}</label>
                             <input class="form-control" v-model="osTemplatePage.formData.os_type" readonly>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">OS 版本</label>
+                            <label class="form-label">{{ t('admin.ostemplate.osVersion') }}</label>
                             <input class="form-control" v-model="osTemplatePage.formData.os_version" readonly>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">架构</label>
+                            <label class="form-label">{{ t('admin.ostemplate.arch') }}</label>
                             <input class="form-control" v-model="osTemplatePage.formData.arch" readonly>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">目标存储</label>
+                            <label class="form-label">{{ t('admin.ostemplate.targetStorage') }}</label>
                             <select class="form-select" v-model="osTemplatePage.formData.target_storage">
-                                <option value="">请选择目标存储</option>
+                                <option value="">{{ t('admin.ostemplate.selectStorage') }}</option>
                                 <option v-for="s in osTemplatePage.allStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }}{{ s.maxdisk ? ' (' + (s.maxdisk/1073741824).toFixed(0) + 'GB)' : '' }}</option>
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">目标磁盘格式</label>
+                            <label class="form-label">{{ t('admin.ostemplate.targetDiskFormat') }}</label>
                             <select class="form-select" v-model="osTemplatePage.formData.disk_format">
-                                <option value="">自动（同源盘格式）</option>
+                                <option value="">{{ t('admin.ostemplate.autoFormat') }}</option>
                                 <option value="raw">raw</option>
                                 <option value="qcow2">qcow2</option>
                                 <option value="vmdk">vmdk</option>
                             </select>
-                            <div class="form-text text-muted">跨存储切换时强制转换的磁盘格式，留空则使用源盘格式</div>
+                            <div class="form-text text-muted">{{ t('admin.ostemplate.formatHint') }}</div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">cloud-init 用户</label>
+                            <label class="form-label">{{ t('admin.ostemplate.ciuser') }}</label>
                             <input class="form-control" v-model="osTemplatePage.formData.ciuser">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">图标标识</label>
+                            <label class="form-label">{{ t('admin.ostemplate.icon') }}</label>
                             <input class="form-control" v-model="osTemplatePage.formData.icon">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">排序</label>
+                            <label class="form-label">{{ t('admin.ostemplate.sortOrder') }}</label>
                             <input class="form-control" type="number" v-model="osTemplatePage.formData.sort_order">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">状态</label>
+                            <label class="form-label">{{ t('common.status') }}</label>
                             <select class="form-select" v-model="osTemplatePage.formData.status">
-                                <option value="active">启用</option>
-                                <option value="maintenance">维护中</option>
-                                <option value="deprecated">已弃用</option>
+                                <option value="active">{{ t('admin.common.enabled') }}</option>
+                                <option value="maintenance">{{ t('admin.ostemplate.maintenance') }}</option>
+                                <option value="deprecated">{{ t('admin.common.deprecated') }}</option>
                             </select>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">启用</label>
+                            <label class="form-label">{{ t('admin.ostemplate.enable') }}</label>
                             <select class="form-select" v-model="osTemplatePage.formData.enabled">
-                                <option :value="1">是</option>
-                                <option :value="0">否</option>
+                                <option :value="1">{{ t('common.yes') }}</option>
+                                <option :value="0">{{ t('common.no') }}</option>
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label">允许的套餐 ID（逗号分隔，空=全部允许）</label>
+                            <label class="form-label">{{ t('admin.ostemplate.allowedPackages') }}</label>
                             <input class="form-control" v-model="osTemplatePage.formData.allowed_package_ids">
                         </div>
                         <div class="col-12">
-                            <label class="form-label">描述</label>
+                            <label class="form-label">{{ t('common.description') }}</label>
                             <textarea class="form-control" rows="3" v-model="osTemplatePage.formData.description"></textarea>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-                    <pv-button type="button" variant="primary" @click="osTemplatePage.save()" :loading="osTemplatePage.saving">保存</pv-button>
+                    <pv-button type="button" data-bs-dismiss="modal" variant="secondary">{{ t('common.cancel') }}</pv-button>
+                    <pv-button type="button" variant="primary" @click="osTemplatePage.save()" :loading="osTemplatePage.saving">{{ t('common.save') }}</pv-button>
                 </div>
             </div></div>
         </div>

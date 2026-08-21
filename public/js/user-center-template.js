@@ -2,9 +2,9 @@
   var el = document.getElementById("appTemplate");
   if (el) el.innerHTML = `        <div v-if="!user" class="text-center py-5">
             <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">加载中...</span>
+                <span class="visually-hidden">{{ t('common.loading') }}</span>
             </div>
-            <p class="mt-2 text-muted">正在验证登录状态...</p>
+            <p class="mt-2 text-muted">{{ t('common.loadingAuth') }}</p>
         </div>
 
         <div v-else>
@@ -12,36 +12,36 @@
             <Teleport to="#sidebarSubNav">
                 <a class="nav-item" :class="{ active: activeSubTab === 'settings' }"
                    @click.prevent="switchSubTab('settings')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="nav-text">个人设置</span>
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="nav-text">{{ t('nav.personal') }}</span>
                 </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'memos' }"
                    @click.prevent="switchSubTab('memos')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">备忘录</span>
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">{{ t('nav.memos') }}</span>
                 </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'messages' }"
                    @click.prevent="switchSubTab('messages')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><span class="nav-text">消息</span>
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><span class="nav-text">{{ t('nav.messages') }}</span>
                     <span v-if="unreadCount > 0" class="nav-badge">{{ unreadCount }}</span>
                 </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'notifications' }"
                    @click.prevent="switchSubTab('notifications')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span><span class="nav-text">通知设置</span>
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span><span class="nav-text">{{ t('nav.notifications') }}</span>
                 </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'security' }"
                    @click.prevent="switchSubTab('security')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><span class="nav-text">安全</span>
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><span class="nav-text">{{ t('nav.security') }}</span>
                 </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'wallet-recharge' }"
                    @click.prevent="switchSubTab('wallet-recharge')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span><span class="nav-text">余额充值</span>
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span><span class="nav-text">{{ t('nav.recharge') }}</span>
                 </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'wallet-transactions' }"
                    @click.prevent="switchSubTab('wallet-transactions')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">交易流水</span>
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">{{ t('nav.transactions') }}</span>
                 </a>
                 <a class="nav-item" :class="{ active: activeSubTab === 'orders' }"
                    @click.prevent="switchSubTab('orders')">
-                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span><span class="nav-text">我的订单</span>
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span><span class="nav-text">{{ t(&#39;nav.myOrders&#39;) }}</span>
                 </a>
             </Teleport>
 
@@ -51,7 +51,7 @@
                         <!-- 卡片1：基本资料（头像/用户名/简介） -->
                         <div class="card mb-3">
                             <div class="card-body">
-                                <h6 class="card-subtitle mb-3 text-muted">基本资料</h6>
+                                <h6 class="card-subtitle mb-3 text-muted">{{ t('user.profile') }}</h6>
                                 <div class="mb-3">
                                     <div class="d-flex align-items-center gap-3">
                                         <div class="avatar-circle">
@@ -60,21 +60,21 @@
                                         </div>
                                         <div>
                                             <input type="file" class="form-control" accept=".jpg,.jpeg,.png" @change="handleAvatarUpload" style="max-width: 300px;">
-                                            <small class="text-muted">支持 JPG、PNG，建议大小 200x200，最大 2MB</small>
+                                            <small class="text-muted">{{ t('user.avatar.hint') }}</small>
                                         </div>
                                     </div>
                                 </div>
 
                                 <form @submit.prevent="updateProfile">
                                     <div class="mb-3">
-                                        <label class="form-label">用户名</label>
+                                        <label class="form-label">{{ t('user.username') }}</label>
                                         <input type="text" class="form-control" v-model="profileForm.username">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">个人简介</label>
-                                        <textarea class="form-control" rows="3" v-model="profileForm.bio" placeholder="介绍一下自己..."></textarea>
+                                        <label class="form-label">{{ t('user.bio') }}</label>
+                                        <textarea class="form-control" rows="3" v-model="profileForm.bio" :placeholder="t('user.bio.placeholder')"></textarea>
                                     </div>
-                                    <pv-button type="submit" variant="glass" >保存修改</pv-button>
+                                    <pv-button type="submit" variant="glass" >{{ t('user.saveProfile') }}</pv-button>
                                 </form>
                             </div>
                         </div>
@@ -82,28 +82,28 @@
                         <!-- 卡片2：邮箱（独立绑定/换绑） -->
                         <div class="card mb-3">
                             <div class="card-body">
-                                <h6 class="card-subtitle mb-3 text-muted">邮箱</h6>
+                                <h6 class="card-subtitle mb-3 text-muted">{{ t('user.email') }}</h6>
                                 <div class="mb-3">
-                                    <label class="form-label">当前绑定邮箱</label>
+                                    <label class="form-label">{{ t('user.email.current') }}</label>
                                     <div class="d-flex align-items-center gap-2">
-                                        <span>{{ user.email || '未绑定' }}</span>
-                                        <small v-if="profileForm.emailVerified" class="text-success">✓ 已验证</small>
-                                        <small v-else-if="user.email" class="text-warning">● 未验证</small>
+                                        <span>{{ user.email || t('user.email.unbound') }}</span>
+                                        <small v-if="profileForm.emailVerified" class="text-success">✓ {{ t('user.email.verified') }}</small>
+                                        <small v-else-if="user.email" class="text-warning">● {{ t('user.email.unverified') }}</small>
                                     </div>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">{{ user.email ? '换绑新邮箱' : '绑定邮箱' }}</label>
+                                    <label class="form-label">{{ user.email ? t('user.email.rebind') : t('user.email.bind') }}</label>
                                     <div class="d-flex gap-2">
-                                        <input type="email" class="form-control" v-model="profileForm.email" :placeholder="user.email ? '输入新邮箱' : '请输入邮箱'">
-                                        <pv-button v-if="profileForm.email && profileForm.email !== user.email" type="button" variant="outline" @click="bindEmail">{{ user.email ? '换绑' : '绑定' }}</pv-button>
-                                        <pv-button v-else-if="!profileForm.emailVerified" type="button" variant="secondary" @click="resendVerification">重发验证</pv-button>
+                                        <input type="email" class="form-control" v-model="profileForm.email" :placeholder="user.email ? t('user.email.newPlaceholder') : t('user.email.placeholder')">
+                                        <pv-button v-if="profileForm.email && profileForm.email !== user.email" type="button" variant="outline" @click="bindEmail">{{ user.email ? t('user.email.rebind') : t('user.email.bind') }}</pv-button>
+                                        <pv-button v-else-if="!profileForm.emailVerified" type="button" variant="secondary" @click="resendVerification">{{ t('user.email.resend') }}</pv-button>
                                     </div>
                                     <!-- M-1 修复：换绑邮箱需输入当前密码做二次验证 -->
-                                    <input v-if="profileForm.email && profileForm.email !== user.email" type="password" class="form-control mt-2" v-model="profileForm.emailPassword" placeholder="输入当前密码以验证">
+                                    <input v-if="profileForm.email && profileForm.email !== user.email" type="password" class="form-control mt-2" v-model="profileForm.emailPassword" :placeholder="t('user.email.passwordHint')">
                                     <div class="mt-1">
-                                        <small v-if="profileForm.emailVerified" class="text-success">✓ 已验证</small>
-                                        <small v-else-if="profileForm.email && profileForm.email === user.email" class="text-warning">● 未验证 - 请查收验证邮件</small>
-                                        <small v-else-if="profileForm.email" class="text-muted">点击「{{ user.email ? '换绑' : '绑定' }}」保存邮箱</small>
+                                        <small v-if="profileForm.emailVerified" class="text-success">✓ {{ t('user.email.verified') }}</small>
+                                        <small v-else-if="profileForm.email && profileForm.email === user.email" class="text-warning">● {{ t('user.email.unverified') }}</small>
+                                        <small v-else-if="profileForm.email" class="text-muted">{{ t('user.email.clickToSave', user.email ? t('user.email.rebind') : t('user.email.bind')) }}</small>
                                     </div>
                                 </div>
                             </div>
@@ -112,24 +112,24 @@
                         <!-- 卡片3：修改密码（独立重置按钮，复用注册页确认密码交互） -->
                         <div class="card mb-3">
                             <div class="card-body">
-                                <h6 class="card-subtitle mb-3 text-muted">修改密码</h6>
+                                <h6 class="card-subtitle mb-3 text-muted">{{ t('user.password') }}</h6>
                                 <form @submit.prevent="updatePassword">
                                     <div class="mb-3">
-                                        <label class="form-label">新密码</label>
-                                        <input type="password" class="form-control" v-model="profileForm.password" autocomplete="new-password" placeholder="请输入新密码">
-                                        <small class="text-muted">至少 8 位，包含大小写字母和特殊字符 (@#$%^&*!)</small>
+                                        <label class="form-label">{{ t('user.password.new') }}</label>
+                                        <input type="password" class="form-control" v-model="profileForm.password" autocomplete="new-password" :placeholder="t('user.password.new')">
+                                        <small class="text-muted">{{ t('user.password.hint') }}</small>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">确认密码</label>
-                                        <input type="password" class="form-control" v-model="profileForm.confirmPassword" autocomplete="new-password" placeholder="请再次输入密码">
-                                        <small v-if="profileForm.confirmPassword && profileForm.confirmPassword !== profileForm.password" class="text-danger">两次输入的密码不一致</small>
+                                        <label class="form-label">{{ t('user.password.confirm') }}</label>
+                                        <input type="password" class="form-control" v-model="profileForm.confirmPassword" autocomplete="new-password" :placeholder="t('user.password.confirm')">
+                                        <small v-if="profileForm.confirmPassword && profileForm.confirmPassword !== profileForm.password" class="text-danger">{{ t('user.password.mismatch') }}</small>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">当前密码（用于验证身份）</label>
+                                        <label class="form-label">{{ t('user.password.current') }}</label>
                                         <input type="password" class="form-control" v-model="profileForm.currentPassword" autocomplete="current-password" placeholder="输入当前密码以验证">
                                     </div>
-                                    <pv-button type="submit" variant="primary" >重置密码</pv-button>
-                                    <small class="text-muted d-block mt-2">重置后所有登录设备需重新登录</small>
+                                    <pv-button type="submit" variant="primary" >{{ t('user.password.submit') }}</pv-button>
+                                    <small class="text-muted d-block mt-2">{{ t('user.password.notice') }}</small>
                                 </form>
                             </div>
                         </div>
@@ -137,8 +137,8 @@
                         <!-- 卡片4：界面模板（个人偏好，覆盖站点全局默认） -->
                         <div class="card mb-3">
                             <div class="card-body">
-                                <h6 class="card-subtitle mb-3 text-muted">界面模板</h6>
-                                <p class="text-muted small mb-3">选择个人偏好的界面模板；「跟随站点默认」使用管理员在站点设置中配置的模板。点击卡片实时预览，保存后所有设备同步。</p>
+                                <h6 class="card-subtitle mb-3 text-muted">{{ t('user.template') }}</h6>
+                                <p class="text-muted small mb-3">{{ t('user.template.desc') }}</p>
                                 <div class="d-flex flex-wrap gap-3 mb-3">
                                     <!-- 跟随站点默认 -->
                                     <div class="template-picker" :class="{ 'template-picker-active': templatePreference === '' }" @click="selectTemplate('')" role="button" tabindex="0">
@@ -150,12 +150,12 @@
                                         </div>
                                         <div class="template-picker-body">
                                             <div class="d-flex align-items-center gap-2">
-                                                <strong>跟随站点默认</strong>
+                                                <strong>{{ t('user.template.follow') }}</strong>
                                                 <span v-if="templatePreference === ''" class="template-check">
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                                                 </span>
                                             </div>
-                                            <small class="text-muted">当前：{{ siteDefaultName }}</small>
+                                            <small class="text-muted">{{ tFormat('user.template.follow.current', siteDefaultName) }}</small>
                                         </div>
                                     </div>
                                     <!-- 赛博霓虹预览卡 -->
@@ -178,12 +178,12 @@
                                         </div>
                                         <div class="template-picker-body">
                                             <div class="d-flex align-items-center gap-2">
-                                                <strong>赛博霓虹</strong>
+                                                <strong>{{ t('settings.template.default') }}</strong>
                                                 <span v-if="templatePreference === 'default'" class="template-check">
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                                                 </span>
                                             </div>
-                                            <small class="text-muted">霓虹赛博 · 紫青发光</small>
+                                            <small class="text-muted">{{ t('settings.template.default.desc') }}</small>
                                         </div>
                                     </div>
                                     <!-- SAAS 企业风预览卡 -->
@@ -206,17 +206,40 @@
                                         </div>
                                         <div class="template-picker-body">
                                             <div class="d-flex align-items-center gap-2">
-                                                <strong>SAAS 企业风</strong>
+                                                <strong>{{ t('settings.template.saas') }}</strong>
                                                 <span v-if="templatePreference === 'saas'" class="template-check">
                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
                                                 </span>
                                             </div>
-                                            <small class="text-muted">腾讯云风格 · 扁平极简</small>
+                                            <small class="text-muted">{{ t('settings.template.saas.desc') }}</small>
                                         </div>
                                     </div>
                                 </div>
                                 <pv-button type="button" variant="primary" @click="saveTemplatePreference" :disabled="templatePreferenceSaving">
-                                    {{ templatePreferenceSaving ? '保存中...' : '保存模板偏好' }}
+                                    {{ templatePreferenceSaving ? t('common.saving') : t('user.template.save') }}
+                                </pv-button>
+                            </div>
+                        </div>
+
+                        <!-- 卡片5：语言设置（个人偏好，覆盖站点全局默认） -->
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h6 class="card-subtitle mb-3 text-muted">{{ t('user.language') }}</h6>
+                                <p class="text-muted small mb-3">{{ t('user.language.desc') }} 当前站点默认：<strong>{{ siteDefaultLangName }}</strong>。</p>
+                                <div class="mb-3">
+                                    <select class="form-select" v-model="langPreference" style="max-width: 300px;">
+                                        <option value="">{{ t('user.language.follow') }}</option>
+                                        <option value="zh-CN">{{ t('lang.zh-CN') }}</option>
+                                        <option value="zh-TW">{{ t('lang.zh-TW') }}</option>
+                                        <option value="en">{{ t('lang.en') }}</option>
+                                        <option value="de">{{ t('lang.de') }}</option>
+                                        <option value="ja">{{ t('lang.ja') }}</option>
+                                        <option value="ko">{{ t('lang.ko') }}</option>
+                                        <option value="fr">{{ t('lang.fr') }}</option>
+                                    </select>
+                                </div>
+                                <pv-button type="button" variant="primary" @click="saveLangPreference" :disabled="langPreferenceSaving">
+                                    {{ langPreferenceSaving ? t('common.saving') : t('user.language.save') }}
                                 </pv-button>
                             </div>
                         </div>
@@ -228,30 +251,30 @@
                 <div class="row justify-content-center">
                     <div class="col-md-8">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-0">备忘录</h4>
-                            <pv-button variant="primary" size="sm" @click="addMemo">+ 新建</pv-button>
+                            <h4 class="mb-0">{{ t('user.memos.title') }}</h4>
+                            <pv-button variant="primary" size="sm" @click="addMemo">+ {{ t('user.memos.add') }}</pv-button>
                         </div>
                         <div v-if="memosLoading" class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">加载中...</span>
+                                <span class="visually-hidden">{{ t('common.loading') }}</span>
                             </div>
                         </div>
                         <div v-else-if="memos.length === 0" class="text-muted text-center py-4">
-                            暂无备忘录，点击上方"新建"添加
+                            {{ t('user.memos.empty') }}
                         </div>
                         <div v-else class="row g-3">
                             <div v-for="memo in memos" :key="memo.id" class="col-md-6">
                                 <div class="card h-100">
                                     <div class="card-body d-flex flex-column">
                                         <div class="d-flex justify-content-between align-items-start mb-2">
-                                            <h6 class="mb-0">{{ memo.title || '无标题' }}</h6>
+                                            <h6 class="mb-0">{{ memo.title || t('user.memos.noTitle') }}</h6>
                                             <div class="btn-group btn-group-sm" style="gap:4px">
-                                                <pv-button variant="secondary" @click="editMemo(memo)">编辑</pv-button>
-                                                <pv-button variant="danger" @click="deleteMemo(memo.id)">删除</pv-button>
+                                                <pv-button variant="secondary" @click="editMemo(memo)">{{ t('common.edit') }}</pv-button>
+                                                <pv-button variant="danger" @click="deleteMemo(memo.id)">{{ t('common.delete') }}</pv-button>
                                             </div>
                                         </div>
-                                        <p class="card-text text-muted small flex-grow-1">{{ memo.content || '无内容' }}</p>
-                                        <small class="text-muted">更新于: {{ formatDate(memo.updated_at) }}</small>
+                                        <p class="card-text text-muted small flex-grow-1">{{ memo.content || t('user.memos.noContent') }}</p>
+                                        <small class="text-muted">{{ t('user.memos.updatedAt') }} {{ formatDate(memo.updated_at) }}</small>
                                     </div>
                                 </div>
                             </div>
@@ -264,34 +287,34 @@
                 <div class="row justify-content-center">
                     <div class="col-md-8">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-0">消息</h4>
+                            <h4 class="mb-0">{{ t('user.message.title') }}</h4>
                             <div class="d-flex gap-2">
-                                <pv-button variant="outline" size="sm" @click="markAllRead">全部标已读</pv-button>
-                                <pv-button variant="danger" size="sm" @click="clearAllMessages">清空已读</pv-button>
+                                <pv-button variant="outline" size="sm" @click="markAllRead">{{ t('user.message.markAllRead') }}</pv-button>
+                                <pv-button variant="danger" size="sm" @click="clearAllMessages">{{ t('user.message.clearRead') }}</pv-button>
                             </div>
                         </div>
                         <!-- 消息类型 tabs：与 admin 日志中心一致的玻璃渐变药丸样式（nav-tabs） -->
                         <ul class="nav nav-tabs mb-3">
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === 'all' }" href="#" @click.prevent="msgType = 'all'; loadMessages()">全部</a></li>
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '1' }" href="#" @click.prevent="msgType = '1'; loadMessages()">系统公告</a></li>
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '2' }" href="#" @click.prevent="msgType = '2'; loadMessages()">业务通知</a></li>
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '3' }" href="#" @click.prevent="msgType = '3'; loadMessages()">续费提醒</a></li>
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '5' }" href="#" @click.prevent="msgType = '5'; loadMessages()">客服私聊</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === 'all' }" href="#" @click.prevent="msgType = 'all'; loadMessages()">{{ t('common.all') }}</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '1' }" href="#" @click.prevent="msgType = '1'; loadMessages()">{{ t('user.message.system') }}</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '2' }" href="#" @click.prevent="msgType = '2'; loadMessages()">{{ t('user.message.business') }}</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '3' }" href="#" @click.prevent="msgType = '3'; loadMessages()">{{ t('user.message.renewal') }}</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '5' }" href="#" @click.prevent="msgType = '5'; loadMessages()">{{ t('user.message.cs') }}</a></li>
                         </ul>
                         <div v-if="messagesLoading" class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">加载中...</span>
+                                <span class="visually-hidden">{{ t('common.loading') }}</span>
                             </div>
                         </div>
-                        <div v-else-if="messages.length === 0" class="text-muted text-center py-4">暂无消息</div>
+                        <div v-else-if="messages.length === 0" class="text-muted text-center py-4">{{ t('user.message.empty') }}</div>
                         <div v-else class="message-list">
                             <div v-for="msg in messages" :key="msg.id" class="message-item" :class="{ 'message-unread': !msg.is_read }" @click="viewMessage(msg)">
                                 <div class="message-header">
                                     <span class="message-type-badge" :class="'msg-type-' + msg.type">
-                                        {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[msg.type] || '消息' }}
+                                        {{ {1:t('user.message.system'),2:t('user.message.business'),3:t('user.message.renewal'),4:t('user.message.ticket'),5:t('user.message.cs')}[msg.type] || t('user.message.title') }}
                                     </span>
                                     <span class="d-flex align-items-center gap-2">
-                                        <span class="message-status-badge" :class="msg.is_read ? 'status-read' : 'status-unread'">{{ msg.is_read ? '已读' : '未读' }}</span>
+                                        <span class="message-status-badge" :class="msg.is_read ? 'status-read' : 'status-unread'">{{ msg.is_read ? t('user.message.read') : t('user.message.unread') }}</span>
                                         <span class="message-time">{{ formatDate(msg.created_at) }}</span>
                                     </span>
                                 </div>
@@ -311,23 +334,23 @@
                             <div class="card-body">
                                 <h5 class="mb-3 d-flex align-items-center gap-2">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-                                    邮件通知设置
+                                    {{ t('user.notif.title') }}
                                 </h5>
-                                <p class="text-muted mb-4">自定义哪些邮件通知需要发送给您。此设置仅影响邮件通知，站内信始终发送。</p>
+                                <p class="text-muted mb-4">{{ t('user.notif.desc') }}</p>
 
                                 <!-- 总开关 -->
                                 <div class="notification-master-switch mb-4">
                                     <div class="d-flex justify-content-between align-items-center p-3 rounded notification-master-bg">
                                         <div>
-                                            <div class="fw-bold">邮件通知总开关</div>
-                                            <small class="text-muted">关闭后所有邮件通知将停止发送</small>
+                                            <div class="fw-bold">{{ t('user.notif.masterSwitch') }}</div>
+                                            <small class="text-muted">{{ t('user.notif.masterSwitchDesc') }}</small>
                                         </div>
                                         <div class="form-check form-switch mb-0">
                                             <input class="form-check-input" type="checkbox" id="emailMasterSwitch"
                                                    :checked="notifSettings.email_notifications_enabled"
                                                    @change="toggleNotifSetting('email_notifications_enabled', $event.target.checked)">
                                             <label class="form-check-label" for="emailMasterSwitch">
-                                                {{ notifSettings.email_notifications_enabled ? '开启' : '关闭' }}
+                                                {{ notifSettings.email_notifications_enabled ? t('user.notif.on') : t('user.notif.off') }}
                                             </label>
                                         </div>
                                     </div>
@@ -340,7 +363,7 @@
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="notification-group-icon" v-html="DOMPurify.sanitize(group.svg)"></span>
                                             <span class="fw-bold">{{ group.label }}</span>
-                                            <small class="text-muted">（{{ group.enabledCount }}/{{ group.items.length }}项已开启）</small>
+                                            <small class="text-muted">{{ tFormat('user.notif.itemsEnabled', group.enabledCount, group.items.length) }}</small>
                                         </div>
                                         <svg class="notification-chevron transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: group.expanded ? 'rotate(90deg)' : 'rotate(0deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
                                     </div>
@@ -370,30 +393,30 @@
                         <div class="card">
                             <div class="card-body">
                                 <div class="mb-3">
-                                    <span class="text-muted">当前余额：</span>
+                                    <span class="text-muted">{{ t('user.wallet.balance') }}</span>
                                     <span class="fw-bold fs-5">¥{{ walletBalance }}</span>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">请输入充值金额</label>
-                                    <input type="number" step="0.01" min="0.01" class="form-control" v-model="rechargeAmount" placeholder="如: 10.00" style="max-width:300px;">
-                                    <small class="text-muted">最低充值 {{ payMethods.min_amount }} 元，最高 {{ payMethods.max_amount }} 元</small>
+                                    <label class="form-label">{{ t('user.wallet.inputAmount') }}</label>
+                                    <input type="number" step="0.01" min="0.01" class="form-control" v-model="rechargeAmount" :placeholder="t('user.wallet.amountPlaceholder')" style="max-width:300px;">
+                                    <small class="text-muted">{{ tFormat('user.wallet.amountRange', payMethods.min_amount, payMethods.max_amount) }}</small>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">支付方式</label>
+                                    <label class="form-label">{{ t('user.wallet.payMethod') }}</label>
                                     <div v-if="payMethods.alipay" class="form-check">
                                         <input class="form-check-input" type="radio" v-model="rechargeMethod" value="alipay" id="ucPayAlipay">
-                                        <label class="form-check-label" for="ucPayAlipay">支付宝</label>
+                                        <label class="form-check-label" for="ucPayAlipay">{{ t('user.wallet.alipay') }}</label>
                                     </div>
                                     <div v-if="payMethods.wxpay" class="form-check">
                                         <input class="form-check-input" type="radio" v-model="rechargeMethod" value="wxpay" id="ucPayWxpay">
-                                        <label class="form-check-label" for="ucPayWxpay">微信支付</label>
+                                        <label class="form-check-label" for="ucPayWxpay">{{ t('user.wallet.wxpay') }}</label>
                                     </div>
-                                    <div v-if="!payMethods.alipay && !payMethods.wxpay" class="text-muted small">暂无可用的支付方式</div>
+                                    <div v-if="!payMethods.alipay && !payMethods.wxpay" class="text-muted small">{{ t('user.wallet.noPayMethod') }}</div>
                                 </div>
                                 <div v-if="rechargeError" class="alert alert-danger py-2 mb-3">{{ rechargeError }}</div>
                                 <pv-button variant="primary" @click="submitRecharge" :disabled="!rechargeMethod || !rechargeAmount || rechargeSubmitting">
-                                    <span v-if="rechargeSubmitting">提交中...</span>
-                                    <span v-else>提交充值</span>
+                                    <span v-if="rechargeSubmitting">{{ t('user.wallet.submitting') }}</span>
+                                    <span v-else>{{ t('user.wallet.submitRecharge') }}</span>
                                 </pv-button>
                             </div>
                         </div>
@@ -406,53 +429,53 @@
                 <div class="row justify-content-center">
                     <div class="col-md-10">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-0">交易明细</h4>
+                            <h4 class="mb-0">{{ t('user.wallet.transactions') }}</h4>
                         </div>
                         <div class="table-container mb-4" style="padding:12px;">
                                 <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">开始时间</label>
+                                        <label class="form-label small mb-1">{{ t('user.wallet.startTime') }}</label>
                                         <input type="datetime-local" class="form-control form-control-sm" v-model="txFilter.start_time">
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">结束时间</label>
+                                        <label class="form-label small mb-1">{{ t('user.wallet.endTime') }}</label>
                                         <input type="datetime-local" class="form-control form-control-sm" v-model="txFilter.end_time">
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">交易类型</label>
+                                        <label class="form-label small mb-1">{{ t('user.wallet.tradeType') }}</label>
                                         <select class="form-select form-select-sm" v-model="txFilter.trade_type">
-                                            <option value="">全部</option>
-                                            <option value="recharge">余额充值</option>
-                                            <option value="admin_recharge">后台充值</option>
-                                            <option value="new_order">新购服务器</option>
-                                            <option value="renewal">服务器续费</option>
-                                            <option value="refund">订单退款</option>
-                                            <option value="disk_purchase">新购硬盘</option>
-                                            <option value="disk_renewal">续费硬盘</option>
+                                            <option value="">{{ t('common.all') }}</option>
+                                            <option value="recharge">{{ t('user.wallet.tx.recharge') }}</option>
+                                            <option value="admin_recharge">{{ t('user.wallet.tx.adminRecharge') }}</option>
+                                            <option value="new_order">{{ t('user.wallet.tx.newOrder') }}</option>
+                                            <option value="renewal">{{ t('user.wallet.tx.renewal') }}</option>
+                                            <option value="refund">{{ t('user.wallet.tx.refund') }}</option>
+                                            <option value="disk_purchase">{{ t('user.wallet.tx.diskPurchase') }}</option>
+                                            <option value="disk_renewal">{{ t('user.wallet.tx.diskRenewal') }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">订单号</label>
-                                        <input type="text" class="form-control form-control-sm" v-model="txFilter.order_no" placeholder="精确搜索" autocomplete="off" @keyup.enter="loadTx(1)">
+                                        <label class="form-label small mb-1">{{ t('user.wallet.orderNo') }}</label>
+                                        <input type="text" class="form-control form-control-sm" v-model="txFilter.order_no" :placeholder="t('user.wallet.orderNoPlaceholder')" autocomplete="off" @keyup.enter="loadTx(1)">
                                     </div>
                                     <div class="col-md-2">
-                                        <pv-button variant="primary" size="sm" @click="loadTx(1)">查询</pv-button>
-                                        <pv-button variant="outline" size="sm" class="ms-1" @click="txFilter = {start_time:'',end_time:'',trade_type:'',order_no:''};loadTx(1);">重置</pv-button>
+                                        <pv-button variant="primary" size="sm" @click="loadTx(1)">{{ t('user.wallet.search') }}</pv-button>
+                                        <pv-button variant="outline" size="sm" class="ms-1" @click="txFilter = {start_time:'',end_time:'',trade_type:'',order_no:''};loadTx(1);">{{ t('common.reset') }}</pv-button>
                                     </div>
                                 </div>
                                 <div class="table-responsive">
                                     <table class="table table-hover table-sm mb-0 table-align-center">
-                                        <thead><tr><th>支付时间</th><th>支付方式</th><th>订单号</th><th>关联订单</th><th>类型</th><th>金额</th></tr></thead>
+                                        <thead><tr><th>{{ t('user.wallet.payTime') }}</th><th>{{ t('user.wallet.payMethod') }}</th><th>{{ t('user.wallet.orderNo') }}</th><th>{{ t('user.wallet.tradeNo') }}</th><th>{{ t('common.type') }}</th><th>{{ t('user.wallet.amount') }}</th></tr></thead>
                                         <tbody>
                                             <tr v-for="tx in txList" :key="tx.id">
                                                 <td>{{ formatDate(tx.pay_time) }}</td>
-                                                <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method === 'manual' ? '系统' : tx.pay_method === 'balance_refund' ? '余额退款' : tx.pay_method === 'alipay_refund' ? '支付宝退款' : tx.pay_method === 'wxpay_refund' ? '微信退款' : tx.pay_method }}</td>
-                                                <td><code style="font-size:11px;">{{ tx.order_no }}</code> <pv-button variant="link" size="sm" class="p-0 ms-1" @click="copyOrderNo(tx.order_no)" title="复制">复制</pv-button></td>
+                                                <td>{{ tx.pay_method === 'alipay' ? t('user.wallet.alipay') : tx.pay_method === 'wxpay' ? t('user.wallet.wxpay') : tx.pay_method === 'balance' ? t('user.wallet.pay.balance') : tx.pay_method === 'manual' ? t('user.wallet.pay.manual') : tx.pay_method === 'balance_refund' ? t('user.wallet.pay.balanceRefund') : tx.pay_method === 'alipay_refund' ? t('user.wallet.pay.alipayRefund') : tx.pay_method === 'wxpay_refund' ? t('user.wallet.pay.wxpayRefund') : tx.pay_method }}</td>
+                                                <td><code style="font-size:11px;">{{ tx.order_no }}</code> <pv-button variant="link" size="sm" class="p-0 ms-1" @click="copyOrderNo(tx.order_no)" :title="t('common.copy')">{{ t('common.copy') }}</pv-button></td>
                                                 <td><code style="font-size:11px;">{{ tx.trade_no || '-' }}</code></td>
-                                                <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'refund' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : tx.trade_type === 'disk_purchase' ? 'badge bg-info' : tx.trade_type === 'disk_renewal' ? 'badge bg-primary' : 'badge badge-renewal'" :style="tx.trade_type !== 'recharge' && tx.trade_type !== 'admin_recharge' && tx.trade_type !== 'refund' && tx.trade_type !== 'new_order' && tx.trade_type !== 'disk_purchase' && tx.trade_type !== 'disk_renewal' ? 'background:#0d9488;color:#fff' : ''">{{ tx.trade_type === 'recharge' ? '余额充值' : tx.trade_type === 'admin_recharge' ? '后台充值' : tx.trade_type === 'refund' ? '订单退款' : tx.trade_type === 'new_order' ? '新购服务器' : tx.trade_type === 'disk_purchase' ? '新购硬盘' : tx.trade_type === 'disk_renewal' ? '续费硬盘' : '服务器续费' }}</span></td>
+                                                <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'refund' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : tx.trade_type === 'disk_purchase' ? 'badge bg-info' : tx.trade_type === 'disk_renewal' ? 'badge bg-primary' : 'badge badge-renewal'" :style="tx.trade_type !== 'recharge' && tx.trade_type !== 'admin_recharge' && tx.trade_type !== 'refund' && tx.trade_type !== 'new_order' && tx.trade_type !== 'disk_purchase' && tx.trade_type !== 'disk_renewal' ? 'background:#0d9488;color:#fff' : ''">{{ tx.trade_type === 'recharge' ? t('user.wallet.tx.recharge') : tx.trade_type === 'admin_recharge' ? t('user.wallet.tx.adminRecharge') : tx.trade_type === 'refund' ? t('user.wallet.tx.refund') : tx.trade_type === 'new_order' ? t('user.wallet.tx.newOrder') : tx.trade_type === 'disk_purchase' ? t('user.wallet.tx.diskPurchase') : tx.trade_type === 'disk_renewal' ? t('user.wallet.tx.diskRenewal') : t('user.wallet.tx.renewal') }}</span></td>
                                                 <td>¥{{ tx.amount }}</td>
                                             </tr>
-                                            <tr v-if="!txList || txList.length === 0"><td colspan="6" class="text-center text-muted py-4">暂无交易记录</td></tr>
+                                            <tr v-if="!txList || txList.length === 0"><td colspan="6" class="text-center text-muted py-4">{{ t('user.wallet.txEmpty') }}</td></tr>
                                         </tbody>
                                     </table>
                                 </div>
@@ -468,53 +491,53 @@
                 <div class="row justify-content-center">
                     <div class="col-md-10">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="mb-0">我的订单</h4>
+                            <h4 class="mb-0">{{ t('nav.myOrders') }}</h4>
                         </div>
                         <div class="table-container mb-4" style="padding:12px;">
                                 <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">订单号</label>
-                                        <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号" autocomplete="off" @keyup.enter="loadMyOrders(1)">
+                                        <label class="form-label small mb-1">{{ t('user.order.orderNo') }}</label>
+                                        <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" :placeholder="t('user.order.orderNoPlaceholder')" autocomplete="off" @keyup.enter="loadMyOrders(1)">
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">类型</label>
+                                        <label class="form-label small mb-1">{{ t('common.type') }}</label>
                                         <select class="form-select form-select-sm" v-model="orderFilter.type">
-                                            <option value="">全部</option>
+                                            <option value="">{{ t('common.all') }}</option>
                                             <option value="vm">VM</option>
                                             <option value="lxc">LXC</option>
-                                            <option value="disk">磁盘</option>
+                                            <option value="disk">{{ t('user.order.disk') }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">状态</label>
+                                        <label class="form-label small mb-1">{{ t('common.status') }}</label>
                                         <select class="form-select form-select-sm" v-model="orderFilter.status">
-                                            <option value="">全部</option>
-                                            <option value="completed">已开通</option>
-                                            <option value="pending">处理中</option>
-                                            <option value="refunded">已退款</option>
-                                            <option value="destroyed">已销毁</option>
+                                            <option value="">{{ t('common.all') }}</option>
+                                            <option value="completed">{{ t('user.order.completed') }}</option>
+                                            <option value="pending">{{ t('user.order.pending') }}</option>
+                                            <option value="refunded">{{ t('user.order.refunded') }}</option>
+                                            <option value="destroyed">{{ t('user.order.destroyed') }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2 d-flex gap-2">
-                                        <pv-button @click="loadMyOrders(1)" size="sm">查询</pv-button>
-                                        <pv-button @click="orderFilter={order_no:'',type:'',status:''};loadMyOrders(1)" variant="outline" size="sm">重置</pv-button>
+                                        <pv-button @click="loadMyOrders(1)" size="sm">{{ t('user.order.search') }}</pv-button>
+                                        <pv-button @click="orderFilter={order_no:'',type:'',status:''};loadMyOrders(1)" variant="outline" size="sm">{{ t('common.reset') }}</pv-button>
                                     </div>
                                 </div>
                             <div class="table-responsive">
                                     <table class="table table-hover table-sm mb-0 table-align-center">
-                                        <thead><tr><th>订单号</th><th>套餐/产品</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>状态</th><th>时间</th></tr></thead>
+                                        <thead><tr><th>{{ t('user.order.orderNo') }}</th><th>{{ t('user.order.package') }}</th><th>{{ t('common.type') }}</th><th>{{ t('user.order.period') }}</th><th>{{ t('user.order.quantity') }}</th><th>{{ t('user.order.amount') }}</th><th>{{ t('common.status') }}</th><th>{{ t('user.order.time') }}</th></tr></thead>
                                     <tbody>
                                         <tr v-for="o in myOrders" :key="o.id">
                                             <td><code style="font-size:11px;">{{ o.order_no }}</code></td>
                                             <td>{{ o.order_kind === 'renewal' ? (o.type === 'disk' ? (o.resource_name || '') : (o.resource_name || '') + '（' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + '）') : (o.type === 'disk' ? o.package_name : o.package_name + '[' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + ']') }}</td>
-                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.order_kind === 'renewal' ? (o.type === 'vm' ? 'VM 续费' : o.type === 'lxc' ? 'LXC 续费' : '磁盘续费') : (o.type === 'vm' ? 'VM' : o.type === 'lxc' ? 'LXC' : '磁盘') }}</span></td>
-                                            <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
+                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.order_kind === 'renewal' ? (o.type === 'vm' ? t('user.order.renewVm') : o.type === 'lxc' ? t('user.order.renewLxc') : t('user.order.renewDisk')) : (o.type === 'vm' ? t('user.order.vm') : o.type === 'lxc' ? t('user.order.lxc') : t('user.order.disk')) }}</span></td>
+                                            <td>{{ o.period === 'month' ? t('user.order.periodMonth') : o.period === 'quarter' ? t('user.order.periodQuarter') : t('user.order.periodYear') }}</td>
                                             <td>{{ o.period_count }}</td>
                                             <td>¥{{ o.amount }}</td>
-                                            <td><span class="badge" :class="o.status === 'completed' ? 'bg-success' : o.status === 'refunded' ? 'bg-danger' : o.status === 'destroyed' ? 'bg-secondary' : 'bg-warning'">{{ o.status === 'completed' ? '已开通' : o.status === 'refunded' ? '已退款' : o.status === 'destroyed' ? '已销毁' : o.status === 'pending' ? '处理中' : o.status }}</span></td>
+                                            <td><span class="badge" :class="o.status === 'completed' ? 'bg-success' : o.status === 'refunded' ? 'bg-danger' : o.status === 'destroyed' ? 'bg-secondary' : 'bg-warning'">{{ o.status === 'completed' ? t('user.order.completed') : o.status === 'refunded' ? t('user.order.refunded') : o.status === 'destroyed' ? t('user.order.destroyed') : o.status === 'pending' ? t('user.order.pending') : o.status }}</span></td>
                                             <td>{{ formatDate(o.created_at) }}</td>
                                         </tr>
-                                        <tr v-if="!myOrders || myOrders.length === 0"><td colspan="8" class="text-center text-muted py-4">暂无订单记录</td></tr>
+                                        <tr v-if="!myOrders || myOrders.length === 0"><td colspan="8" class="text-center text-muted py-4">{{ t('user.order.empty') }}</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -628,7 +651,7 @@
                                     <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">请使用{{ rechargeMethod === 'alipay' ? '支付宝' : '微信' }}扫码支付</h6>
                                     <div class="recharge-qr-wrap mb-2">
                                         <div v-if="rechargeQrLoading" class="recharge-qr-loading">
-                                            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div>
+                                            <div class="spinner-border text-primary" role="status"><span class="visually-hidden">{{ t('common.loading') }}</span></div>
                                         </div>
                                         <div id="rechargeQrContainer" class="recharge-qr-container"></div>
                                     </div>

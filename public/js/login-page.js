@@ -317,9 +317,10 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     const hasSpecial = /[@#$%^&*!]/.test(pwd);
                     const hasLen = pwd.length >= 8;
                     const score = [hasLower, hasUpper, hasSpecial, hasLen].filter(Boolean).length;
-                    if (score <= 1) return { level: 'weak', percent: 33, text: '弱' };
-                    if (score <= 3) return { level: 'medium', percent: 66, text: '中' };
-                    return { level: 'strong', percent: 100, text: '强' };
+                    const t = window.__i18n.t;
+                    if (score <= 1) return { level: 'weak', percent: 33, text: t('password.strength.weak') };
+                    if (score <= 3) return { level: 'medium', percent: 66, text: t('password.strength.medium') };
+                    return { level: 'strong', percent: 100, text: t('password.strength.strong') };
                 });
 
                 // 注册功能：发送验证码按钮可用条件（用户名/密码/确认密码/邮箱齐全且两次密码一致）
@@ -457,6 +458,9 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                 });
 
                 return {
+                    // i18n 翻译函数（响应式：语言切换时自动重渲染）
+                    t: window.__i18n.t,
+                    tFormat: window.__i18n.tFormat,
                     loginForm,
                     loginError,
                     loginUsernameError,
@@ -512,8 +516,14 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
             }
         };
 
-        var app = createApp(App);
-        app.mount('#app');
+        // i18n：先加载当前语言翻译，再挂载 Vue（确保首次渲染即为目标语言）
+        (async function () {
+            if (window.__i18n && !window.__i18n.isLoaded()) {
+                await window.__i18n.init(window.__initialLocale || 'zh-CN');
+            }
+            var app = createApp(App);
+            app.mount('#app');
 
-// Theme toggle — 统一使用 theme-init.js
-if (window.initThemeToggle) window.initThemeToggle();
+            // Theme toggle — 统一使用 theme-init.js
+            if (window.initThemeToggle) window.initThemeToggle();
+        })();

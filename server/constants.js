@@ -49,6 +49,22 @@ var PAYMENT_METHODS = ['alipay', 'wxpay'];
 // 用户级偏好额外允许 ''（跟随站点默认），见 db-users.js userSettings 校验
 var UI_TEMPLATES = ['default', 'saas'];
 
+// ==================== 国际化（i18n） ====================
+
+// 支持的语言列表（白名单校验）
+var SUPPORTED_LOCALES = ['zh-CN', 'zh-TW', 'en', 'de', 'ja', 'ko', 'fr'];
+
+// 语言代码 → 本地化名称映射
+var LOCALE_NAMES = {
+    'zh-CN': '简体中文',
+    'zh-TW': '繁體中文',
+    'en': 'English',
+    'de': 'Deutsch',
+    'ja': '日本語',
+    'ko': '한국어',
+    'fr': 'Français'
+};
+
 // ==================== 限速规则（安全防护·限速设置单一来源） ====================
 
 // 限速规则注册表：大类（category）→ 规则列表。
@@ -229,6 +245,8 @@ module.exports = {
     TEMPLATE_STATUS,
     PAYMENT_METHODS,
     UI_TEMPLATES,
+    SUPPORTED_LOCALES,
+    LOCALE_NAMES,
     RATE_LIMIT_CATEGORIES,
     RATE_LIMIT_RULES,
     getPeriodDays,

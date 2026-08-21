@@ -6,25 +6,25 @@
                     <!-- 用户管理 -->
                     <div v-if="activeTab === 'users'">
                         <div class="module-header">
-                            <h4 class="module-title">用户管理</h4>
-                            <pv-button @click="showCreateUser = true" variant="glass">创建用户</pv-button>
+                            <h4 class="module-title">{{ t('admin.users.title') }}</h4>
+                            <pv-button @click="showCreateUser = true" variant="glass">{{ t('admin.users.create') }}</pv-button>
                         </div>
                         <div class="row g-2 mb-3 align-items-end">
                             <div class="col-md-3">
-                                <label class="form-label small mb-1">用户名/邮箱</label>
-                                <input type="text" class="form-control form-control-sm" v-model="userFilter.keyword" placeholder="搜索用户名或邮箱" @keyup.enter="searchUsers">
+                                <label class="form-label small mb-1">{{ t('admin.users.usernameEmail') }}</label>
+                                <input type="text" class="form-control form-control-sm" v-model="userFilter.keyword" :placeholder="t('admin.users.searchPlaceholder')" @keyup.enter="searchUsers">
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small mb-1">角色</label>
+                                <label class="form-label small mb-1">{{ t('admin.users.role') }}</label>
                                 <select class="form-select form-select-sm" v-model="userFilter.role">
-                                    <option value="">全部</option>
-                                    <option value="admin">管理员</option>
-                                    <option value="user">普通用户</option>
+                                    <option value="">{{ t('common.all') }}</option>
+                                    <option value="admin">{{ t('admin.users.adminRole') }}</option>
+                                    <option value="user">{{ t('admin.users.userRole') }}</option>
                                 </select>
                             </div>
                             <div class="col-md-2 d-flex gap-2">
-                                <pv-button @click="searchUsers" size="sm">查询</pv-button>
-                                <pv-button @click="userFilter={keyword:'',role:''};searchUsers()" variant="outline" size="sm">重置</pv-button>
+                                <pv-button @click="searchUsers" size="sm">{{ t('admin.common.query') }}</pv-button>
+                                <pv-button @click="userFilter={keyword:'',role:''};searchUsers()" variant="outline" size="sm">{{ t('common.reset') }}</pv-button>
                             </div>
                         </div>
                         <div class="table-container mb-4" style="padding:12px;">
@@ -33,15 +33,15 @@
                                     <thead>
                                         <tr>
                                             <th>ID</th>
-                                            <th>头像</th>
-                                            <th>用户名</th>
-                                            <th>邮箱</th>
-                                            <th>余额</th>
-                                            <th>邮箱验证</th>
+                                            <th>{{ t('admin.users.avatar') }}</th>
+                                            <th>{{ t('admin.users.username') }}</th>
+                                            <th>{{ t('admin.users.email') }}</th>
+                                            <th>{{ t('admin.users.balance') }}</th>
+                                            <th>{{ t('admin.users.emailVerified') }}</th>
                                             <th>2FA</th>
-                                            <th>角色</th>
-                                            <th>创建时间</th>
-                                            <th>操作</th>
+                                            <th>{{ t('admin.users.role') }}</th>
+                                            <th>{{ t('admin.users.createdAt') }}</th>
+                                            <th>{{ t('common.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -56,17 +56,17 @@
                                             <td>{{ parseFloat(u.balance||0).toFixed(2) }}</td>
                                             <td>
                                                 <span class="badge" :class="u.emailVerified ? 'bg-success' : 'bg-warning'">
-                                                    {{ u.emailVerified ? '已验证' : '未验证' }}
+                                                    {{ u.emailVerified ? t('admin.users.verified') : t('admin.users.unverified') }}
                                                 </span>
                                             </td>
-                                            <td><span>{{ u.totp_enabled ? '已启用' : '-' }}</span></td>
+                                            <td><span>{{ u.totp_enabled ? t('common.enabled') : '-' }}</span></td>
                                             <td><span class="badge" :class="u.role === 'admin' ? 'bg-primary' : 'bg-secondary'">{{ u.role }}</span></td>
                                             <td>{{ formatDate(u.created_at) }}</td>
                                             <td>
                                                 <div class="d-flex gap-2">
-                                                    <pv-button @click="rechargeUser = u; rechargeShow = true" size="sm">充值</pv-button>
-                                                    <pv-button @click="editUser(u)" variant="primary" size="sm">编辑</pv-button>
-                                                    <pv-button variant="outline-danger" size="sm" @pv-click="deleteUser(u.id)" :disabled="u.username === 'admin'">删除</pv-button>
+                                                    <pv-button @click="rechargeUser = u; rechargeShow = true" size="sm">{{ t('admin.users.recharge') }}</pv-button>
+                                                    <pv-button @click="editUser(u)" variant="primary" size="sm">{{ t('common.edit') }}</pv-button>
+                                                    <pv-button variant="outline-danger" size="sm" @pv-click="deleteUser(u.id)" :disabled="u.username === 'admin'">{{ t('common.delete') }}</pv-button>
                                                 </div>
                                             </td>
                                         </tr>

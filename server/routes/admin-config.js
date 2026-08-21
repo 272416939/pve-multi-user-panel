@@ -594,12 +594,14 @@ router.get('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         var loginTitle = await getConfig('site:login_title') || 'PVE Panel';
         var registerEnabled = await getConfig('register:enabled') || '0';
         var template = await getConfig('site:template') || 'default';
+        var lang = await getConfig('site:lang') || 'zh-CN';
         res.json({
             name: name,
             logo_text: logoText,
             login_title: loginTitle,
             register_enabled: registerEnabled === '1',
-            template: template
+            template: template,
+            lang: lang
         });
     } catch (e) {
         console.error('[admin] site config get:', e.message);
@@ -611,7 +613,7 @@ router.get('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
 router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var setConfig = db.config.set;
-        var { name, logo_text, login_title, register_enabled, template } = req.body;
+        var { name, logo_text, login_title, register_enabled, template, lang } = req.body;
         // 保存前取旧配置（审计 diff 用）
         var getSiteSnapshot = async function () {
             return {
@@ -619,7 +621,8 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
                 logo_text: (await db.config.get('site:logo_text')) || 'PVE 面板',
                 login_title: (await db.config.get('site:login_title')) || 'PVE Panel',
                 register_enabled: (await db.config.get('register:enabled')) === '1',
-                template: (await db.config.get('site:template')) || 'default'
+                template: (await db.config.get('site:template')) || 'default',
+                lang: (await db.config.get('site:lang')) || 'zh-CN'
             };
         };
         var oldSite = await getSiteSnapshot();
@@ -645,11 +648,19 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
                 return res.status(400).json({ error: '界面模板参数不合法' });
             }
         }
+        if (lang !== undefined) {
+            // SUPPORTED_LOCALES 白名单校验，禁止非法值入库
+            var { SUPPORTED_LOCALES } = require('../constants');
+            if (typeof lang !== 'string' || !SUPPORTED_LOCALES.includes(lang)) {
+                return res.status(400).json({ error: '语言参数不合法' });
+            }
+        }
         if (name !== undefined) await setConfig('site:name', name);
         if (logo_text !== undefined) await setConfig('site:logo_text', logo_text);
         if (login_title !== undefined) await setConfig('site:login_title', login_title);
         if (register_enabled !== undefined) await setConfig('register:enabled', register_enabled ? '1' : '0');
         if (template !== undefined) await setConfig('site:template', template);
+        if (lang !== undefined) await setConfig('site:lang', lang);
         // 清除站点配置缓存（Redis + 进程内存），确保下次请求重新加载
         var redis = require('../api/redis').getRedisClient();
         if (redis) { try { await redis.del('site_config'); } catch (e) {} }
@@ -665,7 +676,8 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
                 { key: 'logo_text', label: 'LOGO文字' },
                 { key: 'login_title', label: '登录页标题' },
                 { key: 'register_enabled', label: '开放注册', bool: true },
-                { key: 'template', label: '界面模板', fmt: function (v) { return v === 'saas' ? 'SAAS企业风' : (v === 'default' ? '赛博霓虹' : v); } }
+                { key: 'template', label: '界面模板', fmt: function (v) { return v === 'saas' ? 'SAAS企业风' : (v === 'default' ? '赛博霓虹' : v); } },
+                { key: 'lang', label: '系统默认语言', fmt: function (v) { var { LOCALE_NAMES } = require('../constants'); return LOCALE_NAMES[v] || v; } }
             ]);
             if (changes.length) {
                 await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.site', resourceType: 'config', resourceId: 'site', details: '更新站点设置；变更:' + changes.join(', '), req });

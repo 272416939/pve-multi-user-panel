@@ -85,7 +85,16 @@ var App = {
     app.config.globalProperties.vmBusyClass = $.vmBusyClass;
     app.config.globalProperties.vmBusyText = $.vmBusyText;
     app.config.globalProperties.vmBusyBlock = $.vmBusyBlock;
-    app.mount('#app');
+    // i18n 翻译函数（响应式：语言切换时自动重渲染）
+    app.config.globalProperties.t = window.__i18n.t;
+    app.config.globalProperties.tFormat = window.__i18n.tFormat;
+    // i18n：异步初始化 + 挂载前确保翻译已加载
+    (async function () {
+        if (window.__i18n && !window.__i18n.isLoaded()) {
+            await window.__i18n.init(window.__initialLocale || 'zh-CN');
+        }
+        app.mount('#app');
+    })();
 
 function toggleSidebar() {
     var sb = document.getElementById('sidebar');

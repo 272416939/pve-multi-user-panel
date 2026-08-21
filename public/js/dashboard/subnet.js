@@ -44,14 +44,14 @@
     // 后端批量接口：爱快 dhcp_server show 一次返回全部，避免逐个子网轮询
     $.refreshSubnets = async function() {
         if ($.subnetRefreshing.value) return;
-        if ($.subnets.value.length === 0) return alert('暂无子网');
+        if ($.subnets.value.length === 0) return alert(window.__i18n.t('dash.subnet.empty'));
         $.subnetRefreshing.value = true;
         try {
             var res = await api('/subnets/refresh', { method: 'POST' });
             await $.loadSubnets();
-            alert('刷新完成：已更新 ' + (res.updated || 0) + ' 个子网的可用 IP');
+            alert(window.__i18n.tFormat('dash.subnet.refreshDone', (res.updated || 0)));
         } catch (e) {
-            alert('刷新失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.subnet.refreshFailed', e.message));
         } finally {
             $.subnetRefreshing.value = false;
         }
@@ -71,9 +71,9 @@
             await api('/subnets', { method: 'POST' });
             $.bsModalHide('createSubnetModal');
             await $.loadSubnets();
-            alert('私有网络子网已创建');
+            alert(window.__i18n.t('dash.subnet.created'));
         } catch (e) {
-            alert('创建失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.subnet.createFailed', e.message));
         } finally {
             $.subnetCreating.value = false;
         }
@@ -81,13 +81,13 @@
 
     // ==================== 删除子网 ====================
     $.deleteSubnet = async function(s) {
-        var ok = await window.customConfirm('确定删除子网 ' + s.vlan_name + '（' + (s.cidr || '') + '）？\n删除前请先解绑其下所有服务器。');
+        var ok = await window.customConfirm(window.__i18n.tFormat('dash.subnet.deleteConfirm', s.vlan_name, (s.cidr || '')));
         if (!ok) return;
         try {
             await api('/subnets/' + s.id, { method: 'DELETE' });
             await $.loadSubnets();
         } catch (e) {
-            alert('删除失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.subnet.deleteFailed', e.message));
         }
     };
 
@@ -112,12 +112,12 @@
 
     $.bindSubnet = async function() {
         var subnetId = parseInt($.bindSubnetForm.subnet_id);
-        if (!subnetId) return alert('请选择要绑定的子网');
+        if (!subnetId) return alert(window.__i18n.t('dash.subnet.selectBindTarget'));
         if ($.bindSubnetSubmitting.value) return;
         // 管理员运行中绑定二次确认：热更新网卡后需重启服务器才能正确应用新网段
         var running = $.bindSubnetDevice.status && $.bindSubnetDevice.status.status === 'running';
         if (running && $.user && $.user.value && $.user.value.role === 'admin') {
-            var ok = await window.customConfirm('服务器正在运行，绑定后需关闭并重新启动服务器才能正确应用新网段，确定继续绑定？');
+            var ok = await window.customConfirm(window.__i18n.t('dash.subnet.bindRunningAdminConfirm'));
             if (!ok) return;
         }
         $.bindSubnetSubmitting.value = true;
@@ -126,19 +126,22 @@
             var id = type === 'vm' ? $.bindSubnetDevice.vm_id : $.bindSubnetDevice.ct_id;
             var res = await api('/' + type + '/' + id + '/bind-subnet', { method: 'POST', body: { subnet_id: subnetId } });
             $.bsModalHide('bindSubnetModal');
-            alert('绑定成功' + (res.dhcp_static_ip ? '，分配 IP：' + res.dhcp_static_ip : '') + (res.port_forwards_rebuilt ? '，已更新 ' + res.port_forwards_rebuilt + ' 条端口转发' : ''));
+            var bindMsg = window.__i18n.t('dash.subnet.bindSuccess');
+            if (res.dhcp_static_ip) bindMsg += window.__i18n.tFormat('dash.subnet.bindIp', res.dhcp_static_ip);
+            if (res.port_forwards_rebuilt) bindMsg += window.__i18n.tFormat('dash.subnet.bindPfUpdated', res.port_forwards_rebuilt);
+            alert(bindMsg);
             // 刷新设备列表与子网可用 IP
             if (type === 'vm') { await $.loadData(); } else { await $.loadLxcContainers(); }
             await $.loadSubnets();
         } catch (e) {
-            alert('绑定失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.subnet.bindFailed', e.message));
         } finally {
             $.bindSubnetSubmitting.value = false;
         }
     };
 
     $.unbindSubnet = async function() {
-        var ok = await window.customConfirm('确定解绑当前子网？\n解绑后该服务器关机后将无法开机，需重新绑定子网后才能启动。');
+        var ok = await window.customConfirm(window.__i18n.t('dash.subnet.unbindConfirm'));
         if (!ok) return;
         if ($.bindSubnetSubmitting.value) return;
         $.bindSubnetSubmitting.value = true;
@@ -147,11 +150,11 @@
             var id = type === 'vm' ? $.bindSubnetDevice.vm_id : $.bindSubnetDevice.ct_id;
             await api('/' + type + '/' + id + '/unbind-subnet', { method: 'POST' });
             $.bsModalHide('bindSubnetModal');
-            alert('已解绑子网');
+            alert(window.__i18n.t('dash.subnet.unbound'));
             if (type === 'vm') { await $.loadData(); } else { await $.loadLxcContainers(); }
             await $.loadSubnets();
         } catch (e) {
-            alert('解绑失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.subnet.unbindFailed', e.message));
         } finally {
             $.bindSubnetSubmitting.value = false;
         }

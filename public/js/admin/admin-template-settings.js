@@ -764,6 +764,30 @@
                             </div>
                         </div>
 
+                        <!-- 系统默认语言 -->
+                        <div class="card mt-3">
+                            <div class="card-body">
+                                <h5 class="card-title mb-1">{{ t('settings.language') }}</h5>
+                                <p class="text-muted small mb-3">{{ t('settings.language.desc') }}</p>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <select class="form-select" v-model="langForm" style="max-width: 300px;">
+                                            <option value="zh-CN">{{ t('lang.zh-CN') }}</option>
+                                            <option value="zh-TW">{{ t('lang.zh-TW') }}</option>
+                                            <option value="en">{{ t('lang.en') }}</option>
+                                            <option value="de">{{ t('lang.de') }}</option>
+                                            <option value="ja">{{ t('lang.ja') }}</option>
+                                            <option value="ko">{{ t('lang.ko') }}</option>
+                                            <option value="fr">{{ t('lang.fr') }}</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <pv-button type="button" variant="glass" @click="saveLang" :disabled="langSaving">
+                                    {{ langSaving ? t('common.saving') : t('settings.language.save') }}
+                                </pv-button>
+                            </div>
+                        </div>
+
                         <!-- Redis 缓存配置 -->
                         <div class="card mt-3">
                             <div class="card-body">

@@ -82,7 +82,7 @@
     function vmMarkOperating(vmid) { var m = new Map($.vmOpTimestamps.value); m.set(vmid, Date.now()); $.vmOpTimestamps.value = m; }
 
     $.startVm = async function(vmid) {
-        if (vmIsOperating(vmid)) return alert('虚拟机正在操作中，请勿重复点击！');
+        if (vmIsOperating(vmid)) return alert(window.__i18n.t('dash.vm.opBusy'));
         vmMarkOperating(vmid);
         try {
             await api('/vm/' + vmid + '/start', { method: 'POST' });
@@ -91,7 +91,7 @@
     };
 
     $.shutdownVm = async function(vmid) {
-        if (vmIsOperating(vmid)) return alert('虚拟机正在操作中，请勿重复点击！');
+        if (vmIsOperating(vmid)) return alert(window.__i18n.t('dash.vm.opBusy'));
         vmMarkOperating(vmid);
         try {
             await api('/vm/' + vmid + '/shutdown', { method: 'POST' });
@@ -102,7 +102,7 @@
     };
 
     $.stopVm = async function(vmid) {
-        if (vmIsOperating(vmid)) return alert('虚拟机正在操作中，请勿重复点击！');
+        if (vmIsOperating(vmid)) return alert(window.__i18n.t('dash.vm.opBusy'));
         vmMarkOperating(vmid);
         try {
             await api('/vm/' + vmid + '/stop', { method: 'POST' });
@@ -113,7 +113,7 @@
     };
 
     $.rebootVm = async function(vmid) {
-        if (vmIsOperating(vmid)) return alert('虚拟机正在操作中，请勿重复点击！');
+        if (vmIsOperating(vmid)) return alert(window.__i18n.t('dash.vm.opBusy'));
         vmMarkOperating(vmid);
         try {
             await api('/vm/' + vmid + '/reboot', { method: 'POST' });
@@ -142,7 +142,7 @@
             var data = await api('/vm/' + vmid + '/vnc', { method: 'POST' });
             window.open(data.proxyUrl, '_blank');
         } catch (e) {
-            alert('打开 VNC 控制台失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.vm.vncOpenFailed', e.message));
         }
     };
 
@@ -181,7 +181,7 @@
     };
 
     $.removeVm = async function() {
-        if (await window.customConfirm('确定移除此虚拟机分配？')) {
+        if (await window.customConfirm(window.__i18n.t('dash.vm.removeConfirm'))) {
             try {
                 await api('/user/vms/' + $.editVmForm.value.id, { method: 'DELETE' });
                 $.bsModalHide('editVmModal');
@@ -193,7 +193,7 @@
     };
 
     $.removeVmById = async function(id) {
-        if (await window.customConfirm('确定移除此虚拟机分配？')) {
+        if (await window.customConfirm(window.__i18n.t('dash.vm.removeConfirm'))) {
             try {
                 await api('/user/vms/' + id, { method: 'DELETE' });
                 await $.loadData();
@@ -249,9 +249,9 @@
     $.getRedeemableVmName = function(vmId) {
         var vm = $.userVms.value.find(function(v) { return v.id == vmId; });
         if (!vm) return '';
-        var exp = vm.expiration_date ? formatDate(vm.expiration_date) : '未设置';
+        var exp = vm.expiration_date ? formatDate(vm.expiration_date) : window.__i18n.t('dash.unset');
         var remain = vm.expiration_date ? $.daysUntilExpire(vm.expiration_date) : '';
-        return (vm.name || 'VM ' + vm.vm_id) + '（到期: ' + exp + ' ' + remain + '）';
+        return (vm.name || 'VM ' + vm.vm_id) + window.__i18n.tFormat('dash.expiryLabel', exp, remain);
     };
 
     // ===== Snapshot 函数 =====
@@ -293,7 +293,7 @@
                 max_rollbacks: data.daily_restore_limit || 10
             };
         } catch (e) {
-            alert('获取快照列表失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.snap.loadFailed', e.message));
             $.snapshots.value = [];
         } finally {
             $.snapshotLoading.value = false;
@@ -333,7 +333,7 @@
         if (names.length === 0) return;
         $.bsModalHide('snapshotModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('确定要批量删除 ' + names.length + ' 个快照吗？此操作不可恢复。')) {
+        if (!await window.customConfirm(window.__i18n.tFormat('dash.snap.batchDeleteConfirm', names.length))) {
             $.bsModalShow('snapshotModal');
             return;
         }
@@ -346,11 +346,11 @@
             await $.loadSnapshots(vmid);
             $.bsModalHide('snapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('成功删除 ' + names.length + ' 个快照');
+            alert(window.__i18n.tFormat('dash.snap.batchDeleted', names.length));
         } catch (e) {
             $.bsModalHide('snapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('批量删除失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.snap.batchDeleteFailed', e.message));
             await $.loadSnapshots(vmid);
         } finally {
             $.snapshotDeleting.value = false;
@@ -369,11 +369,11 @@
             $.snapshotForm.value = { name: '', description: '' };
             $.bsModalHide('snapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('快照创建成功');
+            alert(window.__i18n.t('dash.snap.created'));
         } catch (e) {
             $.bsModalHide('snapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('创建快照失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.snap.createFailed', e.message));
         } finally {
             $.snapshotCreating.value = false;
         }
@@ -382,7 +382,7 @@
     $.rollbackSnapshot = async function(vmid, snapname) {
         $.bsModalHide('snapshotModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('确定要回滚到快照「' + snapname + '」吗？\n此操作将恢复虚拟机磁盘到该快照的状态，运行中的数据可能丢失。')) {
+        if (!await window.customConfirm(window.__i18n.tFormat('dash.snap.rollbackVmConfirm', snapname))) {
             $.bsModalShow('snapshotModal');
             return;
         }
@@ -391,18 +391,18 @@
             await $.loadSnapshots(vmid);
             $.bsModalHide('snapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('快照回滚成功');
+            alert(window.__i18n.t('dash.snap.rollbackOk'));
         } catch (e) {
             $.bsModalHide('snapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('回滚快照失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.snap.rollbackFailed', e.message));
         }
     };
 
     $.deleteSnapshot = async function(vmid, snapname) {
         $.bsModalHide('snapshotModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('确定要删除快照「' + snapname + '」吗？此操作不可恢复。')) {
+        if (!await window.customConfirm(window.__i18n.tFormat('dash.snap.deleteConfirm', snapname))) {
             $.bsModalShow('snapshotModal');
             return;
         }
@@ -411,11 +411,11 @@
             await $.loadSnapshots(vmid);
             $.bsModalHide('snapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('快照删除成功');
+            alert(window.__i18n.t('dash.snap.deleted'));
         } catch (e) {
             $.bsModalHide('snapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('删除快照失败：' + e.message);
+            alert(window.__i18n.tFormat('dash.snap.deleteFailed', e.message));
         }
     };
 

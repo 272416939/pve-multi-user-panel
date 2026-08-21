@@ -350,7 +350,8 @@ async function getSiteConfigCached() {
         var logoText = await db.config.get('site:logo_text') || 'PVE 面板';
         var loginTitle = await db.config.get('site:login_title') || 'PVE Panel';
         var template = await db.config.get('site:template') || 'default';
-        var data = { name: name, logo_text: logoText, login_title: loginTitle, template: template };
+        var lang = await db.config.get('site:lang') || 'zh-CN';
+        var data = { name: name, logo_text: logoText, login_title: loginTitle, template: template, lang: lang };
         cache.data = data;
         cache.expires = now + SITE_CONFIG_TTL * 1000;
         if (redis) {
@@ -358,7 +359,7 @@ async function getSiteConfigCached() {
         }
         return data;
     } catch (e) {
-        return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel', template: 'default' };
+        return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel', template: 'default', lang: 'zh-CN' };
     }
 }
 
@@ -374,10 +375,12 @@ app.use(async (req, res, next) => {
     try {
         res.locals.siteConfig = await getSiteConfigCached();
     } catch (e) {
-        res.locals.siteConfig = { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel' };
+        res.locals.siteConfig = { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel', lang: 'zh-CN' };
     }
     // 界面模板（全站默认）：注入到 EJS，<html data-template="..."> 使用；个人偏好由 theme-init.js 在客户端覆盖
     res.locals.templateStyle = res.locals.siteConfig.template || 'default';
+    // 系统默认语言（i18n）：注入到 EJS，<html lang="..."> 使用；用户个人偏好由 i18n.js 在客户端覆盖
+    res.locals.locale = res.locals.siteConfig.lang || 'zh-CN';
     next();
 });
 

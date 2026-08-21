@@ -24,11 +24,11 @@
                         <span id="headerUsername">Admin</span>
                     </div>
                     <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="/dashboard" target="_blank"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> 仪表盘</a></li>
-                        <li><a class="dropdown-item" href="user-center#wallet-recharge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg> <span id="headerWalletBalance">余额：--</span></a></li>
-                        <li><a class="dropdown-item" href="user-center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> 用户中心</a></li>
+                        <li><a class="dropdown-item" href="/dashboard" target="_blank"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> {{ t('nav.dashboard') }}</a></li>
+                        <li><a class="dropdown-item" href="user-center#wallet-recharge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg> {{ t('nav.balance') }}：<span id="headerWalletBalance">--</span></a></li>
+                        <li><a class="dropdown-item" href="user-center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> {{ t('nav.userCenter') }}</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="#" id="headerLogoutBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> 退出登录</a></li>
+                        <li><a class="dropdown-item" href="#" id="headerLogoutBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:text-bottom;margin-right:4px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg> {{ t('nav.logout') }}</a></li>
                     </ul>
                 </div>
             </div>
@@ -37,137 +37,137 @@
         <!-- Fixed Sidebar (Vue 指令生效) -->
         <aside class="sidebar" id="sidebar">
             <nav class="sidebar-nav">
-                <a class="nav-item" :class="{ active: activeSection === 'overview' }" href="#" @click.prevent="switchSection('overview')"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><span class="nav-text">总览</span></a>
-                <a class="nav-item" href="/dashboard" target="_blank"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span><span class="nav-text">仪表盘</span></a>
+                <a class="nav-item" :class="{ active: activeSection === 'overview' }" href="#" @click.prevent="switchSection('overview')"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span><span class="nav-text">{{ t('nav.overview') }}</span></a>
+                <a class="nav-item" href="/dashboard" target="_blank"><span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span><span class="nav-text">{{ t('nav.dashboard') }}</span></a>
                 <a class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('vms')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></span>
-                    <span class="nav-text">虚拟机管理</span>
+                    <span class="nav-text">{{ t('nav.vmManage') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div class="nav-submenu" id="submenu-vms">
-                    <a class="nav-item" data-subsection="vms-manage" href="#" @click.prevent="switchSubsection('vms','manage')"><span class="nav-text">虚拟机列表</span></a>
-                    <a class="nav-item" data-subsection="vms-assign" href="#" @click.prevent="switchSubsection('vms','assign')"><span class="nav-text">分配虚拟机</span></a>
+                    <a class="nav-item" data-subsection="vms-manage" href="#" @click.prevent="switchSubsection('vms','manage')"><span class="nav-text">{{ t('nav.vmList') }}</span></a>
+                    <a class="nav-item" data-subsection="vms-assign" href="#" @click.prevent="switchSubsection('vms','assign')"><span class="nav-text">{{ t('nav.vmAssign') }}</span></a>
                 </div>
                 <a class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('lxc')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
-                    <span class="nav-text">LXC 容器管理</span>
+                    <span class="nav-text">{{ t('nav.lxcManage') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div class="nav-submenu" id="submenu-lxc">
-                    <a class="nav-item" data-subsection="lxc-create" href="#" @click.prevent="switchSubsection('lxc','create')"><span class="nav-text">新建 LXC 容器</span></a>
-                    <a class="nav-item" data-subsection="lxc-assign" href="#" @click.prevent="switchSubsection('lxc','assign')"><span class="nav-text">分配 LXC 容器</span></a>
-                    <a class="nav-item" data-subsection="lxc-manage" href="#" @click.prevent="switchSubsection('lxc','manage')"><span class="nav-text">容器管理</span></a>
+                    <a class="nav-item" data-subsection="lxc-create" href="#" @click.prevent="switchSubsection('lxc','create')"><span class="nav-text">{{ t('nav.lxcCreate') }}</span></a>
+                    <a class="nav-item" data-subsection="lxc-assign" href="#" @click.prevent="switchSubsection('lxc','assign')"><span class="nav-text">{{ t('nav.lxcAssign') }}</span></a>
+                    <a class="nav-item" data-subsection="lxc-manage" href="#" @click.prevent="switchSubsection('lxc','manage')"><span class="nav-text">{{ t('nav.containerManage') }}</span></a>
                 </div>
 
                 <!-- 网络管理（父菜单） -->
                 <a class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('network')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
-                    <span class="nav-text">网络管理</span>
+                    <span class="nav-text">{{ t('nav.network') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div class="nav-submenu" id="submenu-network">
-                    <a class="nav-item" :class="{ active: activeSection === 'port-forward' }" data-subsection="port-forward" href="#" @click.prevent="switchSection('port-forward')"><span class="nav-text">端口转发管理</span></a>
-                    <a class="nav-item" :class="{ active: activeSection === 'private-network' }" data-subsection="private-network" href="#" @click.prevent="switchSection('private-network')"><span class="nav-text">私有网络管理</span></a>
+                    <a class="nav-item" :class="{ active: activeSection === 'port-forward' }" data-subsection="port-forward" href="#" @click.prevent="switchSection('port-forward')"><span class="nav-text">{{ t('nav.portForward') }}</span></a>
+                    <a class="nav-item" :class="{ active: activeSection === 'private-network' }" data-subsection="private-network" href="#" @click.prevent="switchSection('private-network')"><span class="nav-text">{{ t('nav.privateNetwork') }}</span></a>
                 </div>
                 <!-- 后台管理 -->
                 <a class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('manage')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-                    <span class="nav-text">后台管理</span>
+                    <span class="nav-text">{{ t('nav.adminManage') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div class="nav-submenu" id="submenu-manage">
-                    <a class="nav-item" data-subsection="manage-users" href="#" @click.prevent="switchAdminTab('users')"><span class="nav-text">用户管理</span></a>
-                    <a class="nav-item" data-subsection="manage-cdk" href="#" @click.prevent="switchAdminTab('cdk')"><span class="nav-text">CDK 管理</span></a>
-                    <a class="nav-item" data-subsection="manage-messages" href="#" @click.prevent="switchAdminTab('messages')"><span class="nav-text">消息管理</span></a>
+                    <a class="nav-item" data-subsection="manage-users" href="#" @click.prevent="switchAdminTab('users')"><span class="nav-text">{{ t('nav.users') }}</span></a>
+                    <a class="nav-item" data-subsection="manage-cdk" href="#" @click.prevent="switchAdminTab('cdk')"><span class="nav-text">{{ t('nav.cdkManage') }}</span></a>
+                    <a class="nav-item" data-subsection="manage-messages" href="#" @click.prevent="switchAdminTab('messages')"><span class="nav-text">{{ t('nav.messageManage') }}</span></a>
                 </div>
 
                 <!-- 模板管理（父菜单，仅admin） -->
                 <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('templates')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></span>
-                    <span class="nav-text">模板管理</span>
+                    <span class="nav-text">{{ t('nav.templates') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-templates">
-                    <a class="nav-item" data-subsection="templates-vm" href="#" @click.prevent="switchPage('vm-templates')"><span class="nav-text">VM 套餐模板</span></a>
-                    <a class="nav-item" data-subsection="templates-lxc" href="#" @click.prevent="switchPage('lxc-templates')"><span class="nav-text">LXC 套餐模板</span></a>
-                    <a class="nav-item" data-subsection="templates-os" href="#" @click.prevent="switchPage('os-templates')"><span class="nav-text">系统模板</span></a>
+                    <a class="nav-item" data-subsection="templates-vm" href="#" @click.prevent="switchPage('vm-templates')"><span class="nav-text">{{ t('nav.vmPackageTemplates') }}</span></a>
+                    <a class="nav-item" data-subsection="templates-lxc" href="#" @click.prevent="switchPage('lxc-templates')"><span class="nav-text">{{ t('nav.lxcPackageTemplates') }}</span></a>
+                    <a class="nav-item" data-subsection="templates-os" href="#" @click.prevent="switchPage('os-templates')"><span class="nav-text">{{ t('nav.osTemplates') }}</span></a>
                 </div>
 
  <!-- 套餐管理（父菜单，仅admin） -->
                 <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('packages')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
-                    <span class="nav-text">套餐管理</span>
+                    <span class="nav-text">{{ t('nav.packageManage') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-packages">
-                    <a class="nav-item" data-subsection="packages-vm" href="#" @click.prevent="switchPage('vm-packages')"><span class="nav-text">VM 套餐</span></a>
-                    <a class="nav-item" data-subsection="packages-vm-groups" href="#" @click.prevent="switchPage('vm-package-groups')"><span class="nav-text">VM 套餐分组</span></a>
-                    <a class="nav-item" data-subsection="packages-lxc" href="#" @click.prevent="switchPage('lxc-packages')"><span class="nav-text">LXC 套餐</span></a>
-                    <a class="nav-item" data-subsection="packages-lxc-groups" href="#" @click.prevent="switchPage('lxc-package-groups')"><span class="nav-text">LXC 套餐分组</span></a>
+                    <a class="nav-item" data-subsection="packages-vm" href="#" @click.prevent="switchPage('vm-packages')"><span class="nav-text">{{ t('nav.vmPackages') }}</span></a>
+                    <a class="nav-item" data-subsection="packages-vm-groups" href="#" @click.prevent="switchPage('vm-package-groups')"><span class="nav-text">{{ t('nav.vmPackageGroups') }}</span></a>
+                    <a class="nav-item" data-subsection="packages-lxc" href="#" @click.prevent="switchPage('lxc-packages')"><span class="nav-text">{{ t('nav.lxcPackages') }}</span></a>
+                    <a class="nav-item" data-subsection="packages-lxc-groups" href="#" @click.prevent="switchPage('lxc-package-groups')"><span class="nav-text">{{ t('nav.lxcPackageGroups') }}</span></a>
                 </div>
 
                
                 <!-- 硬盘设置（父菜单，仅admin） -->
                 <a v-if="user && user.role === 'admin'" class="nav-item has-children" :class="{ active: activeSection === 'disk-settings' }" href="#" @click.prevent="toggleSubmenu('disk-settings')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></span>
-                    <span class="nav-text">硬盘设置</span>
+                    <span class="nav-text">{{ t('nav.diskSettings') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-disk-settings">
-                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'storage-groups' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'storage-groups'"><span class="nav-text">存储分组管理</span></a>
-                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'specs' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'specs'"><span class="nav-text">硬盘规格管理</span></a>
-                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'data-disks' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'data-disks'"><span class="nav-text">数据盘管理</span></a>
-                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'lifecycle' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'lifecycle'"><span class="nav-text">生命周期管理</span></a>
+                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'storage-groups' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'storage-groups'"><span class="nav-text">{{ t('nav.storageGroups') }}</span></a>
+                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'specs' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'specs'"><span class="nav-text">{{ t('nav.diskSpecs') }}</span></a>
+                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'data-disks' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'data-disks'"><span class="nav-text">{{ t('nav.dataDisks') }}</span></a>
+                    <a class="nav-item" :class="{ active: activeSection === 'disk-settings' && activeTabDisk === 'lifecycle' }" href="#" @click.prevent="switchSection('disk-settings'); activeTabDisk = 'lifecycle'"><span class="nav-text">{{ t('nav.lifecycle') }}</span></a>
                 </div>
 
                 <!-- 财务管理（父菜单，仅admin） -->
                 <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('finance')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/></svg></span>
-                    <span class="nav-text">财务管理</span>
+                    <span class="nav-text">{{ t('nav.finance') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-finance">
-                    <a class="nav-item" data-subsection="finance-transactions" href="#" @click.prevent="switchSection('finance',{highlight:'finance-transactions'}); activeTab='transactions'"><span class="nav-text">交易流水</span></a>
-                    <a class="nav-item" data-subsection="finance-orders" href="#" @click.prevent="switchSection('finance',{highlight:'finance-orders'}); activeTab='orders'"><span class="nav-text">订单管理</span></a>
+                    <a class="nav-item" data-subsection="finance-transactions" href="#" @click.prevent="switchSection('finance',{highlight:'finance-transactions'}); activeTab='transactions'"><span class="nav-text">{{ t('nav.transactions') }}</span></a>
+                    <a class="nav-item" data-subsection="finance-orders" href="#" @click.prevent="switchSection('finance',{highlight:'finance-orders'}); activeTab='orders'"><span class="nav-text">{{ t('nav.orders') }}</span></a>
                 </div>
 
                 <!-- 系统设置 -->
                 <a class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('settings')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/></svg></span>
-                    <span class="nav-text">系统设置</span>
+                    <span class="nav-text">{{ t('nav.settings') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div class="nav-submenu" id="submenu-settings">
-                    <a class="nav-item" data-subsection="settings-smtp" href="#" @click.prevent="switchAdminTab('smtp')"><span class="nav-text">SMTP 配置</span></a>
-                    <a class="nav-item" data-subsection="settings-ikuai" href="#" @click.prevent="switchAdminTab('ikuai')"><span class="nav-text">爱快节点设置</span></a>
-                    <a class="nav-item" data-subsection="settings-pve" href="#" @click.prevent="switchAdminTab('pve')"><span class="nav-text">PVE节点设置</span></a>
-                    <a class="nav-item" data-subsection="settings-snapshot-backup" href="#" @click.prevent="switchAdminTab('snapshot-backup')"><span class="nav-text">快照&备份配置</span></a>
-                    <a class="nav-item" data-subsection="settings-network" href="#" @click.prevent="switchAdminTab('network')"><span class="nav-text">网络配置</span></a>
-                    <a class="nav-item" data-subsection="settings-pay" href="#" @click.prevent="switchAdminTab('pay')"><span class="nav-text">支付配置</span></a>
-                    <a class="nav-item" data-subsection="settings-site" href="#" @click.prevent="switchAdminTab('site')"><span class="nav-text">站点设置</span></a>
-                    <a class="nav-item" data-subsection="settings-uapipro" href="#" @click.prevent="switchAdminTab('uapipro')"><span class="nav-text">UApiPro</span></a>
+                    <a class="nav-item" data-subsection="settings-smtp" href="#" @click.prevent="switchAdminTab('smtp')"><span class="nav-text">{{ t('nav.smtpConfig') }}</span></a>
+                    <a class="nav-item" data-subsection="settings-ikuai" href="#" @click.prevent="switchAdminTab('ikuai')"><span class="nav-text">{{ t('nav.ikuaiNodeSettings') }}</span></a>
+                    <a class="nav-item" data-subsection="settings-pve" href="#" @click.prevent="switchAdminTab('pve')"><span class="nav-text">{{ t('nav.pveNodeSettings') }}</span></a>
+                    <a class="nav-item" data-subsection="settings-snapshot-backup" href="#" @click.prevent="switchAdminTab('snapshot-backup')"><span class="nav-text">{{ t('nav.backupConfig') }}</span></a>
+                    <a class="nav-item" data-subsection="settings-network" href="#" @click.prevent="switchAdminTab('network')"><span class="nav-text">{{ t('nav.networkConfig') }}</span></a>
+                    <a class="nav-item" data-subsection="settings-pay" href="#" @click.prevent="switchAdminTab('pay')"><span class="nav-text">{{ t('nav.payConfig') }}</span></a>
+                    <a class="nav-item" data-subsection="settings-site" href="#" @click.prevent="switchAdminTab('site')"><span class="nav-text">{{ t('nav.siteSettings') }}</span></a>
+                    <a class="nav-item" data-subsection="settings-uapipro" href="#" @click.prevent="switchAdminTab('uapipro')"><span class="nav-text">{{ t('nav.uapipro') }}</span></a>
                 </div>
 
                 <!-- 安全防护（父菜单，仅admin） -->
                 <a v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('security')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
-                    <span class="nav-text">安全防护</span>
+                    <span class="nav-text">{{ t('nav.security') }}</span>
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-security">
-                    <a class="nav-item" data-subsection="security-ratelimit" href="#" @click.prevent="switchSection('security'); activeTabSecurity = 'ratelimit'"><span class="nav-text">限速设置</span></a>
+                    <a class="nav-item" data-subsection="security-ratelimit" href="#" @click.prevent="switchSection('security'); activeTabSecurity = 'ratelimit'"><span class="nav-text">{{ t('nav.rateLimit') }}</span></a>
                 </div>
 
                 <!-- 日志中心（独立一级菜单，仅admin） -->
                 <a v-if="user && user.role === 'admin'" class="nav-item" :class="{ active: activeSection === 'logs' }" href="#" @click.prevent="switchPage('logs')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
-                    <span class="nav-text">日志中心</span>
+                    <span class="nav-text">{{ t('nav.logs') }}</span>
                 </a>
 
                 <!-- 系统更新（独立一级菜单） -->
                 <a class="nav-item" :class="{ active: activeSection === 'system-update' }" href="#" @click.prevent="switchSection('system-update')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></span>
-                    <span class="nav-text">系统更新</span>
+                    <span class="nav-text">{{ t('nav.systemUpdate') }}</span>
                 </a>
             </nav>
         </aside>
