@@ -27,7 +27,7 @@
     <!-- 分类规则（表格容器统一玻璃态 table-container） -->
     <div v-for="cat in rateLimitConfig.categories" :key="cat.key" class="table-container mb-4" style="padding:12px;">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="mb-0">{{ cat.label }}</h5>
+            <h5 class="mb-0">{{ t('admin.ratelimit.cat.' + cat.key) || cat.label }}</h5>
         </div>
         <table class="table table-hover align-middle mb-0">
                 <thead>
@@ -40,7 +40,7 @@
                 </thead>
                 <tbody>
                     <tr v-for="rule in cat.rules" :key="rule.key">
-                        <td>{{ rule.label }}</td>
+                        <td>{{ t('admin.ratelimit.rule.' + rule.key) || rule.label }}</td>
                         <td class="text-center">
                             <div class="form-check form-switch d-inline-block">
                                 <input class="form-check-input" type="checkbox" :id="'rl-' + rule.key" v-model="rule.enabled">
@@ -58,7 +58,7 @@
                                 </select>
                             </div>
                         </td>
-                        <td class="text-muted small">{{ rule.hint }}</td>
+                        <td class="text-muted small">{{ t('admin.ratelimit.hint.' + rule.key) || rule.hint }}</td>
                     </tr>
                 </tbody>
             </table>

@@ -15,6 +15,23 @@
 
   // 支持的语言列表（与 server/constants.js SUPPORTED_LOCALES 保持一致）
   var SUPPORTED_LOCALES = ['zh-CN', 'zh-TW', 'en', 'de', 'ja', 'ko', 'fr'];
+  // localStorage 缓存已解析语言（刷新时 init 优先使用，避免先按站点默认中文渲染再切换的闪烁）
+  var _localeCacheKey = '__i18nLocale';
+
+  function _cachedLocale() {
+    try {
+      var v = localStorage.getItem(_localeCacheKey) || '';
+      return SUPPORTED_LOCALES.indexOf(v) !== -1 ? v : '';
+    } catch (e) { return ''; }
+  }
+  function _setLocaleCache(locale) {
+    try { localStorage.setItem(_localeCacheKey, locale); } catch (e) { /* 隐私模式忽略 */ }
+  }
+  // 语言就绪前隐藏服务端预渲染内容，防「刷新闪中文」；3s 兜底强制显示（防 init 失败白屏）
+  function _reveal() {
+    if (document.documentElement) document.documentElement.classList.remove('i18n-pending');
+  }
+  setTimeout(function () { _reveal(); }, 3000);
 
   // 语言代码 → 本地化名称映射（与 server/constants.js LOCALE_NAMES 保持一致）
   var LOCALE_NAMES = {
@@ -53,7 +70,9 @@
 
   // 初始化：加载当前语言和兜底语言
   async function init(initialLocale) {
-    _locale = initialLocale || 'zh-CN';
+    // 刷新时优先用 localStorage 缓存的用户语言（与服务端偏好一致时零闪烁；不一致由 i18n-user-init 纠正）
+    initialLocale = _cachedLocale() || initialLocale || 'zh-CN';
+    _locale = initialLocale;
     if (!SUPPORTED_LOCALES.includes(_locale)) _locale = 'zh-CN';
 
     try {
@@ -70,6 +89,8 @@
       _loaded = true;
       document.documentElement.lang = _locale;
       applyStatic();
+      _setLocaleCache(_locale);
+      _reveal();
     } catch (e) {
       console.error('[i18n] 加载语言文件失败:', _locale, e.message);
       // 回退到 zh-CN
@@ -82,9 +103,14 @@
           _loaded = true;
           document.documentElement.lang = _locale;
           applyStatic();
+          _setLocaleCache(_locale);
+          _reveal();
         } catch (e2) {
           console.error('[i18n] 回退语言也加载失败:', e2.message);
+          _reveal();
         }
+      } else {
+        _reveal();
       }
     }
   }
@@ -109,6 +135,8 @@
       _locale = locale;
       document.documentElement.lang = _locale;
       applyStatic();
+      _setLocaleCache(locale);
+      _reveal();
       return true;
     } catch (e) {
       console.error('[i18n] 切换语言失败:', locale, e.message);
