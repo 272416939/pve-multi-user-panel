@@ -16,17 +16,17 @@
                                             <input type="text" class="form-control" v-model="smtpConfig.host" placeholder="smtp.example.com">
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label"{{ t('settings.port') }}/label>
+                                            <label class="form-label">{{ t('settings.port') }}</label>
                                             <input type="number" class="form-control" v-model="smtpConfig.port" placeholder="587">
                                         </div>
                                     </div>
                                     <div class="row mb-3">
                                         <div class="col-md-6">
-                                            <label class="form-label"{{ t('settings.username') }}/label>
+                                            <label class="form-label">{{ t('settings.username') }}</label>
                                             <input type="text" class="form-control" v-model="smtpConfig.user" placeholder="user@example.com">
                                         </div>
                                         <div class="col-md-6">
-                                            <label class="form-label"{{ t('settings.password') }}/label>
+                                            <label class="form-label">{{ t('settings.password') }}</label>
                                             <input type="password" class="form-control" v-model="smtpConfig.password" :placeholder="t('settings.keepBlank')" autocomplete="off">
                                         </div>
                                     </div>
@@ -180,8 +180,8 @@
                                             </div>
                                             <div class="d-flex justify-content-between align-items-center mb-2">
                                                 <div class="d-flex gap-1">
-                                                    <pv-button :variant="emailTemplateMode === 'rich' ? 'glass-active' : 'glass-inactive'" size="lg" @click="switchEmailTemplateMode('rich')"{{ t('settings.emailTpl.rich') }}/pv-button>
-                                                    <pv-button :variant="emailTemplateMode === 'source' ? 'glass-active' : 'glass-inactive'" size="lg" @click="switchEmailTemplateMode('source')"{{ t('settings.emailTpl.source') }}/pv-button>
+                                                    <pv-button :variant="emailTemplateMode === 'rich' ? 'glass-active' : 'glass-inactive'" size="lg" @click="switchEmailTemplateMode('rich')">{{ t('settings.emailTpl.rich') }}</pv-button>
+                                                    <pv-button :variant="emailTemplateMode === 'source' ? 'glass-active' : 'glass-inactive'" size="lg" @click="switchEmailTemplateMode('source')">{{ t('settings.emailTpl.source') }}</pv-button>
                                                 </div>
                                                 <small class="text-muted">{{ t('settings.emailTpl.varFormat') }}<code>{变量名}</code>{{ t('settings.emailTpl.varFormatSuffix') }}</small>
                                             </div>
@@ -202,8 +202,8 @@
                                             </div>
                                             <div class="d-flex gap-2">
                                                 <pv-button variant="glass" @click="saveEmailTemplate" :disabled="emailTemplateSaving">{{ emailTemplateSaving ? t('common.saving') : t('settings.emailTpl.save') }}</pv-button>
-                                                <pv-button variant="outline" size="lg" @click="previewEmailTemplate"{{ t('common.preview') }}/pv-button>
-                                                <pv-button variant="outline" size="lg" @click="toggleEmailTemplateEdit(tpl.code)"{{ t('common.cancel') }}/pv-button>
+                                                <pv-button variant="outline" size="lg" @click="previewEmailTemplate">{{ t('common.preview') }}</pv-button>
+                                                <pv-button variant="outline" size="lg" @click="toggleEmailTemplateEdit(tpl.code)">{{ t('common.cancel') }}</pv-button>
                                             </div>
                                         </div>
                                     </div>
@@ -224,7 +224,7 @@
                                         <div v-html="emailTemplatePreviewHtml"></div>
                                     </div>
                                     <div class="modal-footer">
-                                        <pv-button variant="outline" size="lg" @click="emailTemplatePreviewShow = false"{{ t('common.close') }}/pv-button>
+                                        <pv-button variant="outline" size="lg" @click="emailTemplatePreviewShow = false">{{ t('common.close') }}</pv-button>
                                     </div>
                                 </div>
                             </div>
@@ -251,8 +251,8 @@
                                         </div>
                                     </div>
                                     <div class="modal-footer">
-                                        <pv-button variant="outline" size="lg" @click="closeEmailBtnLinkPrompt(false)"{{ t('common.cancel') }}/pv-button>
-                                        <pv-button variant="primary" @click="closeEmailBtnLinkPrompt(true)"{{ t('common.confirm') }}/pv-button>
+                                        <pv-button variant="outline" size="lg" @click="closeEmailBtnLinkPrompt(false)">{{ t('common.cancel') }}</pv-button>
+                                        <pv-button variant="primary" @click="closeEmailBtnLinkPrompt(true)">{{ t('common.confirm') }}</pv-button>
                                     </div>
                                 </div>
                             </div>
@@ -281,13 +281,13 @@
                                 </div>
                                 <div class="row mb-3">
                                     <div class="col-md-8">
-                                        <label class="form-label"{{ t('settings.username') }}/label>
+                                        <label class="form-label">{{ t('settings.username') }}</label>
                                         <input type="text" class="form-control" v-model="ikuaiConfig.username" :placeholder="t('settings.ikuai.userPh')" autocomplete="off">
                                     </div>
                                 </div>
                                 <div class="row mb-3">
                                     <div class="col-md-8">
-                                        <label class="form-label"{{ t('settings.password') }}/label>
+                                        <label class="form-label">{{ t('settings.password') }}</label>
                                         <input type="password" class="form-control" v-model="ikuaiConfig.password" :placeholder="t('settings.keepBlank')" autocomplete="off">
                                     </div>
                                 </div>
@@ -331,7 +331,7 @@
                                 </div>
                                 <div class="row mb-3">
                                     <div class="col-md-8">
-                                        <label class="form-label"{{ t('settings.pve.apiToken') }}/label>
+                                        <label class="form-label">{{ t('settings.pve.apiToken') }}</label>
                                         <input type="password" class="form-control" v-model="pveConfig.api_token" :placeholder="t('settings.keepBlank')" autocomplete="off">
                                         <small class="text-muted">{{ t('settings.pve.tokenFormat') }}</small>
                                     </div>
@@ -471,7 +471,7 @@
                                         <label class="form-label">{{ t('settings.network.wanIface') }}</label>
                                         <div class="input-group">
                                             <input type="text" class="form-control" v-model="networkConfig.wan_interface" :placeholder="t('settings.network.wanIfacePh')" readonly>
-                                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" :disabled="wanInterfaceList.length === 0"{{ t('settings.select') }}/button>
+                                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" :disabled="wanInterfaceList.length === 0">{{ t('settings.select') }}</button>
                                             <ul class="dropdown-menu dropdown-menu-end" style="z-index: 1080;">
                                                 <li v-for="iface in wanInterfaceList" :key="iface.name">
                                                     <a class="dropdown-item d-flex justify-content-between align-items-center" :class="{ 'active': isWanInterfaceSelected(iface.name) }" href="#" @click.prevent="toggleWanInterface(iface.name)">
@@ -481,7 +481,7 @@
                                                 </li>
                                                 <li v-if="wanInterfaceList.length === 0"><span class="dropdown-item text-muted">{{ t('settings.network.noIface') }}</span></li>
                                                 <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item text-danger" href="#" @click.prevent="networkConfig.wan_interface = ''"{{ t('settings.network.clear') }}/a></li>
+                                                <li><a class="dropdown-item text-danger" href="#" @click.prevent="networkConfig.wan_interface = ''">{{ t('settings.network.clear') }}</a></li>
                                             </ul>
                                         </div>
                                         <small class="text-muted">{{ t('settings.network.wanIfaceHint') }}</small>
@@ -508,7 +508,7 @@
                                         <input type="text" class="form-control form-control-sm" v-model="entry.domain" :placeholder="t('settings.network.cnameDomainPh')">
                                     </div>
                                     <div class="col-md-2">
-                                        <pv-button @click="removeCnameEntry(idx)" variant="outline-danger" size="sm"{{ t('common.delete') }}/pv-button>
+                                        <pv-button @click="removeCnameEntry(idx)" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2 mt-2">
@@ -526,11 +526,11 @@
                             <div class="card-body">
                                 <div class="row mb-3">
                                     <div class="col-md-4">
-                                        <label class="form-label"{{ t('settings.network.dns1') }}/label>
+                                        <label class="form-label">{{ t('settings.network.dns1') }}</label>
                                         <input type="text" class="form-control" v-model="networkConfig.dhcp_dns1" placeholder="180.76.76.76">
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label"{{ t('settings.network.dns2') }}/label>
+                                        <label class="form-label">{{ t('settings.network.dns2') }}</label>
                                         <input type="text" class="form-control" v-model="networkConfig.dhcp_dns2" placeholder="223.5.5.5">
                                     </div>
                                 </div>
@@ -801,7 +801,7 @@
                                             <small class="text-muted">{{ t('settings.redis.hostHint') }}</small>
                                         </div>
                                         <div class="col-md-3">
-                                            <label class="form-label"{{ t('settings.port') }}/label>
+                                            <label class="form-label">{{ t('settings.port') }}</label>
                                             <input type="number" class="form-control" v-model.number="redisConfig.port" placeholder="6379">
                                         </div>
                                         <div class="col-md-3">
@@ -811,7 +811,7 @@
                                     </div>
                                     <div class="row mb-3">
                                         <div class="col-md-6">
-                                            <label class="form-label"{{ t('settings.password') }}/label>
+                                            <label class="form-label">{{ t('settings.password') }}</label>
                                             <input type="password" class="form-control" v-model="redisConfig.password" :placeholder="t('settings.redis.pwdPh')">
                                         </div>
                                         <div class="col-md-6">
@@ -892,7 +892,7 @@
                                 <label class="form-check-label" for="uapiproEnabled">{{ t('settings.uapipro.enabled') }}</label>
                             </div>
                             <div class="mb-3">
-                                <label class="form-label"{{ t('settings.uapipro.apiKey') }}/label>
+                                <label class="form-label">{{ t('settings.uapipro.apiKey') }}</label>
                                 <input type="password" class="form-control" v-model="uapiproConfig.api_key" :placeholder="t('settings.uapipro.apiKeyPh')">
                                 <small class="text-muted">{{ t('settings.uapipro.apiKeyHint') }}</small>
                             </div>

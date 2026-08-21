@@ -928,7 +928,7 @@
         <div class="modal-header"><h5 class="modal-title">{{ t('dash.subnet.create') }}</h5><pv-button type="button" data-bs-dismiss="modal"></pv-button></div>
         <div class="modal-body">
             <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-muted small">{{ t('dash.subnet.created') }}<strong>{{ subnetQuota.used }}</strong> / <strong>{{ subnetQuota.max > 0 ? subnetQuota.max : '∞' }}</strong {{ t('dash.subnet.subnetUnit') }}</span>
+                <span class="text-muted small">{{ t('dash.subnet.created') }}<strong>{{ subnetQuota.used }}</strong> / <strong>{{ subnetQuota.max > 0 ? subnetQuota.max : '∞' }}</strong> {{ t('dash.subnet.subnetUnit') }}</span>
                 <span v-if="subnetQuota.max > 0" class="text-muted small">{{ tFormat('dash.subnet.remaining', Math.max(0, subnetQuota.max - subnetQuota.used)) }}</span>
                 <span v-else class="text-muted small">{{ t('dash.subnet.adminUnlimited') }}</span>
             </div>

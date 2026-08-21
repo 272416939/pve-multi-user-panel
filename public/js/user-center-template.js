@@ -563,22 +563,22 @@
                                     <table class="table table-sm table-hover mb-0 table-align-center">
                                         <thead>
                                             <tr>
-                                                <th{{ t('user.devices.device') }}/th>
+                                                <th>{{ t('user.devices.device') }}</th>
                                                 <th>IP</th>
                                                 <th>{{ t('user.devices.loginTime') }}</th>
-                                                <th{{ t('common.actions') }}/th>
+                                                <th>{{ t('common.actions') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr v-for="d in devices" :key="d.id">
                                                 <td>
                                                     <span>{{ d.device_name }}</span>
-                                                    <span v-if="d.id === currentDeviceId" class="badge bg-info ms-1" style="font-size:10px;"{{ t('user.devices.current') }}/span>
+                                                    <span v-if="d.id === currentDeviceId" class="badge bg-info ms-1" style="font-size:10px;">{{ t('user.devices.current') }}</span>
                                                 </td>
                                                 <td class="text-muted small">{{ d.ip }}<span v-if="d.ip_location">（{{ d.ip_location }}）</span></td>
                                                 <td class="text-muted small">{{ formatDate(d.created_at) }}</td>
                                                 <td>
-                                                    <pv-button v-if="d.id !== currentDeviceId" variant="danger" size="sm" @click="revokeDevice(d.id)"{{ t('user.devices.revoke') }}/pv-button>
+                                                    <pv-button v-if="d.id !== currentDeviceId" variant="danger" size="sm" @click="revokeDevice(d.id)">{{ t('user.devices.revoke') }}</pv-button>
                                                     <span v-else class="text-muted small">-</span>
                                                 </td>
                                             </tr>
@@ -625,14 +625,14 @@
                             <div class="modal-body">
                                 <form @submit.prevent="saveMemo">
                                     <div class="mb-3">
-                                        <label class="form-label"{{ t('user.memos.titleLabel') }}/label>
+                                        <label class="form-label">{{ t('user.memos.titleLabel') }}</label>
                                         <input type="text" class="form-control" v-model="editMemoForm.title" :placeholder="t('user.memos.titlePh')">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label"{{ t('user.memos.content') }}/label>
+                                        <label class="form-label">{{ t('user.memos.content') }}</label>
                                         <textarea class="form-control" rows="5" v-model="editMemoForm.content" :placeholder="t('user.memos.contentPh')"></textarea>
                                     </div>
-                                    <pv-button type="submit" variant="glass"{{ t('common.save') }}/pv-button>
+                                    <pv-button type="submit" variant="glass">{{ t('common.save') }}</pv-button>
                                 </form>
                             </div>
                         </div>
@@ -697,7 +697,7 @@
                                 </p>
                             </div>
                             <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                                <button type="button" class="btn btn-primary px-4" @click="closeRechargeResult"{{ t('common.confirm') }}/button>
+                                <button type="button" class="btn btn-primary px-4" @click="closeRechargeResult">{{ t('common.confirm') }}</button>
                             </div>
                         </div>
                     </div>
@@ -721,8 +721,8 @@
                                 <div class="message-detail-content markdown-body" style="line-height:1.7;white-space:pre-wrap;" v-html="parseMarkdown(currentMsg.content)"></div>
                             </div>
                             <div class="modal-footer d-flex gap-2">
-                                <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger"{{ t('common.delete') }}/pv-button>
-                                <pv-button type="button" data-bs-dismiss="modal"{{ t('common.close') }}/pv-button>
+                                <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger">{{ t('common.delete') }}</pv-button>
+                                <pv-button type="button" data-bs-dismiss="modal">{{ t('common.close') }}</pv-button>
                             </div>
                         </div>
                     </div>
@@ -768,7 +768,7 @@
                                 </div>
                                 <div class="table-container mb-3" style="padding:12px;">
                                 <table class="table table-sm table-hover table-align-center">
-                                    <thead><tr><th>#</th><th>{{ t('user.twofa.recoveryCode') }}</th><th{{ t('common.status') }}/th><th>{{ t('user.twofa.createdAt') }}</th></tr></thead>
+                                    <thead><tr><th>#</th><th>{{ t('user.twofa.recoveryCode') }}</th><th>{{ t('common.status') }}</th><th>{{ t('user.twofa.createdAt') }}</th></tr></thead>
                                     <tbody>
                                         <tr v-for="(rc, idx) in twofaRecoveryCodes" :key="rc.id">
                                             <td class="text-muted small">{{ idx + 1 }}</td>
@@ -784,7 +784,7 @@
                                 </div>
                                 <div class="d-flex gap-2 mt-3">
                                     <pv-button variant="secondary" size="sm" @click="copyRecoveryCodes">{{ t('user.twofa.copyAll') }}</pv-button>
-                                    <pv-button variant="outline" size="sm" @click="downloadRecoveryCodes"{{ t('common.download') }}/pv-button>
+                                    <pv-button variant="outline" size="sm" @click="downloadRecoveryCodes">{{ t('common.download') }}</pv-button>
                                     <pv-button variant="outline-danger" size="sm" @click="regenerateRecoveryCodes">{{ t('user.twofa.regenerate') }}</pv-button>
                                 </div>
                             </div>
@@ -805,7 +805,7 @@
                                 <input type="password" class="form-control" v-model="twofaDisablePassword" :placeholder="t('user.twofa.currentPwdPh')">
                             </div>
                             <div class="modal-footer d-flex gap-2">
-                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary"{{ t('common.cancel') }}/pv-button>
+                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">{{ t('common.cancel') }}</pv-button>
                                 <pv-button type="button" @click="disableTwofa" :disabled="!twofaDisablePassword" variant="danger">{{ t('user.twofa.confirmDisable') }}</pv-button>
                             </div>
                         </div>
@@ -826,8 +826,8 @@
                                 <input type="text" class="form-control" v-model="secondaryAuthInput" :placeholder="t('user.secAuth.ph')" @keyup="onSecondaryAuthKeyup">
                             </div>
                             <div class="modal-footer d-flex gap-2">
-                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary"{{ t('common.cancel') }}/pv-button>
-                                <pv-button type="button" @click="confirmSecondaryAuth" :disabled="!secondaryAuthInput" variant="primary"{{ t('user.secAuth.verify') }}/pv-button>
+                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">{{ t('common.cancel') }}</pv-button>
+                                <pv-button type="button" @click="confirmSecondaryAuth" :disabled="!secondaryAuthInput" variant="primary">{{ t('user.secAuth.verify') }}</pv-button>
                             </div>
                         </div>
                     </div>
