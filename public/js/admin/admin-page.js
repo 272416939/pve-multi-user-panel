@@ -183,6 +183,9 @@ var app = Vue.createApp(App);
   // i18n 翻译函数（响应式：语言切换时自动重渲染）
   app.config.globalProperties.t = window.__i18n.t;
   app.config.globalProperties.tFormat = window.__i18n.tFormat;
+  // 日志分类/子分类标识 → i18n key（模板内不直接引用 window，经 globalProperties 转发）
+  app.config.globalProperties.logCatKey = function (k) { return window.__logI18n ? window.__logI18n.cat(k) : ''; };
+  app.config.globalProperties.logSubKey = function (k) { return window.__logI18n ? window.__logI18n.sub(k) : ''; };
 // Global error handler — catch render errors and show on screen
 app.config.errorHandler = function(err, instance, info) {
     console.error('[Vue Error]', err, instance, info);

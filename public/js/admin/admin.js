@@ -1854,57 +1854,57 @@
     };
 
     $.deleteOsSwitchLog = async function(id) {
-        if (!(await window.customConfirm('确认删除日志 #' + id + '？'))) return;
+        if (!(await window.customConfirm(window.__i18n.tFormat('common.confirmDelete', '#' + id)))) return;
         try {
             var res = await api('/admin/os-switch-logs/' + id, { method: 'DELETE' });
             if (res && res.success) {
                 $.loadOsSwitchLogs($.osSwitchLogPage.value);
             } else {
-                alert(res.error || '删除失败');
+                alert(res.error || window.__i18n.t('admin.logs.deleteFailed'));
             }
         } catch (e) {
-            alert('删除请求失败');
+            alert(window.__i18n.t('admin.logs.deleteReqFailed'));
         }
     };
 
     $.batchDeleteOsSwitchLog = async function() {
         var ids = $.osSwitchLogSelected.value;
-        if (ids.length === 0) { alert('请先选择要删除的日志'); return; }
-        if (!(await window.customConfirm('确认删除选中的 ' + ids.length + ' 条日志？'))) return;
+        if (ids.length === 0) { alert(window.__i18n.t('admin.logs.selectFirst')); return; }
+        if (!(await window.customConfirm(window.__i18n.tFormat('admin.logs.confirmBatch', ids.length)))) return;
         try {
             var res = await api('/admin/os-switch-logs/batch-delete', {
                 method: 'POST',
                 body: JSON.stringify({ ids: ids })
             });
             if (res && res.success) {
-                alert(res.message || '已删除');
+                alert(res.message || window.__i18n.t('admin.logs.deleted'));
                 $.osSwitchLogSelected.value = [];
                 $.loadOsSwitchLogs($.osSwitchLogPage.value);
             } else {
-                alert(res.error || '批量删除失败');
+                alert(res.error || window.__i18n.t('admin.logs.batchFailed'));
             }
         } catch (e) {
-            alert('请求失败');
+            alert(window.__i18n.t('admin.logs.requestFailed'));
         }
     };
 
     $.clearAllOsSwitchLog = async function() {
-        if (!(await window.customConfirm('⚠️ 高危操作！确认清空所有切换日志（运行中和需介入的日志将被保留）？'))) return;
-        var confirmStr = await window.customPrompt('请输入 CLEAR_ALL_OS_SWITCH_LOGS 确认清空：');
-        if (confirmStr !== 'CLEAR_ALL_OS_SWITCH_LOGS') { alert('确认串不正确'); return; }
+        if (!(await window.customConfirm(window.__i18n.t('admin.logs.clearOsSwitchConfirm')))) return;
+        var confirmStr = await window.customPrompt(window.__i18n.t('admin.logs.clearOsSwitchPrompt'));
+        if (confirmStr !== 'CLEAR_ALL_OS_SWITCH_LOGS') { alert(window.__i18n.t('admin.logs.confirmStrWrong')); return; }
         try {
             var res = await api('/admin/os-switch-logs/clear', {
                 method: 'POST',
                 body: JSON.stringify({ confirm: confirmStr })
             });
             if (res && res.success) {
-                alert(res.message || '已清空');
+                alert(res.message || window.__i18n.t('admin.logs.cleared'));
                 $.loadOsSwitchLogs(1);
             } else {
-                alert(res.error || '清空失败');
+                alert(res.error || window.__i18n.t('admin.logs.clearFailed'));
             }
         } catch (e) {
-            alert('请求失败');
+            alert(window.__i18n.t('admin.logs.requestFailed'));
         }
     };
 })();

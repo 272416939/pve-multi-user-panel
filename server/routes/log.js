@@ -38,6 +38,7 @@ router.get('/logs/operation', authMiddleware, async (req, res) => {
                 id: r.id,
                 username: r.username,
                 action: r.action,
+                category_key: actionToCategory(r.action),
                 category_name: AUDIT_CATEGORY_NAMES[actionToCategory(r.action)] || '其他',
                 detail_text: buildRowDetail(r, locMap),
                 created_at: r.created_at

@@ -69,7 +69,7 @@
                         <tbody>
                             <tr v-for="row in opLogList" :key="row.id">
                                 <td>{{ row.username || '-' }}</td>
-                                <td>{{ row.category_name }}</td>
+                                <td>{{ t(logCatKey(row.category_key)) || row.category_name }}</td>
                                 <td class="small text-start"><span class="log-detail-truncate" :title="row.detail_text">{{ row.detail_text }}</span></td>
                                 <td class="small text-nowrap">{{ row.created_at }}</td>
                                 <td><pv-button size="sm" @click="showLogDetail(row)">{{ t('common.detail') }}</pv-button></td>

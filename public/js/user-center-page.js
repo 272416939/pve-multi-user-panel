@@ -121,71 +121,71 @@ const App = {
         const notifGroups = ref([
             {
                 key: 'provision',
-                label: '资源开通',
+                labelKey: 'user.notif.group.provision',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h20v11H2z"/><polyline points="12 17 12 20"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="7" y1="8" x2="17" y2="8"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_vm_provisioned', label: '虚拟机开通成功' },
-                    { key: 'notify_lxc_provisioned', label: '容器开通成功' },
-                    { key: 'notify_account_password', label: '服务器账号密码' },
-                    { key: 'notify_subnet_provisioned', label: '子网开通成功' }
+                    { key: 'notify_vm_provisioned', labelKey: 'user.notif.item.notify_vm_provisioned' },
+                    { key: 'notify_lxc_provisioned', labelKey: 'user.notif.item.notify_lxc_provisioned' },
+                    { key: 'notify_account_password', labelKey: 'user.notif.item.notify_account_password' },
+                    { key: 'notify_subnet_provisioned', labelKey: 'user.notif.item.notify_subnet_provisioned' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'refund',
-                label: '资源退款',
+                labelKey: 'user.notif.group.refund',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h11a4 4 0 0 1 0 8h-1"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_vm_refund', label: '虚拟机开通失败退款' },
-                    { key: 'notify_lxc_refund', label: '容器开通失败退款' }
+                    { key: 'notify_vm_refund', labelKey: 'user.notif.item.notify_vm_refund' },
+                    { key: 'notify_lxc_refund', labelKey: 'user.notif.item.notify_lxc_refund' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'disk',
-                label: '硬盘管理',
+                labelKey: 'user.notif.group.disk',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><path d="M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z"/><circle cx="7" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="12" r="1" fill="currentColor" stroke="none"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_disk_purchase', label: '硬盘购买成功' },
-                    { key: 'notify_disk_resize', label: '硬盘扩容成功' },
-                    { key: 'notify_disk_renewal', label: '硬盘续费成功' },
-                    { key: 'notify_disk_refund', label: '硬盘购买/扩容退款' },
-                    { key: 'notify_disk_destroy_refund', label: '硬盘销毁退款' }
+                    { key: 'notify_disk_purchase', labelKey: 'user.notif.item.notify_disk_purchase' },
+                    { key: 'notify_disk_resize', labelKey: 'user.notif.item.notify_disk_resize' },
+                    { key: 'notify_disk_renewal', labelKey: 'user.notif.item.notify_disk_renewal' },
+                    { key: 'notify_disk_refund', labelKey: 'user.notif.item.notify_disk_refund' },
+                    { key: 'notify_disk_destroy_refund', labelKey: 'user.notif.item.notify_disk_destroy_refund' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'wallet',
-                label: '充值续费',
+                labelKey: 'user.notif.group.wallet',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_recharge', label: '充值到账通知' },
-                    { key: 'notify_renewal', label: '余额续费成功' }
+                    { key: 'notify_recharge', labelKey: 'user.notif.item.notify_recharge' },
+                    { key: 'notify_renewal', labelKey: 'user.notif.item.notify_renewal' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'expiry',
-                label: '到期提醒',
+                labelKey: 'user.notif.group.expiry',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_expiry_reminder', label: '到期前提醒' },
-                    { key: 'notify_expiry_alert', label: '已到期通知' }
+                    { key: 'notify_expiry_reminder', labelKey: 'user.notif.item.notify_expiry_reminder' },
+                    { key: 'notify_expiry_alert', labelKey: 'user.notif.item.notify_expiry_alert' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'backup',
-                label: '备份恢复',
+                labelKey: 'user.notif.group.backup',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_backup_result', label: '备份/恢复结果' }
+                    { key: 'notify_backup_result', labelKey: 'user.notif.item.notify_backup_result' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             }
@@ -214,20 +214,22 @@ const App = {
                     body: JSON.stringify({ [field]: value ? 1 : 0 })
                 });
                 // 找到对应的标签用于 toast 提示
-                let label = '';
+                let labelKey = '';
                 if (field === 'email_notifications_enabled') {
-                    label = '邮件通知';
+                    labelKey = 'user.notif.masterLabel';
                 } else {
                     for (const group of notifGroups.value) {
                         const item = group.items.find(i => i.key === field);
-                        if (item) { label = item.label; break; }
+                        if (item) { labelKey = item.labelKey; break; }
                     }
                 }
-                showToast(label + (value ? '已开启' : '已关闭'), 'success');
+                showToast(window.__i18n.tFormat('user.notif.toggleResult',
+                    window.__i18n.t(labelKey),
+                    value ? window.__i18n.t('user.notif.enabled') : window.__i18n.t('user.notif.disabled')), 'success');
             } catch (e) {
                 // 回滚
                 notifSettings.value[field] = value ? 0 : 1;
-                showToast('保存失败：' + e.message, 'error');
+                showToast(window.__i18n.tFormat('user.notif.saveFailed', e.message), 'error');
             }
         };
 
@@ -943,19 +945,23 @@ const App = {
             }
         };
 
+        const avatarFileName = ref('');
         const handleAvatarUpload = async (e) => {
             const file = e.target.files[0];
             if (file) {
                 if (file.size > 2 * 1024 * 1024) {
                     alert('头像文件大小不能超过2MB');
+                    avatarFileName.value = '';
                     e.target.value = '';
                     return;
                 }
                 if (!['image/jpeg', 'image/png'].includes(file.type)) {
                     alert('仅支持 JPG 和 PNG 格式');
+                    avatarFileName.value = '';
                     e.target.value = '';
                     return;
                 }
+                avatarFileName.value = file.name;
                 try {
                     const formData = new FormData();
                     formData.append('avatar', file);
@@ -1531,6 +1537,7 @@ const App = {
             loadMemos,
             updateProfile,
             updatePassword,
+            avatarFileName,
             handleAvatarUpload,
             bindEmail,
             resendVerification,

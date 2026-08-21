@@ -59,7 +59,9 @@
                                             <img v-else :src="getGeekAvatar(profileForm.username || user?.username)" class="avatar-img">
                                         </div>
                                         <div>
-                                            <input type="file" class="form-control" accept=".jpg,.jpeg,.png" @change="handleAvatarUpload" style="max-width: 300px;">
+                                            <input type="file" ref="avatarFileInput" class="d-none" accept=".jpg,.jpeg,.png" @change="handleAvatarUpload">
+                                            <pv-button type="button" variant="outline" size="lg" @click="$refs.avatarFileInput.click()">{{ t('user.avatar.select') }}</pv-button>
+                                            <div class="small text-muted mt-1">{{ avatarFileName || t('user.avatar.none') }}</div>
                                             <small class="text-muted">{{ t('user.avatar.hint') }}</small>
                                         </div>
                                     </div>
@@ -362,14 +364,14 @@
                                          @click="group.expanded = !group.expanded">
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="notification-group-icon" v-html="DOMPurify.sanitize(group.svg)"></span>
-                                            <span class="fw-bold">{{ group.label }}</span>
+                                            <span class="fw-bold">{{ t(group.labelKey) }}</span>
                                             <small class="text-muted">{{ tFormat('user.notif.itemsEnabled', group.enabledCount, group.items.length) }}</small>
                                         </div>
                                         <svg class="notification-chevron transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: group.expanded ? 'rotate(90deg)' : 'rotate(0deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
                                     </div>
                                     <div v-show="group.expanded" class="notification-group-items mt-2">
                                         <div v-for="item in group.items" :key="item.key" class="d-flex justify-content-between align-items-center py-2 px-3 notification-item-row">
-                                            <span :class="{ 'text-muted': !notifSettings.email_notifications_enabled }">{{ item.label }}</span>
+                                            <span :class="{ 'text-muted': !notifSettings.email_notifications_enabled }">{{ t(item.labelKey) }}</span>
                                             <div class="form-check form-switch mb-0">
                                                 <input class="form-check-input" type="checkbox"
                                                        :id="'notif_' + item.key"

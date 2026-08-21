@@ -17,7 +17,7 @@ window.__sharedDialogTemplates = `
                 <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customAlertMessage }}</p>
             </div>
             <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                <pv-button type="button" variant="primary" @mousedown="(e) => e.target.blur()" data-bs-dismiss="modal">确定</pv-button>
+                <pv-button type="button" variant="primary" @mousedown="(e) => e.target.blur()" data-bs-dismiss="modal">{{ t('common.confirm') }}</pv-button>
             </div>
         </div>
     </div>
@@ -38,8 +38,8 @@ window.__sharedDialogTemplates = `
                 <p class="custom-confirm-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;white-space:pre-line;">{{ customConfirmMessage }}</p>
             </div>
             <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
-                <pv-button type="button" variant="outline" @click="confirmCancel">取消</pv-button>
-                <pv-button type="button" variant="primary" @click="confirmOk">确定</pv-button>
+                <pv-button type="button" variant="outline" @click="confirmCancel">{{ t('common.cancel') }}</pv-button>
+                <pv-button type="button" variant="primary" @click="confirmOk">{{ t('common.confirm') }}</pv-button>
             </div>
         </div>
     </div>
@@ -53,14 +53,14 @@ window.__sharedDialogTemplates = `
         <div class="modal-content">
             <div class="modal-header py-2">
                 <h6 class="modal-title mb-0">{{ logDetailTitle }}</h6>
-                <pv-button type="button" variant="close" data-bs-dismiss="modal" aria-label="关闭"></pv-button>
+                <pv-button type="button" variant="close" data-bs-dismiss="modal" :aria-label="t('common.close')"></pv-button>
             </div>
             <div class="modal-body" style="overflow-y:auto;overflow-x:hidden;">
                 <p class="small text-muted mb-2" style="white-space:pre-line;">{{ logDetailMeta }}</p>
                 <p class="mb-0" style="white-space:pre-line;word-break:break-all;color:var(--text-primary);font-size:13px;line-height:1.7;">{{ logDetailText }}</p>
             </div>
             <div class="modal-footer border-0 pt-0">
-                <pv-button type="button" variant="primary" data-bs-dismiss="modal">关闭</pv-button>
+                <pv-button type="button" variant="primary" data-bs-dismiss="modal">{{ t('common.close') }}</pv-button>
             </div>
         </div>
     </div>

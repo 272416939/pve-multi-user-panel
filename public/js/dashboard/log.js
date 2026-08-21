@@ -118,7 +118,8 @@
     $.logDetailText = ref('');
     $.showLogDetail = function(row) {
         if (!row) return;
-        $.logDetailTitle.value = window.__i18n.tFormat('dash.log.detailTitle', row.id, row.category_name || row.action || '');
+        $.logDetailTitle.value = window.__i18n.tFormat('dash.log.detailTitle', row.id,
+            row.category_name ? (window.__i18n.t(window.__logI18n.cat(row.category_key)) || row.category_name) : '');
         $.logDetailMeta.value = (row.username || '-') + ' | ' + (row.created_at || '');
         $.logDetailText.value = row.detail_text || window.__i18n.t('dash.log.noDetail');
         var el = document.getElementById('logDetailModal');

@@ -259,7 +259,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(objUrl);
         } catch (e) {
-            alert('导出失败: ' + (e.message || ''));
+            alert(window.__i18n.tFormat('dash.log.exportFailedMsg', e.message || ''));
         }
     };
 
@@ -269,9 +269,15 @@
     $.logDetailText = ref('');
     $.showLogDetail = function(row) {
         if (!row) return;
-        $.logDetailTitle.value = '日志 #' + row.id + ' · ' + (row.category_name || row.sub_category_name || row.action || '');
+        var typeName = row.sub_category_name || row.category_name || row.action || '';
+        if (row.sub_category_name && row.sub_category_key) {
+            typeName = window.__i18n.t(window.__logI18n.sub(row.sub_category_key)) || row.sub_category_name;
+        } else if (row.category_name && row.category_key) {
+            typeName = window.__i18n.t(window.__logI18n.cat(row.category_key)) || row.category_name;
+        }
+        $.logDetailTitle.value = window.__i18n.tFormat('admin.logs.detailTitle', row.id, typeName);
         $.logDetailMeta.value = (row.username ? row.username + '[' + row.user_id + ']' : (row.user_id || '-')) + ' | ' + (row.created_at || '');
-        $.logDetailText.value = row.detail_text || '（无详情）';
+        $.logDetailText.value = row.detail_text || window.__i18n.t('dash.log.noDetail');
         var el = document.getElementById('logDetailModal');
         if (el) {
             var modal = new bootstrap.Modal(el);
@@ -285,17 +291,17 @@
             if ($.deleteOsSwitchLog) $.deleteOsSwitchLog(row.id);
             return;
         }
-        if (!(await window.customConfirm('确认删除日志 #' + row.id + '？'))) return;
+        if (!(await window.customConfirm(window.__i18n.tFormat('common.confirmDelete', '#' + row.id)))) return;
         try {
             var isLogin = $.logTab.value === 'login';
             var res = await api((isLogin ? '/admin/logs/login/' : '/admin/logs/operation/') + row.id, { method: 'DELETE' });
             if (res && res.success) {
                 $.loadLogs($.currentLogPage.value);
             } else {
-                alert(res.error || '删除失败');
+                alert(res.error || window.__i18n.t('admin.logs.deleteFailed'));
             }
         } catch (e) {
-            alert('删除请求失败');
+            alert(window.__i18n.t('admin.logs.deleteReqFailed'));
         }
     };
 
@@ -305,8 +311,8 @@
             if ($.batchDeleteOsSwitchLog) $.batchDeleteOsSwitchLog();
             return;
         }
-        if ($.selectedLogIds.length === 0) { alert('请先选择要删除的日志'); return; }
-        if (!(await window.customConfirm('确认删除选中的 ' + $.selectedLogIds.length + ' 条日志？'))) return;
+        if ($.selectedLogIds.length === 0) { alert(window.__i18n.t('admin.logs.selectFirst')); return; }
+        if (!(await window.customConfirm(window.__i18n.tFormat('admin.logs.confirmBatch', $.selectedLogIds.length)))) return;
         try {
             var isLogin = $.logTab.value === 'login';
             var res = await api(isLogin ? '/admin/logs/login/batch-delete' : '/admin/logs/operation/batch-delete', {
@@ -314,14 +320,14 @@
                 body: JSON.stringify({ ids: $.selectedLogIds.slice() })
             });
             if (res && res.success) {
-                alert(res.message || '已删除');
+                alert(res.message || window.__i18n.t('admin.logs.deleted'));
                 $.selectedLogIds.splice(0, $.selectedLogIds.length);
                 $.loadLogs($.currentLogPage.value);
             } else {
-                alert(res.error || '批量删除失败');
+                alert(res.error || window.__i18n.t('admin.logs.batchFailed'));
             }
         } catch (e) {
-            alert('请求失败');
+            alert(window.__i18n.t('admin.logs.requestFailed'));
         }
     };
 
@@ -352,8 +358,8 @@
         }
         var isLogin = $.logTab.value === 'login';
         var scope = $.logTab.value === 'admin' ? 'admin' : 'user';
-        var msg = isLogin ? '确定清空全部登录日志？此操作不可恢复。'
-            : (scope === 'admin' ? '确定清空全部后台操作日志？此操作不可恢复。' : '确定清空全部用户操作日志？此操作不可恢复。');
+        var msg = isLogin ? window.__i18n.t('dash.log.clearLoginConfirm')
+            : (scope === 'admin' ? window.__i18n.t('admin.logs.clearAdminConfirm') : window.__i18n.t('admin.logs.clearUserConfirm'));
         if (!(await window.customConfirm(msg))) return;
         var confirmStr = isLogin ? 'CLEAR_ALL_LOGIN_LOGS' : (scope === 'admin' ? 'CLEAR_ALL_ADMIN_LOGS' : 'CLEAR_ALL_OPERATION_LOGS');
         try {
@@ -362,7 +368,7 @@
                 body: JSON.stringify({ confirm: confirmStr, scope: scope })
             });
             if (res && res.deleted !== undefined) {
-                alert(res.message || '已清空');
+                alert(res.message || window.__i18n.t('admin.logs.cleared'));
             }
             $.loadLogs(1);
         } catch (e) {
