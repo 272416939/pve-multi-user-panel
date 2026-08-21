@@ -34,12 +34,13 @@
   setTimeout(function () { _reveal(); }, 3000);
 
   // 语言代码 → 本地化名称映射（与 server/constants.js LOCALE_NAMES 保持一致）
+  // 语言名按设计保留原生写法，禁止替换为 t()——本模块是 __i18n 定义方，加载期自引用会 ReferenceError
   var LOCALE_NAMES = {
-    'zh-CN': window.__i18n.t('lang.zh-CN'),
-    'zh-TW': window.__i18n.t('lang.zh-TW'),
+    'zh-CN': '简体中文',
+    'zh-TW': '繁體中文',
     'en': 'English',
     'de': 'Deutsch',
-    'ja': window.__i18n.t('lang.ja'),
+    'ja': '日本語',
     'ko': '한국어',
     'fr': 'Français'
   };
