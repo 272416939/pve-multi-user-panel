@@ -126,7 +126,7 @@
                                     </div>
                                     <div class="mb-3">
                                         <label class="form-label">{{ t('user.password.current') }}</label>
-                                        <input type="password" class="form-control" v-model="profileForm.currentPassword" autocomplete="current-password" placeholder="输入当前密码以验证">
+                                        <input type="password" class="form-control" v-model="profileForm.currentPassword" autocomplete="current-password" :placeholder="t('user.profile.currentPwdPh')">
                                     </div>
                                     <pv-button type="submit" variant="primary" >{{ t('user.password.submit') }}</pv-button>
                                     <small class="text-muted d-block mt-2">{{ t('user.password.notice') }}</small>
@@ -225,7 +225,7 @@
                         <div class="card mb-3">
                             <div class="card-body">
                                 <h6 class="card-subtitle mb-3 text-muted">{{ t('user.language') }}</h6>
-                                <p class="text-muted small mb-3">{{ t('user.language.desc') }} 当前站点默认：<strong>{{ siteDefaultLangName }}</strong>。</p>
+                                <p class="text-muted small mb-3">{{ t('user.language.desc') }} {{ t('user.language.siteDefault') }}<strong>{{ siteDefaultLangName }}</strong>。</p>
                                 <div class="mb-3">
                                     <select class="form-select" v-model="langPreference" style="max-width: 300px;">
                                         <option value="">{{ t('user.language.follow') }}</option>
@@ -552,33 +552,33 @@
                 <div class="row justify-content-center">
                     <div class="col-md-8">
                         <div class="table-container mb-4" style="padding:12px;">
-                                <h5 class="mb-3">登录设备管理</h5>
+                                <h5 class="mb-3">{{ t('user.devices.title') }}</h5>
                                 <div v-if="devicesLoading" class="text-center py-3">
                                     <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
                                 </div>
                                 <div v-else-if="devices.length === 0" class="text-muted text-center py-3">
-                                    暂无登录设备记录
+                                    {{ t('user.devices.empty') }}
                                 </div>
                                 <div v-else class="table-responsive">
                                     <table class="table table-sm table-hover mb-0 table-align-center">
                                         <thead>
                                             <tr>
-                                                <th>设备</th>
+                                                <th{{ t('user.devices.device') }}/th>
                                                 <th>IP</th>
-                                                <th>登录时间</th>
-                                                <th>操作</th>
+                                                <th>{{ t('user.devices.loginTime') }}</th>
+                                                <th{{ t('common.actions') }}/th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr v-for="d in devices" :key="d.id">
                                                 <td>
                                                     <span>{{ d.device_name }}</span>
-                                                    <span v-if="d.id === currentDeviceId" class="badge bg-info ms-1" style="font-size:10px;">当前</span>
+                                                    <span v-if="d.id === currentDeviceId" class="badge bg-info ms-1" style="font-size:10px;"{{ t('user.devices.current') }}/span>
                                                 </td>
                                                 <td class="text-muted small">{{ d.ip }}<span v-if="d.ip_location">（{{ d.ip_location }}）</span></td>
                                                 <td class="text-muted small">{{ formatDate(d.created_at) }}</td>
                                                 <td>
-                                                    <pv-button v-if="d.id !== currentDeviceId" variant="danger" size="sm" @click="revokeDevice(d.id)">下线</pv-button>
+                                                    <pv-button v-if="d.id !== currentDeviceId" variant="danger" size="sm" @click="revokeDevice(d.id)"{{ t('user.devices.revoke') }}/pv-button>
                                                     <span v-else class="text-muted small">-</span>
                                                 </td>
                                             </tr>
@@ -586,24 +586,24 @@
                                     </table>
                                 </div>
                                 <div v-if="devices.length > 0" class="mt-2">
-                                    <pv-button variant="secondary" size="sm" @click="revokeOtherDevices">下线其他设备</pv-button>
+                                    <pv-button variant="secondary" size="sm" @click="revokeOtherDevices">{{ t('user.devices.revokeOthers') }}</pv-button>
                                 </div>
                         </div>
 
                         <div class="card">
                             <div class="card-body">
                                 <template v-if="!twofaEnabled">
-                                    <h5 class="card-title mb-1">二次验证（2FA）</h5>
-                                    <p class="text-muted small mb-2">启用两步验证，登录时除密码外还需输入动态验证码，进一步提升账号安全性</p>
-                                    <pv-button variant="primary" @click="openTwofaSetup">绑定两步验证</pv-button>
-                                    <p class="text-muted small mt-2 mb-0">提示：需先在手机安装 Google Authenticator 或 Authy 等 TOTP 应用</p>
+                                    <h5 class="card-title mb-1">{{ t('user.twofa.title') }}</h5>
+                                    <p class="text-muted small mb-2">{{ t('user.twofa.desc') }}</p>
+                                    <pv-button variant="primary" @click="openTwofaSetup">{{ t('user.twofa.bind') }}</pv-button>
+                                    <p class="text-muted small mt-2 mb-0">{{ t('user.twofa.installHint') }}</p>
                                 </template>
                                 <template v-else>
-                                    <h5 class="card-title mb-1">二次验证已启用</h5>
-                                    <p class="text-muted small mb-2">您的账号已受两步验证保护</p>
+                                    <h5 class="card-title mb-1">{{ t('user.twofa.enabled') }}</h5>
+                                    <p class="text-muted small mb-2">{{ t('user.twofa.enabledDesc') }}</p>
                                     <div class="d-flex gap-2 flex-wrap">
-                                        <pv-button variant="outline" size="sm" @click="showRecoveryCodes">查看恢复码</pv-button>
-                                        <pv-button variant="danger" size="sm" @click="openDisableTwofa">禁用 2FA</pv-button>
+                                        <pv-button variant="outline" size="sm" @click="showRecoveryCodes">{{ t('user.twofa.viewCodes') }}</pv-button>
+                                        <pv-button variant="danger" size="sm" @click="openDisableTwofa">{{ t('user.twofa.disableBtn') }}</pv-button>
                                     </div>
                                 </template>
                             </div>
@@ -619,20 +619,20 @@
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ editMemoForm.id ? '编辑备忘录' : '新建备忘录' }}</h5>
+                                <h5 class="modal-title">{{ editMemoForm.id ? t('user.memos.edit') : t('user.memos.new') }}</h5>
                                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
                             </div>
                             <div class="modal-body">
                                 <form @submit.prevent="saveMemo">
                                     <div class="mb-3">
-                                        <label class="form-label">标题</label>
-                                        <input type="text" class="form-control" v-model="editMemoForm.title" placeholder="输入标题...">
+                                        <label class="form-label"{{ t('user.memos.titleLabel') }}/label>
+                                        <input type="text" class="form-control" v-model="editMemoForm.title" :placeholder="t('user.memos.titlePh')">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label">内容</label>
-                                        <textarea class="form-control" rows="5" v-model="editMemoForm.content" placeholder="输入内容..."></textarea>
+                                        <label class="form-label"{{ t('user.memos.content') }}/label>
+                                        <textarea class="form-control" rows="5" v-model="editMemoForm.content" :placeholder="t('user.memos.contentPh')"></textarea>
                                     </div>
-                                    <pv-button type="submit" variant="glass">保存</pv-button>
+                                    <pv-button type="submit" variant="glass"{{ t('common.save') }}/pv-button>
                                 </form>
                             </div>
                         </div>
@@ -648,29 +648,29 @@
                             <div class="modal-body text-center py-4 px-4">
                                 <!-- PC 端：二维码扫码 -->
                                 <template v-if="!rechargeIsMobile">
-                                    <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">请使用{{ rechargeMethod === 'alipay' ? '支付宝' : '微信' }}扫码支付</h6>
+                                    <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">{{ tFormat('user.recharge.scanPay', rechargeMethod === 'alipay' ? t('user.recharge.alipay') : t('user.recharge.wxpay')) }}</h6>
                                     <div class="recharge-qr-wrap mb-2">
                                         <div v-if="rechargeQrLoading" class="recharge-qr-loading">
                                             <div class="spinner-border text-primary" role="status"><span class="visually-hidden">{{ t('common.loading') }}</span></div>
                                         </div>
                                         <div id="rechargeQrContainer" class="recharge-qr-container"></div>
                                     </div>
-                                    <button type="button" class="btn btn-outline-primary btn-sm recharge-check-btn mb-1" @click="checkPayStatus">我已完成支付</button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm recharge-check-btn mb-1" @click="checkPayStatus">{{ t('user.recharge.done') }}</button>
                                 </template>
                                 <!-- 手机端：跳转按钮 -->
                                 <template v-else>
-                                    <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">点击下方按钮进行支付</h6>
+                                    <h6 class="mb-3" style="color:var(--text-primary);font-size:15px;font-weight:600;">{{ t('user.recharge.clickToPay') }}</h6>
                                     <button type="button" class="btn btn-primary recharge-pay-btn mb-3" @click="openMobilePay">
-                                        打开{{ rechargeMethod === 'alipay' ? '支付宝' : '微信' }}支付
+                                        {{ tFormat('user.recharge.openPay', rechargeMethod === 'alipay' ? t('user.recharge.alipay') : t('user.recharge.wxpay')) }}
                                     </button>
-                                    <p class="mb-0" style="color:var(--text-secondary);font-size:12px;">支付完成后请返回此页面</p>
+                                    <p class="mb-0" style="color:var(--text-secondary);font-size:12px;">{{ t('user.recharge.backHint') }}</p>
                                 </template>
                                 <!-- 公共订单信息 -->
-                                <p class="mb-1" style="color:var(--text-secondary);font-size:13px;">订单号：{{ rechargePendingOrderNo }}</p>
-                                <p class="mb-0" style="color:var(--text-secondary);font-size:13px;">充值金额：<strong style="color:var(--color-primary);">¥{{ rechargePendingAmount }}</strong></p>
+                                <p class="mb-1" style="color:var(--text-secondary);font-size:13px;">{{ t('user.recharge.orderNo') }}{{ rechargePendingOrderNo }}</p>
+                                <p class="mb-0" style="color:var(--text-secondary);font-size:13px;">{{ t('user.recharge.amount') }}<strong style="color:var(--color-primary);">¥{{ rechargePendingAmount }}</strong></p>
                             </div>
                             <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                                <pv-button type="button" variant="secondary" @click="cancelRecharge">取消支付</pv-button>
+                                <pv-button type="button" variant="secondary" @click="cancelRecharge">{{ t('user.recharge.cancelPay') }}</pv-button>
                             </div>
                         </div>
                     </div>
@@ -693,11 +693,11 @@
                                 </div>
                                 <h6 class="mb-2" style="color:var(--text-primary);font-size:15px;font-weight:600;">{{ rechargeResultTitle }}</h6>
                                 <p v-if="rechargeResultType === 'success'" class="mb-0" style="color:var(--text-secondary);font-size:13px;">
-                                    恭喜您充值成功：<strong style="color:var(--color-primary);">¥{{ rechargeResultAmount }}</strong>
+                                    {{ t('user.recharge.success') }}<strong style="color:var(--color-primary);">¥{{ rechargeResultAmount }}</strong>
                                 </p>
                             </div>
                             <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                                <button type="button" class="btn btn-primary px-4" @click="closeRechargeResult">确定</button>
+                                <button type="button" class="btn btn-primary px-4" @click="closeRechargeResult"{{ t('common.confirm') }}/button>
                             </div>
                         </div>
                     </div>
@@ -714,15 +714,15 @@
                             <div class="modal-body">
                                 <div class="mb-3">
                                     <span class="message-type-badge" :class="'msg-type-' + currentMsg.type">
-                                        {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[currentMsg.type] || '消息' }}
+                                        {{ {1:t('user.message.system'),2:t('user.message.business'),3:t('user.message.renewal'),4:t('user.message.ticket'),5:t('user.message.cs')}[currentMsg.type] || t('user.message.title') }}
                                     </span>
                                     <span class="text-muted ms-2 small">{{ formatDate(currentMsg.created_at) }}</span>
                                 </div>
                                 <div class="message-detail-content markdown-body" style="line-height:1.7;white-space:pre-wrap;" v-html="parseMarkdown(currentMsg.content)"></div>
                             </div>
                             <div class="modal-footer d-flex gap-2">
-                                <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger">删除</pv-button>
-                                <pv-button type="button" data-bs-dismiss="modal">关闭</pv-button>
+                                <pv-button type="button" @click="deleteMessage(currentMsg.id)" variant="danger"{{ t('common.delete') }}/pv-button>
+                                <pv-button type="button" data-bs-dismiss="modal"{{ t('common.close') }}/pv-button>
                             </div>
                         </div>
                     </div>
@@ -733,20 +733,20 @@
                     <div class="modal-dialog modal-dialog-scrollable">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">绑定两步验证</h5>
+                                <h5 class="modal-title">{{ t('user.twofa.bind') }}</h5>
                                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
                             </div>
                             <div class="modal-body">
-                                <p class="mb-2">请使用 Authenticator 应用扫描下方二维码：</p>
+                                <p class="mb-2">{{ t('user.twofa.scanQr') }}</p>
                                 <div class="text-center mb-3">
                                     <img v-if="twofaQrcode" :src="twofaQrcode" alt="2FA QR Code" style="width:200px;height:200px;">
                                 </div>
-                                <p class="mb-1 small">或手动输入密钥：</p>
+                                <p class="mb-1 small">{{ t('user.twofa.manualKey') }}</p>
                                 <p class="mb-3"><code>{{ twofaSecret }}</code></p>
-                                <p class="mb-2">输入应用显示的 6 位验证码：</p>
+                                <p class="mb-2">{{ t('user.twofa.enterCode') }}</p>
                                 <div class="input-group mb-0">
-                                    <input type="text" class="form-control" v-model="twofaSetupCode" maxlength="6" placeholder="6 位验证码">
-                                    <pv-button type="button" @click="verifyTwofaSetup" :disabled="twofaSetupCode.length !== 6" variant="primary">验证并启用</pv-button>
+                                    <input type="text" class="form-control" v-model="twofaSetupCode" maxlength="6" :placeholder="t('user.twofa.codePh')">
+                                    <pv-button type="button" @click="verifyTwofaSetup" :disabled="twofaSetupCode.length !== 6" variant="primary">{{ t('user.twofa.verifyEnable') }}</pv-button>
                                 </div>
                             </div>
                         </div>
@@ -758,24 +758,24 @@
                     <div class="modal-dialog modal-lg modal-dialog-scrollable">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">恢复码</h5>
+                                <h5 class="modal-title">{{ t('user.twofa.recoveryCode') }}</h5>
                                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
                             </div>
                             <div class="modal-body">
                                 <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
                                     <svg class="me-2 flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                                    <span>请立即保存这些恢复码！每个恢复码只能使用一次。</span>
+                                    <span>{{ t('user.twofa.saveCodesWarn') }}</span>
                                 </div>
                                 <div class="table-container mb-3" style="padding:12px;">
                                 <table class="table table-sm table-hover table-align-center">
-                                    <thead><tr><th>#</th><th>恢复码</th><th>状态</th><th>创建时间</th></tr></thead>
+                                    <thead><tr><th>#</th><th>{{ t('user.twofa.recoveryCode') }}</th><th{{ t('common.status') }}/th><th>{{ t('user.twofa.createdAt') }}</th></tr></thead>
                                     <tbody>
                                         <tr v-for="(rc, idx) in twofaRecoveryCodes" :key="rc.id">
                                             <td class="text-muted small">{{ idx + 1 }}</td>
                                             <td><code style="cursor:pointer;font-size:13px;letter-spacing:1px;" @click="copySingleCode(rc.code)">{{ rc.code }}</code></td>
                                             <td>
-                                                <span v-if="rc.used" class="badge bg-secondary">已使用</span>
-                                                <span v-else class="badge bg-success">未使用</span>
+                                                <span v-if="rc.used" class="badge bg-secondary">{{ t('user.twofa.used') }}</span>
+                                                <span v-else class="badge bg-success">{{ t('user.twofa.unused') }}</span>
                                             </td>
                                             <td class="text-muted small">{{ rc.created_at ? formatDate(rc.created_at) : '-' }}</td>
                                         </tr>
@@ -783,9 +783,9 @@
                                 </table>
                                 </div>
                                 <div class="d-flex gap-2 mt-3">
-                                    <pv-button variant="secondary" size="sm" @click="copyRecoveryCodes">复制全部</pv-button>
-                                    <pv-button variant="outline" size="sm" @click="downloadRecoveryCodes">下载</pv-button>
-                                    <pv-button variant="outline-danger" size="sm" @click="regenerateRecoveryCodes">重新生成</pv-button>
+                                    <pv-button variant="secondary" size="sm" @click="copyRecoveryCodes">{{ t('user.twofa.copyAll') }}</pv-button>
+                                    <pv-button variant="outline" size="sm" @click="downloadRecoveryCodes"{{ t('common.download') }}/pv-button>
+                                    <pv-button variant="outline-danger" size="sm" @click="regenerateRecoveryCodes">{{ t('user.twofa.regenerate') }}</pv-button>
                                 </div>
                             </div>
                         </div>
@@ -797,16 +797,16 @@
                     <div class="modal-dialog modal-sm">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">禁用二次验证</h5>
+                                <h5 class="modal-title">{{ t('user.twofa.disable') }}</h5>
                                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
                             </div>
                             <div class="modal-body">
-                                <p class="mb-2">请输入当前密码以确认禁用：</p>
-                                <input type="password" class="form-control" v-model="twofaDisablePassword" placeholder="当前密码">
+                                <p class="mb-2">{{ t('user.twofa.disableConfirmHint') }}</p>
+                                <input type="password" class="form-control" v-model="twofaDisablePassword" :placeholder="t('user.twofa.currentPwdPh')">
                             </div>
                             <div class="modal-footer d-flex gap-2">
-                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-                                <pv-button type="button" @click="disableTwofa" :disabled="!twofaDisablePassword" variant="danger">确认禁用</pv-button>
+                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary"{{ t('common.cancel') }}/pv-button>
+                                <pv-button type="button" @click="disableTwofa" :disabled="!twofaDisablePassword" variant="danger">{{ t('user.twofa.confirmDisable') }}</pv-button>
                             </div>
                         </div>
                     </div>
@@ -821,13 +821,13 @@
                                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
                             </div>
                             <div class="modal-body">
-                                <p class="mb-2">请输入当前密码或 2FA 动态码以验证身份：</p>
+                                <p class="mb-2">{{ t('user.secAuth.hint') }}</p>
                                 <!-- V5-修复：不用 @keyup.enter 修饰符（Teleport 内 withKeys helper 触发 Vue 3.3.11 编译产物 _Vue 解构失败），改无修饰符 @keyup + JS 判断 -->
-                                <input type="text" class="form-control" v-model="secondaryAuthInput" placeholder="当前密码 / 6 位验证码" @keyup="onSecondaryAuthKeyup">
+                                <input type="text" class="form-control" v-model="secondaryAuthInput" :placeholder="t('user.secAuth.ph')" @keyup="onSecondaryAuthKeyup">
                             </div>
                             <div class="modal-footer d-flex gap-2">
-                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary">取消</pv-button>
-                                <pv-button type="button" @click="confirmSecondaryAuth" :disabled="!secondaryAuthInput" variant="primary">验证</pv-button>
+                                <pv-button type="button" data-bs-dismiss="modal" variant="secondary"{{ t('common.cancel') }}/pv-button>
+                                <pv-button type="button" @click="confirmSecondaryAuth" :disabled="!secondaryAuthInput" variant="primary"{{ t('user.secAuth.verify') }}/pv-button>
                             </div>
                         </div>
                     </div>
