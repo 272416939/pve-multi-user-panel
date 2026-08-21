@@ -1191,5 +1191,7 @@
   "admin.sub.log": "Gestion des journaux",
   "admin.sub.cache": "Gestion du cache",
   "admin.sub.system": "Opérations système",
-  "admin.sub.security": "Paramètres de sécurité"
+  "admin.sub.security": "Paramètres de sécurité",
+  "dash.overview.runCount": "En cours {0}",
+  "dash.overview.stopCount": "Arrêté {0}"
 }

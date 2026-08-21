@@ -69,8 +69,8 @@
                             </div>
                         </div>
                         <div class="chart-legend">
-                            <span class="legend-item"><span class="legend-dot dot-run"></span> 运行 {{ userVms.filter(v => v.status && v.status.status === 'running').length }}</span>
-                            <span class="legend-item"><span class="legend-dot dot-stop"></span> 停止 {{ userVms.filter(v => !v.status || v.status.status !== 'running').length }}</span>
+                            <span class="legend-item"><span class="legend-dot dot-run"></span> {{ tFormat('dash.overview.runCount', userVms.filter(v => v.status && v.status.status === 'running').length) }}</span>
+                            <span class="legend-item"><span class="legend-dot dot-stop"></span> {{ tFormat('dash.overview.stopCount', userVms.filter(v => !v.status || v.status.status !== 'running').length) }}</span>
                         </div>
                     </div>
                 </div>
@@ -87,8 +87,8 @@
                             </div>
                         </div>
                         <div class="chart-legend">
-                            <span class="legend-item"><span class="legend-dot dot-run"></span> 运行 {{ userLxcContainers.filter(c => c.status && c.status.status === 'running').length }}</span>
-                            <span class="legend-item"><span class="legend-dot dot-stop"></span> 停止 {{ userLxcContainers.filter(c => !c.status || c.status.status !== 'running').length }}</span>
+                            <span class="legend-item"><span class="legend-dot dot-run"></span> {{ tFormat('dash.overview.runCount', userLxcContainers.filter(c => c.status && c.status.status === 'running').length) }}</span>
+                            <span class="legend-item"><span class="legend-dot dot-stop"></span> {{ tFormat('dash.overview.stopCount', userLxcContainers.filter(c => !c.status || c.status.status !== 'running').length) }}</span>
                         </div>
                     </div>
                 </div>

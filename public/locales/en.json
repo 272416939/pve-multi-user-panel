@@ -1191,5 +1191,7 @@
   "admin.sub.log": "Log management",
   "admin.sub.cache": "Cache management",
   "admin.sub.system": "System operations",
-  "admin.sub.security": "Security settings"
+  "admin.sub.security": "Security settings",
+  "dash.overview.runCount": "Running {0}",
+  "dash.overview.stopCount": "Stopped {0}"
 }

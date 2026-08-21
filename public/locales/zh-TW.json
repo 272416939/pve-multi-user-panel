@@ -1191,5 +1191,7 @@
   "admin.sub.log": "日誌管理",
   "admin.sub.cache": "快取管理",
   "admin.sub.system": "系統操作",
-  "admin.sub.security": "安全設定"
+  "admin.sub.security": "安全設定",
+  "dash.overview.runCount": "運行 {0}",
+  "dash.overview.stopCount": "停止 {0}"
 }

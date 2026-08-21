@@ -1191,5 +1191,7 @@
   "admin.sub.log": "로그 관리",
   "admin.sub.cache": "캐시 관리",
   "admin.sub.system": "시스템 작업",
-  "admin.sub.security": "보안 설정"
+  "admin.sub.security": "보안 설정",
+  "dash.overview.runCount": "실행 {0}",
+  "dash.overview.stopCount": "중지 {0}"
 }
