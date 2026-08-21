@@ -4,17 +4,17 @@
 <!-- Fixed Header -->
         <header class="page-header">
             <div class="header-left">
-                <pv-button class="sidebar-toggle" variant="ghost" @click.prevent="toggleSidebar()" aria-label="菜单"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></pv-button>
+                <pv-button class="sidebar-toggle" variant="ghost" @click.prevent="toggleSidebar()" :aria-label="t('common.menuAria')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></pv-button>
                 <span class="brand-logo">{{ siteLogoText }}</span>
             </div>
             <div class="header-right">
-                <pv-button id="themeToggle" variant="ghost" title="切换主题" aria-label="切换主题">
+                <pv-button id="themeToggle" variant="ghost" :title="t('nav.themeToggle')" :aria-label="t('nav.themeToggle')">
 
                     <svg class="theme-icon theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                     <svg class="theme-icon theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
 
 </pv-button>
-                <a href="user-center#messages" class="header-btn" title="消息">
+                <a href="user-center#messages" class="header-btn" :title="t('nav.messages')">
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
   <span class="notification-badge" id="adminMsgCount" style="display:none;">0</span>
 </a>
@@ -175,9 +175,9 @@
         <div>
             <div v-if="!user" class="text-center py-5">
                 <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">加载中...</span>
+                    <span class="visually-hidden">{{ t('common.loading') }}</span>
                 </div>
-                <p class="mt-2 text-muted">正在验证登录状态...</p>
+                <p class="mt-2 text-muted">{{ t('common.loadingAuth') }}</p>
             </div>
 
             <div v-else>

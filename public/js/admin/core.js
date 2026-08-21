@@ -72,7 +72,7 @@ $.detailVmChartData = null;
 $.detailVmConfigStr = computed(function() {
     var vm = $.detailVm.value;
     if (!vm || !vm.config) return '-';
-    var str = (vm.config.sockets || 1) + '*' + (vm.config.cores || 1) + '核 ' + formatMemory(vm.config.memory);
+    var str = (vm.config.sockets || 1) + '*' + (vm.config.cores || 1) + window.__i18n.t('dash.detail.coresSuffix') + formatMemory(vm.config.memory);
     var diskStr = '';
     // 优先从 config 提取配置的磁盘大小（如 size=40G），避免 maxdisk 字节换算偏差
     var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
@@ -105,8 +105,8 @@ $.detailVmOsStr = computed(function() {
 });
 $.detailVmStatusStr = computed(function() {
     var vm = $.detailVm.value;
-    if (!vm || !vm.status) return '未知';
-    return vm.status.status === 'running' ? '运行中' : '已停止';
+    if (!vm || !vm.status) return window.__i18n.t('admin.disk.unknown');
+    return vm.status.status === 'running' ? window.__i18n.t('dash.vm.running') : window.__i18n.t('dash.vm.stopped');
 });
 $.detailVmUptimeStr = computed(function() {
     var vm = $.detailVm.value;
@@ -261,9 +261,9 @@ watch($.user, function(u) {
             var avatarEl = document.getElementById('headerAvatar');
             var nameEl = document.getElementById('headerUsername');
             if (avatarEl) {
-                avatarEl.src = userData.avatar || getGeekAvatar(userData.username || '用户');
+                avatarEl.src = userData.avatar || getGeekAvatar(userData.username || window.__i18n.t('admin.osswitchlog.user'));
             }
-            if (nameEl) nameEl.textContent = userData.username || '用户';
+            if (nameEl) nameEl.textContent = userData.username || window.__i18n.t('admin.osswitchlog.user');
             return true;
         } catch (e) {
             console.error('加载用户数据失败', e);
@@ -275,7 +275,7 @@ watch($.user, function(u) {
     $.loadNavItems = async function() {
         try {
             var res = await api('/user/nav');
-            var items = (res && res.items && res.items.length > 0) ? res.items : [{id:'vms',label:'虚拟机管理'},{id:'lxc',label:'LXC 容器管理'},{id:'admin',label:'管理后台'}];
+            var items = (res && res.items && res.items.length > 0) ? res.items : [{id:'vms',label:window.__i18n.t('nav.vmManage')},{id:'lxc',label:window.__i18n.t('nav.lxcManage')},{id:'admin',label:window.__i18n.t('nav.admin')}];
             $.navItems.value = items;
         } catch (e) {
             // 保留默认导航菜单，不做覆盖
@@ -354,12 +354,12 @@ watch($.user, function(u) {
         $.rechargeError.value = '';
         var amount = parseFloat($.rechargeAmount.value);
         if (!amount || amount <= 0 || !isFinite(amount)) {
-            $.rechargeError.value = '请输入有效的充值金额';
+            $.rechargeError.value = window.__i18n.t('user.recharge.invalidAmount');
             return;
         }
         var user = $.rechargeUser.value;
         if (!user || !user.id) {
-            $.rechargeError.value = '请选择用户';
+            $.rechargeError.value = window.__i18n.t('admin.recharge.pickUser');
             return;
         }
         try {
@@ -370,13 +370,13 @@ watch($.user, function(u) {
             if (res.success) {
                 $.rechargeShow.value = false;
                 $.rechargeAmount.value = 0;
-                alert('充值成功！用户余额已更新为 ¥' + res.balance);
+                alert(window.__i18n.t('admin.recharge.okPfx') + res.balance);
                 $.loadData();
             } else {
-                $.rechargeError.value = res.error || '充值失败';
+                $.rechargeError.value = res.error || window.__i18n.t('user.recharge.failed');
             }
         } catch (e) {
-            $.rechargeError.value = '请求失败，请稍后重试';
+            $.rechargeError.value = window.__i18n.t('shared.retryLater');
         }
     };
 
@@ -628,15 +628,15 @@ watch($.user, function(u) {
         if (type === 'vm') {
             var vm = $.userVms.value.find(function(v) { return v.id == resourceId; });
             if (!vm) return '';
-            var exp = vm.expiration_date ? formatDate(vm.expiration_date) : '未设置';
+            var exp = vm.expiration_date ? formatDate(vm.expiration_date) : window.__i18n.t('dash.unset');
             var remain = vm.expiration_date ? $.daysUntilExpire(vm.expiration_date) : '';
-            return (vm.name || 'VM ' + vm.vm_id) + '（到期: ' + exp + ' ' + remain + '）';
+            return (vm.name || 'VM ' + vm.vm_id) + window.__i18n.t('dash.expireParen') + exp + ' ' + remain + '）';
         } else {
             var ct = $.userLxcContainers.value.find(function(c) { return c.id == resourceId; });
             if (!ct) return '';
-            var exp = ct.expiration_date ? formatDate(ct.expiration_date) : '未设置';
+            var exp = ct.expiration_date ? formatDate(ct.expiration_date) : window.__i18n.t('dash.unset');
             var remain = ct.expiration_date ? $.daysUntilExpire(ct.expiration_date) : '';
-            return (ct.name || 'CT ' + ct.ct_id) + '（到期: ' + exp + ' ' + remain + '）';
+            return (ct.name || 'CT ' + ct.ct_id) + window.__i18n.t('dash.expireParen') + exp + ' ' + remain + '）';
         }
     };
 
@@ -830,13 +830,13 @@ $.initDetailCharts = function() {
         options:commonOpts}));
     $.detailVmCharts.push(new Chart(netEl.getContext('2d'),{
         type:'line',data:{labels:labels,datasets:[
-            {label:'上行',data:netOutData,borderColor:'#FBBF24',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
-            {label:'下行',data:netInData,borderColor:'#36D399',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
+            {label:window.__i18n.t('dash.net.up'),data:netOutData,borderColor:'#FBBF24',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
+            {label:window.__i18n.t('dash.net.down'),data:netInData,borderColor:'#36D399',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
         ]},options:dualYOpts}));
     $.detailVmCharts.push(new Chart(diskEl.getContext('2d'),{
         type:'line',data:{labels:labels,datasets:[
-            {label:'读取',data:diskReadData,borderColor:'#36A2EB',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
-            {label:'写入',data:diskWriteData,borderColor:'#F53F3F',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
+            {label:window.__i18n.t('dash.disk.read'),data:diskReadData,borderColor:'#36A2EB',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
+            {label:window.__i18n.t('dash.disk.write'),data:diskWriteData,borderColor:'#F53F3F',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
         ]},options:dualYOpts}));
 
     $.fetchDetailStatus = function() {

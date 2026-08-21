@@ -22,7 +22,7 @@
                                         <td>{{ row.id }}</td>
                                         <td>{{ row.name }}</td>
                                         <td>{{ row.disk_size }}</td>
-                                        <td>{{ row.cores }}核</td>
+                                        <td>{{ row.cores }}{{ t('dash.detail.coresSuffix') }}</td>
                                         <td>{{ row.memory }}MB</td>
                                         <td>{{ row.target_storage }}</td>
                                         <td>{{ row.clone_mode === 'full' ? t('admin.templates.cloneFull') : t('admin.templates.cloneLink') }}</td>
@@ -62,7 +62,7 @@
                                         <td>{{ row.name }}</td>
                                         <td>{{ row.ostemplate.split('/').pop() }}</td>
                                         <td>{{ row.storage }}</td>
-                                        <td>{{ row.cores }}核</td>
+                                        <td>{{ row.cores }}{{ t('dash.detail.coresSuffix') }}</td>
                                         <td>{{ row.memory }}MB</td>
                                         <td>{{ row.disk_size }}GB</td>
                                         <td><span :class="row.status === 'active' ? 'badge bg-success' : 'badge bg-secondary'">{{ row.status === 'active' ? t('admin.common.enabled') : t('admin.common.disabled') }}</span></td>

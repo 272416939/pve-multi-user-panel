@@ -4,18 +4,18 @@
 <div v-if="activeSection === 'vms'">
                     <div v-if="activeTabVm === 'manage'">
                         <div class="module-header">
-                            <h4 class="module-title">虚拟机列表</h4>
+                            <h4 class="module-title">{{ t('nav.vmList') }}</h4>
                         </div>
                     <div v-if="vmsLoading" class="text-center py-4">
                         <div class="spinner-border text-primary" role="status">
-                            <span class="visually-hidden">加载中...</span>
+                            <span class="visually-hidden">{{ t('common.loading') }}</span>
                         </div>
-                        <p class="mt-2 text-muted">加载中...</p>
+                        <p class="mt-2 text-muted">{{ t('common.loading') }}</p>
                     </div>
                     <div v-else class="vm-table-wrap">
                         <!-- 移动端卡片视图 -->
                         <div class="d-block d-md-none">
-                            <div v-if="userVms.length === 0" class="text-center text-muted py-4">暂无虚拟机</div>
+                            <div v-if="userVms.length === 0" class="text-center text-muted py-4">{{ t('dash.vm.empty') }}</div>
                             <div v-for="vm in userVms" :key="vm.id" class="vm-mobile-card">
                                 <div class="vm-mobile-card-header">
                                     <div class="vm-mobile-card-title">
@@ -23,54 +23,54 @@
                                         <span class="vm-mobile-card-id">#{{ vm.vm_id }}</span>
                                     </div>
                                     <template v-if="vm._provisioning">
-                                        <span class="tag-pending">开通中</span>
+                                        <span class="tag-pending">{{ t('dash.vm.provisioning') }}</span>
                                     </template>
                                     <template v-else-if="vmBusyClass(vm)">
                                         <span :class="vmBusyClass(vm)">{{ vmBusyText(vm) }}</span>
                                     </template>
                                     <template v-else>
-                                        <span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span>
+                                        <span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? t('dash.vm.running') : t('dash.vm.stopped') }}</span>
                                     </template>
                                 </div>
                                 <div class="vm-mobile-card-body">
-                                    <div class="vm-mobile-card-row" v-if="vm.username"><span class="vm-mobile-card-label">用户</span><span class="vm-mobile-card-value">{{ vm.username }}</span></div>
-                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">内网IP</span><span class="vm-mobile-card-value">{{ vm.ip || vm.dhcp_static_ip || '-' }}</span></div>
+                                    <div class="vm-mobile-card-row" v-if="vm.username"><span class="vm-mobile-card-label">{{ t('admin.osswitchlog.user') }}</span><span class="vm-mobile-card-value">{{ vm.username }}</span></div>
+                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.privateIp') }}</span><span class="vm-mobile-card-value">{{ vm.ip || vm.dhcp_static_ip || '-' }}</span></div>
                                     <div v-if="networkConfig.cname_domain" class="vm-mobile-card-cname">
                                         <div class="vm-mobile-card-cname-toggle" @click="vm._cnameOpen = !vm._cnameOpen">
-                                            <span class="vm-mobile-card-label">CNAME域名</span>
+                                            <span class="vm-mobile-card-label">{{ t('dash.vm.cname') }}</span>
                                             <svg :style="{ transform: vm._cnameOpen ? 'rotate(90deg)' : '' }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                                         </div>
                                         <div v-if="vm._cnameOpen" class="vm-mobile-card-cname-list">
                                             <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
                                                 <span class="text-primary"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</span>
-                                                <button class="cname-copy-btn" @click="copyText(cname.domain)" title="复制">
+                                                <button class="cname-copy-btn" @click="copyText(cname.domain)" :title="t('common.copy')">
                                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
-                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">配置</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
-                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">续费价格</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
+                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.config') }}</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + t('dash.detail.coresSuffix') + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
+                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.renewPrice') }}</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + t('common.perSlash') + (vm.renewal_period === 'year' ? t('dash.period.year') : vm.renewal_period === 'quarter' ? t('dash.period.quarter') : t('dash.period.month')) : '-' }}</span></div>
                                 </div>
                                 <div class="vm-mobile-card-actions">
-                                    <pv-button variant="table-primary" @click="openVmDetail(vm)">详情</pv-button>
-                                    <pv-button variant="table" @click="vmBusyBlock(vm) !== false && openVncConsole(vm.vm_id)">控制台</pv-button>
-                                    <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table" @click="requestConfirm(vm.id, 'reboot')">重启</pv-button>
-                                    <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table" @click="requestConfirm(vm.id, 'shutdown')">关机</pv-button>
-                                    <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table-danger" @click="requestConfirm(vm.id, 'stop')">停止</pv-button>
-                                    <pv-button v-if="!vm.status || vm.status.status !== 'running'" variant="table-primary" @click="vm._busy ? vmBusyBlock(vm) : startVm(vm.vm_id)" :disabled="vm._busy">开机</pv-button>
-                                    <pv-button v-if="!vm.status || vm.status.status !== 'running'" variant="table-danger" @click="vm._busy ? vmBusyBlock(vm) : openDestroyVmModal(vm)" :disabled="vm._busy">销毁</pv-button>
+                                    <pv-button variant="table-primary" @click="openVmDetail(vm)">{{ t('common.detail') }}</pv-button>
+                                    <pv-button variant="table" @click="vmBusyBlock(vm) !== false && openVncConsole(vm.vm_id)">{{ t('dash.vm.console') }}</pv-button>
+                                    <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table" @click="requestConfirm(vm.id, 'reboot')">{{ t('dash.vm.reboot') }}</pv-button>
+                                    <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table" @click="requestConfirm(vm.id, 'shutdown')">{{ t('dash.vm.shutdown') }}</pv-button>
+                                    <pv-button v-if="vm.status && vm.status.status === 'running' && !vm._busy" variant="table-danger" @click="requestConfirm(vm.id, 'stop')">{{ t('dash.vm.stop') }}</pv-button>
+                                    <pv-button v-if="!vm.status || vm.status.status !== 'running'" variant="table-primary" @click="vm._busy ? vmBusyBlock(vm) : startVm(vm.vm_id)" :disabled="vm._busy">{{ t('dash.vm.start') }}</pv-button>
+                                    <pv-button v-if="!vm.status || vm.status.status !== 'running'" variant="table-danger" @click="vm._busy ? vmBusyBlock(vm) : openDestroyVmModal(vm)" :disabled="vm._busy">{{ t('dash.disk.destroy') }}</pv-button>
                                     <div class="dropdown-table">
-                                        <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                        <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">{{ t('common.more') }}</button>
                                         <ul class="dropdown-menu-table">
-                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openSnapshotPanel(vm)">快照</a></li>
-                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBackupPanel(vm)">备份</a></li>
-                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openDeviceForward(vm, 'vm')">网络</a></li>
-                                            <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
-                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">编辑</a></li>
-                                            <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
-                                            <li v-else><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
-                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openAdminVmPasswordReset(vm)">重置密码</a></li>
+                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openSnapshotPanel(vm)">{{ t('dash.vm.snapshot') }}</a></li>
+                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openBackupPanel(vm)">{{ t('dash.vm.backup') }}</a></li>
+                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openDeviceForward(vm, 'vm')">{{ t('dash.vm.network') }}</a></li>
+                                            <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">{{ t('dash.vm.console') }}</a></li>
+                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : editVm(vm)">{{ t('common.edit') }}</a></li>
+                                            <li v-if="!vm.subnet_id"><a href="#" class="disabled" :title="t('dash.vm.noSubnetHint')" @click.prevent>{{ t('dash.vm.resetIp') }}</a></li>
+                                            <li v-else><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openResetVmIpModal(vm)" class="text-warning">{{ t('dash.vm.resetIp') }}</a></li>
+                                            <li><a href="#" @click.prevent="vm._busy ? vmBusyBlock(vm) : openAdminVmPasswordReset(vm)">{{ t('login.resetTitle') }}</a></li>
                                         </ul>
                                     </div>
                                 </div>
@@ -83,17 +83,17 @@
                                     <thead>
                                         <tr>
                                             <th>VMID</th>
-                                            <th>用户</th>
-                                            <th>主机名称</th>
-                                            <th>默认账号</th>
-                                            <th>内网IP</th>
-                                            <th class="text-start">CNAME域名</th>
-                                            <th>配置</th>
-                                            <th>到期时间</th>
-                                            <th>续费价格</th>
-                                            <th>系统</th>
-                                            <th>状态</th>
-                                            <th>操作</th>
+                                            <th>{{ t('admin.osswitchlog.user') }}</th>
+                                            <th>{{ t('dash.vm.hostname') }}</th>
+                                            <th>{{ t('admin.vmpage.defaultUser') }}</th>
+                                            <th>{{ t('dash.vm.privateIp') }}</th>
+                                            <th class="text-start">{{ t('dash.vm.cname') }}</th>
+                                            <th>{{ t('dash.vm.config') }}</th>
+                                            <th>{{ t('dash.expiryTime') }}</th>
+                                            <th>{{ t('dash.vm.renewPrice') }}</th>
+                                            <th>{{ t('vnc.groupSystem') }}</th>
+                                            <th>{{ t('common.status') }}</th>
+                                            <th>{{ t('common.actions') }}</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -101,7 +101,7 @@
                                             <td>{{ vm.vm_id }}</td>
                                             <td>{{ vm.username || '-' }}</td>
                                             <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
-                                            <td>{{ vm.config?.ciuser || '未安装Cloud-init驱动' }}</td>
+                                            <td>{{ vm.config?.ciuser || t('dash.vm.noCloudInit') }}</td>
                                             <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                             <td>
                                                 <template v-if="networkConfig.cname_domain">
@@ -109,61 +109,61 @@
                                                 </template>
                                                 <span v-else class="text-muted">-</span>
                                             </td>
-                                            <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm.config || vm.status ? '/ ' + formatDiskSize(vm) : '' }}</td>
+                                            <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + t('dash.detail.coresSuffix') + formatMemory(vm.config.memory) : '-') }} {{ vm.config || vm.status ? '/ ' + formatDiskSize(vm) : '' }}</td>
                                             <td><span v-if="vm.expiration_date" :class="getExpiryColor(vm.expiration_date)">{{ formatDate(vm.expiration_date) + ' ' + daysUntilExpire(vm.expiration_date) }}</span><span v-else class="text-muted">-</span></td>
-                                            <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
+                                            <td>{{ vm.renewal_price ? vm.renewal_price + t('common.perSlash') + (vm.renewal_period === 'year' ? t('dash.period.year') : vm.renewal_period === 'quarter' ? t('dash.period.quarter') : t('dash.period.month')) : '-' }}</td>
                                             <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                             <td>
                                                 <template v-if="vm._provisioning">
-                                                    <span class="tag-pending">开通中</span>
+                                                    <span class="tag-pending">{{ t('dash.vm.provisioning') }}</span>
                                                 </template>
                                                 <template v-else-if="vmBusyClass(vm)">
                                                     <span :class="vmBusyClass(vm)">{{ vmBusyText(vm) }}</span>
                                                 </template>
                                                 <template v-else>
-                                                    <span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? '运行中' : '已停止' }}</span>
+                                                    <span :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? t('dash.vm.running') : t('dash.vm.stopped') }}</span>
                                                 </template>
                                             </td>
                                         <td>
                                             <div v-if="vm._busy" class="table-actions">
-                                                <pv-button variant="table-primary" @click="openVmDetail(vm)">详情</pv-button>
-                                                <pv-button variant="table" @click="openVncConsole(vm.vm_id)">控制台</pv-button>
+                                                <pv-button variant="table-primary" @click="openVmDetail(vm)">{{ t('common.detail') }}</pv-button>
+                                                <pv-button variant="table" @click="openVncConsole(vm.vm_id)">{{ t('dash.vm.console') }}</pv-button>
                                             </div>
                                             <div v-else class="table-actions">
-                                                <pv-button variant="table-primary" @click="openVmDetail(vm)">详情</pv-button>
+                                                <pv-button variant="table-primary" @click="openVmDetail(vm)">{{ t('common.detail') }}</pv-button>
                                                 <div class="btn-group-table" v-if="vm.status && vm.status.status === 'running'">
-                                                    <pv-button variant="table" @click="requestConfirm(vm.id, 'reboot')">重启</pv-button>
-                                                    <pv-button variant="table" @click="requestConfirm(vm.id, 'shutdown')">关机</pv-button>
-                                                    <pv-button variant="table-danger" @click="requestConfirm(vm.id, 'stop')">停止</pv-button>
+                                                    <pv-button variant="table" @click="requestConfirm(vm.id, 'reboot')">{{ t('dash.vm.reboot') }}</pv-button>
+                                                    <pv-button variant="table" @click="requestConfirm(vm.id, 'shutdown')">{{ t('dash.vm.shutdown') }}</pv-button>
+                                                    <pv-button variant="table-danger" @click="requestConfirm(vm.id, 'stop')">{{ t('dash.vm.stop') }}</pv-button>
                                                 </div>
                                                 <div class="btn-group-table" v-if="!vm.status || vm.status.status !== 'running'">
-                                                    <pv-button variant="table-primary" @click="startVm(vm.vm_id)">开机</pv-button>
-                                                    <pv-button variant="table-warning" @click="removeVmById(vm.id)">移除</pv-button>
-                                                    <pv-button variant="table-danger" @click="openDestroyVmModal(vm)">销毁</pv-button>
+                                                    <pv-button variant="table-primary" @click="startVm(vm.vm_id)">{{ t('dash.vm.start') }}</pv-button>
+                                                    <pv-button variant="table-warning" @click="removeVmById(vm.id)">{{ t('common.remove') }}</pv-button>
+                                                    <pv-button variant="table-danger" @click="openDestroyVmModal(vm)">{{ t('dash.disk.destroy') }}</pv-button>
                                                 </div>
                                                 <div class="dropdown-table">
-                                                    <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">更多</button>
+                                                    <button class="pv-btn pv-btn-table dropdown-toggle" @click.stop="toggleAdminDropdown($event.currentTarget)">{{ t('common.more') }}</button>
                                                     <ul class="dropdown-menu-table">
-                                                        <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'reboot')">重启</a></li>
-                                                        <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'shutdown')">关机</a></li>
-                                                        <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'stop')" class="text-danger">停止</a></li>
-                                                        <li class="d-md-none" v-if="!vm.status || vm.status.status !== 'running'"><a href="#" @click.prevent="startVm(vm.vm_id)" class="text-success">开机</a></li>
-                                                        <li class="d-md-none" v-if="!vm.status || vm.status.status !== 'running'"><a href="#" @click.prevent="openDestroyVmModal(vm)" class="text-danger">销毁</a></li>
-                                                        <li><a href="#" @click.prevent="openSnapshotPanel(vm)">快照</a></li>
-                                                        <li><a href="#" @click.prevent="openBackupPanel(vm)">备份</a></li>
-                                                        <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">网络</a></li>
-                                                        <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">控制台</a></li>
-                                                        <li><a href="#" @click.prevent="editVm(vm)">编辑</a></li>
-                                                        <li v-if="!vm.subnet_id"><a href="#" class="disabled" title="未绑定子网，请先绑定后再重置 IP" @click.prevent>重置IP</a></li>
-                                                        <li v-else><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">重置IP</a></li>
-                                                        <li><a href="#" @click.prevent="openAdminVmPasswordReset(vm)">重置密码</a></li>
+                                                        <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'reboot')">{{ t('dash.vm.reboot') }}</a></li>
+                                                        <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'shutdown')">{{ t('dash.vm.shutdown') }}</a></li>
+                                                        <li class="d-md-none" v-if="vm.status && vm.status.status === 'running'"><a href="#" @click.prevent="requestConfirm(vm.id, 'stop')" class="text-danger">{{ t('dash.vm.stop') }}</a></li>
+                                                        <li class="d-md-none" v-if="!vm.status || vm.status.status !== 'running'"><a href="#" @click.prevent="startVm(vm.vm_id)" class="text-success">{{ t('dash.vm.start') }}</a></li>
+                                                        <li class="d-md-none" v-if="!vm.status || vm.status.status !== 'running'"><a href="#" @click.prevent="openDestroyVmModal(vm)" class="text-danger">{{ t('dash.disk.destroy') }}</a></li>
+                                                        <li><a href="#" @click.prevent="openSnapshotPanel(vm)">{{ t('dash.vm.snapshot') }}</a></li>
+                                                        <li><a href="#" @click.prevent="openBackupPanel(vm)">{{ t('dash.vm.backup') }}</a></li>
+                                                        <li><a href="#" @click.prevent="openDeviceForward(vm, 'vm')">{{ t('dash.vm.network') }}</a></li>
+                                                        <li><a href="#" @click.prevent="openVncConsole(vm.vm_id)">{{ t('dash.vm.console') }}</a></li>
+                                                        <li><a href="#" @click.prevent="editVm(vm)">{{ t('common.edit') }}</a></li>
+                                                        <li v-if="!vm.subnet_id"><a href="#" class="disabled" :title="t('dash.vm.noSubnetHint')" @click.prevent>{{ t('dash.vm.resetIp') }}</a></li>
+                                                        <li v-else><a href="#" @click.prevent="openResetVmIpModal(vm)" class="text-warning">{{ t('dash.vm.resetIp') }}</a></li>
+                                                        <li><a href="#" @click.prevent="openAdminVmPasswordReset(vm)">{{ t('login.resetTitle') }}</a></li>
                                                     </ul>
                                                 </div>
                                             </div>
                                         </td>
                                         </tr>
                                         <tr v-if="userVms.length === 0">
-                                            <td colspan="12" class="text-center text-muted py-4">暂无虚拟机</td>
+                                            <td colspan="12" class="text-center text-muted py-4">{{ t('dash.vm.empty') }}</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -171,15 +171,15 @@
                         </div>
                     </div>
                     <div v-if="!vmsLoading && userVms.length === 0" class="text-muted text-center py-4">
-                        暂无虚拟机
+                        {{ t('dash.vm.empty') }}
                     </div>
                     </div>
                     <div v-if="activeTabVm === 'assign'">
                         <div class="module-header">
-                            <h4 class="module-title">分配虚拟机</h4>
+                            <h4 class="module-title">{{ t('nav.vmAssign') }}</h4>
                             <pv-button variant="outline-warning" size="lg" @click="checkExpired">
 
-                                立即检查过期虚拟机
+                                {{ t('admin.vmpage.checkExpiredNow') }}
                             
 </pv-button>
                         </div>
@@ -188,80 +188,80 @@
                                 <form @submit.prevent="assignVm" novalidate>
                                     <div class="row">
                                         <div class="col-md-3 mb-3">
-                                            <label class="form-label">虚拟机</label>
+                                            <label class="form-label">{{ t('nav.vms') }}</label>
                                             <select class="form-select" v-model="assignForm.vm_id" required>
-                                                <option value="">请选择</option>
+                                                <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
                                                 <option v-for="vm in availableVms" :key="vm.vmid" :value="vm.vmid">
                                                     {{ vm.name || 'VM ' + vm.vmid }} ({{ vm.vmid }})
                                                 </option>
                                             </select>
                                         </div>
                                         <div class="col-md-2 mb-3">
-                                            <label class="form-label">用户</label>
+                                            <label class="form-label">{{ t('admin.osswitchlog.user') }}</label>
                                             <select class="form-select" v-model="assignForm.user_id" required>
-                                                <option value="">请选择</option>
+                                                <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
                                                 <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.username }}</option>
                                             </select>
                                         </div>
                                         <div class="col-md-3 mb-3">
-                                            <label class="form-label">名称</label>
+                                            <label class="form-label">{{ t('common.name') }}</label>
                                             <input type="text" class="form-control" v-model="assignForm.name">
                                         </div>
                                         <div class="col-md-4 mb-3">
-                                            <label class="form-label">到期时间</label>
+                                            <label class="form-label">{{ t('dash.expiryTime') }}</label>
                                             <input type="datetime-local" class="form-control" v-model="assignForm.expiration_date" step="1" onfocus="this.showPicker?.()">
                                         </div>
                                         <div class="col-md-2 mb-3">
-                                            <label class="form-label">续费价格</label>
-                                            <input type="number" step="0.01" min="0" class="form-control" v-model="assignForm.renewal_price" placeholder="如: 50.00">
+                                            <label class="form-label">{{ t('dash.vm.renewPrice') }}</label>
+                                            <input type="number" step="0.01" min="0" class="form-control" v-model="assignForm.renewal_price" :placeholder="t('common.ph.price')">
                                         </div>
                                         <div class="col-md-1 mb-3">
-                                            <label class="form-label">周期</label>
+                                            <label class="form-label">{{ t('user.order.period') }}</label>
                                             <select class="form-select" v-model="assignForm.renewal_period">
-                                                <option value="month">月（30天计）</option>
-                                                <option value="quarter">季（90天计）</option>
-                                                <option value="year">年（365天计）</option>
+                                                <option value="month">{{ t('dash.month30') }}</option>
+                                                <option value="quarter">{{ t('dash.quarter90') }}</option>
+                                                <option value="year">{{ t('dash.year365') }}</option>
                                             </select>
                                         </div>
                                         <div class="col-md-2 mb-3">
-                                            <label class="form-label">月付原价</label>
-                                            <input type="number" step="0.01" min="0" class="form-control" v-model="assignForm.monthly_price" placeholder="如 20">
+                                            <label class="form-label">{{ t('admin.pkg.monthlyOriginal') }}</label>
+                                            <input type="number" step="0.01" min="0" class="form-control" v-model="assignForm.monthly_price" :placeholder="t('admin.pkg.pricePh')">
                                         </div>
                                         <div class="col-md-2 mb-3">
-                                            <label class="form-label">季付折扣(%)</label>
-                                            <input type="number" step="1" min="0" max="100" class="form-control" v-model="assignForm.quarterly_discount" placeholder="如 5（表示5%）">
+                                            <label class="form-label">{{ t('admin.pkg.quarterlyDiscPct') }}</label>
+                                            <input type="number" step="1" min="0" max="100" class="form-control" v-model="assignForm.quarterly_discount" :placeholder="t('admin.pkg.qDiscPh')">
                                         </div>
                                         <div class="col-md-2 mb-3">
-                                            <label class="form-label">年付折扣(%)</label>
-                                            <input type="number" step="1" min="0" max="100" class="form-control" v-model="assignForm.yearly_discount" placeholder="如 10（表示10%）">
+                                            <label class="form-label">{{ t('admin.pkg.yearlyDiscPct') }}</label>
+                                            <input type="number" step="1" min="0" max="100" class="form-control" v-model="assignForm.yearly_discount" :placeholder="t('admin.pkg.yDiscPh')">
                                         </div>
                                         <div class="col-md-2 mb-3">
-                                            <label class="form-label">MAC分组</label>
+                                            <label class="form-label">{{ t('dash.macGroup') }}</label>
                                             <select class="form-select" v-model="assignForm.mac_group_id">
-                                                <option value="">不加入分组</option>
-                                                <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || '分组 ' + g.id }}</option>
+                                                <option value="">{{ t('dash.noGroup') }}</option>
+                                                <option v-for="g in macGroups" :key="g.id" :value="g.id">{{ g.group_name || t('dash.groupPrefix') + g.id }}</option>
                                             </select>
                                         </div>
                                     </div>
-                                    <pv-button type="submit" variant="glass" formnovalidate>分配</pv-button>
+                                    <pv-button type="submit" variant="glass" formnovalidate>{{ t('admin.assign') }}</pv-button>
                                 </form>
                             </div>
                         </div>
 
                         <div v-show="availableVms.length === 0 && assignedVms.length === 0" class="text-muted text-center py-4">
-                            没有找到虚拟机，请确认 PVE 服务已启动
+                            {{ t('admin.vmpage.noneFound') }}
                         </div>
 
                         <div v-show="availableVms.length > 0">
-                            <h5>待分配的虚拟机:</h5>
+                            <h5>{{ t('admin.vmpage.pendingLabel') }}</h5>
                             <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
                                     <table class="table table-hover mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>VM ID</th>
-                                                <th>名称</th>
-                                                <th>状态</th>
+                                                <th>{{ t('common.name') }}</th>
+                                                <th>{{ t('common.status') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -270,7 +270,7 @@
                                                 <td>{{ vm.name || '-' }}</td>
                                                 <td>
                                                     <span :class="vm.status === 'running' ? 'tag-run' : 'tag-stop'">
-                                                        {{ vm.status === 'running' ? '运行中' : '已停止' }}
+                                                        {{ vm.status === 'running' ? t('dash.vm.running') : t('dash.vm.stopped') }}
                                                     </span>
                                                 </td>
                                             </tr>
@@ -281,16 +281,16 @@
                         </div>
 
                         <div v-show="assignedVms.length > 0">
-                            <h5>已分配的虚拟机:</h5>
+                            <h5>{{ t('admin.vmpage.assignedLabel') }}</h5>
                             <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
                                     <table class="table table-hover mb-0 table-align-center">
                                         <thead>
                                             <tr>
                                                 <th>VM ID</th>
-                                                <th>名称</th>
-                                                <th>分配给</th>
-                                                <th>状态</th>
+                                                <th>{{ t('common.name') }}</th>
+                                                <th>{{ t('dash.assignTo') }}</th>
+                                                <th>{{ t('common.status') }}</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -300,7 +300,7 @@
                                                 <td>{{ vm.assigned_user || '-' }}</td>
                                                 <td>
                                                     <span :class="vm.status === 'running' ? 'tag-run' : 'tag-stop'">
-                                                        {{ vm.status === 'running' ? '运行中' : '已停止' }}
+                                                        {{ vm.status === 'running' ? t('dash.vm.running') : t('dash.vm.stopped') }}
                                                     </span>
                                                 </td>
                                             </tr>

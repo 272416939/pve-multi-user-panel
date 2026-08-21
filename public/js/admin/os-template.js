@@ -136,25 +136,25 @@ window.__admin.osTemplatePage = (function () {
             if (res.success) {
                 closeForm();
                 await load();
-                alert(formData.id ? '已更新' : '已创建');
+                alert(formData.id ? window.__i18n.t('common.updated') : window.__i18n.t('common.created'));
             } else {
-                alert(res.error || '操作失败');
+                alert(res.error || window.__i18n.t('common.failed'));
             }
         } catch (e) {
-            alert('请求失败');
+            alert(window.__i18n.t('shared.requestFailed'));
         } finally {
             saving.value = false;
         }
     }
 
     async function deleteRow(row) {
-        if (!(await window.customConfirm('确认删除系统模板「' + row.name + '」？'))) return;
+        if (!(await window.customConfirm(window.__i18n.t('admin.ostemplate.delConfirm') + row.name + '」？'))) return;
         const res = await api('/admin/os-templates/' + row.id, { method: 'DELETE' });
         if (res.success) {
             await load();
-            alert('已删除');
+            alert(window.__i18n.t('dash.disk.deleteFailed'));
         } else {
-            alert(res.error || '删除失败');
+            alert(res.error || window.__i18n.t('admin.logs.deleteFailed'));
         }
     }
 
@@ -401,7 +401,7 @@ window.__admin.osTemplatePage = (function () {
             await load();
         } catch (e) {
             console.error('排序保存失败', e);
-            alert('排序保存失败：' + (e.message || '未知错误'));
+            alert(window.__i18n.t('admin.sort.saveFailColon') + (e.message || window.__i18n.t('common.unknownError')));
             await load(); // 失败还原为服务端顺序
         }
     }

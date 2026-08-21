@@ -76,7 +76,7 @@
     };
 
     $.deleteVmPackage = async function(id) {
-        if (!await window.customConfirm('确定删除此套餐？')) return;
+        if (!await window.customConfirm(window.__i18n.t('admin.pkg.deleteConfirm'))) return;
         try { await api('/admin/vm-packages/' + id, { method: 'DELETE' }); await $.loadVmPackages(); } catch (e) { alert(e.message); }
     };
 
@@ -110,7 +110,7 @@
     };
 
     $.deleteLxcPackage = async function(id) {
-        if (!await window.customConfirm('确定删除此套餐？')) return;
+        if (!await window.customConfirm(window.__i18n.t('admin.pkg.deleteConfirm'))) return;
         try { await api('/admin/lxc-packages/' + id, { method: 'DELETE' }); await $.loadLxcPackages(); } catch (e) { alert(e.message); }
     };
 
@@ -135,7 +135,7 @@
         } catch (e) { alert(e.message); }
     };
     $.deleteVmGroup = async function(id) {
-        if (!await window.customConfirm('确定删除此分组？关联的套餐将变为未分组。')) return;
+        if (!await window.customConfirm(window.__i18n.t('admin.pkg.delGroupConfirm'))) return;
         try { await api('/admin/package-groups/' + id, { method: 'DELETE' }); await $.loadVmPackageGroups(); } catch (e) { alert(e.message); }
     };
     $.openLxcGroupForm = function(g) {
@@ -159,41 +159,41 @@
         } catch (e) { alert(e.message); }
     };
     $.deleteLxcGroup = async function(id) {
-        if (!await window.customConfirm('确定删除此分组？关联的套餐将变为未分组。')) return;
+        if (!await window.customConfirm(window.__i18n.t('admin.pkg.delGroupConfirm'))) return;
         try { await api('/admin/package-groups/' + id, { method: 'DELETE' }); await $.loadLxcPackageGroups(); } catch (e) { alert(e.message); }
     };
 
     $.restockVmPackage = async function(pkg) {
         // 直接设置新的库存数量（不累加）
-        var current = (pkg.stock === -1 || pkg.stock === null) ? '不限' : pkg.stock;
-        var input = await customPrompt('请输入新的库存数量\n（-1 不限量，0 售罄，正整数剩余库存）\n当前库存：' + current, current === '不限' ? '-1' : String(current));
+        var current = (pkg.stock === -1 || pkg.stock === null) ? window.__i18n.t('dash.order.unlimited') : pkg.stock;
+        var input = await customPrompt(window.__i18n.t('admin.pkg.restockPrompt') + current, current === window.__i18n.t('dash.order.unlimited') ? '-1' : String(current));
         if (input === null) return;
         var newStock = parseInt(input);
-        if (isNaN(newStock) || newStock < -1) { alert('请输入 -1 或非负整数'); return; }
+        if (isNaN(newStock) || newStock < -1) { alert(window.__i18n.t('admin.pkg.badStock')); return; }
         try {
             await api('/admin/vm-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
             await $.loadVmPackages();
-        } catch (e) { alert('设置库存失败：' + e.message); }
+        } catch (e) { alert(window.__i18n.t('admin.pkg.stockFail') + e.message); }
     };
 
     $.restockLxcPackage = async function(pkg) {
         // 直接设置新的库存数量（不累加）
-        var current = (pkg.stock === -1 || pkg.stock === null) ? '不限' : pkg.stock;
-        var input = await customPrompt('请输入新的库存数量\n（-1 不限量，0 售罄，正整数剩余库存）\n当前库存：' + current, current === '不限' ? '-1' : String(current));
+        var current = (pkg.stock === -1 || pkg.stock === null) ? window.__i18n.t('dash.order.unlimited') : pkg.stock;
+        var input = await customPrompt(window.__i18n.t('admin.pkg.restockPrompt') + current, current === window.__i18n.t('dash.order.unlimited') ? '-1' : String(current));
         if (input === null) return;
         var newStock = parseInt(input);
-        if (isNaN(newStock) || newStock < -1) { alert('请输入 -1 或非负整数'); return; }
+        if (isNaN(newStock) || newStock < -1) { alert(window.__i18n.t('admin.pkg.badStock')); return; }
         try {
             await api('/admin/lxc-packages/' + pkg.id, { method: 'PUT', body: JSON.stringify({ stock: newStock }) });
             await $.loadLxcPackages();
-        } catch (e) { alert('设置库存失败：' + e.message); }
+        } catch (e) { alert(window.__i18n.t('admin.pkg.stockFail') + e.message); }
     };
 
     $.provisionVm = async function() {
         var f = $.vmProvisionForm.value;
-        if (!f.package_id || !f.user_id) return alert('请选择套餐和用户');
+        if (!f.package_id || !f.user_id) return alert(window.__i18n.t('admin.assign.pickBoth'));
         var pkg = $.vmPackages.value.find(function(p) { return String(p.id) === String(f.package_id); });
-        if (!pkg) return alert('套餐不存在');
+        if (!pkg) return alert(window.__i18n.t('admin.pkg.notFound'));
         try {
             var expDate = toLocalDateTimeStr(f.expiration_date);
             await api('/admin/vm-packages/' + f.package_id + '/provision', {
@@ -205,7 +205,7 @@
                 })
             });
             $.vmProvisionForm.value = { package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' };
-            alert('VM 开通成功');
+            alert(window.__i18n.t('admin.assign.openOkVm'));
             if (window.vmPage && window.vmPage.loadData) await window.vmPage.loadData();
             if (window.vmPage && window.vmPage.loadAssignData) await window.vmPage.loadAssignData();
         } catch (e) { alert(e.message); }
@@ -213,9 +213,9 @@
 
     $.provisionLxc = async function() {
         var f = $.lxcProvisionForm.value;
-        if (!f.package_id || !f.user_id) return alert('请选择套餐和用户');
+        if (!f.package_id || !f.user_id) return alert(window.__i18n.t('admin.assign.pickBoth'));
         var pkg = $.lxcPackages.value.find(function(p) { return String(p.id) === String(f.package_id); });
-        if (!pkg) return alert('套餐不存在');
+        if (!pkg) return alert(window.__i18n.t('admin.pkg.notFound'));
         try {
             var expDate = toLocalDateTimeStr(f.expiration_date);
             await api('/admin/lxc-packages/' + f.package_id + '/provision', {
@@ -227,7 +227,7 @@
                 })
             });
             $.lxcProvisionForm.value = { package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' };
-            alert('LXC 开通成功');
+            alert(window.__i18n.t('admin.assign.openOkLxc'));
             if (window.lxcPage && window.lxcPage.loadUserLxcContainers) await window.lxcPage.loadUserLxcContainers();
             if (window.lxcPage && window.lxcPage.loadLxcContainers) await window.lxcPage.loadLxcContainers();
         } catch (e) { alert(e.message); }
@@ -560,12 +560,12 @@
             else if (type === 'group-lxc') await $.loadLxcPackageGroups();
         } catch (e) {
             console.error('排序保存失败', e);
-            alert('排序保存失败：' + (e.message || '未知错误'));
+            alert(window.__i18n.t('admin.sort.saveFailColon') + (e.message || window.__i18n.t('common.unknownError')));
         }
     };
 
     $.getTemplateName = function(p) {
-        return p.template_name || '<span class="text-secondary">模板已删除</span>';
+        return p.template_name || '<span class="text-secondary">' + window.__i18n.t('admin.pkg.tplDeleted') + '</span>';
     };
 
     admin.packagePage = $;

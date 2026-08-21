@@ -116,7 +116,7 @@
             // 从数据库加载缓存的接口列表（无需立即请求 ikuai）
             if (res.iface_list && res.iface_list.length > 0) {
                 $.ifaceList.value = res.iface_list;
-                $.ifaceUpdateTime.value = '已缓存';
+                $.ifaceUpdateTime.value = window.__i18n.t('admin.net.cached');
             }
             // 解析 cname_domain 为 cnameEntries 数组
             $.parseCnameEntries();
@@ -164,9 +164,9 @@
                 .filter(function(s) { return s.replace(/\|\|/g, '').trim(); })
                 .join(',');
             await api('/admin/network/config', { method: 'PUT', body: $.networkConfig });
-            alert('配置已保存');
+            alert(window.__i18n.t('settings.saved'));
             $.parseCnameEntries();
-        } catch (e) { alert('保存失败: ' + e.message); }
+        } catch (e) { alert(window.__i18n.t('common.saveFailedMsg') + e.message); }
     };
 
     // 外网接口下拉框：判断接口是否已选中
@@ -193,11 +193,11 @@
     };
 
     $.syncDhcpBindings = async function() {
-        if (!await window.customConfirm('将从爱快读取所有 DHCP 静态绑定，匹配 VM/CT 并回写到数据库，继续吗？')) return;
+        if (!await window.customConfirm(window.__i18n.t('admin.net.syncConfirm'))) return;
         try {
             var res = await api('/ikuai/sync-dhcp-bindings', { method: 'POST' });
-            alert('同步完成\n更新: ' + res.updated + ' 条\n跳过: ' + res.skipped + ' 条\n错误: ' + res.errors + ' 条');
-        } catch (e) { alert('同步失败: ' + e.message); }
+            alert(window.__i18n.t('admin.net.syncDone1') + res.updated + window.__i18n.t('admin.net.syncSkip') + res.skipped + window.__i18n.t('admin.net.syncErr') + res.errors + window.__i18n.t('common.countUnit'));
+        } catch (e) { alert(window.__i18n.t('admin.net.syncFail') + e.message); }
     };
 
     $.refreshIfaceList = async function() {
@@ -208,7 +208,7 @@
             // 刷新后重新加载配置（接口可能被自动修正）
             var config = await api('/admin/network/config');
             Object.assign($.networkConfig, config);
-        } catch (e) { alert('获取接口列表失败: ' + e.message); }
+        } catch (e) { alert(window.__i18n.t('admin.net.ifListFail') + e.message); }
     };
 
     // 端口转发
@@ -325,15 +325,15 @@
 
     $.submitForward = async function() {
         // 校验
-        if ($.forwardForm.type === 'vm' && !$.forwardForm.vm_id) return alert('请选择虚拟机');
-        if ($.forwardForm.type === 'lxc' && !$.forwardForm.ct_id) return alert('请选择容器');
-        if (!$.forwardForm.ip) return alert('请填入目标 IP');
-        if (!$.forwardForm.internal_port) return alert('请填入内网端口');
-        if (!$.forwardForm.external_port) return alert('请填入外网端口');
+        if ($.forwardForm.type === 'vm' && !$.forwardForm.vm_id) return alert(window.__i18n.t('admin.pickVm'));
+        if ($.forwardForm.type === 'lxc' && !$.forwardForm.ct_id) return alert(window.__i18n.t('admin.port.pickCt'));
+        if (!$.forwardForm.ip) return alert(window.__i18n.t('dash.port.targetIpRequired'));
+        if (!$.forwardForm.internal_port) return alert(window.__i18n.t('dash.port.internalRequired'));
+        if (!$.forwardForm.external_port) return alert(window.__i18n.t('dash.port.externalRequired'));
         // 管理员不受系统配置的端口范围限制
         if ($.userRole.value !== 'admin') {
             if ($.forwardForm.external_port < $.networkConfig.port_range_start || $.forwardForm.external_port > $.networkConfig.port_range_end) {
-                return alert('外网端口必须在 ' + $.networkConfig.port_range_start + '-' + $.networkConfig.port_range_end + ' 范围内');
+                return alert(window.__i18n.t('admin.port.rangePrefix') + $.networkConfig.port_range_start + '-' + $.networkConfig.port_range_end + window.__i18n.t('admin.port.rangeSuffix'));
             }
         }
         try {
@@ -359,21 +359,21 @@
     };
 
     $.deleteForward = async function(id) {
-        if (!await window.customConfirm('确定删除此转发规则？')) return;
+        if (!await window.customConfirm(window.__i18n.t('dash.port.deleteOneConfirm'))) return;
         try {
             await api('/port-forwards/' + id, { method: 'DELETE' });
             $.loadForwardRules($.forwardFilterType.value);
-        } catch (e) { alert('删除失败: ' + e.message); }
+        } catch (e) { alert(window.__i18n.t('common.deleteFailedMsg') + e.message); }
     };
 
     $.batchDeleteForwards = async function() {
-        if ($.selectedForwardIds.value.length === 0) return alert('请选择要删除的规则');
-        if (!await window.customConfirm('确定批量删除 ' + $.selectedForwardIds.value.length + ' 条转发规则？')) return;
+        if ($.selectedForwardIds.value.length === 0) return alert(window.__i18n.t('dash.port.pickDelete'));
+        if (!await window.customConfirm(window.__i18n.t('admin.fwd.batchDelPfx') + $.selectedForwardIds.value.length + window.__i18n.t('dash.port.batchSuffix'))) return;
         try {
             await api('/port-forwards/batch-delete', { method: 'POST', body: { ids: $.selectedForwardIds.value } });
             $.selectedForwardIds.value = [];
             $.loadForwardRules($.forwardFilterType.value);
-        } catch (e) { alert('批量删除失败: ' + e.message); }
+        } catch (e) { alert(window.__i18n.t('dash.port.batchDelFail') + e.message); }
     };
 
     $.toggleSelectAllForwards = function(event) {
@@ -448,9 +448,9 @@
 
     $.submitDeviceRule = async function() {
         var ip = $.deviceForm.ip || $.deviceModal.device.ip;
-        if (!ip) return alert('当前设备无可用 IP，无法创建端口转发');
-        if (!$.deviceForm.internal_port) return alert('请填入内网端口');
-        if (!$.deviceForm.external_port) return alert('请填入外网端口');
+        if (!ip) return alert(window.__i18n.t('admin.port.noIp'));
+        if (!$.deviceForm.internal_port) return alert(window.__i18n.t('dash.port.internalRequired'));
+        if (!$.deviceForm.external_port) return alert(window.__i18n.t('dash.port.externalRequired'));
         try {
             var body = {
                 type: $.deviceModal.device.type,
@@ -490,7 +490,7 @@
                 });
             }
         }
-        var ok = await window.customConfirm('确定要删除端口转发 "' + (rule.name || rule.external_port) + '" 吗？');
+        var ok = await window.customConfirm(window.__i18n.t('dash.port.deleteConfirm1') + (rule.name || rule.external_port) + window.__i18n.t('dash.port.delTailQ'));
         if (!ok) { $.bsModalShow('deviceForwardModal'); return; }
         try {
             await api('/port-forwards/' + rule.id, { method: 'DELETE' });
@@ -498,7 +498,7 @@
             var cfg = await api('/port-forwards/config');
             $.forwardConfig.value = cfg || $.forwardConfig.value;
         } catch (e) {
-            alert('删除失败: ' + e.message);
+            alert(window.__i18n.t('common.deleteFailedMsg') + e.message);
             $.bsModalShow('deviceForwardModal');
             return;
         }

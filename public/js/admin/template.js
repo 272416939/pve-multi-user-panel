@@ -81,7 +81,7 @@
     };
 
     tp.deleteVmTemplate = async function(id) {
-        if (!await window.customConfirm('确定删除此 VM 模板？')) return;
+        if (!await window.customConfirm(window.__i18n.t('admin.tplpage.delVmConfirm'))) return;
         try {
             await api('/admin/vm-templates/' + id, { method: 'DELETE' });
             await tp.loadVmTemplates();
@@ -121,7 +121,7 @@
     };
 
     tp.deleteLxcTemplate = async function(id) {
-        if (!await window.customConfirm('确定删除此 LXC 模板？')) return;
+        if (!await window.customConfirm(window.__i18n.t('admin.tplpage.delLxcConfirm'))) return;
         try {
             await api('/admin/lxc-templates/' + id, { method: 'DELETE' });
             await tp.loadLxcTemplates();

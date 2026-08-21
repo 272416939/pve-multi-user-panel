@@ -138,7 +138,7 @@
     $.detailVmConfigStr = computed(function() {
         var vm = $.detailVm.value;
         if (!vm || !vm.config) return '-';
-        var str = (vm.config.sockets || 1) + '*' + (vm.config.cores || 1) + '核 ' + formatMemory(vm.config.memory);
+        var str = (vm.config.sockets || 1) + '*' + (vm.config.cores || 1) + window.__i18n.t('dash.detail.coresSuffix') + formatMemory(vm.config.memory);
         var diskStr = '';
         // 优先从 config 提取配置的磁盘大小（如 size=40G），避免 maxdisk 字节换算偏差
         var diskKeys = ['scsi0','virtio0','sata0','ide0','rootfs'];
@@ -171,8 +171,8 @@
     });
     $.detailVmStatusStr = computed(function() {
         var vm = $.detailVm.value;
-        if (!vm || !vm.status) return '未知';
-        return vm.status.status === 'running' ? '运行中' : '已停止';
+        if (!vm || !vm.status) return window.__i18n.t('admin.disk.unknown');
+        return vm.status.status === 'running' ? window.__i18n.t('dash.vm.running') : window.__i18n.t('dash.vm.stopped');
     });
     $.detailVmUptimeStr = computed(function() {
         var vm = $.detailVm.value;
@@ -191,16 +191,16 @@
     };
     $.vmBusyText = function(v) {
         if (!v || !v._busy || !v.busyType) return '';
-        if (v.busyType === 'switch') return '切换中';
-        if (v.busyType === 'backup') return '备份中';
-        if (v.busyType === 'restore') return '恢复中';
+        if (v.busyType === 'switch') return window.__i18n.t('admin.osswitchlog.status.running');
+        if (v.busyType === 'backup') return window.__i18n.t('dash.busy.backup');
+        if (v.busyType === 'restore') return window.__i18n.t('dash.busy.restore');
         return '';
     };
     // 操作被锁定时点击统一提示
     $.vmBusyBlock = function(v) {
         if (!v || !v._busy || !v.busyType) return;
-        var label = $.vmBusyText(v) || '操作';
-        alert(label + '，请等待完成后再操作');
+        var label = $.vmBusyText(v) || window.__i18n.t('common.actions');
+        alert(label + window.__i18n.t('dash.busy.waitSuffix'));
         return false;
     };
     $.formatMemory = formatMemory;
@@ -240,10 +240,10 @@
             if (u.avatar) {
                 avatarEl.src = u.avatar;
             } else {
-                avatarEl.src = getGeekAvatar(u.username || '用户');
+                avatarEl.src = getGeekAvatar(u.username || window.__i18n.t('admin.osswitchlog.user'));
             }
         }
-        if (nameEl) nameEl.textContent = u.username || '用户';
+        if (nameEl) nameEl.textContent = u.username || window.__i18n.t('admin.osswitchlog.user');
         // 管理员显示侧边栏"管理后台"链接
         if (adminLink) {
             adminLink.style.display = u.role === 'admin' ? '' : 'none';
@@ -425,9 +425,9 @@
     };
 
     $.renewPeriodLabel = function(period) {
-        if (period === 'year') return '年';
-        if (period === 'quarter') return '季';
-        return '月';
+        if (period === 'year') return window.__i18n.t('dash.period.year');
+        if (period === 'quarter') return window.__i18n.t('dash.period.quarter');
+        return window.__i18n.t('dash.period.month');
     };
 
     $.calcRenewTotal = function() {
@@ -507,7 +507,7 @@
             return;
         }
         if (vm.status && vm.status.status !== 'stopped') {
-            $.vmPwdError.value = '请先关机后再重置密码';
+            $.vmPwdError.value = window.__i18n.t('dash.resetPwd.powerOffFirst');
         }
         $.vmPwdShow.value = true;
     };
@@ -515,16 +515,16 @@
     $.submitRenew = async function() {
         $.renewError.value = '';
         var resource = $.renewResource.value;
-        if (!resource) { $.renewError.value = '请选择续费资源'; return; }
+        if (!resource) { $.renewError.value = window.__i18n.t('dash.renew.pickResource'); return; }
         var qty = $.renewQuantity.value;
-        if (!Number.isInteger(qty) || qty < 1) { $.renewError.value = '续费数量必须为正整数'; return; }
+        if (!Number.isInteger(qty) || qty < 1) { $.renewError.value = window.__i18n.t('dash.renew.qtyPositive'); return; }
         var vmTotal = $.calcRenewTotal();
         var diskTotal = $.selectedDiskRenewTotal.value;
         var grandTotal = vmTotal + diskTotal;
         var totalPrice = grandTotal.toFixed(2);
         var bal = parseFloat($.walletBalance.value);
         if (bal < parseFloat(totalPrice)) {
-            $.renewError.value = '余额不足，应付 ¥' + totalPrice + '，当前余额 ¥' + bal.toFixed(2) + '，请先充值';
+            $.renewError.value = window.__i18n.t('dash.renew.insufficient1') + totalPrice + window.__i18n.t('dash.renew.insufficient2') + bal.toFixed(2) + window.__i18n.t('dash.renew.insufficient3');
             return;
         }
         try {
@@ -541,7 +541,7 @@
                     }
                 });
                 if (!res.success) {
-                    $.renewError.value = res.error || '续费失败';
+                    $.renewError.value = res.error || window.__i18n.t('dash.disk.renewFailed');
                     return;
                 }
                 $.walletBalance.value = parseFloat(res.balance).toFixed(2);
@@ -565,13 +565,13 @@
                         var ddata = await dres.json();
                         if (!dres.ok) {
                             diskFailed = true;
-                            $.renewError.value = '磁盘 ' + (disks[i].disk_name || disks[i].volume_id) + ' 续费失败: ' + (ddata.error || '未知错误');
+                            $.renewError.value = window.__i18n.t('dash.renew.diskPrefix') + (disks[i].disk_name || disks[i].volume_id) + window.__i18n.t('dash.renew.failTail') + (ddata.error || window.__i18n.t('common.unknownError'));
                             break;
                         }
                         renewedDiskIds.push(disks[i].id);
                     } catch (e) {
                         diskFailed = true;
-                        $.renewError.value = '磁盘续费请求失败: ' + e.message;
+                        $.renewError.value = window.__i18n.t('dash.renew.diskReqFailed') + e.message;
                         break;
                     }
                 }
@@ -592,29 +592,29 @@
 
             $.renewShow.value = false;
             $.walletBalance.value = parseFloat(res ? res.balance : $.walletBalance.value).toFixed(2);
-            alert('续费成功！已从余额中扣除 ¥' + totalPrice);
+            alert(window.__i18n.t('dash.renew.success') + totalPrice);
             $.loadData();
             $.loadLxcContainers();
             // 刷新磁盘列表
             if ($.loadDisks) $.loadDisks();
         } catch (e) {
-            $.renewError.value = '请求失败，请稍后重试';
+            $.renewError.value = window.__i18n.t('shared.retryLater');
         }
     };
 
     $.submitVmPasswordReset = async function() {
         $.vmPwdError.value = '';
         var vm = $.vmPwdResource.value;
-        if (!vm) { $.vmPwdError.value = '请选择虚拟机'; return; }
+        if (!vm) { $.vmPwdError.value = window.__i18n.t('admin.pickVm'); return; }
         var pwd = $.vmPwdNewPassword.value;
         var confirm = $.vmPwdConfirm.value;
-        if (pwd !== confirm) { alert('两次输入的密码不一致'); return; }
+        if (pwd !== confirm) { alert(window.__i18n.t('register.passwordMismatch')); return; }
         var pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,13}$/;
-        if (!pwd || !pwdRegex.test(pwd)) { alert('密码需8-13位，包含大小写英文、数字和特殊字符'); return; }
+        if (!pwd || !pwdRegex.test(pwd)) { alert(window.__i18n.t('register.passwordRule')); return; }
         try {
             await api('/vm/' + vm.vm_id + '/reset-password', { method: 'POST', body: JSON.stringify({ password: pwd }) });
             $.vmPwdShow.value = false;
-            alert('密码重置成功');
+            alert(window.__i18n.t('dash.resetPwd.ok'));
         } catch (e) {
             $.vmPwdError.value = e.message;
         }
@@ -636,7 +636,7 @@
     $.loadNavItems = async function() {
         try {
             var res = await api('/user/nav');
-            var items = (res && res.items && res.items.length > 0) ? res.items : [{id:'vms',label:'我的虚拟机'},{id:'lxc',label:'我的LXC容器'}];
+            var items = (res && res.items && res.items.length > 0) ? res.items : [{id:'vms',label:window.__i18n.t('dash.nav.myVm')},{id:'lxc',label:window.__i18n.t('dash.nav.myLxc')}];
             $.navItems.value = items;
         } catch (e) {
             // 保留默认导航菜单
@@ -960,13 +960,13 @@
             options:commonOpts}));
         $.detailVmCharts.push(new Chart(netEl.getContext('2d'),{
             type:'line',data:{labels:labels,datasets:[
-                {label:'上行',data:netOutData,borderColor:'#FBBF24',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
-                {label:'下行',data:netInData,borderColor:'#36D399',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
+                {label:window.__i18n.t('dash.net.up'),data:netOutData,borderColor:'#FBBF24',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
+                {label:window.__i18n.t('dash.net.down'),data:netInData,borderColor:'#36D399',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
             ]},options:dualYOpts}));
         $.detailVmCharts.push(new Chart(diskEl.getContext('2d'),{
             type:'line',data:{labels:labels,datasets:[
-                {label:'读取',data:diskReadData,borderColor:'#36A2EB',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
-                {label:'写入',data:diskWriteData,borderColor:'#F53F3F',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
+                {label:window.__i18n.t('dash.disk.read'),data:diskReadData,borderColor:'#36A2EB',tension:0.4,fill:false,pointRadius:0,borderWidth:2},
+                {label:window.__i18n.t('dash.disk.write'),data:diskWriteData,borderColor:'#F53F3F',tension:0.4,fill:false,pointRadius:0,borderWidth:2}
             ]},options:dualYOpts}));
 
         $.fetchDetailStatus = function() {
@@ -1023,7 +1023,7 @@
     // 构建分组套餐数据：无分组的归入"默认"分组，分组按 sort_order DESC 排序，组内套餐按 sort_order DESC 排序
     $.buildGroupedPackages = function(groups, packages) {
         var grouped = [];
-        var defaultGroup = { group_id: null, group_name: '默认', packages: [] };
+        var defaultGroup = { group_id: null, group_name: window.__i18n.t('admin.disk.default'), packages: [] };
         var groupMap = {};
         // groups 已由后端按 sort_order DESC 返回
         for (var i = 0; i < groups.length; i++) {
@@ -1109,7 +1109,7 @@
         var placeholderId = window.__storageKeys.PROVISIONING_PREFIX + Date.now();
         var placeholder = {
             id: placeholderId,
-            name: '开通中...',
+            name: window.__i18n.t('dash.vm.provisioningDots'),
             status: { status: 'provisioning' },
             config: null,
             _provisioning: true
@@ -1176,7 +1176,7 @@
             }
             // 清除开通中状态
             try { localStorage.removeItem(window.__storageKeys.PROVISIONING_PREFIX + type); } catch (e2) {}
-            alert('开通失败：' + (e.message || '未知错误'));
+            alert(window.__i18n.t('dash.order.openFailed') + (e.message || window.__i18n.t('common.unknownError')));
         }
     };
     
@@ -1217,7 +1217,7 @@
                 }
                 var placeholder = {
                     id: data.id,
-                    name: '开通中...',
+                    name: window.__i18n.t('dash.vm.provisioningDots'),
                     status: { status: 'provisioning' },
                     config: null,
                     _provisioning: true

@@ -247,7 +247,7 @@
             });
             if (!resp.ok) {
                 var err = await resp.json().catch(function() { return {}; });
-                throw new Error(err.error || '导出失败');
+                throw new Error(err.error || window.__i18n.t('dash.log.exportFailed'));
             }
             var blob = await resp.blob();
             var objUrl = URL.createObjectURL(blob);

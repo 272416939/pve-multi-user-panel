@@ -63,9 +63,9 @@
     // LXC 确认弹窗
     $.confirmLxcActionText = computed(function() {
         var msgs = {
-            shutdown: '这将发送安全关机信号，关闭 LXC 容器。',
-            reboot: 'LXC 容器将重新启动。',
-            stop: '将立即强制停止 LXC 容器，未保存的数据将会丢失。'
+            shutdown: window.__i18n.t('dash.lxc.shutdownHint'),
+            reboot: window.__i18n.t('dash.lxc.ctRebootHint'),
+            stop: window.__i18n.t('dash.lxc.stopHint')
         };
         return msgs[$.lxcConfirmState.value.action] || '';
     });
@@ -124,14 +124,14 @@
     function lxcMarkOperating(ctId) { var m = new Map($.lxcOpTimestamps.value); m.set(ctId, Date.now()); $.lxcOpTimestamps.value = m; }
 
     $.startLxc = async function(ctId) {
-        if (lxcIsOperating(ctId)) return alert('容器正在操作中，请勿重复点击！');
+        if (lxcIsOperating(ctId)) return alert(window.__i18n.t('dash.lxc.opBusy'));
         lxcMarkOperating(ctId);
         try { await api('/lxc/' + ctId + '/start', { method: 'POST' }); await $.loadLxcContainers(); }
         catch (e) { alert(e.message); }
     };
 
     $.shutdownLxc = async function(ctId) {
-        if (lxcIsOperating(ctId)) return alert('容器正在操作中，请勿重复点击！');
+        if (lxcIsOperating(ctId)) return alert(window.__i18n.t('dash.lxc.opBusy'));
         lxcMarkOperating(ctId);
         try {
             await api('/lxc/' + ctId + '/shutdown', { method: 'POST' });
@@ -142,7 +142,7 @@
     };
 
     $.stopLxc = async function(ctId) {
-        if (lxcIsOperating(ctId)) return alert('容器正在操作中，请勿重复点击！');
+        if (lxcIsOperating(ctId)) return alert(window.__i18n.t('dash.lxc.opBusy'));
         lxcMarkOperating(ctId);
         try {
             await api('/lxc/' + ctId + '/stop', { method: 'POST' });
@@ -153,7 +153,7 @@
     };
 
     $.rebootLxc = async function(ctId) {
-        if (lxcIsOperating(ctId)) return alert('容器正在操作中，请勿重复点击！');
+        if (lxcIsOperating(ctId)) return alert(window.__i18n.t('dash.lxc.opBusy'));
         lxcMarkOperating(ctId);
         try { await api('/lxc/' + ctId + '/reboot', { method: 'POST' }); await $.loadLxcContainers(); }
         catch (e) { alert(e.message); }
@@ -164,7 +164,7 @@
             var data = await api('/lxc/' + ctId + '/terminal', { method: 'POST' });
             window.open(data.proxyUrl, '_blank');
         } catch (e) {
-            alert('打开终端失败：' + e.message);
+            alert(window.__i18n.t('dash.lxc.termOpenFailed') + e.message);
         }
     };
 
@@ -218,7 +218,7 @@
     };
 
     $.removeLxc = async function() {
-        if (await window.customConfirm('确定移除此LXC容器分配？')) {
+        if (await window.customConfirm(window.__i18n.t('dash.lxc.removeAssignConfirm'))) {
             try {
                 await api('/user/lxc/' + $.editLxcForm.value.id, { method: 'DELETE' });
                 $.bsModalHide('editLxcModal');
@@ -230,7 +230,7 @@
     };
 
     $.removeLxcById = async function(id) {
-        if (await window.customConfirm('确定移除此LXC容器分配？')) {
+        if (await window.customConfirm(window.__i18n.t('dash.lxc.removeAssignConfirm'))) {
             try {
                 await api('/user/lxc/' + id, { method: 'DELETE' });
                 await $.loadLxcContainers();
@@ -252,12 +252,12 @@
 
     $.submitLxcPasswordReset = async function() {
         if ($.lxcPasswordForm.value.password !== $.lxcPasswordForm.value.confirm) {
-            alert('两次输入的密码不一致');
+            alert(window.__i18n.t('register.passwordMismatch'));
             return;
         }
         var pwdRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,13}$/;
         if (!$.lxcPasswordForm.value.password || !pwdRegex.test($.lxcPasswordForm.value.password)) {
-            alert('密码需8-13位，包含大小写英文、数字和特殊字符');
+            alert(window.__i18n.t('register.passwordRule'));
             return;
         }
         $.lxcPasswordError.value = '';
@@ -267,7 +267,7 @@
                 body: JSON.stringify({ password: $.lxcPasswordForm.value.password })
             });
             $.bsModalHide('lxcPasswordResetModal');
-            alert('密码重置成功');
+            alert(window.__i18n.t('dash.resetPwd.ok'));
         } catch (e) {
             $.lxcPasswordError.value = e.message;
         }
@@ -276,7 +276,7 @@
     $.openResetLxcIpModal = function(ct) {
         // 私有网络：重置 IP 必须先绑定子网
         if (!ct.subnet_id) {
-            alert('该容器尚未绑定子网，请先绑定后再重置 IP');
+            alert(window.__i18n.t('dash.resetIp.needSubnetCt'));
             return;
         }
         $.lxcResetCt.value = ct;
@@ -298,7 +298,7 @@
         if (!ct) return;
         // 私有网络：随机 IP 从当前容器绑定的子网 IP 池选取
         if (!ct.subnet_id) {
-            alert('该容器尚未绑定子网，请先绑定后再使用随机 IP 功能');
+            alert(window.__i18n.t('dash.randomIp.needSubnetCt'));
             return;
         }
         try {
@@ -306,19 +306,19 @@
             $.lxcIpForm.value.ip = data.ip + '/24';
             $.lxcIpForm.value.ip_mode = 'static';
         } catch (e) {
-            alert('获取随机 IP 失败：' + e.message);
+            alert(window.__i18n.t('dash.randomIp.failed') + e.message);
         }
     };
 
     $.confirmResetLxcIp = async function() {
         var f = $.lxcIpForm.value;
         if (f.ip_mode === 'static' && !f.ip) {
-            $.lxcIpError.value = '请输入 IP 地址';
+            $.lxcIpError.value = window.__i18n.t('dash.ipRequired');
             return;
         }
         var ctId = $.lxcPasswordResetCtId.value;
         if (!ctId) return;
-        var confirmed = await window.customConfirm('确认修改 CT ' + ctId + ' 的 IP？容器将短暂关机后自动重启，正在运行的服务会中断。');
+        var confirmed = await window.customConfirm(window.__i18n.tFormat('dash.resetIp.confirmCtFmt', ctId));
         if (!confirmed) return;
         await $.resetLxcIp();
     };
@@ -326,7 +326,7 @@
     $.resetLxcIp = async function() {
         var f = $.lxcIpForm.value;
         if (f.ip_mode === 'static' && !f.ip) {
-            $.lxcIpError.value = '请输入 IP 地址';
+            $.lxcIpError.value = window.__i18n.t('dash.ipRequired');
             return;
         }
         $.lxcIpLoading.value = true;
@@ -337,7 +337,7 @@
             });
             $.lxcIpLoading.value = false;
             $.bsModalHide('resetLxcIpModal');
-            alert('IP 重置成功：' + (result.ip || 'DHCP'));
+            alert(window.__i18n.t('dash.resetIp.ipOk') + (result.ip || 'DHCP'));
             if ($.loadLxcContainers) await $.loadLxcContainers();
         } catch (e) {
             $.lxcIpLoading.value = false;
@@ -360,7 +360,7 @@
                 max_rollbacks: data.daily_restore_limit || 10
             };
         } catch (e) {
-            alert('获取快照列表失败：' + e.message);
+            alert(window.__i18n.t('dash.snap.loadFailed') + e.message);
             $.lxcSnapshots.value = [];
         } finally {
             $.lxcSnapshotLoading.value = false;
@@ -396,7 +396,7 @@
         if (names.length === 0) return;
         $.bsModalHide('lxcSnapshotModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('确定要批量删除 ' + names.length + ' 个快照吗？此操作不可恢复。')) {
+        if (!await window.customConfirm(window.__i18n.t('common.batchDeleteConfirm1') + names.length + window.__i18n.t('dash.snap.batchSuffix'))) {
             $.bsModalShow('lxcSnapshotModal');
             return;
         }
@@ -409,11 +409,11 @@
             await $.loadLxcSnapshots($.lxcSnapshotCtId.value);
             $.bsModalHide('lxcSnapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('成功删除 ' + names.length + ' 个快照');
+            alert(window.__i18n.t('common.deletedPrefix') + names.length + window.__i18n.t('dash.snap.countSuffix'));
         } catch (e) {
             $.bsModalHide('lxcSnapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('批量删除失败：' + e.message);
+            alert(window.__i18n.t('dash.snap.batchDeleteFailed') + e.message);
             await $.loadLxcSnapshots($.lxcSnapshotCtId.value);
         } finally {
             $.lxcSnapshotDeleting.value = false;
@@ -432,11 +432,11 @@
             $.lxcSnapshotForm.value = { name: '', description: '' };
             $.bsModalHide('lxcSnapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('快照创建成功');
+            alert(window.__i18n.t('dash.snap.created'));
         } catch (e) {
             $.bsModalHide('lxcSnapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('创建快照失败：' + e.message);
+            alert(window.__i18n.t('dash.snap.createFailed') + e.message);
         } finally {
             $.lxcSnapshotCreating.value = false;
         }
@@ -445,7 +445,7 @@
     $.rollbackLxcSnapshot = async function(snapname) {
         $.bsModalHide('lxcSnapshotModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('确定要回滚到快照「' + snapname + '」吗？\n此操作将恢复容器磁盘到该快照的状态，运行中的数据可能丢失。')) {
+        if (!await window.customConfirm(window.__i18n.t('dash.snap.rollbackConfirm1') + snapname + window.__i18n.t('dash.snap.rbCtNl'))) {
             $.bsModalShow('lxcSnapshotModal');
             return;
         }
@@ -454,18 +454,18 @@
             await $.loadLxcSnapshots($.lxcSnapshotCtId.value);
             $.bsModalHide('lxcSnapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('快照回滚成功');
+            alert(window.__i18n.t('dash.snap.rollbackOk'));
         } catch (e) {
             $.bsModalHide('lxcSnapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('回滚快照失败：' + e.message);
+            alert(window.__i18n.t('dash.snap.rollbackFailed') + e.message);
         }
     };
 
     $.deleteLxcSnapshot = async function(snapname) {
         $.bsModalHide('lxcSnapshotModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('确定要删除快照「' + snapname + '」吗？此操作不可恢复。')) {
+        if (!await window.customConfirm(window.__i18n.t('dash.snap.deleteConfirm1') + snapname + window.__i18n.t('dash.snap.deleteSuffix'))) {
             $.bsModalShow('lxcSnapshotModal');
             return;
         }
@@ -474,11 +474,11 @@
             await $.loadLxcSnapshots($.lxcSnapshotCtId.value);
             $.bsModalHide('lxcSnapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('快照删除成功');
+            alert(window.__i18n.t('dash.snap.deleted'));
         } catch (e) {
             $.bsModalHide('lxcSnapshotModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('删除快照失败：' + e.message);
+            alert(window.__i18n.t('dash.snap.deleteFailed') + e.message);
         }
     };
 
@@ -531,7 +531,7 @@
             await new Promise(function(r) { setTimeout(r, 300); });
             // 立即刷新容器列表，让「备份中」徽标即时展示并锁定操作按钮
             await $.loadLxcContainers();
-            alert('备份任务已创建，完成后将通过站内信和邮件通知您');
+            alert(window.__i18n.t('dash.backup.taskCreated'));
         } catch (e) {
             $.bsModalHide('lxcBackupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
@@ -544,7 +544,7 @@
     $.deleteLxcBackup = async function(id, ctId) {
         $.bsModalHide('lxcBackupModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('确定要删除此备份吗？此操作不可恢复。')) {
+        if (!await window.customConfirm(window.__i18n.t('dash.backup.deleteConfirm'))) {
             $.bsModalShow('lxcBackupModal');
             return;
         }
@@ -553,11 +553,11 @@
             await $.loadLxcBackups($.lxcBackupCtId.value);
             $.bsModalHide('lxcBackupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('备份已删除');
+            alert(window.__i18n.t('dash.backup.deleted'));
         } catch (e) {
             $.bsModalHide('lxcBackupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('删除备份失败：' + e.message);
+            alert(window.__i18n.t('dash.backup.deleteFailed') + e.message);
         }
     };
 
@@ -566,7 +566,7 @@
         if (ids.length === 0) return;
         $.bsModalHide('lxcBackupModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('确定要批量删除 ' + ids.length + ' 个备份吗？此操作不可恢复。')) {
+        if (!await window.customConfirm(window.__i18n.t('common.batchDeleteConfirm1') + ids.length + window.__i18n.t('dash.backup.batchSuffix'))) {
             $.bsModalShow('lxcBackupModal');
             return;
         }
@@ -577,11 +577,11 @@
             await $.loadLxcBackups($.lxcBackupCtId.value);
             $.bsModalHide('lxcBackupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('成功删除 ' + ids.length + ' 个备份');
+            alert(window.__i18n.t('common.deletedPrefix') + ids.length + window.__i18n.t('dash.backup.countSuffix'));
         } catch (e) {
             $.bsModalHide('lxcBackupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
-            alert('批量删除失败：' + e.message);
+            alert(window.__i18n.t('dash.snap.batchDeleteFailed') + e.message);
         } finally {
             $.lxcBackupDeleting.value = false;
         }
@@ -590,7 +590,7 @@
     $.restoreLxcBackup = async function(backup) {
         $.bsModalHide('lxcBackupModal');
         await new Promise(function(r) { setTimeout(r, 300); });
-        if (!await window.customConfirm('即将使用此备份恢复LXC容器【' + $.lxcBackupCtName.value + '】（备份时间：' + formatDate(backup.created_at) + '）。\n\n恢复将【完全覆盖】当前容器的磁盘数据！\n⚠️ 已有的快照将会被清除\n\n请确保容器已关机，否则恢复将失败。\n\n确认要恢复吗？')) {
+        if (!await window.customConfirm(window.__i18n.t('dash.restore.lxcConfirm1') + $.lxcBackupCtName.value + window.__i18n.t('dash.restore.timeMid') + formatDate(backup.created_at) + window.__i18n.t('dash.restore.ctConfirmOff'))) {
             $.bsModalShow('lxcBackupModal');
             return;
         }
@@ -601,7 +601,7 @@
             await new Promise(function(r) { setTimeout(r, 300); });
             // 立即刷新容器列表，让「恢复中」徽标即时展示并锁定操作按钮
             await $.loadLxcContainers();
-            alert('恢复任务已创建，完成后将通过站内信和邮件通知您');
+            alert(window.__i18n.t('dash.restore.taskCreated'));
         } catch (e) {
             $.bsModalHide('lxcBackupModal');
             await new Promise(function(r) { setTimeout(r, 300); });
@@ -612,9 +612,9 @@
     $.getRedeemableLxcName = function(id) {
         var ct = $.userLxcContainers.value.find(function(c) { return c.id == id; });
         if (!ct) return '';
-        var exp = ct.expiration_date ? formatDate(ct.expiration_date) : '未设置';
+        var exp = ct.expiration_date ? formatDate(ct.expiration_date) : window.__i18n.t('dash.unset');
         var remain = ct.expiration_date ? $.daysUntilExpire(ct.expiration_date) : '';
-        return (ct.name || 'CT ' + ct.ct_id) + '（到期: ' + exp + ' ' + remain + '）';
+        return (ct.name || 'CT ' + ct.ct_id) + window.__i18n.t('dash.expireParen') + exp + ' ' + remain + '）';
     };
 
     // ===== initLxc =====

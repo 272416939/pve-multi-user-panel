@@ -35,11 +35,11 @@
 
   // 语言代码 → 本地化名称映射（与 server/constants.js LOCALE_NAMES 保持一致）
   var LOCALE_NAMES = {
-    'zh-CN': '简体中文',
-    'zh-TW': '繁體中文',
+    'zh-CN': window.__i18n.t('lang.zh-CN'),
+    'zh-TW': window.__i18n.t('lang.zh-TW'),
     'en': 'English',
     'de': 'Deutsch',
-    'ja': '日本語',
+    'ja': window.__i18n.t('lang.ja'),
     'ko': '한국어',
     'fr': 'Français'
   };

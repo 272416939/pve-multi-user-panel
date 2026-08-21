@@ -76,9 +76,9 @@
 
     $.submitDeviceRule = async function() {
         var ip = $.deviceForm.ip;
-        if (!ip) return alert('当前设备无可用 IP，无法创建端口转发');
-        if (!$.deviceForm.internal_port) return alert('请填入内网端口');
-        if (!$.deviceForm.external_port) return alert('请填入外网端口');
+        if (!ip) return alert(window.__i18n.t('admin.port.noIp'));
+        if (!$.deviceForm.internal_port) return alert(window.__i18n.t('dash.port.internalRequired'));
+        if (!$.deviceForm.external_port) return alert(window.__i18n.t('dash.port.externalRequired'));
         try {
             var body = {
                 type: $.currentDevice.type,
@@ -119,7 +119,7 @@
                 });
             }
         }
-        var ok = await window.customConfirm('确定要删除端口转发 "' + (rule.name || rule.external_port) + '" 吗？');
+        var ok = await window.customConfirm(window.__i18n.t('dash.port.deleteConfirm1') + (rule.name || rule.external_port) + window.__i18n.t('dash.port.delTailQ'));
         if (!ok) { $.bsModalShow('deviceForwardModal'); return; }
         try {
             await api('/port-forwards/' + rule.id, { method: 'DELETE' });
@@ -127,7 +127,7 @@
             var cfg = await api('/port-forwards/config');
             $.forwardConfig.value = cfg || $.forwardConfig.value;
         } catch (e) {
-            alert('删除失败: ' + e.message);
+            alert(window.__i18n.t('common.deleteFailedMsg') + e.message);
             $.bsModalShow('deviceForwardModal');
             return;
         }

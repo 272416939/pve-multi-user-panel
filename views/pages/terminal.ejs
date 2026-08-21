@@ -3,6 +3,11 @@
 <head>
     <script src="js/theme-init.js"></script>
     <script src="js/app-version.js" defer></script>
+    <script src="js/shared/i18n.js?cv=<%= locals.cacheVersion %>"></script>
+    <script nonce="<%= locals.cspNonce %>">
+        window.__initialLocale = '<%= locals.locale %>';
+        window.__i18n.init('<%= locals.locale %>');
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LXC 终端</title>
@@ -68,10 +73,10 @@
     <div id="terminal-container"></div>
     <div class="status-bar" id="statusBar">
         <div class="status-bar-left">
-            <span id="statusText">正在连接...</span>
+            <span id="statusText" data-i18n="terminal.connecting">正在连接...</span>
         </div>
         <div class="status-bar-right">
-            <button id="shortcutsBtn" type="button" title="查看快捷键说明">快捷键 ?</button>
+            <button id="shortcutsBtn" type="button" title="查看快捷键说明" data-i18n-title="terminal.viewHelp"><span data-i18n="vnc.groupKeys">快捷键</span> ?</button>
             <span id="connInfo">CT <%= locals.vmid %></span>
         </div>
     </div>
@@ -79,7 +84,7 @@
         <div class="modal-content">
             <div id="shortcutsContent"></div>
             <div class="modal-close">
-                <button type="button" id="shortcutsCloseBtn">关闭</button>
+                <button type="button" id="shortcutsCloseBtn" data-i18n="common.close">关闭</button>
             </div>
         </div>
     </div>

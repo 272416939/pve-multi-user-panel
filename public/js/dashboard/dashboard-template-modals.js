@@ -27,7 +27,7 @@
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">{{ t('dash.renewPrice') }}</label>
-                        <input type="number" step="0.01" min="0" class="form-control" v-model="editVmForm.renewal_price" placeholder="如: 50.00">
+                        <input type="number" step="0.01" min="0" class="form-control" v-model="editVmForm.renewal_price" :placeholder="t('common.ph.price')">
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">{{ t('dash.billingPeriod') }}</label>
@@ -77,12 +77,12 @@
                         </div>
                         <div class="card-body">
                             <div class="mb-2">
-                                <textarea class="form-control form-control-sm" v-model="snapshotForm.description" rows="2" placeholder="备注（可选）"></textarea>
+                                <textarea class="form-control form-control-sm" v-model="snapshotForm.description" rows="2" :placeholder="t('common.ph.notesOptional')"></textarea>
                             </div>
                             <div class="d-flex justify-content-end align-items-center">
                                 <pv-button @click="createSnapshot(snapshotVmId)" :disabled="snapshotCreating" size="sm">
                                     <span v-if="snapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
-                                    创建快照
+                                    {{ t('dash.snap.create') }}
                                 </pv-button>
                             </div>
                         </div>
@@ -96,14 +96,14 @@
                             <div class="d-flex align-items-center gap-2">
                                 <pv-button v-if="isAnySnapshotSelected" @click="batchDeleteSnapshots(snapshotVmId)" :disabled="snapshotDeleting" variant="outline-danger" size="sm">
                                     <span v-if="snapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
-                                    批量删除 ({{ snapshotSelected.size }})
+                                    {{ t('dash.batchDeletePrefix') }}{{ snapshotSelected.size }})
                                 </pv-button>
                                 <span class="badge bg-secondary">{{ tFormat('dash.count.snapshot', snapshots.length) }}</span>
                             </div>
                         </div>
                         <div class="card-body p-0">
                             <div v-if="snapshots.length === 0" class="text-center text-muted py-4 small">
-                                暂无快照
+                                {{ t('dash.snap.empty') }}
                             </div>
                             <div v-else class="list-group list-group-flush">
                                 <div v-for="snap in snapshots" :key="snap.name" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center" :class="snapshotSelected.has(snap.name) ? 'list-group-item-primary' : ''">
@@ -118,8 +118,8 @@
                                         </div>
                                     </div>
                                     <div class="d-flex gap-1 flex-shrink-0">
-                                        <pv-button @click="rollbackSnapshot(snapshotVmId, snap.name)" title="回滚到此快照" variant="outline" size="sm">{{ t('dash.snap.rollback') }}</pv-button>
-                                        <pv-button @click="deleteSnapshot(snapshotVmId, snap.name)" title="删除快照" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
+                                        <pv-button @click="rollbackSnapshot(snapshotVmId, snap.name)" :title="t('dash.snap.rollbackTitle')" variant="outline" size="sm">{{ t('dash.snap.rollback') }}</pv-button>
+                                        <pv-button @click="deleteSnapshot(snapshotVmId, snap.name)" :title="t('dash.snap.deleteTitle')" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
                                     </div>
                                 </div>
                             </div>
@@ -197,14 +197,14 @@
                     <div class="card-header"><h6 class="mb-0">{{ t('dash.backup.create') }}</h6></div>
                     <div class="card-body">
                         <div class="mb-2">
-                            <textarea class="form-control form-control-sm" v-model="backupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
+                            <textarea class="form-control form-control-sm" v-model="backupForm.notes" rows="2" maxlength="50" :placeholder="t('common.ph.notesOptional')" style="resize:none"></textarea>
                             <small class="text-muted">{{ (backupForm.notes || '').length }}/50</small>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">{{ t('dash.backup.stopMode') }}</small>
                             <pv-button @click="createBackup(backupVmId)" :disabled="backupCreating" size="sm">
                                 <span v-if="backupCreating" class="spinner-border spinner-border-sm me-1"></span>
-                                立即备份
+                                {{ t('dash.backup.now') }}
                             </pv-button>
                         </div>
                     </div>
@@ -218,7 +218,7 @@
                         <div class="d-flex align-items-center gap-2">
                             <pv-button v-if="isAnyBackupSelected" @click="batchDeleteBackups(backupVmId)" :disabled="backupDeleting" variant="outline-danger" size="sm">
                                 <span v-if="backupDeleting" class="spinner-border spinner-border-sm me-1"></span>
-                                批量删除 ({{ backupSelected.size }})
+                                {{ t('dash.batchDeletePrefix') }}{{ backupSelected.size }})
                             </pv-button>
                             <span class="badge bg-secondary">{{ tFormat('dash.count.backup', backups.length) }}</span>
                         </div>
@@ -255,8 +255,8 @@
                                         <td class="small">{{ b.storage }}</td>
                                         <td>
                                             <div class="d-flex gap-1">
-                                                <pv-button v-if="b.status === 'completed'" @click="restoreBackup(b)" title="恢复此备份" variant="outline" size="sm">{{ t('dash.backup.restore') }}</pv-button>
-                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" title="删除备份" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
+                                                <pv-button v-if="b.status === 'completed'" @click="restoreBackup(b)" :title="t('dash.backup.restoreTitle')" variant="outline" size="sm">{{ t('dash.backup.restore') }}</pv-button>
+                                                <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteBackup(b.id)" :title="t('dash.backup.deleteTitle')" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
                                             </div>
                                         </td>
                                     </tr>
@@ -285,7 +285,7 @@
                     <div class="mb-3">
                         <label class="form-label">{{ t('dash.resetPwd.newPwd') }}<span class="small text-muted">{{ (lxcPasswordForm.password || '').length }}/13</span></label>
                         <div class="input-group">
-                            <input :type="lxcPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="lxcPasswordForm.password" maxlength="13" required autocomplete="new-password" placeholder="8-13位，需包含英文+数字+符号" @input="lxcPasswordForm.password = lxcPasswordForm.password.slice(0,13)">
+                            <input :type="lxcPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="lxcPasswordForm.password" maxlength="13" required autocomplete="new-password" :placeholder="t('register.pwdPh')" @input="lxcPasswordForm.password = lxcPasswordForm.password.slice(0,13)">
                             <button class="btn btn-outline-secondary" type="button" @click="lxcPwdShowPwd = !lxcPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
                                 <svg v-if="lxcPwdShowPwd" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/><path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/></svg>
                                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>
@@ -295,7 +295,7 @@
                     <div class="mb-3">
                         <label class="form-label">{{ t('dash.resetPwd.confirmPwd') }}</label>
                         <div class="input-group">
-                            <input :type="lxcPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="lxcPasswordForm.confirm" required autocomplete="new-password" placeholder="请再次输入密码">
+                            <input :type="lxcPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="lxcPasswordForm.confirm" required autocomplete="new-password" :placeholder="t('register.confirmPlaceholder')">
                             <button class="btn btn-outline-secondary" type="button" @click="lxcPwdShowPwd = !lxcPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
                                 <svg v-if="lxcPwdShowPwd" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/><path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/></svg>
                                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>
@@ -336,7 +336,7 @@
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">{{ t('dash.renewPrice') }}</label>
-                        <input type="number" step="0.01" min="0" class="form-control" v-model="editLxcForm.renewal_price" placeholder="如: 50.00">
+                        <input type="number" step="0.01" min="0" class="form-control" v-model="editLxcForm.renewal_price" :placeholder="t('common.ph.price')">
                     </div>
                     <div v-if="user && user.role === 'admin'" class="mb-3">
                         <label class="form-label">{{ t('dash.billingPeriod') }}</label>
@@ -384,12 +384,12 @@
                         <div class="card-header"><h6 class="mb-0">{{ t('dash.snap.create') }}</h6></div>
                         <div class="card-body">
                             <div class="mb-2">
-                                <textarea class="form-control form-control-sm" v-model="lxcSnapshotForm.description" rows="2" placeholder="备注（可选）"></textarea>
+                                <textarea class="form-control form-control-sm" v-model="lxcSnapshotForm.description" rows="2" :placeholder="t('common.ph.notesOptional')"></textarea>
                             </div>
                             <div class="d-flex justify-content-end align-items-center">
                                 <pv-button @click="createLxcSnapshot()" :disabled="lxcSnapshotCreating" size="sm">
                                     <span v-if="lxcSnapshotCreating" class="spinner-border spinner-border-sm me-1"></span>
-                                    创建快照
+                                    {{ t('dash.snap.create') }}
                                 </pv-button>
                             </div>
                         </div>
@@ -403,7 +403,7 @@
                             <div class="d-flex align-items-center gap-2">
                                 <pv-button v-if="isAnyLxcSnapshotSelected" @click="batchDeleteLxcSnapshots()" :disabled="lxcSnapshotDeleting" variant="outline-danger" size="sm">
                                     <span v-if="lxcSnapshotDeleting" class="spinner-border spinner-border-sm me-1"></span>
-                                    批量删除 ({{ lxcSnapshotSelected.size }})
+                                    {{ t('dash.batchDeletePrefix') }}{{ lxcSnapshotSelected.size }})
                                 </pv-button>
                                 <span class="badge bg-secondary">{{ tFormat('dash.count.snapshot', lxcSnapshots.length) }}</span>
                             </div>
@@ -423,8 +423,8 @@
                                         </div>
                                     </div>
                                     <div class="d-flex gap-1 flex-shrink-0">
-                                        <pv-button @click="rollbackLxcSnapshot(snap.name)" title="回滚到此快照" variant="outline" size="sm">{{ t('dash.snap.rollback') }}</pv-button>
-                                        <pv-button @click="deleteLxcSnapshot(snap.name)" title="删除快照" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
+                                        <pv-button @click="rollbackLxcSnapshot(snap.name)" :title="t('dash.snap.rollbackTitle')" variant="outline" size="sm">{{ t('dash.snap.rollback') }}</pv-button>
+                                        <pv-button @click="deleteLxcSnapshot(snap.name)" :title="t('dash.snap.deleteTitle')" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
                                     </div>
                                 </div>
                             </div>
@@ -500,14 +500,14 @@
                     <div class="card-header"><h6 class="mb-0">{{ t('dash.backup.create') }}</h6></div>
                     <div class="card-body">
                         <div class="mb-2">
-                            <textarea class="form-control form-control-sm" v-model="lxcBackupForm.notes" rows="2" maxlength="50" placeholder="备注（可选）" style="resize:none"></textarea>
+                            <textarea class="form-control form-control-sm" v-model="lxcBackupForm.notes" rows="2" maxlength="50" :placeholder="t('common.ph.notesOptional')" style="resize:none"></textarea>
                             <small class="text-muted">{{ (lxcBackupForm.notes || '').length }}/50</small>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
                             <small class="text-muted">{{ t('dash.backup.stopMode') }}</small>
                             <pv-button @click="createLxcBackup()" :disabled="lxcBackupCreating" size="sm">
                                 <span v-if="lxcBackupCreating" class="spinner-border spinner-border-sm me-1"></span>
-                                立即备份
+                                {{ t('dash.backup.now') }}
                             </pv-button>
                         </div>
                     </div>
@@ -521,7 +521,7 @@
                         <div class="d-flex align-items-center gap-2">
                             <pv-button v-if="isAnyLxcBackupSelected" @click="batchDeleteLxcBackups()" :disabled="lxcBackupDeleting" variant="outline-danger" size="sm">
                                 <span v-if="lxcBackupDeleting" class="spinner-border spinner-border-sm me-1"></span>
-                                批量删除 ({{ lxcBackupSelected.size }})
+                                {{ t('dash.batchDeletePrefix') }}{{ lxcBackupSelected.size }})
                             </pv-button>
                             <span class="badge bg-secondary">{{ tFormat('dash.count.backup', lxcBackups.length) }}</span>
                         </div>
@@ -557,8 +557,8 @@
                                         </td>
                                         <td class="small">{{ b.storage }}</td>
                                         <td>
-                                            <pv-button v-if="b.status === 'completed'" @click="restoreLxcBackup(b)" title="恢复此备份" variant="outline" size="sm">{{ t('dash.backup.restore') }}</pv-button>
-                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteLxcBackup(b.id, lxcBackupCtId)" title="删除备份" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
+                                            <pv-button v-if="b.status === 'completed'" @click="restoreLxcBackup(b)" :title="t('dash.backup.restoreTitle')" variant="outline" size="sm">{{ t('dash.backup.restore') }}</pv-button>
+                                            <pv-button v-if="b.status !== 'running' && b.status !== 'pending'" @click="deleteLxcBackup(b.id, lxcBackupCtId)" :title="t('dash.backup.deleteTitle')" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
                                         </td>
                                     </tr>
                                 </tbody>
@@ -586,18 +586,18 @@
                 <div v-if="cdkRedeemStep === 'input'">
                     <div class="mb-3">
                         <label class="form-label">{{ t('dash.cdk.code') }}</label>
-                        <input type="text" class="form-control" v-model="cdkRedeemForm.code" placeholder="输入 CDK 码，如 PVE-XXXX-XXXX-XXXX" style="text-transform: uppercase;" @input="cdkRedeemForm.code = cdkRedeemForm.code.toUpperCase()">
+                        <input type="text" class="form-control" v-model="cdkRedeemForm.code" :placeholder="t('dash.cdk.codePh')" style="text-transform: uppercase;" @input="cdkRedeemForm.code = cdkRedeemForm.code.toUpperCase()">
                     </div>
                     <div class="mb-3">
                         <label class="form-label">{{ t('dash.cdk.resType') }}</label>
                         <div class="d-flex gap-3">
                             <label class="form-check-label d-flex align-items-center gap-1" style="cursor:pointer;">
                                 <input type="radio" class="form-check-input" value="vm" v-model="cdkRedeemType">
-                                虚拟机
+                                {{ t('nav.vms') }}
                             </label>
                             <label class="form-check-label d-flex align-items-center gap-1" style="cursor:pointer;">
                                 <input type="radio" class="form-check-input" value="lxc" v-model="cdkRedeemType">
-                                LXC容器
+                                {{ t('dash.cdk.resLxc') }}
                             </label>
                         </div>
                     </div>
@@ -622,7 +622,7 @@
                                 <div v-for="vm in userVms" :key="vm.id" class="option" role="option"
                                      :class="{ selected: cdkRedeemForm.vm_id == vm.id }"
                                      @click="cdkRedeemForm.vm_id = vm.id; toggleCdkDropdown('vm', false);">
-                                    {{ vm.name || 'VM ' + vm.vm_id }}（到期: {{ vm.expiration_date ? formatDate(vm.expiration_date) : '未设置' }} <span :class="getExpiryColor(vm.expiration_date)">{{ vm.expiration_date ? daysUntilExpire(vm.expiration_date) : '' }}</span>）
+                                    {{ vm.name || 'VM ' + vm.vm_id }}{{ t('dash.expireParen') }} {{ vm.expiration_date ? formatDate(vm.expiration_date) : t('dash.unset') }} <span :class="getExpiryColor(vm.expiration_date)">{{ vm.expiration_date ? daysUntilExpire(vm.expiration_date) : '' }}</span>）
                                 </div>
                             </div>
                         </Teleport>
@@ -647,7 +647,7 @@
                                 <div v-for="ct in userLxcContainers" :key="ct.id" class="option" role="option"
                                      :class="{ selected: cdkRedeemForm.container_id == ct.id }"
                                      @click="cdkRedeemForm.container_id = ct.id; toggleCdkDropdown('lxc', false);">
-                                    {{ ct.name || 'CT ' + ct.ct_id }}（到期: {{ ct.expiration_date ? formatDate(ct.expiration_date) : '未设置' }} <span :class="getExpiryColor(ct.expiration_date)">{{ ct.expiration_date ? daysUntilExpire(ct.expiration_date) : '' }}</span>）
+                                    {{ ct.name || 'CT ' + ct.ct_id }}{{ t('dash.expireParen') }} {{ ct.expiration_date ? formatDate(ct.expiration_date) : t('dash.unset') }} <span :class="getExpiryColor(ct.expiration_date)">{{ ct.expiration_date ? daysUntilExpire(ct.expiration_date) : '' }}</span>）
                                 </div>
                             </div>
                         </Teleport>
@@ -740,7 +740,7 @@
                     <div class="mb-3">
                         <label class="form-label">{{ t('dash.resetPwd.newPwd') }}<span class="small text-muted">{{ (vmPwdNewPassword || '').length }}/13</span></label>
                         <div class="input-group">
-                            <input :type="vmPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="vmPwdNewPassword" maxlength="13" placeholder="8-13位，需包含英文+数字+符号" @input="vmPwdNewPassword = vmPwdNewPassword.slice(0,13)">
+                            <input :type="vmPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="vmPwdNewPassword" maxlength="13" :placeholder="t('register.pwdPh')" @input="vmPwdNewPassword = vmPwdNewPassword.slice(0,13)">
                             <button class="btn btn-outline-secondary" type="button" @click="vmPwdShowPwd = !vmPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
                                 <svg v-if="vmPwdShowPwd" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/><path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/></svg>
                                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>
@@ -750,7 +750,7 @@
                     <div class="mb-3">
                         <label class="form-label">{{ t('dash.resetPwd.confirmPwd') }}</label>
                         <div class="input-group">
-                            <input :type="vmPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="vmPwdConfirm" placeholder="请再次输入密码" autocomplete="new-password">
+                            <input :type="vmPwdShowPwd ? 'text' : 'password'" class="form-control" v-model="vmPwdConfirm" :placeholder="t('register.confirmPlaceholder')" autocomplete="new-password">
                             <button class="btn btn-outline-secondary" type="button" @click="vmPwdShowPwd = !vmPwdShowPwd" tabindex="-1" style="border-color:#444;background:transparent;color:#aaa;">
                                 <svg v-if="vmPwdShowPwd" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M13.359 11.238C15.06 9.72 16 8 16 8s-3-5.5-8-5.5a7.028 7.028 0 0 0-2.79.588l.77.771A5.944 5.944 0 0 1 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.134 13.134 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755-.165.165-.337.328-.517.486z"/><path d="M11.297 9.176a3.5 3.5 0 0 0-4.474-4.474l.823.823a2.5 2.5 0 0 1 2.829 2.829zm-2.943 1.299.822.822a3.5 3.5 0 0 1-4.474-4.474l.823.823a2.5 2.5 0 0 0 2.829 2.829z"/><path d="M3.35 5.47c-.18.16-.353.322-.518.487A13.134 13.134 0 0 0 1.172 8l.195.288c.335.48.83 1.12 1.465 1.755C4.121 11.332 5.881 12.5 8 12.5c.716 0 1.39-.133 2.02-.36l.77.772A7.029 7.029 0 0 1 8 13.5C3 13.5 0 8 0 8s.939-1.721 2.641-3.238l.708.709zm10.296 8.884-12-12 .708-.708 12 12-.708.708z"/></svg>
                                 <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M16 8s-3-5.5-8-5.5S0 8 0 8s3 5.5 8 5.5S16 8 16 8zM1.173 8a13.133 13.133 0 0 1 1.66-2.043C4.12 4.668 5.88 3.5 8 3.5c2.12 0 3.879 1.168 5.168 2.457A13.133 13.133 0 0 1 14.828 8c-.058.087-.122.183-.195.288-.335.48-.83 1.12-1.465 1.755C11.879 11.332 10.119 12.5 8 12.5c-2.12 0-3.879-1.168-5.168-2.457A13.134 13.134 0 0 1 1.172 8z"/><path d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0z"/></svg>
@@ -802,7 +802,7 @@
                 </select>
                 <div class="form-text text-muted" v-if="orderOsLoading">{{ t('common.loading') }}</div>
                 <div class="form-text text-muted" v-else-if="orderOsTemplates.length === 0">
-                    该套餐暂无可选系统，请选择其他套餐
+                    {{ t('dash.order.noOs') }}
                 </div>
             </div>
             <div class="mb-3">
@@ -841,7 +841,7 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <span class="message-type-badge" :class="'msg-type-' + currentMsg.type">
-                        {{ {1:'系统公告',2:'业务通知',3:'续费提醒',4:'工单消息',5:'客服私聊'}[currentMsg.type] || '消息' }}
+                        {{ {1:t('user.message.system'),2:t('user.message.business'),3:t('user.message.renewal'),4:t('user.message.ticket'),5:t('user.message.cs')}[currentMsg.type] || t('nav.messages') }}
                     </span>
                     <span class="text-muted ms-2 small">{{ formatDate(currentMsg.created_at) }}</span>
                 </div>
@@ -906,7 +906,7 @@
                 <div v-if="osSwitchList.length === 0" class="text-muted small py-3 text-center">{{ t('dash.osSwitch.none') }}</div>
             </div>
             <div class="current-os text-muted small mb-2" v-if="osSwitchCurrentName">
-                当前系统：{{ osSwitchCurrentName }}
+                {{ t('dash.osSwitch.current') }}{{ osSwitchCurrentName }}
             </div>
             <div class="form-check" v-if="osSwitchSelectedId">
                 <input class="form-check-input" type="checkbox" id="osSwitchConfirm" v-model="osSwitchConfirm">
@@ -933,7 +933,7 @@
                 <span v-else class="text-muted small">{{ t('dash.subnet.adminUnlimited') }}</span>
             </div>
             <div v-if="subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max" class="alert alert-warning py-2 small mb-3">
-                子网数量已达上限，无法继续创建，如需更多请联系管理员
+                {{ t('dash.subnet.limitReached') }}
             </div>
             <p class="text-muted small">{{ t('dash.subnet.autoAssignHint') }}</p>
             <ul class="small text-muted mb-3">
@@ -947,7 +947,7 @@
             </div>
             <div v-if="subnetCreating" class="text-center text-muted py-3">
                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                正在创建子网，请稍候...
+                {{ t('dash.subnet.creating') }}
             </div>
         </div>
         <div class="modal-footer d-flex gap-2">
@@ -974,14 +974,14 @@
                 <template v-else>{{ t('dash.subnet.runningHint') }}</template>
             </div>
             <div class="alert alert-warning small" v-else-if="bindSubnetDevice.status && bindSubnetDevice.status.status !== 'running'">
-                解绑子网后需重新绑定才能开机
+                {{ t('dash.subnet.unbindHint') }}
             </div>
             <!-- 已绑定：显示当前子网 + 解绑按钮 -->
             <template v-if="bindSubnetCurrentSubnet">
                 <div class="mb-3">
                     <label class="form-label">{{ t('dash.subnet.currentBound') }}</label>
                     <div class="form-control" readonly>
-                        {{ bindSubnetCurrentSubnet.vlan_name }}（{{ bindSubnetCurrentSubnet.cidr }}）· 可用 IP：{{ bindSubnetCurrentSubnet.available }}
+                        {{ bindSubnetCurrentSubnet.vlan_name }}（{{ bindSubnetCurrentSubnet.cidr }}{{ t('dash.subnet.availIpSuffix') }}{{ bindSubnetCurrentSubnet.available }}
                     </div>
                     <div class="form-text text-muted" v-if="bindSubnetDevice.dhcp_static_ip">{{ t('dash.subnet.assignedIp') }}: {{ bindSubnetDevice.dhcp_static_ip }}</div>
                 </div>
@@ -994,7 +994,7 @@
                     <select class="form-select" v-model="bindSubnetForm.subnet_id">
                         <option :value="0">{{ t('dash.subnet.select') }}</option>
                         <option v-for="s in subnets" :key="s.id" :value="s.id">
-                            {{ s.vlan_name }}（{{ s.cidr }}）· 可用 IP：{{ s.available }}
+                            {{ s.vlan_name }}（{{ s.cidr }}{{ t('dash.subnet.availIpSuffix') }}{{ s.available }}
                         </option>
                     </select>
                     <div class="form-text text-muted" v-if="subnets.length === 0">{{ t('dash.subnet.noSubnet') }}</div>
@@ -1003,7 +1003,7 @@
             </template>
             <div v-if="bindSubnetSubmitting" class="text-center text-muted py-3">
                 <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-                正在处理中，请稍候...
+                {{ t('common.processing') }}
             </div>
         </div>
     </div></div>
@@ -1044,7 +1044,7 @@
                     <label class="form-label">{{ t('dash.resetIp.cidr') }}</label>
                     <div class="input-group">
                         <input type="text" class="form-control" v-model="lxcIpForm.ip" placeholder="10.0.0.150/24">
-                        <pv-button type="button" @click="randomLxcIp" title="随机生成未绑定的 IP" variant="outline">{{ t('dash.random') }}</pv-button>
+                        <pv-button type="button" @click="randomLxcIp" :title="t('dash.randomIp.title')" variant="outline">{{ t('dash.random') }}</pv-button>
                     </div>
                 </div>
                 <div v-if="lxcIpError" class="alert alert-danger py-2">{{ lxcIpError }}</div>
@@ -1053,7 +1053,7 @@
                 <pv-button type="button" data-bs-dismiss="modal">{{ t('common.cancel') }}</pv-button>
                 <pv-button type="button" @click="confirmResetLxcIp" :disabled="lxcIpLoading">
                     <span v-if="lxcIpLoading" class="spinner-border spinner-border-sm me-1"></span>
-                    保存
+                    {{ t('common.save') }}
                 </pv-button>
             </div>
         </div>
@@ -1095,7 +1095,7 @@
                     <label class="form-label">{{ t('dash.resetIp.cidr') }}</label>
                     <div class="input-group">
                         <input type="text" class="form-control" v-model="vmIpForm.ip" placeholder="10.0.0.150/24">
-                        <pv-button type="button" @click="randomVmIp" title="随机生成未绑定的 IP" variant="outline">{{ t('dash.random') }}</pv-button>
+                        <pv-button type="button" @click="randomVmIp" :title="t('dash.randomIp.title')" variant="outline">{{ t('dash.random') }}</pv-button>
                     </div>
                 </div>
                 <div v-if="vmIpError" class="alert alert-danger py-2">{{ vmIpError }}</div>
@@ -1104,7 +1104,7 @@
                 <pv-button type="button" data-bs-dismiss="modal" variant="secondary">{{ t('common.cancel') }}</pv-button>
                 <pv-button type="button" @click="confirmResetVmIp" :disabled="vmIpLoading" variant="warning">
                     <span v-if="vmIpLoading" class="spinner-border spinner-border-sm me-1"></span>
-                    确认修改
+                    {{ t('login.forceChange.submit') }}
                 </pv-button>
             </div>
         </div>

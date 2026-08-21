@@ -69,7 +69,7 @@
     $.diskLoading.value = true;
     try {
       var res = await authFetch('/api/disks');
-      if (!res.ok) throw new Error('加载失败');
+      if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
       $.disks.value = await res.json();
     } catch (e) {
       console.error('[disk] 加载磁盘列表失败:', e.message);
@@ -92,7 +92,7 @@
   $.loadDiskOptions = async function() {
     try {
       var res = await authFetch('/api/disk-options');
-      if (!res.ok) throw new Error('加载失败');
+      if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
       $.diskOptions.value = await res.json();
     } catch (e) {
       console.error('[disk] 加载选项失败:', e.message);

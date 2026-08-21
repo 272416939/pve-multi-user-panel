@@ -135,12 +135,12 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.config') }}</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
-                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.renewPrice') }}</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.config') }}</span><span class="vm-mobile-card-value">{{ vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + t('dash.detail.coresSuffix') + formatMemory(vm.config.memory) : '-' }} / {{ formatDiskSize(vm) }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.renewPrice') }}</span><span class="vm-mobile-card-value">{{ vm.renewal_price ? vm.renewal_price + t('common.perSlash') + (vm.renewal_period === 'year' ? t('dash.period.year') : vm.renewal_period === 'quarter' ? t('dash.period.quarter') : t('dash.period.month')) : '-' }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.expiry') }}</span><span class="vm-mobile-card-value" :class="getExpiryColor(vm.expiration_date)">{{ vm.expiration_date ? formatDate(vm.expiration_date) + ' ' + daysUntilExpire(vm.expiration_date) : '-' }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.account') }}</span><span class="vm-mobile-card-value">{{ vm.config?.ciuser || t('dash.vm.noCloudInit') }}</span></div>
                         </div>
-                        <div v-if="vm._provisioning" class="text-center text-muted py-2"><small>正在{{ t('dash.vm.provisioning') }}，请稍后刷新</small></div>
+                        <div v-if="vm._provisioning" class="text-center text-muted py-2"><small>{{ tFormat('dash.vm.provisioningHint', t('dash.vm.provisioning')) }}</small></div>
                         <div v-else class="vm-mobile-card-actions">
                             <pv-button variant="table-primary" @click="openVmDetail(vm)">{{ t('dash.vm.detail') }}</pv-button>
                             <pv-button variant="table" @click="vmBusyBlock(vm) !== false && openVncConsole(vm.vm_id)">{{ t('dash.vm.console') }}</pv-button>
@@ -206,9 +206,9 @@
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>
-                                    <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + '核 ' + formatMemory(vm.config.memory) : '-') }} {{ vm._provisioning ? '' : (vm.config || vm.status ? '/ ' + formatDiskSize(vm) : '') }}</td>
+                                    <td>{{ (vm.config ? (vm.config.sockets||1) + '*' + (vm.config.cores||1) + t('dash.detail.coresSuffix') + formatMemory(vm.config.memory) : '-') }} {{ vm._provisioning ? '' : (vm.config || vm.status ? '/ ' + formatDiskSize(vm) : '') }}</td>
                                     <td><span v-if="vm._provisioning" class="text-muted">-</span><span v-else :class="getExpiryColor(vm.expiration_date)">{{ vm.expiration_date ? formatDate(vm.expiration_date) + ' ' + daysUntilExpire(vm.expiration_date) : '-' }}</span></td>
-                                    <td>{{ vm.renewal_price ? vm.renewal_price + '元/' + (vm.renewal_period === 'year' ? '年' : vm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
+                                    <td>{{ vm.renewal_price ? vm.renewal_price + t('common.perSlash') + (vm.renewal_period === 'year' ? t('dash.period.year') : vm.renewal_period === 'quarter' ? t('dash.period.quarter') : t('dash.period.month')) : '-' }}</td>
                                     <td>{{ vm.os || (vm.config ? (vm.config.ostype || '-') : '-') }}</td>
                                     <td>
                                         <template v-if="vm._provisioning">
@@ -223,7 +223,7 @@
                                     </td>
                                     <td>
                                         <div v-if="vm._provisioning" class="text-center text-muted py-2">
-                                            <small>正在{{ t('dash.vm.provisioning') }}，请稍后刷新</small>
+                                            <small>{{ tFormat('dash.vm.provisioningHint', t('dash.vm.provisioning')) }}</small>
                                         </div>
                                         <div v-else class="table-actions">
                                             <pv-button variant="table-primary" @click="openVmDetail(vm)">{{ t('dash.vm.detail') }}</pv-button>
@@ -308,12 +308,12 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.config') }}</span><span class="vm-mobile-card-value">{{ ct.config ? (ct.config.cores || 1) + '核 ' + formatMemory(ct.config.memory) : '-' }} / {{ formatDiskSize(ct) }}</span></div>
-                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.renewPrice') }}</span><span class="vm-mobile-card-value">{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : ct.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.config') }}</span><span class="vm-mobile-card-value">{{ ct.config ? (ct.config.cores || 1) + t('dash.detail.coresSuffix') + formatMemory(ct.config.memory) : '-' }} / {{ formatDiskSize(ct) }}</span></div>
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.renewPrice') }}</span><span class="vm-mobile-card-value">{{ ct.renewal_price ? ct.renewal_price + t('common.perSlash') + (ct.renewal_period === 'year' ? t('dash.period.year') : ct.renewal_period === 'quarter' ? t('dash.period.quarter') : t('dash.period.month')) : '-' }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.expiry') }}</span><span class="vm-mobile-card-value" :class="getExpiryColor(ct.expiration_date)">{{ ct.expiration_date ? formatDate(ct.expiration_date) + ' ' + daysUntilExpire(ct.expiration_date) : '-' }}</span></div>
                             <div class="vm-mobile-card-row" v-if="ct.template_name"><span class="vm-mobile-card-label"> {{ t('dash.lxc.image') }} </span><span class="vm-mobile-card-value">{{ ct.template_name }}</span></div>
                         </div>
-                        <div v-if="ct._provisioning" class="text-center text-muted py-2"><small>正在{{ t('dash.vm.provisioning') }}，请稍后刷新</small></div>
+                        <div v-if="ct._provisioning" class="text-center text-muted py-2"><small>{{ tFormat('dash.vm.provisioningHint', t('dash.vm.provisioning')) }}</small></div>
                         <div v-else class="vm-mobile-card-actions">
                             <pv-button variant="table-primary" @click="openLxcDetail(ct)">{{ t('dash.vm.detail') }}</pv-button>
                             <pv-button variant="table" @click="vmBusyBlock(ct) !== false && openLxcTerminal(ct.ct_id)">{{ t('dash.lxc.terminal') }}</pv-button>
@@ -376,9 +376,9 @@
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>
-                                    <td>{{ (ct.config ? (ct.config.cores || 1) + '核' + formatMemory(ct.config.memory) : '-') }} {{ ct._provisioning ? '' : (ct.config || ct.status ? '/ ' + formatDiskSize(ct) : '') }}</td>
+                                    <td>{{ (ct.config ? (ct.config.cores || 1) + t('dash.detail.coresSuffix') + formatMemory(ct.config.memory) : '-') }} {{ ct._provisioning ? '' : (ct.config || ct.status ? '/ ' + formatDiskSize(ct) : '') }}</td>
                                     <td><span v-if="ct._provisioning" class="text-muted">-</span><span v-else :class="getExpiryColor(ct.expiration_date)">{{ ct.expiration_date ? formatDate(ct.expiration_date) + ' ' + daysUntilExpire(ct.expiration_date) : '-' }}</span></td>
-                                    <td>{{ ct.renewal_price ? ct.renewal_price + '元/' + (ct.renewal_period === 'year' ? '年' : ct.renewal_period === 'quarter' ? '季' : '月') : '-' }}</td>
+                                    <td>{{ ct.renewal_price ? ct.renewal_price + t('common.perSlash') + (ct.renewal_period === 'year' ? t('dash.period.year') : ct.renewal_period === 'quarter' ? t('dash.period.quarter') : t('dash.period.month')) : '-' }}</td>
                                     <td>{{ ct.template_name || (ct.config ? (ct.config.ostype || '-') : '-') }}</td>
                                     <td>
                                         <template v-if="ct._provisioning">
@@ -393,7 +393,7 @@
                                     </td>
                                     <td>
                                         <div v-if="ct._provisioning" class="text-center text-muted py-2">
-                                            <small>正在{{ t('dash.vm.provisioning') }}，请稍后刷新</small>
+                                            <small>{{ tFormat('dash.vm.provisioningHint', t('dash.vm.provisioning')) }}</small>
                                         </div>
                                         <div v-else class="table-actions">
                                             <pv-button variant="table-primary" @click="openLxcDetail(ct)">{{ t('dash.vm.detail') }}</pv-button>
@@ -504,18 +504,18 @@
     <div v-if="activeTabOrder === 'vm'">
         <h4 class="module-title">{{ t('dash.order.vmTitle') }}</h4>
         <div v-for="grp in vmGroupedPackages" :key="grp.group_name" class="package-group-section">
-            <h5 class="package-group-title" v-if="grp.group_name !== '默认'">{{ grp.group_name }}</h5>
+            <h5 class="package-group-title" v-if="grp.group_name !== t('admin.disk.default')">{{ grp.group_name }}</h5>
             <div class="package-cards">
                 <div class="package-card" v-for="p in grp.packages" :key="p.id" v-show="p.status === 'active'">
                     <div class="package-card-header">{{ p.name }}</div>
                     <div class="package-card-body">
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.cpuModel') }}</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
-                        <div class="package-spec"><span class="spec-label">{{ t('dash.order.vcpu') }}</span><span class="spec-value">{{ p.cores }} 核</span></div>
+                        <div class="package-spec"><span class="spec-label">{{ t('dash.order.vcpu') }}</span><span class="spec-value">{{ p.cores }} {{ t('dash.detail.coresSuffix') }}</span></div>
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.memory') }}</span><span class="spec-value">{{ p.memory }} MB</span></div>
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.disk') }}</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.bandwidth') }}</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
                         <div class="package-desc">{{ t('dash.order.note') }}：<span v-html="parseMarkdown(p.description)"></span></div>
-                        <div class="package-stock">库存：{{ p.stock === -1 || p.stock === null ? t('dash.order.unlimited') : p.stock }}</div>
+                        <div class="package-stock">{{ t('dash.stockPrefix') }}{{ p.stock === -1 || p.stock === null ? t('dash.order.unlimited') : p.stock }}</div>
                         <div class="price-tabs">
                             <div class="price-tab" :class="{ 'price-tab-active': (pkgSelectedPeriod[p.id] || 'month') === 'month' }" @click="selectPackagePeriod(p.id, 'month')">
                                 <span class="price-tab-label">{{ t('dash.order.monthPay') }}</span>
@@ -546,18 +546,18 @@
     <div v-if="activeTabOrder === 'lxc'">
         <h4 class="module-title">{{ t('dash.order.lxcTitle') }}</h4>
         <div v-for="grp in lxcGroupedPackages" :key="grp.group_name" class="package-group-section">
-            <h5 class="package-group-title" v-if="grp.group_name !== '默认'">{{ grp.group_name }}</h5>
+            <h5 class="package-group-title" v-if="grp.group_name !== t('admin.disk.default')">{{ grp.group_name }}</h5>
             <div class="package-cards">
                 <div class="package-card" v-for="p in grp.packages" :key="p.id" v-show="p.status === 'active'">
                     <div class="package-card-header">{{ p.name }}</div>
                     <div class="package-card-body">
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.cpuModel') }}</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
-                        <div class="package-spec"><span class="spec-label">{{ t('dash.order.vcpu') }}</span><span class="spec-value">{{ p.cores }} 核</span></div>
+                        <div class="package-spec"><span class="spec-label">{{ t('dash.order.vcpu') }}</span><span class="spec-value">{{ p.cores }} {{ t('dash.detail.coresSuffix') }}</span></div>
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.memory') }}</span><span class="spec-value">{{ p.memory }} MB</span></div>
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.disk') }}</span><span class="spec-value">{{ p.disk_size }} GB</span></div>
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.bandwidth') }}</span><span class="spec-value">{{ p.bandwidth || '-' }} Mbps</span></div>
                         <div class="package-desc">{{ t('dash.order.note') }}：<span v-html="parseMarkdown(p.description)"></span></div>
-                        <div class="package-stock">库存：{{ p.stock === -1 || p.stock === null ? t('dash.order.unlimited') : p.stock }}</div>
+                        <div class="package-stock">{{ t('dash.stockPrefix') }}{{ p.stock === -1 || p.stock === null ? t('dash.order.unlimited') : p.stock }}</div>
                         <div class="price-tabs">
                             <div class="price-tab" :class="{ 'price-tab-active': (pkgSelectedPeriod[p.id] || 'month') === 'month' }" @click="selectPackagePeriod(p.id, 'month')">
                                 <span class="price-tab-label">{{ t('dash.order.monthPay') }}</span>
@@ -617,11 +617,11 @@
                                     <td>{{ rule.internal_port }}</td>
                                     <td>{{ rule.external_port }}</td>
                                     <td>{{ (rule.protocol || '').toUpperCase() }}</td>
-                                    <td><span :class="rule.enabled ? 'text-success' : 'text-muted'">{{ rule.enabled ? '启用' : '禁用' }}</span></td>
+                                    <td><span :class="rule.enabled ? 'text-success' : 'text-muted'">{{ rule.enabled ? t('admin.common.enabled') : t('admin.disk.disabled') }}</span></td>
                                     <td>
                                         <div class="d-flex gap-1">
-                                            <pv-button variant="outline" size="sm" @click="openDeviceEditModal(rule)" title="编辑">{{ t('dash.port.edit') }}</pv-button>
-                                            <pv-button variant="outline-danger" size="sm" @click="deleteDeviceRule(rule)" title="删除">{{ t('dash.subnet.delete') }}</pv-button>
+                                            <pv-button variant="outline" size="sm" @click="openDeviceEditModal(rule)" :title="t('common.edit')">{{ t('dash.port.edit') }}</pv-button>
+                                            <pv-button variant="outline-danger" size="sm" @click="deleteDeviceRule(rule)" :title="t('common.delete')">{{ t('dash.subnet.delete') }}</pv-button>
                                         </div>
                                     </td>
                                 </tr>
@@ -665,7 +665,7 @@
                     </div>
                     <div class="d-flex justify-content-end gap-2">
                         <pv-button type="button" @click="cancelDeviceForm" variant="outline">{{ t('dash.port.cancel') }}</pv-button>
-                        <pv-button type="button" @click="submitDeviceRule" variant="primary">{{ editingDeviceRuleId ? '保存' : '添加' }}</pv-button>
+                        <pv-button type="button" @click="submitDeviceRule" variant="primary">{{ editingDeviceRuleId ? t('common.save') : t('common.add') }}</pv-button>
                     </div>
                 </template>
             </div>
@@ -702,15 +702,15 @@
             <!-- 基本信息区域 -->
             <div class="info-card">
                 <div class="info-grid">
-                    <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '容器ID' : '虚拟机ID' }}</span><span class="info-value">{{ detailVm.vm_id || '-' }}</span></div>
+                    <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? t('admin.detail.ctId') : t('admin.detail.vmId') }}</span><span class="info-value">{{ detailVm.vm_id || '-' }}</span></div>
                     <div class="info-item"><span class="info-label">{{ t('dash.detail.privateIp') }}</span><span class="info-value">{{ detailVm.ip || '-' }}</span></div>
                     <div class="info-item"><span class="info-label">{{ t('dash.detail.hardware') }}</span><span class="info-value">{{ detailVmConfigStr }}</span></div>
-                    <div class="info-item"><span class="info-label">{{ t('dash.detail.renewPrice') }}</span><span class="info-value">{{ detailVm.renewal_price ? detailVm.renewal_price + '元/' + (detailVm.renewal_period === 'year' ? '年' : detailVm.renewal_period === 'quarter' ? '季' : '月') : '-' }}</span></div>
+                    <div class="info-item"><span class="info-label">{{ t('dash.detail.renewPrice') }}</span><span class="info-value">{{ detailVm.renewal_price ? detailVm.renewal_price + t('common.perSlash') + (detailVm.renewal_period === 'year' ? t('dash.period.year') : detailVm.renewal_period === 'quarter' ? t('dash.period.quarter') : t('dash.period.month')) : '-' }}</span></div>
                     <div class="info-item">
                         <span class="info-label">{{ t('dash.detail.expiry') }}</span>
                         <span class="info-value" :class="detailVm.expiration_date ? getExpiryColor(detailVm.expiration_date) : ''">{{ detailVm.expiration_date ? formatDate(detailVm.expiration_date) + '（' + daysUntilExpire(detailVm.expiration_date) + '）' : t('dash.detail.notSet') }}</span>
                     </div>
-                    <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? '镜像' : '操作系统' }}</span><span class="info-value">{{ detailVmOsStr }}</span></div>
+                    <div class="info-item"><span class="info-label">{{ detailVm._isLxc ? t('dash.lxc.image') : t('admin.detail.osName') }}</span><span class="info-value">{{ detailVmOsStr }}</span></div>
                     <div class="info-item"><span class="info-label">{{ t('dash.detail.status') }}</span><span class="info-value">{{ detailVmStatusStr }}</span></div>
                     <div class="info-item"><span class="info-label">{{ t('dash.detail.uptime') }}</span><span class="info-value">{{ detailVmUptimeStr }}</span></div>
                 </div>

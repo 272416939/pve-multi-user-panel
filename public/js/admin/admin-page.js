@@ -5,8 +5,8 @@ $.daysUntilExpire = function(expireTime) {
     if (!expireTime) return '';
     var diff = new Date(expireTime) - new Date();
     var days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (days <= 0) return '已到期';
-    return '剩余' + days + '天';
+    if (days <= 0) return window.__i18n.t('dash.disk.statusExpired');
+    return window.__i18n.t('dash.remainPrefix') + days + window.__i18n.t('common.days');
 };
 $.getExpiryColor = function(expireTime) {
     if (!expireTime) return '';
@@ -27,16 +27,16 @@ $.vmBusyClass = function(v) {
 };
 $.vmBusyText = function(v) {
     if (!v || !v._busy || !v.busyType) return '';
-    if (v.busyType === 'switch') return '切换中';
-    if (v.busyType === 'backup') return '备份中';
-    if (v.busyType === 'restore') return '恢复中';
+    if (v.busyType === 'switch') return window.__i18n.t('admin.osswitchlog.status.running');
+    if (v.busyType === 'backup') return window.__i18n.t('dash.busy.backup');
+    if (v.busyType === 'restore') return window.__i18n.t('dash.busy.restore');
     return '';
 };
 // 操作被锁定时点击统一提示
 $.vmBusyBlock = function(v) {
     if (!v || !v._busy || !v.busyType) return;
-    var label = $.vmBusyText(v) || '操作';
-    alert(label + '，请等待完成后再操作');
+    var label = $.vmBusyText(v) || window.__i18n.t('common.actions');
+    alert(label + window.__i18n.t('dash.busy.waitSuffix'));
     return false;
 };
 
@@ -213,37 +213,37 @@ app.component('port-forward-list', {
     template: '\
         <div>\
 <div class="module-header">\
-	                <h4 class="module-title">端口转发管理</h4>\
+	                <h4 class="module-title">{{ t(\'dash.port.mgmtTitle\') }}</h4>\
 	                <div class="d-flex align-items-center gap-2">\
 	                    <select class="form-select form-select-sm" style="width:auto" v-model="forwardFilterType" @change="filterForward">\
-	                        <option value="all">全部</option>\
+	                        <option value="all">{{ t(\'common.all\') }}</option>\
 	                        <option value="vm">VM</option>\
 	                        <option value="lxc">LXC</option>\
-	                        <option value="general">通用</option>\
+	                        <option value="general">{{ t(\'admin.port.generic\') }}</option>\
 	                    </select>\
-	                    <input type="text" class="form-control form-control-sm" style="width:200px" v-model="forwardSearchText" placeholder="搜索 IP 或端口..." @input="onForwardSearch">\
-	                    <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">添加端口转发</pv-button>\
-	                    <pv-button variant="danger" size="sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">批量删除</pv-button>\
+	                    <input type="text" class="form-control form-control-sm" style="width:200px" v-model="forwardSearchText" :placeholder="t(\'admin.fwd.searchPh\')" @input="onForwardSearch">\
+	                    <pv-button variant="primary" size="sm" class="me-2" @click="openAddForward" :disabled="userForwardCount >= maxForwardPerUser && userRole !== \'admin\'">{{ t(\'dash.port.add\') }}</pv-button>\
+	                    <pv-button variant="danger" size="sm" @click="batchDelete" :disabled="selectedForwardIds.length === 0">{{ t(\'admin.logs.batchDelete\') }}</pv-button>\
 	                </div>\
             </div>\
             <div v-if="forwardRulesLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>\
-            <div v-else-if="forwardRules.length === 0" class="text-center py-4 text-muted">暂无端口转发规则</div>\
+            <div v-else-if="forwardRules.length === 0" class="text-center py-4 text-muted">{{ t(\'dash.port.empty\') }}</div>\
             <div v-else class="table-container mb-4" style="padding:12px;">\
                 <div class="table-responsive">\
                 <table class="table table-hover table-align-center">\
                     <thead>\
                         <tr>\
                             <th v-if="userRole === \'admin\'" class="checkbox-col"><input type="checkbox" @change="toggleAll"></th>\
-                            <th>序号</th>\
-                            <th>名称</th>\
-                            <th>类型</th>\
-                            <th>目标 IP</th>\
-                            <th>内网端口</th>\
-                            <th>外网端口</th>\
-                            <th>协议</th>\
-                            <th>状态</th>\
-                            <th>同步状态</th>\
-                            <th>操作</th>\
+                            <th>{{ t(\'admin.fwd.idx\') }}</th>\
+                            <th>{{ t(\'common.name\') }}</th>\
+                            <th>{{ t(\'common.type\') }}</th>\
+                            <th>{{ t(\'dash.port.targetIp\') }}</th>\
+                            <th>{{ t(\'dash.port.internalPort\') }}</th>\
+                            <th>{{ t(\'dash.port.externalPort\') }}</th>\
+                            <th>{{ t(\'dash.port.protocol\') }}</th>\
+                            <th>{{ t(\'common.status\') }}</th>\
+                            <th>{{ t(\'admin.fwd.syncStatus\') }}</th>\
+                            <th>{{ t(\'common.actions\') }}</th>\
                         </tr>\
                     </thead>\
                     <tbody>\
@@ -254,22 +254,22 @@ app.component('port-forward-list', {
                             <td>\
                                 <span v-if="rule.type === \'vm\'" class="badge bg-primary">VM</span>\
                                 <span v-else-if="rule.type === \'lxc\'" class="badge bg-info">LXC</span>\
-                                <span v-else class="badge bg-secondary">通用</span>\
+                                <span v-else class="badge bg-secondary">{{ t(\'admin.port.generic\') }}</span>\
                             </td>\
                             <td>{{ rule.ip }}</td>\
                             <td>{{ rule.internal_port }}</td>\
                             <td>{{ rule.external_port }}</td>\
                             <td>{{ rule.protocol?.toUpperCase() }}</td>\
-                            <td><span :class="rule.enabled ? \'text-success\' : \'text-muted\'">{{ rule.enabled ? \'启用\' : \'禁用\' }}</span></td>\
+                            <td><span :class="rule.enabled ? \'text-success\' : \'text-muted\'">{{ rule.enabled ? {{ t(\'admin.common.enabled\') }} : {{ t(\'admin.common.disabled\') }} }}</span></td>\
                             <td>\
-                                <span v-if="rule.sync_status === \'synced\'" class="badge bg-success">已同步</span>\
-                                <span v-else-if="rule.sync_status === \'orphan\'" class="badge bg-secondary">孤立</span>\
-                                <span v-else-if="rule.sync_status === \'failed\'" class="badge bg-danger">失败</span>\
-                                <span v-else class="badge bg-warning text-dark">待同步</span>\
+                                <span v-if="rule.sync_status === \'synced\'" class="badge bg-success">{{ t(\'admin.fwd.synced\') }}</span>\
+                                <span v-else-if="rule.sync_status === \'orphan\'" class="badge bg-secondary">{{ t(\'admin.fwd.orphan\') }}</span>\
+                                <span v-else-if="rule.sync_status === \'failed\'" class="badge bg-danger">{{ t(\'admin.osswitchlog.status.failed\') }}</span>\
+                                <span v-else class="badge bg-warning text-dark">{{ t(\'admin.fwd.pendingSync\') }}</span>\
                             </td>\
                             <td>\
-                                <pv-button variant="outline" size="sm" class="me-1" @click="editForward(rule)">编辑</pv-button>\
-                                <pv-button variant="outline-danger" size="sm" @click="deleteForward(rule.id)">删除</pv-button>\
+                                <pv-button variant="outline" size="sm" class="me-1" @click="editForward(rule)">{{ t(\'common.edit\') }}</pv-button>\
+                                <pv-button variant="outline-danger" size="sm" @click="deleteForward(rule.id)">{{ t(\'common.delete\') }}</pv-button>\
                             </td>\
                         </tr>\
                     </tbody>\
@@ -279,7 +279,7 @@ app.component('port-forward-list', {
                 <pv-pagination :total="forwardTotal" :page="forwardPage" :page-size="forwardPageSize" @change="setPage"></pv-pagination>\
             </div>\
             <div class="text-muted small" v-if="userRole !== \'admin\'">\
-                已使用 {{ userForwardCount }} / {{ maxForwardPerUser }} 条\
+                {{ t(\'admin.fwd.usedPfx\') }}{{ userForwardCount }} / {{ maxForwardPerUser }}{{ t(\'common.countUnit\') }}\
             </div>\
         </div>\
     ',
@@ -354,28 +354,28 @@ app.component('private-network-list', {
     template: '\
         <div>\
             <div class="module-header">\
-                <h4 class="module-title">私有网络管理</h4>\
+                <h4 class="module-title">{{ t(\'admin.net.privateTitle\') }}</h4>\
                 <div class="d-flex align-items-center gap-2">\
-                    <input type="text" class="form-control form-control-sm" style="width:240px" v-model="privateSubnetSearch" placeholder="搜索用户名、VLAN ID、网络名称或网关..." @input="onPrivateSubnetSearch">\
+                    <input type="text" class="form-control form-control-sm" style="width:240px" v-model="privateSubnetSearch" :placeholder="t(\'admin.net.searchPh\')" @input="onPrivateSubnetSearch">\
                 </div>\
             </div>\
             <div v-if="privateSubnetsLoading" class="text-center py-3"><div class="spinner-border text-primary"></div></div>\
-            <div v-else-if="privateSubnets.length === 0" class="text-center py-4 text-muted">暂无私有网络</div>\
+            <div v-else-if="privateSubnets.length === 0" class="text-center py-4 text-muted">{{ t(\'admin.net.empty\') }}</div>\
             <div v-else class="table-container mb-4" style="padding:12px;">\
                 <div class="table-responsive">\
                 <table class="table table-sm table-hover mb-0 table-align-center">\
                     <thead>\
                         <tr>\
                             <th>ID</th>\
-                            <th>所有者</th>\
+                            <th>{{ t(\'admin.net.owner\') }}</th>\
                             <th>VLAN ID</th>\
-                            <th>网络名称</th>\
-                            <th>网关 / 掩码</th>\
-                            <th>地址池</th>\
-                            <th>可用IP</th>\
-                            <th>接口</th>\
-                            <th>绑定设备</th>\
-                            <th>创建时间</th>\
+                            <th>{{ t(\'admin.net.name\') }}</th>\
+                            <th>{{ t(\'admin.net.gatewayMask\') }}</th>\
+                            <th>{{ t(\'admin.net.pool\') }}</th>\
+                            <th>{{ t(\'admin.net.availIp\') }}</th>\
+                            <th>{{ t(\'admin.net.iface\') }}</th>\
+                            <th>{{ t(\'admin.net.boundDevice\') }}</th>\
+                            <th>{{ t(\'admin.users.createdAt\') }}</th>\
                         </tr>\
                     </thead>\
                     <tbody>\

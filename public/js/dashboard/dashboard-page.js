@@ -14,8 +14,8 @@ $.daysUntilExpire = function(expireTime) {
     if (!expireTime) return '';
     var diff = new Date(expireTime) - new Date();
     var days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    if (days <= 0) return '已到期';
-    return '剩余' + days + '天';
+    if (days <= 0) return window.__i18n.t('dash.disk.statusExpired');
+    return window.__i18n.t('dash.remainPrefix') + days + window.__i18n.t('common.days');
 };
 $.getExpiryColor = function(expireTime) {
     if (!expireTime) return '';

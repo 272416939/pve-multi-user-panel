@@ -183,7 +183,7 @@
                                                     <pv-button :variant="emailTemplateMode === 'rich' ? 'glass-active' : 'glass-inactive'" size="lg" @click="switchEmailTemplateMode('rich')">{{ t('settings.emailTpl.rich') }}</pv-button>
                                                     <pv-button :variant="emailTemplateMode === 'source' ? 'glass-active' : 'glass-inactive'" size="lg" @click="switchEmailTemplateMode('source')">{{ t('settings.emailTpl.source') }}</pv-button>
                                                 </div>
-                                                <small class="text-muted">{{ t('settings.emailTpl.varFormat') }}<code>{变量名}</code>{{ t('settings.emailTpl.varFormatSuffix') }}</small>
+                                                <small class="text-muted">{{ t('settings.emailTpl.varFormat') }}<code>{{ t('settings.etpl.varExample') }}</code>{{ t('settings.emailTpl.varFormatSuffix') }}</small>
                                             </div>
                                             <div class="email-template-quill-wrap mb-2" v-show="emailTemplateMode === 'rich'">
                                                 <div id="emailTemplateQuill" style="min-height:200px;"></div>

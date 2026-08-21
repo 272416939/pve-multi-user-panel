@@ -7,7 +7,7 @@ function isLoginPage() {
 const api = (endpoint, options = {}) => {
     return ensureValidToken().then(token => {
         // 会话已失效（ensureValidToken 已触发带参跳转）：短路，避免无 token 请求与兜底跳转覆盖参数
-        if (window.__sessionExpired) throw new Error('登录已过期，请重新登录');
+        if (window.__sessionExpired) throw new Error(window.__i18n.t('shared.sessionExpired'));
         const fetchOptions = {
             ...options,
             headers: {
@@ -54,13 +54,13 @@ const api = (endpoint, options = {}) => {
                                     if (!isLoginPage()) {
                                         window.location.href = 'login.html';
                                     }
-                                    throw new Error(d.error || '首次登录请先修改密码');
+                                    throw new Error(d.error || window.__i18n.t('shared.mustChangePwd'));
                                 }
                                 // 限速 429：错误文案统一拼接剩余等待秒数（全局倒计时提示，所有页面生效）
-                                const err = new Error(d.error || '请求失败');
+                                const err = new Error(d.error || window.__i18n.t('shared.requestFailed'));
                                 if (d.retryAfter != null) {
                                     err.retryAfter = d.retryAfter;
-                                    err.message = err.message + '，请 ' + Math.ceil(d.retryAfter) + ' 秒后重试';
+                                    err.message = err.message + window.__i18n.t('shared.retryPrefix') + Math.ceil(d.retryAfter) + window.__i18n.t('shared.retrySuffix');
                                 }
                                 throw err;
                             }
@@ -74,7 +74,7 @@ const api = (endpoint, options = {}) => {
                         localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
                         window.__sessionExpired = true;
                         window.location.href = 'login?expired=1';
-                        throw new Error(refreshErr.error || '登录已过期，请重新登录');
+                        throw new Error(refreshErr.error || window.__i18n.t('shared.sessionExpired'));
                     }
                 }
             }
@@ -84,7 +84,7 @@ const api = (endpoint, options = {}) => {
                 localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
                 window.location.href = 'login.html';
             }
-            throw new Error(data.error || '请求失败');
+            throw new Error(data.error || window.__i18n.t('shared.requestFailed'));
         }
         const data = await res.json();
         if (!res.ok) {
@@ -94,13 +94,13 @@ const api = (endpoint, options = {}) => {
                 if (!isLoginPage()) {
                     window.location.href = 'login.html';
                 }
-                throw new Error(data.error || '首次登录请先修改密码');
+                throw new Error(data.error || window.__i18n.t('shared.mustChangePwd'));
             }
             // 限速 429：错误文案统一拼接剩余等待秒数（全局倒计时提示，所有页面生效）
-            const err = new Error(data.error || '请求失败');
+            const err = new Error(data.error || window.__i18n.t('shared.requestFailed'));
             if (data.retryAfter != null) {
                 err.retryAfter = data.retryAfter;
-                err.message = err.message + '，请 ' + Math.ceil(data.retryAfter) + ' 秒后重试';
+                err.message = err.message + window.__i18n.t('shared.retryPrefix') + Math.ceil(data.retryAfter) + window.__i18n.t('shared.retrySuffix');
             }
             throw err;
         }
@@ -138,7 +138,7 @@ function ensureValidToken() {
         if (res.ok) return res.json();
         return res.json().then(function(d) {
             // 附带服务端错误码：会话策略拒绝续期（2小时无操作/7天到期）时 code=TOKEN_EXPIRED，跳登录页提示重新登录
-            var err = new Error(d.error || '刷新失败');
+            var err = new Error(d.error || window.__i18n.t('shared.refreshFailed'));
             err.code = d.code;
             throw err;
         });
@@ -149,7 +149,7 @@ function ensureValidToken() {
             _refreshPromise = null;
             return data.token;
         }
-        throw new Error('无token');
+        throw new Error(window.__i18n.t('shared.noToken'));
     }).catch(function(err) {
         _refreshPromise = null;
         localStorage.removeItem(window.__storageKeys.TOKEN);
@@ -356,12 +356,13 @@ const formatDate = (date) => {
 
 const formatUptime = (seconds) => {
     if (!seconds || seconds < 0) return '';
+    const T = (key) => window.__i18n ? window.__i18n.t(key) : key;
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    if (days > 0) return `${days}天${hours}小时`;
-    if (hours > 0) return `${hours}小时${minutes}分钟`;
-    return `${minutes}分钟`;
+    if (days > 0) return `${days}${T("common.days")}${hours}${T("common.hoursUnit")}`;
+    if (hours > 0) return `${hours}${T("common.hoursUnit")}${minutes}${T("common.minutesUnit")}`;
+    return `${minutes}${T("common.minutesUnit")}`;
 };
 
 const trimContent = (text) => {
@@ -574,7 +575,7 @@ window.copyText = function(text) {
     if (!text) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(function() {
-            if (window.alert) window.alert('已复制：' + text);
+            if (window.alert) window.alert(window.__i18n.t('common.copiedColon') + text);
         }).catch(function() {
             fallbackCopy(text);
         });
@@ -589,7 +590,7 @@ function fallbackCopy(text) {
     ta.style.opacity = '0';
     document.body.appendChild(ta);
     ta.select();
-    try { document.execCommand('copy'); if (window.alert) window.alert('已复制：' + text); } catch(e) {}
+    try { document.execCommand('copy'); if (window.alert) window.alert(window.__i18n.t('common.copiedColon') + text); } catch(e) {}
     document.body.removeChild(ta);
 }
 
@@ -632,7 +633,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             var res = await api('/wallet/balance');
             var bal = parseFloat(res.balance || '0.00');
-            el.textContent = bal.toFixed(2) + ' ' + (window.__i18n ? window.__i18n.t('common.currencyUnit') : '元');
+            el.textContent = bal.toFixed(2) + ' ' + (window.__i18n ? window.__i18n.t('common.currencyUnit') : window.__i18n.t('common.currencyUnit'));
         } catch (e) {
             el.textContent = '--';
         }

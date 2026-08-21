@@ -17,12 +17,12 @@ const App = {
         const templatePreferenceSaving = ref(false);
         // 站点全局默认模板（跟随站点默认卡需要）
         const siteDefault = ref('default');
-        const siteDefaultName = ref('赛博霓虹');
+        const siteDefaultName = ref(window.__i18n.t('settings.template.default'));
         // 语言偏好（'' = 跟随站点默认）
         const langPreference = ref('');
         const langPreferenceSaving = ref(false);
         const siteDefaultLang = ref('zh-CN');
-        const siteDefaultLangName = ref('简体中文');
+        const siteDefaultLangName = ref(window.__i18n.t('lang.zh-CN'));
         const memos = ref([]);
         const memosLoading = ref(false);
         const editMemoForm = ref({ id: null, title: '', content: '' });
@@ -276,14 +276,14 @@ const App = {
         const submitRecharge = async () => {
             // 重复提交防护
             if (rechargePollingTimer) {
-                rechargeError.value = '已有充值进行中，请先完成或取消';
+                rechargeError.value = window.__i18n.t('user.recharge.inProgress');
                 return;
             }
             const amount = parseFloat(rechargeAmount.value);
-            if (isNaN(amount) || amount <= 0) { rechargeError.value = '请输入有效的充值金额'; return; }
+            if (isNaN(amount) || amount <= 0) { rechargeError.value = window.__i18n.t('user.recharge.invalidAmount'); return; }
             const min = parseFloat(payMethods.value.min_amount) || 0.01;
-            if (amount < min) { rechargeError.value = '最低充值金额为 ' + min.toFixed(2) + ' 元'; return; }
-            if (!rechargeMethod.value) { rechargeError.value = '请选择支付方式'; return; }
+            if (amount < min) { rechargeError.value = window.__i18n.t('user.recharge.minAmount1') + min.toFixed(2) + window.__i18n.t('common.currencyUnit'); return; }
+            if (!rechargeMethod.value) { rechargeError.value = window.__i18n.t('user.recharge.pickMethod'); return; }
             rechargeSubmitting.value = true;
             rechargeError.value = '';
             try {
@@ -305,7 +305,7 @@ const App = {
                     } else {
                         // PC 端：用支付链接生成二维码（qrcodejs2 渲染到 DOM）
                         if (!window.QRCode) {
-                            rechargeError.value = '二维码库加载失败，请刷新重试';
+                            rechargeError.value = window.__i18n.t('user.recharge.qrLibFail');
                             rechargeSubmitting.value = false;
                             return;
                         }
@@ -336,7 +336,7 @@ const App = {
                                     rechargeQrLoading.value = false;
                                 } catch (e2) {
                                     console.error('二维码生成失败', e2);
-                                    rechargeError.value = '二维码生成失败，请稍后重试';
+                                    rechargeError.value = window.__i18n.t('user.recharge.qrFailRetry');
                                     rechargeSubmitting.value = false;
                                 }
                             }
@@ -344,8 +344,8 @@ const App = {
                     }
                     // 启动轮询
                     pollOrderStatus(res.order_no, amount.toFixed(2));
-                } else { rechargeError.value = res.error || '创建订单失败'; }
-            } catch (e) { rechargeError.value = e.message || '请求失败，请稍后重试'; }
+                } else { rechargeError.value = res.error || window.__i18n.t('user.recharge.orderFail'); }
+            } catch (e) { rechargeError.value = e.message || window.__i18n.t('shared.retryLater'); }
             rechargeSubmitting.value = false;
         };
 
@@ -410,18 +410,18 @@ const App = {
         const showRechargeResult = (type, amount) => {
             rechargeResultType.value = type;
             if (type === 'success') {
-                rechargeResultTitle.value = '充值成功';
+                rechargeResultTitle.value = window.__i18n.t('user.recharge.successTitle');
                 // 金额格式化：兼容 string/number，统一输出两位小数
                 var num = parseFloat(amount);
                 rechargeResultAmount.value = isNaN(num) ? '--' : num.toFixed(2);
             } else if (type === 'fail') {
-                rechargeResultTitle.value = '充值失败';
+                rechargeResultTitle.value = window.__i18n.t('user.recharge.failed');
                 rechargeResultAmount.value = '';
             } else if (type === 'cancel') {
-                rechargeResultTitle.value = '支付已取消';
+                rechargeResultTitle.value = window.__i18n.t('user.recharge.cancelled');
                 rechargeResultAmount.value = '';
             } else if (type === 'timeout') {
-                rechargeResultTitle.value = '支付超时';
+                rechargeResultTitle.value = window.__i18n.t('user.recharge.timeout');
                 rechargeResultAmount.value = '';
             }
             const el = document.getElementById('rechargeResultModal');
@@ -470,11 +470,11 @@ const App = {
                     rechargeMethod.value = '';
                 } else {
                     // 未支付，提示用户
-                    rechargeError.value = '暂未检测到支付成功，请确认支付完成后重试';
+                    rechargeError.value = window.__i18n.t('user.recharge.notDetected');
                     setTimeout(() => { rechargeError.value = ''; }, 3000);
                 }
             } catch (e) {
-                rechargeError.value = '查询失败，请稍后重试';
+                rechargeError.value = window.__i18n.t('user.recharge.queryFail');
                 setTimeout(() => { rechargeError.value = ''; }, 3000);
             }
         };
@@ -570,8 +570,8 @@ const App = {
         };
 
         const copyOrderNo = (orderNo) => {
-            if (navigator.clipboard) { navigator.clipboard.writeText(orderNo).then(() => alert('订单号已复制')); }
-            else { const el = document.createElement('textarea'); el.value = orderNo; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert('订单号已复制'); }
+            if (navigator.clipboard) { navigator.clipboard.writeText(orderNo).then(() => alert(window.__i18n.t('user.order.noCopied'))); }
+            else { const el = document.createElement('textarea'); el.value = orderNo; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert(window.__i18n.t('user.order.noCopied')); }
         };
 
         const loadMyOrders = async (page) => {
@@ -785,17 +785,17 @@ const App = {
         const handleEmailVerification = () => {            var params = new URLSearchParams(window.location.search);
             var verified = params.get('email_verified');
             if (verified === '1') {
-                setTimeout(function() { alert('邮箱验证成功！'); }, 500);
+                setTimeout(function() { alert(window.__i18n.t('user.email.verifyOk')); }, 500);
                 var url = new URL(window.location);
                 url.searchParams.delete('email_verified');
                 url.searchParams.delete('reason');
                 window.history.replaceState({}, '', url.toString());
             } else if (verified === '0') {
                 var reason = params.get('reason');
-                var msg = '邮箱验证失败';
-                if (reason === 'expired') msg = '验证链接已过期，请重新发送验证邮件';
-                else if (reason === 'user_not_found') msg = '用户不存在';
-                else if (reason === 'error') msg = '验证过程出错，请重试';
+                var msg = window.__i18n.t('user.email.verifyFail');
+                if (reason === 'expired') msg = window.__i18n.t('user.email.linkExpired');
+                else if (reason === 'user_not_found') msg = window.__i18n.t('user.notFound');
+                else if (reason === 'error') msg = window.__i18n.t('user.verifyError');
                 setTimeout(function() { alert(msg); }, 500);
                 var url = new URL(window.location);
                 url.searchParams.delete('email_verified');
@@ -822,7 +822,7 @@ const App = {
                 templatePreference.value = (res && res.template) || '';
                 var sd = (res && res.siteDefault) || 'default';
                 siteDefault.value = sd;
-                siteDefaultName.value = sd === 'saas' ? 'SAAS 企业风' : '赛博霓虹';
+                siteDefaultName.value = sd === 'saas' ? window.__i18n.t('settings.template.saas') : window.__i18n.t('settings.template.default');
                 window.applyTemplate(templatePreference.value, sd);
             } catch (e) {
                 console.error('加载界面模板偏好失败', e);
@@ -849,9 +849,9 @@ const App = {
                 });
                 templatePreference.value = (res && res.template) || '';
                 window.applyTemplate(templatePreference.value, (res && res.siteDefault) || 'default');
-                alert('模板偏好已保存');
+                alert(window.__i18n.t('user.tpl.saved'));
             } catch (e) {
-                alert('保存失败: ' + (e.message || '未知错误'));
+                alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
             }
             templatePreferenceSaving.value = false;
         };
@@ -863,7 +863,7 @@ const App = {
                 langPreference.value = (res && res.lang) || '';
                 var sd = (res && res.siteDefault) || 'zh-CN';
                 siteDefaultLang.value = sd;
-                var names = { 'zh-CN': '简体中文', 'zh-TW': '繁體中文', 'en': 'English', 'de': 'Deutsch', 'ja': '日本語', 'ko': '한국어', 'fr': 'Français' };
+                var names = { 'zh-CN': window.__i18n.t('lang.zh-CN'), 'zh-TW': window.__i18n.t('lang.zh-TW'), 'en': 'English', 'de': 'Deutsch', 'ja': window.__i18n.t('lang.ja'), 'ko': '한국어', 'fr': 'Français' };
                 siteDefaultLangName.value = names[sd] || sd;
                 // 应用用户实际语言（个人偏好优先，其次站点默认）
                 var resolved = langPreference.value || sd;
@@ -890,11 +890,11 @@ const App = {
                 // 更新站点默认显示
                 var sd = (res && res.siteDefault) || 'zh-CN';
                 siteDefaultLang.value = sd;
-                var names = { 'zh-CN': '简体中文', 'zh-TW': '繁體中文', 'en': 'English', 'de': 'Deutsch', 'ja': '日本語', 'ko': '한국어', 'fr': 'Français' };
+                var names = { 'zh-CN': window.__i18n.t('lang.zh-CN'), 'zh-TW': window.__i18n.t('lang.zh-TW'), 'en': 'English', 'de': 'Deutsch', 'ja': window.__i18n.t('lang.ja'), 'ko': '한국어', 'fr': 'Français' };
                 siteDefaultLangName.value = names[sd] || sd;
                 alert(window.__i18n.t('user.language.save') + ' ' + window.__i18n.t('common.success'));
             } catch (e) {
-                alert('保存失败: ' + (e.message || '未知错误'));
+                alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
             }
             langPreferenceSaving.value = false;
         };
@@ -910,7 +910,7 @@ const App = {
                     body: JSON.stringify(data)
                 });
                 user.value = result.user;
-                alert('资料更新成功！');
+                alert(window.__i18n.t('user.profile.updateOk'));
             } catch (e) {
                 alert(e.message);
             }
@@ -919,15 +919,15 @@ const App = {
         // 独立修改密码卡片：新密码 + 确认密码（复用注册页交互）+ 当前密码二次验证
         const updatePassword = async () => {
             if (!profileForm.value.password) {
-                alert('请输入新密码');
+                alert(window.__i18n.t('user.secAuth.newPwdRequired'));
                 return;
             }
             if (profileForm.value.password !== profileForm.value.confirmPassword) {
-                alert('两次输入的密码不一致');
+                alert(window.__i18n.t('register.passwordMismatch'));
                 return;
             }
             if (!profileForm.value.currentPassword) {
-                alert('重置密码需要输入当前密码进行验证');
+                alert(window.__i18n.t('user.sec.pwdNeedsCurrent'));
                 return;
             }
             try {
@@ -950,13 +950,13 @@ const App = {
             const file = e.target.files[0];
             if (file) {
                 if (file.size > 2 * 1024 * 1024) {
-                    alert('头像文件大小不能超过2MB');
+                    alert(window.__i18n.t('user.avatar.tooLarge'));
                     avatarFileName.value = '';
                     e.target.value = '';
                     return;
                 }
                 if (!['image/jpeg', 'image/png'].includes(file.type)) {
-                    alert('仅支持 JPG 和 PNG 格式');
+                    alert(window.__i18n.t('user.avatar.format'));
                     avatarFileName.value = '';
                     e.target.value = '';
                     return;
@@ -975,14 +975,14 @@ const App = {
                     });
                     if (!response.ok) {
                         const data = await response.json();
-                        throw new Error(data.error || '上传失败');
+                        throw new Error(data.error || window.__i18n.t('common.uploadFailed'));
                     }
                     const data = await response.json();
                     profileForm.value.avatar = data.avatar;
                     if (user.value) {
                         user.value.avatar = data.avatar;
                     }
-                    alert('头像上传成功！');
+                    alert(window.__i18n.t('user.avatar.uploadOk'));
                 } catch (e) {
                     alert(e.message);
                 }
@@ -993,7 +993,7 @@ const App = {
             try {
                 // M-1 修复：换绑邮箱需要当前密码做二次验证
                 if (!profileForm.value.emailPassword) {
-                    alert('绑定新邮箱需要输入当前密码进行验证');
+                    alert(window.__i18n.t('user.sec.emailNeedsCurrent'));
                     return;
                 }
                 const result = await api('/user/email', {
@@ -1061,7 +1061,7 @@ const App = {
         };
 
         const deleteMemo = async (id) => {
-            if (!await window.customConfirm('确定删除此备忘录？')) return;
+            if (!await window.customConfirm(window.__i18n.t('user.memos.deleteConfirm'))) return;
             try {
                 await api(`/user/memos/${id}`, { method: 'DELETE' });
                 await loadMemos();
@@ -1092,7 +1092,7 @@ const App = {
                 }
                 bsModalShow('messageDetailModal');
             } catch (e) {
-                alert('获取消息详情失败');
+                alert(window.__i18n.t('user.message.detailFail'));
             }
         };
 
@@ -1107,7 +1107,7 @@ const App = {
         };
 
         const deleteMessage = async (id) => {
-            if (!await window.customConfirm('确定删除此消息？')) return;
+            if (!await window.customConfirm(window.__i18n.t('user.message.deleteConfirm'))) return;
             try {
                 await api('/messages/' + id, { method: 'DELETE' });
                 messages.value = messages.value.filter(m => m.id !== id);
@@ -1119,7 +1119,7 @@ const App = {
         };
 
         const clearAllMessages = async () => {
-            if (!await window.customConfirm('确定清空所有已读消息？未读消息将保留。')) return;
+            if (!await window.customConfirm(window.__i18n.t('user.message.clearReadConfirm'))) return;
             try {
                 await api('/messages', { method: 'DELETE' });
                 messages.value = messages.value.filter(m => !m.is_read);
@@ -1159,11 +1159,11 @@ const App = {
         };
 
         const revokeDevice = async (id) => {
-            if (await window.customConfirm('确定要将该设备下线吗？')) {
+            if (await window.customConfirm(window.__i18n.t('user.devices.kickConfirm'))) {
                 try {
                     await api(`/user/devices/${id}`, { method: 'DELETE' });
                     devices.value = devices.value.filter(d => d.id !== id);
-                    alert('设备已下线');
+                    alert(window.__i18n.t('user.devices.kicked'));
                 } catch (e) {
                     alert(e.message);
                 }
@@ -1171,7 +1171,7 @@ const App = {
         };
 
         const revokeOtherDevices = async () => {
-            if (await window.customConfirm('确定要下线除当前设备外的所有设备吗？')) {
+            if (await window.customConfirm(window.__i18n.t('user.devices.kickAllConfirm'))) {
                 try {
                     const refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
                     await api('/user/devices', {
@@ -1179,7 +1179,7 @@ const App = {
                         body: JSON.stringify({ refreshToken })
                     });
                     devices.value = devices.value.filter(d => d.id === currentDeviceId.value);
-                    alert('其他设备已下线');
+                    alert(window.__i18n.t('user.devices.kickedAll'));
                 } catch (e) {
                     alert(e.message);
                 }
@@ -1243,7 +1243,7 @@ const App = {
 
         const copyRecoveryCodes = async () => {
             const codes = twofaRecoveryCodes.value.filter(rc => !rc.used).map(rc => rc.code);
-            if (codes.length === 0) { alert('没有未使用的恢复码'); return; }
+            if (codes.length === 0) { alert(window.__i18n.t('user.twofa.noCodes')); return; }
             const text = codes.join('\n');
             bsModalHide('twofaRecoveryModal');
             await new Promise(r => setTimeout(r, 300));
@@ -1264,7 +1264,7 @@ const App = {
                     bsModalShow('twofaRecoveryModal');
                 }, { once: true });
             }
-            customAlertMessage.value = '未使用的恢复码已复制到剪贴板';
+            customAlertMessage.value = window.__i18n.t('user.twofa.codesCopied');
             var oldModal = bootstrap.Modal.getInstance(el);
             if (oldModal) oldModal.dispose();
             window.applyModalZIndex(el);
@@ -1291,7 +1291,7 @@ const App = {
                     bsModalShow('twofaRecoveryModal');
                 }, { once: true });
             }
-            customAlertMessage.value = '恢复码已复制';
+            customAlertMessage.value = window.__i18n.t('user.twofa.codeCopied');
             var oldModal = bootstrap.Modal.getInstance(el);
             if (oldModal) oldModal.dispose();
             window.applyModalZIndex(el);
@@ -1299,7 +1299,7 @@ const App = {
         };
 
         const downloadRecoveryCodes = () => {
-            const text = twofaRecoveryCodes.value.map(rc => (rc.used ? '[已使用] ' : '') + rc.code).join('\n');
+            const text = twofaRecoveryCodes.value.map(rc => (rc.used ? window.__i18n.t('user.twofa.usedTag') : '') + rc.code).join('\n');
             const blob = new Blob([text], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1311,7 +1311,7 @@ const App = {
 
         // M-1 修复：恢复码重生成前先做二次验证（当前密码或 2FA 动态码）
         const secondaryAuthInput = ref('');
-        const secondaryAuthTitle = ref('二次验证');
+        const secondaryAuthTitle = ref(window.__i18n.t('user.twofa.title'));
         let secondaryAuthCallback = null;
 
         const openSecondaryAuth = (title, cb) => {
@@ -1324,7 +1324,7 @@ const App = {
         const confirmSecondaryAuth = async () => {
             const input = secondaryAuthInput.value.trim();
             if (!input) {
-                alert('请输入当前密码或 2FA 验证码');
+                alert(window.__i18n.t('user.twofa.pwdOrCodeRequired'));
                 return;
             }
             bsModalHide('secondaryAuthModal');
@@ -1343,11 +1343,11 @@ const App = {
         const regenerateRecoveryCodes = async () => {
             bsModalHide('twofaRecoveryModal');
             await new Promise(r => setTimeout(r, 300));
-            if (!await window.customConfirm('确定要重新生成恢复码吗？当前的恢复码将全部作废。')) {
+            if (!await window.customConfirm(window.__i18n.t('user.twofa.regenerateConfirm'))) {
                 bsModalShow('twofaRecoveryModal');
                 return;
             }
-            openSecondaryAuth('重新生成恢复码', async (input) => {
+            openSecondaryAuth(window.__i18n.t('user.twofa.regenerateBtn'), async (input) => {
                 try {
                     const data = await api('/user/2fa/recovery-codes/regenerate', {
                         method: 'POST',
@@ -1365,7 +1365,7 @@ const App = {
                             bsModalShow('twofaRecoveryModal');
                         }, { once: true });
                     }
-                    customAlertMessage.value = '恢复码已重新生成';
+                    customAlertMessage.value = window.__i18n.t('user.twofa.regenerated');
                     var oldModal = bootstrap.Modal.getInstance(el);
                     if (oldModal) oldModal.dispose();
                     window.applyModalZIndex(el);
@@ -1373,7 +1373,7 @@ const App = {
                 } catch (e) {
                     bsModalShow('twofaRecoveryModal');
                     await new Promise(r => setTimeout(r, 300));
-                    alert('重新生成恢复码失败：' + e.message);
+                    alert(window.__i18n.t('user.twofa.regenerateFail') + e.message);
                 }
             });
         };
@@ -1393,7 +1393,7 @@ const App = {
                 twofaEnabled.value = false;
                 twofaRecoveryCount.value = 0;
                 twofaDisablePassword.value = '';
-                alert('二次验证已禁用');
+                alert(window.__i18n.t('user.twofa.disabledToast'));
             } catch (e) {
                 alert(e.message);
             }
