@@ -495,13 +495,13 @@
       var data = await res.json();
       if (!res.ok) return alert(data.error || window.__i18n.t('dash.disk.destroyFailed'));
       if (data.refund_amount > 0) {
-        alert(window.__i18n.t('dash.disk.destroyRefunded') + data.refund_amount);
+        alert(window.__i18n.tFormat('dash.disk.destroyRefunded', data.refund_amount));
       } else {
         alert(window.__i18n.t('dash.disk.destroyed'));
       }
       await $.diskPage.loadAllDisks();
     } catch (e) {
-      alert(window.__i18n.t('dash.disk.destroyFailedMsg') + e.message);
+      alert(window.__i18n.tFormat('dash.disk.destroyFailedMsg', e.message));
     }
   };
 
