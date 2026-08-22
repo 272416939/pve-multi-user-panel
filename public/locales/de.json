@@ -334,6 +334,7 @@
   "admin.i18n.overridesCount": "Überschrieben",
   "admin.i18n.pendingBanner": "{0} Einträge zu übersetzen",
   "admin.i18n.pendingCount": "{0} ausstehend",
+  "admin.i18n.pendingLangs": "Sprachen mit offenen Übersetzungen",
   "admin.i18n.progress": "Fortschritt {0}%",
   "admin.i18n.rename": "Umbenennen",
   "admin.i18n.renameOk": "Sprache umbenannt",

@@ -334,6 +334,7 @@
   "admin.i18n.overridesCount": "덮어쓴 항목 수",
   "admin.i18n.pendingBanner": "번역 대기 항목 {0}개",
   "admin.i18n.pendingCount": "{0} 대기",
+  "admin.i18n.pendingLangs": "번역 대기 언어",
   "admin.i18n.progress": "진행률 {0}%",
   "admin.i18n.rename": "이름 바꾸기",
   "admin.i18n.renameOk": "언어 이름이 변경되었습니다",

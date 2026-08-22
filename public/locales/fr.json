@@ -334,6 +334,7 @@
   "admin.i18n.overridesCount": "Surcharges",
   "admin.i18n.pendingBanner": "{0} entrées à traduire",
   "admin.i18n.pendingCount": "{0} en attente",
+  "admin.i18n.pendingLangs": "Langues à traduire",
   "admin.i18n.progress": "Progression {0}%",
   "admin.i18n.rename": "Renommer",
   "admin.i18n.renameOk": "Langue renommée",

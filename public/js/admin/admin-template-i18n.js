@@ -14,6 +14,15 @@
             </div>
         </div>
 
+        <!-- 有待翻译语言清单（跨语言汇总，点击直达该语言；默认选中的系统语言无待翻译时仍可见） -->
+        <div v-if="i18nPage.pendingLanguages.value.length > 0" class="i18n-pending-banner d-flex flex-wrap align-items-center gap-2 mb-3">
+            <span class="i18n-pending-warn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+            <span class="banner-text">{{ t('admin.i18n.pendingLangs') }}：</span>
+            <button v-for="l in i18nPage.pendingLanguages.value" :key="l.code" class="i18n-lang-chip" :class="{ 'i18n-lang-chip-active': l.code === i18nPage.selectedCode.value }" @click="i18nPage.selectLanguage(l.code)">{{ l.name }}（{{ tFormat('admin.i18n.pendingCount', l.pending) }}）</button>
+        </div>
+
         <!-- 待翻译横幅（当前语言存在新增未译词条时） -->
         <div v-if="i18nPage.pendingInfo.value.pending > 0" class="i18n-pending-banner d-flex align-items-center gap-2 mb-3">
             <span class="i18n-pending-warn">

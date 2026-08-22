@@ -334,6 +334,7 @@
   "admin.i18n.overridesCount": "已覆蓋數",
   "admin.i18n.pendingBanner": "有待翻譯詞條 {0} 條",
   "admin.i18n.pendingCount": "{0} 待翻譯",
+  "admin.i18n.pendingLangs": "有待翻譯語言",
   "admin.i18n.progress": "進度 {0}%",
   "admin.i18n.rename": "重新命名",
   "admin.i18n.renameOk": "語言重新命名成功",

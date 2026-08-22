@@ -334,6 +334,7 @@
   "admin.i18n.overridesCount": "上書き数",
   "admin.i18n.pendingBanner": "翻訳待ちのエントリが {0} 件",
   "admin.i18n.pendingCount": "{0} 未翻訳",
+  "admin.i18n.pendingLangs": "翻訳待ち言語",
   "admin.i18n.progress": "進捗 {0}%",
   "admin.i18n.rename": "名前を変更",
   "admin.i18n.renameOk": "言語名を変更しました",

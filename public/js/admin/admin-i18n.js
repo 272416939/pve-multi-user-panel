@@ -83,6 +83,24 @@ window.__admin.i18nPage = (function () {
         return { total: total, pending: pending, percent: total > 0 ? Math.round((total - pending) / total * 100) : 100 };
     });
 
+    // 有待翻译的语言清单（跨语言汇总，从 summary 过滤 pending>0，按待翻译数降序）
+    var pendingLanguages = computed(function () {
+        var langs = (summary.value && summary.value.languages) || [];
+        var out = [];
+        for (var i = 0; i < langs.length; i++) {
+            if (langs[i].pending > 0) out.push(langs[i]);
+        }
+        out.sort(function (a, b) { return b.pending - a.pending; });
+        return out;
+    });
+
+    // 切换到指定语言（顶部待翻译语言清单点击直达）
+    function selectLanguage(code) {
+        if (selectedCode.value === code) return;
+        selectedCode.value = code;
+        load();
+    }
+
     // 分类折叠组（分组 = key 首个点分前缀；搜索时强制展开并按 500 条上限显示）
     var groups = computed(function () {
         var kw = (search.value || '').trim().toLowerCase();
@@ -399,12 +417,14 @@ window.__admin.i18nPage = (function () {
         showOnlyPending: showOnlyPending,
         groups: groups,
         pendingInfo: pendingInfo,
+        pendingLanguages: pendingLanguages,
         dirtyCount: dirtyCount,
         resetDisabled: resetDisabled,
         // 方法
         load: load,
         save: save,
         resetAll: resetAll,
+        selectLanguage: selectLanguage,
         toggleGroup: toggleGroup,
         loadMore: loadMore,
         openPending: openPending,

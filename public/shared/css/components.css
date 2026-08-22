@@ -994,3 +994,27 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 .i18n-pending-banner .banner-text {
     flex: 1 1 auto;
 }
+
+/* 待翻译语言清单 chip（可点击切换） */
+.i18n-lang-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+    color: var(--color-danger);
+    border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.i18n-lang-chip:hover {
+    background: color-mix(in srgb, var(--color-danger) 24%, transparent);
+}
+.i18n-lang-chip-active {
+    background: var(--color-danger);
+    color: #fff;
+}
+.i18n-lang-chip-active:hover {
+    background: var(--color-danger);
+}
