@@ -7,10 +7,11 @@
  *   不落覆盖表、不掉回 zh-CN；管理页打「新增」徽标，写入覆盖后即固定
  * 系统语言：显示值 = 内置文件值 ?? 覆盖（覆盖见 i18n_entries 表；语言文件永不写入）
  *
- * 缓存语义（长缓存 + 写时失效，非 TTL 兜底）：基线是「语言文件 + DB 覆盖表」这种改了才变的
- * 数据，故用长 TTL（30 天）实现「无修改不回源」，失效由写操作 invalidateI18nCache([code]) 驱动
- * （保存词条/新建/改名/删除/恢复默认均触发）。启动时 warmupI18nCache() 预热（先清 Redis 残留
- * 旧键再回源填充），保证首个请求前缓存就绪；发版新增词条由「发布必重启 + 预热清残留重读新文件」覆盖。
+ * 缓存语义（无 TTL + 写时失效）：基线是「语言文件 + DB 覆盖表」这种改了才变的数据，
+ * 故用「无 TTL」（cache-store create(ns, 0)：内存不清理、Redis 不设 EX），无修改永不过期，
+ * 失效由写操作 invalidateI18nCache([code]) / invalidateI18nLanguages() 驱动（保存词条/新建/改名/删除/恢复默认）。
+ * 启动时 warmupI18nCache() 预热（先清 Redis 残留旧键再回源填充）；新建语言 createCustomLanguage 内部立即
+ * 预热新语言到 Redis（选中即可用，无需等首次访问回源）。发版新增词条由「发布必重启 + 预热清残留重读新文件」覆盖。
  * 系统语言无覆盖时前端仍走静态文件路径，本服务不参与（零新增请求）。
  */
 const fs = require('fs');
@@ -19,12 +20,12 @@ const cacheStore = require('../utils/cache-store');
 const db = require('../api/db');
 const { SYSTEM_LOCALES, LOCALE_NAMES } = require('../constants');
 
-// 长缓存 TTL（30 天）：无修改时持续命中不回源，失效以写操作 invalidateI18nCache 为准
-const I18N_CACHE_TTL = 30 * 24 * 3600;
+// 无 TTL（0=永不过期）：i18n 基线是「改了才变」的数据，靠写操作手动失效，不依赖 TTL 驱逐
+const I18N_CACHE_TTL = 0;
 
 const localeCache = cacheStore.create('i18n:locale', I18N_CACHE_TTL);
 const languagesCache = cacheStore.create('i18n:languages', I18N_CACHE_TTL);
-const entriesCache = cacheStore.create('i18n:entries', I18N_CACHE_TTL); // 管理页词条列表（含 zh 母本），长缓存写后失效
+const entriesCache = cacheStore.create('i18n:entries', I18N_CACHE_TTL); // 管理页词条列表（含 zh 母本），无 TTL 写后失效
 
 // 内置语言文件名白名单（防路径穿越：只允许 7 个固定文件名映射，绝不使用用户输入拼接路径）
 const LOCALE_FILES = {};
@@ -222,7 +223,10 @@ async function createCustomLanguage(fields) {
                 snapshot: snapshot,
                 createdBy: createdBy || 0
             });
-            await invalidateI18nCache();
+            // 新建语言：只刷语言列表（集合变了），并立即预热新语言到 Redis——
+            // 管理员建完即可选中/切换，无需等首次访问回源（用户关注点：新建立即缓存）
+            await invalidateI18nLanguages();
+            await warmI18nLanguage(code);
             return { code: code };
         } catch (e) {
             if (e && e.code === 'ER_DUP_ENTRY') {
@@ -258,6 +262,22 @@ async function invalidateI18nCache(codes) {
 }
 
 /**
+ * 只失效语言列表缓存（改名语言、新建语言后调用：语言集合/name 变化，但各语言内容不动，
+ * 无需重建所有语言的 locale/entries 包——避免「改名清全部」的过度失效）
+ */
+async function invalidateI18nLanguages() {
+    await languagesCache.del('list');
+}
+
+/**
+ * 预热单个语言到缓存（新建语言后立即调用，管理员可立即选中/切换）
+ */
+async function warmI18nLanguage(code) {
+    await resolveLocale(code);
+    await getLocaleEntries(code);
+}
+
+/**
  * 启动预热：回源填充全部语言的缓存（语言列表 + 合并内容 + 管理页词条列表）
  * 由 server.js 启动阶段调用（先 invalidateI18nCache 清 Redis 残留旧键，再 warmup 从最新文件+覆盖表重建）。
  * 数据量小（7 系统语言 + 少量自定义），同步执行保证首个请求前缓存就绪；预热异常由调用方降级 warn。
@@ -279,6 +299,8 @@ module.exports = {
     getLocaleEntries,
     createCustomLanguage,
     invalidateI18nCache,
+    invalidateI18nLanguages,
+    warmI18nLanguage,
     warmupI18nCache,
     // 导出纯函数供测试
     isLogicalKey,

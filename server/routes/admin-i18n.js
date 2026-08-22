@@ -102,7 +102,8 @@ router.put('/admin/i18n/languages/:code', authMiddleware, adminMiddleware, async
         const nameErr = validateName(name);
         if (nameErr) return res.status(400).json({ error: nameErr });
         await db.i18n.updateName(code, name.trim());
-        await i18nService.invalidateI18nCache();
+        // 改名只影响语言列表的 name，无关词条内容——只失效列表，不重建各语言 locale/entries 包（避免过度失效）
+        await i18nService.invalidateI18nLanguages();
         // 操作审计：重命名语言
         try {
             const { auditLog } = require('../utils/audit-log');
@@ -138,7 +139,8 @@ router.delete('/admin/i18n/languages/:code', authMiddleware, adminMiddleware, as
         }
         const name = lang.name;
         await db.i18n.deleteLanguage(code);
-        await i18nService.invalidateI18nCache();
+        // 删除语言：清语言列表 + 只删该语言内容（含移除其残留缓存）；快照隔离使其他语言不受影响
+        await i18nService.invalidateI18nCache([code]);
         // 操作审计：删除语言
         try {
             const { auditLog } = require('../utils/audit-log');
