@@ -194,7 +194,7 @@
         <div class="mb-3">
           <label class="form-label">{{ t('dash.disk.targetVm') }}</label>
           <select class="form-select" v-model="bindTargetVmid">
-            <option value="">{{ t('dash.select') }}</option>
+            <option value="">{{ t('dash.selectVm') }}</option>
             <option v-for="vm in userVmsForBind" :key="vm.id" :value="vm.vm_id">{{ vm.name || ('VM ' + vm.vm_id) }}{{ vm.status && vm.status.status !== 'stopped' ? t('dash.status.runningBracket') : '' }}</option>
           </select>
           <div v-if="userVmsForBind.length === 0" class="text-warning small mt-1">{{ t('dash.disk.noVmAvailable') }}</div>
