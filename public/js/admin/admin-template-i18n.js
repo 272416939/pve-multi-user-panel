@@ -49,7 +49,7 @@
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                     </span>
                     <span class="fw-bold">{{ cat.label }}</span>
-                    <small class="text-muted">（{{ cat.count }} 个词条）</small>
+                    <small class="text-muted">（{{ tFormat('admin.i18n.countEntries', cat.count) }}）</small>
                     <span class="i18n-cat-desc">{{ cat.desc }}</span>
                     <span class="ms-auto notification-chevron">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: i18nPage.collapsed[cat.key] === false ? 'rotate(90deg)' : 'rotate(0deg)' }"><polyline points="9 18 15 12 9 6"/></svg>

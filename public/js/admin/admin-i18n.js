@@ -13,29 +13,47 @@ window.__admin.i18nPage = (function () {
     var PAGE_CHUNK = 200;        // 每组展开的分页条数（增量「加载更多」）
     var SAVE_BATCH = 500;        // 与后端单次保存上限对齐
 
-    // 分类描述（生效位置，供管理员了解词条在哪些页面显示；管理工具用中文母本说明）
+    // 分类生效位置描述（i18n key，随界面语言切换；前缀→key 映射，值在各语言文件的 admin.i18n.cat.*）
     var CATEGORY_DESC = {
-        admin: '后台管理（用户/虚拟机/套餐/模板/系统设置等管理页）',
-        dash: '用户仪表盘（控制台/资产卡片/日志中心/消息）',
-        user: '用户中心（个人资料/钱包/订单/通知设置）',
-        settings: '系统设置（站点/支付/安全/网络/快照备份配置）',
-        login: '登录页',
-        register: '注册页',
-        nav: '全站侧边栏菜单（后台/仪表盘/用户中心）',
-        common: '全站通用（保存/取消/确认/加载/删除）',
-        lang: '语言选择器（语言原生名）',
-        shared: '跨端共享（弹窗/组件/工具提示）',
-        terminal: 'Web 终端',
-        vnc: 'VNC 控制台',
-        password: '密码相关提示'
+        admin: 'admin.i18n.cat.admin',
+        dash: 'admin.i18n.cat.dash',
+        user: 'admin.i18n.cat.user',
+        settings: 'admin.i18n.cat.settings',
+        login: 'admin.i18n.cat.login',
+        register: 'admin.i18n.cat.register',
+        nav: 'admin.i18n.cat.nav',
+        common: 'admin.i18n.cat.common',
+        lang: 'admin.i18n.cat.lang',
+        shared: 'admin.i18n.cat.shared',
+        terminal: 'admin.i18n.cat.terminal',
+        vnc: 'admin.i18n.cat.vnc',
+        password: 'admin.i18n.cat.password'
     };
 
     // ==================== 状态 ====================
     var languages = ref([]);         // 注册表（系统 + 自定义）
     var systemLanguages = ref([]);   // 复制源下拉（仅系统语言）
     var selectedCode = ref('zh-CN'); // 当前查看/编辑语言（默认简体中文）
-    var entries = ref([]);           // [{key, original, value, override, is_new}]
-    var languageMeta = ref('');
+    var entries = ref([]);           // [{key, original, value, override, is_new, zh}]
+    var currentLanguage = ref(null); // {code,name,base_code,is_system}
+    // 元信息（响应式 computed：语言切换/覆盖数变化时自动重建，避免 load 时一次性快照残留中文）
+    var languageMeta = computed(function () {
+        var lang = currentLanguage.value;
+        if (!lang) return '';
+        var list = entries.value;
+        var parts = [
+            window.__i18n.t('admin.i18n.code') + ': ' + lang.code,
+            window.__i18n.t('admin.i18n.entries') + ': ' + list.length
+        ];
+        if (lang.base_code && !lang.is_system) {
+            parts.push(window.__i18n.t('admin.i18n.copyFrom') + ': ' + lang.base_code);
+        }
+        var overrideCount = 0, newCount = 0;
+        list.forEach(function (r) { if (r.override) overrideCount++; if (r.is_new) newCount++; });
+        if (overrideCount > 0) parts.push(window.__i18n.t('admin.i18n.overridesCount') + ': ' + overrideCount);
+        if (newCount > 0) parts.push(window.__i18n.t('admin.i18n.isNewCount') + ': ' + newCount);
+        return parts.join(' · ');
+    });
     var isCustom = ref(false);
     var loading = ref(false);
     var saving = ref(false);
@@ -90,7 +108,8 @@ window.__admin.i18nPage = (function () {
             return {
                 key: cat,
                 label: cat,
-                desc: CATEGORY_DESC[cat] || '',
+                // 描述走 t()（读 _translations → 响应式依赖），语言切换时 groups 自动重算更新
+                desc: CATEGORY_DESC[cat] ? window.__i18n.t(CATEGORY_DESC[cat]) : '',
                 count: rows.length,
                 visible: visible,
                 hasMore: !collapsedFlag && rows.length > visible.length
@@ -118,23 +137,6 @@ window.__admin.i18nPage = (function () {
 
     // ==================== 数据加载 ====================
 
-    function buildMeta(data) {
-        var lang = (data && data.language) || {};
-        var list = (data && data.entries) || [];
-        var parts = [
-            window.__i18n.t('admin.i18n.code') + ': ' + lang.code,
-            window.__i18n.t('admin.i18n.entries') + ': ' + list.length
-        ];
-        if (lang.base_code && !lang.is_system) {
-            parts.push(window.__i18n.t('admin.i18n.copyFrom') + ': ' + lang.base_code);
-        }
-        var overrideCount = 0, newCount = 0;
-        list.forEach(function (r) { if (r.override) overrideCount++; if (r.is_new) newCount++; });
-        if (overrideCount > 0) parts.push(window.__i18n.t('admin.i18n.overridesCount') + ': ' + overrideCount);
-        if (newCount > 0) parts.push(window.__i18n.t('admin.i18n.isNewCount') + ': ' + newCount);
-        return parts.join(' · ');
-    }
-
     // 进入/切换语言/刷新路径统一入口（core.js watch + onMounted 同源调用，规范第四节）
     async function load() {
         loading.value = true;
@@ -149,8 +151,8 @@ window.__admin.i18nPage = (function () {
             var code = selectedCode.value;
             var data = await api('/admin/i18n/languages/' + encodeURIComponent(code) + '/entries');
             entries.value = (data && data.entries) || [];
+            currentLanguage.value = (data && data.language) || null;
             isCustom.value = !!(data && data.language && !data.language.is_system);
-            languageMeta.value = buildMeta(data);
             clearDirty();
         } catch (e) {
             console.error('加载 i18n 条目失败', e && e.message);
