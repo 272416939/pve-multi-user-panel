@@ -593,7 +593,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content" style="background:var(--bg-modal);color:var(--text-primary);">
             <div class="modal-header" style="border-bottom:1px solid var(--border-color);">
-                <h5 class="modal-title">{{ currentDevice.name || (currentDevice.type === 'vm' ? 'VM ' + currentDevice.deviceId : 'CT ' + currentDevice.deviceId) }} - {{ t('dash.port.title') }}</h5>
+                <h5 class="modal-title">{{ currentDevice.name || (currentDevice.type === 'vm' ? 'VM ' + currentDevice.deviceId : 'CT ' + currentDevice.deviceId) }} - {{ t('dash.port.mgmtTitle') }}</h5>
                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
             </div>
             <div class="modal-body" style="min-height:150px;">

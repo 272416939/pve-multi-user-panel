@@ -260,7 +260,7 @@ app.component('port-forward-list', {
                             <td>{{ rule.internal_port }}</td>\
                             <td>{{ rule.external_port }}</td>\
                             <td>{{ rule.protocol?.toUpperCase() }}</td>\
-                            <td><span :class="rule.enabled ? \'text-success\' : \'text-muted\'">{{ rule.enabled ? {{ t(\'admin.common.enabled\') }} : {{ t(\'admin.common.disabled\') }} }}</span></td>\
+                            <td><span :class="rule.enabled ? \'text-success\' : \'text-muted\'">{{ rule.enabled ? t(\'admin.common.enabled\') : t(\'admin.common.disabled\') }}</span></td>\
                             <td>\
                                 <span v-if="rule.sync_status === \'synced\'" class="badge bg-success">{{ t(\'admin.fwd.synced\') }}</span>\
                                 <span v-else-if="rule.sync_status === \'orphan\'" class="badge bg-secondary">{{ t(\'admin.fwd.orphan\') }}</span>\

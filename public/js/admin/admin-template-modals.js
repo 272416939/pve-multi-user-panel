@@ -1278,7 +1278,7 @@
                     <div class="modal-dialog">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ isEditingForward ? t('common.edit') : t('common.add') }}{{ t('dash.port.title') }}</h5>
+                                <h5 class="modal-title">{{ isEditingForward ? t('dash.port.editTitle') : t('dash.port.addTitle') }}</h5>
                                 <pv-button type="button" data-bs-dismiss="modal"></pv-button>
                             </div>
                             <div class="modal-body">
