@@ -45,6 +45,10 @@
     $.logConfigForm = ref({ keep_count: 5000, keep_admin_count: 5000 });
     $.logConfigSaving = ref(false);
     $.cdkList = ref([]);
+    $.cdkPage = ref(1);
+    $.cdkPageSize = ref(20);
+    $.cdkTotal = ref(0);
+    $.cdkLoadSeq = 0;
     $.cdkForm = ref({ duration_days: 30, count: 1, expires_at: '' });
     $.cdkResult = ref([]);
     $.cdkResultBatchId = ref('');
@@ -174,6 +178,32 @@
     $.changeUserPageSize = function(size) {
         $.userPageSize.value = size || 20;
         $.loadUsers(1);
+    };
+    // CDK 列表分页（loadData 与 CDK 页删除后共用；空页且非第 1 页自动回退一页）
+    $.loadCdkList = async function(page) {
+        var seq = ++$.cdkLoadSeq;
+        $.cdkPage.value = page || 1;
+        try {
+            var res = await api('/admin/cdk/list?page=' + $.cdkPage.value + '&limit=' + $.cdkPageSize.value);
+            if (seq !== $.cdkLoadSeq) return;
+            if (Array.isArray(res)) {
+                $.cdkList.value = res;
+                $.cdkTotal.value = res.length;
+            } else {
+                $.cdkList.value = res.rows || [];
+                $.cdkTotal.value = res.total || 0;
+                if ($.cdkList.value.length === 0 && $.cdkTotal.value > 0 && $.cdkPage.value > 1) {
+                    return $.loadCdkList(Math.ceil($.cdkTotal.value / $.cdkPageSize.value));
+                }
+            }
+        } catch (e) {
+            if (seq !== $.cdkLoadSeq) return;
+            console.error('加载 CDK 列表失败', e);
+        }
+    };
+    $.changeCdkPageSize = function(size) {
+        $.cdkPageSize.value = size || 20;
+        $.loadCdkList(1);
     };
 
     $.createUser = async function() {
@@ -1440,8 +1470,14 @@
     };
 
     $.toggleSelectAllCdk = function() {
-        if ($.selectedCdkIds.value.length === $.cdkList.value.length) {
-            $.selectedCdkIds.value = [];
+        // 分页后全选作用于当前页，选中可跨页累积
+        var allSelected = $.cdkList.value.length > 0 && $.cdkList.value.every(function(c) {
+            return $.selectedCdkIds.value.indexOf(c.id) !== -1;
+        });
+        if (allSelected) {
+            $.selectedCdkIds.value = $.selectedCdkIds.value.filter(function(id) {
+                return !$.cdkList.value.some(function(c) { return c.id === id; });
+            });
         } else {
             $.selectedCdkIds.value = $.cdkList.value.map(function(c) { return c.id; });
         }

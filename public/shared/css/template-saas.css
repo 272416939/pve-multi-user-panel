@@ -866,10 +866,6 @@ html[data-template="saas"] .send-code-btn {
 html[data-template="saas"] .send-code-btn:hover:not(:disabled) {
     background: rgba(37, 99, 235, 0.08);
 }
-/* 底部版本信息 */
-html[data-template="saas"] .login-version-info {
-    color: var(--login-text-version);
-}
 /* 错误/成功提示：扁平 */
 html[data-template="saas"] .login-card .alert-danger,
 html[data-template="saas"] .login-card .alert-success {

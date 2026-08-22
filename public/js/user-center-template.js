@@ -296,12 +296,13 @@
                             </div>
                         </div>
                         <!-- 消息类型 tabs：与 admin 日志中心一致的玻璃渐变药丸样式（nav-tabs） -->
+                        <div class="table-container mb-4" style="padding:12px;">
                         <ul class="nav nav-tabs mb-3">
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === 'all' }" href="#" @click.prevent="msgType = 'all'; loadMessages()">{{ t('common.all') }}</a></li>
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '1' }" href="#" @click.prevent="msgType = '1'; loadMessages()">{{ t('user.message.system') }}</a></li>
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '2' }" href="#" @click.prevent="msgType = '2'; loadMessages()">{{ t('user.message.business') }}</a></li>
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '3' }" href="#" @click.prevent="msgType = '3'; loadMessages()">{{ t('user.message.renewal') }}</a></li>
-                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '5' }" href="#" @click.prevent="msgType = '5'; loadMessages()">{{ t('user.message.cs') }}</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === 'all' }" href="#" @click.prevent="msgType = 'all'; loadMessages(1)">{{ t('common.all') }}</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '1' }" href="#" @click.prevent="msgType = '1'; loadMessages(1)">{{ t('user.message.system') }}</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '2' }" href="#" @click.prevent="msgType = '2'; loadMessages(1)">{{ t('user.message.business') }}</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '3' }" href="#" @click.prevent="msgType = '3'; loadMessages(1)">{{ t('user.message.renewal') }}</a></li>
+                            <li class="nav-item"><a class="nav-link" :class="{ active: msgType === '5' }" href="#" @click.prevent="msgType = '5'; loadMessages(1)">{{ t('user.message.cs') }}</a></li>
                         </ul>
                         <div v-if="messagesLoading" class="text-center py-4">
                             <div class="spinner-border text-primary" role="status">
@@ -323,6 +324,9 @@
                                 <div class="message-title">{{ msg.title }}</div>
                                 <div class="message-preview">{{ trimContent(msg.content) }}</div>
                             </div>
+                        </div>
+                        <!-- 分页：通用分页条（pv-pagination 单一实现） -->
+                        <pv-pagination :total="msgTotal" :page="msgPage" :page-size="msgPageSize" @change="loadMessages" @page-size-change="changeMsgPageSize"></pv-pagination>
                         </div>
                     </div>
                 </div>
@@ -843,9 +847,6 @@
                 </div>
             </transition>
 
-            <div class="text-center py-4 mt-4 text-muted small">
-                <div>PVE 管理面板 <span id="appVersion"></span></div>
-            </div>
         </div>
     </template>`;
 })();

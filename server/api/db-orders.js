@@ -82,6 +82,23 @@ const cdk = {
             `SELECT COUNT(*) as count FROM cdk_codes
              WHERE is_used = 0 AND (expires_at IS NULL OR expires_at > NOW())`
         );
+    },
+    getPaginated: async ({ page, limit } = {}) => {
+        page = parseInt(page) || 1;
+        limit = Math.min(parseInt(limit) || 20, 200);
+        const offset = (page - 1) * limit;
+        const totalRow = await queryOne('SELECT COUNT(*) as total FROM cdk_codes');
+        const rows = await queryAll(`
+            SELECT c.*, creator.username as creator_username, user.username as used_username,
+                   v.name as used_vm_name, v.vm_id as used_vm_vmid, target.username as target_username
+            FROM cdk_codes c
+            LEFT JOIN users creator ON c.created_by = creator.id
+            LEFT JOIN users user ON c.used_by = user.id
+            LEFT JOIN users target ON c.target_user_id = target.id
+            LEFT JOIN vms v ON c.used_vm_id = v.id
+            ORDER BY c.created_at DESC LIMIT ? OFFSET ?
+        `, [limit, offset]);
+        return { rows, total: totalRow.total, page, limit };
     }
 };
 

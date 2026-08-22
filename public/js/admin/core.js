@@ -299,11 +299,7 @@ watch($.user, function(u) {
                 }),
                 // 用户列表统一走 loadUsers 分页接口（id 降序），避免与全量接口双顺序竞态覆盖
                 $.loadUsers(lastUserPage),
-                api('/admin/cdk/list').then(function(data) {
-                    $.cdkList.value = data;
-                }).catch(function(e) {
-                    console.error('加载 CDK 列表失败', e);
-                }),
+                $.loadCdkList(),
                 api('/admin/smtp').then(function(data) {
                     $.smtpConfig.value = data;
                 }).catch(function(e) {

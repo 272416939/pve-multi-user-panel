@@ -9,7 +9,7 @@
                         <div class="module-header">
                             <h4 class="module-title">{{ t('admin.cdk.title') }}</h4>
                             <div class="d-flex gap-2">
-                                <pv-button @click="exportCdkCsv()" :disabled="cdkList.length === 0" variant="glass">
+                                <pv-button @click="exportCdkCsv()" :disabled="cdkTotal === 0" variant="glass">
 
                                     {{ t('admin.cdk.exportAll') }}
                                 
@@ -96,18 +96,18 @@
 
                         <div class="table-container mb-4" style="padding:12px;">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="mb-0">{{ t('admin.cdk.listPfx') }}{{ cdkList.length }}）</h5>
+                                <h5 class="mb-0">{{ t('admin.cdk.listPfx') }}{{ cdkTotal }}）</h5>
                                 <div v-if="selectedCdkIds.length > 0" class="d-flex align-items-center gap-2">
                                     <span class="text-muted small">{{ t('admin.cdk.selCount') }} {{ selectedCdkIds.length }} {{ t('admin.geSuffix') }}</span>
                                     <pv-button @click="batchDeleteCdk" variant="outline-danger" size="sm">{{ t('admin.logs.batchDelete') }}</pv-button>
                                 </div>
                             </div>
-                            <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                            <div class="table-responsive">
                                 <table class="table table-hover mb-0 table-sm table-align-center">
                                     <thead style="position: sticky; top: 0;">
                                         <tr>
                                             <th class="checkbox-col">
-                                                <input type="checkbox" :checked="selectedCdkIds.length === cdkList.length && cdkList.length > 0" @change="toggleSelectAllCdk">
+                                                <input type="checkbox" :checked="cdkList.length > 0 && cdkList.every(function(c) { return selectedCdkIds.indexOf(c.id) !== -1; })" @change="toggleSelectAllCdk">
                                             </th>
                                             <th>ID</th>
                                             <th>{{ t('admin.cdk.codeShort') }}</th>
@@ -155,6 +155,8 @@
                             <div v-if="cdkList.length === 0" class="text-muted text-center py-4">
                                 {{ t('admin.cdk.empty') }}
                             </div>
+                            <!-- 分页：通用分页条（pv-pagination 单一实现） -->
+                            <pv-pagination :total="cdkTotal" :page="cdkPage" :page-size="cdkPageSize" @change="loadCdkList" @page-size-change="changeCdkPageSize"></pv-pagination>
                         </div>
                     </div>
 

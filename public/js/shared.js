@@ -608,6 +608,33 @@ const logout = () => {
     window.location.href = 'login.html';
 };
 
+// 加载钱包余额到头像下拉菜单（三端共用）
+// 定义在 DOMContentLoaded 之外：admin 端 Vue 模板在 i18n init 完成（网络 fetch 异步）后才挂载，
+// 若仅 DOMContentLoaded 时调用一次，挂载晚于该事件时元素不存在、静默返回导致余额恒为 --
+window.loadHeaderBalance = async function() {
+    var el = document.getElementById('headerWalletBalance');
+    if (!el) return;
+    try {
+        var res = await api('/wallet/balance');
+        var bal = parseFloat(res.balance || '0.00');
+        // 格式与用户中心钱包区块一致（¥ + 两位小数），不依赖 currencyUnit key
+        el.textContent = '¥' + bal.toFixed(2);
+    } catch (e) {
+        el.textContent = '--';
+    }
+};
+
+// logout 按钮改文档级事件委托：监听注册时机与元素出现时机解耦
+// （admin 端 header 由 Vue 在 DOMContentLoaded 之后挂载，一次性 getElementById 绑定会落空——
+//   28bba00 i18n 异步挂载回归：退出登录点击无效）
+document.addEventListener('click', function(e) {
+    var btn = e.target && e.target.closest ? e.target.closest('#headerLogoutBtn') : null;
+    if (btn) {
+        e.preventDefault();
+        logout();
+    }
+});
+
 // XSS-4 修复：替换内联 onclick 为 addEventListener（CSP nonce 合规）
 document.addEventListener('DOMContentLoaded', function() {
     var sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
@@ -618,26 +645,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (headerRefreshBtn) {
         headerRefreshBtn.addEventListener('click', function() { location.reload(); });
     }
-    var headerLogoutBtn = document.getElementById('headerLogoutBtn');
-    if (headerLogoutBtn) {
-        headerLogoutBtn.addEventListener('click', function(e) { e.preventDefault(); logout(); });
-    }
     var sidebarOverlay = document.getElementById('sidebarOverlay');
     if (sidebarOverlay && typeof toggleSidebar === 'function') {
         sidebarOverlay.addEventListener('click', toggleSidebar);
     }
-    // 加载钱包余额到头像下拉菜单（三端共用）
-    window.loadHeaderBalance = async function() {
-        var el = document.getElementById('headerWalletBalance');
-        if (!el) return;
-        try {
-            var res = await api('/wallet/balance');
-            var bal = parseFloat(res.balance || '0.00');
-            el.textContent = bal.toFixed(2) + ' ' + (window.__i18n ? window.__i18n.t('common.currencyUnit') : window.__i18n.t('common.currencyUnit'));
-        } catch (e) {
-            el.textContent = '--';
-        }
-    };
+    // 加载钱包余额到头像下拉菜单（服务端直出 header 的页面在此即可；admin 端由挂载后再调用一次）
     window.loadHeaderBalance();
 });
 

@@ -12,8 +12,9 @@ const { sanitizeTitle, sanitizeMessageContent, sanitizeLinkUrl, sanitizeLinkText
 router.get('/messages', authMiddleware, async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
+        const limit = Math.min(parseInt(req.query.limit) || 20, 200);
         const type = req.query.type || 'all';
-        const result = await db.messages.getByUser(req.user.id, type, page);
+        const result = await db.messages.getByUser(req.user.id, type, page, limit);
         res.json(result);
     } catch (error) {
         console.error('获取消息列表失败:', error);

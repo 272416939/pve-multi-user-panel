@@ -30,6 +30,10 @@ const App = {
         const messages = ref([]);
         const messagesLoading = ref(false);
         const msgType = ref('all');
+        const msgTotal = ref(0);
+        const msgPage = ref(1);
+        const msgPageSize = ref(20);
+        let msgLoadSeq = 0;
         const currentMsg = ref({ title: '', content: '', type: 1, created_at: '' });
 
         const devices = ref([]);
@@ -1070,16 +1074,31 @@ const App = {
             }
         };
 
-        const loadMessages = async () => {
+        const loadMessages = async (page) => {
+            const seq = ++msgLoadSeq;
+            msgPage.value = page || 1;
             messagesLoading.value = true;
             try {
-                const data = await api('/messages?type=' + msgType.value);
+                const params = { type: msgType.value, page: msgPage.value, limit: msgPageSize.value };
+                const data = await api('/messages?' + new URLSearchParams(params));
+                if (seq !== msgLoadSeq) return; // 已有更新的请求，丢弃本次结果
                 messages.value = data.list || [];
+                msgTotal.value = data.total || 0;
+                // 删除/清空后当前页可能为空：若非第 1 页且还有数据，回退到最后一页
+                if (messages.value.length === 0 && msgTotal.value > 0 && msgPage.value > 1) {
+                    return loadMessages(Math.ceil(msgTotal.value / msgPageSize.value));
+                }
             } catch (e) {
+                if (seq !== msgLoadSeq) return;
                 console.error('加载消息失败', e);
             } finally {
-                messagesLoading.value = false;
+                if (seq === msgLoadSeq) messagesLoading.value = false;
             }
+        };
+        // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+        const changeMsgPageSize = (size) => {
+            msgPageSize.value = size || 20;
+            loadMessages(1);
         };
 
         const viewMessage = async (msg) => {
@@ -1099,7 +1118,7 @@ const App = {
         const markAllRead = async () => {
             try {
                 await api('/messages/read-all', { method: 'PUT' });
-                messages.value.forEach(m => m.is_read = 1);
+                await loadMessages(msgPage.value); // 列表按 is_read 排序，标记后重载保持一致性
                 unreadCount.value = 0;
             } catch (e) {
                 alert(e.message);
@@ -1110,8 +1129,8 @@ const App = {
             if (!await window.customConfirm(window.__i18n.t('user.message.deleteConfirm'))) return;
             try {
                 await api('/messages/' + id, { method: 'DELETE' });
-                messages.value = messages.value.filter(m => m.id !== id);
                 bsModalHide('messageDetailModal');
+                await loadMessages(msgPage.value); // 删空当前页时自动回退
                 loadUnreadCount();
             } catch (e) {
                 alert(e.message);
@@ -1122,7 +1141,7 @@ const App = {
             if (!await window.customConfirm(window.__i18n.t('user.message.clearReadConfirm'))) return;
             try {
                 await api('/messages', { method: 'DELETE' });
-                messages.value = messages.value.filter(m => !m.is_read);
+                await loadMessages(msgPage.value); // 重载修正 total；页面删空时自动回退
                 loadUnreadCount();
             } catch (e) {
                 alert(e.message);
@@ -1525,6 +1544,9 @@ const App = {
             messages,
             messagesLoading,
             msgType,
+            msgTotal,
+            msgPage,
+            msgPageSize,
             currentMsg,
             parseMarkdown,
             customAlertMessage,
@@ -1547,6 +1569,7 @@ const App = {
             deleteMemo,
             loadUnreadCount,
             loadMessages,
+            changeMsgPageSize,
             viewMessage,
             markAllRead,
             deleteMessage,
@@ -1602,6 +1625,10 @@ const App = {
         await window.__i18n.init(window.__initialLocale || 'zh-CN');
     }
     var app = createApp(App);
+    // 组件内部（pv-pagination 等）不继承主组件 setup return 的 t/tFormat，
+    // 必须经 globalProperties 提供（与 admin/dashboard 一致）；缺失会导致组件渲染抛错 → 分页条静默消失
+    app.config.globalProperties.t = window.__i18n.t;
+    app.config.globalProperties.tFormat = window.__i18n.tFormat;
     app.mount('#app');
 })();
 

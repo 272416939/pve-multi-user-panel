@@ -221,18 +221,6 @@
             color: var(--login-color-primary) !important;
             transition: color 0.3s ease;
         }
-        /* 底部版本信息样式 */
-        .login-version-info {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
-            color: var(--login-text-version);
-            font-size: 12px;
-            z-index: 1;
-            transition: color 0.3s ease;
-        }
         /* 毛玻璃效果 */
         [data-theme="light"] .login-card,
         [data-theme="dark"] .login-card {

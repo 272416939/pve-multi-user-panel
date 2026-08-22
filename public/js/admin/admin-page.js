@@ -429,6 +429,9 @@ app.component('private-network-list', {
           await window.__i18n.init(window.__initialLocale || 'zh-CN');
       }
       app.mount('#app');
+      // 挂载完成后 Vue 才渲染出 header 的头像下拉菜单（含徽章/余额/退出按钮）；
+      // shared.js 的 DOMContentLoaded 一次性绑定此时已错过，需在此补触发余额加载
+      if (window.loadHeaderBalance) window.loadHeaderBalance();
   })();
 
   // ===== Bottom inline script (DOM utilities) =====
