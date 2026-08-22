@@ -221,10 +221,13 @@ window.__admin.i18nPage = (function () {
 
     // ==================== 词条输入/回显（3. 保存后回显改动值） ====================
 
-    // 输入框显示值：草稿优先（含 ''=清空恢复），否则显示当前生效值（覆盖值或基线）
-    // ——保存后 load() 清空草稿，输入框回退显示 row.value（覆盖后的新值），实现回显
+    // 输入框显示值：草稿优先（含 ''=清空恢复），否则：
+    // - 待翻译词条（is_new && !override）显示空框（等待用户填写，placeholder=原文参考）——避免预填源语言值造成「已翻译」误导
+    // - 其余显示当前生效值（覆盖值或基线）；保存后 load 清草稿 → 回退 row.value（覆盖后的新值）实现回显
     function fieldValue(row) {
-        return dirty[row.key] !== undefined ? dirty[row.key] : row.value;
+        if (dirty[row.key] !== undefined) return dirty[row.key];
+        if (row.is_new && !row.override) return '';
+        return row.value;
     }
 
     // v-model 替代：写草稿（触发响应式脏态/保存计数）

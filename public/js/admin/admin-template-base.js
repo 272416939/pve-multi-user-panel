@@ -166,7 +166,7 @@
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-other">
-                    <a :title="t('nav.i18nManage')" class="nav-item" :class="{ active: activeSection === 'i18n' }" data-subsection="i18n" href="#" @click.prevent="switchSection('i18n')"><span class="nav-text">{{ t('nav.i18nManage') }}</span></a>
+                    <a :title="t('nav.i18nManage')" class="nav-item" :class="{ active: activeSection === 'i18n' }" data-subsection="i18n" href="#" @click.prevent="switchSection('i18n')"><span class="nav-text">{{ t('nav.i18nManage') }}</span><span v-if="i18nPendingCount > 0" class="i18n-nav-reddot" :title="tFormat('admin.i18n.navPending', i18nPendingCount)"></span></a>
                 </div>
 
                 <!-- 日志中心（独立一级菜单，仅admin） -->
