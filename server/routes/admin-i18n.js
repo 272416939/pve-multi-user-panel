@@ -54,6 +54,17 @@ router.get('/admin/i18n/languages/:code/entries', authMiddleware, adminMiddlewar
     }
 });
 
+// GET /admin/i18n/summary - 待翻译汇总（侧边栏「其他选项」红点 + 管理页顶部横幅/分类进度）
+// 「待翻译」= is_new && !override（自定义语言新增未译；系统语言恒不待翻译），由 services/i18n.js 计算并缓存
+router.get('/admin/i18n/summary', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        res.json(await i18nService.getI18nSummary());
+    } catch (error) {
+        console.error('获取 i18n 待翻译汇总失败:', error.message);
+        res.status(500).json({ error: safeError(error) });
+    }
+});
+
 // POST /admin/i18n/languages - 新建自定义语言（复制源限定系统语言）
 router.post('/admin/i18n/languages', authMiddleware, adminMiddleware, async (req, res) => {
     try {

@@ -963,3 +963,34 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     font-size: 0.78rem;
     color: var(--text-muted);
 }
+
+/* 侧边栏「其他选项」待翻译红点（inline 圆点，走主题色明暗自适应） */
+.i18n-nav-reddot {
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    border-radius: 50%;
+    background: var(--color-danger);
+    flex-shrink: 0;
+    box-shadow: 0 0 4px color-mix(in srgb, var(--color-danger) 60%, transparent);
+}
+
+/* 待翻译提醒（红色感叹号 SVG 图标容器：stroke=currentColor 继承此 class 颜色） */
+.i18n-pending-warn {
+    display: inline-flex;
+    align-items: center;
+    color: var(--color-danger);
+}
+
+/* 待翻译顶部横幅 */
+.i18n-pending-banner {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--color-danger) 30%, var(--border-color));
+    background: color-mix(in srgb, var(--color-danger) 10%, var(--bg-input));
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+.i18n-pending-banner .banner-text {
+    flex: 1 1 auto;
+}

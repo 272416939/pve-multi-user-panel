@@ -26,6 +26,7 @@ const I18N_CACHE_TTL = 0;
 const localeCache = cacheStore.create('i18n:locale', I18N_CACHE_TTL);
 const languagesCache = cacheStore.create('i18n:languages', I18N_CACHE_TTL);
 const entriesCache = cacheStore.create('i18n:entries', I18N_CACHE_TTL); // 管理页词条列表（含 zh 母本），无 TTL 写后失效
+const summaryCache = cacheStore.create('i18n:summary', I18N_CACHE_TTL); // 待翻译汇总（侧边栏红点/页顶横幅用），无 TTL 写后失效
 
 // 内置语言文件名白名单（防路径穿越：只允许 7 个固定文件名映射，绝不使用用户输入拼接路径）
 const LOCALE_FILES = {};
@@ -250,6 +251,7 @@ async function createCustomLanguage(fields) {
  */
 async function invalidateI18nCache(codes) {
     await languagesCache.del('list');
+    await summaryCache.del('list');
     if (codes && codes.length) {
         for (const c of codes) {
             await localeCache.del(c);
@@ -263,10 +265,44 @@ async function invalidateI18nCache(codes) {
 
 /**
  * 只失效语言列表缓存（改名语言、新建语言后调用：语言集合/name 变化，但各语言内容不动，
- * 无需重建所有语言的 locale/entries 包——避免「改名清全部」的过度失效）
+ * 无需重建所有语言的 locale/entries 包——避免「改名清全部」的过度失效）；待翻译汇总一并刷新
  */
 async function invalidateI18nLanguages() {
     await languagesCache.del('list');
+    await summaryCache.del('list');
+}
+
+/**
+ * 待翻译汇总（侧边栏「其他选项」红点 + i18n 管理页顶部横幅/分类进度）
+ * 「待翻译」= is_new && !override（自定义语言「创建后新增、未人工翻译」词条；系统语言无 is_new 恒不待翻译）
+ * 复用被预热 + 无 TTL 缓存的 getLocaleEntries，不额外读 i18n_entries 表；结果无 TTL 缓存，写操作经
+ * invalidateI18nCache / invalidateI18nLanguages 一并失效。
+ * @returns {Promise<{totalPending:number, languages:Array<{code,name,base_code,is_system,total,pending}>}>}
+ */
+async function getI18nSummary() {
+    const cached = await summaryCache.get('list', async function () {
+        const langs = await getLanguages();
+        const languages = [];
+        let totalPending = 0;
+        for (const l of langs) {
+            const entries = await getLocaleEntries(l.code) || [];
+            let pending = 0;
+            for (const e of entries) {
+                if (e.is_new && !e.override) pending++;
+            }
+            totalPending += pending;
+            languages.push({
+                code: l.code,
+                name: l.name,
+                base_code: l.base_code,
+                is_system: l.is_system,
+                total: entries.length,
+                pending: pending
+            });
+        }
+        return { totalPending: totalPending, languages: languages };
+    });
+    return cached || { totalPending: 0, languages: [] };
 }
 
 /**
@@ -300,6 +336,7 @@ module.exports = {
     createCustomLanguage,
     invalidateI18nCache,
     invalidateI18nLanguages,
+    getI18nSummary,
     warmI18nLanguage,
     warmupI18nCache,
     // 导出纯函数供测试

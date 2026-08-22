@@ -63,12 +63,25 @@ window.__admin.i18nPage = (function () {
     var dirty = reactive({});        // 草稿 {key: ''}；'' 表示删除覆盖恢复基线
     var shown = reactive({});        // 每组已渲染条数（分组缓存）
     var createForm = reactive({ name: '', baseCode: 'en' });
+    var summary = ref(null);         // 待翻译汇总（跨语言，侧边栏红点 + 页内横幅）
+    var showOnlyPending = ref(false); // 只看待翻译（顶部横幅「查看待翻译」）
 
     // 清理草稿（切语言/重载时丢弃旧草稿；分组折叠/已展示条数保留，
     // 避免保存或切语言后所有分类收起——展开状态属通用视图状态，跨语言复用）
     function clearDirty() {
         Object.keys(dirty).forEach(function (k) { delete dirty[k]; });
     }
+
+    // 待翻译统计（当前语言）：待翻译 = is_new && !override；快照词条视为已完成
+    var pendingInfo = computed(function () {
+        var list = entries.value;
+        var total = list.length;
+        var pending = 0;
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].is_new && !list[i].override) pending++;
+        }
+        return { total: total, pending: pending, percent: total > 0 ? Math.round((total - pending) / total * 100) : 100 };
+    });
 
     // 分类折叠组（分组 = key 首个点分前缀；搜索时强制展开并按 500 条上限显示）
     var groups = computed(function () {
@@ -82,35 +95,46 @@ window.__admin.i18nPage = (function () {
                     String(r.original).toLowerCase().indexOf(kw) !== -1;
                 if (!hit) return;
             }
+            // 只看待翻译：过滤掉已翻译（非 is_new 或已覆盖）词条
+            if (showOnlyPending.value && !(r.is_new && !r.override)) return;
             var cat = r.key.split('.')[0] || '_';
             if (!map[cat]) { map[cat] = []; order.push(cat); }
             map[cat].push(r);
         });
         return order.map(function (cat) {
             var rows = map[cat];
-            var collapsedFlag = kw ? false : collapsed[cat] !== false; // 缺省折叠；搜索强制展开
-            var limit = collapsedFlag ? 0 : (shown[cat] || PAGE_CHUNK);
-        // 每行 dirty 判定：逐 key 直接读 dirty[r.key] 建立响应式依赖
-        // （hasOwnProperty.call 不经过 Vue 的 get trap（无 getOwnPropertyDescriptor），
-        //  且短路写法在 key 首次写入前从未触发 get → computed 不重算，badge/脏色不出现）
-        var visible = collapsedFlag ? [] : rows.slice(0, limit).map(function (r) {
-            var d = dirty[r.key];
-            return {
-                key: r.key,
-                original: r.original,
-                value: r.value,
-                override: r.override,
-                is_new: r.is_new,
-                zh: r.zh,
-                dirty: d !== undefined && d !== r.value
-            };
-        });
+            // 搜索 / 只看待翻译 时强制展开；否则跟随折叠/展开状态并分页
+            var effectiveExpand = !!(kw || showOnlyPending.value);
+            var collapsedFlag = effectiveExpand ? false : collapsed[cat] !== false; // 缺省折叠
+            var limit = collapsedFlag ? 0 : (showOnlyPending.value ? rows.length : (shown[cat] || PAGE_CHUNK));
+            // 每行 dirty 判定：逐 key 直接读 dirty[r.key] 建立响应式依赖
+            // （hasOwnProperty.call 不经过 Vue 的 get trap（无 getOwnPropertyDescriptor），
+            //  且短路写法在 key 首次写入前从未触发 get → computed 不重算，badge/脏色不出现）
+            var visible = collapsedFlag ? [] : rows.slice(0, limit).map(function (r) {
+                var d = dirty[r.key];
+                return {
+                    key: r.key,
+                    original: r.original,
+                    value: r.value,
+                    override: r.override,
+                    is_new: r.is_new,
+                    zh: r.zh,
+                    dirty: d !== undefined && d !== r.value
+                };
+            });
+            var pending = 0;
+            for (var i = 0; i < rows.length; i++) {
+                if (rows[i].is_new && !rows[i].override) pending++;
+            }
             return {
                 key: cat,
                 label: cat,
                 // 描述走 t()（读 _translations → 响应式依赖），语言切换时 groups 自动重算更新
                 desc: CATEGORY_DESC[cat] ? window.__i18n.t(CATEGORY_DESC[cat]) : '',
                 count: rows.length,
+                pending: pending,
+                percent: rows.length > 0 ? Math.round((rows.length - pending) / rows.length * 100) : 100,
+                hasPending: pending > 0,
                 visible: visible,
                 hasMore: !collapsedFlag && rows.length > visible.length
             };
@@ -149,11 +173,22 @@ window.__admin.i18nPage = (function () {
                 selectedCode.value = 'zh-CN';
             }
             var code = selectedCode.value;
-            var data = await api('/admin/i18n/languages/' + encodeURIComponent(code) + '/entries');
+            var entriesPromise = api('/admin/i18n/languages/' + encodeURIComponent(code) + '/entries');
+            // 并行拉待翻译汇总（页内横幅 + 侧边栏红点）；失败不阻塞条目展示
+            var summaryPromise = api('/admin/i18n/summary').then(function (s) {
+                summary.value = s;
+                if ($.i18nPendingCount) $.i18nPendingCount.value = (s && s.totalPending) || 0;
+                return s;
+            }).catch(function (e) {
+                console.error('加载 i18n 待翻译汇总失败', e && e.message);
+                return null;
+            });
+            var data = await entriesPromise;
             entries.value = (data && data.entries) || [];
             currentLanguage.value = (data && data.language) || null;
             isCustom.value = !!(data && data.language && !data.language.is_system);
             clearDirty();
+            await summaryPromise;
         } catch (e) {
             console.error('加载 i18n 条目失败', e && e.message);
             alert(window.__i18n.t('admin.i18n.loadFail'));
@@ -171,6 +206,17 @@ window.__admin.i18nPage = (function () {
     // 分组增量加载（展开超过 200 条时）
     function loadMore(cat) {
         shown[cat] = (shown[cat] || PAGE_CHUNK) + PAGE_CHUNK;
+    }
+
+    // 只看待翻译（顶部横幅「查看待翻译」；打开时清空搜索避免过滤叠加）
+    function openPending() {
+        search.value = '';
+        showOnlyPending.value = true;
+    }
+
+    // 退出待翻译视图
+    function closePending() {
+        showOnlyPending.value = false;
     }
 
     // ==================== 词条输入/回显（3. 保存后回显改动值） ====================
@@ -346,7 +392,10 @@ window.__admin.i18nPage = (function () {
         collapsed: collapsed,
         dirty: dirty,
         createForm: createForm,
+        summary: summary,
+        showOnlyPending: showOnlyPending,
         groups: groups,
+        pendingInfo: pendingInfo,
         dirtyCount: dirtyCount,
         resetDisabled: resetDisabled,
         // 方法
@@ -355,6 +404,8 @@ window.__admin.i18nPage = (function () {
         resetAll: resetAll,
         toggleGroup: toggleGroup,
         loadMore: loadMore,
+        openPending: openPending,
+        closePending: closePending,
         fieldValue: fieldValue,
         onFieldInput: onFieldInput,
         rowOverridable: rowOverridable,

@@ -14,6 +14,20 @@
             </div>
         </div>
 
+        <!-- 待翻译横幅（当前语言存在新增未译词条时） -->
+        <div v-if="i18nPage.pendingInfo.value.pending > 0" class="i18n-pending-banner d-flex align-items-center gap-2 mb-3">
+            <span class="i18n-pending-warn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </span>
+            <span class="banner-text">{{ tFormat('admin.i18n.pendingBanner', i18nPage.pendingInfo.value.pending) }}</span>
+            <template v-if="!i18nPage.showOnlyPending.value">
+                <pv-button variant="outline" size="lg" @click="i18nPage.openPending()">{{ t('admin.i18n.viewPending') }}</pv-button>
+            </template>
+            <template v-else>
+                <pv-button variant="outline" size="lg" @click="i18nPage.closePending()">{{ t('admin.i18n.exitPending') }}</pv-button>
+            </template>
+        </div>
+
         <!-- 语言选择 + 自定义语言操作 + 搜索 -->
         <div class="card mb-3">
             <div class="card-body">
@@ -51,15 +65,22 @@
                     <span class="fw-bold">{{ cat.label }}</span>
                     <small class="text-muted">（{{ tFormat('admin.i18n.countEntries', cat.count) }}）</small>
                     <span class="i18n-cat-desc">{{ cat.desc }}</span>
+                    <span v-if="cat.hasPending" class="i18n-pending-warn" :title="tFormat('admin.i18n.pendingCount', cat.pending)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    </span>
+                    <span v-if="cat.hasPending" class="i18n-badge i18n-badge--new">{{ tFormat('admin.i18n.pendingCount', cat.pending) }} · {{ tFormat('admin.i18n.progress', cat.percent) }}</span>
                     <span class="ms-auto notification-chevron">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: i18nPage.collapsed[cat.key] === false ? 'rotate(90deg)' : 'rotate(0deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
                     </span>
                 </div>
-                <div v-if="i18nPage.collapsed[cat.key] === false || i18nPage.search.value" class="notification-group-items">
+                <div v-if="i18nPage.collapsed[cat.key] === false || i18nPage.search.value || i18nPage.showOnlyPending.value" class="notification-group-items">
                     <div v-for="row in cat.visible" :key="row.key" class="notification-item-row p-3">
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                             <code class="i18n-key-text" :title="row.key">{{ row.key }}</code>
                             <span v-if="row.is_new" class="i18n-badge i18n-badge--new">{{ t('admin.i18n.isNew') }}</span>
+                            <span v-if="row.is_new && !row.override" class="i18n-pending-warn" :title="t('admin.i18n.isNew')">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                            </span>
                             <span v-if="row.override && !row.dirty" class="i18n-badge i18n-badge--override">{{ t('admin.i18n.overridden') }}</span>
                             <span v-if="row.dirty" class="i18n-badge i18n-badge--dirty">{{ t('admin.i18n.dirty') }}</span>
                             <span class="ms-auto">
@@ -82,7 +103,7 @@
                 </div>
             </div>
             <div v-if="!i18nPage.groups.value.length && !i18nPage.loading.value" class="text-muted text-center py-4">
-                {{ i18nPage.search.value ? t('admin.i18n.emptySearch') : t('admin.i18n.empty') }}
+                {{ (i18nPage.search.value || i18nPage.showOnlyPending.value) ? t('admin.i18n.emptySearch') : t('admin.i18n.empty') }}
             </div>
         </div>
 

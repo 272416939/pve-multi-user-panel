@@ -39,6 +39,8 @@
     setupCustomConfirm($.customConfirmMessage, $.customConfirmResolve);
     setupCustomPrompt($.customPromptMessage, $.customPromptValue, $.customPromptResolve);
     $.unreadCount = ref(0);
+    // i18n 待翻译跨语言汇总（「其他选项」侧边栏红点；由 loadI18nSummary / i18nPage.load 更新）
+    $.i18nPendingCount = ref(0);
     $.destroyLxcConfirmText = ref('');
     $.currentMsg = ref({ title: '', content: '', type: 1, created_at: '' });
 // ==================== 详情弹窗状态 ====================
@@ -308,6 +310,7 @@ watch($.user, function(u) {
                 $.loadEmailQueueStats ? $.loadEmailQueueStats() : Promise.resolve(),
                 $.loadEmailTemplates ? $.loadEmailTemplates() : Promise.resolve(),
                 $.loadEmailShell ? $.loadEmailShell() : Promise.resolve(),
+                $.loadI18nSummary ? $.loadI18nSummary() : Promise.resolve(),
                 $.loadPveConfig(),
                 $.loadIkuaiConfig(),
                 $.loadRedisConfig(),
@@ -373,6 +376,16 @@ watch($.user, function(u) {
             }
         } catch (e) {
             $.rechargeError.value = window.__i18n.t('shared.retryLater');
+        }
+    };
+
+    $.loadI18nSummary = async function() {
+        // 侧边栏「其他选项」红点：跨语言待翻译（is_new && !override）总数量
+        try {
+            var data = await api('/admin/i18n/summary');
+            $.i18nPendingCount.value = (data && data.totalPending) || 0;
+        } catch (e) {
+            console.error('加载 i18n 待翻译汇总失败', e && e.message);
         }
     };
 
