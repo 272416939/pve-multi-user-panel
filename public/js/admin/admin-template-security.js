@@ -14,7 +14,6 @@
             <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <div>
                     <strong>{{ t('admin.ratelimit.master') }}</strong>
-                    <p class="text-muted small mb-0">{{ t('admin.ratelimit.masterDesc') }}</p>
                 </div>
                 <div class="form-check form-switch">
                     <input class="form-check-input" type="checkbox" id="rateLimitMaster" v-model="rateLimitConfig.master_enabled">
