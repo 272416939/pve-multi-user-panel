@@ -155,7 +155,7 @@
                     <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
                 </a>
                 <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-security">
-                    <a :title="t('nav.rateLimit')" class="nav-item" data-subsection="security-ratelimit" href="#" @click.prevent="switchSection('security'); activeTabSecurity = 'ratelimit'"><span class="nav-text">{{ t('nav.rateLimit') }}</span></a>
+                    <a :title="t('nav.rateLimit')" class="nav-item" :class="{ active: activeSection === 'security' && activeTabSecurity === 'ratelimit' }" data-subsection="security-ratelimit" href="#" @click.prevent="switchSection('security'); activeTabSecurity = 'ratelimit'"><span class="nav-text">{{ t('nav.rateLimit') }}</span></a>
                 </div>
 
                 <!-- 日志中心（独立一级菜单，仅admin） -->
