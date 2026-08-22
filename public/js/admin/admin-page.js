@@ -436,6 +436,9 @@ app.component('private-network-list', {
       // 挂载完成后 Vue 才渲染出 header 的头像下拉菜单（含徽章/余额/退出按钮）；
       // shared.js 的 DOMContentLoaded 一次性绑定此时已错过，需在此补触发余额加载
       if (window.loadHeaderBalance) window.loadHeaderBalance();
+      // #themeToggle 是 Vue 渲染（mount 后才有），DOMContentLoaded 时 getElementById 找不到即静默返回
+      // （28bba00 把 mount 挪进 await i18n.init 后导致）；必须在 mount 后补调主题切换绑定
+      if (window.initThemeToggle) window.initThemeToggle();
   })();
 
   // ===== Bottom inline script (DOM utilities) =====
@@ -445,9 +448,6 @@ app.component('private-network-list', {
   }
   document.addEventListener('DOMContentLoaded', function() {
       // 注意：侧边栏导航点击已由 Vue @click.prevent + switchSection() 统一处理（含移动端自动收起）
-
-      // 统一主题切换（theme-init.js 中的 window.initThemeToggle）
-      if (window.initThemeToggle) window.initThemeToggle();
 
       // 界面模板个人偏好同步（跨设备，管理员个人偏好同样生效）
       if (window.syncUserTemplate) window.syncUserTemplate();

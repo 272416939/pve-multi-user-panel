@@ -21,7 +21,7 @@
         <div class="dropdown">
             <div class="user-info-dropdown" data-bs-toggle="dropdown">
                 <img class="header-user-avatar" id="headerAvatar" alt="" />
-                <span id="headerUsername">{{ t('login.username') }}</span>
+                <span id="headerUsername" data-i18n="login.username">{{ t('login.username') }}</span>
             </div>
             <ul class="dropdown-menu dropdown-menu-end">
                 <%# L-10 修复：删除原 headerDropdownExtra 未转义注入点（全项目无任何数据流，属死代码；如未来需要注入可信 HTML，必须走白名单/转义方案） %>

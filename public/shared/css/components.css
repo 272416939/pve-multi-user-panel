@@ -995,6 +995,11 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     flex: 1 1 auto;
 }
 
+/* 清单横幅：标签不撑满，待翻译语言 chips 紧跟左对齐（当前语言横幅的「查看/退出」按钮仍需靠右） */
+.i18n-pending-banner--langs .banner-text {
+    flex: 0 0 auto;
+}
+
 /* 待翻译语言清单 chip（可点击切换） */
 .i18n-lang-chip {
     display: inline-flex;
