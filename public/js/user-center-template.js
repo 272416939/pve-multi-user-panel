@@ -10,36 +10,36 @@
         <div v-else>
             <!-- 侧边栏子导航（通过Teleport渲染到#sidebarSubNav） -->
             <Teleport to="#sidebarSubNav">
-                <a class="nav-item" :class="{ active: activeSubTab === 'settings' }"
+                <a class="nav-item" :title="t('nav.personal')" :class="{ active: activeSubTab === 'settings' }"
                    @click.prevent="switchSubTab('settings')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span><span class="nav-text">{{ t('nav.personal') }}</span>
                 </a>
-                <a class="nav-item" :class="{ active: activeSubTab === 'memos' }"
+                <a class="nav-item" :title="t('nav.memos')" :class="{ active: activeSubTab === 'memos' }"
                    @click.prevent="switchSubTab('memos')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">{{ t('nav.memos') }}</span>
                 </a>
-                <a class="nav-item" :class="{ active: activeSubTab === 'messages' }"
+                <a class="nav-item" :title="t('nav.messages')" :class="{ active: activeSubTab === 'messages' }"
                    @click.prevent="switchSubTab('messages')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span><span class="nav-text">{{ t('nav.messages') }}</span>
                     <span v-if="unreadCount > 0" class="nav-badge">{{ unreadCount }}</span>
                 </a>
-                <a class="nav-item" :class="{ active: activeSubTab === 'notifications' }"
+                <a class="nav-item" :title="t('nav.notifications')" :class="{ active: activeSubTab === 'notifications' }"
                    @click.prevent="switchSubTab('notifications')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span><span class="nav-text">{{ t('nav.notifications') }}</span>
                 </a>
-                <a class="nav-item" :class="{ active: activeSubTab === 'security' }"
+                <a class="nav-item" :title="t('nav.security')" :class="{ active: activeSubTab === 'security' }"
                    @click.prevent="switchSubTab('security')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span><span class="nav-text">{{ t('nav.security') }}</span>
                 </a>
-                <a class="nav-item" :class="{ active: activeSubTab === 'wallet-recharge' }"
+                <a class="nav-item" :title="t('nav.recharge')" :class="{ active: activeSubTab === 'wallet-recharge' }"
                    @click.prevent="switchSubTab('wallet-recharge')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span><span class="nav-text">{{ t('nav.recharge') }}</span>
                 </a>
-                <a class="nav-item" :class="{ active: activeSubTab === 'wallet-transactions' }"
+                <a class="nav-item" :title="t('nav.transactions')" :class="{ active: activeSubTab === 'wallet-transactions' }"
                    @click.prevent="switchSubTab('wallet-transactions')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span><span class="nav-text">{{ t('nav.transactions') }}</span>
                 </a>
-                <a class="nav-item" :class="{ active: activeSubTab === 'orders' }"
+                <a class="nav-item" :title="t('nav.myOrders')" :class="{ active: activeSubTab === 'orders' }"
                    @click.prevent="switchSubTab('orders')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg></span><span class="nav-text">{{ t(&#39;nav.myOrders&#39;) }}</span>
                 </a>

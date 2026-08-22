@@ -91,7 +91,8 @@ body {
     font-weight: 500; box-shadow: none; }
 .nav-item.has-children.active::before { transform: scaleY(0); }
 .nav-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
-.nav-text { white-space: nowrap; }
+/* 侧边栏文案超长统一省略号（en/de/fr 等拉丁语系比中文长，硬裁切会遮字）；flex + min-width:0 让 flex 子项可收缩出省略号 */
+.nav-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 auto; min-width: 0; }
 /* 侧边栏遮罩：opacity/visibility 过渡实现淡入淡出（display 切换无法过渡），三端共用；
    全屏覆盖（left:0），与 dashboard 端一致，避免半屏遮罩的生硬感 */
 .sidebar-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5);
@@ -111,6 +112,7 @@ body {
 .nav-item.has-children .nav-arrow {
     transition: transform 0.2s ease;
     margin-left: auto;
+    flex-shrink: 0;
 }
 .nav-item.has-children.expanded .nav-arrow {
     transform: rotate(90deg);
