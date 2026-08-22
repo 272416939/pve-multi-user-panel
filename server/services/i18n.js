@@ -7,8 +7,11 @@
  *   不落覆盖表、不掉回 zh-CN；管理页打「新增」徽标，写入覆盖后即固定
  * 系统语言：显示值 = 内置文件值 ?? 覆盖（覆盖见 i18n_entries 表；语言文件永不写入）
  *
- * 性能：合并结果 60s 缓存（cache-store：Redis 优先 / 进程内存回退），写操作立即失效；
- * 系统语言无覆盖时前端仍走静态文件路径，本服务不参与（零新增请求）
+ * 缓存语义（长缓存 + 写时失效，非 TTL 兜底）：基线是「语言文件 + DB 覆盖表」这种改了才变的
+ * 数据，故用长 TTL（30 天）实现「无修改不回源」，失效由写操作 invalidateI18nCache([code]) 驱动
+ * （保存词条/新建/改名/删除/恢复默认均触发）。启动时 warmupI18nCache() 预热（先清 Redis 残留
+ * 旧键再回源填充），保证首个请求前缓存就绪；发版新增词条由「发布必重启 + 预热清残留重读新文件」覆盖。
+ * 系统语言无覆盖时前端仍走静态文件路径，本服务不参与（零新增请求）。
  */
 const fs = require('fs');
 const path = require('path');
@@ -16,9 +19,12 @@ const cacheStore = require('../utils/cache-store');
 const db = require('../api/db');
 const { SYSTEM_LOCALES, LOCALE_NAMES } = require('../constants');
 
-const localeCache = cacheStore.create('i18n:locale', 60);
-const languagesCache = cacheStore.create('i18n:languages', 60);
-const entriesCache = cacheStore.create('i18n:entries', 60); // 管理页词条列表（含 zh 母本），60s 缓存写后失效
+// 长缓存 TTL（30 天）：无修改时持续命中不回源，失效以写操作 invalidateI18nCache 为准
+const I18N_CACHE_TTL = 30 * 24 * 3600;
+
+const localeCache = cacheStore.create('i18n:locale', I18N_CACHE_TTL);
+const languagesCache = cacheStore.create('i18n:languages', I18N_CACHE_TTL);
+const entriesCache = cacheStore.create('i18n:entries', I18N_CACHE_TTL); // 管理页词条列表（含 zh 母本），长缓存写后失效
 
 // 内置语言文件名白名单（防路径穿越：只允许 7 个固定文件名映射，绝不使用用户输入拼接路径）
 const LOCALE_FILES = {};
@@ -251,6 +257,19 @@ async function invalidateI18nCache(codes) {
     }
 }
 
+/**
+ * 启动预热：回源填充全部语言的缓存（语言列表 + 合并内容 + 管理页词条列表）
+ * 由 server.js 启动阶段调用（先 invalidateI18nCache 清 Redis 残留旧键，再 warmup 从最新文件+覆盖表重建）。
+ * 数据量小（7 系统语言 + 少量自定义），同步执行保证首个请求前缓存就绪；预热异常由调用方降级 warn。
+ */
+async function warmupI18nCache() {
+    const langs = await getLanguages();
+    for (const l of langs) {
+        await resolveLocale(l.code);
+        await getLocaleEntries(l.code);
+    }
+}
+
 module.exports = {
     getLanguages,
     isSupportedLocale,
@@ -260,6 +279,7 @@ module.exports = {
     getLocaleEntries,
     createCustomLanguage,
     invalidateI18nCache,
+    warmupI18nCache,
     // 导出纯函数供测试
     isLogicalKey,
     readLocaleFile

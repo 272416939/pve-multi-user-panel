@@ -591,6 +591,18 @@ httpServer.listen(PORT, async () => {
         console.warn('[template] 预编译失败（不影响运行，首次访问时自动编译）:', e.message);
     }
 
+    // i18n 缓存预热：先清 Redis 残留旧键（部署后旧基线），再从最新语言文件+覆盖表回源填充。
+    // 长缓存语义「无修改不回源」，失效由写操作 invalidateI18nCache 驱动（保存词条/新建/改名/删除/恢复默认）；
+    // 发版新增词条由「发布必重启 + 预热清残留重读新文件」覆盖。失败降级 warn 不阻断启动（与其它预热块一致）。
+    try {
+        const i18n = require('./services/i18n');
+        await i18n.invalidateI18nCache();
+        await i18n.warmupI18nCache();
+        console.log('[i18n] 缓存预热完成');
+    } catch (e) {
+        console.warn('[i18n] 缓存预热失败（不影响运行，请求时自动回源）:', e.message);
+    }
+
     try {
         const pveApi = require('./api/pve-api');
         await pveApi.detectNode();
