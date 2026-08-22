@@ -10,13 +10,13 @@ var cacheStore = require('../utils/cache-store');
 var { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
 // 单一来源：周期常量统一走 constants（规范第七节）
-var { VALID_PERIODS } = require('../constants');
+var { VALID_PERIODS, FRONTEND_CACHE_TTL } = require('../constants');
 // 开通业务下沉 services/（规范第七节）
 var provisioning = require('../services/provisioning');
 
-// 套餐列表缓存（5 分钟 TTL，低频变更场景；cache-store 按 namespace 单例，与 service 共享）
-var vmPackageCache = cacheStore.create('vm_packages', 300);
-var lxcPackageCache = cacheStore.create('lxc_packages', 300);
+// 套餐列表缓存（FRONTEND_CACHE_TTL；增删改/开通扣库存均即时失效，cache-store 按 namespace 单例与 service 共享）
+var vmPackageCache = cacheStore.create('vm_packages', FRONTEND_CACHE_TTL);
+var lxcPackageCache = cacheStore.create('lxc_packages', FRONTEND_CACHE_TTL);
 
 // 操作审计统一封装（敏感写操作埋点，失败不影响主流程；规范十一）
 async function adminAudit(req, action, details) {

@@ -321,7 +321,9 @@ httpServer.on('upgrade', (request, socket, head) => {
 app.locals.siteConfigCache = { data: null, expires: 0 };
 function getRedisClient() { return require('./api/redis').getRedisClient(); }
 var SITE_CONFIG_REDIS_KEY = 'site_config';
-var SITE_CONFIG_TTL = 60; // 秒
+// 站点配置缓存 TTL：保存站点设置时主动失效（Redis del + 内存置空，admin-config.js），
+// 60s → 1h 提升页面渲染速度；漏失效兜底见启动清理 clearFrontendCachesOnStartup
+var SITE_CONFIG_TTL = require('./constants').FRONTEND_CACHE_TTL; // 秒
 
 async function getSiteConfigCached() {
     var now = Date.now();
@@ -419,9 +421,9 @@ app.get('/login', async (req, res) => {
     }
     res.render('pages/login', { title: '登录', page: 'login' }, function(err, html) {
         if (err) return res.status(500).send('服务器内部错误');
-        // 异步写入 Redis 缓存（60s TTL，不阻塞响应）
+        // 异步写入 Redis 缓存（FRONTEND_CACHE_TTL，不阻塞响应）；保存站点设置时主动 del（admin-config.js）
         if (redis) {
-            redis.set('page:login', html, 'EX', 60).catch(() => {});
+            redis.set('page:login', html, 'EX', require('./constants').FRONTEND_CACHE_TTL).catch(() => {});
         }
         res.send(html);
     });
@@ -589,6 +591,30 @@ httpServer.listen(PORT, async () => {
         console.log('[template] 预编译完成: ' + pages.length + ' 个模板');
     } catch (e) {
         console.warn('[template] 预编译失败（不影响运行，首次访问时自动编译）:', e.message);
+    }
+
+    // 前端数据缓存启动清空：Redis 层跨重启存活，发版后旧结构数据会按剩余 TTL 继续服务；
+    // 用户要求「重启后全部清空」——启动时定向清理前端数据缓存命名空间。
+    // 严禁 clearAll()：会误清 jwt_blacklist（已登出 token 复活=安全回归）、限速计数、分布式锁。
+    // 失败降级 warn 不阻断启动（与其它预热块一致）。
+    try {
+        const cacheStore = require('./utils/cache-store');
+        var frontendCacheNamespaces = ['profile', 'admin_users', 'vm_packages', 'lxc_packages',
+            'disk_specs', 'storage_groups', 'email_template', 'email_shell'];
+        for (var fci = 0; fci < frontendCacheNamespaces.length; fci++) {
+            await cacheStore.clearNamespace(frontendCacheNamespaces[fci]);
+        }
+        var frontendRedis = getRedisClient();
+        if (frontendRedis) {
+            try {
+                await frontendRedis.del('site_config');
+                await frontendRedis.del('page:login');
+            } catch (e) {}
+        }
+        app.locals.siteConfigCache = { data: null, expires: 0 };
+        console.log('[cache] 前端数据缓存启动清理完成: ' + frontendCacheNamespaces.length + ' 个命名空间 + site_config/page:login');
+    } catch (e) {
+        console.warn('[cache] 前端数据缓存启动清理失败（不影响运行，TTL 到期自动回源）:', e.message);
     }
 
     // i18n 缓存预热：先清 Redis 残留旧键（部署后旧基线），再从最新语言文件+覆盖表回源填充。

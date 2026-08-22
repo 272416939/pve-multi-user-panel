@@ -193,8 +193,10 @@ function create(namespace, ttlSeconds) {
             if (typeof loader === 'function') {
                 var value = await loader(key);
                 if (value === null || value === undefined) {
-                    // 缓存空值防止穿透，短 TTL
-                    await cache.set(key, null, Math.floor(ttlSeconds / 4 || 10));
+                    // 缓存空值防止穿透，短 TTL（主 TTL 的 1/4，封顶 60s——
+                    // 长 TTL（如 3600s）下负缓存会被同比放大到 15 分钟，「查无数据」窗口过长）
+                    var negativeTtl = Math.min(Math.floor((ttlSeconds || 40) / 4), 60);
+                    await cache.set(key, null, Math.max(negativeTtl, 10));
                     return null;
                 }
                 await cache.set(key, value);
@@ -283,8 +285,20 @@ async function clearAll() {
     await scanDel('*');
 }
 
+/**
+ * 清空单个命名空间（内存 + Redis）
+ * 供启动时定向清理前端数据缓存用——绝不能用 clearAll()：会误清
+ * jwt_blacklist（已登出 token 复活=安全回归）、限速计数、分布式锁
+ */
+async function clearNamespace(namespace) {
+    if (memoryStores[namespace]) {
+        memoryStores[namespace].map.clear();
+    }
+    await scanDel(namespace + ':*');
+}
+
 module.exports = {
-    create, clearAll,
+    create, clearAll, clearNamespace,
     // 导出纯函数供测试
     computeJitteredTtl,
     shouldSerialize,

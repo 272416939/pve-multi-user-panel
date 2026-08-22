@@ -45,6 +45,13 @@ var TEMPLATE_STATUS = ['active', 'maintenance', 'deprecated'];
 // 支付方式白名单
 var PAYMENT_METHODS = ['alipay', 'wxpay'];
 
+// ==================== 缓存 ====================
+
+// 前端数据缓存统一 TTL（秒）：profile / site_config / page:login / 套餐 / 磁盘规格 / 邮件模板等
+// 延长 TTL 的前置条件是写路径失效完备（见 services/profile-cache.js 与各 cache 消费点）；
+// 认证类（device/user_active/jwt_blacklist）、pve 只读缓存（面板外变更唯一安全网）不适用本值
+var FRONTEND_CACHE_TTL = 3600;
+
 // 界面模板（UI 模板体系）：'default' = 赛博霓虹（默认），'saas' = SAAS 企业风
 // 用户级偏好额外允许 ''（跟随站点默认），见 db-users.js userSettings 校验
 var UI_TEMPLATES = ['default', 'saas'];
@@ -250,6 +257,7 @@ module.exports = {
     ORDER_STATUS,
     TEMPLATE_STATUS,
     PAYMENT_METHODS,
+    FRONTEND_CACHE_TTL,
     UI_TEMPLATES,
     SYSTEM_LOCALES,
     SUPPORTED_LOCALES,

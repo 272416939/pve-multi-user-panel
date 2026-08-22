@@ -15,11 +15,11 @@ const { calculateAmount, setVmAffinity, generateOrderNo } = require('../utils/or
 const { withTransaction } = require('../utils/with-transaction');
 const { takeDiskSnapshot } = require('../services/disk-audit');
 const { formatLocalDate } = require('../utils/date');
-const { VALID_PERIODS, getPeriodDays, MAX_PERIOD_COUNT } = require('../constants');
+const { VALID_PERIODS, getPeriodDays, MAX_PERIOD_COUNT, FRONTEND_CACHE_TTL } = require('../constants');
 
-// 套餐列表缓存（5 分钟 TTL，低频变更场景；cache-store 按 namespace 单例，与路由共享同一份）
-var vmPackageCache = cacheStore.create('vm_packages', 300);
-var lxcPackageCache = cacheStore.create('lxc_packages', 300);
+// 套餐列表缓存（FRONTEND_CACHE_TTL；增删改/开通扣库存均即时失效，cache-store 按 namespace 单例与路由共享同一份）
+var vmPackageCache = cacheStore.create('vm_packages', FRONTEND_CACHE_TTL);
+var lxcPackageCache = cacheStore.create('lxc_packages', FRONTEND_CACHE_TTL);
 
 function generateRandomPassword() {
     var chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';

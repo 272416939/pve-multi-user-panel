@@ -2,7 +2,7 @@
  * 邮件模板渲染引擎
  *
  * 职责：模板读取（DB 优先 + 常量注册表兜底）→ 变量替换 → 套共享外壳 → 发送
- * - getTemplate(code)：cache-store 缓存（TTL 300s），保存/恢复默认后 invalidateTemplateCache() 主动失效
+ * - getTemplate(code)：cache-store 缓存（FRONTEND_CACHE_TTL），保存/恢复默认后 invalidateTemplateCache() 主动失效
  * - renderTemplate(code, vars)：返回 { subject, title, content, site_name }
  * - sendTemplateEmail(to, code, vars, { sync })：sync=true 走 sendEmail（验证码/重置/测试等即时反馈场景），
  *   否则走 enqueueEmail（通知类异步队列）
@@ -17,8 +17,9 @@
  */
 const { create } = require('../utils/cache-store');
 const { EMAIL_TEMPLATES } = require('../constants/email-templates');
+const { FRONTEND_CACHE_TTL } = require('../constants');
 
-const templateCache = create('email_template', 300);
+const templateCache = create('email_template', FRONTEND_CACHE_TTL);
 
 const VAR_RE = /\{([a-z0-9_]+)\}/g;
 

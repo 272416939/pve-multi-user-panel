@@ -663,7 +663,11 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         if (lang !== undefined) await setConfig('site:lang', lang);
         // 清除站点配置缓存（Redis + 进程内存），确保下次请求重新加载
         var redis = require('../api/redis').getRedisClient();
-        if (redis) { try { await redis.del('site_config'); } catch (e) {} }
+        if (redis) {
+            try { await redis.del('site_config'); } catch (e) {}
+            // 登录页整页渲染缓存同样由站点配置渲染，TTL 已延长到 1h，必须同步失效
+            try { await redis.del('page:login'); } catch (e) {}
+        }
         if (req.app.locals.siteConfigCache) {
             req.app.locals.siteConfigCache.data = null;
             req.app.locals.siteConfigCache.expires = 0;

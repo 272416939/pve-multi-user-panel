@@ -11,8 +11,10 @@ const { withTransaction } = require('../utils/with-transaction');
 const { safeError } = require('../utils/safe-error');
 const { hashPassword, verifyPassword } = require('../utils/password-hash');
 const { isValidEmail } = require('../utils/email-validate');
-// 用户列表缓存（30s TTL，低频变更场景）
+// 用户列表缓存（30s TTL，低频变更场景——保持短 TTL：注册/用户自助改资料等写路径分散，无失效入口）
 const userListCache = cacheStore.create('admin_users', 30);
+// 管理员编辑用户后失效目标用户的 profile 缓存（TTL 1h，见 services/profile-cache.js）
+const { invalidateProfile } = require('../services/profile-cache');
 
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -239,6 +241,8 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     await db.users.update(userId, updates);
     await userListCache.del('list');
     await invalidateUserActiveCache(userId);
+    // 目标用户的 profile 缓存同步失效（改邮箱/角色/用户名/强制改密标记都会进缓存对象）
+    await invalidateProfile(userId);
     // 操作审计：管理员修改用户资料（角色/用户名/邮箱变更摘要；密码重置单独记 password.reset.admin）
     try {
         var changeParts = [];

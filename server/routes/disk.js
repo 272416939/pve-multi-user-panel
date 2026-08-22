@@ -11,13 +11,13 @@ var { safeError } = require('../utils/safe-error');
 var db = require('../api/db');
 var cacheStore = require('../utils/cache-store');
 // 单一来源：周期常量统一走 constants（规范第七节）
-var { VALID_PERIODS } = require('../constants');
+var { VALID_PERIODS, FRONTEND_CACHE_TTL } = require('../constants');
 // 磁盘生命周期业务下沉 services/disk.js（规范第七节）
 var diskService = require('../services/disk');
 
 // PERF-07: 复用管理端磁盘规格/存储分组缓存（同一命名空间，管理端写操作 clearDiskCache 同时失效）
-var specCache = cacheStore.create('disk_specs', 300);
-var groupCache = cacheStore.create('storage_groups', 300);
+var specCache = cacheStore.create('disk_specs', FRONTEND_CACHE_TTL);
+var groupCache = cacheStore.create('storage_groups', FRONTEND_CACHE_TTL);
 
 
 // ==================== 中间件：权限校验 ====================

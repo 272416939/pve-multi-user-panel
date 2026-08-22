@@ -15,15 +15,14 @@ const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const getSiteUrl = require('../utils/site-url');
 const { sendTemplateEmail } = require('../services/email-template');
 const { hashPassword, verifyPassword, isStrongPassword } = require('../utils/password-hash');
-const cacheStore = require('../utils/cache-store');
 const { getIpLocation, getIpLocations } = require('../services/ip-location');
 const { invalidateDeviceCache, invalidateUserActiveCache, clearDeviceCache } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/safe-error');
 // 本地时间格式化统一走 utils/date.js（规范第八节：禁止 toISOString 直写）
 const { formatLocalDate } = require('../utils/date');
 const { isValidEmail } = require('../utils/email-validate');
-// profileCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
-const profileCache = cacheStore.create('profile', 60);
+// profileCache 单一来源在 services/profile-cache.js（admin-user 等模块共用失效入口），TTL=FRONTEND_CACHE_TTL
+const { profileCache, invalidateProfile } = require('../services/profile-cache');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
 
@@ -255,6 +254,8 @@ router.get('/user/profile', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: '用户不存在' });
         }
         const safeUser = sanitizeUser(user);
+        // balance 随对象一起缓存但允许脏值：前端余额显示全部走 /wallet/balance（直查 DB），
+        // 余额写路径多为事务内直写 SQL 无统一入口，不为零消费字段逐路径补失效（见 services/profile-cache.js）
         await profileCache.set(String(req.user.id), safeUser);
         res.json(safeUser);
     } catch (error) {
@@ -545,6 +546,8 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         }
         
         await db.users.update(req.user.id, { email, emailVerified: false });
+        // 缓存 TTL 已延长到 1h，换绑/绑定邮箱后必须立即失效，否则用户中心一直显示旧邮箱
+        await invalidateProfile(req.user.id);
 
         // 操作审计：邮箱变更埋点（换绑/首次绑定记录，重发验证不记录）
         // 场景显式枚举：换绑（已有邮箱且变更）→ setting.email.change；首次绑定（从未绑过）→ setting.email.bind

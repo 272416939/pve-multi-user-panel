@@ -14,11 +14,12 @@ async function getSiteName() {
 
 // ==================== 邮件外壳样式（邮件样式编辑） ====================
 // 参数定义单一来源 constants/email-templates.js 的 EMAIL_SHELL_PARAMS；
-// DB 可编辑（mail:shell_* 键），cache-store 缓存 300s，保存/恢复默认后 invalidateEmailShellCache 失效
+// DB 可编辑（mail:shell_* 键），cache-store 缓存 FRONTEND_CACHE_TTL，保存/恢复默认后 invalidateEmailShellCache 失效
 
 const { create } = require('../utils/cache-store');
+const { FRONTEND_CACHE_TTL } = require('../constants');
 
-const shellCache = create('email_shell', 300);
+const shellCache = create('email_shell', FRONTEND_CACHE_TTL);
 
 /**
  * 获取邮件外壳样式配置（带缓存；参数缺省回退注册表默认值）
