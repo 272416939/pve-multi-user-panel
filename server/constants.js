@@ -51,8 +51,9 @@ var UI_TEMPLATES = ['default', 'saas'];
 
 // ==================== 国际化（i18n） ====================
 
-// 支持的语言列表（白名单校验）
-var SUPPORTED_LOCALES = ['zh-CN', 'zh-TW', 'en', 'de', 'ja', 'ko', 'fr'];
+// 内置系统语言（只读基线；在线编辑以 i18n_entries 覆盖存储，语言文件永不写入）
+// 自定义语言由 services/i18n.js 动态注册，另存 i18n_languages 表
+var SYSTEM_LOCALES = ['zh-CN', 'zh-TW', 'en', 'de', 'ja', 'ko', 'fr'];
 
 // 语言代码 → 本地化名称映射
 var LOCALE_NAMES = {
@@ -64,6 +65,10 @@ var LOCALE_NAMES = {
     'ko': '한국어',
     'fr': 'Français'
 };
+
+// 兼容别名：白名单校验的历史引用点（routes/user-settings.js / admin-config.js）
+// 只校验系统语言；自定义语言的白名单判定统一走 services/i18n.js isSupportedLocale()
+var SUPPORTED_LOCALES = SYSTEM_LOCALES;
 
 // ==================== 限速规则（安全防护·限速设置单一来源） ====================
 
@@ -174,7 +179,8 @@ var RATE_LIMIT_CATEGORIES = [
             { key: 'cdk_redeemable', label: 'CDK可兑换资源查询', hint: '按用户，外呼PVE', max: 10, windowSec: 60 },
             { key: 'terminal_open', label: '打开终端/VNC会话', hint: '按用户，消耗SSH/VNC连接', max: 10, windowSec: 60 },
             { key: 'smtp_test', label: 'SMTP测试发送', hint: '按用户，外呼SMTP真实发信', max: 5, windowSec: 60 },
-            { key: 'email_template_op', label: '邮件模板预览/保存', hint: '按用户，渲染+外呼预览', max: 20, windowSec: 60 }
+            { key: 'email_template_op', label: '邮件模板预览/保存', hint: '按用户，渲染+外呼预览', max: 20, windowSec: 60 },
+            { key: 'i18n_op', label: 'i18n 管理写操作', hint: '按用户，新建语言/批量保存词条/恢复默认', max: 30, windowSec: 60 }
         ]
     },
     {
@@ -245,6 +251,7 @@ module.exports = {
     TEMPLATE_STATUS,
     PAYMENT_METHODS,
     UI_TEMPLATES,
+    SYSTEM_LOCALES,
     SUPPORTED_LOCALES,
     LOCALE_NAMES,
     RATE_LIMIT_CATEGORIES,

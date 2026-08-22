@@ -282,6 +282,8 @@ app.use('/api', require('./routes/user-settings'));
 app.use('/api', require('./routes/log'));
 app.use('/api', require('./routes/admin-logs'));
 app.use('/api', require('./routes/admin-email-template'));
+app.use('/api', require('./routes/i18n'));
+app.use('/api', require('./routes/admin-i18n'));
 
 const vncProxy = require('./websocket/vnc-proxy');
 const terminalProxy = require('./websocket/terminal-proxy');
@@ -380,7 +382,14 @@ app.use(async (req, res, next) => {
     // 界面模板（全站默认）：注入到 EJS，<html data-template="..."> 使用；个人偏好由 theme-init.js 在客户端覆盖
     res.locals.templateStyle = res.locals.siteConfig.template || 'default';
     // 系统默认语言（i18n）：注入到 EJS，<html lang="..."> 使用；用户个人偏好由 i18n.js 在客户端覆盖
-    res.locals.locale = res.locals.siteConfig.lang || 'zh-CN';
+    // 动态白名单校验：站点默认语言可能是指向已删除自定义语言的悬空配置，未知回退 zh-CN
+    try {
+        const { isSupportedLocale } = require('./services/i18n');
+        const siteLang = res.locals.siteConfig.lang || 'zh-CN';
+        res.locals.locale = (await isSupportedLocale(siteLang)) ? siteLang : 'zh-CN';
+    } catch (e) {
+        res.locals.locale = 'zh-CN';
+    }
     next();
 });
 

@@ -899,8 +899,8 @@ $.initDetailCharts = function() {
                 // Auto-expand submenu based on current section
                 // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates）；
                 // logs 为一级菜单（active 由模板 :class 绑定），无需展开子菜单
-                var expandSections = ['vms', 'lxc', 'network', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'port-forward', 'private-network'];
-                var submenuIdMap = { 'templates-os': 'templates', 'port-forward': 'network', 'private-network': 'network' };
+                var expandSections = ['vms', 'lxc', 'network', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'port-forward', 'private-network', 'i18n'];
+                var submenuIdMap = { 'templates-os': 'templates', 'port-forward': 'network', 'private-network': 'network', 'i18n': 'other' };
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
                         var section = $.activeSection.value;
@@ -1049,6 +1049,10 @@ $.initDetailCharts = function() {
                 if ($.activeSection.value === 'private-network') {
                     $.loadPrivateSubnets();
                 }
+                // 刷新后停留在 i18n 管理时主动加载数据
+                if ($.activeSection.value === 'i18n' && $.i18nPage) {
+                    $.i18nPage.load();
+                }
                 // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
                 setInterval(function() {
                     var token = localStorage.getItem(window.__storageKeys.TOKEN);
@@ -1130,6 +1134,10 @@ $.initDetailCharts = function() {
             // watch(activeTabSecurity) 值不变不会触发，故挂在 section 变化上；刷新路径由 onMounted 分支覆盖）
             if (val === 'security') {
                 $.loadRateLimitConfig();
+            }
+            // i18n 管理：点击/路由/刷新复用同一加载函数（规范第四节：点击路径与刷新路径必须同源）
+            if (val === 'i18n' && $.i18nPage) {
+                $.i18nPage.load();
             }
         });
 

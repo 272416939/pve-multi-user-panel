@@ -649,9 +649,9 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
             }
         }
         if (lang !== undefined) {
-            // SUPPORTED_LOCALES 白名单校验，禁止非法值入库
-            var { SUPPORTED_LOCALES } = require('../constants');
-            if (typeof lang !== 'string' || !SUPPORTED_LOCALES.includes(lang)) {
+            // 动态白名单校验（系统语言 + 自定义语言），禁止非法值入库
+            const { isSupportedLocale } = require('../services/i18n');
+            if (typeof lang !== 'string' || !(await isSupportedLocale(lang))) {
                 return res.status(400).json({ error: '语言参数不合法' });
             }
         }
@@ -671,13 +671,19 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         // 操作审计：更新站点设置（DB 新旧值字段级 diff）
         try {
             const { auditLog } = require('../utils/audit-log');
-            var changes = buildFieldDiff(oldSite, await getSiteSnapshot(), [
+            const { getLocaleName } = require('../services/i18n');
+            var newSite = await getSiteSnapshot();
+            // 语言显示名动态解析（系统+自定义）；fmt 由 audit-diff 同步调用，先解析成映射
+            var langNames = {};
+            if (oldSite && oldSite.lang) langNames[oldSite.lang] = (await getLocaleName(oldSite.lang)) || oldSite.lang;
+            if (newSite && newSite.lang) langNames[newSite.lang] = (await getLocaleName(newSite.lang)) || newSite.lang;
+            var changes = buildFieldDiff(oldSite, newSite, [
                 { key: 'name', label: '站点名称' },
                 { key: 'logo_text', label: 'LOGO文字' },
                 { key: 'login_title', label: '登录页标题' },
                 { key: 'register_enabled', label: '开放注册', bool: true },
                 { key: 'template', label: '界面模板', fmt: function (v) { return v === 'saas' ? 'SAAS企业风' : (v === 'default' ? '赛博霓虹' : v); } },
-                { key: 'lang', label: '系统默认语言', fmt: function (v) { var { LOCALE_NAMES } = require('../constants'); return LOCALE_NAMES[v] || v; } }
+                { key: 'lang', label: '系统默认语言', fmt: function (v) { return langNames[v] || v; } }
             ]);
             if (changes.length) {
                 await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.site', resourceType: 'config', resourceId: 'site', details: '更新站点设置；变更:' + changes.join(', '), req });

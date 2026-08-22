@@ -114,13 +114,13 @@ router.put('/user/template', authMiddleware, async (req, res) => {
 router.get('/user/lang', authMiddleware, async (req, res) => {
     try {
         const db = require('../api/db');
-        var { SUPPORTED_LOCALES } = require('../constants');
+        const { isSupportedLocale } = require('../services/i18n');
         var settings = await db.userSettings.getByUserId(req.user.id);
         var lang = settings.lang;
-        // 兼容旧数据：非法值归一为跟随站点默认
-        if (lang !== '' && !SUPPORTED_LOCALES.includes(lang)) lang = '';
+        // 兼容旧数据：非法值（含已删除的自定义语言）归一为跟随站点默认
+        if (lang !== '' && !(await isSupportedLocale(lang))) lang = '';
         var siteDefault = await db.config.get('site:lang') || 'zh-CN';
-        if (!SUPPORTED_LOCALES.includes(siteDefault)) siteDefault = 'zh-CN';
+        if (!(await isSupportedLocale(siteDefault))) siteDefault = 'zh-CN';
         res.json({ lang: lang || '', siteDefault: siteDefault });
     } catch (e) {
         console.error('[user-settings] 获取语言偏好失败:', e.message);
@@ -136,19 +136,19 @@ router.put('/user/lang', authMiddleware, async (req, res) => {
 
     try {
         const db = require('../api/db');
-        var { SUPPORTED_LOCALES, LOCALE_NAMES } = require('../constants');
+        const { isSupportedLocale, getLocaleName } = require('../services/i18n');
         var lang = req.body && req.body.lang;
-        // B-1: 只操作 req.user.id 的记录，不接受 user_id 参数；白名单校验
-        if (typeof lang !== 'string' || (lang !== '' && !SUPPORTED_LOCALES.includes(lang))) {
+        // B-1: 只操作 req.user.id 的记录，不接受 user_id 参数；动态白名单校验（系统语言 + 自定义语言）
+        if (typeof lang !== 'string' || (lang !== '' && !(await isSupportedLocale(lang)))) {
             return res.status(400).json({ error: '语言参数不合法' });
         }
         var settings = await db.userSettings.upsert(req.user.id, { lang: lang });
         var siteDefault = await db.config.get('site:lang') || 'zh-CN';
-        if (!SUPPORTED_LOCALES.includes(siteDefault)) siteDefault = 'zh-CN';
+        if (!(await isSupportedLocale(siteDefault))) siteDefault = 'zh-CN';
         // 操作审计：语言偏好变更
         try {
             const { auditLog } = require('../utils/audit-log');
-            var label = lang === '' ? '跟随站点默认' : (LOCALE_NAMES[lang] || lang);
+            var label = lang === '' ? '跟随站点默认' : ((await getLocaleName(lang)) || lang);
             await auditLog({ userId: req.user.id, username: req.user.username, action: 'setting.language', resourceType: 'setting', resourceId: 'language', details: '更新语言偏好：' + label, req });
         } catch (_) {}
         res.json({ lang: (settings && settings.lang) || '', siteDefault: siteDefault });

@@ -231,13 +231,7 @@
                                 <div class="mb-3">
                                     <select class="form-select" v-model="langPreference" style="max-width: 300px;">
                                         <option value="">{{ t('user.language.follow') }}</option>
-                                        <option value="zh-CN">{{ t('lang.zh-CN') }}</option>
-                                        <option value="zh-TW">{{ t('lang.zh-TW') }}</option>
-                                        <option value="en">{{ t('lang.en') }}</option>
-                                        <option value="de">{{ t('lang.de') }}</option>
-                                        <option value="ja">{{ t('lang.ja') }}</option>
-                                        <option value="ko">{{ t('lang.ko') }}</option>
-                                        <option value="fr">{{ t('lang.fr') }}</option>
+                                        <option v-for="l in i18nLanguageList()" :key="l.code" :value="l.code">{{ l.name }}</option>
                                     </select>
                                 </div>
                                 <pv-button type="button" variant="primary" @click="saveLangPreference" :disabled="langPreferenceSaving">

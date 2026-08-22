@@ -119,6 +119,8 @@ var App = {
         if (!$.osSwitchLogFilter) $.osSwitchLogFilter = Vue.reactive({ status: '', vm_id: '', user_id: '' });
         if (!$.osSwitchLogSelected) $.osSwitchLogSelected = Vue.reactive([]);
         if (!$.osSwitchLogDetail) $.osSwitchLogDetail = Vue.ref(null);
+        // i18n 管理兜底初始化（页面脚本异常时避免模板引用 undefined 崩溃）
+        if (!$.i18nPage) $.i18nPage = {};
         if (!$.activeTabDisk) $.activeTabDisk = Vue.ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_DISK) || 'storage-groups');
         $.initCore();
         $.initVm();
@@ -186,6 +188,8 @@ var app = Vue.createApp(App);
   // 日志分类/子分类标识 → i18n key（模板内不直接引用 window，经 globalProperties 转发）
   app.config.globalProperties.logCatKey = function (k) { return window.__logI18n ? window.__logI18n.cat(k) : ''; };
   app.config.globalProperties.logSubKey = function (k) { return window.__logI18n ? window.__logI18n.sub(k) : ''; };
+  // 语言下拉选项列表（系统 + 自定义语言；注册表加载失败时回退 7 种系统语言）
+  app.config.globalProperties.i18nLanguageList = window.__i18n.getLanguages;
 // Global error handler — catch render errors and show on screen
 app.config.errorHandler = function(err, instance, info) {
     console.error('[Vue Error]', err, instance, info);

@@ -867,8 +867,8 @@ const App = {
                 langPreference.value = (res && res.lang) || '';
                 var sd = (res && res.siteDefault) || 'zh-CN';
                 siteDefaultLang.value = sd;
-                var names = { 'zh-CN': window.__i18n.t('lang.zh-CN'), 'zh-TW': window.__i18n.t('lang.zh-TW'), 'en': 'English', 'de': 'Deutsch', 'ja': window.__i18n.t('lang.ja'), 'ko': '한국어', 'fr': 'Français' };
-                siteDefaultLangName.value = names[sd] || sd;
+                // 语言名走注册表（含自定义语言，见 i18n.js getLanguageName）
+                siteDefaultLangName.value = window.__i18n.getLanguageName(sd);
                 // 应用用户实际语言（个人偏好优先，其次站点默认）
                 var resolved = langPreference.value || sd;
                 if (window.__i18n && window.__i18n.getLocale() !== resolved) {
@@ -894,8 +894,7 @@ const App = {
                 // 更新站点默认显示
                 var sd = (res && res.siteDefault) || 'zh-CN';
                 siteDefaultLang.value = sd;
-                var names = { 'zh-CN': window.__i18n.t('lang.zh-CN'), 'zh-TW': window.__i18n.t('lang.zh-TW'), 'en': 'English', 'de': 'Deutsch', 'ja': window.__i18n.t('lang.ja'), 'ko': '한국어', 'fr': 'Français' };
-                siteDefaultLangName.value = names[sd] || sd;
+                siteDefaultLangName.value = window.__i18n.getLanguageName(sd);
                 alert(window.__i18n.t('user.language.save') + ' ' + window.__i18n.t('common.success'));
             } catch (e) {
                 alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
@@ -1629,6 +1628,8 @@ const App = {
     // 必须经 globalProperties 提供（与 admin/dashboard 一致）；缺失会导致组件渲染抛错 → 分页条静默消失
     app.config.globalProperties.t = window.__i18n.t;
     app.config.globalProperties.tFormat = window.__i18n.tFormat;
+    // 语言下拉选项列表（系统 + 自定义语言；注册表加载失败时回退 7 种系统语言）
+    app.config.globalProperties.i18nLanguageList = window.__i18n.getLanguages;
     app.mount('#app');
 })();
 

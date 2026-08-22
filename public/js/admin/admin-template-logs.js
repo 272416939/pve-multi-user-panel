@@ -79,6 +79,7 @@
                             <option value="vm,lxc">{{ t('admin.logs.subVm') }}</option>
                             <option value="package,template,os-template">{{ t('admin.logs.subPackageTpl') }}</option>
                             <option value="email-template">{{ t('admin.sub.emailTemplate') }}</option>
+                            <option value="i18n">{{ t('admin.sub.i18n') }}</option>
                             <option value="package-group">{{ t('admin.sub.packageGroup') }}</option>
                             <option value="cdk">{{ t('admin.sub.cdk') }}</option>
                             <option value="backup">{{ t('admin.sub.backup') }}</option>

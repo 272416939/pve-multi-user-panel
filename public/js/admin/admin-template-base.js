@@ -158,6 +158,16 @@
                     <a :title="t('nav.rateLimit')" class="nav-item" :class="{ active: activeSection === 'security' && activeTabSecurity === 'ratelimit' }" data-subsection="security-ratelimit" href="#" @click.prevent="switchSection('security'); activeTabSecurity = 'ratelimit'"><span class="nav-text">{{ t('nav.rateLimit') }}</span></a>
                 </div>
 
+                <!-- 其他（父菜单，仅admin） -->
+                <a :title="t('nav.other')" v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('other')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
+                    <span class="nav-text">{{ t('nav.other') }}</span>
+                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+                </a>
+                <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-other">
+                    <a :title="t('nav.i18nManage')" class="nav-item" :class="{ active: activeSection === 'i18n' }" data-subsection="i18n" href="#" @click.prevent="switchSection('i18n')"><span class="nav-text">{{ t('nav.i18nManage') }}</span></a>
+                </div>
+
                 <!-- 日志中心（独立一级菜单，仅admin） -->
                 <a :title="t('nav.logs')" v-if="user && user.role === 'admin'" class="nav-item" :class="{ active: activeSection === 'logs' }" href="#" @click.prevent="switchPage('logs')">
                     <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>

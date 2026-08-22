@@ -1,6 +1,11 @@
 // public/js/shared/i18n.js - 全局 i18n 国际化模块
-// 提供 t(key) 翻译函数，支持 7 种语言，缺失 key 自动回退 zh-CN
-// 与 Vue 集成：translations 用 Vue.ref 持有，模板中 {{ t('key') }} 在语言切换时自动重渲染
+// 提供 t(key) 翻译函数，支持 7 种系统语言 + 管理员新建的自定义语言（运行时拉注册表），
+// 缺失 key 自动回退 zh-CN；与 Vue 集成：translations 用 Vue.ref 持有，模板中 {{ t('key') }} 语言切换自动重渲染。
+//
+// 加载路径两分支（public/locales/*.json 为只读基线，永不写入）：
+// - 系统语言且无覆盖 → 静态文件 /locales/<code>.json?cv=（历史路径零改动）
+// - 有覆盖的系统语言 / 自定义语言 → /api/i18n/locale/<code>（服务端合并基线+覆盖，
+//   60s 服务端缓存 + 写操作失效；cache:reload 绕过浏览器缓存保证编辑后立即可见）
 // 使用方式：window.__i18n.t('common.save') → 当前语言的翻译文本
 
 (function () {
@@ -13,15 +18,19 @@
   var _fallbackLocale = 'zh-CN';
   var _loaded = false;
 
-  // 支持的语言列表（与 server/constants.js SUPPORTED_LOCALES 保持一致）
+  // 系统语言白名单（与 server/constants.js SYSTEM_LOCALES 保持一致；注册表接口失败时的兜底）
   var SUPPORTED_LOCALES = ['zh-CN', 'zh-TW', 'en', 'de', 'ja', 'ko', 'fr'];
   // localStorage 缓存已解析语言（刷新时 init 优先使用，避免先按站点默认中文渲染再切换的闪烁）
   var _localeCacheKey = '__i18nLocale';
 
+  // 语言注册表（GET /api/i18n/languages：7 系统语言 + 管理员新建自定义语言，含 overrides 标志）
+  var _languages = null; // Vue.ref([])
+  var _languagesLoaded = false;
+
   function _cachedLocale() {
     try {
       var v = localStorage.getItem(_localeCacheKey) || '';
-      return SUPPORTED_LOCALES.indexOf(v) !== -1 ? v : '';
+      return _isSupportedLocale(v) ? v : '';
     } catch (e) { return ''; }
   }
   function _setLocaleCache(locale) {
@@ -45,22 +54,66 @@
     'fr': 'Français'
   };
 
-  // 初始化响应式字典（依赖全局 Vue；无 Vue 时退化为普通对象）
+  // 初始化响应式字典与语言注册表（依赖全局 Vue；无 Vue 时退化为普通对象）
   function _ensureReactive() {
     if (_translations) return;
     if (typeof Vue !== 'undefined' && Vue.ref) {
       _translations = Vue.ref({});
+      _languages = Vue.ref([]);
     } else {
       _translations = { value: {} };
+      _languages = { value: [] };
     }
   }
 
-  // 从服务端加载语言文件
+  // 拉取语言注册表（失败回退 7 种系统语言，行为与现状一致；init 时先于 locale 加载）
+  async function _loadLanguages() {
+    try {
+      var resp = await fetch('/api/i18n/languages', { cache: 'reload' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      var list = await resp.json();
+      if (!Array.isArray(list) || !list.length) throw new Error('语言列表为空');
+      _ensureReactive();
+      _languages.value = list;
+      _languagesLoaded = true;
+      return list;
+    } catch (e) {
+      console.error('[i18n] 获取语言列表失败（回退 7 种系统语言）:', e.message);
+      _languagesLoaded = false;
+      return null;
+    }
+  }
+
+  // 注册表查询（未加载返回 null）
+  function _languageInfo(code) {
+    if (!_languagesLoaded || !_languages) return null;
+    var list = _languages.value;
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].code === code) return list[i];
+    }
+    return null;
+  }
+
+  // 动态白名单：系统语言 ∪ 已注册自定义语言
+  function _isSupportedLocale(code) {
+    if (SUPPORTED_LOCALES.indexOf(code) !== -1) return true;
+    return !!_languageInfo(code);
+  }
+
+  // 从服务端加载语言文件（见模块头部注释的两分支说明）
   async function _fetchLocale(locale) {
+    var info = _languageInfo(locale);
+    // 有覆盖的系统语言 / 自定义语言：服务端合并接口（cache:reload 绕过浏览器缓存，服务端缓存承载）
+    if (info && (!info.is_system || info.overrides)) {
+      var resp = await fetch('/api/i18n/locale/' + encodeURIComponent(locale), { cache: 'reload' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return await resp.json();
+    }
+    // 系统语言且无覆盖：静态文件路径（与历史行为一致，cv 控制缓存）
     var cv = (typeof window !== 'undefined' && window.__cacheVersion) ? ('?cv=' + window.__cacheVersion) : '';
-    var resp = await fetch('/locales/' + locale + '.json' + cv);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return await resp.json();
+    var resp2 = await fetch('/locales/' + locale + '.json' + cv);
+    if (!resp2.ok) throw new Error('HTTP ' + resp2.status);
+    return await resp2.json();
   }
 
   // 设置当前语言字典（触发 Vue 重渲染）
@@ -69,12 +122,12 @@
     _translations.value = dict;
   }
 
-  // 初始化：加载当前语言和兜底语言
+  // 初始化：加载语言注册表 → 当前语言和兜底语言
   async function init(initialLocale) {
+    await _loadLanguages();
     // 刷新时优先用 localStorage 缓存的用户语言（与服务端偏好一致时零闪烁；不一致由 i18n-user-init 纠正）
     initialLocale = _cachedLocale() || initialLocale || 'zh-CN';
-    _locale = initialLocale;
-    if (!SUPPORTED_LOCALES.includes(_locale)) _locale = 'zh-CN';
+    _locale = _isSupportedLocale(initialLocale) ? initialLocale : 'zh-CN';
 
     try {
       // 加载兜底语言（zh-CN），用于缺失 key 回退
@@ -118,7 +171,7 @@
 
   // 切换语言（重新加载翻译文件，触发 Vue 重渲染）
   async function setLocale(locale) {
-    if (!SUPPORTED_LOCALES.includes(locale)) {
+    if (!_isSupportedLocale(locale)) {
       console.warn('[i18n] 不支持的语言:', locale);
       return false;
     }
@@ -145,9 +198,52 @@
     }
   }
 
+  // 强制重新加载当前语言（后台修改翻译后调用；setLocale 同语言会短路，不重拉）
+  async function refreshLocale() {
+    if (!_locale) return false;
+    try {
+      var dict = await _fetchLocale(_locale);
+      _applyTranslations(dict);
+      if (_locale === _fallbackLocale) {
+        _fallbackTranslations = dict;
+      }
+      document.documentElement.lang = _locale;
+      applyStatic();
+      _reveal();
+      return true;
+    } catch (e) {
+      console.error('[i18n] 刷新语言失败:', _locale, e.message);
+      return false;
+    }
+  }
+
   // 获取当前 locale
   function getLocale() {
     return _locale;
+  }
+
+  // 语言列表（注册表未加载时回退 7 种系统语言，保证下拉可用）
+  function getLanguages() {
+    if (_languagesLoaded && _languages) return _languages.value;
+    var list = [];
+    for (var i = 0; i < SUPPORTED_LOCALES.length; i++) {
+      var code = SUPPORTED_LOCALES[i];
+      list.push({ code: code, name: LOCALE_NAMES[code] || code, base_code: '', is_system: true, overrides: false });
+    }
+    return list;
+  }
+
+  // 重新拉取语言注册表（管理端新建/重命名/删除语言后调用，保证下拉与白名单即时同步）
+  async function refreshLanguages() {
+    await _loadLanguages();
+    return getLanguages();
+  }
+
+  // 语言显示名（系统语言用常量表；自定义语言用注册表 name）
+  function getLanguageName(code) {
+    var info = _languageInfo(code);
+    if (info && info.name) return info.name;
+    return LOCALE_NAMES[code] || code;
   }
 
   // 翻译函数：从当前语言取值，缺失则回退 zh-CN，再缺失则返回 key 本身
@@ -207,9 +303,13 @@
     t: t,
     tFormat: tFormat,
     setLocale: setLocale,
+    refreshLocale: refreshLocale,
     getLocale: getLocale,
     isLoaded: isLoaded,
     applyStatic: applyStatic,
+    getLanguages: getLanguages,
+    refreshLanguages: refreshLanguages,
+    getLanguageName: getLanguageName,
     SUPPORTED_LOCALES: SUPPORTED_LOCALES,
     LOCALE_NAMES: LOCALE_NAMES
   };

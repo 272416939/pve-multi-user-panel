@@ -23,6 +23,7 @@
         template: 'admin.sub.template',
         'os-template': 'admin.sub.osTemplate',
         'email-template': 'admin.sub.emailTemplate',
+        i18n: 'admin.sub.i18n',
         cdk: 'admin.sub.cdk',
         backup: 'admin.sub.backup',
         message: 'admin.sub.message',
