@@ -18,6 +18,7 @@ const { SYSTEM_LOCALES, LOCALE_NAMES } = require('../constants');
 
 const localeCache = cacheStore.create('i18n:locale', 60);
 const languagesCache = cacheStore.create('i18n:languages', 60);
+const entriesCache = cacheStore.create('i18n:entries', 60); // 管理页词条列表（含 zh 母本），60s 缓存写后失效
 
 // 内置语言文件名白名单（防路径穿越：只允许 7 个固定文件名映射，绝不使用用户输入拼接路径）
 const LOCALE_FILES = {};
@@ -149,26 +150,41 @@ async function getBaselineKeys(code) {
 }
 
 /**
- * 管理页条目列表（全部逻辑 key；original=基线值只读，value=当前生效值）
- * @returns {Promise<Array<{key,original,value,override,is_new}>|null>}
+ * 管理页条目列表（全部逻辑 key；original=基线值只读，value=当前生效值，zh=中文母本参考）
+ * 对非 zh-CN 语言自动注入 zh-CN 对应原文做翻译母本（翻译对照，避免误译）；结果 60s 缓存（写后失效）
+ * @returns {Promise<Array<{key,original,value,override,is_new,zh}>|null>}
  */
 async function getLocaleEntries(code) {
-    const row = await db.i18n.getLanguage(code);
-    if (!row) return null;
-    const { keys, baseline } = await resolveBaseValues(row);
-    const overrides = {};
-    (await db.i18n.getOverrides(code)).forEach(function (r) { overrides[r.entry_key] = r.value; });
-    const snapshot = row.is_system ? null : parseSnapshot(row);
-    return keys.map(function (k) {
-        const isOverride = overrides[k] !== undefined;
-        return {
-            key: k,
-            original: baseline[k],
-            value: isOverride ? overrides[k] : baseline[k],
-            override: isOverride,
-            is_new: !row.is_system && snapshot[k] === undefined
-        };
+    const cached = await entriesCache.get(code, async function () {
+        const row = await db.i18n.getLanguage(code);
+        if (!row) return null;
+        const { keys, baseline } = await resolveBaseValues(row);
+        const overrides = {};
+        (await db.i18n.getOverrides(code)).forEach(function (r) { overrides[r.entry_key] = r.value; });
+        const snapshot = row.is_system ? null : parseSnapshot(row);
+        // 非中文语言：注入 zh-CN 母本做翻译参考（zh-CN 缺失时回退该词条当前值）
+        let zhMap = null;
+        if (code !== 'zh-CN') {
+            const zhRow = await db.i18n.getLanguage('zh-CN');
+            if (zhRow && zhRow.is_system) {
+                const zhBase = await resolveBaseValues(zhRow);
+                zhMap = zhBase.baseline;
+            }
+        }
+        return keys.map(function (k) {
+            const isOverride = overrides[k] !== undefined;
+            const cur = isOverride ? overrides[k] : baseline[k];
+            return {
+                key: k,
+                original: baseline[k],
+                value: cur,
+                override: isOverride,
+                is_new: !row.is_system && snapshot[k] === undefined,
+                zh: zhMap ? (zhMap[k] !== undefined ? zhMap[k] : cur) : undefined
+            };
+        });
     });
+    return cached;
 }
 
 /**
@@ -219,17 +235,19 @@ async function createCustomLanguage(fields) {
 }
 
 /**
- * 失效 i18n 缓存（语言列表 + 受影响语言的合并内容）
- * @param {string[]} [codes] - 受影响语言；省略则清空全部 locale 缓存
+ * 失效 i18n 缓存（语言列表 + 受影响语言的合并内容 + 管理页词条列表）
+ * @param {string[]} [codes] - 受影响语言；省略则清空全部 locale/entries 缓存
  */
 async function invalidateI18nCache(codes) {
     await languagesCache.del('list');
     if (codes && codes.length) {
         for (const c of codes) {
             await localeCache.del(c);
+            await entriesCache.del(c);
         }
     } else {
         await localeCache.clear();
+        await entriesCache.clear();
     }
 }
 

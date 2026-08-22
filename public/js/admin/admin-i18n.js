@@ -13,6 +13,23 @@ window.__admin.i18nPage = (function () {
     var PAGE_CHUNK = 200;        // 每组展开的分页条数（增量「加载更多」）
     var SAVE_BATCH = 500;        // 与后端单次保存上限对齐
 
+    // 分类描述（生效位置，供管理员了解词条在哪些页面显示；管理工具用中文母本说明）
+    var CATEGORY_DESC = {
+        admin: '后台管理（用户/虚拟机/套餐/模板/系统设置等管理页）',
+        dash: '用户仪表盘（控制台/资产卡片/日志中心/消息）',
+        user: '用户中心（个人资料/钱包/订单/通知设置）',
+        settings: '系统设置（站点/支付/安全/网络/快照备份配置）',
+        login: '登录页',
+        register: '注册页',
+        nav: '全站侧边栏菜单（后台/仪表盘/用户中心）',
+        common: '全站通用（保存/取消/确认/加载/删除）',
+        lang: '语言选择器（语言原生名）',
+        shared: '跨端共享（弹窗/组件/工具提示）',
+        terminal: 'Web 终端',
+        vnc: 'VNC 控制台',
+        password: '密码相关提示'
+    };
+
     // ==================== 状态 ====================
     var languages = ref([]);         // 注册表（系统 + 自定义）
     var systemLanguages = ref([]);   // 复制源下拉（仅系统语言）
@@ -66,12 +83,14 @@ window.__admin.i18nPage = (function () {
                 value: r.value,
                 override: r.override,
                 is_new: r.is_new,
+                zh: r.zh,
                 dirty: d !== undefined && d !== r.value
             };
         });
             return {
                 key: cat,
                 label: cat,
+                desc: CATEGORY_DESC[cat] || '',
                 count: rows.length,
                 visible: visible,
                 hasMore: !collapsedFlag && rows.length > visible.length
@@ -152,6 +171,24 @@ window.__admin.i18nPage = (function () {
         shown[cat] = (shown[cat] || PAGE_CHUNK) + PAGE_CHUNK;
     }
 
+    // ==================== 词条输入/回显（3. 保存后回显改动值） ====================
+
+    // 输入框显示值：草稿优先（含 ''=清空恢复），否则显示当前生效值（覆盖值或基线）
+    // ——保存后 load() 清空草稿，输入框回退显示 row.value（覆盖后的新值），实现回显
+    function fieldValue(row) {
+        return dirty[row.key] !== undefined ? dirty[row.key] : row.value;
+    }
+
+    // v-model 替代：写草稿（触发响应式脏态/保存计数）
+    function onFieldInput(row, e) {
+        dirty[row.key] = e.target.value;
+    }
+
+    // 单条是否可恢复（有覆盖或未保存草稿）
+    function rowOverridable(row) {
+        return row.override || row.dirty;
+    }
+
     // ==================== 写操作 ====================
 
     // 保存全部未保存草稿（空串=删除覆盖恢复基线；按 500 批发送）
@@ -198,6 +235,24 @@ window.__admin.i18nPage = (function () {
             alert(window.__i18n.t('admin.i18n.resetOk'));
         } catch (e) {
             console.error('恢复 i18n 默认失败', e && e.message);
+            alert(window.__i18n.t('admin.i18n.saveFail') + (e && e.message ? ' ' + e.message : ''));
+        }
+    }
+
+    // 单条恢复默认（有覆盖或未保存改动时出现）：清空该 key 覆盖 → 恢复基线
+    async function restoreKey(row) {
+        try {
+            await api('/admin/i18n/languages/' + encodeURIComponent(selectedCode.value) + '/entries', {
+                method: 'PUT',
+                body: JSON.stringify({ entries: [{ key: row.key, value: '' }] })
+            });
+            await load();
+            if (window.__i18n.getLocale() === selectedCode.value) {
+                window.__i18n.refreshLocale();
+            }
+            alert(window.__i18n.t('admin.i18n.resetOk'));
+        } catch (e) {
+            console.error('恢复词条默认失败', e && e.message);
             alert(window.__i18n.t('admin.i18n.saveFail') + (e && e.message ? ' ' + e.message : ''));
         }
     }
@@ -298,6 +353,10 @@ window.__admin.i18nPage = (function () {
         resetAll: resetAll,
         toggleGroup: toggleGroup,
         loadMore: loadMore,
+        fieldValue: fieldValue,
+        onFieldInput: onFieldInput,
+        rowOverridable: rowOverridable,
+        restoreKey: restoreKey,
         openCreateModal: openCreateModal,
         createLang: createLang,
         rename: rename,

@@ -44,30 +44,35 @@
         </div>
         <div v-else>
             <div v-for="cat in i18nPage.groups.value" :key="cat.key" class="notification-group mb-3">
-                <div class="notification-group-header d-flex align-items-center gap-2 p-3" @click="i18nPage.toggleGroup(cat.key)">
+                <div class="notification-group-header d-flex align-items-center gap-2 p-3" @click="i18nPage.toggleGroup(cat.key)" :title="cat.desc">
                     <span class="notification-group-icon">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
                     </span>
                     <span class="fw-bold">{{ cat.label }}</span>
                     <small class="text-muted">（{{ cat.count }} 个词条）</small>
+                    <span class="i18n-cat-desc">{{ cat.desc }}</span>
                     <span class="ms-auto notification-chevron">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: i18nPage.collapsed[cat.key] === false ? 'rotate(90deg)' : 'rotate(0deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
                     </span>
                 </div>
                 <div v-if="i18nPage.collapsed[cat.key] === false || i18nPage.search.value" class="notification-group-items">
                     <div v-for="row in cat.visible" :key="row.key" class="notification-item-row p-3">
-                        <div class="d-flex align-items-center gap-2 mb-1">
-                            <code class="i18n-key-text flex-shrink-0" :title="row.key">{{ row.key }}</code>
-                            <span v-if="row.is_new" class="badge bg-primary">{{ t('admin.i18n.isNew') }}</span>
-                            <span v-if="row.override && !row.dirty" class="badge bg-secondary">{{ t('admin.i18n.overridden') }}</span>
-                            <span v-if="row.dirty" class="badge bg-warning text-dark">{{ t('admin.i18n.dirty') }}</span>
+                        <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                            <code class="i18n-key-text" :title="row.key">{{ row.key }}</code>
+                            <span v-if="row.is_new" class="i18n-badge i18n-badge--new">{{ t('admin.i18n.isNew') }}</span>
+                            <span v-if="row.override && !row.dirty" class="i18n-badge i18n-badge--override">{{ t('admin.i18n.overridden') }}</span>
+                            <span v-if="row.dirty" class="i18n-badge i18n-badge--dirty">{{ t('admin.i18n.dirty') }}</span>
+                            <span class="ms-auto">
+                                <pv-button v-if="i18nPage.rowOverridable(row)" variant="outline-danger" @click="i18nPage.restoreKey(row)">{{ t('admin.i18n.resetOne') }}</pv-button>
+                            </span>
                         </div>
-                        <div class="row g-2 align-items-start">
+                        <div class="row g-2 align-items-center">
                             <div class="col-md-4">
                                 <div class="i18n-original-text text-muted small" :title="row.original">{{ row.original }}</div>
+                                <div v-if="row.zh !== undefined" class="i18n-zh-ref small" :title="row.zh">{{ t('admin.i18n.zhRef') }}：{{ row.zh }}</div>
                             </div>
                             <div class="col-md-8">
-                                <input type="text" class="form-control form-control-sm" :class="['i18n-edit-input', { 'i18n-edit-dirty': row.dirty }]" :placeholder="row.original" v-model="i18nPage.dirty[row.key]">
+                                <input type="text" class="form-control form-control-sm i18n-edit-input" :class="{ 'i18n-edit-dirty': row.dirty }" :placeholder="row.original" :value="i18nPage.fieldValue(row)" @input="i18nPage.onFieldInput(row, $event)" autocomplete="off">
                             </div>
                         </div>
                     </div>
