@@ -131,6 +131,36 @@ router.put('/admin/i18n/languages/:code', authMiddleware, adminMiddleware, async
     }
 });
 
+// PUT /admin/i18n/languages/:code/enabled - 语言启用开关（关闭后用户端不可选择/不展示；admin 后台不受影响）
+// 守卫：zh-CN 兜底语言不可禁用；当前站点默认语言不可禁用（防偏好归一循环）
+router.put('/admin/i18n/languages/:code/enabled', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (!(await rateLimit(req, res))) return;
+        const code = String(req.params.code || '');
+        const enabled = req.body && req.body.enabled;
+        if (typeof enabled !== 'boolean') {
+            return res.status(400).json({ error: '语言参数不合法', code: 'LANG_PARAM_INVALID' });
+        }
+        const updated = await i18nService.setLanguageEnabled(code, enabled);
+        // 操作审计：启用/禁用语言
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            await auditLog({
+                userId: req.user.id, username: req.user.username, action: enabled ? 'admin.i18n.lang-enable' : 'admin.i18n.lang-disable',
+                resourceType: 'i18n-language', resourceId: code,
+                details: (enabled ? '启用' : '禁用') + '语言[' + code + ' ' + updated.name + ']', req
+            });
+        } catch (e) {}
+        res.json({ language: updated, message: enabled ? '语言已启用' : '语言已禁用' });
+    } catch (error) {
+        if (error && error.status) {
+            return res.status(error.status).json({ error: error.message, code: error.code });
+        }
+        console.error('设置 i18n 语言开关失败:', error.message);
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
+    }
+});
+
 // DELETE /admin/i18n/languages/:code - 删除自定义语言
 // 守卫：站点默认语言或仍有用户偏好引用 → 409（防悬挂引用）；级联删覆盖
 router.delete('/admin/i18n/languages/:code', authMiddleware, adminMiddleware, async (req, res) => {

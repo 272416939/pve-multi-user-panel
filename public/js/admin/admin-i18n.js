@@ -122,8 +122,9 @@ window.__admin.i18nPage = (function () {
         });
         return order.map(function (cat) {
             var rows = map[cat];
-            // 搜索 / 只看待翻译 时强制展开；否则跟随折叠/展开状态并分页
-            var effectiveExpand = !!(kw || showOnlyPending.value);
+            // 仅搜索时强制展开（结果跨组分散，收起无意义）；待翻译视图走通用折叠状态
+            // （openPending 打开时已主动展开全部分类，词条多时可逐组收起，可再次点击展开）
+            var effectiveExpand = !!kw;
             var collapsedFlag = effectiveExpand ? false : collapsed[cat] !== false; // 缺省折叠
             var limit = collapsedFlag ? 0 : (showOnlyPending.value ? rows.length : (shown[cat] || PAGE_CHUNK));
             // 每行 dirty 判定：逐 key 直接读 dirty[r.key] 建立响应式依赖
@@ -227,10 +228,16 @@ window.__admin.i18nPage = (function () {
         shown[cat] = (shown[cat] || PAGE_CHUNK) + PAGE_CHUNK;
     }
 
-    // 只看待翻译（顶部横幅「查看待翻译」；打开时清空搜索避免过滤叠加）
+    // 只看待翻译（顶部横幅「查看待翻译」；打开时清空搜索避免过滤叠加；
+    // 主动展开全部分类作为初始视图——分组头仍可点击收起/再展开，词条多时便于分组操作）
     function openPending() {
         search.value = '';
         showOnlyPending.value = true;
+        var set = {};
+        entries.value.forEach(function (r) {
+            set[r.key.split('.')[0] || '_'] = 1;
+        });
+        Object.keys(set).forEach(function (cat) { collapsed[cat] = false; });
     }
 
     // 退出待翻译视图
@@ -399,6 +406,32 @@ window.__admin.i18nPage = (function () {
         }
     }
 
+    // 当前选中语言的启用状态（缺省视为启用，兼容注册表未带 enabled 的过渡态）
+    var selectedEnabled = computed(function () {
+        var l = null;
+        for (var i = 0; i < languages.value.length; i++) {
+            if (languages.value[i].code === selectedCode.value) { l = languages.value[i]; break; }
+        }
+        return !l || l.enabled !== false;
+    });
+
+    // 语言启用开关（关闭后用户端不可选择/不展示，admin 后台不受影响；
+    // zh-CN 兜底语言与站点默认语言由后端守卫拒绝，错误经 code 词条翻译弹出）
+    async function toggleEnabled() {
+        var target = !selectedEnabled.value;
+        try {
+            await api('/admin/i18n/languages/' + encodeURIComponent(selectedCode.value) + '/enabled', {
+                method: 'PUT',
+                body: JSON.stringify({ enabled: target })
+            });
+            languages.value = await window.__i18n.refreshLanguages();
+            alert(window.__i18n.t(target ? 'admin.i18n.enableOk' : 'admin.i18n.disableOk'));
+        } catch (e) {
+            console.error('设置 i18n 语言开关失败', e && e.message);
+            alert(window.__i18n.t('admin.i18n.createFail') + (e && e.message ? ' ' + e.message : ''));
+        }
+    }
+
     return {
         // 状态（模板 .value 显式访问）
         languages: languages,
@@ -427,6 +460,8 @@ window.__admin.i18nPage = (function () {
         resetAll: resetAll,
         selectLanguage: selectLanguage,
         toggleGroup: toggleGroup,
+        toggleEnabled: toggleEnabled,
+        selectedEnabled: selectedEnabled,
         loadMore: loadMore,
         openPending: openPending,
         closePending: closePending,

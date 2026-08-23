@@ -11,12 +11,17 @@ const { withTransaction } = require('../utils/with-transaction');
  */
 const i18n = {
     listLanguages: () => queryAll(
-        'SELECT id, code, name, base_code, snapshot, is_system, status FROM i18n_languages ORDER BY is_system DESC, id'
+        'SELECT id, code, name, base_code, snapshot, is_system, status, enabled FROM i18n_languages ORDER BY is_system DESC, id'
     ),
 
     getLanguage: (code) => queryOne(
-        'SELECT id, code, name, base_code, snapshot, is_system, status, created_by FROM i18n_languages WHERE code = ?',
+        'SELECT id, code, name, base_code, snapshot, is_system, status, enabled, created_by FROM i18n_languages WHERE code = ?',
         [code]
+    ),
+
+    // 语言启用开关（调用方须先过守卫：zh-CN 与当前站点默认语言不可禁用）
+    setEnabled: (code, enabled) => (
+        execute('UPDATE i18n_languages SET enabled = ? WHERE code = ?', [enabled ? 1 : 0, code])
     ),
 
     createLanguage: async (fields) => {

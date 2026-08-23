@@ -47,6 +47,13 @@
                             <option v-for="l in i18nPage.languages.value" :key="l.code" :value="l.code">{{ l.name }}</option>
                         </select>
                     </div>
+                    <div class="col-auto">
+                        <label class="form-label">{{ t('admin.i18n.enabledLabel') }}</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" role="switch" id="i18nLangEnabledSwitch" :checked="i18nPage.selectedEnabled.value" @change="i18nPage.toggleEnabled()">
+                            <label class="form-check-label" for="i18nLangEnabledSwitch" :title="t('admin.i18n.enabledHint')">{{ t('admin.i18n.enabledHint') }}</label>
+                        </div>
+                    </div>
                     <div class="col-auto d-flex gap-2" v-if="i18nPage.isCustom.value">
                         <pv-button variant="outline" size="lg" @click="i18nPage.rename()">{{ t('admin.i18n.rename') }}</pv-button>
                         <pv-button variant="outline-danger" size="lg" @click="i18nPage.remove()">{{ t('common.delete') }}</pv-button>
@@ -82,7 +89,7 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: i18nPage.collapsed[cat.key] === false ? 'rotate(90deg)' : 'rotate(0deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
                     </span>
                 </div>
-                <div v-if="i18nPage.collapsed[cat.key] === false || i18nPage.search.value || i18nPage.showOnlyPending.value" class="notification-group-items">
+                <div v-if="i18nPage.collapsed[cat.key] === false || i18nPage.search.value" class="notification-group-items">
                     <div v-for="row in cat.visible" :key="row.key" class="notification-item-row p-3">
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                             <code class="i18n-key-text" :title="row.key">{{ row.key }}</code>

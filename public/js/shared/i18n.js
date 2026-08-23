@@ -94,10 +94,12 @@
     return null;
   }
 
-  // 动态白名单：系统语言 ∪ 已注册自定义语言
+  // 动态白名单：注册表命中时以 enabled 为准（禁用语言用户不可选，setLocale/init 校验拒绝）；
+  // 注册表未加载时系统语言常量兜底（init 里 _loadLanguages 先跑，实际校验时已加载）
   function _isSupportedLocale(code) {
-    if (SUPPORTED_LOCALES.indexOf(code) !== -1) return true;
-    return !!_languageInfo(code);
+    var info = _languageInfo(code);
+    if (info) return info.enabled !== false;
+    return SUPPORTED_LOCALES.indexOf(code) !== -1;
   }
 
   // 从服务端加载语言文件（见模块头部注释的两分支说明）
@@ -241,6 +243,11 @@
     return getLanguages();
   }
 
+  // 用户端可选语言（过滤禁用；admin 后台用 getLanguages 看全量）
+  function getUserLanguages() {
+    return getLanguages().filter(function (l) { return l.enabled !== false; });
+  }
+
   // 语言显示名（系统语言用常量表；自定义语言用注册表 name）
   function getLanguageName(code) {
     var info = _languageInfo(code);
@@ -331,6 +338,7 @@
     isLoaded: isLoaded,
     applyStatic: applyStatic,
     getLanguages: getLanguages,
+    getUserLanguages: getUserLanguages,
     refreshLanguages: refreshLanguages,
     getLanguageName: getLanguageName,
     SUPPORTED_LOCALES: SUPPORTED_LOCALES,

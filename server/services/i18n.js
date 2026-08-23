@@ -104,6 +104,7 @@ async function getLanguages() {
                 name: r.name,
                 base_code: r.base_code,
                 is_system: !!r.is_system,
+                enabled: r.enabled === undefined ? true : !!r.enabled,
                 overrides: (cntMap[r.code] || 0) > 0
             };
         });
@@ -112,12 +113,37 @@ async function getLanguages() {
 }
 
 /**
- * 动态白名单：系统语言（常量）∪ 已注册自定义语言（表）
+ * 动态白名单：注册表中存在且 active 且未禁用（7 系统语言种子行恒在，统一查表；
+ * 禁用语言对用户不可选——GET/PUT /user/lang 的偏好归一/校验都走这里，存量偏好自动回退站点默认）
  */
 async function isSupportedLocale(code) {
-    if (SYSTEM_LOCALES.indexOf(code) !== -1) return true;
     const row = await db.i18n.getLanguage(code);
-    return !!(row && row.status === 'active' && !row.is_system);
+    return !!(row && row.status === 'active' && row.enabled !== 0);
+}
+
+/**
+ * 语言启用开关（zh-CN 兜底语言与当前站点默认语言不可禁用——前端 fallback 依赖 zh-CN，
+ * 默认语言禁用会造成偏好归一循环；调用方为 admin 路由）
+ */
+async function setLanguageEnabled(code, enabled) {
+    const row = await db.i18n.getLanguage(code);
+    if (!row) {
+        throw Object.assign(new Error('未知语言'), { status: 404, code: 'UNKNOWN_LANG' });
+    }
+    if (!enabled) {
+        if (row.code === 'zh-CN') {
+            throw Object.assign(new Error('zh-CN 为兜底语言，不可禁用'), { status: 400, code: 'I18N_ZH_REQUIRED' });
+        }
+        const siteDefault = await db.config.get('site:lang') || 'zh-CN';
+        if (siteDefault === code) {
+            throw Object.assign(new Error('该语言为当前系统默认语言，请先切换'), { status: 400, code: 'I18N_DEFAULT_LANG' });
+        }
+    }
+    await db.i18n.setEnabled(code, !!enabled);
+    // 只影响语言集合可见性（词条内容/覆盖不动），刷列表 + 待翻译汇总即可
+    await invalidateI18nLanguages();
+    const updated = await db.i18n.getLanguage(code);
+    return { code: updated.code, name: updated.name, is_system: !!updated.is_system, enabled: updated.enabled !== 0 };
 }
 
 /**
@@ -329,6 +355,7 @@ async function warmupI18nCache() {
 module.exports = {
     getLanguages,
     isSupportedLocale,
+    setLanguageEnabled,
     getLocaleName,
     resolveLocale,
     getBaselineKeys,

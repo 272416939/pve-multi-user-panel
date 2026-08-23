@@ -1628,8 +1628,8 @@ const App = {
     // 必须经 globalProperties 提供（与 admin/dashboard 一致）；缺失会导致组件渲染抛错 → 分页条静默消失
     app.config.globalProperties.t = window.__i18n.t;
     app.config.globalProperties.tFormat = window.__i18n.tFormat;
-    // 语言下拉选项列表（系统 + 自定义语言；注册表加载失败时回退 7 种系统语言）
-    app.config.globalProperties.i18nLanguageList = window.__i18n.getLanguages;
+    // 语言下拉选项列表（系统 + 自定义语言；过滤管理端禁用的语言——禁用后用户不可选不展示）
+    app.config.globalProperties.i18nLanguageList = window.__i18n.getUserLanguages;
     app.mount('#app');
 })();
 

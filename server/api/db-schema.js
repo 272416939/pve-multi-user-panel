@@ -788,6 +788,9 @@ async function initDb() {
     // 初始化 i18n 系统语言（INSERT IGNORE：已存在不覆盖）
     await initI18nLanguages();
 
+    // 语言启用开关（默认全部启用；关闭后用户端不可选择/不展示，admin 后台不受影响）
+    try { await execute('ALTER TABLE i18n_languages ADD COLUMN enabled TINYINT(1) NOT NULL DEFAULT 1'); } catch (_) {}
+
     // 初始化默认邮件模板（INSERT IGNORE：已存在不覆盖，保留管理员修改）
     await initEmailTemplates();
 
