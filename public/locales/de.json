@@ -1781,7 +1781,7 @@
   "err.INVALID_OS_TPL_ID": "Ungültige OS-Vorlagen-ID.",
   "err.INVALID_PERIOD": "Ungültiger Abrechnungszeitraum.",
   "err.INVALID_PORT": "Ungültiger Port.",
-  "err.INVALID_PROTO": "Ungültiges Protokoll: tcp oder udp.",
+  "err.INVALID_PROTO": "Ungültiges Protokoll: tcp, udp oder tcp+udp.",
   "err.INVALID_QUERY_RANGE": "Ungültiger Abfragebereich.",
   "err.INVALID_REF_TYPE": "Ungültiger Typ: vm/lxc/general.",
   "err.INVALID_RESOURCE_TYPE": "Ungültiger Ressourcentyp.",

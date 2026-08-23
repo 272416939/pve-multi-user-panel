@@ -1781,7 +1781,7 @@
   "err.INVALID_OS_TPL_ID": "無効なOSテンプレートIDです。",
   "err.INVALID_PERIOD": "無効な課金周期です。",
   "err.INVALID_PORT": "無効なポートです。",
-  "err.INVALID_PROTO": "無効なプロトコルです。tcpまたはudpである必要があります。",
+  "err.INVALID_PROTO": "無効なプロトコルです。tcp、udpまたはtcp+udpである必要があります。",
   "err.INVALID_QUERY_RANGE": "無効な検索範囲です。",
   "err.INVALID_REF_TYPE": "無効なタイプです。vm/lxc/general である必要があります。",
   "err.INVALID_RESOURCE_TYPE": "無効なリソースタイプです。",

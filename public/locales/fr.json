@@ -1781,7 +1781,7 @@
   "err.INVALID_OS_TPL_ID": "ID de modèle OS invalide.",
   "err.INVALID_PERIOD": "Période de facturation invalide.",
   "err.INVALID_PORT": "Port invalide.",
-  "err.INVALID_PROTO": "Protocole invalide : tcp ou udp.",
+  "err.INVALID_PROTO": "Protocole invalide : tcp, udp ou tcp+udp.",
   "err.INVALID_QUERY_RANGE": "Plage de requête invalide.",
   "err.INVALID_REF_TYPE": "Type invalide : vm/lxc/general.",
   "err.INVALID_RESOURCE_TYPE": "Type de ressource invalide.",

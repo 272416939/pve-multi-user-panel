@@ -434,10 +434,10 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         if (!allowedTypes.includes(type)) {
             return res.status(400).json({ error: '无效的转发类型', code: 'INVALID_FORWARD_TYPE' });
         }
-        // L-4 修复：protocol 白名单（tcp/udp）+ name 长度限制与控制字符剔除
+        // L-4 修复：protocol 白名单（tcp/udp/tcp+udp，tcp+udp 为爱快 dnat 原生协议值）+ name 长度限制与控制字符剔除
         const finalProtocol = String(protocol || 'tcp').toLowerCase();
-        if (!['tcp', 'udp'].includes(finalProtocol)) {
-            return res.status(400).json({ error: '无效的协议，必须为 tcp 或 udp', code: 'INVALID_PROTO' });
+        if (!['tcp', 'udp', 'tcp+udp'].includes(finalProtocol)) {
+            return res.status(400).json({ error: '无效的协议，必须为 tcp、udp 或 tcp+udp', code: 'INVALID_PROTO' });
         }
         const finalName = String(name || '').replace(/[\x00-\x1f\x7f]/g, '').slice(0, 50);
         // general 类型强制 vm_id/ct_id 为 null
@@ -585,8 +585,8 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         }
         // L-4 修复：protocol 白名单 + name 长度限制与控制字符剔除（与 POST 端点一致）
         if (protocol !== undefined && protocol !== null) {
-            if (!['tcp', 'udp'].includes(String(protocol).toLowerCase())) {
-                return res.status(400).json({ error: '无效的协议，必须为 tcp 或 udp', code: 'INVALID_PROTO' });
+            if (!['tcp', 'udp', 'tcp+udp'].includes(String(protocol).toLowerCase())) {
+                return res.status(400).json({ error: '无效的协议，必须为 tcp、udp 或 tcp+udp', code: 'INVALID_PROTO' });
             }
         }
         const finalName = name !== undefined && name !== null

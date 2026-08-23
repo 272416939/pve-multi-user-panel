@@ -1781,7 +1781,7 @@
   "err.INVALID_OS_TPL_ID": "Invalid OS template ID.",
   "err.INVALID_PERIOD": "Invalid billing period.",
   "err.INVALID_PORT": "Invalid port.",
-  "err.INVALID_PROTO": "Invalid protocol: must be tcp or udp.",
+  "err.INVALID_PROTO": "Invalid protocol: must be tcp, udp or tcp+udp.",
   "err.INVALID_QUERY_RANGE": "Invalid query range.",
   "err.INVALID_REF_TYPE": "Invalid type: must be vm/lxc/general.",
   "err.INVALID_RESOURCE_TYPE": "Invalid resource type.",

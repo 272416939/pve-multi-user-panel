@@ -1781,7 +1781,7 @@
   "err.INVALID_OS_TPL_ID": "无效的 OS 模板 ID",
   "err.INVALID_PERIOD": "无效的计费周期",
   "err.INVALID_PORT": "无效端口",
-  "err.INVALID_PROTO": "无效的协议，必须为 tcp 或 udp",
+  "err.INVALID_PROTO": "无效的协议，必须为 tcp、udp 或 tcp+udp",
   "err.INVALID_QUERY_RANGE": "无效的查询范围",
   "err.INVALID_REF_TYPE": "无效的类型，必须为 vm/lxc/general",
   "err.INVALID_RESOURCE_TYPE": "无效的资源类型",
