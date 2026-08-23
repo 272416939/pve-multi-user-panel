@@ -806,6 +806,43 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
     color: var(--text-muted);
     font-style: normal;
 }
+/* 字号/标题下拉标签中文化（quill.snow.css 默认英文 Normal/Small/Large/Huge/Heading N，
+   加 .email-template-quill-wrap 前缀提升特异性覆盖，明暗主题通用） */
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-label::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-item::before { content: '标准'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='small']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='small']::before { content: '小'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='large']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='large']::before { content: '大'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-label[data-value='huge']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-size .ql-picker-item[data-value='huge']::before { content: '特大'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-label::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-item::before { content: '正文'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='2']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='2']::before { content: '标题2'; }
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='3']::before,
+.email-template-quill-wrap .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='3']::before { content: '标题3'; }
+/* 按钮链接（btn-link blot）编辑器内实时预览：复用邮件外壳 .btn 同款外观。
+   外壳渐变色是 DB 可配置参数（mail:shell_btn_from/to），编辑器内用默认渐变近似，
+   真实效果以预览弹窗/实发邮件为准 */
+.email-template-quill-wrap .ql-editor a.btn {
+    display: inline-block;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff !important;
+    padding: 14px 32px;
+    border-radius: 8px;
+    text-decoration: none !important;
+    font-weight: 600;
+    margin: 10px 0;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+/* 链接编辑气泡文案中文化（quill.snow.css 默认英文 Visit URL:/Edit/Remove/Save/Enter link，
+   ::before/::after content 渲染，加前缀提升特异性覆盖，明暗主题通用——气泡本身白底深字） */
+.email-template-quill-wrap .ql-snow .ql-tooltip::before { content: '访问链接：'; }
+.email-template-quill-wrap .ql-snow .ql-tooltip[data-mode=link]::before { content: '输入链接：'; }
+.email-template-quill-wrap .ql-snow .ql-tooltip a.ql-action::after { content: '编辑'; border-right: 1px solid #ccc; margin-left: 16px; padding-right: 8px; }
+.email-template-quill-wrap .ql-snow .ql-tooltip a.ql-remove::before { content: '移除'; margin-left: 8px; }
+.email-template-quill-wrap .ql-snow .ql-tooltip.ql-editing a.ql-action::after { content: '保存'; border-right: 0; padding-right: 0; }
 /* 邮件模板预览弹窗：背景模拟常见邮件客户端（QQ 邮箱等）浅灰页面，与真实发送效果一致 */
 .email-template-preview-body {
     background: #f5f5f5;
@@ -862,4 +899,127 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 }
 .cursor-pointer {
     cursor: pointer;
+}
+
+/* ===== i18n 管理词条行（徽标明暗适配 + 词条布局）=====
+   全走 CSS 变量（tokens.css 暗/亮自动切换），禁止硬编码颜色；
+   badge 三态：新增=主题色、已覆盖=次要文本、未保存=警告色 */
+.i18n-badge {
+    font-size: 0.7rem;
+    line-height: 1.2;
+    padding: 2px 8px;
+    border-radius: 8px;
+    white-space: nowrap;
+    border: 1px solid var(--border-light);
+}
+.i18n-badge--new {
+    background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+    color: var(--color-primary);
+}
+.i18n-badge--override {
+    background: color-mix(in srgb, var(--text-muted) 22%, transparent);
+    color: var(--text-secondary);
+}
+.i18n-badge--dirty {
+    background: color-mix(in srgb, var(--color-warning, #f59e0b) 24%, transparent);
+    color: var(--color-warning, #f59e0b);
+}
+.i18n-key-text {
+    display: inline-block;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+    color: var(--color-primary);
+}
+.i18n-original-text {
+    line-height: 1.4;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.i18n-zh-ref {
+    line-height: 1.4;
+    word-break: break-word;
+    margin-top: 2px;
+    color: var(--text-muted);
+}
+.i18n-edit-input {
+    background: var(--bg-input);
+    color: var(--text-primary);
+}
+.i18n-edit-input:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+.i18n-edit-dirty {
+    border-color: var(--color-warning, #f59e0b);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-warning, #f59e0b) 25%, transparent) !important;
+}
+.i18n-cat-desc {
+    font-weight: 400;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+/* 侧边栏「其他选项」待翻译红点（inline 圆点，走主题色明暗自适应） */
+.i18n-nav-reddot {
+    width: 8px;
+    height: 8px;
+    min-width: 8px;
+    border-radius: 50%;
+    background: var(--color-danger);
+    flex-shrink: 0;
+    box-shadow: 0 0 4px color-mix(in srgb, var(--color-danger) 60%, transparent);
+}
+
+/* 待翻译提醒（红色感叹号 SVG 图标容器：stroke=currentColor 继承此 class 颜色） */
+.i18n-pending-warn {
+    display: inline-flex;
+    align-items: center;
+    color: var(--color-danger);
+}
+
+/* 待翻译顶部横幅 */
+.i18n-pending-banner {
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--color-danger) 30%, var(--border-color));
+    background: color-mix(in srgb, var(--color-danger) 10%, var(--bg-input));
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+.i18n-pending-banner .banner-text {
+    flex: 1 1 auto;
+}
+
+/* 清单横幅：标签不撑满，待翻译语言 chips 紧跟左对齐（当前语言横幅的「查看/退出」按钮仍需靠右） */
+.i18n-pending-banner--langs .banner-text {
+    flex: 0 0 auto;
+}
+
+/* 待翻译语言清单 chip（可点击切换） */
+.i18n-lang-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    line-height: 1.3;
+    cursor: pointer;
+    background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+    color: var(--color-danger);
+    border: 1px solid color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+.i18n-lang-chip:hover {
+    background: color-mix(in srgb, var(--color-danger) 24%, transparent);
+}
+.i18n-lang-chip-active {
+    background: var(--color-danger);
+    color: #fff;
+}
+.i18n-lang-chip-active:hover {
+    background: var(--color-danger);
 }

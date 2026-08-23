@@ -41,10 +41,10 @@ async function withRetry(fn, maxRetries = 2) {
 class PveApi {
   constructor() {
     this.node = null;
-    // 内部缓存（从 DB 读取，60s TTL）
+    // 内部缓存（从 DB 读取，保存 PVE 配置后 reloadConfig() 即时失效，TTL 仅兜底）
     this._configCache = null;
     this._configCacheTime = 0;
-    this._configTTL = 60000; // 60 秒
+    this._configTTL = 300000; // 5 分钟
     this._httpsAgent = null;
     var self = this;
     // axios 实例（httpsAgent 在拦截器中动态设置，依赖 DB 配置的 strict_tls）

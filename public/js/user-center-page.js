@@ -17,7 +17,12 @@ const App = {
         const templatePreferenceSaving = ref(false);
         // 站点全局默认模板（跟随站点默认卡需要）
         const siteDefault = ref('default');
-        const siteDefaultName = ref('赛博霓虹');
+        const siteDefaultName = ref(window.__i18n.t('settings.template.default'));
+        // 语言偏好（'' = 跟随站点默认）
+        const langPreference = ref('');
+        const langPreferenceSaving = ref(false);
+        const siteDefaultLang = ref('zh-CN');
+        const siteDefaultLangName = ref(window.__i18n.t('lang.zh-CN'));
         const memos = ref([]);
         const memosLoading = ref(false);
         const editMemoForm = ref({ id: null, title: '', content: '' });
@@ -25,6 +30,10 @@ const App = {
         const messages = ref([]);
         const messagesLoading = ref(false);
         const msgType = ref('all');
+        const msgTotal = ref(0);
+        const msgPage = ref(1);
+        const msgPageSize = ref(20);
+        let msgLoadSeq = 0;
         const currentMsg = ref({ title: '', content: '', type: 1, created_at: '' });
 
         const devices = ref([]);
@@ -116,71 +125,71 @@ const App = {
         const notifGroups = ref([
             {
                 key: 'provision',
-                label: '资源开通',
+                labelKey: 'user.notif.group.provision',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h20v11H2z"/><polyline points="12 17 12 20"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="7" y1="8" x2="17" y2="8"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_vm_provisioned', label: '虚拟机开通成功' },
-                    { key: 'notify_lxc_provisioned', label: '容器开通成功' },
-                    { key: 'notify_account_password', label: '服务器账号密码' },
-                    { key: 'notify_subnet_provisioned', label: '子网开通成功' }
+                    { key: 'notify_vm_provisioned', labelKey: 'user.notif.item.notify_vm_provisioned' },
+                    { key: 'notify_lxc_provisioned', labelKey: 'user.notif.item.notify_lxc_provisioned' },
+                    { key: 'notify_account_password', labelKey: 'user.notif.item.notify_account_password' },
+                    { key: 'notify_subnet_provisioned', labelKey: 'user.notif.item.notify_subnet_provisioned' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'refund',
-                label: '资源退款',
+                labelKey: 'user.notif.group.refund',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14l-4-4 4-4"/><path d="M5 10h11a4 4 0 0 1 0 8h-1"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_vm_refund', label: '虚拟机开通失败退款' },
-                    { key: 'notify_lxc_refund', label: '容器开通失败退款' }
+                    { key: 'notify_vm_refund', labelKey: 'user.notif.item.notify_vm_refund' },
+                    { key: 'notify_lxc_refund', labelKey: 'user.notif.item.notify_lxc_refund' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'disk',
-                label: '硬盘管理',
+                labelKey: 'user.notif.group.disk',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><path d="M4 6h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1z"/><circle cx="7" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="10" cy="12" r="1" fill="currentColor" stroke="none"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_disk_purchase', label: '硬盘购买成功' },
-                    { key: 'notify_disk_resize', label: '硬盘扩容成功' },
-                    { key: 'notify_disk_renewal', label: '硬盘续费成功' },
-                    { key: 'notify_disk_refund', label: '硬盘购买/扩容退款' },
-                    { key: 'notify_disk_destroy_refund', label: '硬盘销毁退款' }
+                    { key: 'notify_disk_purchase', labelKey: 'user.notif.item.notify_disk_purchase' },
+                    { key: 'notify_disk_resize', labelKey: 'user.notif.item.notify_disk_resize' },
+                    { key: 'notify_disk_renewal', labelKey: 'user.notif.item.notify_disk_renewal' },
+                    { key: 'notify_disk_refund', labelKey: 'user.notif.item.notify_disk_refund' },
+                    { key: 'notify_disk_destroy_refund', labelKey: 'user.notif.item.notify_disk_destroy_refund' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'wallet',
-                label: '充值续费',
+                labelKey: 'user.notif.group.wallet',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="10" y2="15"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_recharge', label: '充值到账通知' },
-                    { key: 'notify_renewal', label: '余额续费成功' }
+                    { key: 'notify_recharge', labelKey: 'user.notif.item.notify_recharge' },
+                    { key: 'notify_renewal', labelKey: 'user.notif.item.notify_renewal' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'expiry',
-                label: '到期提醒',
+                labelKey: 'user.notif.group.expiry',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_expiry_reminder', label: '到期前提醒' },
-                    { key: 'notify_expiry_alert', label: '已到期通知' }
+                    { key: 'notify_expiry_reminder', labelKey: 'user.notif.item.notify_expiry_reminder' },
+                    { key: 'notify_expiry_alert', labelKey: 'user.notif.item.notify_expiry_alert' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             },
             {
                 key: 'backup',
-                label: '备份恢复',
+                labelKey: 'user.notif.group.backup',
                 svg: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
                 expanded: false,
                 items: [
-                    { key: 'notify_backup_result', label: '备份/恢复结果' }
+                    { key: 'notify_backup_result', labelKey: 'user.notif.item.notify_backup_result' }
                 ],
                 get enabledCount() { return this.items.filter(i => notifSettings.value[i.key]).length; }
             }
@@ -209,20 +218,22 @@ const App = {
                     body: JSON.stringify({ [field]: value ? 1 : 0 })
                 });
                 // 找到对应的标签用于 toast 提示
-                let label = '';
+                let labelKey = '';
                 if (field === 'email_notifications_enabled') {
-                    label = '邮件通知';
+                    labelKey = 'user.notif.masterLabel';
                 } else {
                     for (const group of notifGroups.value) {
                         const item = group.items.find(i => i.key === field);
-                        if (item) { label = item.label; break; }
+                        if (item) { labelKey = item.labelKey; break; }
                     }
                 }
-                showToast(label + (value ? '已开启' : '已关闭'), 'success');
+                showToast(window.__i18n.tFormat('user.notif.toggleResult',
+                    window.__i18n.t(labelKey),
+                    value ? window.__i18n.t('user.notif.enabled') : window.__i18n.t('user.notif.disabled')), 'success');
             } catch (e) {
                 // 回滚
                 notifSettings.value[field] = value ? 0 : 1;
-                showToast('保存失败：' + e.message, 'error');
+                showToast(window.__i18n.tFormat('user.notif.saveFailed', e.message), 'error');
             }
         };
 
@@ -269,14 +280,14 @@ const App = {
         const submitRecharge = async () => {
             // 重复提交防护
             if (rechargePollingTimer) {
-                rechargeError.value = '已有充值进行中，请先完成或取消';
+                rechargeError.value = window.__i18n.t('user.recharge.inProgress');
                 return;
             }
             const amount = parseFloat(rechargeAmount.value);
-            if (isNaN(amount) || amount <= 0) { rechargeError.value = '请输入有效的充值金额'; return; }
+            if (isNaN(amount) || amount <= 0) { rechargeError.value = window.__i18n.t('user.recharge.invalidAmount'); return; }
             const min = parseFloat(payMethods.value.min_amount) || 0.01;
-            if (amount < min) { rechargeError.value = '最低充值金额为 ' + min.toFixed(2) + ' 元'; return; }
-            if (!rechargeMethod.value) { rechargeError.value = '请选择支付方式'; return; }
+            if (amount < min) { rechargeError.value = window.__i18n.t('user.recharge.minAmount1') + min.toFixed(2) + window.__i18n.t('common.currencyUnit'); return; }
+            if (!rechargeMethod.value) { rechargeError.value = window.__i18n.t('user.recharge.pickMethod'); return; }
             rechargeSubmitting.value = true;
             rechargeError.value = '';
             try {
@@ -298,7 +309,7 @@ const App = {
                     } else {
                         // PC 端：用支付链接生成二维码（qrcodejs2 渲染到 DOM）
                         if (!window.QRCode) {
-                            rechargeError.value = '二维码库加载失败，请刷新重试';
+                            rechargeError.value = window.__i18n.t('user.recharge.qrLibFail');
                             rechargeSubmitting.value = false;
                             return;
                         }
@@ -329,7 +340,7 @@ const App = {
                                     rechargeQrLoading.value = false;
                                 } catch (e2) {
                                     console.error('二维码生成失败', e2);
-                                    rechargeError.value = '二维码生成失败，请稍后重试';
+                                    rechargeError.value = window.__i18n.t('user.recharge.qrFailRetry');
                                     rechargeSubmitting.value = false;
                                 }
                             }
@@ -337,8 +348,8 @@ const App = {
                     }
                     // 启动轮询
                     pollOrderStatus(res.order_no, amount.toFixed(2));
-                } else { rechargeError.value = res.error || '创建订单失败'; }
-            } catch (e) { rechargeError.value = e.message || '请求失败，请稍后重试'; }
+                } else { rechargeError.value = res.error || window.__i18n.t('user.recharge.orderFail'); }
+            } catch (e) { rechargeError.value = e.message || window.__i18n.t('shared.retryLater'); }
             rechargeSubmitting.value = false;
         };
 
@@ -403,18 +414,18 @@ const App = {
         const showRechargeResult = (type, amount) => {
             rechargeResultType.value = type;
             if (type === 'success') {
-                rechargeResultTitle.value = '充值成功';
+                rechargeResultTitle.value = window.__i18n.t('user.recharge.successTitle');
                 // 金额格式化：兼容 string/number，统一输出两位小数
                 var num = parseFloat(amount);
                 rechargeResultAmount.value = isNaN(num) ? '--' : num.toFixed(2);
             } else if (type === 'fail') {
-                rechargeResultTitle.value = '充值失败';
+                rechargeResultTitle.value = window.__i18n.t('user.recharge.failed');
                 rechargeResultAmount.value = '';
             } else if (type === 'cancel') {
-                rechargeResultTitle.value = '支付已取消';
+                rechargeResultTitle.value = window.__i18n.t('user.recharge.cancelled');
                 rechargeResultAmount.value = '';
             } else if (type === 'timeout') {
-                rechargeResultTitle.value = '支付超时';
+                rechargeResultTitle.value = window.__i18n.t('user.recharge.timeout');
                 rechargeResultAmount.value = '';
             }
             const el = document.getElementById('rechargeResultModal');
@@ -463,11 +474,11 @@ const App = {
                     rechargeMethod.value = '';
                 } else {
                     // 未支付，提示用户
-                    rechargeError.value = '暂未检测到支付成功，请确认支付完成后重试';
+                    rechargeError.value = window.__i18n.t('user.recharge.notDetected');
                     setTimeout(() => { rechargeError.value = ''; }, 3000);
                 }
             } catch (e) {
-                rechargeError.value = '查询失败，请稍后重试';
+                rechargeError.value = window.__i18n.t('user.recharge.queryFail');
                 setTimeout(() => { rechargeError.value = ''; }, 3000);
             }
         };
@@ -563,8 +574,8 @@ const App = {
         };
 
         const copyOrderNo = (orderNo) => {
-            if (navigator.clipboard) { navigator.clipboard.writeText(orderNo).then(() => alert('订单号已复制')); }
-            else { const el = document.createElement('textarea'); el.value = orderNo; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert('订单号已复制'); }
+            if (navigator.clipboard) { navigator.clipboard.writeText(orderNo).then(() => alert(window.__i18n.t('user.order.noCopied'))); }
+            else { const el = document.createElement('textarea'); el.value = orderNo; document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el); alert(window.__i18n.t('user.order.noCopied')); }
         };
 
         const loadMyOrders = async (page) => {
@@ -778,17 +789,17 @@ const App = {
         const handleEmailVerification = () => {            var params = new URLSearchParams(window.location.search);
             var verified = params.get('email_verified');
             if (verified === '1') {
-                setTimeout(function() { alert('邮箱验证成功！'); }, 500);
+                setTimeout(function() { alert(window.__i18n.t('user.email.verifyOk')); }, 500);
                 var url = new URL(window.location);
                 url.searchParams.delete('email_verified');
                 url.searchParams.delete('reason');
                 window.history.replaceState({}, '', url.toString());
             } else if (verified === '0') {
                 var reason = params.get('reason');
-                var msg = '邮箱验证失败';
-                if (reason === 'expired') msg = '验证链接已过期，请重新发送验证邮件';
-                else if (reason === 'user_not_found') msg = '用户不存在';
-                else if (reason === 'error') msg = '验证过程出错，请重试';
+                var msg = window.__i18n.t('user.email.verifyFail');
+                if (reason === 'expired') msg = window.__i18n.t('user.email.linkExpired');
+                else if (reason === 'user_not_found') msg = window.__i18n.t('user.notFound');
+                else if (reason === 'error') msg = window.__i18n.t('user.verifyError');
                 setTimeout(function() { alert(msg); }, 500);
                 var url = new URL(window.location);
                 url.searchParams.delete('email_verified');
@@ -815,7 +826,7 @@ const App = {
                 templatePreference.value = (res && res.template) || '';
                 var sd = (res && res.siteDefault) || 'default';
                 siteDefault.value = sd;
-                siteDefaultName.value = sd === 'saas' ? 'SAAS 企业风' : '赛博霓虹';
+                siteDefaultName.value = sd === 'saas' ? window.__i18n.t('settings.template.saas') : window.__i18n.t('settings.template.default');
                 window.applyTemplate(templatePreference.value, sd);
             } catch (e) {
                 console.error('加载界面模板偏好失败', e);
@@ -842,11 +853,53 @@ const App = {
                 });
                 templatePreference.value = (res && res.template) || '';
                 window.applyTemplate(templatePreference.value, (res && res.siteDefault) || 'default');
-                alert('模板偏好已保存');
+                alert(window.__i18n.t('user.tpl.saved'));
             } catch (e) {
-                alert('保存失败: ' + (e.message || '未知错误'));
+                alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
             }
             templatePreferenceSaving.value = false;
+        };
+
+        // 语言偏好：载入服务端偏好
+        const loadLangPreference = async () => {
+            try {
+                var res = await api('/user/lang');
+                langPreference.value = (res && res.lang) || '';
+                var sd = (res && res.siteDefault) || 'zh-CN';
+                siteDefaultLang.value = sd;
+                // 语言名走注册表（含自定义语言，见 i18n.js getLanguageName）
+                siteDefaultLangName.value = window.__i18n.getLanguageName(sd);
+                // 应用用户实际语言（个人偏好优先，其次站点默认）
+                var resolved = langPreference.value || sd;
+                if (window.__i18n && window.__i18n.getLocale() !== resolved) {
+                    await window.__i18n.setLocale(resolved);
+                }
+            } catch (e) {
+                console.error('加载语言偏好失败', e);
+            }
+        };
+
+        // 语言偏好：保存到服务端 + 本地立即应用
+        const saveLangPreference = async () => {
+            langPreferenceSaving.value = true;
+            try {
+                var res = await api('/user/lang', {
+                    method: 'PUT',
+                    body: JSON.stringify({ lang: langPreference.value })
+                });
+                langPreference.value = (res && res.lang) || '';
+                // 立即应用语言（触发全站重渲染；跟随站点默认时用返回的 siteDefault）
+                var target = langPreference.value || (res && res.siteDefault) || 'zh-CN';
+                await window.__i18n.setLocale(target);
+                // 更新站点默认显示
+                var sd = (res && res.siteDefault) || 'zh-CN';
+                siteDefaultLang.value = sd;
+                siteDefaultLangName.value = window.__i18n.getLanguageName(sd);
+                alert(window.__i18n.t('user.language.save') + ' ' + window.__i18n.t('common.success'));
+            } catch (e) {
+                alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
+            }
+            langPreferenceSaving.value = false;
         };
 
         const updateProfile = async () => {
@@ -860,7 +913,7 @@ const App = {
                     body: JSON.stringify(data)
                 });
                 user.value = result.user;
-                alert('资料更新成功！');
+                alert(window.__i18n.t('user.profile.updateOk'));
             } catch (e) {
                 alert(e.message);
             }
@@ -869,15 +922,15 @@ const App = {
         // 独立修改密码卡片：新密码 + 确认密码（复用注册页交互）+ 当前密码二次验证
         const updatePassword = async () => {
             if (!profileForm.value.password) {
-                alert('请输入新密码');
+                alert(window.__i18n.t('user.secAuth.newPwdRequired'));
                 return;
             }
             if (profileForm.value.password !== profileForm.value.confirmPassword) {
-                alert('两次输入的密码不一致');
+                alert(window.__i18n.t('register.passwordMismatch'));
                 return;
             }
             if (!profileForm.value.currentPassword) {
-                alert('重置密码需要输入当前密码进行验证');
+                alert(window.__i18n.t('user.sec.pwdNeedsCurrent'));
                 return;
             }
             try {
@@ -895,19 +948,23 @@ const App = {
             }
         };
 
+        const avatarFileName = ref('');
         const handleAvatarUpload = async (e) => {
             const file = e.target.files[0];
             if (file) {
                 if (file.size > 2 * 1024 * 1024) {
-                    alert('头像文件大小不能超过2MB');
+                    alert(window.__i18n.t('user.avatar.tooLarge'));
+                    avatarFileName.value = '';
                     e.target.value = '';
                     return;
                 }
                 if (!['image/jpeg', 'image/png'].includes(file.type)) {
-                    alert('仅支持 JPG 和 PNG 格式');
+                    alert(window.__i18n.t('user.avatar.format'));
+                    avatarFileName.value = '';
                     e.target.value = '';
                     return;
                 }
+                avatarFileName.value = file.name;
                 try {
                     const formData = new FormData();
                     formData.append('avatar', file);
@@ -921,14 +978,14 @@ const App = {
                     });
                     if (!response.ok) {
                         const data = await response.json();
-                        throw new Error(data.error || '上传失败');
+                        throw new Error(data.error || window.__i18n.t('common.uploadFailed'));
                     }
                     const data = await response.json();
                     profileForm.value.avatar = data.avatar;
                     if (user.value) {
                         user.value.avatar = data.avatar;
                     }
-                    alert('头像上传成功！');
+                    alert(window.__i18n.t('user.avatar.uploadOk'));
                 } catch (e) {
                     alert(e.message);
                 }
@@ -939,7 +996,7 @@ const App = {
             try {
                 // M-1 修复：换绑邮箱需要当前密码做二次验证
                 if (!profileForm.value.emailPassword) {
-                    alert('绑定新邮箱需要输入当前密码进行验证');
+                    alert(window.__i18n.t('user.sec.emailNeedsCurrent'));
                     return;
                 }
                 const result = await api('/user/email', {
@@ -1007,7 +1064,7 @@ const App = {
         };
 
         const deleteMemo = async (id) => {
-            if (!await window.customConfirm('确定删除此备忘录？')) return;
+            if (!await window.customConfirm(window.__i18n.t('user.memos.deleteConfirm'))) return;
             try {
                 await api(`/user/memos/${id}`, { method: 'DELETE' });
                 await loadMemos();
@@ -1016,16 +1073,31 @@ const App = {
             }
         };
 
-        const loadMessages = async () => {
+        const loadMessages = async (page) => {
+            const seq = ++msgLoadSeq;
+            msgPage.value = page || 1;
             messagesLoading.value = true;
             try {
-                const data = await api('/messages?type=' + msgType.value);
+                const params = { type: msgType.value, page: msgPage.value, limit: msgPageSize.value };
+                const data = await api('/messages?' + new URLSearchParams(params));
+                if (seq !== msgLoadSeq) return; // 已有更新的请求，丢弃本次结果
                 messages.value = data.list || [];
+                msgTotal.value = data.total || 0;
+                // 删除/清空后当前页可能为空：若非第 1 页且还有数据，回退到最后一页
+                if (messages.value.length === 0 && msgTotal.value > 0 && msgPage.value > 1) {
+                    return loadMessages(Math.ceil(msgTotal.value / msgPageSize.value));
+                }
             } catch (e) {
+                if (seq !== msgLoadSeq) return;
                 console.error('加载消息失败', e);
             } finally {
-                messagesLoading.value = false;
+                if (seq === msgLoadSeq) messagesLoading.value = false;
             }
+        };
+        // 每页条数切换：从第 1 页重新加载（pv-pagination 事件回调）
+        const changeMsgPageSize = (size) => {
+            msgPageSize.value = size || 20;
+            loadMessages(1);
         };
 
         const viewMessage = async (msg) => {
@@ -1038,14 +1110,14 @@ const App = {
                 }
                 bsModalShow('messageDetailModal');
             } catch (e) {
-                alert('获取消息详情失败');
+                alert(window.__i18n.t('user.message.detailFail'));
             }
         };
 
         const markAllRead = async () => {
             try {
                 await api('/messages/read-all', { method: 'PUT' });
-                messages.value.forEach(m => m.is_read = 1);
+                await loadMessages(msgPage.value); // 列表按 is_read 排序，标记后重载保持一致性
                 unreadCount.value = 0;
             } catch (e) {
                 alert(e.message);
@@ -1053,11 +1125,11 @@ const App = {
         };
 
         const deleteMessage = async (id) => {
-            if (!await window.customConfirm('确定删除此消息？')) return;
+            if (!await window.customConfirm(window.__i18n.t('user.message.deleteConfirm'))) return;
             try {
                 await api('/messages/' + id, { method: 'DELETE' });
-                messages.value = messages.value.filter(m => m.id !== id);
                 bsModalHide('messageDetailModal');
+                await loadMessages(msgPage.value); // 删空当前页时自动回退
                 loadUnreadCount();
             } catch (e) {
                 alert(e.message);
@@ -1065,10 +1137,10 @@ const App = {
         };
 
         const clearAllMessages = async () => {
-            if (!await window.customConfirm('确定清空所有已读消息？未读消息将保留。')) return;
+            if (!await window.customConfirm(window.__i18n.t('user.message.clearReadConfirm'))) return;
             try {
                 await api('/messages', { method: 'DELETE' });
-                messages.value = messages.value.filter(m => !m.is_read);
+                await loadMessages(msgPage.value); // 重载修正 total；页面删空时自动回退
                 loadUnreadCount();
             } catch (e) {
                 alert(e.message);
@@ -1105,11 +1177,11 @@ const App = {
         };
 
         const revokeDevice = async (id) => {
-            if (await window.customConfirm('确定要将该设备下线吗？')) {
+            if (await window.customConfirm(window.__i18n.t('user.devices.kickConfirm'))) {
                 try {
                     await api(`/user/devices/${id}`, { method: 'DELETE' });
                     devices.value = devices.value.filter(d => d.id !== id);
-                    alert('设备已下线');
+                    alert(window.__i18n.t('user.devices.kicked'));
                 } catch (e) {
                     alert(e.message);
                 }
@@ -1117,7 +1189,7 @@ const App = {
         };
 
         const revokeOtherDevices = async () => {
-            if (await window.customConfirm('确定要下线除当前设备外的所有设备吗？')) {
+            if (await window.customConfirm(window.__i18n.t('user.devices.kickAllConfirm'))) {
                 try {
                     const refreshToken = localStorage.getItem(window.__storageKeys.REFRESH_TOKEN);
                     await api('/user/devices', {
@@ -1125,7 +1197,7 @@ const App = {
                         body: JSON.stringify({ refreshToken })
                     });
                     devices.value = devices.value.filter(d => d.id === currentDeviceId.value);
-                    alert('其他设备已下线');
+                    alert(window.__i18n.t('user.devices.kickedAll'));
                 } catch (e) {
                     alert(e.message);
                 }
@@ -1189,7 +1261,7 @@ const App = {
 
         const copyRecoveryCodes = async () => {
             const codes = twofaRecoveryCodes.value.filter(rc => !rc.used).map(rc => rc.code);
-            if (codes.length === 0) { alert('没有未使用的恢复码'); return; }
+            if (codes.length === 0) { alert(window.__i18n.t('user.twofa.noCodes')); return; }
             const text = codes.join('\n');
             bsModalHide('twofaRecoveryModal');
             await new Promise(r => setTimeout(r, 300));
@@ -1210,7 +1282,7 @@ const App = {
                     bsModalShow('twofaRecoveryModal');
                 }, { once: true });
             }
-            customAlertMessage.value = '未使用的恢复码已复制到剪贴板';
+            customAlertMessage.value = window.__i18n.t('user.twofa.codesCopied');
             var oldModal = bootstrap.Modal.getInstance(el);
             if (oldModal) oldModal.dispose();
             window.applyModalZIndex(el);
@@ -1237,7 +1309,7 @@ const App = {
                     bsModalShow('twofaRecoveryModal');
                 }, { once: true });
             }
-            customAlertMessage.value = '恢复码已复制';
+            customAlertMessage.value = window.__i18n.t('user.twofa.codeCopied');
             var oldModal = bootstrap.Modal.getInstance(el);
             if (oldModal) oldModal.dispose();
             window.applyModalZIndex(el);
@@ -1245,7 +1317,7 @@ const App = {
         };
 
         const downloadRecoveryCodes = () => {
-            const text = twofaRecoveryCodes.value.map(rc => (rc.used ? '[已使用] ' : '') + rc.code).join('\n');
+            const text = twofaRecoveryCodes.value.map(rc => (rc.used ? window.__i18n.t('user.twofa.usedTag') : '') + rc.code).join('\n');
             const blob = new Blob([text], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1257,7 +1329,7 @@ const App = {
 
         // M-1 修复：恢复码重生成前先做二次验证（当前密码或 2FA 动态码）
         const secondaryAuthInput = ref('');
-        const secondaryAuthTitle = ref('二次验证');
+        const secondaryAuthTitle = ref(window.__i18n.t('user.twofa.title'));
         let secondaryAuthCallback = null;
 
         const openSecondaryAuth = (title, cb) => {
@@ -1270,7 +1342,7 @@ const App = {
         const confirmSecondaryAuth = async () => {
             const input = secondaryAuthInput.value.trim();
             if (!input) {
-                alert('请输入当前密码或 2FA 验证码');
+                alert(window.__i18n.t('user.twofa.pwdOrCodeRequired'));
                 return;
             }
             bsModalHide('secondaryAuthModal');
@@ -1289,11 +1361,11 @@ const App = {
         const regenerateRecoveryCodes = async () => {
             bsModalHide('twofaRecoveryModal');
             await new Promise(r => setTimeout(r, 300));
-            if (!await window.customConfirm('确定要重新生成恢复码吗？当前的恢复码将全部作废。')) {
+            if (!await window.customConfirm(window.__i18n.t('user.twofa.regenerateConfirm'))) {
                 bsModalShow('twofaRecoveryModal');
                 return;
             }
-            openSecondaryAuth('重新生成恢复码', async (input) => {
+            openSecondaryAuth(window.__i18n.t('user.twofa.regenerateBtn'), async (input) => {
                 try {
                     const data = await api('/user/2fa/recovery-codes/regenerate', {
                         method: 'POST',
@@ -1311,7 +1383,7 @@ const App = {
                             bsModalShow('twofaRecoveryModal');
                         }, { once: true });
                     }
-                    customAlertMessage.value = '恢复码已重新生成';
+                    customAlertMessage.value = window.__i18n.t('user.twofa.regenerated');
                     var oldModal = bootstrap.Modal.getInstance(el);
                     if (oldModal) oldModal.dispose();
                     window.applyModalZIndex(el);
@@ -1319,7 +1391,7 @@ const App = {
                 } catch (e) {
                     bsModalShow('twofaRecoveryModal');
                     await new Promise(r => setTimeout(r, 300));
-                    alert('重新生成恢复码失败：' + e.message);
+                    alert(window.__i18n.t('user.twofa.regenerateFail') + e.message);
                 }
             });
         };
@@ -1339,7 +1411,7 @@ const App = {
                 twofaEnabled.value = false;
                 twofaRecoveryCount.value = 0;
                 twofaDisablePassword.value = '';
-                alert('二次验证已禁用');
+                alert(window.__i18n.t('user.twofa.disabledToast'));
             } catch (e) {
                 alert(e.message);
             }
@@ -1395,6 +1467,7 @@ const App = {
                 await loadNavItems();
                 await loadProfile();
                 await loadTemplatePreference();
+                await loadLangPreference();
                 window.syncUserTemplate && window.syncUserTemplate();
                 handleEmailVerification();
                 if (window.location.hash === '#messages' || activeSubTab.value === 'messages') {
@@ -1443,6 +1516,9 @@ const App = {
         }, { deep: true });
 
         return {
+            // i18n 翻译函数（响应式：语言切换时自动重渲染）
+            t: window.__i18n.t,
+            tFormat: window.__i18n.tFormat,
             user,
             DOMPurify,
             activeSubTab,
@@ -1455,6 +1531,11 @@ const App = {
             siteDefaultName,
             selectTemplate,
             saveTemplatePreference,
+            langPreference,
+            langPreferenceSaving,
+            siteDefaultLangName,
+            loadLangPreference,
+            saveLangPreference,
             memos,
             memosLoading,
             editMemoForm,
@@ -1462,6 +1543,9 @@ const App = {
             messages,
             messagesLoading,
             msgType,
+            msgTotal,
+            msgPage,
+            msgPageSize,
             currentMsg,
             parseMarkdown,
             customAlertMessage,
@@ -1474,6 +1558,7 @@ const App = {
             loadMemos,
             updateProfile,
             updatePassword,
+            avatarFileName,
             handleAvatarUpload,
             bindEmail,
             resendVerification,
@@ -1483,6 +1568,7 @@ const App = {
             deleteMemo,
             loadUnreadCount,
             loadMessages,
+            changeMsgPageSize,
             viewMessage,
             markAllRead,
             deleteMessage,
@@ -1532,8 +1618,20 @@ const App = {
     }
 };
 
-var app = createApp(App);
-app.mount('#app');
+// i18n：先加载当前语言翻译，再挂载 Vue（确保首次渲染即为目标语言）
+(async function () {
+    if (window.__i18n && !window.__i18n.isLoaded()) {
+        await window.__i18n.init(window.__initialLocale || 'zh-CN');
+    }
+    var app = createApp(App);
+    // 组件内部（pv-pagination 等）不继承主组件 setup return 的 t/tFormat，
+    // 必须经 globalProperties 提供（与 admin/dashboard 一致）；缺失会导致组件渲染抛错 → 分页条静默消失
+    app.config.globalProperties.t = window.__i18n.t;
+    app.config.globalProperties.tFormat = window.__i18n.tFormat;
+    // 语言下拉选项列表（系统 + 自定义语言；注册表加载失败时回退 7 种系统语言）
+    app.config.globalProperties.i18nLanguageList = window.__i18n.getLanguages;
+    app.mount('#app');
+})();
 
 /* ===== Sidebar Toggle & Theme Switch ===== */
 function toggleSidebar() {

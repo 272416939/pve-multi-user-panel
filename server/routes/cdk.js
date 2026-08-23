@@ -71,8 +71,11 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
 
 router.get('/admin/cdk/list', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const cdkList = await db.cdk.getAll();
-        res.json(cdkList);
+        const result = await db.cdk.getPaginated({
+            page: parseInt(req.query.page) || 1,
+            limit: parseInt(req.query.limit) || 20
+        });
+        res.json(result);
     } catch (error) {
         console.error('获取 CDK 列表失败:', error);
         res.status(500).json({ error: '获取 CDK 列表失败' });

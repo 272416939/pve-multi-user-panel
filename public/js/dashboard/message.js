@@ -32,7 +32,7 @@
             }
             $.bsModalShow('messageDetailModal');
         } catch (e) {
-            alert('获取消息详情失败');
+            alert(window.__i18n.t('user.message.detailFail'));
         }
     };
 
@@ -58,7 +58,7 @@
     };
 
     $.clearAllMessages = async function() {
-        if (!await window.customConfirm('确定清空所有已读消息？未读消息将保留。')) return;
+        if (!await window.customConfirm(window.__i18n.t('user.message.clearReadConfirm'))) return;
         try {
             await api('/messages', { method: 'DELETE' });
             $.messages.value = $.messages.value.filter(function(m) { return !m.is_read; });

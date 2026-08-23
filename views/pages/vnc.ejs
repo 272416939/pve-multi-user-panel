@@ -1,8 +1,13 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="<%= locals.locale %>" data-theme="dark">
 <head>
     <script src="js/theme-init.js"></script>
     <script src="js/app-version.js" defer></script>
+    <script src="js/shared/i18n.js?cv=<%= locals.cacheVersion %>"></script>
+    <script nonce="<%= locals.cspNonce %>">
+        window.__initialLocale = '<%= locals.locale %>';
+        window.__i18n.init('<%= locals.locale %>');
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VNC 控制台</title>
@@ -79,20 +84,20 @@
 <body>
     <div id="toolbar">
         <span class="title"><span id="vmLabel"></span></span>
-        <span class="status" id="statusText">连接中...</span>
-        <button id="disconnectBtn" aria-label="断开连接">断开</button>
+        <span class="status" id="statusText" data-i18n="vnc.connecting">连接中...</span>
+        <button id="disconnectBtn" aria-label="断开连接" data-i18n="vnc.disconnect">断开</button>
     </div>
     <div id="screen">
         <div id="connecting">
-            <span class="spinner"></span>正在连接 VNC 控制台...
+            <span class="spinner"></span><span data-i18n="vnc.connectingMsg">正在连接 VNC 控制台...</span>
         </div>
     </div>
     <div class="ctrl-bar">
-        <span class="group-label">系统</span>
+        <span class="group-label" data-i18n="vnc.groupSystem">系统</span>
         <button id="ctrlAltDelBtn" class="primary" aria-label="发送 Ctrl+Alt+Del">Ctrl+Alt+Del</button>
         <button id="winBtn" aria-label="发送 Win 键">⊞ Win</button>
 
-        <span class="group-label">快捷键</span>
+        <span class="group-label" data-i18n="vnc.groupKeys">快捷键</span>
         <button id="altTabBtn" aria-label="发送 Alt+Tab">Alt+Tab</button>
         <button id="altF4Btn" aria-label="发送 Alt+F4">Alt+F4</button>
         <button id="winRBtn" aria-label="发送 Win+R">⊞+R 运行</button>
@@ -100,13 +105,31 @@
         <button id="winEBtn" aria-label="发送 Win+E">⊞+E 资源管理器</button>
         <button id="ctrlShiftEscBtn" aria-label="发送 Ctrl+Shift+Esc">Ctrl+Shift+Esc</button>
 
-        <span class="group-label">显示</span>
-        <button id="fullscreenBtn" aria-label="切换全屏">全屏</button>
-        <button id="scaleBtn" aria-label="切换缩放">适应窗口</button>
+        <span class="group-label" data-i18n="vnc.groupDisplay">显示</span>
+        <button id="fullscreenBtn" aria-label="切换全屏" data-i18n="vnc.fullscreen">全屏</button>
+        <button id="scaleBtn" aria-label="切换缩放" data-i18n="vnc.fitWindow">适应窗口</button>
     </div>
 
     <script type="module" nonce="<%= locals.cspNonce %>">
         import RFB from '/novnc/core/rfb.js';
+
+        // 等待翻译就绪（最多 3s 兜底），保证后续文案取到当前语言
+        await new Promise(function (resolve) {
+            if (window.__i18n && window.__i18n.isLoaded()) return resolve();
+            var start = Date.now();
+            var iv = setInterval(function () {
+                if ((window.__i18n && window.__i18n.isLoaded()) || Date.now() - start > 3000) { clearInterval(iv); resolve(); }
+            }, 50);
+        });
+        var T = function (k) { return window.__i18n.t(k); };
+        document.title = T('vnc.title');
+        [['disconnectBtn', 'vnc.ariaDisconnect'], ['ctrlAltDelBtn', 'vnc.ariaCtrlAltDel'], ['winBtn', 'vnc.ariaWin'],
+         ['altTabBtn', 'vnc.ariaAltTab'], ['altF4Btn', 'vnc.ariaAltF4'], ['winRBtn', 'vnc.ariaWinR'],
+         ['winDBtn', 'vnc.ariaWinD'], ['winEBtn', 'vnc.ariaWinE'], ['ctrlShiftEscBtn', 'vnc.ariaCtrlShiftEsc'],
+         ['fullscreenBtn', 'vnc.ariaFullscreen'], ['scaleBtn', 'vnc.ariaFit']].forEach(function (a) {
+            var el = document.getElementById(a[0]);
+            if (el) el.setAttribute('aria-label', T(a[1]));
+        });
 
         const error = <%- JSON.stringify(typeof locals.error !== 'undefined' ? locals.error : null).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
         if (error) {
@@ -123,11 +146,11 @@
         const statusText = document.getElementById('statusText');
         const connectingEl = document.getElementById('connecting');
         const screenEl = document.getElementById('screen');
-        document.getElementById('vmLabel').textContent = (type === 'lxc' ? 'CT ' : 'VM ') + vmid + ' - VNC 控制台';
+        document.getElementById('vmLabel').textContent = (type === 'lxc' ? 'CT ' : 'VM ') + vmid + ' - ' + T('vnc.title');
 
         if (!session) {
-            statusText.textContent = '参数缺失';
-            connectingEl.innerHTML = '<span id="error-msg">缺少会话参数，请重新打开</span>';
+            statusText.textContent = T('vnc.missingParams');
+            connectingEl.innerHTML = '<span id="error-msg">' + T('vnc.missingSession') + '</span>';
             throw new Error('missing session');
         }
 
@@ -138,9 +161,9 @@
         let scaled = true;
 
         function onConnected() {
-            statusText.innerHTML = '已连接';
+            statusText.innerHTML = T('vnc.connected');
             connectingEl.style.display = 'none';
-            document.getElementById('disconnectBtn').textContent = '已连接';
+            document.getElementById('disconnectBtn').textContent = T('vnc.connected');
             // 连接成功后才设置 scaleViewport，确保 framebuffer 尺寸已知
             // 避免在 viewport 为 0 时计算 scale 导致坐标映射错误
             if (rfb) {
@@ -150,14 +173,14 @@
         }
 
         function onDisconnected() {
-            statusText.innerHTML = '已断开';
+            statusText.innerHTML = T('vnc.disconnected');
             rfb = null;
-            document.getElementById('disconnectBtn').textContent = '断开';
+            document.getElementById('disconnectBtn').textContent = T('vnc.disconnect');
         }
 
         function connectVnc() {
             connectingEl.style.display = '';
-            statusText.textContent = '连接中...';
+            statusText.textContent = T('vnc.connecting');
             try {
                 rfb = new RFB(screenEl, wsUrl, {
                     credentials: { password: ticket }
@@ -167,10 +190,10 @@
             } catch(e) {
                 var errorSpan = document.createElement('span');
                 errorSpan.id = 'error-msg';
-                errorSpan.textContent = '连接失败: ' + e.message;
+                errorSpan.textContent = T('vnc.failedMsg') + e.message;
                 connectingEl.innerHTML = '';
                 connectingEl.appendChild(errorSpan);
-                statusText.textContent = '连接失败';
+                statusText.textContent = T('vnc.failed');
             }
         }
 
@@ -214,7 +237,7 @@
         document.getElementById('scaleBtn').addEventListener('click', function() {
             scaled = !scaled;
             if (rfb) rfb.scaleViewport = scaled;
-            this.textContent = scaled ? '原始大小' : '适应窗口';
+            this.textContent = scaled ? T('vnc.nativeSize') : T('vnc.fitWindow');
         });
 
         connectVnc();

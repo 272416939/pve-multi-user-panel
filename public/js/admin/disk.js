@@ -50,7 +50,7 @@
   $.diskPage.loadStorageGroups = async function() {
     try {
       var res = await authFetch('/api/storage-groups');
-      if (!res.ok) throw new Error('加载失败');
+      if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
       $.diskPage.storageGroups.value = await res.json();
     } catch (e) {
       console.error('[disk] 加载存储分组失败:', e.message);
@@ -70,7 +70,7 @@
   $.diskPage.saveStorageGroup = async function() {
     try {
       var f = $.diskPage.storageGroupForm.value;
-      if (!f.name || !f.name.trim()) return alert('请输入分组名称');
+      if (!f.name || !f.name.trim()) return alert(window.__i18n.t('admin.disk.groupNameRequired'));
 
       // 新建时自动获取当前最大 sort_order + 1
       var sortOrder = parseInt(f.sort_order) || 0;
@@ -91,11 +91,11 @@
         body: JSON.stringify({ name: f.name.trim(), sort_order: sortOrder })
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '操作失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('common.failed'));
       $.bsModalHide('storageGroupModal');
       await $.diskPage.loadStorageGroups();
     } catch (e) {
-      alert('操作失败: ' + e.message);
+      alert(window.__i18n.t('common.opFailedMsg') + e.message);
     }
   };
 
@@ -105,18 +105,18 @@
     var hint = '';
     if (group) {
       if (specs.length > 0) {
-        hint = '\n\n⚠ 该分组下已绑定 ' + specs.length + ' 个硬盘规格：' + specs.map(function(s) { return s.disk_type + '|' + s.name; }).join('、');
-        hint += '\n删除分组后，这些规格将失去分组关联！';
+        hint = window.__i18n.t('admin.disk.groupBoundPfxNl') + specs.length + window.__i18n.t('admin.disk.groupBoundSuffix') + specs.map(function(s) { return s.disk_type + '|' + s.name; }).join('、');
+        hint += window.__i18n.t('admin.disk.delGroupWarnNl');
       }
     }
-    if (!(await customConfirm('确定删除存储分组「' + (group ? group.name : '') + '」？' + hint))) return;
+    if (!(await customConfirm(window.__i18n.t('admin.disk.deleteGroupConfirm') + (group ? group.name : '') + '」？' + hint))) return;
     try {
       var res = await authFetch('/api/storage-groups/' + id, { method: 'DELETE' });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '删除失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('admin.logs.deleteFailed'));
       await $.diskPage.loadStorageGroups();
     } catch (e) {
-      alert('删除失败: ' + e.message);
+      alert(window.__i18n.t('common.deleteFailedMsg') + e.message);
     }
   };
 
@@ -204,7 +204,7 @@
   $.diskPage.loadDiskSpecs = async function() {
     try {
       var res = await authFetch('/api/disk-specs');
-      if (!res.ok) throw new Error('加载失败');
+      if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
       $.diskPage.diskSpecs.value = await res.json();
     } catch (e) {
       console.error('[disk] 加载规格失败:', e.message);
@@ -215,7 +215,7 @@
   $.diskPage.loadPveStorages = async function() {
     try {
       var res = await authFetch('/api/pve-storages');
-      if (!res.ok) throw new Error('加载失败');
+      if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
       $.diskPage.pveStorages.value = await res.json();
     } catch (e) {
       console.error('[disk] 加载 PVE 存储列表失败:', e.message);
@@ -224,7 +224,7 @@
 
   // 格式化存储容量显示
   $.diskPage.formatStorageSize = function(gb) {
-    if (!gb || gb <= 0) return '未知';
+    if (!gb || gb <= 0) return window.__i18n.t('admin.disk.unknown');
     if (gb >= 1024) return (gb / 1024).toFixed(1) + ' TiB';
     return gb + ' GiB';
   };
@@ -310,9 +310,9 @@
   $.diskPage.saveDiskSpec = async function() {
     try {
       var f = $.diskPage.diskSpecForm.value;
-      if (!f.name || !f.name.trim()) return alert('请输入规格名称');
-      if (!f.storage_group_id) return alert('请选择存储分组');
-      if (!f.storage_pool || !f.storage_pool.trim()) return alert('请选择存储位置');
+      if (!f.name || !f.name.trim()) return alert(window.__i18n.t('admin.disk.specNameRequired'));
+      if (!f.storage_group_id) return alert(window.__i18n.t('dash.disk.pickGroup'));
+      if (!f.storage_pool || !f.storage_pool.trim()) return alert(window.__i18n.t('admin.disk.pickStorage'));
 
       var url = $.diskPage.editingDiskSpec.value
         ? '/api/disk-specs/' + $.diskPage.editingDiskSpec.value.id
@@ -339,25 +339,25 @@
         })
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '操作失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('common.failed'));
       $.bsModalHide('diskSpecModal');
       await $.diskPage.loadDiskSpecs();
     } catch (e) {
-      alert('操作失败: ' + e.message);
+      alert(window.__i18n.t('common.opFailedMsg') + e.message);
     }
   };
 
   $.diskPage.deleteDiskSpec = async function(id) {
     var spec = ($.diskPage.diskSpecs.value || []).find(function(s) { return s.id === id; });
     var name = spec ? (spec.disk_type + '|' + spec.name) : '';
-    if (!(await customConfirm('确定删除硬盘规格「' + name + '」？'))) return;
+    if (!(await customConfirm(window.__i18n.t('admin.disk.deleteSpecConfirm') + name + '」？'))) return;
     try {
       var res = await authFetch('/api/disk-specs/' + id, { method: 'DELETE' });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '删除失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('admin.logs.deleteFailed'));
       await $.diskPage.loadDiskSpecs();
     } catch (e) {
-      alert('删除失败: ' + e.message);
+      alert(window.__i18n.t('common.deleteFailedMsg') + e.message);
     }
   };
 
@@ -383,7 +383,7 @@
   $.diskPage.loadLifecycleConfig = async function() {
     try {
       var res = await authFetch('/api/lifecycle-config');
-      if (!res.ok) throw new Error('加载失败');
+      if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
       var data = await res.json();
       $.diskPage.lifecycleConfig.value = data;
       $.diskPage.lifecycleForm.value = {
@@ -407,12 +407,12 @@
         body: JSON.stringify(f)
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '保存失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('common.saveFailed'));
       $.diskPage.editingLifecycle.value = false;
       await $.diskPage.loadLifecycleConfig();
-      alert('保存成功');
+      alert(window.__i18n.t('common.saveOk'));
     } catch (e) {
-      alert('保存失败: ' + e.message);
+      alert(window.__i18n.t('common.saveFailedMsg') + e.message);
     }
   };
 
@@ -446,7 +446,7 @@
   };
 
   $.diskPage.openBatchEditGroup = function() {
-    if ($.diskPage.selectedDiskIds.value.length === 0) return alert('请先选择要修改的磁盘');
+    if ($.diskPage.selectedDiskIds.value.length === 0) return alert(window.__i18n.t('admin.disk.pickFirst'));
     $.diskPage.batchGroupId.value = null;
     $.diskPage.showBatchEditGroupModal.value = true;
     $.bsModalShow('batchEditGroupModal');
@@ -454,9 +454,9 @@
 
   $.diskPage.submitBatchEditGroup = async function() {
     var groupId = $.diskPage.batchGroupId.value;
-    if (!groupId) return alert('请选择目标存储分组');
+    if (!groupId) return alert(window.__i18n.t('admin.disk.pickTargetGroup'));
     var ids = $.diskPage.selectedDiskIds.value;
-    if (ids.length === 0) return alert('请先选择磁盘');
+    if (ids.length === 0) return alert(window.__i18n.t('admin.disk.pickDisk'));
 
     try {
       var res = await authFetchJson('/api/admin/disks/batch/storage-group', {
@@ -464,21 +464,21 @@
         body: JSON.stringify({ disk_ids: ids, storage_group_id: groupId })
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '修改失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('admin.disk.modifyFailed'));
       $.bsModalHide('batchEditGroupModal');
       $.diskPage.showBatchEditGroupModal.value = false;
-      alert('修改成功，共更新 ' + data.updated + '/' + data.total + ' 个磁盘');
+      alert(window.__i18n.t('admin.disk.modifyOk1') + data.updated + '/' + data.total + window.__i18n.t('admin.disk.countSuffix'));
       $.diskPage.selectedDiskIds.value = [];
       await $.diskPage.loadAllDisks();
     } catch (e) {
-      alert('修改失败: ' + e.message);
+      alert(window.__i18n.t('admin.disk.modifyFailedMsg') + e.message);
     }
   };
 
   $.diskPage.loadAllDisks = async function() {
     try {
       var res = await authFetch('/api/admin/disks');
-      if (!res.ok) throw new Error('加载失败');
+      if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
       var data = await res.json();
       $.diskPage.allDisks.value = data.rows || data.data || data || [];
     } catch (e) {
@@ -488,40 +488,40 @@
 
   $.diskPage.destroyDisk = async function(disk) {
     if (!disk) return;
-    var ok = await customConfirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n管理员销毁不受15天限制，3天内全额退款，超过3天按剩余时间比例退款。');
+    var ok = await customConfirm(window.__i18n.t('dash.disk.destroyConfirm1') + (disk.disk_name || disk.volume_id) + window.__i18n.t('dash.disk.destroyAdminMid'));
     if (!ok) return;
     try {
       var res = await authFetch('/api/admin/disks/' + disk.id + '/destroy', { method: 'POST' });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '销毁失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('dash.disk.destroyFailed'));
       if (data.refund_amount > 0) {
-        alert('销毁成功，已退款 ¥' + data.refund_amount);
+        alert(window.__i18n.tFormat('dash.disk.destroyRefunded', data.refund_amount));
       } else {
-        alert('销毁成功');
+        alert(window.__i18n.t('dash.disk.destroyed'));
       }
       await $.diskPage.loadAllDisks();
     } catch (e) {
-      alert('销毁失败: ' + e.message);
+      alert(window.__i18n.tFormat('dash.disk.destroyFailedMsg', e.message));
     }
   };
 
   $.diskPage.hardDeleteDisk = async function(disk) {
     if (!disk) return;
-    var ok = await customConfirm('确定删除此已销毁的磁盘记录？');
+    var ok = await customConfirm(window.__i18n.t('dash.disk.deleteDestroyedConfirm'));
     if (!ok) return;
     try {
       var res = await authFetch('/api/admin/disks/' + disk.id + '/destroy', { method: 'POST' });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '删除失败');
-      alert('已删除');
+      if (!res.ok) return alert(data.error || window.__i18n.t('admin.logs.deleteFailed'));
+      alert(window.__i18n.t('dash.disk.deleteFailed'));
       await $.diskPage.loadAllDisks();
     } catch (e) {
-      alert('删除失败: ' + e.message);
+      alert(window.__i18n.t('common.deleteFailedMsg') + e.message);
     }
   };
 
   $.diskPage.importExistingDisks = async function() {
-    var ok = await customConfirm('确定导入存量磁盘？\n此操作会扫描 PVE，清理孤立记录并导入未在台账中的磁盘。');
+    var ok = await customConfirm(window.__i18n.t('admin.disk.importConfirm'));
     if (!ok) return;
 
     // 显示加载中弹窗
@@ -530,8 +530,8 @@
     loadingEl.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
     loadingEl.innerHTML = '<div style="background:var(--card-bg,#1e1e2e);border-radius:12px;padding:40px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.4);">'
       + '<div class="spinner-border text-primary" style="width:3rem;height:3rem;" role="status"></div>'
-      + '<p class="mt-3 mb-0" style="color:var(--text-primary,#fff);font-size:16px;">正在扫描 PVE 并导入磁盘...</p>'
-      + '<p class="mt-1 mb-0" style="color:var(--text-secondary,#999);font-size:13px;">请稍候，可能需要一些时间</p>'
+      + '<p class="mt-3 mb-0" style="color:var(--text-primary,#fff);font-size:16px;">' + window.__i18n.t('admin.disk.scanning') + '</p>'
+      + '<p class="mt-1 mb-0" style="color:var(--text-secondary,#999);font-size:13px;">' + window.__i18n.t('admin.disk.pleaseWait') + '</p>'
       + '</div>';
     document.body.appendChild(loadingEl);
 
@@ -541,18 +541,18 @@
       // 移除加载弹窗
       document.body.removeChild(loadingEl);
 
-      if (!res.ok) return alert(data.error || '导入失败');
-      var msg = '导入完成';
-      if (data.cleaned > 0) msg += '\n清理孤立记录: ' + data.cleaned + ' 个';
-      if (data.imported > 0) msg += '\n新导入: ' + data.imported + ' 个';
-      if (data.skipped > 0) msg += '\n跳过已存在: ' + data.skipped + ' 个';
-      if (data.unmatched > 0) msg += '\n未匹配规格: ' + data.unmatched + ' 个';
+      if (!res.ok) return alert(data.error || window.__i18n.t('admin.disk.importFailed'));
+      var msg = window.__i18n.t('admin.disk.importDone');
+      if (data.cleaned > 0) msg += window.__i18n.t('admin.disk.impCleanedNl') + data.cleaned + window.__i18n.t('admin.geSuffix');
+      if (data.imported > 0) msg += window.__i18n.t('admin.disk.importedNewNl') + data.imported + window.__i18n.t('admin.geSuffix');
+      if (data.skipped > 0) msg += window.__i18n.t('admin.disk.skippedNl') + data.skipped + window.__i18n.t('admin.geSuffix');
+      if (data.unmatched > 0) msg += window.__i18n.t('admin.disk.unmatchedNl') + data.unmatched + window.__i18n.t('admin.geSuffix');
       alert(msg);
       await $.diskPage.loadAllDisks();
     } catch (e) {
       // 移除加载弹窗
       if (loadingEl.parentNode) document.body.removeChild(loadingEl);
-      alert('导入失败: ' + e.message);
+      alert(window.__i18n.t('admin.disk.importFailedMsg') + e.message);
     }
   };
 
@@ -586,8 +586,8 @@
   $.diskPage.saveEditDisk = async function() {
     try {
       var f = $.diskPage.editDiskForm.value;
-      if (!f.disk_name || !f.disk_name.trim()) return alert('请输入磁盘名称');
-      if (!f.storage_group_id) return alert('请选择存储分组');
+      if (!f.disk_name || !f.disk_name.trim()) return alert(window.__i18n.t('admin.disk.nameRequired'));
+      if (!f.storage_group_id) return alert(window.__i18n.t('dash.disk.pickGroup'));
 
       var res = await authFetchJson('/api/admin/disks/' + $.diskPage.editingDisk.value.id, {
         method: 'PUT',
@@ -598,13 +598,13 @@
         })
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '编辑失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('admin.disk.editFailed'));
       $.bsModalHide('editDiskModal');
       $.diskPage.showEditDiskModal.value = false;
-      alert('编辑成功');
+      alert(window.__i18n.t('admin.disk.editOk'));
       await $.diskPage.loadAllDisks();
     } catch (e) {
-      alert('编辑失败: ' + e.message);
+      alert(window.__i18n.t('admin.disk.editFailedMsg') + e.message);
     }
   };
 
@@ -625,7 +625,7 @@
   };
 
   $.diskPage.getDiskStatusText = function(status) {
-    var map = { free: '空闲', bound: '已挂载', grace: '宽限期', expired: '已过期', destroyed: '已销毁' };
+    var map = { free: window.__i18n.t('dash.disk.statusFree'), bound: window.__i18n.t('dash.disk.statusMounted'), grace: window.__i18n.t('dash.disk.statusGrace'), expired: window.__i18n.t('common.expired'), destroyed: window.__i18n.t('dash.disk.statusDestroyed') };
     return map[status] || status;
   };
 

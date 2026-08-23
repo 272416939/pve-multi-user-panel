@@ -35,6 +35,13 @@ function validateActionPrefix(prefix) {
 
 // 后台操作二级子域中文名（单一来源 ADMIN_SUB_CATEGORIES）：action 形如 admin.<子域>.<动作>，
 // 列表「操作类型」列与 CSV 导出共用，禁止前端自行拷贝映射
+function subCategoryKey(action) {
+    var parts = String(action || '').split('.');
+    if (parts.length >= 3 && parts[0] === 'admin' && ADMIN_SUB_CATEGORIES[parts[1]]) {
+        return parts[1];
+    }
+    return '';
+}
 function subCategoryName(action) {
     var parts = String(action || '').split('.');
     if (parts.length >= 3 && parts[0] === 'admin') {
@@ -123,7 +130,9 @@ router.get('/admin/logs/operation', async (req, res) => {
                 user_id: r.user_id,
                 username: r.username,
                 action: r.action,
+                category_key: actionToCategory(r.action),
                 category_name: AUDIT_CATEGORY_NAMES[actionToCategory(r.action)] || '其他',
+                sub_category_key: subCategoryKey(r.action),
                 sub_category_name: subCategoryName(r.action),
                 detail_text: buildRowDetail(r, locMap),
                 created_at: r.created_at

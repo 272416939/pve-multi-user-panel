@@ -46,6 +46,7 @@ const ADMIN_SUB_CATEGORIES = {
     template: '模板管理',
     'os-template': 'OS模板',
     'email-template': '邮件模板',
+    i18n: '国际化',
     cdk: 'CDK管理',
     backup: '备份管理',
     message: '消息管理',

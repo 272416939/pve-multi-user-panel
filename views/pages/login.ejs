@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark" data-template="<%= locals.templateStyle %>">
+<html lang="<%= locals.locale %>" data-theme="dark" data-template="<%= locals.templateStyle %>" class="i18n-pending">
 <head>
+<style>html.i18n-pending, html.i18n-pending body { visibility: hidden; }</style>
+
     <link rel="preconnect" href="https://cdn.jsdelivr.net">
     <link rel="preconnect" href="https://fonts.loli.net" crossorigin>
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
@@ -27,7 +29,7 @@
     <div class="login-card">
         <!-- Theme Toggle Button -->
         <div style="position:absolute;top:12px;right:12px;">
-            <button id="themeToggle" style="background:none;border:1px solid var(--login-border-input);border-radius:8px;width:36px;height:36px;cursor:pointer;color:var(--login-text-label);display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;" title="切换主题" aria-label="切换主题">
+            <button id="themeToggle" style="background:none;border:1px solid var(--login-border-input);border-radius:8px;width:36px;height:36px;cursor:pointer;color:var(--login-text-label);display:flex;align-items:center;justify-content:center;transition:all 0.3s ease;" :title="t('nav.themeToggle')" :aria-label="t('nav.themeToggle')">
                 <svg class="theme-icon theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                 <svg class="theme-icon theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
             </button>
@@ -39,16 +41,15 @@
 
     <template id="appTemplate"></template>
 
-    <div class="login-version-info">
-        <%= locals.siteConfig.name %> <span id="appVersion"></span>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/vue@3.3.11/dist/vue.global.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-    <script nonce="<%= locals.cspNonce %>">window.__siteLoginTitle = <%- JSON.stringify(locals.siteConfig.login_title).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;</script>
+    <script nonce="<%= locals.cspNonce %>">window.__siteLoginTitle = <%- JSON.stringify(locals.siteConfig.login_title).replace(/</g, '\\u003c').replace(/>/g, '\\u003e') %>;
+window.__initialLocale = '<%= locals.locale %>';
+window.__cacheVersion = '<%= locals.cacheVersion %>';</script>
     <script src="js/shared/storage-keys.js?cv=<%= locals.cacheVersion %>"></script>
 <script src="js/shared/api-paths.js?cv=<%= locals.cacheVersion %>"></script>
 <script src="js/shared.js?cv=<%= locals.cacheVersion %>"></script>
+<script src="js/shared/i18n.js?cv=<%= locals.cacheVersion %>"></script>
     <script src="components/pv-button.js?cv=<%= locals.cacheVersion %>"></script>
 <script src="js/login-template.js?cv=<%= locals.cacheVersion %>"></script>
 <script src="js/login-page.js?cv=<%= locals.cacheVersion %>"></script>

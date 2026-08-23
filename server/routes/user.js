@@ -14,15 +14,15 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const getSiteUrl = require('../utils/site-url');
 const { sendTemplateEmail } = require('../services/email-template');
-const { hashPassword, verifyPassword } = require('../utils/password-hash');
-const cacheStore = require('../utils/cache-store');
+const { hashPassword, verifyPassword, isStrongPassword } = require('../utils/password-hash');
 const { getIpLocation, getIpLocations } = require('../services/ip-location');
 const { invalidateDeviceCache, invalidateUserActiveCache, clearDeviceCache } = require('../middleware/auth');
 const { sanitizeUser } = require('../utils/safe-error');
 // 本地时间格式化统一走 utils/date.js（规范第八节：禁止 toISOString 直写）
 const { formatLocalDate } = require('../utils/date');
-// profileCache 迁移到 cache-store（Redis 优先，内存回退，多实例一致）
-const profileCache = cacheStore.create('profile', 60);
+const { isValidEmail } = require('../utils/email-validate');
+// profileCache 单一来源在 services/profile-cache.js（admin-user 等模块共用失效入口），TTL=FRONTEND_CACHE_TTL
+const { profileCache, invalidateProfile } = require('../services/profile-cache');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
 
@@ -254,6 +254,8 @@ router.get('/user/profile', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: '用户不存在' });
         }
         const safeUser = sanitizeUser(user);
+        // balance 随对象一起缓存但允许脏值：前端余额显示全部走 /wallet/balance（直查 DB），
+        // 余额写路径多为事务内直写 SQL 无统一入口，不为零消费字段逐路径补失效（见 services/profile-cache.js）
         await profileCache.set(String(req.user.id), safeUser);
         res.json(safeUser);
     } catch (error) {
@@ -287,9 +289,20 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         }
         
         const { username, password, bio } = req.body;
-        
+
+        // V6-L4 修复：强制改密未完成期间仅放行改密操作（authMiddleware 白名单放行本端点
+        // 用于提交新密码），先改用户名/简介会绕过强制改密意图
+        if (user.must_change_password && !password) {
+            return res.status(403).json({ error: '请先完成强制修改密码后再修改个人资料', code: 'MUST_CHANGE_PASSWORD' });
+        }
+
         // M-1 修复：修改密码必须二次验证（当前密码/2FA 动态码/恢复码）
         if (password) {
+            // V6-M2 修复：改密必须过强度校验（首登强制改密弹窗走本端点，此前仅 /user/password
+            // 有校验——同功能两条路径规则不一致，弱密码即可清除 must_change_password 标记）
+            if (!isStrongPassword(password)) {
+                return res.status(400).json({ error: '密码至少 8 位，且需包含大小写字母和特殊字符 (@#$%^&*!)' });
+            }
             const secondary = await verifySensitiveAction(user, req.body, req);
             if (!secondary.ok) return res.status(403).json({ error: secondary.error });
         }
@@ -339,9 +352,8 @@ router.put('/user/password', authMiddleware, async (req, res) => {
     try {
         const { password } = req.body;
 
-        // 密码强度校验（与注册/忘记密码同款正则，auth.js 一致）
-        const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/;
-        if (!password || !passwordRegex.test(password)) {
+        // 密码强度校验（V6-M2 收敛：与注册/忘记密码共用 utils/password-hash 公共函数）
+        if (!isStrongPassword(password)) {
             return res.status(400).json({ error: '密码至少 8 位，且需包含大小写字母和特殊字符 (@#$%^&*!)' });
         }
 
@@ -499,8 +511,8 @@ router.put('/user/email', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '请提供邮箱地址' });
         }
         
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
+        // 邮箱格式校验（单一来源 email-validate.js：收紧正则，拒绝末尾句点等 SMTP 不兼容格式）
+        if (!isValidEmail(email)) {
             return res.status(400).json({ error: '邮箱格式不正确' });
         }
         
@@ -534,6 +546,8 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         }
         
         await db.users.update(req.user.id, { email, emailVerified: false });
+        // 缓存 TTL 已延长到 1h，换绑/绑定邮箱后必须立即失效，否则用户中心一直显示旧邮箱
+        await invalidateProfile(req.user.id);
 
         // 操作审计：邮箱变更埋点（换绑/首次绑定记录，重发验证不记录）
         // 场景显式枚举：换绑（已有邮箱且变更）→ setting.email.change；首次绑定（从未绑过）→ setting.email.bind
@@ -572,8 +586,10 @@ router.put('/user/email', authMiddleware, async (req, res) => {
             } else {
                 tplCode = 'email_verify_first';
             }
-            // 邮箱验证邮件（模板: email_verify_*，同步发送保证反馈；{site_name} 由渲染引擎注入）
-            await sendTemplateEmail(email, tplCode, { username: user.username, email: email, link: verifyUrl }, { sync: true });
+            // 邮箱验证邮件（模板: email_verify_*）走队列异步发送：
+            // 发送失败本来就被下方 catch 吞掉（邮箱已保存，仍提示查收），同步等待无反馈价值；
+            // 队列 3 次重试反而提升送达率，失败计入管理端队列统计。{site_name} 由渲染引擎注入
+            await sendTemplateEmail(email, tplCode, { username: user.username, email: email, link: verifyUrl });
         } catch (emailError) {
             console.error('发送验证邮件失败，但邮箱已保存', emailError);
         }

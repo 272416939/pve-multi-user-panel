@@ -69,7 +69,7 @@
     $.diskLoading.value = true;
     try {
       var res = await authFetch('/api/disks');
-      if (!res.ok) throw new Error('加载失败');
+      if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
       $.disks.value = await res.json();
     } catch (e) {
       console.error('[disk] 加载磁盘列表失败:', e.message);
@@ -92,7 +92,7 @@
   $.loadDiskOptions = async function() {
     try {
       var res = await authFetch('/api/disk-options');
-      if (!res.ok) throw new Error('加载失败');
+      if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
       $.diskOptions.value = await res.json();
     } catch (e) {
       console.error('[disk] 加载选项失败:', e.message);
@@ -176,8 +176,8 @@
   // ===== 提交购买 =====
   $.submitPurchaseDisk = async function() {
     var f = $.diskPurchaseForm.value;
-    if (!f.spec_id) { return alert('请选择硬盘规格'); }
-    if (!f.capacity_gb || f.capacity_gb < 1) { return alert('请输入有效容量'); }
+    if (!f.spec_id) { return alert(window.__i18n.t('dash.disk.selectSpec')); }
+    if (!f.capacity_gb || f.capacity_gb < 1) { return alert(window.__i18n.t('dash.disk.invalidCapacity')); }
     try {
       var res = await authFetch('/api/disks/purchase', {
         method: 'POST',
@@ -193,12 +193,12 @@
         })
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '购买失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('dash.disk.purchaseFailed'));
       $.bsModalHide('createDiskModal');
-      alert('购买成功');
+      alert(window.__i18n.t('dash.disk.purchased'));
       await $.loadDisks();
     } catch (e) {
-      alert('购买失败: ' + e.message);
+      alert(window.__i18n.tFormat('dash.disk.purchaseFailedMsg', e.message));
     }
   };
 
@@ -206,9 +206,9 @@
   $.openBindModal = async function() {
     var diskId = $.selectedDisks.value[0];
     var disk = $.disks.value.find(function(d) { return d.id === diskId; });
-    if (!disk) return alert('请先选择一块磁盘');
+    if (!disk) return alert(window.__i18n.t('dash.disk.selectDisk'));
     if (disk.status !== 'free' && disk.status !== 'expired') {
-      return alert('该磁盘状态不允许挂载');
+      return alert(window.__i18n.t('dash.disk.cannotBind'));
     }
     $.bindTargetDisk.value = disk;
     $.bindTargetVmid.value = '';
@@ -224,10 +224,10 @@
   $.submitBindDisk = async function() {
     var disk = $.bindTargetDisk.value;
     var vmid = $.bindTargetVmid.value;
-    if (!vmid) { return alert('请选择目标虚拟机'); }
+    if (!vmid) { return alert(window.__i18n.t('dash.disk.selectTargetVm')); }
     if ($.diskActionLoading.value) return;
     $.diskActionLoading.value = true;
-    $.diskActionText.value = '挂载中...';
+    $.diskActionText.value = window.__i18n.t('dash.disk.binding');
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/bind', {
         method: 'POST',
@@ -235,12 +235,12 @@
         body: JSON.stringify({ vmid: parseInt(vmid) })
       });
       var data = await res.json();
-      if (!res.ok) { alert(data.error || '挂载失败'); return; }
+      if (!res.ok) { alert(data.error || window.__i18n.t('dash.disk.bindFailed')); return; }
       $.bsModalHide('bindDiskModal');
-      alert('挂载成功（总线: ' + data.bus + ', 设备号: ' + data.dev + '）');
+      alert(window.__i18n.tFormat('dash.disk.bindSuccess', data.bus, data.dev));
       await $.loadDisks();
     } catch (e) {
-      alert('挂载失败: ' + e.message);
+      alert(window.__i18n.tFormat('dash.disk.bindFailedMsg', e.message));
     } finally {
       $.diskActionLoading.value = false;
       $.diskActionText.value = '';
@@ -251,20 +251,20 @@
   $.unbindDisk = async function(disk) {
     if (!disk) return;
     if ($.diskActionLoading.value) return;
-    var ok = await customConfirm('确定卸载磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\nSCSI 支持热插拔，无需关闭虚拟机');
+    var ok = await customConfirm(window.__i18n.tFormat('dash.disk.unbindConfirm', (disk.disk_name || disk.volume_id)));
     if (!ok) return;
     $.diskActionLoading.value = true;
-    $.diskActionText.value = '卸载中...';
+    $.diskActionText.value = window.__i18n.t('dash.disk.unbinding');
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/unbind', {
         method: 'POST'
       });
       var data = await res.json();
-      if (!res.ok) { alert(data.error || '卸载失败'); return; }
-      alert('卸载成功');
+      if (!res.ok) { alert(data.error || window.__i18n.t('dash.disk.unbindFailed')); return; }
+      alert(window.__i18n.t('dash.disk.unbound'));
       await $.loadDisks();
     } catch (e) {
-      alert('卸载失败: ' + e.message);
+      alert(window.__i18n.tFormat('dash.disk.unbindFailedMsg', e.message));
     } finally {
       $.diskActionLoading.value = false;
       $.diskActionText.value = '';
@@ -286,8 +286,8 @@
     if ($.selectedDisks.value.length !== 1) return '';
     var d = $.disks.value.find(function(x) { return x.id === $.selectedDisks.value[0]; });
     if (!d) return '';
-    if (d.is_legacy) return 'legacy磁盘随VM管理';
-    if (d.disk_format && ['vmdk', 'subvol', 'raw'].indexOf(d.disk_format) !== -1) return '该磁盘格式（' + d.disk_format + '）不支持扩容';
+    if (d.is_legacy) return window.__i18n.t('dash.disk.legacyManaged');
+    if (d.disk_format && ['vmdk', 'subvol', 'raw'].indexOf(d.disk_format) !== -1) return window.__i18n.tFormat('dash.disk.formatNoResize', d.disk_format);
     return '';
   };
 
@@ -327,17 +327,17 @@
     if (!disk) return;
     var addGb = parseInt($.resizeInputAddGb.value) || 0;
     if (addGb <= 0) {
-      return alert('新增容量必须大于0');
+      return alert(window.__i18n.t('dash.disk.resizeGtZero'));
     }
     var newSize = parseInt(disk.capacity_gb) + addGb;
     // 检查余额（前端提示）
     if ($.resizePrice.value > 0 && $.user && parseFloat($.user.balance) < $.resizePrice.value) {
-      var ok = await customConfirm('余额不足，扩容费用 ¥' + $.resizePrice.value + '，当前余额 ¥' + parseFloat($.user.balance || 0).toFixed(2) + '\n是否继续尝试？');
+      var ok = await customConfirm(window.__i18n.tFormat('dash.disk.resizeInsufficient', $.resizePrice.value, parseFloat($.user.balance || 0).toFixed(2)));
       if (!ok) return;
     }
     if ($.diskActionLoading.value) return;
     $.diskActionLoading.value = true;
-    $.diskActionText.value = '扩容中...';
+    $.diskActionText.value = window.__i18n.t('dash.disk.resizing');
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/resize', {
         method: 'POST',
@@ -345,12 +345,12 @@
         body: JSON.stringify({ capacity_gb: newSize })
       });
       var data = await res.json();
-      if (!res.ok) { alert(data.error || '扩容失败'); return; }
-      alert('扩容成功，新容量：' + data.new_capacity + ' GiB，费用：¥' + (data.amount || 0));
+      if (!res.ok) { alert(data.error || window.__i18n.t('dash.disk.resizeFailed')); return; }
+      alert(window.__i18n.tFormat('dash.disk.resizeSuccess', data.new_capacity, (data.amount || 0)));
       $.bsModalHide('resizeDiskModal');
       await $.loadDisks();
     } catch (e) {
-      alert('扩容失败: ' + e.message);
+      alert(window.__i18n.tFormat('dash.disk.resizeFailedMsg', e.message));
     } finally {
       $.diskActionLoading.value = false;
       $.diskActionText.value = '';
@@ -367,30 +367,31 @@
       var now = new Date();
       var daysSince = Math.floor((now - createDate) / (1000 * 60 * 60 * 24));
       if (daysSince > 15) {
-        extraWarning = '\n\n⚠ 警告：该磁盘开通时间已超过 ' + daysSince + ' 天，无法进行退款操作，确定销毁将无退款！';
+        extraWarning = window.__i18n.tFormat('dash.disk.destroyNoRefundWarn', daysSince);
       }
     }
-    var ok = await customConfirm('确定销毁磁盘 "' + (disk.disk_name || disk.volume_id) + '"？\n此操作不可恢复！' + extraWarning);
+    var destroyMsg = window.__i18n.tFormat('dash.disk.destroyConfirm', (disk.disk_name || disk.volume_id));
+    var ok = await customConfirm(destroyMsg + extraWarning);
     if (!ok) return;
     if ($.diskActionLoading.value) return;
     $.diskActionLoading.value = true;
-    $.diskActionText.value = '销毁中...';
+    $.diskActionText.value = window.__i18n.t('dash.disk.destroying');
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/destroy', {
         method: 'POST'
       });
       var data = await res.json();
-      if (!res.ok) { alert(data.error || '销毁失败'); return; }
+      if (!res.ok) { alert(data.error || window.__i18n.t('dash.disk.destroyFailed')); return; }
       if (data.refund) {
-        alert('销毁成功，已退款 ¥' + data.refund_amount);
+        alert(window.__i18n.tFormat('dash.disk.destroyRefunded', data.refund_amount));
       } else if (data.refund_desc) {
-        alert(data.refund_desc + '\n销毁成功');
+        alert(window.__i18n.tFormat('dash.disk.destroyWithDesc', data.refund_desc));
       } else {
-        alert('销毁成功');
+        alert(window.__i18n.t('dash.disk.destroyed'));
       }
       await $.loadDisks();
     } catch (e) {
-      alert('销毁失败: ' + e.message);
+      alert(window.__i18n.tFormat('dash.disk.destroyFailedMsg', e.message));
     } finally {
       $.diskActionLoading.value = false;
       $.diskActionText.value = '';
@@ -400,18 +401,18 @@
   // ===== 删除已销毁的磁盘记录 =====
   $.deleteDestroyedDisk = async function(disk) {
     if (!disk) return;
-    var ok = await customConfirm('确定删除此已销毁的磁盘记录？');
+    var ok = await customConfirm(window.__i18n.t('dash.disk.deleteDestroyedConfirm'));
     if (!ok) return;
     try {
       var res = await authFetch('/api/disks/' + disk.id + '/destroy', {
         method: 'POST'
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '删除失败');
-      alert('已删除');
+      if (!res.ok) return alert(data.error || window.__i18n.t('dash.disk.deleteFailed'));
+      alert(window.__i18n.t('dash.disk.deleted'));
       await $.loadDisks();
     } catch (e) {
-      alert('删除失败: ' + e.message);
+      alert(window.__i18n.tFormat('dash.disk.deleteFailedMsg', e.message));
     }
   };
 
@@ -428,13 +429,13 @@
       if (!res.ok) {
         // 失败时回滚 UI
         disk.auto_renew = enabled ? 0 : 1;
-        return alert(data.error || '切换失败');
+        return alert(data.error || window.__i18n.t('dash.disk.toggleFailed'));
       }
       disk.auto_renew = data.auto_renew;
     } catch (e) {
       // 失败时回滚 UI
       disk.auto_renew = enabled ? 0 : 1;
-      alert('切换失败: ' + e.message);
+      alert(window.__i18n.tFormat('dash.disk.toggleFailedMsg', e.message));
     }
   };
 
@@ -472,18 +473,24 @@
         })
       });
       var data = await res.json();
-      if (!res.ok) return alert(data.error || '续费失败');
+      if (!res.ok) return alert(data.error || window.__i18n.t('dash.disk.renewFailed'));
       $.bsModalHide('renewDiskModal');
-      alert('续费成功');
+      alert(window.__i18n.t('dash.disk.renewed'));
       await $.loadDisks();
     } catch (e) {
-      alert('续费失败: ' + e.message);
+      alert(window.__i18n.tFormat('dash.disk.renewFailedMsg', e.message));
     }
   };
 
   // ===== 工具函数 =====
   $.getDiskStatusText = function(status) {
-    var map = { free: '空闲', bound: '已绑定', grace: '宽限期', expired: '已到期', destroyed: '已销毁' };
+    var map = {
+      free: window.__i18n.t('dash.disk.statusFree'),
+      bound: window.__i18n.t('dash.disk.statusBound'),
+      grace: window.__i18n.t('dash.disk.statusGrace'),
+      expired: window.__i18n.t('dash.disk.statusExpired'),
+      destroyed: window.__i18n.t('dash.disk.statusDestroyed')
+    };
     return map[status] || status;
   };
 

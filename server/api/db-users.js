@@ -179,7 +179,9 @@ const userSettings = {
         notify_expiry_alert: 1,
         notify_backup_result: 1,
         // 界面模板偏好：'' = 跟随站点默认，'default' / 'saas' = 个人固定
-        template: ''
+        template: '',
+        // 语言偏好：'' = 跟随站点默认，'zh-CN'/'zh-TW'/'en'/'de'/'ja'/'ko'/'fr' = 个人固定
+        lang: ''
     },
     // 允许更新的字段白名单
     ALLOWED_FIELDS: [
@@ -192,7 +194,8 @@ const userSettings = {
         'notify_recharge', 'notify_renewal',
         'notify_expiry_reminder', 'notify_expiry_alert',
         'notify_backup_result',
-        'template'
+        'template',
+        'lang'
     ],
     getByUserId: async (userId) => {
         var row = await queryOne('SELECT * FROM user_settings WHERE user_id = ?', [parseInt(userId)]);
@@ -217,6 +220,11 @@ const userSettings = {
                     // 字符串字段：模板偏好白名单校验（'' = 跟随站点默认，'default'/'saas' = 个人固定）
                     const { UI_TEMPLATES } = require('../constants');
                     if (fields[key] === '' || UI_TEMPLATES.includes(fields[key])) safeFields[key] = fields[key];
+                } else if (key === 'lang') {
+                    // 字符串字段：语言偏好（'' = 跟随站点默认；语义白名单校验在路由层走动态注册表
+                    // services/i18n.js isSupportedLocale——系统语言 + 自定义语言均合法，DAO 只做格式兜底：
+                    // ≤10 字符（user_settings.lang 列宽 VARCHAR(10)），防超长/非字符串入库）
+                    if (typeof fields[key] === 'string' && fields[key].length <= 10) safeFields[key] = fields[key];
                 } else {
                     // 值校验：只能是 0 或 1
                     safeFields[key] = fields[key] ? 1 : 0;

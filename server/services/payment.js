@@ -260,7 +260,9 @@ async function processPayCallback(params, opts) {
     try {
         await withTransaction(async (conn) => {
             // 事务内读取最新余额，保证 balance_before/after 与扣款一致（防并发竞态）
-            const [balanceRows] = await conn.execute('SELECT balance FROM users WHERE id = ?', [userId]);
+            // V6-L3 修复：加 FOR UPDATE 行锁——同一用户两笔订单并发回调时串行化，
+            // 流水中的 balance_before/after 与最终实际余额严格一致（余额更新本身原子，无资金风险）
+            const [balanceRows] = await conn.execute('SELECT balance FROM users WHERE id = ? FOR UPDATE', [userId]);
             const latestBalance = balanceRows[0] ? parseFloat(balanceRows[0].balance || '0') : balanceBefore;
             const newBalance = latestBalance + amount;
             balanceAfter = newBalance;

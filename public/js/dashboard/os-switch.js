@@ -23,7 +23,7 @@
       if (res && res.success) {
         $.osSwitchList.value = res.data || [];
         var current = (res.data || []).find(function(t) { return t.id === res.current_os_template_id; });
-        $.osSwitchCurrentName.value = current ? current.name : '未记录';
+        $.osSwitchCurrentName.value = current ? current.name : window.__i18n.t('dash.osSwitch.notRecorded');
       } else {
         $.osSwitchList.value = [];
       }
@@ -53,7 +53,7 @@
         body: JSON.stringify({ os_template_id: $.osSwitchSelectedId.value })
       });
       if (res && res.success) {
-        alert('系统切换已开始，请稍候');
+        alert(window.__i18n.t('dash.osSwitch.started'));
         $.closeOsSwitchModal();
         // 立即刷新列表，让「切换中」徽标即刻展示并锁定操作按钮
         if (typeof $.loadData === 'function') {
@@ -66,10 +66,10 @@
       } else if (res && res.error) {
         alert(res.error);
       } else {
-        alert('切换失败');
+        alert(window.__i18n.t('dash.osSwitch.switchFailed'));
       }
     } catch (e) {
-      alert(e.message || '请求失败');
+      alert(e.message || window.__i18n.t('dash.osSwitch.requestFailed'));
     } finally {
       $.osSwitchSubmitting.value = false;
     }
@@ -83,7 +83,7 @@
         if (res && res.status) {
           if (res.status === 'success') {
             clearInterval(pollInterval);
-            alert('系统切换成功！');
+            alert(window.__i18n.t('dash.osSwitch.success'));
             // 刷新 VM 列表
             if (typeof $.loadUserVms === 'function') {
               $.loadUserVms();
@@ -92,10 +92,10 @@
             }
           } else if (res.status === 'failed') {
             clearInterval(pollInterval);
-            alert('系统切换失败，请查看通知');
+            alert(window.__i18n.t('dash.osSwitch.failedNotify'));
           } else if (res.status === 'rolled_back') {
             clearInterval(pollInterval);
-            alert('系统切换已回滚，请查看通知');
+            alert(window.__i18n.t('dash.osSwitch.rolledBackNotify'));
           }
         }
       } catch (e) {

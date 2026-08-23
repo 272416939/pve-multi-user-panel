@@ -24,6 +24,7 @@ const dbConfig = require('./db-config');
 const dbBilling = require('./db-billing');
 const dbIp = require('./db-ip');
 const dbEmailTemplates = require('./db-email-templates');
+const dbI18n = require('./db-i18n');
 
 module.exports = {
     // 数据库连接
@@ -158,4 +159,7 @@ module.exports = {
 
     // 邮件模板（email_templates）
     emailTemplates: dbEmailTemplates.emailTemplates,
+
+    // i18n 语言（i18n_languages + i18n_entries）
+    i18n: dbI18n.i18n,
 };

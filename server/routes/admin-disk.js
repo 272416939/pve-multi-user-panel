@@ -11,13 +11,13 @@ var db = require('../api/db');
 var pveApi = require('../api/pve-api');
 var { importExistingDisks } = require('../services/disk-expiry-check');
 // 单一来源：磁盘类型白名单统一走 constants（规范第七节）
-var { DISK_TYPES } = require('../constants');
+var { DISK_TYPES, FRONTEND_CACHE_TTL } = require('../constants');
 // 审计字段级 diff 通用工具（规范第十一节：更新类审计从 DB 新旧状态 diff 生成，不从请求体拼接）
 var { buildFieldDiff } = require('../utils/audit-diff');
 
-// 规格列表缓存（5 分钟 TTL）
-var specCache = cacheStore.create('disk_specs', 300);
-var groupCache = cacheStore.create('storage_groups', 300);
+// 规格列表缓存（FRONTEND_CACHE_TTL；增删改后 clearDiskCache 即时失效）
+var specCache = cacheStore.create('disk_specs', FRONTEND_CACHE_TTL);
+var groupCache = cacheStore.create('storage_groups', FRONTEND_CACHE_TTL);
 
 // 清除缓存辅助函数
 function clearDiskCache() {

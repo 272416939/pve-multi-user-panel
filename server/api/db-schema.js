@@ -729,6 +729,9 @@ async function initDb() {
     // 迁移：界面模板偏好列（'' = 跟随站点默认，'default' / 'saas' = 个人固定）
     try { await execute("ALTER TABLE user_settings ADD COLUMN template VARCHAR(20) NOT NULL DEFAULT ''"); } catch (_) {}
 
+    // 迁移：用户语言偏好列（'' = 跟随站点默认，'zh-CN'/'zh-TW'/'en'/'de'/'ja'/'ko'/'fr' = 个人固定）
+    try { await execute("ALTER TABLE user_settings ADD COLUMN lang VARCHAR(10) NOT NULL DEFAULT ''"); } catch (_) {}
+
     // 邮件模板表（邮件模板在线编辑；默认模板由 constants/email-templates.js 注册表初始化，DB 可编辑 + 恢复默认）
     await execute(`
         CREATE TABLE IF NOT EXISTS email_templates (
@@ -749,6 +752,41 @@ async function initDb() {
             INDEX idx_email_templates_category (category)
         ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
+
+    // i18n 语言注册表（7 系统语言种子 + 管理员新建自定义语言）
+    // 自定义语言 snapshot = 创建时复制源内容的快照（旧词条快照固定；创建后系统新增的词条自动以源文件为基线）
+    await execute(`
+        CREATE TABLE IF NOT EXISTS i18n_languages (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            code VARCHAR(10) NOT NULL UNIQUE,
+            name VARCHAR(64) NOT NULL,
+            base_code VARCHAR(10) NOT NULL DEFAULT '',
+            snapshot JSON NULL,
+            is_system TINYINT(1) NOT NULL DEFAULT 0,
+            status VARCHAR(16) NOT NULL DEFAULT 'active',
+            created_by INT NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // i18n 词条覆盖表（显示值 = 基线 ?? 覆盖；清空 '' 删除行即恢复基线）
+    await execute(`
+        CREATE TABLE IF NOT EXISTS i18n_entries (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            lang_code VARCHAR(10) NOT NULL,
+            entry_key VARCHAR(255) NOT NULL,
+            value TEXT NOT NULL,
+            updated_by INT NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_i18n_entries_lang_key (lang_code, entry_key),
+            INDEX idx_i18n_entries_lang (lang_code)
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    // 初始化 i18n 系统语言（INSERT IGNORE：已存在不覆盖）
+    await initI18nLanguages();
 
     // 初始化默认邮件模板（INSERT IGNORE：已存在不覆盖，保留管理员修改）
     await initEmailTemplates();
@@ -966,6 +1004,22 @@ async function migrateSchema() {
     // 如需修改类型，请管理员在端口转发管理界面手动编辑
 }
 
+// 初始化 i18n 系统语言（异步）
+// 7 种内置语言（is_system=1，不可删除）；语言文件为只读基线，在线编辑以 i18n_entries 覆盖存储
+async function initI18nLanguages() {
+    const { SYSTEM_LOCALES, LOCALE_NAMES } = require('../constants');
+    for (const code of SYSTEM_LOCALES) {
+        try {
+            await execute(
+                'INSERT IGNORE INTO i18n_languages (code, name, base_code, snapshot, is_system) VALUES (?, ?, ?, NULL, 1)',
+                [code, LOCALE_NAMES[code] || code, '']
+            );
+        } catch (e) {
+            console.error('[db] 初始化 i18n 系统语言失败: ' + code + ' - ' + e.message);
+        }
+    }
+}
+
 // 初始化默认邮件模板（异步）
 // 默认模板定义单一来源：server/constants/email-templates.js（与 RATE_LIMIT_RULES 同模式）
 // INSERT IGNORE 按 code 幂等：已存在（管理员改过）不覆盖
@@ -1039,6 +1093,8 @@ async function initDefaultConfig() {
         'site:login_title': 'PVE Panel',
         // 界面模板（全站默认）：'default' = 赛博霓虹，'saas' = SAAS 企业风
         'site:template': 'default',
+        // 系统默认语言（i18n）：zh-CN/zh-TW/en/de/ja/ko/fr
+        'site:lang': 'zh-CN',
         'pve:host': '',
         'pve:api_token': '',
         'pve:ssh_host': '',

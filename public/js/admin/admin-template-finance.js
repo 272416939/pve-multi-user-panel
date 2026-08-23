@@ -4,50 +4,50 @@
 <div v-if="activeSection === 'finance'">
                     <div v-if="activeTab === 'transactions'">
                         <div class="module-header">
-                        <h4 class="module-title">交易流水</h4>
+                        <h4 class="module-title">{{ t('admin.finance.title') }}</h4>
                     </div>
                     <div class="table-container" style="padding:12px;">
                         <!-- 筛选栏 -->
                         <div class="row g-2 mb-3 align-items-end">
                             <div class="col-md-2">
-                                <label class="form-label small mb-1">开始时间</label>
+                                <label class="form-label small mb-1">{{ t('admin.finance.startTime') }}</label>
                                 <input type="datetime-local" class="form-control form-control-sm" v-model="financeFilter.start_time">
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small mb-1">结束时间</label>
+                                <label class="form-label small mb-1">{{ t('admin.finance.endTime') }}</label>
                                 <input type="datetime-local" class="form-control form-control-sm" v-model="financeFilter.end_time">
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small mb-1">支付方式</label>
+                                <label class="form-label small mb-1">{{ t('admin.finance.payMethod') }}</label>
                                 <select class="form-select form-select-sm" v-model="financeFilter.pay_method">
-                                    <option value="">全部</option>
-                                    <option value="alipay">支付宝</option>
-                                    <option value="wxpay">微信支付</option>
-                                    <option value="balance">余额抵扣</option>
-                                    <option value="balance_refund">余额退款</option>
-                                    <option value="alipay_refund">支付宝退款</option>
-                                    <option value="wxpay_refund">微信退款</option>
+                                    <option value="">{{ t('common.all') }}</option>
+                                    <option value="alipay">{{ t('admin.finance.alipay') }}</option>
+                                    <option value="wxpay">{{ t('admin.finance.wxpay') }}</option>
+                                    <option value="balance">{{ t('admin.finance.balanceDeduct') }}</option>
+                                    <option value="balance_refund">{{ t('admin.finance.balanceRefund') }}</option>
+                                    <option value="alipay_refund">{{ t('admin.finance.alipayRefund') }}</option>
+                                    <option value="wxpay_refund">{{ t('admin.finance.wxpayRefund') }}</option>
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small mb-1">交易类型</label>
+                                <label class="form-label small mb-1">{{ t('admin.finance.tradeType') }}</label>
                                 <select class="form-select form-select-sm" v-model="financeFilter.trade_type">
-                                    <option value="">全部</option>
-                                    <option value="recharge">余额充值</option>
-                                    <option value="renewal">服务器续费</option>
-                                    <option value="admin_recharge">后台充值</option>
-                                    <option value="new_order">新购服务器</option>
-                                    <option value="disk_purchase">新购硬盘</option>
-                                    <option value="disk_renewal">续费硬盘</option>
+                                    <option value="">{{ t('common.all') }}</option>
+                                    <option value="recharge">{{ t('admin.finance.tRecharge') }}</option>
+                                    <option value="renewal">{{ t('admin.finance.tRenewal') }}</option>
+                                    <option value="admin_recharge">{{ t('admin.finance.tAdminRecharge') }}</option>
+                                    <option value="new_order">{{ t('admin.finance.tNewOrder') }}</option>
+                                    <option value="disk_purchase">{{ t('admin.finance.tDiskPurchase') }}</option>
+                                    <option value="disk_renewal">{{ t('admin.finance.tDiskRenewal') }}</option>
                                 </select>
                             </div>
                             <div class="col-md-2">
-                                <label class="form-label small mb-1">订单号搜索</label>
-                                <input type="text" class="form-control form-control-sm" v-model="financeFilter.order_no" placeholder="精确搜索" autocomplete="off" @keyup.enter="loadTransactions(1)">
+                                <label class="form-label small mb-1">{{ t('admin.finance.orderNoSearch') }}</label>
+                                <input type="text" class="form-control form-control-sm" v-model="financeFilter.order_no" :placeholder="t('admin.finance.exactSearch')" autocomplete="off" @keyup.enter="loadTransactions(1)">
                             </div>
                             <div class="col-md-2 d-flex gap-2 align-items-center">
-                                <pv-button @click="loadTransactions(1)" size="sm">查询</pv-button>
-                                <pv-button @click="exportTransactions" variant="outline" size="sm">导出Excel</pv-button>
+                                <pv-button @click="loadTransactions(1)" size="sm">{{ t('admin.finance.search') }}</pv-button>
+                                <pv-button @click="exportTransactions" variant="outline" size="sm">{{ t('admin.finance.exportExcel') }}</pv-button>
                             </div>
                         </div>
 
@@ -55,27 +55,27 @@
                         <table class="table table-hover table-sm table-align-center">
                             <thead>
                                 <tr>
-                                    <th>支付时间</th>
-                                    <th>用户名</th>
-                                    <th>支付方式</th>
-                                    <th>订单号</th>
-                                    <th>关联订单</th>
-                                    <th>交易类型</th>
-                                    <th>交易金额</th>
+                                    <th>{{ t('admin.finance.payTime') }}</th>
+                                    <th>{{ t('admin.logs.username') }}</th>
+                                    <th>{{ t('admin.finance.payMethod') }}</th>
+                                    <th>{{ t('admin.finance.orderNo') }}</th>
+                                    <th>{{ t('admin.finance.relatedOrder') }}</th>
+                                    <th>{{ t('admin.finance.tradeType') }}</th>
+                                    <th>{{ t('admin.finance.tradeAmount') }}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr v-for="tx in transactionList" :key="tx.id">
                                     <td>{{ formatDate(tx.pay_time) }}</td>
                                     <td>{{ tx.username }}</td>
-                                    <td>{{ tx.pay_method === 'alipay' ? '支付宝' : tx.pay_method === 'wxpay' ? '微信支付' : tx.pay_method === 'balance' ? '余额抵扣' : tx.pay_method === 'manual' ? '系统' : tx.pay_method === 'balance_refund' ? '余额退款' : tx.pay_method === 'alipay_refund' ? '支付宝退款' : tx.pay_method === 'wxpay_refund' ? '微信退款' : tx.pay_method }}</td>
+                                    <td>{{ tx.pay_method === 'alipay' ? t('admin.finance.alipay') : tx.pay_method === 'wxpay' ? t('admin.finance.wxpay') : tx.pay_method === 'balance' ? t('admin.finance.balanceDeduct') : tx.pay_method === 'manual' ? t('admin.finance.system') : tx.pay_method === 'balance_refund' ? t('admin.finance.balanceRefund') : tx.pay_method === 'alipay_refund' ? t('admin.finance.alipayRefund') : tx.pay_method === 'wxpay_refund' ? t('admin.finance.wxpayRefund') : tx.pay_method }}</td>
                                     <td><code style="font-size:11px;">{{ tx.order_no }}</code></td>
                                     <td><code style="font-size:11px;">{{ tx.trade_no || '-' }}</code></td>
-                                    <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'refund' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : tx.trade_type === 'disk_purchase' ? 'badge bg-info' : tx.trade_type === 'disk_renewal' ? 'badge bg-primary' : 'badge badge-renewal'" :style="tx.trade_type !== 'recharge' && tx.trade_type !== 'admin_recharge' && tx.trade_type !== 'refund' && tx.trade_type !== 'new_order' && tx.trade_type !== 'disk_purchase' && tx.trade_type !== 'disk_renewal' ? 'background:#0d9488;color:#fff' : ''">{{ tx.trade_type === 'recharge' ? '余额充值' : tx.trade_type === 'admin_recharge' ? '后台充值' : tx.trade_type === 'refund' ? '订单退款' : tx.trade_type === 'new_order' ? '新购服务器' : tx.trade_type === 'disk_purchase' ? '新购硬盘' : tx.trade_type === 'disk_renewal' ? '续费硬盘' : '服务器续费' }}</span></td>
+                                    <td><span :class="tx.trade_type === 'recharge' ? 'badge bg-success' : tx.trade_type === 'admin_recharge' ? 'badge bg-warning' : tx.trade_type === 'refund' ? 'badge bg-warning' : tx.trade_type === 'new_order' ? 'badge bg-primary' : tx.trade_type === 'disk_purchase' ? 'badge bg-info' : tx.trade_type === 'disk_renewal' ? 'badge bg-primary' : 'badge badge-renewal'" :style="tx.trade_type !== 'recharge' && tx.trade_type !== 'admin_recharge' && tx.trade_type !== 'refund' && tx.trade_type !== 'new_order' && tx.trade_type !== 'disk_purchase' && tx.trade_type !== 'disk_renewal' ? 'background:#0d9488;color:#fff' : ''">{{ tx.trade_type === 'recharge' ? t('admin.finance.tRecharge') : tx.trade_type === 'admin_recharge' ? t('admin.finance.tAdminRecharge') : tx.trade_type === 'refund' ? t('admin.finance.tRefund') : tx.trade_type === 'new_order' ? t('admin.finance.tNewOrder') : tx.trade_type === 'disk_purchase' ? t('admin.finance.tDiskPurchase') : tx.trade_type === 'disk_renewal' ? t('admin.finance.tDiskRenewal') : t('admin.finance.tRenewal') }}</span></td>
                                     <td>¥{{ tx.amount }}</td>
                                 </tr>
                                 <tr v-if="!transactionList || transactionList.length === 0">
-                                    <td colspan="7" class="text-center text-muted py-4">暂无交易记录</td>
+                                    <td colspan="7" class="text-center text-muted py-4">{{ t('admin.finance.empty') }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -88,65 +88,65 @@
                     <!-- 订单管理 -->
                     <div v-if="activeTab === 'orders'">
                         <div class="module-header">
-                            <h4 class="module-title">订单管理</h4>
+                            <h4 class="module-title">{{ t('admin.finance.ordersTitle') }}</h4>
                         </div>
                         <div class="table-container mb-4" style="padding:12px;">
                             <!-- 筛选栏 -->
                             <div class="row g-2 mb-3 align-items-end">
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">订单号</label>
-                                        <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" placeholder="搜索订单号" autocomplete="off">
+                                        <label class="form-label small mb-1">{{ t('admin.finance.orderNo') }}</label>
+                                        <input type="text" class="form-control form-control-sm" v-model="orderFilter.order_no" :placeholder="t('admin.finance.orderNoPlaceholder')" autocomplete="off">
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">类型</label>
+                                        <label class="form-label small mb-1">{{ t('admin.finance.type') }}</label>
                                         <select class="form-select form-select-sm" v-model="orderFilter.type">
-                                            <option value="">全部</option>
+                                            <option value="">{{ t('common.all') }}</option>
                                             <option value="vm">VM</option>
                                             <option value="lxc">LXC</option>
-                                            <option value="disk">磁盘</option>
+                                            <option value="disk">{{ t('admin.finance.disk') }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">状态</label>
+                                        <label class="form-label small mb-1">{{ t('common.status') }}</label>
                                         <select class="form-select form-select-sm" v-model="orderFilter.status">
-                                            <option value="">全部</option>
-                                            <option value="completed">已开通</option>
-                                            <option value="pending">处理中</option>
-                                            <option value="refunded">已退款</option>
-                                            <option value="destroyed">已销毁</option>
+                                            <option value="">{{ t('common.all') }}</option>
+                                            <option value="completed">{{ t('admin.finance.oCompleted') }}</option>
+                                            <option value="pending">{{ t('admin.finance.oPending') }}</option>
+                                            <option value="refunded">{{ t('admin.finance.oRefunded') }}</option>
+                                            <option value="destroyed">{{ t('admin.finance.oDestroyed') }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">开始时间</label>
+                                        <label class="form-label small mb-1">{{ t('admin.finance.startTime') }}</label>
                                         <input type="datetime-local" class="form-control form-control-sm" v-model="orderFilter.start_time">
                                     </div>
                                     <div class="col-md-2">
-                                        <label class="form-label small mb-1">结束时间</label>
+                                        <label class="form-label small mb-1">{{ t('admin.finance.endTime') }}</label>
                                         <input type="datetime-local" class="form-control form-control-sm" v-model="orderFilter.end_time">
                                     </div>
                                     <div class="col-md-2 d-flex gap-2">
-                                        <pv-button @click="searchOrders" size="sm">查询</pv-button>
-                                        <pv-button @click="exportOrders" size="sm">导出</pv-button>
+                                        <pv-button @click="searchOrders" size="sm">{{ t('admin.finance.search') }}</pv-button>
+                                        <pv-button @click="exportOrders" size="sm">{{ t('common.export') }}</pv-button>
                                     </div>
                                 </div>
                             <div class="table-responsive">
                                 <table class="table table-hover mb-0 table-align-center">
                                     <thead>
-                                        <tr><th>订单号</th><th>用户名</th><th>套餐/产品</th><th>类型</th><th>周期</th><th>数量</th><th>金额</th><th>状态</th><th>开通时间</th></tr>
+                                        <tr><th>{{ t('admin.finance.orderNo') }}</th><th>{{ t('admin.logs.username') }}</th><th>{{ t('admin.finance.product') }}</th><th>{{ t('admin.finance.type') }}</th><th>{{ t('admin.finance.period') }}</th><th>{{ t('common.quantity') }}</th><th>{{ t('admin.finance.amount') }}</th><th>{{ t('common.status') }}</th><th>{{ t('admin.finance.createdAt') }}</th></tr>
                                     </thead>
                                     <tbody>
                                         <tr v-for="o in orders" :key="o.id">
                                             <td><code>{{ o.order_no }}</code></td>
                                             <td>{{ o.username }}</td>
                                             <td>{{ o.order_kind === 'renewal' ? (o.type === 'disk' ? (o.resource_name || '') : (o.resource_name || '') + '（' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + '）') : (o.type === 'disk' ? o.package_name : o.package_name + '[' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + ']') }}</td>
-                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.order_kind === 'renewal' ? (o.type === 'vm' ? 'VM 续费' : o.type === 'lxc' ? 'LXC 续费' : '磁盘续费') : (o.type === 'vm' ? 'VM' : o.type === 'lxc' ? 'LXC' : '磁盘') }}</span></td>
-                                            <td>{{ o.period === 'month' ? '月付' : o.period === 'quarter' ? '季付' : '年付' }}</td>
+                                            <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.order_kind === 'renewal' ? (o.type === 'vm' ? t('admin.finance.vmRenewal') : o.type === 'lxc' ? t('admin.finance.lxcRenewal') : t('admin.finance.diskRenewal')) : (o.type === 'vm' ? 'VM' : o.type === 'lxc' ? 'LXC' : t('admin.finance.disk')) }}</span></td>
+                                            <td>{{ o.period === 'month' ? t('admin.finance.monthly') : o.period === 'quarter' ? t('admin.finance.quarterly') : t('admin.finance.yearly') }}</td>
                                             <td>{{ o.period_count }}</td>
-                                            <td>{{ o.amount }} 元</td>
-                                            <td><span class="badge" :class="o.status === 'completed' ? 'bg-success' : o.status === 'refunded' ? 'bg-danger' : o.status === 'destroyed' ? 'bg-secondary' : 'bg-warning'">{{ o.status === 'completed' ? '已开通' : o.status === 'refunded' ? '已退款' : o.status === 'destroyed' ? '已销毁' : o.status === 'pending' ? '处理中' : o.status }}</span></td>
+                                            <td>{{ tFormat('admin.finance.amountYuan', o.amount) }}</td>
+                                            <td><span class="badge" :class="o.status === 'completed' ? 'bg-success' : o.status === 'refunded' ? 'bg-danger' : o.status === 'destroyed' ? 'bg-secondary' : 'bg-warning'">{{ o.status === 'completed' ? t('admin.finance.oCompleted') : o.status === 'refunded' ? t('admin.finance.oRefunded') : o.status === 'destroyed' ? t('admin.finance.oDestroyed') : o.status === 'pending' ? t('admin.finance.oPending') : o.status }}</span></td>
                                             <td>{{ formatDate(o.created_at) }}</td>
                                         </tr>
-                                        <tr v-if="!orders || orders.length === 0"><td colspan="9" class="text-center text-muted">暂无订单</td></tr>
+                                        <tr v-if="!orders || orders.length === 0"><td colspan="9" class="text-center text-muted">{{ t('admin.finance.noOrders') }}</td></tr>
                                     </tbody>
                                 </table>
                             </div>

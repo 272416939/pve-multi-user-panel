@@ -118,7 +118,7 @@
             for (var i = 0; i < select.options.length; i++) {
                 if (select.options[i].value === '') return select.options[i].textContent.trim();
             }
-            return '请选择';
+            return window.__i18n.t('admin.disk.pleaseSelect');
         }
         // trigger 文本与原生 select 同步
         function syncText() {

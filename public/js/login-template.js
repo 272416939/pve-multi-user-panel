@@ -2,95 +2,95 @@
   var el = document.getElementById("appTemplate");
   if (el) el.innerHTML = `        <div>
             <div class="login-logo">{{ siteLoginTitle }}</div>
-            <div class="login-subtitle">欢迎回来，请登录您的账户</div>
+            <div class="login-subtitle">{{ t('login.subtitle') }}</div>
             <div v-if="!showResetPassword" class="row justify-content-center">
                 <div class="col-md-12">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="card-title mb-0">登录</h5>
+                            <h5 class="card-title mb-0">{{ t('login.title') }}</h5>
                         </div>
                         <div class="card-body">
                             <div v-if="currentView === 'login'">
                             <div v-if="!showTwofaInput">
                                 <form @submit.prevent="login" novalidate>
                                     <div class="mb-3">
-                                        <label class="form-label" for="login-username">用户名</label>
+                                        <label class="form-label" for="login-username">{{ t('login.username') }}</label>
                                         <input type="text" class="form-control" id="login-username" name="username" autocomplete="username" v-model="loginForm.username" @input="clearLoginErrors" required>
-                                        <div class="register-hint">支持使用用户名或已验证的邮箱登录</div>
+                                        <div class="register-hint">{{ t('login.usernameHint') }}</div>
                                         <span class="login-field-error" v-if="loginUsernameError">{{ loginUsernameError }}</span>
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label" for="login-password">密码</label>
+                                        <label class="form-label" for="login-password">{{ t('login.password') }}</label>
                                         <input type="password" class="form-control" id="login-password" name="password" autocomplete="current-password" v-model="loginForm.password" @input="clearLoginErrors" required>
                                         <span class="login-field-error" v-if="loginPasswordError">{{ loginPasswordError }}</span>
                                     </div>
                                     <div class="form-check mt-1 mb-2">
                                         <input type="checkbox" class="form-check-input" id="login-remember" v-model="loginForm.remember">
-                                        <label class="form-check-label" for="login-remember">7天内无需登录</label>
+                                        <label class="form-check-label" for="login-remember">{{ t('login.remember') }}</label>
                                     </div>
                                     <div class="login-form-error" v-if="loginError">{{ loginError }}</div>
                                     <div class="d-flex gap-2 mt-2">
-                                        <button type="submit" class="btn btn-primary login-submit-btn" style="flex:1">登录</button>
-                                        <button v-if="registerEnabled" type="button" class="btn btn-outline-secondary login-submit-btn" style="flex:1" @click="switchView('register')">注册</button>
+                                        <button type="submit" class="btn btn-primary login-submit-btn" style="flex:1">{{ t('login.submit') }}</button>
+                                        <button v-if="registerEnabled" type="button" class="btn btn-outline-secondary login-submit-btn" style="flex:1" @click="switchView('register')">{{ t('register.title') }}</button>
                                     </div>
                                 </form>
                                 <div class="mt-3 text-center">
-                                    <pv-button type="button" variant="link" @click="showResetPassword = true">忘记密码？</pv-button>
+                                    <pv-button type="button" variant="link" @click="showResetPassword = true">{{ t('login.forgotPassword') }}</pv-button>
                                 </div>
                             </div>
                             <div v-else>
                                 <div class="text-center mb-3">
-                                    <h6 class="mb-1">双重验证</h6>
+                                    <h6 class="mb-1">{{ t('login.twoFactorTitle') }}</h6>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label" for="twofa-code">验证码</label>
-                                    <input type="text" class="form-control" id="twofa-code" autocomplete="one-time-code" v-model="twofaCode" @input="twofaError = ''" @keyup="handleTwofaInput" @keydown.enter.prevent="verifyTwofa" ref="twofaInputRef" maxlength="30" placeholder="输入 6 位验证码或恢复码">
+                                    <label class="form-label" for="twofa-code">{{ t('login.twoFactorCode') }}</label>
+                                    <input type="text" class="form-control" id="twofa-code" autocomplete="one-time-code" v-model="twofaCode" @input="twofaError = ''" @keyup="handleTwofaInput" @keydown.enter.prevent="verifyTwofa" ref="twofaInputRef" maxlength="30" :placeholder="t('login.twoFactorPlaceholder')">
                                     <span class="login-field-error" v-if="twofaError">{{ twofaError }}</span>
                                 </div>
-                                <p class="text-muted small text-center mb-3" style="font-size:0.82rem;line-height:1.5;">请输入身份验证器中的 6 位验证码，或使用恢复码登录</p>
+                                <p class="text-muted small text-center mb-3" style="font-size:0.82rem;line-height:1.5;">{{ t('login.twoFactorDesc') }}</p>
                                 <div class="d-flex gap-2 mt-3">
-                                <pv-button type="button" variant="primary" @click="verifyTwofa" style="flex:1">验证</pv-button>
-                                <pv-button type="button" variant="secondary" @click="backToLogin" style="flex:1">返回</pv-button>
+                                <pv-button type="button" variant="primary" @click="verifyTwofa" style="flex:1">{{ t('login.twoFactorVerify') }}</pv-button>
+                                <pv-button type="button" variant="secondary" @click="backToLogin" style="flex:1">{{ t('common.back') }}</pv-button>
                                 </div>
                             </div>
                             </div>
                             <div v-else-if="currentView === 'register'" class="register-form">
-                                <h6 class="register-title">注册新账号</h6>
+                                <h6 class="register-title">{{ t('register.title') }}</h6>
                                 <div class="mb-3">
-                                    <label class="form-label">用户名</label>
-                                    <input type="text" class="form-control" v-model="registerForm.username" placeholder="3-32 位字符" autocomplete="username">
+                                    <label class="form-label">{{ t('register.username') }}</label>
+                                    <input type="text" class="form-control" v-model="registerForm.username" :placeholder="t('register.usernameHint')" autocomplete="username">
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">密码</label>
+                                    <label class="form-label">{{ t('register.password') }}</label>
                                     <input type="password" class="form-control" v-model="registerForm.password" autocomplete="new-password">
                                     <div v-if="passwordStrength.level" class="password-strength">
                                         <div class="password-strength-bar" :class="'strength-' + passwordStrength.level" :style="{ width: passwordStrength.percent + '%' }"></div>
                                     </div>
                                     <div class="password-strength-text" v-if="passwordStrength.text">{{ passwordStrength.text }}</div>
-                                    <div class="register-hint">至少 8 位，包含大小写字母和特殊字符 (@#$%^&*!)</div>
+                                    <div class="register-hint">{{ t('user.password.hint') }}</div>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">确认密码</label>
-                                    <input type="password" class="form-control" v-model="registerConfirmPassword" autocomplete="new-password" placeholder="请再次输入密码">
-                                    <div v-if="registerConfirmPassword && registerConfirmPassword !== registerForm.password" class="login-field-error">两次输入的密码不一致</div>
+                                    <label class="form-label">{{ t('register.confirmPassword') }}</label>
+                                    <input type="password" class="form-control" v-model="registerConfirmPassword" autocomplete="new-password" :placeholder="t('register.confirmPlaceholder')">
+                                    <div v-if="registerConfirmPassword && registerConfirmPassword !== registerForm.password" class="login-field-error">{{ t('register.passwordMismatch') }}</div>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">邮箱</label>
+                                    <label class="form-label">{{ t('register.email') }}</label>
                                     <input type="email" class="form-control" v-model="registerForm.email" autocomplete="email">
                                     <button type="button" class="send-code-btn" @click="sendCode" :disabled="codeCountdown > 0 || !canSendCode">
-                                        {{ codeCountdown > 0 ? codeCountdown + 's 后重发' : '发送验证码' }}
+                                        {{ codeCountdown > 0 ? tFormat('register.resendCountdown', codeCountdown) : t('register.sendCode') }}
                                     </button>
                                 </div>
                                 <div class="mb-3">
-                                    <label class="form-label">验证码</label>
-                                    <input type="text" class="form-control" v-model="registerForm.code" maxlength="6" placeholder="6 位数字" autocomplete="one-time-code">
+                                    <label class="form-label">{{ t('login.captcha') }}</label>
+                                    <input type="text" class="form-control" v-model="registerForm.code" maxlength="6" :placeholder="t('register.captchaHint')" autocomplete="one-time-code">
                                 </div>
                                 <div v-if="registerError" class="login-form-error">{{ registerError }}</div>
                                 <button type="button" class="btn btn-primary" style="width:100%" @click="submitRegister" :disabled="registerSubmitting">
-                                    {{ registerSubmitting ? '注册中...' : '注册' }}
+                                    {{ registerSubmitting ? t('register.registering') : t('register.submit') }}
                                 </button>
                                 <div class="mt-3 text-center">
-                                    <a href="javascript:void(0)" class="register-back-link" @click="switchView('login')">已有账号？去登录</a>
+                                    <a href="javascript:void(0)" class="register-back-link" @click="switchView('login')">{{ t('register.hasAccount') }}</a>
                                 </div>
                             </div>
                         </div>
@@ -102,35 +102,35 @@
                 <div class="col-md-12">
                     <div class="card">
                         <div class="card-header">
-                            <h5 class="card-title mb-0">重置密码</h5>
+                            <h5 class="card-title mb-0">{{ t('login.resetTitle') }}</h5>
                         </div>
                         <div class="card-body">
                             <div v-if="!resetTokenValidated">
                                 <form @submit.prevent="requestPasswordReset">
                                     <div class="mb-3">
-                                        <label class="form-label" for="reset-email">邮箱地址</label>
+                                        <label class="form-label" for="reset-email">{{ t('login.resetEmail') }}</label>
                                         <input type="email" class="form-control" id="reset-email" name="email" autocomplete="email" v-model="resetEmail" required>
                                     </div>
                                     <div v-if="resetMessage" class="alert alert-success">{{ resetMessage }}</div>
                                     <div class="d-flex gap-2">
-                                        <pv-button type="submit" variant="primary" >发送重置链接</pv-button>
-                                        <pv-button type="button" variant="secondary" @click="showResetPassword = false">返回</pv-button>
+                                        <pv-button type="submit" variant="primary" >{{ t('login.resetSendLink') }}</pv-button>
+                                        <pv-button type="button" variant="secondary" @click="showResetPassword = false">{{ t('common.back') }}</pv-button>
                                     </div>
                                 </form>
                             </div>
                             <div v-else>
                                 <form @submit.prevent="resetPassword">
                                     <div class="mb-3">
-                                        <label class="form-label" for="new-password">新密码</label>
+                                        <label class="form-label" for="new-password">{{ t('user.password.new') }}</label>
                                         <input type="password" class="form-control" id="new-password" name="new-password" autocomplete="new-password" v-model="newPassword" required minlength="6">
                                     </div>
                                     <div class="mb-3">
-                                        <label class="form-label" for="confirm-password">确认密码</label>
+                                        <label class="form-label" for="confirm-password">{{ t('user.password.confirm') }}</label>
                                         <input type="password" class="form-control" id="confirm-password" name="confirm-password" autocomplete="new-password" v-model="confirmPassword" required minlength="6">
                                     </div>
                                     <div v-if="resetError" class="alert alert-danger">{{ resetError }}</div>
                                     <div v-if="resetSuccess" class="alert alert-success">{{ resetSuccess }}</div>
-                                    <pv-button type="submit" variant="primary" >重置密码</pv-button>
+                                    <pv-button type="submit" variant="primary" >{{ t('user.password.submit') }}</pv-button>
                                 </form>
                             </div>
                         </div>
@@ -152,7 +152,7 @@
                             <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customAlertMessage }}</p>
                         </div>
                         <div class="modal-footer justify-content-center border-0 pt-0 pb-4">
-                            <pv-button type="button" variant="primary" data-bs-dismiss="modal">确定</pv-button>
+                            <pv-button type="button" variant="primary" data-bs-dismiss="modal">{{ t('common.confirm') }}</pv-button>
                         </div>
                     </div>
                 </div>
@@ -170,8 +170,8 @@
                             <p class="custom-alert-msg mb-0" style="color:var(--text-primary);font-size:14px;line-height:1.6;">{{ customConfirmMessage }}</p>
                         </div>
                         <div class="modal-footer justify-content-center border-0 pt-0 pb-4 gap-3">
-                            <pv-button type="button" variant="outline" @click="confirmCancel">取消</pv-button>
-                            <pv-button type="button" variant="primary" @click="confirmOk">确定</pv-button>
+                            <pv-button type="button" variant="outline" @click="confirmCancel">{{ t('common.cancel') }}</pv-button>
+                            <pv-button type="button" variant="primary" @click="confirmOk">{{ t('common.confirm') }}</pv-button>
                         </div>
                     </div>
                 </div>
@@ -183,13 +183,13 @@
             <Teleport to="body">
             <div v-if="showForceChangePwd" class="modal-overlay" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:1060">
                 <div class="glass-card" style="max-width:420px;margin:15vh auto;padding:24px;border-radius:16px;text-align:center;background:var(--login-bg-card);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)">
-                    <h3 style="margin-bottom:12px;color:var(--login-text-input)">首次登录 - 强制修改密码</h3>
-                    <p style="color:var(--login-text-label);margin-bottom:16px;font-size:13px">为了账户安全，请设置一个新的登录密码</p>
-                    <input type="password" v-model="forceCurrentPassword" placeholder="当前密码（验证身份）" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup="handleForceKeyup" />
-                    <input type="password" v-model="forceNewPassword" placeholder="新密码（至少8位）" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup="handleForceKeyup" />
-                    <input type="password" v-model="forceConfirmPassword" placeholder="确认新密码" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup="handleForceKeyup" />
+                    <h3 style="margin-bottom:12px;color:var(--login-text-input)">{{ t('login.forceChange.title') }}</h3>
+                    <p style="color:var(--login-text-label);margin-bottom:16px;font-size:13px">{{ t('login.forceChange.desc') }}</p>
+                    <input type="password" v-model="forceCurrentPassword" :placeholder="t('login.forceChange.current')" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup="handleForceKeyup" />
+                    <input type="password" v-model="forceNewPassword" :placeholder="t('login.forceChange.new')" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup="handleForceKeyup" />
+                    <input type="password" v-model="forceConfirmPassword" :placeholder="t('login.forceChange.confirm')" style="width:100%;padding:10px 14px;margin-bottom:10px;border-radius:8px;border:1px solid var(--login-border-input);background:var(--login-bg-input);color:var(--login-text-input);outline:none;box-sizing:border-box;font-size:14px" @keyup="handleForceKeyup" />
                     <div v-if="forcePwdError" style="color:var(--login-color-error);font-size:12px;margin-bottom:12px">{{ forcePwdError }}</div>
-                    <pv-button type="button" variant="primary" size="lg" @click="submitForceChangePwd" style="width:100%">确认修改</pv-button>
+                    <pv-button type="button" variant="primary" size="lg" @click="submitForceChangePwd" style="width:100%">{{ t('login.forceChange.submit') }}</pv-button>
                 </div>
             </div>
             </Teleport>

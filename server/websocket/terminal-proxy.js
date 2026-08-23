@@ -26,7 +26,11 @@ terminalProxy.on('connection', async (clientWs, request) => {
     currentConnections++;
     ipConnectionCount.set(remoteAddr, ipCount + 1);
 
+    // V6-I1 修复：released 标志防 close/error 双注册重复释放（同 vnc-proxy）
+    let released = false;
     const releaseConnection = () => {
+        if (released) return;
+        released = true;
         const c = ipConnectionCount.get(remoteAddr) || 1;
         if (c <= 1) ipConnectionCount.delete(remoteAddr);
         else ipConnectionCount.set(remoteAddr, c - 1);

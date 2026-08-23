@@ -14,8 +14,10 @@
  * - ioredis 的 maxRetriesPerRequest 必须为 null，否则 Worker 的阻塞命令在
  *   重连时会抛 "Reached the max retries per request limit"
  *
- * 调用约定：通知类邮件用 enqueueEmail（永不抛异常）；验证码/换绑等需要
- * 立即反馈发送结果的场景仍直接调 utils/email.js 的 sendEmail（同步）。
+ * 调用约定（sendTemplateEmail 默认走本队列，仅 { sync: true } 直发）：
+ * - 队列（默认）：通知类 + 密码重置 + 邮箱验证（换绑/绑定）——失败无需即时反馈给用户，
+ *   队列 3 次重试提升送达率，失败计入 stats（failed / syncFailed）
+ * - 同步（sync: true）：注册验证码、SMTP 测试——用户/管理员需要立即知道发送成败
  */
 
 const { Queue, Worker } = require('bullmq');
@@ -29,11 +31,12 @@ let _queueConn = null;  // 生产端独立连接（无 ioredis keyPrefix）
 let _worker = null;     // 消费端 Worker
 let _workerConn = null; // 消费端独立连接
 
-// 进程内统计（供管理端 stats 接口；failed 事件在重试耗尽后写入）
+// 进程内统计（供管理端 stats 接口；failed 事件在重试耗尽后写入；syncFailed 统计降级/同步路径失败）
 let _stats = {
     lastError: null,
     lastFailedAt: null,
-    failedCount: 0
+    failedCount: 0,
+    syncFailedCount: 0
 };
 
 // 创建 BullMQ 专用 ioredis 连接（无 keyPrefix + maxRetriesPerRequest: null）
@@ -69,20 +72,34 @@ function getQueue() {
     return _queue;
 }
 
+// 记录一次同步路径发送失败（降级/直接调用 sendEmail 的场景），供管理端 stats 展示
+function recordSyncFailure(err) {
+    _stats.lastError = String((err && err.message) || err || '未知错误').slice(0, 300);
+    _stats.lastFailedAt = new Date().toLocaleString('zh-CN');
+    _stats.syncFailedCount++;
+}
+
 /**
  * 入队一封通知类邮件（异步发送）。永不抛异常：
  * - Redis 不可用 / 入队失败 → 降级直接同步发送（保证邮件送达）
+ *   注意：降级发送的成败在内部消化并计入 syncFailedCount 统计，不再抛出——
+ *   否则外层 catch 会把「降级发送已失败」误当「入队失败」再同步发送一次（双重外呼）
  * @param {string} to - 收件人邮箱
  * @param {string} subject - 邮件主题
  * @param {string} html - 邮件 HTML 内容
- * @returns {Promise<boolean>} true=已入队；false=降级同步发送
+ * @returns {Promise<boolean>} true=已入队；false=降级同步发送（含发送失败，见服务端日志与 syncFailedCount）
  */
 async function enqueueEmail(to, subject, html) {
     try {
         var queue = getQueue();
         if (!queue) {
-            // Redis 未配置：降级同步发送
-            await require('../utils/email').sendEmail(to, subject, html);
+            // Redis 未配置：降级同步发送（失败计入统计，不抛出防双重发送）
+            try {
+                await require('../utils/email').sendEmail(to, subject, html);
+            } catch (sendErr) {
+                console.error('[email-queue] 降级同步发送失败:', sendErr.message);
+                recordSyncFailure(sendErr);
+            }
             return false;
         }
         await queue.add(QUEUE_NAME, { to, subject, html }, {
@@ -101,6 +118,7 @@ async function enqueueEmail(to, subject, html) {
             await require('../utils/email').sendEmail(to, subject, html);
         } catch (sendErr) {
             console.error('[email-queue] 降级同步发送失败:', sendErr.message);
+            recordSyncFailure(sendErr);
         }
         return false;
     }
@@ -179,7 +197,8 @@ async function restartEmailWorker() {
 
 /**
  * 获取邮件队列统计（管理端只读接口使用；失败时返回零值，不影响接口）
- * @returns {Promise<{redisEnabled:boolean,pending:number,active:number,failed:number,delayed:number,lastError:string|null,lastFailedAt:string|null,failedCount:number}>}
+ * failed（BullMQ 重试耗尽）与 syncFailed（同步/降级路径失败）分开计数，前端合并展示为「累计失败」
+ * @returns {Promise<{redisEnabled:boolean,pending:number,active:number,failed:number,delayed:number,lastError:string|null,lastFailedAt:string|null,failedCount:number,syncFailedCount:number}>}
  */
 async function getEmailQueueStats() {
     var stats = {
@@ -190,7 +209,8 @@ async function getEmailQueueStats() {
         delayed: 0,
         lastError: _stats.lastError,
         lastFailedAt: _stats.lastFailedAt,
-        failedCount: _stats.failedCount
+        failedCount: _stats.failedCount,
+        syncFailedCount: _stats.syncFailedCount
     };
     try {
         var queue = getQueue();
@@ -207,4 +227,4 @@ async function getEmailQueueStats() {
     return stats;
 }
 
-module.exports = { enqueueEmail, startEmailWorker, restartEmailWorker, getEmailQueueStats };
+module.exports = { enqueueEmail, startEmailWorker, restartEmailWorker, getEmailQueueStats, recordSyncFailure };

@@ -136,7 +136,6 @@ function getMemoryStore(namespace, ttlMs) {
     }
     return memoryStores[namespace];
 }
-
 // 后台清理内存缓存（每 60 秒）
 setInterval(function() {
     var now = Date.now();
@@ -153,10 +152,12 @@ setInterval(function() {
 /**
  * 创建一个带 TTL 的缓存实例
  * @param {string} namespace - 命名空间（如 'profile', 'unread'）
- * @param {number} ttlSeconds - TTL（秒）
+ * @param {number} ttlSeconds - TTL（秒）；传 0 表示「无 TTL」（永不过期，靠写操作手动 del/clear 失效，
+ *   内存不清理、Redis 不设 EX——适用于「改了才变」的静态/配置数据，如 i18n 语言基线）
  */
 function create(namespace, ttlSeconds) {
-    var ttlMs = (ttlSeconds || 60) * 1000;
+    var noExpiry = ttlSeconds === 0;
+    var ttlMs = noExpiry ? Infinity : (ttlSeconds || 60) * 1000;
     var memStore = getMemoryStore(namespace, ttlMs);
 
     var cache = {
@@ -192,8 +193,10 @@ function create(namespace, ttlSeconds) {
             if (typeof loader === 'function') {
                 var value = await loader(key);
                 if (value === null || value === undefined) {
-                    // 缓存空值防止穿透，短 TTL
-                    await cache.set(key, null, Math.floor(ttlSeconds / 4 || 10));
+                    // 缓存空值防止穿透，短 TTL（主 TTL 的 1/4，封顶 60s——
+                    // 长 TTL（如 3600s）下负缓存会被同比放大到 15 分钟，「查无数据」窗口过长）
+                    var negativeTtl = Math.min(Math.floor((ttlSeconds || 40) / 4), 60);
+                    await cache.set(key, null, Math.max(negativeTtl, 10));
                     return null;
                 }
                 await cache.set(key, value);
@@ -211,8 +214,15 @@ function create(namespace, ttlSeconds) {
          */
         async set(key, value, customTtl) {
             var fullKey = namespace + ':' + key;
-            var ttl = customTtl || ttlSeconds;
-            var actualTtl = computeJitteredTtl(ttl);
+            // 无 TTL 分支：不设 Redis EX、内存不清理；有 customTtl（如空值防穿透）仍走 EX
+            var actualTtl;
+            if (customTtl) {
+                actualTtl = computeJitteredTtl(customTtl);
+            } else if (noExpiry) {
+                actualTtl = 0; // 0 = 无 EX，永不过期
+            } else {
+                actualTtl = computeJitteredTtl(ttlSeconds);
+            }
             // 写内存
             memStore.map.set(key, { value: value, ts: Date.now() });
             // 写 Redis
@@ -220,7 +230,11 @@ function create(namespace, ttlSeconds) {
             if (redisClient) {
                 try {
                     var raw = serialize(value);
-                    await redisClient.set(fullKey, raw, 'EX', actualTtl);
+                    if (actualTtl > 0) {
+                        await redisClient.set(fullKey, raw, 'EX', actualTtl);
+                    } else {
+                        await redisClient.set(fullKey, raw);
+                    }
                 } catch (e) {
                     // Redis 异常，静默回退
                 }
@@ -271,8 +285,20 @@ async function clearAll() {
     await scanDel('*');
 }
 
+/**
+ * 清空单个命名空间（内存 + Redis）
+ * 供启动时定向清理前端数据缓存用——绝不能用 clearAll()：会误清
+ * jwt_blacklist（已登出 token 复活=安全回归）、限速计数、分布式锁
+ */
+async function clearNamespace(namespace) {
+    if (memoryStores[namespace]) {
+        memoryStores[namespace].map.clear();
+    }
+    await scanDel(namespace + ':*');
+}
+
 module.exports = {
-    create, clearAll,
+    create, clearAll, clearNamespace,
     // 导出纯函数供测试
     computeJitteredTtl,
     shouldSerialize,

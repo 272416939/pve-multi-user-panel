@@ -118,9 +118,10 @@
     $.logDetailText = ref('');
     $.showLogDetail = function(row) {
         if (!row) return;
-        $.logDetailTitle.value = '日志 #' + row.id + ' · ' + (row.category_name || row.action || '');
+        $.logDetailTitle.value = window.__i18n.tFormat('dash.log.detailTitle', row.id,
+            row.category_name ? (window.__i18n.t(window.__logI18n.cat(row.category_key)) || row.category_name) : '');
         $.logDetailMeta.value = (row.username || '-') + ' | ' + (row.created_at || '');
-        $.logDetailText.value = row.detail_text || '（无详情）';
+        $.logDetailText.value = row.detail_text || window.__i18n.t('dash.log.noDetail');
         var el = document.getElementById('logDetailModal');
         if (el) {
             var modal = new bootstrap.Modal(el);
@@ -171,7 +172,7 @@
             });
             if (!resp.ok) {
                 var err = await resp.json().catch(function() { return {}; });
-                throw new Error(err.error || '导出失败');
+                throw new Error(err.error || window.__i18n.t('dash.log.exportFailed'));
             }
             var blob = await resp.blob();
             var objUrl = URL.createObjectURL(blob);
@@ -183,14 +184,14 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(objUrl);
         } catch (e) {
-            alert('导出失败: ' + (e.message || ''));
+            alert(window.__i18n.tFormat('dash.log.exportFailedMsg', e.message || ''));
         }
     };
 
     // ===== 清空（customConfirm 二次确认 + 后端确认串） =====
     $.clearLogs = async function() {
         var isOp = $.logTab.value === 'operation';
-        var msg = isOp ? '确定清空全部操作日志？此操作不可恢复。' : '确定清空全部登录日志？此操作不可恢复。';
+        var msg = isOp ? window.__i18n.t('dash.log.clearOpConfirm') : window.__i18n.t('dash.log.clearLoginConfirm');
         if (!await window.customConfirm(msg)) return;
         try {
             await api(isOp ? '/logs/operation/clear' : '/logs/login/clear', {

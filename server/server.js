@@ -1,6 +1,12 @@
 // 启动耗时计时起点（记录整个启动过程，含模块加载）
 const APP_START_TIME = Date.now();
 
+// libuv 线程池扩容（必须在任何异步任务创建前设置）：默认 4 线程偏保守，多核机器上
+// 原生 bcrypt（密码哈希）、DNS 等线程池任务会排队——16 核实测 1000 并发哈希 52s 中
+// 大部分在排队。按逻辑核数扩容（上限 8，兼顾每线程约 1MB 栈内存）显著提升吞吐。
+// 注意：UV_THREADPOOL_SIZE 只影响线程池任务，不改变事件循环模型。
+process.env.UV_THREADPOOL_SIZE = String(Math.min(require('os').cpus().length || 4, 8));
+
 const express = require('express');
 const cors = require('cors');
 const compression = require('compression');
@@ -276,6 +282,8 @@ app.use('/api', require('./routes/user-settings'));
 app.use('/api', require('./routes/log'));
 app.use('/api', require('./routes/admin-logs'));
 app.use('/api', require('./routes/admin-email-template'));
+app.use('/api', require('./routes/i18n'));
+app.use('/api', require('./routes/admin-i18n'));
 
 const vncProxy = require('./websocket/vnc-proxy');
 const terminalProxy = require('./websocket/terminal-proxy');
@@ -313,7 +321,9 @@ httpServer.on('upgrade', (request, socket, head) => {
 app.locals.siteConfigCache = { data: null, expires: 0 };
 function getRedisClient() { return require('./api/redis').getRedisClient(); }
 var SITE_CONFIG_REDIS_KEY = 'site_config';
-var SITE_CONFIG_TTL = 60; // 秒
+// 站点配置缓存 TTL：保存站点设置时主动失效（Redis del + 内存置空，admin-config.js），
+// 60s → 1h 提升页面渲染速度；漏失效兜底见启动清理 clearFrontendCachesOnStartup
+var SITE_CONFIG_TTL = require('./constants').FRONTEND_CACHE_TTL; // 秒
 
 async function getSiteConfigCached() {
     var now = Date.now();
@@ -344,7 +354,8 @@ async function getSiteConfigCached() {
         var logoText = await db.config.get('site:logo_text') || 'PVE 面板';
         var loginTitle = await db.config.get('site:login_title') || 'PVE Panel';
         var template = await db.config.get('site:template') || 'default';
-        var data = { name: name, logo_text: logoText, login_title: loginTitle, template: template };
+        var lang = await db.config.get('site:lang') || 'zh-CN';
+        var data = { name: name, logo_text: logoText, login_title: loginTitle, template: template, lang: lang };
         cache.data = data;
         cache.expires = now + SITE_CONFIG_TTL * 1000;
         if (redis) {
@@ -352,7 +363,7 @@ async function getSiteConfigCached() {
         }
         return data;
     } catch (e) {
-        return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel', template: 'default' };
+        return { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel', template: 'default', lang: 'zh-CN' };
     }
 }
 
@@ -368,10 +379,19 @@ app.use(async (req, res, next) => {
     try {
         res.locals.siteConfig = await getSiteConfigCached();
     } catch (e) {
-        res.locals.siteConfig = { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel' };
+        res.locals.siteConfig = { name: 'PVE 多用户控制面板', logo_text: 'PVE 面板', login_title: 'PVE Panel', lang: 'zh-CN' };
     }
     // 界面模板（全站默认）：注入到 EJS，<html data-template="..."> 使用；个人偏好由 theme-init.js 在客户端覆盖
     res.locals.templateStyle = res.locals.siteConfig.template || 'default';
+    // 系统默认语言（i18n）：注入到 EJS，<html lang="..."> 使用；用户个人偏好由 i18n.js 在客户端覆盖
+    // 动态白名单校验：站点默认语言可能是指向已删除自定义语言的悬空配置，未知回退 zh-CN
+    try {
+        const { isSupportedLocale } = require('./services/i18n');
+        const siteLang = res.locals.siteConfig.lang || 'zh-CN';
+        res.locals.locale = (await isSupportedLocale(siteLang)) ? siteLang : 'zh-CN';
+    } catch (e) {
+        res.locals.locale = 'zh-CN';
+    }
     next();
 });
 
@@ -401,9 +421,9 @@ app.get('/login', async (req, res) => {
     }
     res.render('pages/login', { title: '登录', page: 'login' }, function(err, html) {
         if (err) return res.status(500).send('服务器内部错误');
-        // 异步写入 Redis 缓存（60s TTL，不阻塞响应）
+        // 异步写入 Redis 缓存（FRONTEND_CACHE_TTL，不阻塞响应）；保存站点设置时主动 del（admin-config.js）
         if (redis) {
-            redis.set('page:login', html, 'EX', 60).catch(() => {});
+            redis.set('page:login', html, 'EX', require('./constants').FRONTEND_CACHE_TTL).catch(() => {});
         }
         res.send(html);
     });
@@ -571,6 +591,42 @@ httpServer.listen(PORT, async () => {
         console.log('[template] 预编译完成: ' + pages.length + ' 个模板');
     } catch (e) {
         console.warn('[template] 预编译失败（不影响运行，首次访问时自动编译）:', e.message);
+    }
+
+    // 前端数据缓存启动清空：Redis 层跨重启存活，发版后旧结构数据会按剩余 TTL 继续服务；
+    // 用户要求「重启后全部清空」——启动时定向清理前端数据缓存命名空间。
+    // 严禁 clearAll()：会误清 jwt_blacklist（已登出 token 复活=安全回归）、限速计数、分布式锁。
+    // 失败降级 warn 不阻断启动（与其它预热块一致）。
+    try {
+        const cacheStore = require('./utils/cache-store');
+        var frontendCacheNamespaces = ['profile', 'admin_users', 'vm_packages', 'lxc_packages',
+            'disk_specs', 'storage_groups', 'email_template', 'email_shell'];
+        for (var fci = 0; fci < frontendCacheNamespaces.length; fci++) {
+            await cacheStore.clearNamespace(frontendCacheNamespaces[fci]);
+        }
+        var frontendRedis = getRedisClient();
+        if (frontendRedis) {
+            try {
+                await frontendRedis.del('site_config');
+                await frontendRedis.del('page:login');
+            } catch (e) {}
+        }
+        app.locals.siteConfigCache = { data: null, expires: 0 };
+        console.log('[cache] 前端数据缓存启动清理完成: ' + frontendCacheNamespaces.length + ' 个命名空间 + site_config/page:login');
+    } catch (e) {
+        console.warn('[cache] 前端数据缓存启动清理失败（不影响运行，TTL 到期自动回源）:', e.message);
+    }
+
+    // i18n 缓存预热：先清 Redis 残留旧键（部署后旧基线），再从最新语言文件+覆盖表回源填充。
+    // 长缓存语义「无修改不回源」，失效由写操作 invalidateI18nCache 驱动（保存词条/新建/改名/删除/恢复默认）；
+    // 发版新增词条由「发布必重启 + 预热清残留重读新文件」覆盖。失败降级 warn 不阻断启动（与其它预热块一致）。
+    try {
+        const i18n = require('./services/i18n');
+        await i18n.invalidateI18nCache();
+        await i18n.warmupI18nCache();
+        console.log('[i18n] 缓存预热完成');
+    } catch (e) {
+        console.warn('[i18n] 缓存预热失败（不影响运行，请求时自动回源）:', e.message);
     }
 
     try {

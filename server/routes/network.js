@@ -566,6 +566,12 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         }
         const { name, ip, internal_port, external_port, protocol, type, vm_id, ct_id } = req.body;
 
+        // V6-I2 修复：删除中（deleting）的规则禁止编辑——删除流程先置中间态再外呼爱快，
+        // 期间 PUT 会把 sync_status 覆盖回 synced/pending 且改动的规则最终仍被物理删除
+        if (existing.sync_status === 'deleting') {
+            return res.status(409).json({ error: '该规则正在删除中，无法编辑' });
+        }
+
         // L-2🔶 修复：修改 IP 时同步格式校验（与 POST 端点一致）
         if (ip !== undefined && ip !== null) {
             if (!/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip)) {

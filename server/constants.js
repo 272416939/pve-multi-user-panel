@@ -45,9 +45,37 @@ var TEMPLATE_STATUS = ['active', 'maintenance', 'deprecated'];
 // 支付方式白名单
 var PAYMENT_METHODS = ['alipay', 'wxpay'];
 
+// ==================== 缓存 ====================
+
+// 前端数据缓存统一 TTL（秒）：profile / site_config / page:login / 套餐 / 磁盘规格 / 邮件模板等
+// 延长 TTL 的前置条件是写路径失效完备（见 services/profile-cache.js 与各 cache 消费点）；
+// 认证类（device/user_active/jwt_blacklist）、pve 只读缓存（面板外变更唯一安全网）不适用本值
+var FRONTEND_CACHE_TTL = 3600;
+
 // 界面模板（UI 模板体系）：'default' = 赛博霓虹（默认），'saas' = SAAS 企业风
 // 用户级偏好额外允许 ''（跟随站点默认），见 db-users.js userSettings 校验
 var UI_TEMPLATES = ['default', 'saas'];
+
+// ==================== 国际化（i18n） ====================
+
+// 内置系统语言（只读基线；在线编辑以 i18n_entries 覆盖存储，语言文件永不写入）
+// 自定义语言由 services/i18n.js 动态注册，另存 i18n_languages 表
+var SYSTEM_LOCALES = ['zh-CN', 'zh-TW', 'en', 'de', 'ja', 'ko', 'fr'];
+
+// 语言代码 → 本地化名称映射
+var LOCALE_NAMES = {
+    'zh-CN': '简体中文',
+    'zh-TW': '繁體中文',
+    'en': 'English',
+    'de': 'Deutsch',
+    'ja': '日本語',
+    'ko': '한국어',
+    'fr': 'Français'
+};
+
+// 兼容别名：白名单校验的历史引用点（routes/user-settings.js / admin-config.js）
+// 只校验系统语言；自定义语言的白名单判定统一走 services/i18n.js isSupportedLocale()
+var SUPPORTED_LOCALES = SYSTEM_LOCALES;
 
 // ==================== 限速规则（安全防护·限速设置单一来源） ====================
 
@@ -81,6 +109,7 @@ var RATE_LIMIT_CATEGORIES = [
         rules: [
             { key: 'register_code', label: '注册验证码发送', hint: '按邮箱', max: 1, windowSec: 60 },
             { key: 'register_code_ip', label: '注册验证码发送', hint: '按 IP，1 小时', max: 5, windowSec: 3600 },
+            { key: 'register_code_global', label: '注册验证码发送', hint: '全局并发在途上限（突发洪峰快速 429，防 SMTP 池排队拖死）', max: 20, windowSec: 60 },
             { key: 'register', label: '注册提交', hint: '按 IP，1 小时', max: 3, windowSec: 3600 }
         ]
     },
@@ -155,7 +184,10 @@ var RATE_LIMIT_CATEGORIES = [
             { key: 'pve_test', label: 'PVE测试连接', hint: '按用户，外呼PVE API+SSH', max: 10, windowSec: 60 },
             { key: 'random_ip', label: '随机IP申请', hint: '按用户', max: 30, windowSec: 60 },
             { key: 'cdk_redeemable', label: 'CDK可兑换资源查询', hint: '按用户，外呼PVE', max: 10, windowSec: 60 },
-            { key: 'terminal_open', label: '打开终端/VNC会话', hint: '按用户，消耗SSH/VNC连接', max: 10, windowSec: 60 }
+            { key: 'terminal_open', label: '打开终端/VNC会话', hint: '按用户，消耗SSH/VNC连接', max: 10, windowSec: 60 },
+            { key: 'smtp_test', label: 'SMTP测试发送', hint: '按用户，外呼SMTP真实发信', max: 5, windowSec: 60 },
+            { key: 'email_template_op', label: '邮件模板预览/保存', hint: '按用户，渲染+外呼预览', max: 20, windowSec: 60 },
+            { key: 'i18n_op', label: 'i18n 管理写操作', hint: '按用户，新建语言/批量保存词条/恢复默认', max: 30, windowSec: 60 }
         ]
     },
     {
@@ -225,7 +257,11 @@ module.exports = {
     ORDER_STATUS,
     TEMPLATE_STATUS,
     PAYMENT_METHODS,
+    FRONTEND_CACHE_TTL,
     UI_TEMPLATES,
+    SYSTEM_LOCALES,
+    SUPPORTED_LOCALES,
+    LOCALE_NAMES,
     RATE_LIMIT_CATEGORIES,
     RATE_LIMIT_RULES,
     getPeriodDays,

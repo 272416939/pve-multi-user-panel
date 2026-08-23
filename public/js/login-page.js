@@ -2,7 +2,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
 
         function getDeviceName() {
             const ua = navigator.userAgent;
-            let browser = '浏览器';
+            let browser = window.__i18n.t('login.deviceBrowser');
             if (ua.includes('Edg')) browser = 'Edge';
             else if (ua.includes('Chrome')) browser = 'Chrome';
             else if (ua.includes('Firefox')) browser = 'Firefox';
@@ -102,11 +102,11 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     // 前端空值校验
                     let hasError = false;
                     if (!loginForm.value.username.trim()) {
-                        loginUsernameError.value = '用户名不能为空';
+                        loginUsernameError.value = window.__i18n.t('login.usernameRequired');
                         hasError = true;
                     }
                     if (!loginForm.value.password) {
-                        loginPasswordError.value = '登录密码不能为空';
+                        loginPasswordError.value = window.__i18n.t('login.passwordEmpty');
                         hasError = true;
                     }
                     if (hasError) return;
@@ -148,8 +148,8 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             window.location.href = 'dashboard.html' + (location.search || '');
                         }
                     } catch (e) {
-                        if (e.message.includes('网络') || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
-                            loginError.value = '服务器连接异常，请稍后再试';
+                        if (e.message.includes(window.__i18n.t('dash.vm.network')) || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
+                            loginError.value = window.__i18n.t('login.serverUnreachable');
                         } else {
                             loginError.value = e.message;
                         }
@@ -166,7 +166,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     twofaError.value = '';
                     const code = twofaCode.value.trim();
                     if (!code) {
-                        twofaError.value = '请输入验证码';
+                        twofaError.value = window.__i18n.t('login.codeRequired');
                         return;
                     }
                     try {
@@ -198,8 +198,8 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             window.location.href = 'dashboard.html';
                         }
                     } catch (e) {
-                        if (e.message.includes('网络') || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
-                            twofaError.value = '服务器连接异常，请稍后再试';
+                        if (e.message.includes(window.__i18n.t('dash.vm.network')) || e.message.includes('fetch') || e.message.includes('NetworkError') || e.message.includes('Failed to fetch')) {
+                            twofaError.value = window.__i18n.t('login.serverUnreachable');
                         } else {
                             twofaError.value = e.message;
                         }
@@ -224,9 +224,9 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             method: 'POST',
                             body: JSON.stringify({ email: resetEmail.value })
                         });
-                        resetMessage.value = '如果该邮箱已绑定，重置链接已发送！';
+                        resetMessage.value = window.__i18n.t('login.resetSentNotice');
                     } catch (e) {
-                        resetMessage.value = '如果该邮箱已绑定，重置链接已发送！';
+                        resetMessage.value = window.__i18n.t('login.resetSentNotice');
                     }
                 };
 
@@ -235,14 +235,14 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                         resetError.value = '';
                         resetSuccess.value = '';
                         if (newPassword.value !== confirmPassword.value) {
-                            resetError.value = '两次输入的密码不一致！';
+                            resetError.value = window.__i18n.t('register.mismatchBang');
                             return;
                         }
                         await api('/auth/reset-password', {
                             method: 'POST',
                             body: JSON.stringify({ token: resetToken.value, newPassword: newPassword.value })
                         });
-                        resetSuccess.value = '密码重置成功！';
+                        resetSuccess.value = window.__i18n.t('login.resetOk');
                         setTimeout(() => {
                             showResetPassword.value = false;
                             resetTokenValidated.value = false;
@@ -260,15 +260,20 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     const currentPwd = forceCurrentPassword.value;
 
                     if (!currentPwd) {
-                        forcePwdError.value = '请输入当前密码验证身份';
+                        forcePwdError.value = window.__i18n.t('login.forceChange.currentRequired');
                         return;
                     }
                     if (!newPwd || newPwd.length < 8) {
-                        forcePwdError.value = '密码长度至少8位';
+                        forcePwdError.value = window.__i18n.t('login.pwdMinLen');
+                        return;
+                    }
+                    // V6-M2：与后端强度规则一致（大小写字母 + 特殊字符），提前提示防提交被 400
+                    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!])/.test(newPwd)) {
+                        forcePwdError.value = window.__i18n.t('login.pwdComplexity');
                         return;
                     }
                     if (newPwd !== confirmPwd) {
-                        forcePwdError.value = '两次输入的密码不一致';
+                        forcePwdError.value = window.__i18n.t('register.passwordMismatch');
                         return;
                     }
 
@@ -283,12 +288,12 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                         localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
                         showForceChangePwd.value = false;
                         forcePwdError.value = '';
-                        alert('密码修改成功，请使用新密码重新登录');
+                        alert(window.__i18n.t('login.changePwdOkRelogin'));
                         setTimeout(() => {
                             window.location.href = 'login.html';
                         }, 1600);
                     } catch (e) {
-                        forcePwdError.value = e.message || '修改失败，请重试';
+                        forcePwdError.value = e.message || window.__i18n.t('login.changePwdFail');
                     }
                 };
 
@@ -312,9 +317,10 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     const hasSpecial = /[@#$%^&*!]/.test(pwd);
                     const hasLen = pwd.length >= 8;
                     const score = [hasLower, hasUpper, hasSpecial, hasLen].filter(Boolean).length;
-                    if (score <= 1) return { level: 'weak', percent: 33, text: '弱' };
-                    if (score <= 3) return { level: 'medium', percent: 66, text: '中' };
-                    return { level: 'strong', percent: 100, text: '强' };
+                    const t = window.__i18n.t;
+                    if (score <= 1) return { level: 'weak', percent: 33, text: t('password.strength.weak') };
+                    if (score <= 3) return { level: 'medium', percent: 66, text: t('password.strength.medium') };
+                    return { level: 'strong', percent: 100, text: t('password.strength.strong') };
                 });
 
                 // 注册功能：发送验证码按钮可用条件（用户名/密码/确认密码/邮箱齐全且两次密码一致）
@@ -326,8 +332,9 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                 // 注册功能：发送验证码
                 const sendCode = async () => {
                     const email = registerForm.value.email.trim();
-                    if (!email) { registerError.value = '请输入邮箱'; return; }
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { registerError.value = '邮箱格式不正确'; return; }
+                    if (!email) { registerError.value = window.__i18n.t('user.email.placeholder'); return; }
+                    // 与后端 email-validate.js 同源收紧（拒绝末尾句点等 SMTP 不兼容格式，曾致 RCPT 500 bad syntax）
+                    if (!/^[A-Za-z0-9]([A-Za-z0-9._+-]{0,62}[A-Za-z0-9])?@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(email)) { registerError.value = window.__i18n.t('login.badEmail'); return; }
                     if (codeCountdown.value > 0) return;
                     try {
                         registerError.value = '';
@@ -339,10 +346,10 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                                 if (codeCountdown.value <= 0) { clearInterval(codeTimer); codeTimer = null; }
                             }, 1000);
                         } else {
-                            registerError.value = res.error || '验证码发送失败';
+                            registerError.value = res.error || window.__i18n.t('login.codeSendFail');
                         }
                     } catch (e) {
-                        registerError.value = e.message || '请求失败，请稍后重试';
+                        registerError.value = e.message || window.__i18n.t('shared.retryLater');
                     }
                 };
 
@@ -350,19 +357,19 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                 const submitRegister = async () => {
                     const f = registerForm.value;
                     if (!f.username || f.username.length < 3 || f.username.length > 32) {
-                        registerError.value = '用户名长度需为 3-32 位'; return;
+                        registerError.value = window.__i18n.t('register.usernameLen'); return;
                     }
                     if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&*!]).{8,}$/.test(f.password)) {
-                        registerError.value = '密码必须至少 8 位，包含大小写字母和特殊字符'; return;
+                        registerError.value = window.__i18n.t('register.pwdRuleLong'); return;
                     }
                     if (f.password !== registerConfirmPassword.value) {
-                        registerError.value = '两次输入的密码不一致'; return;
+                        registerError.value = window.__i18n.t('register.passwordMismatch'); return;
                     }
-                    if (!f.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) {
-                        registerError.value = '邮箱格式不正确'; return;
+                    if (!f.email || !/^[A-Za-z0-9]([A-Za-z0-9._+-]{0,62}[A-Za-z0-9])?@([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(f.email.trim())) {
+                        registerError.value = window.__i18n.t('login.badEmail'); return;
                     }
                     if (!f.code || f.code.length !== 6) {
-                        registerError.value = '请输入 6 位验证码'; return;
+                        registerError.value = window.__i18n.t('register.codeSix'); return;
                     }
                     registerSubmitting.value = true;
                     registerError.value = '';
@@ -371,15 +378,15 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                         if (res.success) {
                             switchView('login');
                             loginForm.value.username = f.username;
-                            alert(res.message || '注册成功，请登录');
+                            alert(res.message || window.__i18n.t('register.successLogin'));
                             registerForm.value = { username: '', password: '', email: '', code: '' };
                             registerConfirmPassword.value = '';
                             if (codeTimer) { clearInterval(codeTimer); codeTimer = null; codeCountdown.value = 0; }
                         } else {
-                            registerError.value = res.error || '注册失败';
+                            registerError.value = res.error || window.__i18n.t('register.failed');
                         }
                     } catch (e) {
-                        registerError.value = e.message || '请求失败，请稍后重试';
+                        registerError.value = e.message || window.__i18n.t('shared.retryLater');
                     }
                     registerSubmitting.value = false;
                 };
@@ -392,7 +399,7 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                     if (urlParams.get('expired') === '1') {
                         localStorage.removeItem(window.__storageKeys.TOKEN);
                         localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
-                        loginError.value = '登录状态已过期，请重新登录';
+                        loginError.value = window.__i18n.t('login.sessionExpired');
                         window.history.replaceState({}, document.title, window.location.pathname);
                     }
 
@@ -403,10 +410,10 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                             if (res.ok) {
                                 resetTokenValidated.value = true;
                             } else {
-                                resetError.value = '链接无效或已过期';
+                                resetError.value = window.__i18n.t('login.linkInvalid');
                             }
                         }).catch(err => {
-                            resetError.value = '链接无效或已过期';
+                            resetError.value = window.__i18n.t('login.linkInvalid');
                         });
                         window.history.replaceState({}, document.title, window.location.pathname);
                         return;
@@ -451,6 +458,9 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
                 });
 
                 return {
+                    // i18n 翻译函数（响应式：语言切换时自动重渲染）
+                    t: window.__i18n.t,
+                    tFormat: window.__i18n.tFormat,
                     loginForm,
                     loginError,
                     loginUsernameError,
@@ -506,8 +516,14 @@ const { createApp, ref, onMounted, onUnmounted, nextTick, computed } = Vue;
             }
         };
 
-        var app = createApp(App);
-        app.mount('#app');
+        // i18n：先加载当前语言翻译，再挂载 Vue（确保首次渲染即为目标语言）
+        (async function () {
+            if (window.__i18n && !window.__i18n.isLoaded()) {
+                await window.__i18n.init(window.__initialLocale || 'zh-CN');
+            }
+            var app = createApp(App);
+            app.mount('#app');
 
-// Theme toggle — 统一使用 theme-init.js
-if (window.initThemeToggle) window.initThemeToggle();
+            // Theme toggle — 统一使用 theme-init.js
+            if (window.initThemeToggle) window.initThemeToggle();
+        })();

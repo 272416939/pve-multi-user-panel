@@ -36,12 +36,16 @@ function splitCnameEntry(entry) {
 }
 
 // 校验单条 label（节点名称）：长度 + 结构字符/控制字符黑名单
+// V6-L2 修复：改白名单收紧（中文/字母/数字/空格/连字符/下划线/点），剔除 <>"'& 等 HTML 元字符——
+// label 存 config 表永久保留，防存储型 XSS 种子（当前前端纯文本渲染，纵深防御）；
+// 空 label 合法（.域名 / 裸域名条目无标签）
+var LABEL_RE = /^[\u4e00-\u9fa5a-zA-Z0-9 _\-\.]{0,50}$/;
 function isValidLabel(label) {
     if (label.length > MAX_LABEL_LEN) return false;
     if (/[\x00-\x1f\x7f]/.test(label)) return false;  // 控制字符
     if (label.indexOf(',') > -1) return false;        // 逗号破坏条目分隔
     if (label.indexOf('||') > -1) return false;       // || 破坏标签分隔
-    return true;
+    return LABEL_RE.test(label);
 }
 
 // 校验单条 domain：允许前导 .，剥离后为合法 DNS 域名且 ≤253

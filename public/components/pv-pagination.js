@@ -65,7 +65,7 @@
     },
     template: `
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-            <small class="text-muted">共 {{ total }} 条</small>
+            <small class="text-muted">{{ tFormat('common.paginationTotal', total) }}</small>
             <div class="d-flex align-items-center gap-1">
                 <pv-button variant="outline" size="sm" :disabled="page <= 1" @click="goTo(page - 1)">&lt;</pv-button>
                 <template v-for="(p, idx) in pageNumbers" :key="idx">
@@ -74,12 +74,12 @@
                 </template>
                 <pv-button variant="outline" size="sm" :disabled="page >= totalPages" @click="goTo(page + 1)">&gt;</pv-button>
                 <select v-if="showSize" class="form-select form-select-sm ms-2" style="width:auto" :value="pageSize" @change="onPageSizeChange">
-                    <option v-for="s in sizeOptions" :key="s" :value="s">{{ s }}条/页</option>
+                    <option v-for="s in sizeOptions" :key="s" :value="s">{{ tFormat('common.paginationPerPage', s) }}</option>
                 </select>
                 <template v-if="showJump">
-                    <span class="text-muted small ms-2">前往</span>
-                    <input type="number" class="form-control form-control-sm" style="width:70px" v-model="goPage" min="1" :max="totalPages" placeholder="页" autocomplete="off" @keyup.enter="onGoPage">
-                    <span class="text-muted small">页</span>
+                    <span class="text-muted small ms-2">{{ t('common.paginationGo') }}</span>
+                    <input type="number" class="form-control form-control-sm" style="width:70px" v-model="goPage" min="1" :max="totalPages" :placeholder="t('common.paginationPage')" autocomplete="off" @keyup.enter="onGoPage">
+                    <span class="text-muted small">{{ t('common.paginationPage') }}</span>
                 </template>
             </div>
         </div>

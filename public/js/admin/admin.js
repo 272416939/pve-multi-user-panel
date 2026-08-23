@@ -34,6 +34,9 @@
     // 模板样式（站点全局默认，个人偏好优先级更高）
     $.templateStyle = ref('default');
     $.templateStyleSaving = ref(false);
+    // 系统默认语言
+    $.langForm = ref('zh-CN');
+    $.langSaving = ref(false);
     $.redisConfig = ref({ host: '', port: 6379, password: '', db: 0, prefix: 'pve:' });
     $.redisConfigSaving = ref(false);
     $.redisTesting = ref(false);
@@ -42,6 +45,10 @@
     $.logConfigForm = ref({ keep_count: 5000, keep_admin_count: 5000 });
     $.logConfigSaving = ref(false);
     $.cdkList = ref([]);
+    $.cdkPage = ref(1);
+    $.cdkPageSize = ref(20);
+    $.cdkTotal = ref(0);
+    $.cdkLoadSeq = 0;
     $.cdkForm = ref({ duration_days: 30, count: 1, expires_at: '' });
     $.cdkResult = ref([]);
     $.cdkResultBatchId = ref('');
@@ -172,6 +179,32 @@
         $.userPageSize.value = size || 20;
         $.loadUsers(1);
     };
+    // CDK 列表分页（loadData 与 CDK 页删除后共用；空页且非第 1 页自动回退一页）
+    $.loadCdkList = async function(page) {
+        var seq = ++$.cdkLoadSeq;
+        $.cdkPage.value = page || 1;
+        try {
+            var res = await api('/admin/cdk/list?page=' + $.cdkPage.value + '&limit=' + $.cdkPageSize.value);
+            if (seq !== $.cdkLoadSeq) return;
+            if (Array.isArray(res)) {
+                $.cdkList.value = res;
+                $.cdkTotal.value = res.length;
+            } else {
+                $.cdkList.value = res.rows || [];
+                $.cdkTotal.value = res.total || 0;
+                if ($.cdkList.value.length === 0 && $.cdkTotal.value > 0 && $.cdkPage.value > 1) {
+                    return $.loadCdkList(Math.ceil($.cdkTotal.value / $.cdkPageSize.value));
+                }
+            }
+        } catch (e) {
+            if (seq !== $.cdkLoadSeq) return;
+            console.error('加载 CDK 列表失败', e);
+        }
+    };
+    $.changeCdkPageSize = function(size) {
+        $.cdkPageSize.value = size || 20;
+        $.loadCdkList(1);
+    };
 
     $.createUser = async function() {
         try {
@@ -188,7 +221,7 @@
     };
 
     $.deleteUser = async function(id) {
-        if (await window.customConfirm('确定删除此用户？该用户名下若仍有虚拟机、容器、硬盘、私有网络、余额等资产将无法删除')) {
+        if (await window.customConfirm(window.__i18n.t('admin.users.deleteBlockedConfirm'))) {
             try {
                 await api('/users/' + id, { method: 'DELETE' });
                 $.loadData();
@@ -236,12 +269,12 @@
     };
 
     $.disableUser2fa = async function(userId) {
-        if (!(await window.customConfirm('确定禁用此用户的 2FA 二次验证？'))) return;
+        if (!(await window.customConfirm(window.__i18n.t('admin.users.disable2faConfirm')))) return;
         try {
             await api('/admin/user/' + userId + '/disable-2fa', { method: 'POST' });
             $.editUserForm.value.totp_enabled = false;
             await $.loadData();
-            alert('2FA 已禁用');
+            alert(window.__i18n.t('admin.users.twofaDisabledAlert'));
         } catch (e) {
             alert(e.message);
         }
@@ -254,7 +287,7 @@
                 method: 'PUT',
                 body: JSON.stringify($.smtpConfig.value)
             });
-            alert('配置已保存');
+            alert(window.__i18n.t('settings.saved'));
         } catch (e) {
             alert(e.message);
         }
@@ -284,10 +317,10 @@
         $.pveConfigSaving.value = true;
         try {
             await api('/admin/pve/config', { method: 'PUT', body: $.pveConfig.value });
-            alert('PVE 配置保存成功');
+            alert(window.__i18n.t('admin.pve.saveOk'));
             await $.loadPveConfig();
         } catch (e) {
-            alert('保存失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.pveConfigSaving.value = false;
     };
@@ -297,9 +330,9 @@
         $.pveTesting.value = true;
         try {
             var result = await api('/admin/pve/test', { method: 'POST', body: $.pveConfig.value });
-            alert(result.message || '连接成功');
+            alert(result.message || window.__i18n.t('admin.pve.testOk'));
         } catch (e) {
-            alert('测试失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('admin.pve.testFailed') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.pveTesting.value = false;
     };
@@ -318,10 +351,10 @@
         $.ikuaiConfigSaving.value = true;
         try {
             await api('/admin/ikuai/config', { method: 'PUT', body: $.ikuaiConfig.value });
-            alert('爱快配置保存成功');
+            alert(window.__i18n.t('admin.ikuai.saveOk'));
             await $.loadIkuaiConfig();
         } catch (e) {
-            alert('保存失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.ikuaiConfigSaving.value = false;
     };
@@ -330,9 +363,9 @@
         $.ikuaiTesting.value = true;
         try {
             var result = await api('/admin/ikuai/test', { method: 'POST', body: {} });
-            alert(result.message || '连接成功');
+            alert(result.message || window.__i18n.t('admin.pve.testOk'));
         } catch (e) {
-            alert('测试失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('admin.pve.testFailed') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.ikuaiTesting.value = false;
     };
@@ -347,7 +380,7 @@
                 method: 'POST',
                 body: JSON.stringify({ testEmail: $.testEmail.value })
             });
-            alert('测试邮件已发送');
+            alert(window.__i18n.t('admin.smtp.testSent'));
             $.bsModalHide('testEmailModal');
         } catch (e) {
             alert(e.message);
@@ -360,7 +393,7 @@
                 method: 'PUT',
                 body: JSON.stringify($.reminderConfig.value)
             });
-            alert('配置已保存');
+            alert(window.__i18n.t('settings.saved'));
         } catch (e) {
             alert(e.message);
         }
@@ -410,7 +443,7 @@
                 body: JSON.stringify($.emailShellForm.value)
             });
             $.emailShellForm.value = res.values || $.emailShellForm.value;
-            alert(res.message || '样式已保存');
+            alert(res.message || window.__i18n.t('admin.shell.styleSaved'));
         } catch (e) {
             alert(e.message);
         } finally {
@@ -420,11 +453,11 @@
 
     // 恢复默认外壳样式
     $.resetEmailShell = async function() {
-        if (!(await window.customConfirm('确认将邮件外壳样式恢复为系统默认？当前修改将被覆盖。'))) return;
+        if (!(await window.customConfirm(window.__i18n.t('admin.shell.resetConfirm')))) return;
         try {
             var res = await api('/admin/email-shell/reset', { method: 'POST' });
             $.emailShellForm.value = res.values || $.emailShellForm.value;
-            alert(res.message || '已恢复默认');
+            alert(res.message || window.__i18n.t('settings.restoredDefault'));
         } catch (e) {
             alert(e.message);
         }
@@ -433,7 +466,7 @@
     // 预览外壳样式：用 SMTP 测试模板 + 当前编辑的 shell 参数渲染（未保存也可预览）
     $.previewEmailShell = async function() {
         var tpl = ($.emailTemplates.value || []).find(function(t) { return t.code === 'smtp_test'; });
-        if (!tpl) { alert('邮件模板尚未加载'); return; }
+        if (!tpl) { alert(window.__i18n.t('admin.etpl.notLoaded')); return; }
         try {
             var res = await api('/admin/email-templates/smtp_test/preview', {
                 method: 'POST',
@@ -460,6 +493,9 @@
     $.emailTemplatePreviewShow = ref(false);
     $.emailTemplatePreviewHtml = ref('');
     $.emailTemplatePreviewSubject = ref('');
+    // 打开模板时的原文快照：Quill 打开即洗版（btn/info-box/复杂内联样式等不支持的格式被丢弃），
+    // 保存/预览时若内容未被用户改动则回退此原文，防止洗版内容被动写库或预览失真
+    $.emailTemplateOriginalContent = ref('');
 
     /**
      * 设置预览 HTML：邮件外壳 <style> 为服务端生成（可信），直接保留；
@@ -472,6 +508,16 @@
         var shellCss = styleMatch ? styleMatch[1] : '';
         var bodyHtml = raw.replace(/<style>[\s\S]*?<\/style>/, '');
         var safeBody = window.DOMPurify ? DOMPurify.sanitize(bodyHtml, { ADD_ATTR: ['target'] }) : bodyHtml;
+        // 外壳全局选择器作用域化（防泄漏污染控制台页面——曾致预览后整站背景变邮件深紫渐变、全局 margin 归零）：
+        // - 裸 body 规则整体丢弃：真实邮件客户端（QQ 邮箱等）同样忽略 body 背景，预览以弹窗浅灰容器
+        //   模拟客户端阅读区，与实发所见一致；
+        // - 裸 * 全局重置收窄到预览容器内：真实邮件中该重置生效，需保留等效效果（不动规则顺序，
+        //   与邮件内级联一致）
+        if (shellCss) {
+            shellCss = shellCss
+                .replace(/(^|\})\s*body\s*\{[^}]*\}/g, '$1')
+                .replace(/(^|\})\s*\*\s*\{/g, '$1.email-template-preview-body * {');
+        }
         $.emailTemplatePreviewHtml.value = shellCss ? '<style>' + shellCss + '</style>' + safeBody : safeBody;
     };
 
@@ -486,6 +532,20 @@
         } else if (emailTemplatePreviewZIndex != null) {
             window.ModalZIndexManager.release(emailTemplatePreviewZIndex);
             emailTemplatePreviewZIndex = null;
+        }
+    });
+
+    // 按钮链接编辑弹窗 z-index 管理（同预览弹窗模式）
+    var emailBtnLinkZIndex = null;
+    watch($.emailBtnLinkShow, function(val) {
+        if (val) {
+            Vue.nextTick(function() {
+                var el = document.getElementById('emailBtnLinkWrap');
+                if (el) emailBtnLinkZIndex = $.applyModalZIndex(el);
+            });
+        } else if (emailBtnLinkZIndex != null) {
+            window.ModalZIndexManager.release(emailBtnLinkZIndex);
+            emailBtnLinkZIndex = null;
         }
     });
 
@@ -557,30 +617,89 @@
         return list;
     };
 
+    // 注册「邮件按钮链接」自定义 Blot（输出 <a class="btn">）：
+    // 邮件外壳 .btn 类承载实心渐变按钮样式（server/utils/email.js createEmailTemplate），
+    // Quill 原生 Link blot 不保留 class 属性——打开模板时 <a class="btn"> 会被洗成普通链接丢样式。
+    // 注册后按钮成为 Quill 可表达的格式，编辑含按钮的模板再保存按钮不再丢失。
+    // 必须在首个 Quill 实例创建前注册一次（Quill.import 全局注册，重复注册幂等）。
+    $.registerEmailBtnLinkBlot = function() {
+        if (window.__emailBtnLinkBlotRegistered || typeof Quill === 'undefined') return;
+        var Link = Quill.import('formats/link');
+        class BtnLink extends Link {
+            static create(value) {
+                var node = super.create(value);
+                node.setAttribute('target', '_blank');
+                return node;
+            }
+        }
+        BtnLink.blotName = 'btn-link';
+        BtnLink.tagName = 'A';
+        // 关键：className 区分同 tagName 的两个 blot——不设时 BtnLink 会抢先匹配所有 <a>，
+        // 模板里的普通链接（备用链接 {link} 等）被误转成按钮（Quill 官方「克隆 blot 匹配 DOM」方案）
+        BtnLink.className = 'btn';
+        Quill.register(BtnLink, true);
+        // 工具栏按钮图标：Quill 无内置 btn-link 图标，注册自定义 SVG（ql-stroke 走主题色，hover 联动）
+        var icons = Quill.import('ui/icons');
+        if (icons && !icons['btn-link']) {
+            icons['btn-link'] = '<svg viewBox="0 0 18 18"><rect class="ql-stroke" x="2.5" y="5.5" width="13" height="7" rx="2"></rect><line class="ql-stroke" x1="6" y1="9" x2="12" y2="9"></line></svg>';
+        }
+        window.__emailBtnLinkBlotRegistered = true;
+    };
+
     // 初始化 Quill 富文本编辑器（模板编辑区展开后调用；DOM 由 v-if/v-show 控制）
     $.initEmailTemplateQuill = function() {
         $.destroyEmailTemplateQuill();
         var el = document.getElementById('emailTemplateQuill');
         if (!el || typeof Quill === 'undefined') return;
-        // 自定义色板：Quill 2 默认色板无纯黑（最深仅 #444444 深灰），且首项为「清除格式」，
+        $.registerEmailBtnLinkBlot();
+        // 自定义色板：Quill 2 默认色板无纯黑（最深仅 #444444 深灰），且色板首项是「清除格式」（无色块），
         // 用户选「黑色」会点到深灰、选「灰色」会误触清除格式 → 颜色错乱。
         // 显式提供 黑/深灰/中灰/浅灰/白 + 常用色，第一个色块即纯黑，便于准确选择。
         var EMAIL_COLORS = ['#000000', '#333333', '#666666', '#999999', '#cccccc', '#ffffff', '#e60000', '#ff9900', '#ffff00', '#008a00', '#0066cc', '#9933ff', '#facccc', '#ffebcc', '#ffffcc', '#cce8cc', '#cce0f5', '#ebd6ff', '#888888', '#444444'];
+        // 对齐/缩进/字号按钮输出的 ql-align-*/ql-indent-*/ql-size-* 类依赖邮件外壳兼容样式
+        // （server/utils/email.js createEmailTemplate 内 <style>），新增这三类之外的格式需同步补外壳规则
         var quill = new Quill(el, {
             theme: 'snow',
-            placeholder: '编辑邮件正文…',
+            placeholder: window.__i18n.t('admin.etpl.editPlaceholder'),
             modules: {
-                toolbar: [
-                    [{ header: [2, 3, false] }],
-                    ['bold', 'italic', 'underline', 'strike'],
-                    [{ color: EMAIL_COLORS.slice() }, { background: EMAIL_COLORS.slice() }],
-                    [{ list: 'ordered' }, { list: 'bullet' }],
-                    ['blockquote', 'link', 'code-block'],
-                    ['clean']
-                ]
+                toolbar: {
+                    container: [
+                        [{ header: [2, 3, false] }],
+                        [{ size: ['small', false, 'large', 'huge'] }],
+                        ['bold', 'italic', 'underline', 'strike'],
+                        [{ color: EMAIL_COLORS.slice() }, { background: EMAIL_COLORS.slice() }],
+                        [{ align: '' }, { align: 'center' }, { align: 'right' }, { align: 'justify' }],
+                        [{ list: 'ordered' }, { list: 'bullet' }],
+                        [{ indent: '-1' }, { indent: '+1' }],
+                        ['blockquote', 'link', 'code-block'],
+                        ['btn-link'],
+                        ['clean']
+                    ],
+                    handlers: {
+                        // 插入/编辑按钮链接：选区或光标落在已有按钮上 → 编辑模式（回显文字+URL，原位更新）；
+                        // 选中普通文字 → 转按钮（文字预填选中文本）；光标在空白处 → 插入默认文案按钮。
+                        // 文字与链接均可在弹窗中修改
+                        'btn-link': function() { $.emailLinkHandler('btn-link'); },
+                        // 原生「插入链接」接管：与按钮链接同一弹窗/同一三分支逻辑，仅格式不同
+                        // （原生行为空白光标不可插入，必须先选中文字——接管后支持空白插入+变量）
+                        'link': function() { $.emailLinkHandler('link'); }
+                    }
+                }
             }
         });
         var content = $.emailTemplateForm.value.content || '';
+        // 剪贴板 matcher：模板 HTML 中的 <a class="btn"> 解析归入 btn-link 格式
+        // （Quill 默认 A matcher 归入 link 格式会丢弃 class="btn"，addMatcher 追加在默认之后运行，改写属性即可）
+        quill.clipboard.addMatcher('A', function(node, delta) {
+            if (node.classList && node.classList.contains('btn')) {
+                delta.ops.forEach(function(op) {
+                    if (op.attributes) delete op.attributes.link;
+                    op.attributes = op.attributes || {};
+                    op.attributes['btn-link'] = node.getAttribute('href') || '';
+                });
+            }
+            return delta;
+        });
         if (content) {
             try {
                 quill.clipboard.dangerouslyPasteHTML(content);
@@ -593,8 +712,52 @@
             $.emailTemplateForm.value.content = html;
             $.emailTemplateSource.value = html;
         });
+        // 记录打开时快照：原文 + Quill 洗版后 Delta 基线（供 isEmailTemplateUntouched 判定「未被用户改动」）
+        $.emailTemplateOriginalContent.value = content;
+        window.__emailTemplateQuillBaseline = JSON.stringify(quill.getContents());
         window.__emailTemplateQuill = quill;
         $.applyEmailToolbarTitles();
+        $.clampEmailTooltipBounds(quill);
+    };
+
+    // 链接编辑气泡边界避让：Quill 把气泡 absolute 定位到光标处，光标在编辑器左缘时
+    // 气泡左半截溢出容器（.email-template-quill-wrap overflow:hidden 圆角裁剪）被吞掉。
+    // 每次 Quill 重设气泡位置后横向 clamp 到编辑器可视区内。
+    $.clampEmailTooltipBounds = function(quill) {
+        if (!quill || quill.__tooltipClampBound) return;
+        quill.__tooltipClampBound = true;
+        var tooltip = quill.root.closest('.email-template-quill-wrap') && quill.root.closest('.email-template-quill-wrap').querySelector('.ql-tooltip');
+        if (!tooltip) return;
+        var clamp = function() {
+            // 气泡隐藏时不处理；Quill 用 style.left（px）定位，读当前值后夹取
+            if (tooltip.classList.contains('ql-hidden') || tooltip.style.visibility === 'hidden') return;
+            var wrap = quill.root.closest('.email-template-quill-wrap');
+            if (!wrap) return;
+            var left = parseFloat(tooltip.style.left);
+            if (isNaN(left)) return;
+            var wrapRect = wrap.getBoundingClientRect();
+            var tipRect = tooltip.getBoundingClientRect();
+            // 修正量：相对当前 style.left 的偏移（容器宽度差 - 气泡实际宽度）
+            var margin = 4; // 距边缘留 4px
+            var minLeft = margin - (wrapRect.left - tooltip.parentElement.getBoundingClientRect().left) - 0;
+            // 直接以父容器（ql-container，与 wrap 同宽）坐标系计算：wrap 与 ql-container 左缘基本重合
+            var container = tooltip.parentElement;
+            var containerRect = container.getBoundingClientRect();
+            var shift = 0;
+            if (tipRect.left < wrapRect.left + margin) {
+                shift = (wrapRect.left + margin) - tipRect.left;      // 左溢出 → 右移
+            } else if (tipRect.right > wrapRect.right - margin) {
+                shift = (wrapRect.right - margin) - tipRect.right;    // 右溢出 → 左移
+            }
+            if (shift !== 0) {
+                tooltip.style.left = (left + shift) + 'px';
+                containerRect = null; // 已用完
+            }
+        };
+        // Quill tooltip 定位发生在 selection-change / 编辑动作后；MutationObserver 监听 style 变化最可靠
+        var mo = new MutationObserver(function() { clamp(); });
+        mo.observe(tooltip, { attributes: true, attributeFilter: ['style', 'class'] });
+        clamp();
     };
 
     // 工具栏按钮/下拉中文提示（Quill 默认只有图标，悬浮 title 说明功能）
@@ -604,26 +767,37 @@
             if (!tb) return;
             // 普通按钮
             var BTN_TITLES = {
-                '.ql-bold': '加粗',
-                '.ql-italic': '斜体',
-                '.ql-underline': '下划线',
-                '.ql-strike': '删除线',
-                '.ql-blockquote': '引用',
-                '.ql-link': '插入链接',
-                '.ql-code-block': '代码块',
-                '.ql-clean': '清除格式',
-                '.ql-list[value="ordered"]': '有序列表',
-                '.ql-list[value="bullet"]': '无序列表'
+                '.ql-bold': window.__i18n.t('admin.quill.bold'),
+                '.ql-italic': window.__i18n.t('admin.quill.italic'),
+                '.ql-underline': window.__i18n.t('admin.quill.underline'),
+                '.ql-strike': window.__i18n.t('admin.quill.strike'),
+                '.ql-blockquote': window.__i18n.t('admin.quill.blockquote'),
+                '.ql-link': window.__i18n.t('admin.quill.insertLink'),
+                '.ql-code-block': window.__i18n.t('admin.quill.codeBlock'),
+                '.ql-clean': window.__i18n.t('admin.quill.clean'),
+                '.ql-list[value="ordered"]': window.__i18n.t('admin.quill.orderedList'),
+                '.ql-list[value="bullet"]': window.__i18n.t('admin.quill.bulletList'),
+                '.ql-indent[value="-1"]': window.__i18n.t('admin.quill.indentMinus'),
+                '.ql-indent[value="+1"]': window.__i18n.t('admin.quill.indentPlus'),
+                '.ql-btn-link': window.__i18n.t('admin.quill.btnLinkTip')
             };
             Object.keys(BTN_TITLES).forEach(function(sel) {
                 var el = tb.querySelector(sel);
                 if (el) el.setAttribute('title', BTN_TITLES[sel]);
             });
+            // 对齐按钮组（4 个独立按钮：左对齐按钮可能无 value 属性，逐个按 value 映射补 title）
+            var ALIGN_TITLES = { '': window.__i18n.t('admin.quill.alignLeft'), center: window.__i18n.t('admin.quill.alignCenter'), right: window.__i18n.t('admin.quill.alignRight'), justify: window.__i18n.t('admin.quill.alignJustify') };
+            tb.querySelectorAll('button.ql-align').forEach(function(el) {
+                if (!el.getAttribute('title')) {
+                    el.setAttribute('title', ALIGN_TITLES[el.getAttribute('value') || ''] || window.__i18n.t('admin.quill.align'));
+                }
+            });
             // 下拉选择器（标题/文字颜色/背景颜色）
             var PICKER_TITLES = {
-                '.ql-header': '标题级别',
-                '.ql-color': '文字颜色',
-                '.ql-background': '背景颜色'
+                '.ql-header': window.__i18n.t('admin.quill.heading'),
+                '.ql-size': window.__i18n.t('admin.quill.size'),
+                '.ql-color': window.__i18n.t('admin.quill.color'),
+                '.ql-background': window.__i18n.t('admin.quill.bgColor')
             };
             Object.keys(PICKER_TITLES).forEach(function(sel) {
                 var el = tb.querySelector(sel + ' .ql-picker-label');
@@ -637,13 +811,20 @@
                     tb.querySelectorAll('.ql-header .ql-picker-options .ql-picker-item').forEach(function(item) {
                         if (!item.getAttribute('title')) {
                             var v = item.getAttribute('data-value');
-                            item.setAttribute('title', v === 'false' || v === null ? '正文' : '标题 ' + v);
+                            item.setAttribute('title', v === 'false' || v === null ? window.__i18n.t('admin.quill.normal') : window.__i18n.t('admin.quill.headingPrefix') + v);
                         }
                     });
                     tb.querySelectorAll('.ql-color .ql-picker-options .ql-picker-item, .ql-background .ql-picker-options .ql-picker-item').forEach(function(item) {
                         if (!item.getAttribute('title')) {
                             var v = item.getAttribute('data-value');
-                            item.setAttribute('title', v ? '颜色 ' + v : '清除颜色格式');
+                            item.setAttribute('title', v ? window.__i18n.t('admin.quill.colorPrefix') + v : window.__i18n.t('admin.quill.clearColor'));
+                        }
+                    });
+                    var SIZE_TITLES = { small: window.__i18n.t('admin.quill.small'), large: window.__i18n.t('admin.quill.large'), huge: window.__i18n.t('admin.quill.huge') };
+                    tb.querySelectorAll('.ql-size .ql-picker-options .ql-picker-item').forEach(function(item) {
+                        if (!item.getAttribute('title')) {
+                            var v = item.getAttribute('data-value');
+                            item.setAttribute('title', (v && SIZE_TITLES[v]) ? SIZE_TITLES[v] : window.__i18n.t('admin.quill.standardSize'));
                         }
                     });
                 };
@@ -662,6 +843,173 @@
         if (window.__emailTemplateQuill) {
             try { window.__emailTemplateQuill = null; } catch (e) {}
         }
+        window.__emailTemplateQuillBaseline = null;
+    };
+
+    // ==================== 按钮链接编辑弹窗（按钮文字 + URL 输入 + 变量快捷插入） ====================
+    $.emailBtnLinkShow = ref(false);
+    $.emailBtnLinkUrl = ref('');
+    $.emailBtnLinkText = ref('');
+    $.emailBtnLinkTitle = ref(window.__i18n.t('admin.quill.btnLink'));
+    $.emailBtnLinkMode = ref('btn');        // btn = 按钮链接 | link = 普通链接（共用弹窗）
+    $.emailBtnLinkResolve = ref(null);
+    // 可用变量 = 当前编辑模板声明变量 + 全局通用变量（与正文编辑区变量面板同源）
+    $.emailBtnLinkVariables = computed(function() {
+        var tpl = ($.emailTemplates.value || []).find(function(t) { return t.code === $.emailTemplateEditing.value; });
+        if (tpl) return $.emailTemplateAllVariables(tpl);
+        return $.emailTemplateGlobalVariables.value || [];
+    });
+
+    // 打开弹窗（返回 Promise：确定 → { url, text }，取消 → null）
+    // initialUrl 非空视为编辑已有按钮（标题「编辑」），文字/链接均回显；mode: btn=按钮链接 link=普通链接
+    $.openEmailBtnLinkPrompt = function(initialUrl, initialText, mode) {
+        $.emailBtnLinkMode.value = mode || 'btn';
+        $.emailBtnLinkUrl.value = initialUrl || '';
+        $.emailBtnLinkText.value = initialText || '';
+        var noun = $.emailBtnLinkMode.value === 'link' ? window.__i18n.t('admin.quill.link') : window.__i18n.t('admin.quill.buttonLink');
+        $.emailBtnLinkTitle.value = initialUrl ? window.__i18n.t('common.edit') + noun : window.__i18n.t('admin.quill.insert') + noun;
+        $.emailBtnLinkShow.value = true;
+        return new Promise(function(resolve) {
+            $.emailBtnLinkResolve.value = resolve;
+            Vue.nextTick(function() {
+                var input = document.getElementById('emailBtnLinkInput');
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            });
+        });
+    };
+
+    // 关闭（ok=true 确定 / false 取消）
+    $.closeEmailBtnLinkPrompt = function(ok) {
+        var resolve = $.emailBtnLinkResolve.value;
+        $.emailBtnLinkResolve.value = null;
+        $.emailBtnLinkShow.value = false;
+        if (resolve) {
+            resolve(ok ? {
+                url: ($.emailBtnLinkUrl.value || '').trim(),
+                text: ($.emailBtnLinkText.value || '').trim()
+            } : null);
+        }
+    };
+
+    // 弹窗内 Enter 提交（禁止模板事件修饰符，JS 内判断 key）
+    $.emailBtnLinkKeydown = function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            $.closeEmailBtnLinkPrompt(true);
+        }
+    };
+
+    // 弹窗内点变量插入到当前聚焦的输入框（文字框或 URL 框）光标处
+    // （mousedown.prevent 保焦维持光标位置；未聚焦任一框时默认插 URL 框）
+    $.insertEmailBtnLinkVar = function(name) {
+        var varStr = '{' + name + '}';
+        var active = document.activeElement;
+        var input = (active && (active.id === 'emailBtnLinkInput' || active.id === 'emailBtnLinkTextInput'))
+            ? active : document.getElementById('emailBtnLinkInput');
+        if (!input) return;
+        var start = input.selectionStart != null ? input.selectionStart : input.value.length;
+        var end = input.selectionEnd != null ? input.selectionEnd : start;
+        input.value = input.value.slice(0, start) + varStr + input.value.slice(end);
+        if (input.id === 'emailBtnLinkInput') $.emailBtnLinkUrl.value = input.value;
+        else $.emailBtnLinkText.value = input.value;
+        input.focus();
+        input.setSelectionRange(start + varStr.length, start + varStr.length);
+    };
+
+    // 定位包含指定位置的按钮链接完整范围（遍历 Delta ops 找 btn-link 属性的 op）：
+    // 编辑已有按钮时用——光标落在按钮文字内时找到整段 op 范围，提交后原位更新 href
+    $.findEmailBtnLinkRange = function(quill, index) {
+        try {
+            var ops = quill.getContents().ops;
+            var pos = 0;
+            for (var i = 0; i < ops.length; i++) {
+                var op = ops[i];
+                var len = typeof op.insert === 'string' ? op.insert.length : 1;
+                if (op.attributes && op.attributes['btn-link'] !== undefined) {
+                    if (index >= pos && index < pos + len) {
+                        return { index: pos, length: len };
+                    }
+                }
+                pos += len;
+            }
+        } catch (e) {}
+        return null;
+    };
+
+    // 链接类插入/编辑统一 handler（'btn-link' 按钮格式 / 'link' 普通链接共用）：
+    // 选区或光标落在已有链接上 → 编辑模式（回显文字+URL，原位更新，文字可改）；
+    // 选中普通文字 → 转链接（文字预填）；光标空白处 → 弹窗输入文字+链接插入（原生 link 无此能力）
+    $.emailLinkHandler = async function(format) {
+        var q = window.__emailTemplateQuill;
+        if (!q) return;
+        var range = q.getSelection(true) || { index: Math.max(0, q.getLength() - 1), length: 0 };
+        var probe = range.length > 0 ? range.index : Math.min(range.index, Math.max(0, q.getLength() - 1));
+        var fmt = {};
+        try { fmt = q.getFormat(probe, Math.max(1, range.length)) || {}; } catch (e) {}
+        // 编辑探测：目标格式命中 + 定位到完整 op 范围（btn-link 用专用定位，link 用 getFormat 命中即可）
+        var existing = null;
+        var currentUrl = '';
+        if (fmt[format] !== undefined) {
+            currentUrl = String(fmt[format] || '');
+            if (format === 'btn-link') {
+                existing = $.findEmailBtnLinkRange(q, probe);
+            } else {
+                // 普通链接：光标在链接内或选中链接片段——定位完整范围（遍历 ops 找 link 属性）
+                try {
+                    var ops = q.getContents().ops;
+                    var pos = 0;
+                    for (var i = 0; i < ops.length; i++) {
+                        var op = ops[i];
+                        var len = typeof op.insert === 'string' ? op.insert.length : 1;
+                        if (op.attributes && op.attributes[format] !== undefined) {
+                            if (probe >= pos && probe < pos + len) { existing = { index: pos, length: len }; break; }
+                        }
+                        pos += len;
+                    }
+                } catch (e) {}
+            }
+        }
+        var currentText = existing ? q.getText(existing.index, existing.length)
+            : (range.length > 0 ? q.getText(range.index, range.length) : '');
+        var res = await $.openEmailBtnLinkPrompt(currentUrl, currentText, format === 'btn-link' ? 'btn' : 'link');
+        if (!res || !res.url) return;
+        var url = res.url;
+        var text = res.text || window.__i18n.t('admin.quill.visitUrl');
+        var target = existing || range;
+        if (target.length > 0) {
+            q.deleteText(target.index, target.length, 'user');
+            q.insertText(target.index, text, 'user');
+        } else {
+            q.insertText(target.index, text, 'user');
+        }
+        q.formatText(target.index, text.length, format, url, 'user');
+        q.setSelection(target.index, text.length);
+        q.focus();
+    };
+
+    // 当前编辑内容是否未被用户改动：
+    // 富文本模式 = Quill 当前 Delta 与打开时基线一致；源码模式 = 源码文本与原文一致
+    $.isEmailTemplateUntouched = function() {
+        var original = $.emailTemplateOriginalContent.value;
+        if ($.emailTemplateMode.value === 'source') {
+            return $.emailTemplateSource.value === original;
+        }
+        var quill = window.__emailTemplateQuill;
+        return !!quill && !!window.__emailTemplateQuillBaseline &&
+            JSON.stringify(quill.getContents()) === window.__emailTemplateQuillBaseline;
+    };
+
+    // 取当前生效的正文内容（保存/预览统一入口）：
+    // 未被用户改动时回退打开时的原文——Quill 打开模板即洗版（按钮类/提示块/复杂内联样式被丢弃），
+    // 直接用 Quill 输出会造成「预览与实发不一致」甚至原文样式被动丢失写库
+    $.getEmailTemplateCurrentContent = function() {
+        if ($.emailTemplateMode.value === 'source') return $.emailTemplateSource.value;
+        if ($.isEmailTemplateUntouched()) return $.emailTemplateOriginalContent.value;
+        if (window.__emailTemplateQuill) return window.__emailTemplateQuill.root.innerHTML;
+        return $.emailTemplateForm.value.content || '';
     };
 
     // 展开/收起模板编辑区（一次只展开一个）
@@ -699,9 +1047,21 @@
         $.emailTemplateMode.value = mode;
     };
 
-    // 插入变量到光标处（富文本用 Quill 选区，源码用 textarea 选区）
+    // 插入变量到光标处（链接气泡编辑态→气泡输入框，源码→textarea 选区，富文本→Quill 选区）
     $.insertEmailTemplateVar = function(name) {
         var varStr = '{' + name + '}';
+        // 链接气泡编辑态：焦点在气泡 URL 输入框（点变量经 mousedown.prevent 保焦不关气泡），
+        // 变量应插入气泡输入框光标处而非正文
+        var tooltip = document.querySelector('.email-template-quill-wrap .ql-tooltip.ql-editing');
+        var tipInput = tooltip ? tooltip.querySelector('input[type=text]') : null;
+        if (tipInput && getComputedStyle(tipInput).display !== 'none') {
+            var tStart = tipInput.selectionStart != null ? tipInput.selectionStart : tipInput.value.length;
+            var tEnd = tipInput.selectionEnd != null ? tipInput.selectionEnd : tStart;
+            tipInput.value = tipInput.value.slice(0, tStart) + varStr + tipInput.value.slice(tEnd);
+            tipInput.focus();
+            tipInput.setSelectionRange(tStart + varStr.length, tStart + varStr.length);
+            return;
+        }
         if ($.emailTemplateMode.value === 'source') {
             var ta = document.getElementById('emailTemplateSource');
             if (!ta) return;
@@ -728,11 +1088,7 @@
         var code = $.emailTemplateEditing.value;
         if (!code) return;
         var form = $.emailTemplateForm.value;
-        if ($.emailTemplateMode.value === 'source') {
-            form.content = $.emailTemplateSource.value;
-        } else if (window.__emailTemplateQuill) {
-            form.content = window.__emailTemplateQuill.root.innerHTML;
-        }
+        form.content = $.getEmailTemplateCurrentContent();
         $.emailTemplateSaving.value = true;
         try {
             var res = await api('/admin/email-templates/' + code, {
@@ -747,7 +1103,7 @@
                 tpl.version = res.template.version;
                 tpl.updated_at = res.template.updated_at;
             }
-            alert(res.message || '模板已保存');
+            alert(res.message || window.__i18n.t('admin.etpl.saved'));
         } catch (e) {
             alert(e.message);
         } finally {
@@ -761,11 +1117,7 @@
         var code = $.emailTemplateEditing.value;
         if (!code) return;
         var form = $.emailTemplateForm.value;
-        if ($.emailTemplateMode.value === 'source') {
-            form.content = $.emailTemplateSource.value;
-        } else if (window.__emailTemplateQuill) {
-            form.content = window.__emailTemplateQuill.root.innerHTML;
-        }
+        form.content = $.getEmailTemplateCurrentContent();
         try {
             var res = await api('/admin/email-templates/' + code + '/preview', {
                 method: 'POST',
@@ -783,7 +1135,7 @@
     // 恢复默认（常量注册表覆盖；正在编辑时同步刷新表单）
     $.resetEmailTemplate = async function(code) {
         var tpl = ($.emailTemplates.value || []).find(function(t) { return t.code === code; });
-        if (!(await window.customConfirm('确认将「' + (tpl ? tpl.name : code) + '」恢复为系统默认模板？当前修改将被覆盖。'))) return;
+        if (!(await window.customConfirm(window.__i18n.t('admin.etpl.resetConfirm1') + (tpl ? tpl.name : code) + window.__i18n.t('admin.etpl.resetTail2')))) return;
         try {
             var res = await api('/admin/email-templates/' + code + '/reset', {
                 method: 'POST'
@@ -794,7 +1146,7 @@
                 Vue.nextTick(function() { $.initEmailTemplateQuill(); });
             }
             await $.loadEmailTemplates();
-            alert(res.message || '已恢复默认');
+            alert(res.message || window.__i18n.t('settings.restoredDefault'));
         } catch (e) {
             alert(e.message);
         }
@@ -812,6 +1164,8 @@
             };
             // 同步模板样式选择（站点全局默认值）
             if (res.template) $.templateStyle.value = res.template;
+            // 同步系统默认语言
+            if (res.lang) $.langForm.value = res.lang;
         } catch (e) {
             console.error('加载站点配置失败:', e);
         }
@@ -833,11 +1187,28 @@
                 method: 'PUT',
                 body: JSON.stringify({ template: $.templateStyle.value })
             });
-            alert('模板样式保存成功，已全局生效');
+            alert(window.__i18n.t('admin.site.tplSaved'));
         } catch (e) {
-            alert('保存失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.templateStyleSaving.value = false;
+    };
+
+    // 系统默认语言：保存站点全局默认
+    $.saveLang = async function() {
+        $.langSaving.value = true;
+        try {
+            await api('/admin/site/config', {
+                method: 'PUT',
+                body: JSON.stringify({ lang: $.langForm.value })
+            });
+            // 立即应用语言（触发全站重渲染）
+            await window.__i18n.setLocale($.langForm.value);
+            alert(window.__i18n.t('settings.language.save') + ' ' + window.__i18n.t('common.success'));
+        } catch (e) {
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
+        }
+        $.langSaving.value = false;
     };
 
     $.saveSiteConfig = async function() {
@@ -847,11 +1218,11 @@
                 method: 'PUT',
                 body: JSON.stringify($.siteConfigForm.value)
             });
-            alert('站点配置保存成功');
+            alert(window.__i18n.t('admin.site.saveOk'));
             // 保存后刷新 LOGO 显示
             $.siteLogoText.value = $.siteConfigForm.value.logo_text || 'PVE 面板';
         } catch (e) {
-            alert('保存失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.siteConfigSaving.value = false;
     };
@@ -859,24 +1230,24 @@
     // 一键清除所有缓存（Redis + 内存），带二次确认
     $.clearAllCache = async function() {
         var confirmed = await window.customConfirm(
-            '⚠️ 危险操作：清除所有缓存\n' +
-            '此操作将立即清除以下数据：\n' +
-            '· 用户列表 / 套餐列表缓存\n' +
-            '· 设备状态 / 用户活跃状态缓存\n' +
-            '· JWT 黑名单（已登出的令牌将恢复可用）\n' +
-            '· 未读消息数 / 用户资料缓存\n' +
-            '· 站点配置缓存\n' +
-            '· 验证码 / 找回密码 Token\n' +
-            '· 登录限速计数器\n' +
-            '确认要继续吗？'
+            window.__i18n.t('admin.cache.title2') +
+            window.__i18n.t('admin.cache.clearList') +
+            window.__i18n.t('admin.cache.i1') +
+            window.__i18n.t('admin.cache.i2') +
+            window.__i18n.t('admin.cache.i3') +
+            window.__i18n.t('admin.cache.i4') +
+            window.__i18n.t('admin.cache.i5') +
+            window.__i18n.t('admin.cache.i6') +
+            window.__i18n.t('admin.cache.i7') +
+            window.__i18n.t('admin.cache.confirmGo')
         );
         if (!confirmed) return;
         $.cacheClearing.value = true;
         try {
             await api('/admin/cache/clear', { method: 'POST' });
-            alert('所有缓存已清除');
+            alert(window.__i18n.t('admin.cache.cleared'));
         } catch (e) {
-            alert('清除失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('admin.cache.clearFailed') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.cacheClearing.value = false;
     };
@@ -895,10 +1266,10 @@
         $.redisConfigSaving.value = true;
         try {
             await api('/admin/redis/config', { method: 'PUT', body: $.redisConfig.value });
-            alert('Redis 配置保存成功');
+            alert(window.__i18n.t('admin.redis.saveOk'));
             await $.loadRedisConfig();
         } catch (e) {
-            alert('保存失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.redisConfigSaving.value = false;
     };
@@ -917,10 +1288,10 @@
         $.logConfigSaving.value = true;
         try {
             await api('/admin/log/config', { method: 'PUT', body: $.logConfigForm.value });
-            alert('日志配置保存成功');
+            alert(window.__i18n.t('admin.logs.cfgSaveOk'));
             await $.loadLogConfig();
         } catch (e) {
-            alert('保存失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.logConfigSaving.value = false;
     };
@@ -936,7 +1307,7 @@
                 alert(result.message);
             }
         } catch (e) {
-            alert('测试失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('admin.pve.testFailed') + (e.message || window.__i18n.t('common.unknownError')));
         }
         $.redisTesting.value = false;
     };
@@ -959,7 +1330,7 @@
                 method: 'PUT',
                 body: JSON.stringify($.snapshotConfig.value)
             });
-            alert('快照配置已保存');
+            alert(window.__i18n.t('admin.snap.saveOk'));
         } catch (e) {
             alert(e.message);
         }
@@ -996,7 +1367,7 @@
                 method: 'PUT',
                 body: JSON.stringify($.backupConfigForm.value)
             });
-            alert('备份配置已保存');
+            alert(window.__i18n.t('admin.backup.saveOk'));
         } catch (e) {
             alert(e.message);
         }
@@ -1026,13 +1397,13 @@
 
     $.copyCdkCode = function(code) {
         navigator.clipboard.writeText(code);
-        alert('已复制');
+        alert(window.__i18n.t('common.copied'));
     };
 
     $.copyBatchCodes = async function() {
         var codes = $.cdkResult.value.map(function(c) { return c.code; }).join('\n');
         await navigator.clipboard.writeText(codes);
-        alert('已复制全部兑换码');
+        alert(window.__i18n.t('admin.cdk.copiedAll'));
     };
 
     $.exportCdkCsv = async function(batchId) {
@@ -1045,7 +1416,7 @@
             });
             if (!response.ok) {
                 var data = await response.json();
-                throw new Error(data.error || '导出失败');
+                throw new Error(data.error || window.__i18n.t('dash.log.exportFailed'));
             }
             var blob = await response.blob();
             var link = document.createElement('a');
@@ -1059,10 +1430,10 @@
     };
 
     $.cleanupCdk = async function() {
-        if (await window.customConfirm('确定要清理所有已使用和已过期的 CDK 吗？')) {
+        if (await window.customConfirm(window.__i18n.t('admin.cdk.cleanupConfirm'))) {
             try {
                 await api('/admin/cdk/cleanup', { method: 'POST' });
-                alert('清理完成');
+                alert(window.__i18n.t('admin.cdk.cleanupDone'));
                 await $.loadData();
             } catch (e) {
                 alert(e.message);
@@ -1071,7 +1442,7 @@
     };
 
     $.deleteCdk = async function(id) {
-        if (await window.customConfirm('确定要删除这个 CDK 吗？')) {
+        if (await window.customConfirm(window.__i18n.t('admin.cdk.deleteOneConfirm'))) {
             try {
                 await api('/admin/cdk/' + id, { method: 'DELETE' });
                 await $.loadData();
@@ -1084,7 +1455,7 @@
     $.batchDeleteCdk = async function() {
         var ids = $.selectedCdkIds.value;
         if (ids.length === 0) return;
-        if (await window.customConfirm('确定要删除选中的 ' + ids.length + ' 个 CDK 吗？')) {
+        if (await window.customConfirm(window.__i18n.t('admin.cdk.deleteSelPrefix') + ids.length + window.__i18n.t('admin.cdk.deleteSelSuffix'))) {
             try {
                 await api('/admin/cdk/batch-delete', {
                     method: 'POST',
@@ -1099,8 +1470,14 @@
     };
 
     $.toggleSelectAllCdk = function() {
-        if ($.selectedCdkIds.value.length === $.cdkList.value.length) {
-            $.selectedCdkIds.value = [];
+        // 分页后全选作用于当前页，选中可跨页累积
+        var allSelected = $.cdkList.value.length > 0 && $.cdkList.value.every(function(c) {
+            return $.selectedCdkIds.value.indexOf(c.id) !== -1;
+        });
+        if (allSelected) {
+            $.selectedCdkIds.value = $.selectedCdkIds.value.filter(function(id) {
+                return !$.cdkList.value.some(function(c) { return c.id === id; });
+            });
         } else {
             $.selectedCdkIds.value = $.cdkList.value.map(function(c) { return c.id; });
         }
@@ -1110,10 +1487,10 @@
     $.sendAdminMessage = async function() {
         var content = $.adminMsgForm.value.content ? $.adminMsgForm.value.content.trim() : '';
         if (!content) {
-            return alert('消息内容不能为空，请填写通知正文');
+            return alert(window.__i18n.t('admin.msg.emptyBody'));
         }
         if (content.length > 5000) {
-            return alert('内容超出字数上限，请精简文案或拆分发送');
+            return alert(window.__i18n.t('admin.msg.tooLong'));
         }
         $.adminSending.value = true;
         try {
@@ -1125,7 +1502,7 @@
             $.adminMsgForm.value = { scope: 'all', uids: [], type: '1', title: '', content: '', link_url: '' };
             $.msgSelectedUsers.value = [];
             $.msgUserSearch.value = '';
-            alert('消息发送成功');
+            alert(window.__i18n.t('admin.msg.sent'));
         } catch (e) {
             alert(e.message);
         } finally {
@@ -1134,7 +1511,7 @@
     };
 
     $.deleteMessage = async function(id) {
-        if (await window.customConfirm('确定要删除这条消息吗？')) {
+        if (await window.customConfirm(window.__i18n.t('admin.msg.deleteConfirm'))) {
             try {
                 await api('/messages/' + id, { method: 'DELETE' });
                 $.bsModalHide('messageDetailModal');
@@ -1165,9 +1542,9 @@
     $.savePayConfig = async function() {
         try {
             await api('/admin/pay/config', { method: 'PUT', body: $.payConfig.value });
-            alert('支付配置保存成功！');
+            alert(window.__i18n.t('admin.pay.saveOk'));
         } catch (e) {
-            alert('保存失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
         }
     };
 
@@ -1192,10 +1569,10 @@
         $.uapiproSaving.value = true;
         try {
             await api('/admin/uapipro/config', { method: 'PUT', body: $.uapiproConfig.value });
-            alert('UApiPro 配置保存成功！');
+            alert(window.__i18n.t('admin.uapi.saveOk'));
             await $.loadUapiproConfig();
         } catch (e) {
-            alert('保存失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
         } finally {
             $.uapiproSaving.value = false;
         }
@@ -1204,7 +1581,7 @@
     $.testUapiproIpQuery = async function() {
         var ip = ($.uapiproTestIp.value || '').trim();
         if (!ip) {
-            $.uapiproTestError.value = '请输入要查询的 IP 地址';
+            $.uapiproTestError.value = window.__i18n.t('admin.ipquery.enter');
             return;
         }
         $.uapiproTesting.value = true;
@@ -1214,7 +1591,7 @@
             var result = await api('/admin/uapipro/test', { method: 'POST', body: { ip: ip } });
             $.uapiproTestResult.value = result;
         } catch (e) {
-            $.uapiproTestError.value = e.message || '查询失败';
+            $.uapiproTestError.value = e.message || window.__i18n.t('admin.ipquery.failed');
         } finally {
             $.uapiproTesting.value = false;
         }
@@ -1265,11 +1642,11 @@
                 var max = parseInt(rule.max);
                 var windowSec = windowUIToSec(parseInt(rule.windowValue) || 0, rule.windowUnit);
                 if (!Number.isInteger(max) || max < 1 || max > 10000) {
-                    alert('规则「' + rule.label + '」限速次数须为 1-10000 的整数');
+                    alert(window.__i18n.t('admin.ratelimit.ruleQuote1') + rule.label + window.__i18n.t('admin.ratelimit.badMax2'));
                     return;
                 }
                 if (!Number.isInteger(windowSec) || windowSec < 1 || windowSec > 86400) {
-                    alert('规则「' + rule.label + '」时间窗须在 1 秒 ~ 24 小时之间');
+                    alert(window.__i18n.t('admin.ratelimit.ruleQuote1') + rule.label + window.__i18n.t('admin.ratelimit.badWindow2'));
                     return;
                 }
                 rule.max = max;
@@ -1284,10 +1661,10 @@
                 method: 'PUT',
                 body: JSON.stringify({ master_enabled: !!cfg.master_enabled, categories: cfg.categories, restore_default: isRestoreDefault })
             });
-            alert('限速配置保存成功');
+            alert(window.__i18n.t('admin.ratelimit.saveOk'));
             await $.loadRateLimitConfig();
         } catch (e) {
-            alert('保存失败: ' + (e.message || '未知错误'));
+            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
         } finally {
             $.rateLimitSaving.value = false;
         }
@@ -1356,8 +1733,8 @@
                 headers: { 'Authorization': 'Bearer ' + (token || '') }
             });
             if (!resp.ok) {
-                var err = await resp.json().catch(function() { return { error: '导出失败' }; });
-                throw new Error(err.error || '导出失败');
+                var err = await resp.json().catch(function() { return { error: window.__i18n.t('dash.log.exportFailed') }; });
+                throw new Error(err.error || window.__i18n.t('dash.log.exportFailed'));
             }
             var blob = await resp.blob();
             var url = URL.createObjectURL(blob);
@@ -1367,7 +1744,7 @@
             a.click();
             URL.revokeObjectURL(url);
         } catch (e) {
-            alert('导出失败: ' + (e.message || ''));
+            alert(window.__i18n.t('admin.fin.exportFailedMsg') + (e.message || ''));
         }
     };
 
@@ -1413,7 +1790,7 @@
             var resp = await fetch('/api/admin/orders/export?' + params.toString(), {
                 headers: { 'Authorization': 'Bearer ' + (token || '') }
             });
-            if (!resp.ok) { alert('导出失败'); return; }
+            if (!resp.ok) { alert(window.__i18n.t('dash.log.exportFailed')); return; }
             var blob = await resp.blob();
             var url = URL.createObjectURL(blob);
             var a = document.createElement('a');
@@ -1513,57 +1890,57 @@
     };
 
     $.deleteOsSwitchLog = async function(id) {
-        if (!(await window.customConfirm('确认删除日志 #' + id + '？'))) return;
+        if (!(await window.customConfirm(window.__i18n.tFormat('common.confirmDelete', '#' + id)))) return;
         try {
             var res = await api('/admin/os-switch-logs/' + id, { method: 'DELETE' });
             if (res && res.success) {
                 $.loadOsSwitchLogs($.osSwitchLogPage.value);
             } else {
-                alert(res.error || '删除失败');
+                alert(res.error || window.__i18n.t('admin.logs.deleteFailed'));
             }
         } catch (e) {
-            alert('删除请求失败');
+            alert(window.__i18n.t('admin.logs.deleteReqFailed'));
         }
     };
 
     $.batchDeleteOsSwitchLog = async function() {
         var ids = $.osSwitchLogSelected.value;
-        if (ids.length === 0) { alert('请先选择要删除的日志'); return; }
-        if (!(await window.customConfirm('确认删除选中的 ' + ids.length + ' 条日志？'))) return;
+        if (ids.length === 0) { alert(window.__i18n.t('admin.logs.selectFirst')); return; }
+        if (!(await window.customConfirm(window.__i18n.tFormat('admin.logs.confirmBatch', ids.length)))) return;
         try {
             var res = await api('/admin/os-switch-logs/batch-delete', {
                 method: 'POST',
                 body: JSON.stringify({ ids: ids })
             });
             if (res && res.success) {
-                alert(res.message || '已删除');
+                alert(res.message || window.__i18n.t('admin.logs.deleted'));
                 $.osSwitchLogSelected.value = [];
                 $.loadOsSwitchLogs($.osSwitchLogPage.value);
             } else {
-                alert(res.error || '批量删除失败');
+                alert(res.error || window.__i18n.t('admin.logs.batchFailed'));
             }
         } catch (e) {
-            alert('请求失败');
+            alert(window.__i18n.t('admin.logs.requestFailed'));
         }
     };
 
     $.clearAllOsSwitchLog = async function() {
-        if (!(await window.customConfirm('⚠️ 高危操作！确认清空所有切换日志（运行中和需介入的日志将被保留）？'))) return;
-        var confirmStr = await window.customPrompt('请输入 CLEAR_ALL_OS_SWITCH_LOGS 确认清空：');
-        if (confirmStr !== 'CLEAR_ALL_OS_SWITCH_LOGS') { alert('确认串不正确'); return; }
+        if (!(await window.customConfirm(window.__i18n.t('admin.logs.clearOsSwitchConfirm')))) return;
+        var confirmStr = await window.customPrompt(window.__i18n.t('admin.logs.clearOsSwitchPrompt'));
+        if (confirmStr !== 'CLEAR_ALL_OS_SWITCH_LOGS') { alert(window.__i18n.t('admin.logs.confirmStrWrong')); return; }
         try {
             var res = await api('/admin/os-switch-logs/clear', {
                 method: 'POST',
                 body: JSON.stringify({ confirm: confirmStr })
             });
             if (res && res.success) {
-                alert(res.message || '已清空');
+                alert(res.message || window.__i18n.t('admin.logs.cleared'));
                 $.loadOsSwitchLogs(1);
             } else {
-                alert(res.error || '清空失败');
+                alert(res.error || window.__i18n.t('admin.logs.clearFailed'));
             }
         } catch (e) {
-            alert('请求失败');
+            alert(window.__i18n.t('admin.logs.requestFailed'));
         }
     };
 })();

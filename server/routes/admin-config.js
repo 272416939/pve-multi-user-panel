@@ -9,6 +9,7 @@ const { sendTemplateEmail } = require('../services/email-template');
 const { loadSentRemindersFromDb, checkExpiredVms, checkExpiredLxc } = require('../services/expiry-check');
 const pkg = require('../../package.json');
 const { safeError } = require('../utils/safe-error');
+const { isValidEmail } = require('../utils/email-validate');
 const { maskSecret, isMasked, encrypt, decrypt } = require('../utils/crypto-utils');
 const { queryIpLocation } = require('../services/ip-location');
 const { checkConfiguredRateLimit, invalidateRateLimitCache } = require('../middleware/rate-limiter');
@@ -104,9 +105,18 @@ router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
 
 router.post('/admin/smtp/test', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        // V6-M4 修复：真外呼 SMTP 发信端点必须专项限速（防会话被窃后当 SPAM 放大器；先例 pve_test）
+        const smtpTestLimit = await checkConfiguredRateLimit('smtp_test', 'ratelimit:smtp-test:' + req.user.id);
+        if (!smtpTestLimit.allowed) {
+            return res.status(429).json({ error: '测试邮件发送过于频繁，请稍后再试', retryAfter: smtpTestLimit.retryAfter });
+        }
         const { testEmail } = req.body;
         if (!testEmail) {
             return res.status(400).json({ error: '请提供测试邮箱' });
+        }
+        // 测试邮箱格式校验（单一来源 email-validate.js：防 SMTP RCPT 拒收浪费外呼配额）
+        if (!isValidEmail(testEmail)) {
+            return res.status(400).json({ error: '邮箱格式不正确' });
         }
         
         // 测试前失效缓存：确保用最新保存的 SMTP 配置发送（而不是旧 transporter）
@@ -584,12 +594,14 @@ router.get('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         var loginTitle = await getConfig('site:login_title') || 'PVE Panel';
         var registerEnabled = await getConfig('register:enabled') || '0';
         var template = await getConfig('site:template') || 'default';
+        var lang = await getConfig('site:lang') || 'zh-CN';
         res.json({
             name: name,
             logo_text: logoText,
             login_title: loginTitle,
             register_enabled: registerEnabled === '1',
-            template: template
+            template: template,
+            lang: lang
         });
     } catch (e) {
         console.error('[admin] site config get:', e.message);
@@ -601,7 +613,7 @@ router.get('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
 router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var setConfig = db.config.set;
-        var { name, logo_text, login_title, register_enabled, template } = req.body;
+        var { name, logo_text, login_title, register_enabled, template, lang } = req.body;
         // 保存前取旧配置（审计 diff 用）
         var getSiteSnapshot = async function () {
             return {
@@ -609,7 +621,8 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
                 logo_text: (await db.config.get('site:logo_text')) || 'PVE 面板',
                 login_title: (await db.config.get('site:login_title')) || 'PVE Panel',
                 register_enabled: (await db.config.get('register:enabled')) === '1',
-                template: (await db.config.get('site:template')) || 'default'
+                template: (await db.config.get('site:template')) || 'default',
+                lang: (await db.config.get('site:lang')) || 'zh-CN'
             };
         };
         var oldSite = await getSiteSnapshot();
@@ -635,14 +648,26 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
                 return res.status(400).json({ error: '界面模板参数不合法' });
             }
         }
+        if (lang !== undefined) {
+            // 动态白名单校验（系统语言 + 自定义语言），禁止非法值入库
+            const { isSupportedLocale } = require('../services/i18n');
+            if (typeof lang !== 'string' || !(await isSupportedLocale(lang))) {
+                return res.status(400).json({ error: '语言参数不合法' });
+            }
+        }
         if (name !== undefined) await setConfig('site:name', name);
         if (logo_text !== undefined) await setConfig('site:logo_text', logo_text);
         if (login_title !== undefined) await setConfig('site:login_title', login_title);
         if (register_enabled !== undefined) await setConfig('register:enabled', register_enabled ? '1' : '0');
         if (template !== undefined) await setConfig('site:template', template);
+        if (lang !== undefined) await setConfig('site:lang', lang);
         // 清除站点配置缓存（Redis + 进程内存），确保下次请求重新加载
         var redis = require('../api/redis').getRedisClient();
-        if (redis) { try { await redis.del('site_config'); } catch (e) {} }
+        if (redis) {
+            try { await redis.del('site_config'); } catch (e) {}
+            // 登录页整页渲染缓存同样由站点配置渲染，TTL 已延长到 1h，必须同步失效
+            try { await redis.del('page:login'); } catch (e) {}
+        }
         if (req.app.locals.siteConfigCache) {
             req.app.locals.siteConfigCache.data = null;
             req.app.locals.siteConfigCache.expires = 0;
@@ -650,12 +675,19 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         // 操作审计：更新站点设置（DB 新旧值字段级 diff）
         try {
             const { auditLog } = require('../utils/audit-log');
-            var changes = buildFieldDiff(oldSite, await getSiteSnapshot(), [
+            const { getLocaleName } = require('../services/i18n');
+            var newSite = await getSiteSnapshot();
+            // 语言显示名动态解析（系统+自定义）；fmt 由 audit-diff 同步调用，先解析成映射
+            var langNames = {};
+            if (oldSite && oldSite.lang) langNames[oldSite.lang] = (await getLocaleName(oldSite.lang)) || oldSite.lang;
+            if (newSite && newSite.lang) langNames[newSite.lang] = (await getLocaleName(newSite.lang)) || newSite.lang;
+            var changes = buildFieldDiff(oldSite, newSite, [
                 { key: 'name', label: '站点名称' },
                 { key: 'logo_text', label: 'LOGO文字' },
                 { key: 'login_title', label: '登录页标题' },
                 { key: 'register_enabled', label: '开放注册', bool: true },
-                { key: 'template', label: '界面模板', fmt: function (v) { return v === 'saas' ? 'SAAS企业风' : (v === 'default' ? '赛博霓虹' : v); } }
+                { key: 'template', label: '界面模板', fmt: function (v) { return v === 'saas' ? 'SAAS企业风' : (v === 'default' ? '赛博霓虹' : v); } },
+                { key: 'lang', label: '系统默认语言', fmt: function (v) { return langNames[v] || v; } }
             ]);
             if (changes.length) {
                 await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.site', resourceType: 'config', resourceId: 'site', details: '更新站点设置；变更:' + changes.join(', '), req });
@@ -714,12 +746,13 @@ router.put('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, r
         if (username.length > 64) return res.status(400).json({ error: '用户名过长' });
         // 保存前取旧配置（审计 diff 用；密码只记「已更新」标记，不记录原文）
         var oldIkuai = await db.config.getIkuai();
-        var pwdChanged = password !== undefined && !isMasked(password);
+        // V6-I4 修复：空字符串视为未修改（保留旧密码），与 PVE 配置对称
+        var pwdChanged = password !== undefined && password !== '' && !isMasked(password);
         // 脱敏值跳过，不覆盖原值
         var configToSave = {
             host: host,
             username: username,
-            password: (password !== undefined && !isMasked(password)) ? password : undefined,
+            password: (password !== undefined && password !== '' && !isMasked(password)) ? password : undefined,
             strict_tls: !!strict_tls
         };
         await db.config.setIkuai(configToSave);
@@ -785,18 +818,23 @@ router.get('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
 router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var { host, api_token, ssh_host, ssh_port, ssh_user, ssh_password, strict_tls } = req.body;
+        // V6-I3 修复：SSH 端口范围校验（1-65535，非法/缺省回退 22）
+        var parsedPort = parseInt(ssh_port);
+        if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65535) parsedPort = 22;
         // 保存前取旧配置（审计 diff 用；token/SSH 密码只记「已更新」标记，不记录原文）
         var oldPve = await db.config.getPve();
-        var tokenChanged = api_token !== undefined && !isMasked(api_token);
-        var sshPwdChanged = ssh_password !== undefined && !isMasked(ssh_password);
+        // V6-I4 修复：空字符串视为未修改（保留旧凭据）——isMasked('') 为 false，此前空串会
+        // 加密空值入库覆盖原密码导致连接失败；显式清空应走其他途径而非空串覆盖
+        var tokenChanged = api_token !== undefined && api_token !== '' && !isMasked(api_token);
+        var sshPwdChanged = ssh_password !== undefined && ssh_password !== '' && !isMasked(ssh_password);
         // 脱敏值跳过，不覆盖原值
         var configToSave = {
             host: host || '',
-            api_token: (api_token !== undefined && !isMasked(api_token)) ? api_token : undefined,
+            api_token: (api_token !== undefined && api_token !== '' && !isMasked(api_token)) ? api_token : undefined,
             ssh_host: ssh_host || '',
-            ssh_port: parseInt(ssh_port) || 22,
+            ssh_port: parsedPort,
             ssh_user: ssh_user || 'root',
-            ssh_password: (ssh_password !== undefined && !isMasked(ssh_password)) ? ssh_password : undefined,
+            ssh_password: (ssh_password !== undefined && ssh_password !== '' && !isMasked(ssh_password)) ? ssh_password : undefined,
             strict_tls: !!strict_tls
         };
         await db.config.setPve(configToSave);
