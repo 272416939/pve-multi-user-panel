@@ -634,14 +634,15 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             const conflict = (await db.portForwards.getByExternalPort(external_port)).filter(r => r.id !== id);
             if (conflict.length > 0) return res.status(400).json({ error: '外网端口已被占用，请更换', code: 'EXT_PORT_TAKEN' });
         }
-        // 检测端口/IP/类型/设备 ID 变更，需要同步爱快（类型或设备 ID 变化会导致 ikuai comment 变化）
+        // 检测端口/IP/协议/类型/设备 ID 变更，需要同步爱快（类型或设备 ID 变化会导致 ikuai comment 变化；协议变化必须同步，否则面板与爱快协议分叉）
         const portChanged = external_port && Number(external_port) !== Number(existing.external_port);
         const ipChanged = ip && ip !== existing.ip;
         const internalChanged = internal_port && Number(internal_port) !== Number(existing.internal_port);
+        const protocolChanged = protocol !== undefined && protocol !== null && String(protocol).toLowerCase() !== String(existing.protocol || 'tcp').toLowerCase();
         const typeChanged = type && type !== existing.type;
         const vmIdChanged = effectiveType === 'vm' && String(effectiveVmId) !== String(existing.vm_id || '');
         const ctIdChanged = effectiveType === 'lxc' && String(effectiveCtId) !== String(existing.ct_id || '');
-        const needIkuaiSync = ipChanged || portChanged || internalChanged || typeChanged || vmIdChanged || ctIdChanged;
+        const needIkuaiSync = ipChanged || portChanged || internalChanged || protocolChanged || typeChanged || vmIdChanged || ctIdChanged;
         let newIkuaiIds = parseIkuaiIds(existing.ikuai_id);
         if (needIkuaiSync) {
             await db.portForwards.update(id, { sync_status: 'pending' });
