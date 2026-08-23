@@ -98,6 +98,26 @@ window.__admin.i18nPage = (function () {
         Object.keys(dirty).forEach(function (k) { delete dirty[k]; });
     }
 
+    // 放弃全部未保存草稿（底部浮动保存条「取消」）
+    function clearDrafts() {
+        clearDirty();
+    }
+
+    // 回到顶部浮钮（页面滚动超过一屏显示；admin 页加载即注册全局监听，i18n 页内生效）
+    var showTop = ref(false);
+    window.addEventListener('scroll', function () {
+        var y = window.scrollY || document.documentElement.scrollTop || 0;
+        showTop.value = y > 400;
+    }, { passive: true });
+
+    function scrollTop() {
+        try {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (e) {
+            window.scrollTo(0, 0);
+        }
+    }
+
     // 待翻译统计（当前语言）：待翻译 = is_new && !override；快照词条视为已完成
     // 用分组元数据聚合（全量口径，非已加载分页条目）
     var pendingInfo = computed(function () {
@@ -594,6 +614,9 @@ window.__admin.i18nPage = (function () {
         fieldValue: fieldValue,
         onFieldInput: onFieldInput,
         rowOverridable: rowOverridable,
+        clearDrafts: clearDrafts,
+        showTop: showTop,
+        scrollTop: scrollTop,
         restoreKey: restoreKey,
         openCreateModal: openCreateModal,
         createLang: createLang,

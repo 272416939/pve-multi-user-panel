@@ -37,8 +37,8 @@
             </template>
         </div>
 
-        <!-- 语言选择 + 自定义语言操作 + 搜索 -->
-        <div class="card mb-3">
+        <!-- 语言选择 + 自定义语言操作 + 搜索（吸顶：滚动时语言/搜索/开关随时可用） -->
+        <div class="card mb-3 i18n-langbar">
             <div class="card-body">
                 <div class="row g-2 align-items-end">
                     <div class="col-auto">
@@ -72,7 +72,7 @@
                 <span class="visually-hidden">{{ t('common.loading') }}</span>
             </div>
         </div>
-        <div v-else>
+        <div v-else class="i18n-groups-list">
             <div v-for="cat in i18nPage.groups.value" :key="cat.key" class="notification-group mb-3">
                 <div class="notification-group-header d-flex align-items-center gap-2 p-3" @click="i18nPage.toggleGroup(cat.key)" :title="cat.desc">
                     <span class="notification-group-icon">
@@ -151,6 +151,20 @@
                 {{ (i18nPage.search.value || i18nPage.showOnlyPending.value) ? t('admin.i18n.emptySearch') : t('admin.i18n.empty') }}
             </div>
         </div>
+
+        <!-- 底部浮动保存条（有未保存草稿时出现，任何滚动位置可直接保存/放弃） -->
+        <div v-if="i18nPage.dirtyCount.value > 0" class="i18n-savebar">
+            <span class="i18n-savebar-count">{{ tFormat('admin.i18n.dirtyBar', i18nPage.dirtyCount.value) }}</span>
+            <div class="d-flex gap-2">
+                <pv-button variant="outline" size="lg" @click="i18nPage.clearDrafts()">{{ t('common.cancel') }}</pv-button>
+                <pv-button variant="glass" size="lg" :disabled="i18nPage.saving.value" @click="i18nPage.save()">{{ i18nPage.saving.value ? t('common.saving') : t('admin.i18n.save') }}</pv-button>
+            </div>
+        </div>
+
+        <!-- 回到顶部浮钮（滚动超过一屏出现） -->
+        <button v-if="i18nPage.showTop.value" class="i18n-top-btn" :title="t('admin.i18n.backToTop')" @click="i18nPage.scrollTop()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+        </button>
 
         <!-- 新建语言弹窗 -->
         <Teleport to="body">
