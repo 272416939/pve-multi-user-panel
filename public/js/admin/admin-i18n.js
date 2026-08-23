@@ -208,6 +208,10 @@ window.__admin.i18nPage = (function () {
     // ==================== 数据加载 ====================
 
     // 进入/切换语言/刷新路径统一入口（core.js watch + onMounted 同源调用，规范第四节）
+    // 上次 load 的语言（判定是否发生了语言切换——切换语言时展开状态重置收起，
+    // 不跨语言复用展开；保存/刷新等语言未变场景保持展开并重拉当前分组）
+    var lastLoadedCode = null;
+
     async function load() {
         loading.value = true;
         try {
@@ -219,6 +223,8 @@ window.__admin.i18nPage = (function () {
                 selectedCode.value = 'zh-CN';
             }
             var code = selectedCode.value;
+            var codeChanged = lastLoadedCode !== null && lastLoadedCode !== code;
+            lastLoadedCode = code;
             // 拉分组元数据（无 cat/kw → groups；轻量，不返回条目）
             var metaPromise = api('/admin/i18n/languages/' + encodeURIComponent(code) + '/entries' + (showOnlyPending.value ? '?pending=1' : '')).then(function (d) {
                 groupsMeta.value = (d && d.groups) || [];
@@ -239,11 +245,16 @@ window.__admin.i18nPage = (function () {
             langSwitchChecked.value = selectedEnabled.value; // 切语言后开关跟随新语言的启用状态
             clearDirty();
             resetLoaded(); // 清分页/搜索缓存（语言/模式变了）
-            // 已展开的分组（跨语言复用展开状态）重拉当前语言第 1 页；搜索态恢复搜索结果
-            var cats = [];
-            Object.keys(collapsed).forEach(function (k) { if (collapsed[k] === false) cats.push(k); });
-            cats.forEach(function (cat) { ensureLoaded(cat); });
-            if (searchMode.value) doSearch(1);
+            if (codeChanged) {
+                // 切换语言：展开状态重置为缺省收起（分组默认收起，按需点开）
+                resetCollapsed();
+            } else {
+                // 语言未变（保存/刷新）：已展开的分组重拉当前语言第 1 页；搜索态恢复搜索结果
+                var cats = [];
+                Object.keys(collapsed).forEach(function (k) { if (collapsed[k] === false) cats.push(k); });
+                cats.forEach(function (cat) { ensureLoaded(cat); });
+                if (searchMode.value) doSearch(1);
+            }
             await summaryPromise;
         } catch (e) {
             console.error('加载 i18n 条目失败', e && e.message);
