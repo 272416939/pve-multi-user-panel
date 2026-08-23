@@ -1,5 +1,56 @@
 # Changelog
 
+## [3.4.0] - 2026-08-23
+
+**全站国际化（7 语言）为主题的中型版本**：41 个提交（16 feat + 19 fix + 4 perf + 1 refactor + 1 chore），123 文件 +22305/-3751。
+
+### Added（16 个 feat）
+
+**🌍 全站国际化 i18n（主体）**
+- **feat(i18n): 接入全站国际化（7 语言）+ 站点/用户语言设置**（`28bba00` 起系列 8 个 feat）
+  - 7 语言：zh-CN（母本回退）/ zh-TW / en / de / ja / ko / fr，最终 **2170 词条 ×7 语言** key 集合完全一致
+  - 覆盖：登录页、用户 dashboard 全部弹窗（编辑 VM/LXC/快照/备份/下单/子网/系统切换）、用户中心（安全/2FA/备忘录/充值/消息）、管理后台全部页面与设置 Tab（+213 key）、总览区块、交易流水/订单/限速/存储分组
+  - 架构：`public/js/shared/i18n.js`（`t()`/`tFormat()` + Vue.ref 响应式）+ `i18n-user-init.js`（用户偏好自动应用）+ 7 语言 JSON 字典（缺失 key 回退 zh-CN）
+  - FOUC 三层修复：localStorage 缓存 + `<html>` 静态 `i18n-pending` 类（CSP 兼容）+ 3 秒兜底揭示，语言切换刷新零闪烁
+  - 限速设置 11 分类 47 规则 105 key 程序化生成（零手抄）
+- **feat(admin): i18n 管理页**——「其他选项」一级标签 + **自定义语言创建**（基准语言快照）+ **词条覆盖在线编辑**（`212a279`）
+- **feat(i18n): 待翻译工作流**——分类翻译进度 + 侧边栏双红点 + 待翻译词条空框提示（`ab3e166`）+ 顶部「有待翻译语言」清单 chip 点选直达（`cab5af0`）
+- **feat(ui): 分页与页脚统一**——CDK 列表分页 + 用户中心消息翻页卡片化 + 移除页脚版本号（`a7bf317`）；pv-pagination 公共组件接入 t() 全站统一
+
+**📧 邮件模板富文本编辑器排版增强**
+- **feat(email-template): 排版按钮**——对齐（居中/右/两端）/缩进/字号按钮（`62eab5c`）
+- **feat(email-template): 插入按钮链接 + 链接气泡中文化 + 边界避让**（`55436a5`）+ 变量快捷插入面板 + 按钮链接专用弹窗（`95f3d87`）+ 已有按钮链接回显原位更新（`14b21f2`）+ 链接弹窗文字编辑与空白处插入（`a191134`）
+
+### Changed
+- **perf(auth): 1000 并发注册抗压三件套**（`4e757bc`）——bcryptjs 主线程冻结全站换**原生 bcrypt**（登录停顿 5053ms→23ms，双向兼容）+ `UV_THREADPOOL_SIZE` 扩容 + SMTP 失败分类不关全池 + send-code 并发闸 + 找回密码防枚举对称通知邮件
+- **refactor(email): 密码重置与邮箱验证邮件迁移队列**（`c0dc9b6`）——同步路径收敛至「失败需即时反馈」两类（仅注册验证码/SMTP 测试）
+- **perf(cache): 前端数据缓存 TTL 延长至 1h**（`4234816`）——`FRONTEND_CACHE_TTL=3600` 单一来源覆盖 9 类缓存（profile/site_config/vm_packages/disk_specs 等）；失效链路补 4 处缺口（新建 `profile-cache.js` 共享 invalidateProfile）；启动**定向清理** 8 命名空间（严禁 clearAll）；负缓存 TTL 封顶 `min(主TTL/4, 60s)`；实测命中率提升（profile 11.7ms→4.0ms）
+- **perf(i18n): 翻译缓存语义重构**（`f2b002a`/`905957a`）——「启动预热 + 无 TTL 长缓存 + 写时精确失效」，重复进管理页零回源
+- fix(email): 邮箱校验收紧单一来源（`0b7e0e1`，新增 `email-validate.js`）+ 队列统计覆盖同步发送失败
+- chore(test): check-coupling.js 归位 test/（本地测试不入库，`011e48a`）
+
+### Fixed（i18n 改造过程修复 14 项 + 其他）
+- **fix(i18n): 全量核对修正 26 个被污染/错译的翻译 key ×7 语言**（`c2ad546`）+ 第二轮 4 处错译 + 嵌套 mustache 致端口转发页白屏（`a21d954`）+ 磁盘页占位符/串位污染（`4e2551b`）+ 挂载磁盘下拉占位污染（`84904eb`）+ 限速设置总开关卡（`b1b9df5`）
+- **fix(i18n): 侧边栏超长文案溢出**（`cb5ee0e`，cv 181）——省略号三件套（min-width:0 关键）+ title 三途径 + 按 SAAS 实测槽位精简 en/fr/de
+- **fix(i18n): i18n.js LOCALE_NAMES 加载期自引用致登录页白屏**（`dc473fb`）+ 模板标签破损整页 SyntaxError（`0e05369`）
+- **fix(i18n): i18n 管理页体验**——六项优化（徽标明暗适配/单条恢复/保存回显/中文母本/分类描述/加载提速，`834177d`）+ 分类描述响应式（`72e2ccb`）+ 待翻译提示定点与输入框不预填（`4b1c8f6`）+ 补 zh-CN 缺失 pendingLangs key（`a198493`）
+- **fix(admin): i18n 横幅左对齐 + header 刷新闪现裸 t() + admin 主题切换按钮失效**（`dc9603a`，cv 204）——静态 EJS partial 禁止裸 `{{ }}` Vue 表达式（data-i18n 替代）+ mount 后补调 initThemeToggle
+- **fix: 头像上传恒 500**（`d24ed47`）——multer fileFilter 扩展名误用 mimetype 正则（全拒→500），非法输入改返 400
+- **fix(admin): 限速子标签首次点击无选中遮罩**（`6f33143`）——补响应式 :class 绑定
+
+### Security（V6 全面安全审查，`e5849b8`，16 文件 +150/-47）
+- 回归结论：V5 基线后 142 提交复查，**历次修复无回归**
+- **H1（高危）**：`/auth/refresh` 未校验 `record.revoked`——登出/改密后 token 可续期复活会话 → 补校验一律 401
+- **H2（高危）**：2FA 第一步（仅验密码）即发 refresh_token 绕过 2FA → 第一步零凭证下发，会话记录移至第二步并补归属校验
+- **M1-M4（中危）**：恢复码路径会话永不过期（补 remember/session_deadline/last_active_at）；改密无强度校验（`isStrongPassword()` 5 处统一）；邮件正文变量不转义（默认实体转义 + html:true 白名单）；外呼端点缺限速（smtp_test/email_template_op，规则 44→46）
+- **L1-L4/I1-I4（低危/信息级 8 项）**：预览 shell 参数白名单、CNAME label 白名单、支付余额 `FOR UPDATE`、强制改密期间 profile 403、WS released 防重复释放、deleting 态 409、ssh_port 1-65535 校验、空字符串凭据不覆盖
+
+### Notes
+- **生产部署必须**：`npm install`（原生 bcrypt 依赖）+ `pm2 restart`（含启动定向清缓存）
+- 新增数据表：`i18n_languages`、`i18n_entries`（首次启动自动迁移）
+- 验证：mocha 全量 **563 passing**、check-coupling 通过、7 语言 key 集合一致性 PASS、三端英文冒烟零泄漏、真实 HTTP E2E 9 断言全过（V6）
+- 缓存版本 v152 → v204（i18n 前端分批下发）
+
 ## [3.3.6] - 2026-08-19
 
 ### Added

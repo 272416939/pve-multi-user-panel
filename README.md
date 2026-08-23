@@ -4,7 +4,7 @@
 
 **Proxmox VE 多用户管理面板 · 现代化科技风格界面**
 
-[![Version](https://img.shields.io/badge/version-v3.3.6-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
+[![Version](https://img.shields.io/badge/version-v3.4.0-8b5cf6?style=flat-square&labelColor=1a1740)](https://github.com/272416939/pve-multi-user-panel)
 [![Node](https://img.shields.io/badge/Node.js-18%2B-22c55e?style=flat-square&labelColor=1a1740&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![Vue](https://img.shields.io/badge/Vue-3-4fc08d?style=flat-square&labelColor=1a1740&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-00758f?style=flat-square&labelColor=1a1740&logo=mysql&logoColor=white)](https://www.mysql.com/)
@@ -149,6 +149,16 @@
 | 66 | **重置 IP 适配子网** | 重置 IP 兼容私有网络（未绑定拦截/static 池内校验/LXC 网关用子网网关），并开放到用户侧 |
 | 67 | **网络管理菜单** | Admin 一级菜单「网络管理」：端口转发管理 + 私有网络管理页（只读表格/搜索/分页/绑定设备统计） |
 
+### 🌍 全站国际化 i18n（v3.4.0 新增）
+| # | 功能 | 说明 |
+|---|------|------|
+| 76 | **7 语言全站国际化** | zh-CN（母本回退）/ zh-TW / en / de / ja / ko / fr，**2170 词条 ×7 语言**全覆盖：登录页、用户 dashboard、用户中心、管理后台全部页面与弹窗 |
+| 77 | **语言切换** | 站点级默认语言（Admin 设置）+ 个人偏好语言（用户中心）双级配置，localStorage 缓存 + FOUC 三层修复（i18n-pending 静态类 + CSP 兼容）切换刷新零闪烁 |
+| 78 | **i18n 管理后台** | Admin「其他选项 > i18n 管理」：**自定义语言**（基于任意基准语言快照创建）+ **词条覆盖在线编辑**（7 基线语言只读，自定义语言可编辑覆盖任意 key） |
+| 79 | **待翻译工作流** | 新建语言自动标记待翻译 key：分类翻译进度条 + 词条空框提示 + 侧边栏双红点 + 顶部「有待翻译语言」清单 chip 点选直达 |
+| 80 | **长缓存 + 写时失效** | 翻译字典 cache-store 无 TTL 长缓存：启动预热 + 写时精确失效（新建语言立即缓存/改名只清列表），重复进管理页零回源 |
+| 81 | **分页/页脚统一** | pv-pagination 公共组件接入 t() 全站统一翻译；CDK 列表分页 + 用户中心消息翻页卡片化 + 移除页脚版本号 |
+
 ### 🗄️ 基础设施（v1.8.0 新增）
 | # | 功能 | 说明 |
 |---|------|------|
@@ -159,7 +169,7 @@
 | 72 | **EJS 模板缓存** | 编译后缓存在内存，`NODE_ENV=production` 自动启用 |
 | 73 | **Gzip 压缩** | compression 中间件，所有响应压缩 60-80% |
 | 74 | **资源预加载** | preconnect / dns-prefetch / script defer 优化首屏加载 |
-| 75 | **安全审计体系** | 五轮安全审计（V1~V5）全量修复：敏感操作二次验证、到期资源拦截、支付事务化、CSV 防注入、限速可配置化等 |
+| 75 | **安全审计体系** | 六轮安全审计（V1~V6）全量修复：敏感操作二次验证、到期资源拦截、支付事务化、CSV 防注入、限速可配置化、refresh revoked 校验/2FA 绕过修复（V6，v3.4.0）等 |
 
 ---
 
@@ -291,36 +301,37 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 │   ├── middleware/
 │   │   ├── auth.js            # JWT 认证 + 权限中间件（算法固定 HS256）
 │   │   └── rate-limiter.js    # 统一速率限制（Redis/内存双模式）
-	│   ├── utils/                 # 工具模块
-	│   │   ├── debug.js
-	│   │   ├── pve-rate.js
-	│   │   ├── cache.js           # TTL Map 进程内缓存
-	│   │   ├── cache-store.js     # Redis/内存双模式缓存存储
-	│   │   ├── console-session.js # VNC/终端一次性 session 管理
-	│   │   ├── email.js           # 邮件发送（createEmailTemplate 统一模板）
-	│   │   ├── token.js
-	│   │   ├── token-store.js     # refresh token 持久化
-	│   │   ├── site-url.js
-	│   │   ├── cdk-generator.js
-	│   │   ├── order-utils.js     # 订购工具（扣余额/计算金额/affinity）
-	│   │   ├── date.js            # 时区/格式化工具
-	│   │   ├── random-name.js     # VM/LXC 随机名称
-	│   │   ├── safe-error.js      # 统一错误脱敏（safeError）
-	│   │   ├── username-blacklist.js
-	│   │   ├── crypto-utils.js    # AES-256-GCM 加密工具（JWT_SECRET 派生等）
-	│   │   ├── disk-validation.js # 💾 磁盘校验纯函数（白名单/卷名/系统盘判定）
-	│   │   ├── disk-billing.js    # 💾 磁盘计费纯函数（购买/续费/扩容金额）
-	│   │   ├── logger.js          # 统一日志工具
-	│   │   ├── audit-log.js       # 📋 操作日志埋点（审计）
-	│   │   ├── password-hash.js   # bcryptjs 密码哈希
-	│   │   ├── csv.js            # 🔒 CSV 导出统一转义（防公式注入 =+-@）
-	│   │   ├── message-sanitize.js # 🔒 站内信服务端净化（DOMPurify 等价）
-	│   │   └── with-transaction.js # MySQL 事务封装
-	│   ├── constants.js           # ⚙️ 全局共享常量（周期/磁盘/订单/模板/支付，单一来源）
-		│   ├── routes/                # 路由模块（21 个）
+		│   ├── utils/                 # 工具模块
+		│   │   ├── debug.js
+		│   │   ├── pve-rate.js
+		│   │   ├── cache-store.js     # Redis/内存双模式缓存存储（namespace 定向清理）
+		│   │   ├── console-session.js # VNC/终端一次性 session 管理
+		│   │   ├── email.js           # 邮件发送（createEmailTemplate 统一模板）
+		│   │   ├── email-validate.js  # 📧 邮箱校验单一来源（收紧规则）
+		│   │   ├── token.js
+		│   │   ├── token-store.js     # refresh token 持久化
+		│   │   ├── site-url.js
+		│   │   ├── cdk-generator.js
+		│   │   ├── order-utils.js     # 订购工具（扣余额/计算金额/affinity）
+		│   │   ├── date.js            # 时区/格式化工具
+		│   │   ├── random-name.js     # VM/LXC 随机名称
+		│   │   ├── safe-error.js      # 统一错误脱敏（safeError）
+		│   │   ├── username-blacklist.js
+		│   │   ├── crypto-utils.js    # AES-256-GCM 加密工具（JWT_SECRET 派生等）
+		│   │   ├── disk-validation.js # 💾 磁盘校验纯函数（白名单/卷名/系统盘判定）
+		│   │   ├── disk-billing.js    # 💾 磁盘计费纯函数（购买/续费/扩容金额）
+		│   │   ├── logger.js          # 统一日志工具
+		│   │   ├── audit-log.js       # 📋 操作日志埋点（审计）
+		│   │   ├── password-hash.js   # 原生 bcrypt 密码哈希（v3.4.0 并发抗压升级）
+		│   │   ├── csv.js            # 🔒 CSV 导出统一转义（防公式注入 =+-@）
+		│   │   ├── message-sanitize.js # 🔒 站内信服务端净化（DOMPurify 等价）
+		│   │   └── with-transaction.js # MySQL 事务封装
+		│   ├── constants.js           # ⚙️ 全局共享常量（周期/磁盘/订单/模板/支付/限速/FRONTEND_CACHE_TTL，单一来源）
+		│   ├── routes/                # 路由模块（26 个）
 		│   │   ├── auth.js            # 认证 + 2FA + 忘记密码
 		│   │   ├── user.js            # 用户中心 + 2FA + 设备 + Push ticket
-		│   │   ├── user-settings.js   # 用户设置（邮件通知类型偏好）
+		│   │   ├── user-settings.js   # 用户设置（邮件通知类型偏好 + 界面语言偏好）
+		│   │   ├── i18n.js            # 🌍 用户侧 i18n（语言列表/翻译字典下发）
 		│   │   ├── admin-user.js      # 用户管理
 		│   │   ├── vm.js              # VM 管理
 		│   │   ├── lxc.js             # LXC 管理
@@ -338,6 +349,7 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 		│   │   ├── disk.js            # 💾 用户侧数据盘 CRUD（购买/挂载/卸载/扩容/销毁/续费）
 		│   │   ├── admin-disk.js      # 💾 管理后台数据盘/存储分组/规格/生命周期管理
 		│   │   ├── admin-os-template.js # 🖥️ OS 模板管理（系统切换）
+		│   │   ├── admin-i18n.js     # 🌍 i18n 管理（自定义语言 CRUD/词条覆盖）
 		│   │   └── log.js             # 📋 操作/登录日志（查询/导出/删除）
 		│   ├── websocket/
 		│   │   ├── vnc-proxy.js       # VNC WebSocket 代理（ticket + Redis 校验）
@@ -348,6 +360,8 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 		│   │   ├── backup-polling.js  # 备份/恢复进度轮询
 		│   │   ├── ikuai-sync.js      # ikuai 定时同步
 		│   │   ├── dhcp.js            # DHCP 静态绑定工具
+		│   │   ├── i18n.js            # 🌍 i18n 服务（字典合并/预热/缓存失效）
+		│   │   ├── profile-cache.js   # profile 共享缓存失效（跨模块 invalidateProfile）
 		│   │   ├── disk-expiry-check.js # 💾 磁盘到期巡检（预警/宽限期/停机分离/销毁回收）
 		│   │   ├── disk-audit.js      # 💾 备份恢复后磁盘对账审计（防白嫖）
 		│   │   ├── holding-vm.js      # 💾 中转 VM（VMID 9999）托管服务（卸载磁盘托管）
@@ -404,9 +418,12 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 │   ├── shared/css/            # 共享 CSS 层（按层叠顺序加载）
 │   │   ├── tokens.css         # CSS 变量定义（:root + [data-theme]）
 │   │   ├── layout.css         # 通用布局（sidebar/header/main-wrap/响应式）
-│   │   ├── components.css     # 通用组件（btn-glass/table/modal/card/badge）
+│   │   ├── components.css     # 通用组件（btn-glass/table/modal/card/badge/i18n 横幅）
 │   │   ├── pv-buttons.css     # Web Component 按钮样式补充
 │   │   └── theme.css          # 主题适配（[data-theme="dark/light"] 覆盖）
+│   ├── locales/               # 🌍 i18n 翻译字典（7 语言基线，2170 key/语言，v3.4.0）
+│   │   ├── zh-CN.json         # 简体中文（母本，缺失 key 回退源）
+│   │   ├── zh-TW.json / en.json / de.json / ja.json / ko.json / fr.json
 │   ├── components/            # Web Components（8 个 pv-* 自定义元素）
 │   │   ├── pv-button.js       # 按钮（variant/size/disabled）
 │   │   ├── pv-button-v2.js    # 按钮 v2（增强变体）
@@ -428,9 +445,10 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 │   │   ├── terminal-standalone.js # xterm.js 终端独立逻辑
 │   │   ├── terminal-keyboard.js    # 终端快捷键捕获（复制/粘贴/透传）
 │   │   ├── terminal-shortcuts-help.js # 终端快捷键说明 modal
-	│   │   ├── lib/               # 第三方库（DOMPurify）
-	│   │   ├── admin/             # 管理后台模块（core/admin/vm/lxc/network/update/package/template/disk/os-template + admin-template-* 拆分模块）
-	│   │   └── dashboard/         # 用户面板模块（core/vm/lxc/forward/message/disk/log/os-switch + dashboard-template-*）
+		│   │   ├── lib/               # 第三方库（DOMPurify）
+		│   │   ├── shared/            # 🌍 共享前端模块（i18n.js 翻译核心 / i18n-user-init.js 用户偏好初始化 / log-i18n.js 日志映射）
+		│   │   ├── admin/             # 管理后台模块（core/admin/vm/lxc/network/update/package/template/disk/os-template/admin-i18n + admin-template-* 拆分模块）
+		│   │   └── dashboard/         # 用户面板模块（core/vm/lxc/forward/message/disk/log/os-switch + dashboard-template-*）
 	│   └── novnc/                 # noVNC 库
 ├── scripts/                      # 修复/维护脚本（fix-dir-volume-id、fix-refresh-token-timezone、clean-orphan-disks）
 ├── test/                      # Mocha + Chai 测试
@@ -509,6 +527,7 @@ Redis 配置已迁移到面板管理后台，在 **系统设置 > 站点设置 >
 | **网络管理** | 🌐 **端口转发管理 + 私有网络管理页**（只读表格/搜索/分页/绑定设备统计，v3.0.0） |
 | **硬盘设置** | 💾 **存储分组（拖拽排序）/规格管理（含 QoS 限速）、生命周期配置、数据盘管理（查看/编辑/销毁/多选批量迁移/导入存量磁盘，含 PVE 路径列）** |
 | **日志中心** | 操作/后台/登录/系统切换四 tab，后台操作按子域筛选，约 50 处敏感操作埋点（v2.35.0） |
+| **i18n 管理** | 🌍 **其他选项 > i18n 管理**（v3.4.0）：自定义语言创建（基准语言快照）、词条覆盖在线编辑、分类翻译进度、待翻译红点与顶部清单直达 |
 | **系统更新** | 检查更新、查看更新日志、一键更新 |
 
 ### 普通用户功能
@@ -762,6 +781,8 @@ MYSQL_DATABASE=pve_panel
 ## 🔄 手动更新
 
 当「系统更新」功能无法使用时，SSH 进入项目目录手动更新。根据目标版本选择对应流程：
+
+> ⚠️ **v3.4.0 升级提示**：①包含数据库 schema 变更（新增 `i18n_languages`、`i18n_entries` 表），升级后首次启动自动执行迁移，请确保数据库用户有 `ALTER`/`CREATE` 权限；②密码哈希切换为**原生 bcrypt**（替换 bcryptjs），生产环境更新后必须执行 `npm install` 再 `pm2 restart`。
 
 > ⚠️ **v2.33.0 升级提示**：本次为大版本功能更新，包含数据库 schema 变更（新增 `os_templates`、`vm_os_switch_logs`、`vm_disk_snapshots` 等表）。升级后首次启动会自动执行迁移，请确保数据库用户有 `ALTER`/`CREATE` 权限。
 
