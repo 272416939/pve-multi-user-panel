@@ -67,7 +67,7 @@
                                     <span v-if="emailQueueStats">{{ t('settings.emailQueue.active') }}{{ emailQueueStats.active }}</span>
                                     <span v-if="emailQueueStats">{{ t('settings.emailQueue.failed') }}{{ emailQueueStats.failed }}</span>
                                     <span v-if="emailQueueStats && emailQueueStats.syncFailedCount > 0" style="color:#ed6463;">{{ t('settings.emailQueue.syncFailed') }}{{ emailQueueStats.syncFailedCount }}</span>
-                                    <span v-if="emailQueueStats && emailQueueStats.lastError" style="color:#ed6463;">{{ t('settings.emailQueue.lastError') }}{{ emailQueueStats.lastError }}（{{ emailQueueStats.lastFailedAt }}）</span>
+                                    <span v-if="emailQueueStats && emailQueueStats.lastError" style="color:#ed6463;">{{ t('settings.emailQueue.lastError') }}{{ emailQueueStats.lastError }}({{ emailQueueStats.lastFailedAt }})</span>
                                 </div>
                                 <small class="text-muted">{{ t('settings.emailQueue.desc') }}</small>
                             </div>
@@ -109,10 +109,10 @@
                             <div class="card-body">
                                 <p class="text-muted small mb-3">{{ t('settings.emailShell.desc') }}</p>
                                 <div v-for="g in emailShellGroups" :key="g" class="mb-3">
-                                    <h6 class="mb-2" style="font-weight:600;color:var(--color-primary);">{{ g }}</h6>
+                                    <h6 class="mb-2" style="font-weight:600;color:var(--color-primary);">{{ t('settings.shellGroup.' + g) }}</h6>
                                     <div class="row g-3">
                                         <div v-for="p in emailShellParamsByGroup(g)" :key="p.key" class="col-md-3">
-                                            <label class="form-label">{{ p.label }}</label>
+                                            <label class="form-label">{{ t('settings.shellParam.' + p.key) }}</label>
                                             <input v-if="p.type === 'color'" type="color" class="form-control form-control-color" style="height:38px;padding:4px;cursor:pointer;" :title="p.default" v-model="emailShellForm[p.key]">
                                             <input v-else-if="p.type === 'number'" type="number" class="form-control" v-model.number="emailShellForm[p.key]" :min="p.min" :max="p.max">
                                             <input v-else type="text" class="form-control" v-model="emailShellForm[p.key]">
@@ -149,8 +149,8 @@
                                     <div class="notification-group-header d-flex justify-content-between align-items-center px-3 py-2 cursor-pointer" @click="toggleEmailTemplateCategory(cat.key)">
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="notification-group-icon" v-html="cat.svg"></span>
-                                            <span class="fw-bold">{{ cat.label }}</span>
-                                            <small class="text-muted">（{{ emailTemplatesByCategory(cat.key).length }} {{ t('settings.emailTpl.countTpl') }}）</small>
+                                            <span class="fw-bold">{{ t('settings.etpl.cat.' + cat.key) }}</span>
+                                            <small class="text-muted">({{ emailTemplatesByCategory(cat.key).length }} {{ t('settings.emailTpl.countTpl') }})</small>
                                         </div>
                                         <svg class="notification-chevron transition-transform" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :style="{ transform: emailTemplateCategoryCollapsed[cat.key] ? 'rotate(0deg)' : 'rotate(90deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
                                     </div>
@@ -158,7 +158,7 @@
                                     <div v-for="tpl in emailTemplatesByCategory(cat.key)" :key="tpl.code">
                                         <div class="notification-item-row d-flex align-items-center justify-content-between flex-wrap gap-2 px-3 py-2">
                                             <div class="d-flex align-items-center gap-2">
-                                                <strong>{{ tpl.name }}</strong>
+                                                <strong>{{ t('admin.etpl.name.' + tpl.code) }}</strong>
                                                 <span class="text-muted" style="font-size:12px;">{{ tpl.code }}</span>
                                                 <span class="text-muted" style="font-size:12px;">v{{ tpl.version }}</span>
                                             </div>
@@ -197,7 +197,7 @@
                                             <div class="mb-2 p-2 rounded" style="background:rgba(255,255,255,0.04);border:1px solid var(--border-color);">
                                                 <small class="text-muted d-block mb-1">{{ t('settings.emailTpl.vars') }}</small>
                                                 <div class="d-flex flex-wrap gap-1">
-                                                    <span v-for="v in emailTemplateAllVariables(tpl)" :key="v.name" class="badge" style="cursor:pointer;background:color-mix(in srgb, var(--color-primary) 18%, transparent);color:var(--color-primary);border:1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);font-weight:500;" :title="tFormat('settings.varExample', v.label, v.example || '')" @mousedown.prevent @click="insertEmailTemplateVar(v.name)">{{ '{' + v.name + '}' }}</span>
+                                                    <span v-for="v in emailTemplateAllVariables(tpl)" :key="v.name" class="badge" style="cursor:pointer;background:color-mix(in srgb, var(--color-primary) 18%, transparent);color:var(--color-primary);border:1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);font-weight:500;" :title="tFormat('settings.varExample', t('admin.etpl.var.' + v.name), emailVarExample(v))" @mousedown.prevent @click="insertEmailTemplateVar(v.name)">{{ '{' + v.name + '}' }}</span>
                                                 </div>
                                             </div>
                                             <div class="d-flex gap-2">
@@ -246,7 +246,7 @@
                                         <div class="mt-2 p-2 rounded" style="background:rgba(255,255,255,0.04);border:1px solid var(--border-color);">
                                             <small class="text-muted d-block mb-1">{{ t('settings.emailTpl.vars') }}</small>
                                             <div class="d-flex flex-wrap gap-1">
-                                                <span v-for="v in emailBtnLinkVariables" :key="v.name" class="badge" style="cursor:pointer;background:color-mix(in srgb, var(--color-primary) 18%, transparent);color:var(--color-primary);border:1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);font-weight:500;" :title="tFormat('settings.varExample', v.label, v.example || '')" @mousedown.prevent @click="insertEmailBtnLinkVar(v.name)">{{ '{' + v.name + '}' }}</span>
+                                                <span v-for="v in emailBtnLinkVariables" :key="v.name" class="badge" style="cursor:pointer;background:color-mix(in srgb, var(--color-primary) 18%, transparent);color:var(--color-primary);border:1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);font-weight:500;" :title="tFormat('settings.varExample', t('admin.etpl.var.' + v.name), emailVarExample(v))" @mousedown.prevent @click="insertEmailBtnLinkVar(v.name)">{{ '{' + v.name + '}' }}</span>
                                             </div>
                                         </div>
                                     </div>

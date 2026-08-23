@@ -443,7 +443,7 @@
                 body: JSON.stringify($.emailShellForm.value)
             });
             $.emailShellForm.value = res.values || $.emailShellForm.value;
-            alert(res.message || window.__i18n.t('admin.shell.styleSaved'));
+            alert(window.__i18n.t('admin.shell.styleSaved'));
         } catch (e) {
             alert(e.message);
         } finally {
@@ -457,7 +457,7 @@
         try {
             var res = await api('/admin/email-shell/reset', { method: 'POST' });
             $.emailShellForm.value = res.values || $.emailShellForm.value;
-            alert(res.message || window.__i18n.t('settings.restoredDefault'));
+            alert(window.__i18n.t('settings.restoredDefault'));
         } catch (e) {
             alert(e.message);
         }
@@ -615,6 +615,16 @@
         var list = (tpl.variables || []).slice();
         ($.emailTemplateGlobalVariables.value || []).forEach(function(v) { list.push(v); });
         return list;
+    };
+
+    // 变量示例值 i18n：仅中文语义示例（张三/云服务控制台/1个月等）需要翻译，
+    // 技术格式示例（URL/日期/金额/订单号）各语言通用原样返回；cdk_list 的 example 是 HTML 演示片段豁免
+    var EMAIL_VAR_EXAMPLE_L10N = { username: 1, renewal_price: 1, disk_name: 1, period: 1, refund_desc: 1, resource_label: 1, duration: 1, status: 1, detail: 1, site_name: 1 };
+    $.emailVarExample = function(v) {
+        if (v && EMAIL_VAR_EXAMPLE_L10N[v.name]) {
+            return window.__i18n.t('settings.varExampleVal.' + v.name);
+        }
+        return (v && v.example) || '';
     };
 
     // 注册「邮件按钮链接」自定义 Blot（输出 <a class="btn">）：
@@ -1103,7 +1113,7 @@
                 tpl.version = res.template.version;
                 tpl.updated_at = res.template.updated_at;
             }
-            alert(res.message || window.__i18n.t('admin.etpl.saved'));
+            alert(window.__i18n.t('admin.etpl.saved'));
         } catch (e) {
             alert(e.message);
         } finally {
@@ -1135,7 +1145,7 @@
     // 恢复默认（常量注册表覆盖；正在编辑时同步刷新表单）
     $.resetEmailTemplate = async function(code) {
         var tpl = ($.emailTemplates.value || []).find(function(t) { return t.code === code; });
-        if (!(await window.customConfirm(window.__i18n.t('admin.etpl.resetConfirm1') + (tpl ? tpl.name : code) + window.__i18n.t('admin.etpl.resetTail2')))) return;
+        if (!(await window.customConfirm(window.__i18n.t('admin.etpl.resetConfirm1') + (tpl ? window.__i18n.t('admin.etpl.name.' + tpl.code) : code) + window.__i18n.t('admin.etpl.resetTail2')))) return;
         try {
             var res = await api('/admin/email-templates/' + code + '/reset', {
                 method: 'POST'
@@ -1146,7 +1156,7 @@
                 Vue.nextTick(function() { $.initEmailTemplateQuill(); });
             }
             await $.loadEmailTemplates();
-            alert(res.message || window.__i18n.t('settings.restoredDefault'));
+            alert(window.__i18n.t('settings.restoredDefault'));
         } catch (e) {
             alert(e.message);
         }

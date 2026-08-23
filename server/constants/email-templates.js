@@ -42,20 +42,21 @@ const EMAIL_TEMPLATE_CATEGORIES = [
  * - createEmailTemplate 渲染时按参数生成 <style>（缺省回退 default）
  * - custom_css 为高级模式：追加到 <style> 末尾的 CSS 源码
  */
+// 分组值用 slug（前端 t('settings.shellGroup.<slug>') 映射显示，i18n 适配 2026-08-23）
 const EMAIL_SHELL_PARAMS = [
-    { key: 'header_from', label: '头部渐变起始色', group: '头部', type: 'color', default: '#667eea' },
-    { key: 'header_to', label: '头部渐变结束色', group: '头部', type: 'color', default: '#764ba2' },
-    { key: 'header_text', label: '头部标题文字色', group: '头部', type: 'color', default: '#ffffff' },
-    { key: 'card_bg', label: '卡片背景色', group: '卡片', type: 'color', default: '#ffffff' },
-    { key: 'card_radius', label: '卡片圆角（px）', group: '卡片', type: 'number', default: 16, min: 0, max: 40 },
-    { key: 'btn_from', label: '按钮渐变起始色', group: '按钮', type: 'color', default: '#667eea' },
-    { key: 'btn_to', label: '按钮渐变结束色', group: '按钮', type: 'color', default: '#764ba2' },
-    { key: 'btn_text', label: '按钮文字色', group: '按钮', type: 'color', default: '#ffffff' },
-    { key: 'footer_bg', label: '页脚背景色', group: '页脚', type: 'color', default: '#f7fafc' },
-    { key: 'footer_text', label: '页脚文字色', group: '页脚', type: 'color', default: '#718096' },
-    { key: 'footer_note', label: '页脚第一行文案', group: '页脚', type: 'text', default: '此邮件由系统自动发送，请勿直接回复。', maxLen: 100 },
-    { key: 'footer_contact', label: '页脚第二行文案', group: '页脚', type: 'text', default: '如有问题，请联系管理员。', maxLen: 100 },
-    { key: 'custom_css', label: '自定义样式（高级）', group: '高级', type: 'css', default: '', maxLen: 8000 }
+    { key: 'header_from', label: '头部渐变起始色', group: 'header', type: 'color', default: '#667eea' },
+    { key: 'header_to', label: '头部渐变结束色', group: 'header', type: 'color', default: '#764ba2' },
+    { key: 'header_text', label: '头部标题文字色', group: 'header', type: 'color', default: '#ffffff' },
+    { key: 'card_bg', label: '卡片背景色', group: 'card', type: 'color', default: '#ffffff' },
+    { key: 'card_radius', label: '卡片圆角（px）', group: 'card', type: 'number', default: 16, min: 0, max: 40 },
+    { key: 'btn_from', label: '按钮渐变起始色', group: 'btn', type: 'color', default: '#667eea' },
+    { key: 'btn_to', label: '按钮渐变结束色', group: 'btn', type: 'color', default: '#764ba2' },
+    { key: 'btn_text', label: '按钮文字色', group: 'btn', type: 'color', default: '#ffffff' },
+    { key: 'footer_bg', label: '页脚背景色', group: 'footer', type: 'color', default: '#f7fafc' },
+    { key: 'footer_text', label: '页脚文字色', group: 'footer', type: 'color', default: '#718096' },
+    { key: 'footer_note', label: '页脚第一行文案', group: 'footer', type: 'text', default: '此邮件由系统自动发送，请勿直接回复。', maxLen: 100 },
+    { key: 'footer_contact', label: '页脚第二行文案', group: 'footer', type: 'text', default: '如有问题，请联系管理员。', maxLen: 100 },
+    { key: 'custom_css', label: '自定义样式（高级）', group: 'advanced', type: 'css', default: '', maxLen: 8000 }
 ];
 
 // 通用变量（渲染自动注入；前端变量面板统一展示）
@@ -115,7 +116,7 @@ const EMAIL_TEMPLATES = {
                 <strong>如果您没有请求重置密码</strong>，请忽略此邮件，您的密码不会被修改。
             </p>`,
         variables: V_USER.concat([
-            { name: 'link', label: '重置链接', example: 'https://example.com/?resetPassword=xxx', group: '链接' }
+            { name: 'link', label: '链接', example: 'https://example.com/?resetPassword=xxx', group: '链接' }
         ])
     },
 
@@ -191,7 +192,7 @@ const EMAIL_TEMPLATES = {
             </div>`,
         variables: V_USER.concat([
             { name: 'email', label: '新邮箱', example: 'user@example.com', group: '用户' },
-            { name: 'link', label: '验证链接', example: 'https://example.com/api/user/verify-email/xxx', group: '链接' }
+            { name: 'link', label: '链接', example: 'https://example.com/api/user/verify-email/xxx', group: '链接' }
         ])
     },
 
@@ -216,7 +217,7 @@ const EMAIL_TEMPLATES = {
                 <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快验证。</p>
             </div>`,
         variables: V_USER.concat([
-            { name: 'link', label: '验证链接', example: 'https://example.com/api/user/verify-email/xxx', group: '链接' }
+            { name: 'link', label: '链接', example: 'https://example.com/api/user/verify-email/xxx', group: '链接' }
         ])
     },
 
@@ -242,7 +243,7 @@ const EMAIL_TEMPLATES = {
                 <p style="margin-bottom: 0;">该链接将在 <strong>1 小时后过期</strong>，请尽快验证。</p>
             </div>`,
         variables: V_USER.concat([
-            { name: 'link', label: '验证链接', example: 'https://example.com/api/user/verify-email/xxx', group: '链接' }
+            { name: 'link', label: '链接', example: 'https://example.com/api/user/verify-email/xxx', group: '链接' }
         ])
     },
 
@@ -524,7 +525,7 @@ const EMAIL_TEMPLATES = {
             </div>
             <p>前往 <a href="{site_url}/">控制面板</a> 查看硬盘详情。</p>`,
         variables: [
-            { name: 'disk_name', label: '硬盘名称', example: '数据盘A', group: '资源' },
+            { name: 'disk_name', label: '磁盘名称', example: '数据盘A', group: '资源' },
             { name: 'capacity_gb', label: '容量（GiB）', example: '50', group: '资源' },
             { name: 'quantity', label: '数量（块）', example: '2', group: '资源' },
             { name: 'period', label: '计费周期', example: '1个月', group: '时间' }
@@ -663,7 +664,7 @@ const EMAIL_TEMPLATES = {
             <p>前往 <a href="{site_url}/">控制面板</a> 查看硬盘详情。</p>`,
         variables: [
             { name: 'disk_name', label: '磁盘名称', example: '数据盘A', group: '资源' },
-            { name: 'period', label: '续费详情', example: '1个月', group: '时间' }
+            { name: 'period', label: '计费周期', example: '1个月', group: '时间' }
         ].concat(V_TIME).concat(V_MONEY).concat(V_ORDER)
     },
 
@@ -688,7 +689,7 @@ const EMAIL_TEMPLATES = {
         variables: [
             { name: 'resource_label', label: '资源类型', example: '虚拟机', group: '资源' },
             { name: 'resource_name', label: '资源名称', example: 'web-server-01', group: '资源' },
-            { name: 'period', label: '续费详情', example: '1个月', group: '时间' }
+            { name: 'period', label: '计费周期', example: '1个月', group: '时间' }
         ].concat(V_TIME).concat(V_MONEY).concat(V_ORDER)
     },
 
@@ -772,7 +773,7 @@ const EMAIL_TEMPLATES = {
         variables: V_USER.concat([
             { name: 'cdk_count', label: '生成张数', example: '2', group: '资源' },
             { name: 'duration', label: '续费时长', example: '30天', group: '时间' },
-            { name: 'expire_time', label: '有效期至', example: '2026-12-31', group: '时间' },
+            { name: 'expire_time', label: '到期时间', example: '2026-12-31', group: '时间' },
             { name: 'cdk_list', label: '兑换码列表（≤5 张时显示，传 HTML 或留空）', example: '<p style="margin-bottom: 4px;">兑换码：<br>CDK-XXXX<br>CDK-YYYY</p>', group: '资源', html: true }
         ])
     },
@@ -1026,7 +1027,7 @@ const EMAIL_TEMPLATES = {
         variables: V_USER.concat([
             { name: 'vmid', label: '容器 ID', example: '2003', group: '资源' },
             { name: 'status', label: '状态（完成/失败）', example: '完成', group: '系统' },
-            { name: 'detail', label: '详情（失败原因等，可留空）', example: '原因：超时', group: '系统' }
+            { name: 'detail', label: '详情（原因等，可留空）', example: '原因：超时', group: '系统' }
         ])
     },
 
@@ -1042,7 +1043,7 @@ const EMAIL_TEMPLATES = {
         variables: V_USER.concat([
             { name: 'vmid', label: '容器 ID', example: '2003', group: '资源' },
             { name: 'status', label: '状态（完成/失败）', example: '完成', group: '系统' },
-            { name: 'detail', label: '详情（失败原因等，可留空）', example: '原因：超时', group: '系统' }
+            { name: 'detail', label: '详情（原因等，可留空）', example: '原因：超时', group: '系统' }
         ])
     },
 
@@ -1059,7 +1060,7 @@ const EMAIL_TEMPLATES = {
         variables: V_USER.concat([
             { name: 'vm_name', label: '虚拟机名称', example: 'web-server-01', group: '资源' },
             { name: 'status', label: '状态（完成/失败）', example: '完成', group: '系统' },
-            { name: 'detail', label: '详情（备份文件/原因，可留空）', example: '备份文件：vzdump-qemu-1001.vma.zst', group: '系统' }
+            { name: 'detail', label: '详情（原因等，可留空）', example: '备份文件：vzdump-qemu-1001.vma.zst', group: '系统' }
         ])
     },
 
@@ -1076,7 +1077,7 @@ const EMAIL_TEMPLATES = {
         variables: V_USER.concat([
             { name: 'vm_name', label: '虚拟机名称', example: 'web-server-01', group: '资源' },
             { name: 'status', label: '状态（完成/失败）', example: '完成', group: '系统' },
-            { name: 'detail', label: '详情（失败原因，可留空）', example: '原因：磁盘空间不足', group: '系统' }
+            { name: 'detail', label: '详情（原因等，可留空）', example: '原因：磁盘空间不足', group: '系统' }
         ])
     }
 };
