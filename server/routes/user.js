@@ -58,7 +58,7 @@ async function verifySensitiveAction(user, body, req) {
     }
 
     // 验证失败统一文案，不区分密码/动态码，防止枚举
-    return { ok: false, error: '验证失败：请提供正确的当前密码或 2FA 验证码' };
+    return { ok: false, error: '验证失败：请提供正确的当前密码或 2FA 验证码', code: 'VERIFY_PWD_OR_2FA' };
 }
 
 // 改密公共逻辑：哈希更新 + 撤销全部 refresh token + 清活跃状态/资料缓存
@@ -83,9 +83,9 @@ async function changeUserPassword(userId, newPassword) {
 router.post('/user/2fa/setup', authMiddleware, async (req, res) => {
     try {
         const user = await db.users.getById(req.user.id);
-        if (!user) return res.status(404).json({ error: '用户不存在' });
+        if (!user) return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
         if (await db.twofa.isEnabled(user.id)) {
-            return res.status(400).json({ error: '2FA 已启用，请先禁用后再重新设置' });
+            return res.status(400).json({ error: '2FA 已启用，请先禁用后再重新设置', code: '2FA_ALREADY_ENABLED' });
         }
 
         const secret = otplib.generateSecret();
@@ -99,20 +99,20 @@ router.post('/user/2fa/setup', authMiddleware, async (req, res) => {
     } catch (error) {
         console.error('获取 2FA 设置信息失败:', error.message);
         if (error.stack) console.error(error.stack);
-        res.status(500).json({ error: '获取 2FA 设置信息失败' });
+        res.status(500).json({ error: '获取 2FA 设置信息失败', code: '2FA_LOAD_FAILED' });
     }
 });
 
 router.post('/user/2fa/verify', authMiddleware, async (req, res) => {
     try {
         const { code } = req.body;
-        if (!code) return res.status(400).json({ error: '缺少验证码' });
+        if (!code) return res.status(400).json({ error: '缺少验证码', code: 'CODE_MISSING' });
 
         const secret = await db.twofa.getSecret(req.user.id);
-        if (!secret) return res.status(400).json({ error: '请先获取 2FA 密钥' });
+        if (!secret) return res.status(400).json({ error: '请先获取 2FA 密钥', code: '2FA_SECRET_REQUIRED' });
 
         const isValid = otplib.verifySync({ token: code, secret }).valid;
-        if (!isValid) return res.status(400).json({ error: '验证码错误' });
+        if (!isValid) return res.status(400).json({ error: '验证码错误', code: 'CODE_INVALID' });
 
         await db.twofa.enable(req.user.id);
 
@@ -127,19 +127,19 @@ router.post('/user/2fa/verify', authMiddleware, async (req, res) => {
         res.json({ message: '2FA 已启用', recovery_codes: codes });
     } catch (error) {
         console.error('启用 2FA 失败:', error.message);
-        res.status(500).json({ error: '启用 2FA 失败' });
+        res.status(500).json({ error: '启用 2FA 失败', code: '2FA_ENABLE_FAILED' });
     }
 });
 
 router.post('/user/2fa/disable', authMiddleware, async (req, res) => {
     try {
         const { password } = req.body;
-        if (!password) return res.status(400).json({ error: '需要验证密码' });
+        if (!password) return res.status(400).json({ error: '需要验证密码', code: 'PASSWORD_REQUIRED' });
 
         const user = await db.users.getById(req.user.id);
         let passwordMatch = await verifyPassword(password, user.password, user.password_salt);
         if (!passwordMatch) {
-            return res.status(401).json({ error: '密码错误' });
+            return res.status(401).json({ error: '密码错误', code: 'PASSWORD_WRONG' });
         }
 
         await db.twofa.disable(req.user.id);
@@ -148,7 +148,7 @@ router.post('/user/2fa/disable', authMiddleware, async (req, res) => {
         await auditAction(req, 'security.2fa.disable', '关闭二次验证');
         res.json({ message: '2FA 已禁用' });
     } catch (error) {
-        res.status(500).json({ error: '禁用 2FA 失败' });
+        res.status(500).json({ error: '禁用 2FA 失败', code: '2FA_DISABLE_FAILED' });
     }
 });
 
@@ -163,16 +163,16 @@ router.get('/user/2fa/recovery-codes', authMiddleware, async (req, res) => {
         const codes = await db.twofa.getRecoveryCodes(req.user.id);
         res.json({ codes });
     } catch (error) {
-        res.status(500).json({ error: '获取恢复码失败' });
+        res.status(500).json({ error: '获取恢复码失败', code: 'RECOVERY_CODES_LOAD_FAILED' });
     }
 });
 
 router.post('/user/2fa/recovery-codes/regenerate', authMiddleware, async (req, res) => {
     // M-1 修复：重生成恢复码需要二次验证（当前密码/2FA 动态码/恢复码）
     const user = await db.users.getById(req.user.id);
-    if (!user) return res.status(404).json({ error: '用户不存在' });
+    if (!user) return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
     const secondary = await verifySensitiveAction(user, req.body, req);
-    if (!secondary.ok) return res.status(403).json({ error: secondary.error });
+    if (!secondary.ok) return res.status(403).json({ error: secondary.error , code: secondary.code });
     try {
         const newCodes = [];
         for (let i = 0; i < 8; i++) {
@@ -183,14 +183,14 @@ router.post('/user/2fa/recovery-codes/regenerate', authMiddleware, async (req, r
         await auditAction(req, 'security.recovery-codes', '重新生成恢复码');
         res.json({ message: '恢复码已重新生成', recovery_codes: newCodes });
     } catch (error) {
-        res.status(500).json({ error: '重新生成恢复码失败' });
+        res.status(500).json({ error: '重新生成恢复码失败', code: 'RECOVERY_CODES_REGEN_FAILED' });
     }
 });
 
 router.post('/admin/user/:id/disable-2fa', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const user = await db.users.getById(req.params.id);
-        if (!user) return res.status(404).json({ error: '用户不存在' });
+        if (!user) return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
 
         await db.twofa.disable(req.params.id);
         await db.twofa.deleteRecoveryCodes(req.params.id);
@@ -201,7 +201,7 @@ router.post('/admin/user/:id/disable-2fa', authMiddleware, adminMiddleware, asyn
         } catch (e) {}
         res.json({ message: `已为用户 ${user.username} 禁用 2FA` });
     } catch (error) {
-        res.status(500).json({ error: '禁用 2FA 失败' });
+        res.status(500).json({ error: '禁用 2FA 失败', code: '2FA_DISABLE_FAILED' });
     }
 });
 
@@ -217,7 +217,7 @@ router.delete('/user/devices/:id', authMiddleware, async (req, res) => {
     const deviceId = parseInt(req.params.id);
     const device = await db.refreshTokens.getById(deviceId);
     if (!device || device.user_id !== req.user.id) {
-        return res.status(404).json({ error: '设备不存在' });
+        return res.status(404).json({ error: '设备不存在', code: 'DEVICE_NOT_FOUND' });
     }
     await db.refreshTokens.revoke(deviceId);
     await invalidateDeviceCache(deviceId);
@@ -251,7 +251,7 @@ router.get('/user/profile', authMiddleware, async (req, res) => {
 
         const user = await db.users.getById(req.user.id);
         if (!user) {
-            return res.status(404).json({ error: '用户不存在' });
+            return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
         }
         const safeUser = sanitizeUser(user);
         // balance 随对象一起缓存但允许脏值：前端余额显示全部走 /wallet/balance（直查 DB），
@@ -259,7 +259,7 @@ router.get('/user/profile', authMiddleware, async (req, res) => {
         await profileCache.set(String(req.user.id), safeUser);
         res.json(safeUser);
     } catch (error) {
-        res.status(500).json({ error: '获取用户信息失败' });
+        res.status(500).json({ error: '获取用户信息失败', code: 'PROFILE_LOAD_FAILED' });
     }
 });
 
@@ -285,7 +285,7 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
     try {
         const user = await db.users.getById(req.user.id);
         if (!user) {
-            return res.status(404).json({ error: '用户不存在' });
+            return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
         }
         
         const { username, password, bio } = req.body;
@@ -301,10 +301,10 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
             // V6-M2 修复：改密必须过强度校验（首登强制改密弹窗走本端点，此前仅 /user/password
             // 有校验——同功能两条路径规则不一致，弱密码即可清除 must_change_password 标记）
             if (!isStrongPassword(password)) {
-                return res.status(400).json({ error: '密码至少 8 位，且需包含大小写字母和特殊字符 (@#$%^&*!)' });
+                return res.status(400).json({ error: '密码至少 8 位，且需包含大小写字母和特殊字符 (@#$%^&*!)', code: 'PASSWORD_RULE_FULL' });
             }
             const secondary = await verifySensitiveAction(user, req.body, req);
-            if (!secondary.ok) return res.status(403).json({ error: secondary.error });
+            if (!secondary.ok) return res.status(403).json({ error: secondary.error , code: secondary.code });
         }
         
         const updates = {};
@@ -312,7 +312,7 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         if (username && username !== user.username) {
             const allUsers = await db.users.getAll();
             if (allUsers.find(u => u.username === username)) {
-                return res.status(400).json({ error: '用户名已存在' });
+                return res.status(400).json({ error: '用户名已存在', code: 'USERNAME_TAKEN' });
             }
             updates.username = username;
         }
@@ -342,7 +342,7 @@ router.put('/user/profile', authMiddleware, async (req, res) => {
         }
         res.json({ message: '资料更新成功', user: safeUser });
     } catch (error) {
-        res.status(500).json({ error: '更新资料失败' });
+        res.status(500).json({ error: '更新资料失败', code: 'PROFILE_UPDATE_FAILED' });
     }
 });
 
@@ -354,17 +354,17 @@ router.put('/user/password', authMiddleware, async (req, res) => {
 
         // 密码强度校验（V6-M2 收敛：与注册/忘记密码共用 utils/password-hash 公共函数）
         if (!isStrongPassword(password)) {
-            return res.status(400).json({ error: '密码至少 8 位，且需包含大小写字母和特殊字符 (@#$%^&*!)' });
+            return res.status(400).json({ error: '密码至少 8 位，且需包含大小写字母和特殊字符 (@#$%^&*!)', code: 'PASSWORD_RULE_FULL' });
         }
 
         const user = await db.users.getById(req.user.id);
         if (!user) {
-            return res.status(404).json({ error: '用户不存在' });
+            return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
         }
 
         // 二次验证：当前密码/2FA 动态码/恢复码（与换绑邮箱一致，防 token 泄露后改密接管账号）
         const secondary = await verifySensitiveAction(user, req.body, req);
-        if (!secondary.ok) return res.status(403).json({ error: secondary.error });
+        if (!secondary.ok) return res.status(403).json({ error: secondary.error , code: secondary.code });
 
         await changeUserPassword(req.user.id, password);
         // 操作审计：归「重置密码」分类
@@ -375,7 +375,7 @@ router.put('/user/password', authMiddleware, async (req, res) => {
         res.json({ message: '密码重置成功，请使用新密码登录', user: safeUser });
     } catch (error) {
         console.error('重置密码失败', error);
-        res.status(500).json({ error: '重置密码失败' });
+        res.status(500).json({ error: '重置密码失败', code: 'PASSWORD_RESET_FAILED' });
     }
 });
 
@@ -384,7 +384,7 @@ router.get('/user/memos', authMiddleware, async (req, res) => {
         const memos = await db.memos.getByUserId(req.user.id);
         res.json(memos);
     } catch (error) {
-        res.status(500).json({ error: '获取备忘录失败' });
+        res.status(500).json({ error: '获取备忘录失败', code: 'MEMO_LOAD_FAILED' });
     }
 });
 
@@ -401,7 +401,7 @@ router.post('/user/memos', authMiddleware, async (req, res) => {
         await auditAction(req, 'setting.memo.create', '编辑备忘录[' + String(title || '无标题').substring(0, 30) + ']');
         res.json(newMemo);
     } catch (error) {
-        res.status(500).json({ error: '创建备忘录失败' });
+        res.status(500).json({ error: '创建备忘录失败', code: 'MEMO_CREATE_FAILED' });
     }
 });
 
@@ -411,7 +411,7 @@ router.put('/user/memos/:id', authMiddleware, async (req, res) => {
         const memo = await db.memos.getById(memoId);
         
         if (!memo || memo.user_id !== req.user.id) {
-            return res.status(404).json({ error: '备忘录不存在' });
+            return res.status(404).json({ error: '备忘录不存在', code: 'MEMO_NOT_FOUND' });
         }
         
         const { title, content } = req.body;
@@ -423,7 +423,7 @@ router.put('/user/memos/:id', authMiddleware, async (req, res) => {
         await auditAction(req, 'setting.memo.update', '编辑备忘录[' + String(title !== undefined ? title : memo.title || '无标题').substring(0, 30) + ']');
         res.json({ message: '备忘录更新成功', memo: updatedMemo });
     } catch (error) {
-        res.status(500).json({ error: '更新备忘录失败' });
+        res.status(500).json({ error: '更新备忘录失败', code: 'MEMO_UPDATE_FAILED' });
     }
 });
 
@@ -433,21 +433,21 @@ router.delete('/user/memos/:id', authMiddleware, async (req, res) => {
         const memo = await db.memos.getById(memoId);
         
         if (!memo || memo.user_id !== req.user.id) {
-            return res.status(404).json({ error: '备忘录不存在' });
+            return res.status(404).json({ error: '备忘录不存在', code: 'MEMO_NOT_FOUND' });
         }
         
         await db.memos.delete(memoId);
         await auditAction(req, 'setting.memo.delete', '删除备忘录[' + String(memo.title || '无标题').substring(0, 30) + ']');
         res.json({ message: '备忘录删除成功' });
     } catch (error) {
-        res.status(500).json({ error: '删除备忘录失败' });
+        res.status(500).json({ error: '删除备忘录失败', code: 'MEMO_DELETE_FAILED' });
     }
 });
 
 router.post('/user/avatar', authMiddleware, upload.single('avatar'), async (req, res) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: '请选择要上传的图片' });
+            return res.status(400).json({ error: '请选择要上传的图片', code: 'UPLOAD_SELECT_REQUIRED' });
         }
 
         // M-8: 上传后校验文件头魔数，防止伪造扩展名的恶意文件
@@ -461,20 +461,20 @@ router.post('/user/avatar', authMiddleware, upload.single('avatar'), async (req,
             const validHeaders = ['89504E47', 'FFD8FF', '47494638', '52494646']; // PNG, JPEG, GIF, WebP
             if (!validHeaders.some(h => header.startsWith(h))) {
                 fs.unlinkSync(req.file.path);
-                return res.status(400).json({ error: '文件格式不合法（魔数不匹配）' });
+                return res.status(400).json({ error: '文件格式不合法（魔数不匹配）', code: 'UPLOAD_MIME_INVALID' });
             }
         } catch (e) {
             // 读不到文件时删除并报错
             if (req.file.path && fs.existsSync(req.file.path)) {
                 fs.unlinkSync(req.file.path);
             }
-            return res.status(400).json({ error: '文件校验失败，请重新上传' });
+            return res.status(400).json({ error: '文件校验失败，请重新上传', code: 'UPLOAD_VERIFY_FAILED' });
         }
 
         const user = await db.users.getById(req.user.id);
         if (!user) {
             fs.unlinkSync(req.file.path);
-            return res.status(404).json({ error: '用户不存在' });
+            return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
         }
 
         if (user.avatar && user.avatar.startsWith('/images/')) {
@@ -499,7 +499,7 @@ router.post('/user/avatar', authMiddleware, upload.single('avatar'), async (req,
         res.json({ message: '头像上传成功', avatar: avatarPath, user: safeUser });
     } catch (error) {
         console.error('上传头像失败', error);
-        res.status(500).json({ error: '上传头像失败' });
+        res.status(500).json({ error: '上传头像失败', code: 'AVATAR_UPLOAD_FAILED' });
     }
 });
 
@@ -508,17 +508,17 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         const { email } = req.body;
         
         if (!email) {
-            return res.status(400).json({ error: '请提供邮箱地址' });
+            return res.status(400).json({ error: '请提供邮箱地址', code: 'EMAIL_REQUIRED' });
         }
         
         // 邮箱格式校验（单一来源 email-validate.js：收紧正则，拒绝末尾句点等 SMTP 不兼容格式）
         if (!isValidEmail(email)) {
-            return res.status(400).json({ error: '邮箱格式不正确' });
+            return res.status(400).json({ error: '邮箱格式不正确', code: 'EMAIL_INVALID' });
         }
         
         const user = await db.users.getById(req.user.id);
         if (!user) {
-            return res.status(404).json({ error: '用户不存在' });
+            return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
         }
 
         // M-1 修复：换绑邮箱必须二次验证（当前密码/2FA 动态码/恢复码），防止 token 泄露后接管邮箱
@@ -526,7 +526,7 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         var isRebind = !user.email || user.email !== email;
         if (isRebind) {
             const secondary = await verifySensitiveAction(user, req.body, req);
-            if (!secondary.ok) return res.status(403).json({ error: secondary.error });
+            if (!secondary.ok) return res.status(403).json({ error: secondary.error , code: secondary.code });
         }
 
         // 限速：发送邮箱验证邮件统一按用户限速（重发/首次绑定/换绑，防邮件轰炸）
@@ -534,7 +534,7 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         const emailRateLimit = await checkConfiguredRateLimit('email_verify', `ratelimit:email-verify:${req.user.id}`);
         if (!emailRateLimit.allowed) {
             return res.status(429).json({
-                error: '验证邮件发送过于频繁，请稍后再试',
+                error: '验证邮件发送过于频繁，请稍后再试', code: 'RATE_LIMITED_VERIFY_MAIL',
                 retryAfter: emailRateLimit.retryAfter
             });
         }
@@ -542,7 +542,7 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         const allUsers = await db.users.getAll();
         const existingUser = allUsers.find(u => u.email === email && u.id !== req.user.id);
         if (existingUser) {
-            return res.status(400).json({ error: '该邮箱已被使用' });
+            return res.status(400).json({ error: '该邮箱已被使用', code: 'EMAIL_TAKEN' });
         }
         
         await db.users.update(req.user.id, { email, emailVerified: false });
@@ -599,7 +599,7 @@ router.put('/user/email', authMiddleware, async (req, res) => {
         res.json({ message: '邮箱绑定成功！请查收验证邮件', user: safeUser });
     } catch (error) {
         console.error('绑定邮箱失败', error);
-        res.status(500).json({ error: '绑定邮箱失败' });
+        res.status(500).json({ error: '绑定邮箱失败', code: 'EMAIL_BIND_FAILED' });
     }
 });
 
@@ -644,7 +644,7 @@ router.get('/user/push-ticket', authMiddleware, async (req, res) => {
         );
         res.json({ ticket });
     } catch (error) {
-        res.status(500).json({ error: '生成ticket失败' });
+        res.status(500).json({ error: '生成ticket失败', code: 'TICKET_GEN_FAILED' });
     }
 });
 

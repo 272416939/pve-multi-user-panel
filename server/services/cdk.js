@@ -21,23 +21,23 @@ async function redeemCdk(opts) {
     var { userId, code, vm_id, container_id, req } = opts;
 
     if (!code || (!vm_id && !container_id)) {
-        return { ok: false, status: 400, error: '请提供 CDK 码和虚拟机/容器' };
+        return { ok: false, status: 400, error: '请提供 CDK 码和虚拟机/容器', code: 'CDK_CODE_TARGET_REQUIRED' };
     }
 
     // 查找 CDK
     var cdk = await db.cdk.getByCode(code.trim().toUpperCase());
     if (!cdk) {
-        return { ok: false, status: 400, error: 'CDK 码不存在' };
+        return { ok: false, status: 400, error: 'CDK 码不存在', code: 'CDK_CODE_NOT_FOUND' };
     }
 
     // 检查有效期
     if (cdk.expires_at && new Date(cdk.expires_at) <= new Date()) {
-        return { ok: false, status: 400, error: '该 CDK 已过期' };
+        return { ok: false, status: 400, error: '该 CDK 已过期', code: 'CDK_EXPIRED' };
     }
 
     // 检查分配限制：指定用户的 CDK 仅允许该用户使用
     if (cdk.target_user_id && cdk.target_user_id !== userId) {
-        return { ok: false, status: 403, error: '该 CDK 已被指定给其他用户，无法使用' };
+        return { ok: false, status: 403, error: '该 CDK 已被指定给其他用户，无法使用', code: 'CDK_ASSIGNED_OTHER' };
     }
 
     // L-2 修复：先校验目标资源存在与归属，再 CAS 标记（防止对他人资源兑换导致 CDK 被烧毁）
@@ -47,11 +47,11 @@ async function redeemCdk(opts) {
     if (container_id) {
         var ct = await db.lxcContainers.getById(parseInt(container_id));
         if (!ct) {
-            return { ok: false, status: 404, error: 'LXC 容器不存在' };
+            return { ok: false, status: 404, error: 'LXC 容器不存在', code: 'LXC_NOT_FOUND' };
         }
 
         if (ct.user_id !== userId) {
-            return { ok: false, status: 403, error: '无权操作此容器' };
+            return { ok: false, status: 403, error: '无权操作此容器', code: 'LXC_NO_PERM_2' };
         }
 
         targetType = 'lxc';
@@ -66,16 +66,16 @@ async function redeemCdk(opts) {
         newExpirationDate = new Date(baseDate.getTime() + cdk.duration_days * 24 * 60 * 60 * 1000);
         var hardCap = new Date(now.getTime() + MAX_CDK_RENEWAL_DAYS * 24 * 60 * 60 * 1000);
         if (newExpirationDate > hardCap) {
-            return { ok: false, status: 400, error: `续费后到期时间超过上限（${Math.floor(MAX_CDK_RENEWAL_DAYS / 365)} 年），无法兑换` };
+            return { ok: false, status: 400, error: `续费后到期时间超过上限（${Math.floor(MAX_CDK_RENEWAL_DAYS / 365)} 年），无法兑换`, code: 'CDK_RENEW_OVER_LIMIT', params: [Math.floor(MAX_CDK_RENEWAL_DAYS / 365)] };
         }
     } else {
         var vm = await db.vms.getById(parseInt(vm_id));
         if (!vm) {
-            return { ok: false, status: 404, error: '虚拟机不存在' };
+            return { ok: false, status: 404, error: '虚拟机不存在', code: 'VM_NOT_FOUND' };
         }
 
         if (vm.user_id !== userId) {
-            return { ok: false, status: 403, error: '无权操作此虚拟机' };
+            return { ok: false, status: 403, error: '无权操作此虚拟机', code: 'VM_NO_PERM' };
         }
 
         targetType = 'vm';
@@ -97,7 +97,7 @@ async function redeemCdk(opts) {
     // 原子 CAS 操作防并发重复兑换（归属校验通过后才消耗 CDK）
     var markResult = await db.cdk.markAsUsed(cdk.id, userId, vm_id ? parseInt(vm_id) : null, container_id ? parseInt(container_id) : null);
     if (markResult.affected === 0) {
-        return { ok: false, status: 400, error: 'CDK 已被使用或无效' };
+        return { ok: false, status: 400, error: 'CDK 已被使用或无效', code: 'CDK_USED_OR_INVALID' };
     }
 
     if (container_id) {
@@ -170,11 +170,11 @@ async function redeemCdk(opts) {
     // ===== 虚拟机续费 =====
     var vm = await db.vms.getById(parseInt(vm_id));
     if (!vm) {
-        return { ok: false, status: 404, error: '虚拟机不存在' };
+        return { ok: false, status: 404, error: '虚拟机不存在', code: 'VM_NOT_FOUND' };
     }
 
     if (vm.user_id !== userId) {
-        return { ok: false, status: 403, error: '无权操作此虚拟机' };
+        return { ok: false, status: 403, error: '无权操作此虚拟机', code: 'VM_NO_PERM' };
     }
 
     targetType = 'vm';
@@ -258,7 +258,7 @@ async function batchGenerateCdk(opts) {
     var { duration_days, count, expires_at, target_user_ids, created_by } = opts;
 
     if (!duration_days || duration_days < 1) {
-        return { ok: false, status: 400, error: '请提供有效的续费天数' };
+        return { ok: false, status: 400, error: '请提供有效的续费天数', code: 'RENEW_DAYS_REQUIRED' };
     }
 
     // 解析目标用户列表
@@ -267,7 +267,7 @@ async function batchGenerateCdk(opts) {
     for (var uid of targetUserIds) {
         var user = await db.users.getById(uid);
         if (!user) {
-            return { ok: false, status: 400, error: `用户 ID ${uid} 不存在` };
+            return { ok: false, status: 400, error: `用户 ID ${uid} 不存在`, code: 'USER_ID_NOT_FOUND', params: [uid] };
         }
         targetUsers.push(user);
     }

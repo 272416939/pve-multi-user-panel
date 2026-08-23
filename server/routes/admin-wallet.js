@@ -55,7 +55,7 @@ router.get('/admin/transactions', authMiddleware, adminMiddleware, async (req, r
         res.json({ data: list, total: total, page: page, limit: limit });
     } catch (e) {
         console.error('[管理员流水]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -104,7 +104,7 @@ router.get('/admin/transactions/export', authMiddleware, adminMiddleware, async 
         res.send(csv);
     } catch (e) {
         console.error('[导出流水]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -123,7 +123,7 @@ router.get('/admin/orders', authMiddleware, adminMiddleware, async (req, res) =>
         var result = await db.orders.getAll(params);
         res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -174,7 +174,7 @@ router.get('/admin/orders/export', authMiddleware, adminMiddleware, async (req, 
         // 添加 BOM 确保 Excel 正确识别 UTF-8
         res.send('\ufeff' + csvRows.join('\n'));
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

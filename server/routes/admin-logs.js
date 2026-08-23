@@ -53,20 +53,20 @@ function subCategoryName(action) {
 // 校验操作日志通用筛选参数（列表与导出共用），返回规范化参数对象；非法返回 { error }
 function buildOperationFilters(req) {
     var scope = (req.query.scope || 'all').trim();
-    if (SCOPE_WHITELIST.indexOf(scope) === -1) return { error: '无效的查询范围' };
+    if (SCOPE_WHITELIST.indexOf(scope) === -1) return { error: '无效的查询范围', code: 'INVALID_QUERY_RANGE' };
     var category = (req.query.category || '').trim();
-    if (category && AUDIT_CATEGORIES.indexOf(category) === -1) return { error: '无效的操作类型' };
+    if (category && AUDIT_CATEGORIES.indexOf(category) === -1) return { error: '无效的操作类型', code: 'INVALID_ACTION' };
     var actionPrefix = (req.query.action_prefix || '').trim();
-    if (!validateActionPrefix(actionPrefix)) return { error: '无效的操作类型' };
+    if (!validateActionPrefix(actionPrefix)) return { error: '无效的操作类型', code: 'INVALID_ACTION' };
     var keyword = (req.query.keyword || '').trim();
-    if (keyword.length > 50) return { error: '搜索关键词过长' };
+    if (keyword.length > 50) return { error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' };
     var filterUserId = (req.query.user_id || '').trim();
-    if (filterUserId && !/^\d+$/.test(filterUserId)) return { error: '无效的用户ID' };
+    if (filterUserId && !/^\d+$/.test(filterUserId)) return { error: '无效的用户ID', code: 'INVALID_USER_ID' };
     var username = (req.query.username || '').trim();
-    if (username.length > 64) return { error: '用户名过长' };
+    if (username.length > 64) return { error: '用户名过长', code: 'USERNAME_TOO_LONG' };
     var startDate = normalizeDateParam(req.query.start_date || '', false);
     var endDate = normalizeDateParam(req.query.end_date || '', true);
-    if (startDate === null || endDate === null) return { error: '无效的日期格式' };
+    if (startDate === null || endDate === null) return { error: '无效的日期格式', code: 'INVALID_DATE' };
     return {
         scope: scope, category: category, actionPrefix: actionPrefix,
         filterUserId: filterUserId, username: username,
@@ -77,16 +77,16 @@ function buildOperationFilters(req) {
 // 校验登录日志通用筛选参数（列表与导出共用），返回规范化参数对象；非法返回 { error }
 function buildLoginFilters(req) {
     var status = (req.query.status || '').trim();
-    if (status && ['success', 'failed'].indexOf(status) === -1) return { error: '无效的登录状态' };
+    if (status && ['success', 'failed'].indexOf(status) === -1) return { error: '无效的登录状态', code: 'INVALID_LOGIN_STATE' };
     var keyword = (req.query.keyword || '').trim();
-    if (keyword.length > 50) return { error: '搜索关键词过长' };
+    if (keyword.length > 50) return { error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' };
     var filterUserId = (req.query.user_id || '').trim();
-    if (filterUserId && !/^\d+$/.test(filterUserId)) return { error: '无效的用户ID' };
+    if (filterUserId && !/^\d+$/.test(filterUserId)) return { error: '无效的用户ID', code: 'INVALID_USER_ID' };
     var username = (req.query.username || '').trim();
-    if (username.length > 64) return { error: '用户名过长' };
+    if (username.length > 64) return { error: '用户名过长', code: 'USERNAME_TOO_LONG' };
     var startDate = normalizeDateParam(req.query.start_date || '', false);
     var endDate = normalizeDateParam(req.query.end_date || '', true);
-    if (startDate === null || endDate === null) return { error: '无效的日期格式' };
+    if (startDate === null || endDate === null) return { error: '无效的日期格式', code: 'INVALID_DATE' };
     return {
         status: status, filterUserId: filterUserId, username: username,
         keyword: keyword, startDate: startDate, endDate: endDate
@@ -105,7 +105,7 @@ function auditLogAction(req, action, details) {
 router.get('/admin/logs/operation', async (req, res) => {
     try {
         var filters = buildOperationFilters(req);
-        if (filters.error) return res.status(400).json({ error: filters.error });
+        if (filters.error) return res.status(400).json({ error: filters.error , code: filters.code });
 
         var result = await db.auditLogs.getListWithPaging({
             page: req.query.page,
@@ -145,7 +145,7 @@ router.get('/admin/logs/operation', async (req, res) => {
         res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit, keep_count: keepCount, keep_admin_count: keepAdminCount });
     } catch (e) {
         console.error('[admin-logs] 操作日志查询失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -153,7 +153,7 @@ router.get('/admin/logs/operation', async (req, res) => {
 router.get('/admin/logs/login', async (req, res) => {
     try {
         var filters = buildLoginFilters(req);
-        if (filters.error) return res.status(400).json({ error: filters.error });
+        if (filters.error) return res.status(400).json({ error: filters.error , code: filters.code });
 
         var result = await db.loginLogs.getListWithPaging({
             page: req.query.page,
@@ -188,7 +188,7 @@ router.get('/admin/logs/login', async (req, res) => {
         res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit, keep_count: keepCount, keep_admin_count: keepAdminCount });
     } catch (e) {
         console.error('[admin-logs] 登录日志查询失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -196,7 +196,7 @@ router.get('/admin/logs/login', async (req, res) => {
 router.get('/admin/logs/operation/export', async (req, res) => {
     try {
         var filters = buildOperationFilters(req);
-        if (filters.error) return res.status(400).json({ error: filters.error });
+        if (filters.error) return res.status(400).json({ error: filters.error , code: filters.code });
 
         var result = await db.auditLogs.getListWithPaging({
             page: 1,
@@ -233,14 +233,14 @@ router.get('/admin/logs/operation/export', async (req, res) => {
         res.send(csv);
     } catch (e) {
         console.error('[admin-logs] 操作日志导出失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.get('/admin/logs/login/export', async (req, res) => {
     try {
         var filters = buildLoginFilters(req);
-        if (filters.error) return res.status(400).json({ error: filters.error });
+        if (filters.error) return res.status(400).json({ error: filters.error , code: filters.code });
 
         var result = await db.loginLogs.getListWithPaging({
             page: 1,
@@ -275,7 +275,7 @@ router.get('/admin/logs/login/export', async (req, res) => {
         res.send(csv);
     } catch (e) {
         console.error('[admin-logs] 登录日志导出失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -283,28 +283,28 @@ router.get('/admin/logs/login/export', async (req, res) => {
 router.delete('/admin/logs/operation/:id', async (req, res) => {
     try {
         var id = parseInt(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: '无效的日志 ID' });
+        if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: '无效的日志 ID', code: 'INVALID_LOG_ID' });
         var result = await db.auditLogs.deleteById(id);
-        if (!result.affectedRows) return res.status(404).json({ error: '日志不存在' });
+        if (!result.affectedRows) return res.status(404).json({ error: '日志不存在', code: 'LOG_NOT_FOUND' });
         auditLogAction(req, 'admin.log.delete', '删除操作日志 #' + id);
         res.json({ success: true, message: '日志已删除' });
     } catch (e) {
         console.error('[admin-logs] 删除操作日志失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.delete('/admin/logs/login/:id', async (req, res) => {
     try {
         var id = parseInt(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: '无效的日志 ID' });
+        if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: '无效的日志 ID', code: 'INVALID_LOG_ID' });
         var result = await db.loginLogs.deleteById(id);
-        if (!result.affectedRows) return res.status(404).json({ error: '日志不存在' });
+        if (!result.affectedRows) return res.status(404).json({ error: '日志不存在', code: 'LOG_NOT_FOUND' });
         auditLogAction(req, 'admin.log.delete', '删除登录日志 #' + id);
         res.json({ success: true, message: '日志已删除' });
     } catch (e) {
         console.error('[admin-logs] 删除登录日志失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -313,14 +313,14 @@ router.post('/admin/logs/operation/batch-delete', async (req, res) => {
     try {
         var ids = req.body.ids;
         if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500) {
-            return res.status(400).json({ error: 'ids 必须是 1-500 长度的数组' });
+            return res.status(400).json({ error: 'ids 必须是 1-500 长度的数组', code: 'IDS_ARRAY_1_500' });
         }
         var result = await db.auditLogs.batchDeleteByIds(ids);
         auditLogAction(req, 'admin.log.delete', '批量删除操作日志 ' + result.deleted + ' 条');
         res.json({ success: true, message: '已删除 ' + result.deleted + ' 条', deleted: result.deleted });
     } catch (e) {
         console.error('[admin-logs] 批量删除操作日志失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -328,14 +328,14 @@ router.post('/admin/logs/login/batch-delete', async (req, res) => {
     try {
         var ids = req.body.ids;
         if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500) {
-            return res.status(400).json({ error: 'ids 必须是 1-500 长度的数组' });
+            return res.status(400).json({ error: 'ids 必须是 1-500 长度的数组', code: 'IDS_ARRAY_1_500' });
         }
         var result = await db.loginLogs.batchDeleteByIds(ids);
         auditLogAction(req, 'admin.log.delete', '批量删除登录日志 ' + result.deleted + ' 条');
         res.json({ success: true, message: '已删除 ' + result.deleted + ' 条', deleted: result.deleted });
     } catch (e) {
         console.error('[admin-logs] 批量删除登录日志失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -343,36 +343,36 @@ router.post('/admin/logs/login/batch-delete', async (req, res) => {
 router.post('/admin/logs/operation/clear', async (req, res) => {
     try {
         var scope = (req.body.scope || 'user').trim();
-        if (SCOPE_WHITELIST.indexOf(scope) === -1) return res.status(400).json({ error: '无效的查询范围' });
+        if (SCOPE_WHITELIST.indexOf(scope) === -1) return res.status(400).json({ error: '无效的查询范围', code: 'INVALID_QUERY_RANGE' });
         var confirmStr = scope === 'admin' ? 'CLEAR_ALL_ADMIN_LOGS' : 'CLEAR_ALL_OPERATION_LOGS';
         if (req.body.confirm !== confirmStr) {
-            return res.status(400).json({ error: '确认串不正确' });
+            return res.status(400).json({ error: '确认串不正确', code: 'CONFIRM_MISMATCH' });
         }
         var limit = await checkConfiguredRateLimit('log_clear_op', 'log-clear-op:' + req.user.id);
-        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: limit.retryAfter });
         var result = await db.auditLogs.clearAll(scope);
         var scopeText = scope === 'admin' ? '后台操作日志' : (scope === 'user' ? '用户操作日志' : '全部操作日志');
         auditLogAction(req, 'admin.log.clear', '清空' + scopeText + ' ' + result.deleted + ' 条');
         res.json({ message: scopeText + '已清空 ' + result.deleted + ' 条', deleted: result.deleted });
     } catch (e) {
         console.error('[admin-logs] 清空操作日志失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.post('/admin/logs/login/clear', async (req, res) => {
     try {
         if (req.body.confirm !== 'CLEAR_ALL_LOGIN_LOGS') {
-            return res.status(400).json({ error: '确认串不正确' });
+            return res.status(400).json({ error: '确认串不正确', code: 'CONFIRM_MISMATCH' });
         }
         var limit = await checkConfiguredRateLimit('log_clear_login', 'log-clear-login:' + req.user.id);
-        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: limit.retryAfter });
         var result = await db.loginLogs.clearAll();
         auditLogAction(req, 'admin.log.clear', '清空登录日志 ' + result.deleted + ' 条');
         res.json({ message: '登录日志已清空 ' + result.deleted + ' 条', deleted: result.deleted });
     } catch (e) {
         console.error('[admin-logs] 清空登录日志失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 

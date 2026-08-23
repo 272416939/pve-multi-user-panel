@@ -62,25 +62,25 @@ async function createRechargeOrder(opts) {
 
     var numAmount = parseFloat(amount);
     if (isNaN(numAmount) || typeof numAmount !== 'number') {
-        return { ok: false, status: 400, error: '充值金额必须为有效数字' };
+        return { ok: false, status: 400, error: '充值金额必须为有效数字', code: 'RECHARGE_NUMERIC' };
     }
     if (numAmount <= 0) {
-        return { ok: false, status: 400, error: '充值金额必须大于0' };
+        return { ok: false, status: 400, error: '充值金额必须大于0', code: 'RECHARGE_GT_0' };
     }
 
     var minAmount = parseFloat(await db.config.get('pay:min_amount') || '0.01');
     var maxAmount = parseFloat(await db.config.get('pay:max_amount') || '999999.99');
     if (numAmount < minAmount || numAmount > maxAmount) {
-        return { ok: false, status: 400, error: '充值金额必须在 ' + minAmount + ' ~ ' + maxAmount + ' 之间' };
+        return { ok: false, status: 400, error: '充值金额必须在 ' + minAmount + ' ~ ' + maxAmount + ' 之间', code: 'RECHARGE_RANGE', params: [minAmount, maxAmount] };
     }
 
     if (!payMethod || !PAYMENT_METHODS.includes(payMethod)) {
-        return { ok: false, status: 400, error: '请选择支付方式' };
+        return { ok: false, status: 400, error: '请选择支付方式', code: 'PAY_METHOD_REQUIRED' };
     }
 
     var enabled = await db.config.get('pay:' + payMethod + '_enabled') || '1';
     if (enabled !== '1') {
-        return { ok: false, status: 400, error: '该支付方式暂未开放' };
+        return { ok: false, status: 400, error: '该支付方式暂未开放', code: 'PAY_METHOD_UNAVAILABLE' };
     }
 
     var pid = await db.config.get('pay:pid');
@@ -92,7 +92,7 @@ async function createRechargeOrder(opts) {
     // V4-04 修复：v1_enabled 开关生效（默认 '1' 保持存量行为），V1 通道可被管理员显式关闭
     var v1Enabled = (await db.config.get('pay:v1_enabled') || '1') === '1';
 
-    if (!pid) return { ok: false, status: 400, error: '支付接口未配置，请联系管理员' };
+    if (!pid) return { ok: false, status: 400, error: '支付接口未配置，请联系管理员', code: 'PAY_NOT_CONFIGURED' };
 
     var orderNo = generateOrderNo(payMethod);
     var siteUrl = process.env.SITE_URL || baseUrl;
@@ -139,7 +139,7 @@ async function createRechargeOrder(opts) {
     } else {
         // V4-04 修复：V1 mapi 通道受 v1_enabled 开关控制，关闭后拒绝下单
         if (!v1Enabled) {
-            return { ok: false, status: 400, error: 'V1 支付通道已关闭，请联系管理员' };
+            return { ok: false, status: 400, error: 'V1 支付通道已关闭，请联系管理员', code: 'PAY_V1_DISABLED' };
         }
         // V1: /mapi.php 接口，clientip 为必填，device 可选
         payParams.clientip = clientIp;

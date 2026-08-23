@@ -17,7 +17,7 @@ router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         // V3-08 修复：列表类端点限速
         const listRate = await checkConfiguredRateLimit('lxc_backups', 'ratelimit:lxc-backups:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: listRate.retryAfter });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
  
@@ -25,10 +25,10 @@ router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
             const isOwner = req.user.id === ct.user_id;
             const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限查看此容器备份' });
+                return res.status(403).json({ error: '无权限查看此容器备份', code: 'BACKUP_LXC_NO_PERM' });
             }
         } else if (req.user.role !== 'admin') {
-            return res.status(403).json({ error: '资源未分配，无权限' });
+            return res.status(403).json({ error: '资源未分配，无权限', code: 'RESOURCE_UNASSIGNED' });
         }
  
         const backups = await db.backups.getByCtId(vmid);
@@ -39,7 +39,7 @@ router.get('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
  
         res.json({ backups, limits });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -50,36 +50,36 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
 
         // V3-09 修复：备份操作用户级限速（5次/分钟）
         const opRate = await checkConfiguredRateLimit('backup_op', 'ratelimit:backup-op:' + req.user.id);
-        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试', retryAfter: opRate.retryAfter });
+        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试', code: 'RATE_LIMITED_BACKUP', retryAfter: opRate.retryAfter });
  
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
  
         if (!ct) {
-            return res.status(404).json({ error: '容器未分配或不存在' });
+            return res.status(404).json({ error: '容器未分配或不存在', code: 'LXC_UNASSIGNED_OR_MISSING' });
         }
  
         const isOwner = req.user.id === ct.user_id;
         const isAdmin = req.user.role === 'admin';
         if (!isOwner && !isAdmin) {
-            return res.status(403).json({ error: '无权限操作此容器' });
+            return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
         }
 
         // M-2 修复：到期资源拦截（备份创建占用存储资源）
         if (!isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '容器已到期，请先续费' });
+            return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
  
         // 检查容器是否正在运行
         const status = await pveApi.getLxcStatus(vmid);
         if (status.status === 'running') {
-            return res.status(400).json({ error: '备份前请先关闭容器' });
+            return res.status(400).json({ error: '备份前请先关闭容器', code: 'SHUTDOWN_BEFORE_BACKUP_LXC' });
         }
  
         // 检查是否有正在进行的备份或恢复
         const runningBackups = (await db.backups.getRunningBackups()).filter(b => b.ct_id === vmid && b.type === 'lxc');
         if (runningBackups.length > 0) {
-            return res.status(400).json({ error: '该容器已有备份或恢复任务在进行中' });
+            return res.status(400).json({ error: '该容器已有备份或恢复任务在进行中', code: 'LXC_BACKUP_BUSY' });
         }
  
         const cfg = await db.backupConfig.get();
@@ -89,12 +89,12 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         if (!isAdmin) {
             const count = await db.backups.getCountByCtId(vmid, req.user.id);
             if (count >= lxcCfg.max_per_vm) {
-                return res.status(400).json({ error: `该容器备份数已达上限（${lxcCfg.max_per_vm} 个），请删除旧备份后再试` });
+                return res.status(400).json({ error: `该容器备份数已达上限（${lxcCfg.max_per_vm} 个），请删除旧备份后再试`, code: 'LXC_BACKUP_LIMIT', params: [lxcCfg.max_per_vm] });
             }
  
             const dailyCount = await db.backupLogs.getDailyCount(req.user.id);
             if (dailyCount >= cfg.daily_limit) {
-                return res.status(400).json({ error: `今日备份次数已达上限（${cfg.daily_limit} 次）` });
+                return res.status(400).json({ error: `今日备份次数已达上限（${cfg.daily_limit} 次）`, code: 'BACKUP_DAILY_LIMIT', params: [cfg.daily_limit] });
             }
         }
  
@@ -102,7 +102,7 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         // V3-02 修复：storage 参数必须白名单校验（防存储名注入/指向任意 PVE 存储）
         const storage = reqStorage || lxcCfg.default_storage || cfg.default_storage || 'local';
         if (!/^[a-zA-Z0-9_-]+$/.test(storage)) {
-            return res.status(400).json({ error: '无效的存储名称' });
+            return res.status(400).json({ error: '无效的存储名称', code: 'INVALID_STORAGE_NAME' });
         }
  
         // 获取容器的 rootfs 存储位置，用于恢复时指定
@@ -142,7 +142,7 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         res.json({ id: backupId, message: '备份任务已提交' });
     } catch (error) {
         console.error('创建 LXC 备份失败:', error.response?.data || error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -152,11 +152,11 @@ router.delete('/lxc/:vmid/backups/:id', authMiddleware, async (req, res) => {
         const backup = await db.backups.getById(backupId);
  
         if (!backup || backup.type !== 'lxc') {
-            return res.status(404).json({ error: '备份不存在' });
+            return res.status(404).json({ error: '备份不存在', code: 'BACKUP_NOT_FOUND' });
         }
  
         if (req.user.role !== 'admin' && backup.user_id !== req.user.id) {
-            return res.status(403).json({ error: '无权限删除此备份' });
+            return res.status(403).json({ error: '无权限删除此备份', code: 'BACKUP_DEL_NO_PERM' });
         }
  
         // 删除 PVE 上的备份文件（失败仅记录，不影响 DB 删除）
@@ -177,17 +177,17 @@ router.delete('/lxc/:vmid/backups/:id', authMiddleware, async (req, res) => {
         res.json({ message: '备份已删除' });
     } catch (error) {
         console.error('删除备份失败:', error);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         // V3-09 修复：恢复操作用户级限速（5次/分钟）
         const restoreRate = await checkConfiguredRateLimit('restore_op', 'ratelimit:restore-op:' + req.user.id);
-        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试', retryAfter: restoreRate.retryAfter });
+        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试', code: 'RATE_LIMITED_RESTORE', retryAfter: restoreRate.retryAfter });
         const backupId = parseInt(req.params.id);
  
         const allCts = await db.lxcContainers.getAll();
@@ -197,38 +197,38 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
             const isOwner = req.user.id === ct.user_id;
             const isAdmin = req.user.role === 'admin';
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此容器' });
+                return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
             }
             // M-2 修复：到期资源拦截（备份恢复属于资源使用）
             if (!isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请先续费' });
+                return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
             }
         } else if (req.user.role !== 'admin') {
-            return res.status(403).json({ error: '无权限操作此容器' });
+            return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
         }
 
         const backup = await db.backups.getById(backupId);
         if (!backup || backup.type !== 'lxc') {
-            return res.status(404).json({ error: '备份不存在' });
+            return res.status(404).json({ error: '备份不存在', code: 'BACKUP_NOT_FOUND' });
         }
         // B-1 修复：校验备份是否属于目标容器
         if (backup.ct_id !== parseInt(vmid)) {
-            return res.status(400).json({ error: '备份不属于目标容器' });
+            return res.status(400).json({ error: '备份不属于目标容器', code: 'BACKUP_NOT_LXC' });
         }
         if (backup.status !== 'completed' || !backup.filename) {
-            return res.status(400).json({ error: '备份文件不完整，无法恢复' });
+            return res.status(400).json({ error: '备份文件不完整，无法恢复', code: 'BACKUP_INCOMPLETE' });
         }
  
         // 检查容器是否已关机
         const status = await pveApi.getLxcStatus(vmid);
         if (status.status !== 'stopped') {
-            return res.status(400).json({ error: '恢复前请先关闭容器' });
+            return res.status(400).json({ error: '恢复前请先关闭容器', code: 'SHUTDOWN_BEFORE_RESTORE_LXC' });
         }
  
         // 检查是否有正在进行的备份或恢复
         const runningBackups = (await db.backups.getRunningBackups()).filter(b => b.ct_id === vmid && b.type === 'lxc');
         if (runningBackups.length > 0) {
-            return res.status(400).json({ error: '该容器已有备份或恢复任务在进行中' });
+            return res.status(400).json({ error: '该容器已有备份或恢复任务在进行中', code: 'LXC_BACKUP_BUSY' });
         }
  
         // 通过 SSH 执行 pct restore --force 1 覆盖恢复（无需先删容器）
@@ -273,7 +273,7 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
         res.json({ id: restoreRecord.id, message: '恢复任务已提交' });
     } catch (error) {
         console.error('恢复备份失败:', error.response?.data || error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -311,11 +311,11 @@ router.get('/vm/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表类端点限速
         const listRate = await checkConfiguredRateLimit('vm_backups', 'ratelimit:vm-backups:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: listRate.retryAfter });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const owned = userVms.some(v => v.vm_id == req.params.vmid);
-            if (!owned) return res.status(403).json({ error: '无权操作此虚拟机' });
+            if (!owned) return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
         }
         const backups = await db.backups.getByVmId(req.params.vmid);
         const cfg = await db.backupConfig.get();
@@ -323,33 +323,33 @@ router.get('/vm/:vmid/backups', authMiddleware, async (req, res) => {
         const todayCount = await db.backupLogs.getDailyCount(req.user.id);
         res.json({ backups, limits: { current, max_per_vm: cfg.max_per_vm, today_creates: todayCount, daily_limit: cfg.daily_limit } });
     } catch (error) {
-        res.status(500).json({ error: '获取备份列表失败' });
+        res.status(500).json({ error: '获取备份列表失败', code: 'BACKUP_LIST_FAILED' });
     }
 });
 
 router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID', code: 'INVALID_VM_ID_2' });
         // V3-09 修复：备份操作用户级限速（5次/分钟）
         const opRate = await checkConfiguredRateLimit('backup_op', 'ratelimit:backup-op:' + req.user.id);
-        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试', retryAfter: opRate.retryAfter });
+        if (!opRate.allowed) return res.status(429).json({ error: '备份操作过于频繁，请稍后再试', code: 'RATE_LIMITED_BACKUP', retryAfter: opRate.retryAfter });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const ownedVm = userVms.find(v => v.vm_id == vmid);
-            if (!ownedVm) return res.status(403).json({ error: '无权操作此虚拟机' });
+            if (!ownedVm) return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
             // M-2 修复：到期资源拦截（备份创建占用存储资源）
             if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
             }
         }
         const status = await pveApi.getVmStatus(vmid);
         if (status.status !== 'stopped') {
-            return res.status(400).json({ error: '请先关闭虚拟机后再进行备份' });
+            return res.status(400).json({ error: '请先关闭虚拟机后再进行备份', code: 'SHUTDOWN_BEFORE_BACKUP_VM' });
         }
         const existingRunning = (await db.backups.getByVmId(vmid)).filter(b => b.status === 'running' || b.status === 'pending');
         if (existingRunning.length > 0) {
-            return res.status(409).json({ error: '该虚拟机有正在进行的备份，请等待完成后再试' });
+            return res.status(409).json({ error: '该虚拟机有正在进行的备份，请等待完成后再试', code: 'VM_BACKUP_RUNNING' });
         }
         let storage = req.body.storage || '';
         if (req.user.role !== 'admin') {
@@ -358,7 +358,7 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
             const cfg = await db.backupConfig.get();
             const backupCount = await db.backups.getCountByVmId(vmid, req.user.id);
             if (backupCount >= cfg.max_per_vm) {
-                return res.status(400).json({ error: `该虚拟机备份数已达上限（${cfg.max_per_vm} 个），请删除旧备份后再试` });
+                return res.status(400).json({ error: `该虚拟机备份数已达上限（${cfg.max_per_vm} 个），请删除旧备份后再试`, code: 'VM_BACKUP_LIMIT', params: [cfg.max_per_vm] });
             }
             const dailyCount = await db.backupLogs.getDailyCount(req.user.id);
             if (dailyCount >= cfg.daily_limit) {
@@ -366,7 +366,7 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
             }
         } else if (storage && !/^[a-zA-Z0-9_-]+$/.test(storage)) {
             // V4-09 修复：admin 自定义 storage 白名单校验（与 LXC 路径 V3-02 一致），空值走下方默认存储
-            return res.status(400).json({ error: '无效的存储位置' });
+            return res.status(400).json({ error: '无效的存储位置', code: 'INVALID_STORAGE' });
         }
         if (!storage) storage = (await db.backupConfig.get()).default_storage;
         const backup = await db.backups.create({ vm_id: vmid, user_id: req.user.id, storage, notes: req.body.notes || '' });
@@ -378,25 +378,25 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
             startBackupPolling(backup.id, upid);
         } catch (e) {
             await db.backups.fail(backup.id, e.response?.data?.message || e.message);
-            return res.status(500).json({ error: safeError(e) });
+            return res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
         }
         await auditAction(req, 'vm.backup.create', '创建 VM ' + vmid + ' 备份');
         res.json({ message: '备份任务已创建', backup_id: backup.id });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.delete('/backups/:id', authMiddleware, async (req, res) => {
     try {
         const backup = await db.backups.getById(req.params.id);
-        if (!backup) return res.status(404).json({ error: '备份不存在' });
+        if (!backup) return res.status(404).json({ error: '备份不存在', code: 'BACKUP_NOT_FOUND' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const owned = userVms.some(v => v.vm_id == backup.vm_id);
-            if (!owned) return res.status(403).json({ error: '无权删除此备份' });
+            if (!owned) return res.status(403).json({ error: '无权删除此备份', code: 'BACKUP_DEL_NO_PERM_2' });
             if (backup.status === 'running' || backup.status === 'pending') {
-                return res.status(400).json({ error: '不能删除正在执行的备份' });
+                return res.status(400).json({ error: '不能删除正在执行的备份', code: 'BACKUP_DELETING' });
             }
         }
         if (backup.filename && backup.status === 'completed') {
@@ -408,14 +408,14 @@ router.delete('/backups/:id', authMiddleware, async (req, res) => {
         await auditAction(req, 'vm.backup.delete', '删除 VM ' + (backup.vm_id || '') + ' 备份', { resourceType: 'backup', resourceId: backup.vm_id || '' });
         res.json({ message: '备份已删除' });
     } catch (error) {
-        res.status(500).json({ error: '删除备份失败' });
+        res.status(500).json({ error: '删除备份失败', code: 'BACKUP_DELETE_FAILED' });
     }
 });
 
 router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
     try {
         const { ids } = req.body;
-        if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: '请选择要删除的备份' });
+        if (!ids || !Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: '请选择要删除的备份', code: 'BACKUP_SELECT_REQUIRED' });
         // B-2 修复：收集有权限删除的 ID，而非使用原始 ids
         const deletableIds = [];
         for (const id of ids) {
@@ -461,7 +461,7 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
         } catch (_) {}
         res.json({ message: `已删除 ${deletableIds.length} 个备份` });
     } catch (error) {
-        res.status(500).json({ error: '批量删除失败' });
+        res.status(500).json({ error: '批量删除失败', code: 'BATCH_DELETE_FAILED' });
     }
 });
 
@@ -480,14 +480,14 @@ router.get('/admin/backups', authMiddleware, adminMiddleware, async (req, res) =
         }
         res.json(backups);
     } catch (error) {
-        res.status(500).json({ error: '获取备份列表失败' });
+        res.status(500).json({ error: '获取备份列表失败', code: 'BACKUP_LIST_FAILED' });
     }
 });
 
 router.delete('/admin/backups/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const backup = await db.backups.getById(req.params.id);
-        if (!backup) return res.status(404).json({ error: '备份不存在' });
+        if (!backup) return res.status(404).json({ error: '备份不存在', code: 'BACKUP_NOT_FOUND' });
         if (backup.filename && backup.status === 'completed') {
             const volid = backup.type === 'lxc' ? `${backup.storage}:backup/${backup.filename}` : backup.filename;
             try { await pveApi.deleteBackupFile(volid); } catch (e) { console.error('删除备份文件失败:', e.message); }
@@ -501,44 +501,44 @@ router.delete('/admin/backups/:id', authMiddleware, adminMiddleware, async (req,
         } catch (e) {}
         res.json({ message: '备份已删除' });
     } catch (error) {
-        res.status(500).json({ error: '删除备份失败' });
+        res.status(500).json({ error: '删除备份失败', code: 'BACKUP_DELETE_FAILED' });
     }
 });
 
 router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID', code: 'INVALID_VM_ID_2' });
         // V3-09 修复：恢复操作用户级限速（5次/分钟）
         const restoreRate = await checkConfiguredRateLimit('restore_op', 'ratelimit:restore-op:' + req.user.id);
-        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试', retryAfter: restoreRate.retryAfter });
+        if (!restoreRate.allowed) return res.status(429).json({ error: '恢复操作过于频繁，请稍后再试', code: 'RATE_LIMITED_RESTORE', retryAfter: restoreRate.retryAfter });
         const backupId = req.params.id;
         const backup = await db.backups.getById(backupId);
-        if (!backup) return res.status(404).json({ error: '备份不存在' });
+        if (!backup) return res.status(404).json({ error: '备份不存在', code: 'BACKUP_NOT_FOUND' });
         // B-1 修复：校验备份是否属于目标虚拟机
         if (backup.vm_id != vmid) {
-            return res.status(400).json({ error: '备份不属于目标虚拟机' });
+            return res.status(400).json({ error: '备份不属于目标虚拟机', code: 'BACKUP_NOT_VM' });
         }
         if (backup.status !== 'completed' || !backup.filename) {
-            return res.status(400).json({ error: '备份文件不完整，无法恢复' });
+            return res.status(400).json({ error: '备份文件不完整，无法恢复', code: 'BACKUP_INCOMPLETE' });
         }
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const ownedVm = userVms.find(v => v.vm_id == vmid);
-            if (!ownedVm) return res.status(403).json({ error: '无权操作此虚拟机' });
+            if (!ownedVm) return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
             // M-2 修复：到期资源拦截（备份恢复属于资源使用）
             if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
             }
         }
         const status = await pveApi.getVmStatus(vmid);
         if (status.status !== 'stopped') {
-            return res.status(400).json({ error: '请先关闭虚拟机后再进行恢复' });
+            return res.status(400).json({ error: '请先关闭虚拟机后再进行恢复', code: 'SHUTDOWN_BEFORE_RESTORE_VM' });
         }
         const runningBackups = (await db.backups.getByVmId(vmid)).filter(b => b.status === 'running' || b.status === 'pending');
         const runningRestores = await db.restoreTasks.getRunningByVmId(vmid);
         if (runningBackups.length > 0 || runningRestores.length > 0) {
-            return res.status(409).json({ error: '该虚拟机有正在进行的备份或恢复任务，请等待完成后再试' });
+            return res.status(409).json({ error: '该虚拟机有正在进行的备份或恢复任务，请等待完成后再试', code: 'VM_BACKUP_RESTORE_RUNNING' });
         }
         const restore = await db.restoreTasks.create({ vm_id: vmid, user_id: req.user.id, backup_id: backupId });
         // 恢复前快照：记录当前 VM 磁盘配置和活跃数据盘，用于恢复后对账
@@ -558,28 +558,28 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
             startRestorePolling(restore.id, upid);
         } catch (e) {
             await db.restoreTasks.fail(restore.id, e.response?.data?.message || e.message);
-            return res.status(500).json({ error: safeError(e) });
+            return res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
         }
         await auditAction(req, 'vm.backup.restore', '恢复 VM ' + vmid + ' 备份');
         res.json({ message: '恢复任务已创建，完成后将通过站内信和邮件通知您' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.get('/vm/:vmid/restore-status', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID' });
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的 VM ID', code: 'INVALID_VM_ID_2' });
         if (req.user.role !== 'admin') {
             const userVms = await db.vms.getByUserId(req.user.id);
             const owned = userVms.some(v => v.vm_id === vmid);
-            if (!owned) return res.status(403).json({ error: '无权操作此虚拟机' });
+            if (!owned) return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
         }
         const tasks = (await db.restoreTasks.getByVmId(vmid)).filter(t => t.status === 'running' || t.status === 'pending');
         res.json(tasks.length > 0 ? tasks[0] : null);
     } catch (error) {
-        res.status(500).json({ error: '获取恢复任务状态失败' });
+        res.status(500).json({ error: '获取恢复任务状态失败', code: 'RESTORE_STATUS_FAILED' });
     }
 });
 
@@ -587,7 +587,7 @@ router.post('/admin/backups/cleanup', authMiddleware, adminMiddleware, async (re
     try {
         const { ids } = req.body;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ error: '请指定要清理的备份 ID' });
+            return res.status(400).json({ error: '请指定要清理的备份 ID', code: 'BACKUP_CLEAN_ID_REQUIRED' });
         }
         let deleted = 0;
         for (const id of ids) {
@@ -606,7 +606,7 @@ router.post('/admin/backups/cleanup', authMiddleware, adminMiddleware, async (re
         res.json({ message: `已清理 ${deleted} 条备份记录` });
     } catch (error) {
         console.error('清理备份记录失败:', error);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

@@ -21,11 +21,11 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
     try {
         const vmid = parseInt(req.params.vmid);
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
-            return res.status(400).json({ error: '无效的 VMID' });
+            return res.status(400).json({ error: '无效的 VMID', code: 'INVALID_VMD' });
         }
         const config = await pveApi.getVmConfig(vmid);
         if (!config) {
-            return res.status(404).json({ error: 'PVE 模板不存在' });
+            return res.status(404).json({ error: 'PVE 模板不存在', code: 'PVE_TEMPLATE_NOT_FOUND' });
         }
 
         // 从 config 解析系统盘容量
@@ -132,7 +132,7 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
         });
     } catch (e) {
         console.error('[pve-template-config] 读取模板配置失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -144,7 +144,7 @@ router.get('/admin/os-templates', async (req, res) => {
         const list = await db.osTemplates.getAll();
         res.json({ success: true, data: list });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -152,12 +152,12 @@ router.get('/admin/os-templates', async (req, res) => {
 router.get('/admin/os-templates/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID' });
+        if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID', code: 'INVALID_ID_2' });
         const tpl = await db.osTemplates.getById(id);
-        if (!tpl) return res.status(404).json({ error: '模板不存在' });
+        if (!tpl) return res.status(404).json({ error: '模板不存在', code: 'TEMPLATE_NOT_FOUND' });
         res.json({ success: true, data: tpl });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -166,12 +166,12 @@ router.post('/admin/os-templates/reorder', async (req, res) => {
     try {
         const ids = req.body.ids;
         if (!Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ error: 'ids 参数无效' });
+            return res.status(400).json({ error: 'ids 参数无效', code: 'IDS_INVALID' });
         }
         for (let i = 0; i < ids.length; i++) {
             ids[i] = parseInt(ids[i]);
             if (!Number.isInteger(ids[i]) || ids[i] <= 0) {
-                return res.status(400).json({ error: 'ids 必须为正整数' });
+                return res.status(400).json({ error: 'ids 必须为正整数', code: 'IDS_POSITIVE_INT' });
             }
         }
         await db.osTemplates.batchUpdateSortOrder(ids);
@@ -182,7 +182,7 @@ router.post('/admin/os-templates/reorder', async (req, res) => {
         } catch (e) {}
         res.json({ success: true });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -191,16 +191,16 @@ router.post('/admin/os-templates', async (req, res) => {
     try {
         const data = req.body;
         if (!data.name || !data.template_vmid) {
-            return res.status(400).json({ error: '名称和模板 VMID 必填' });
+            return res.status(400).json({ error: '名称和模板 VMID 必填', code: 'NAME_VMID_REQUIRED' });
         }
         const templateVmid = parseInt(data.template_vmid);
         if (!Number.isInteger(templateVmid) || templateVmid < 100 || templateVmid > 999999999) {
-            return res.status(400).json({ error: '无效的模板 VMID' });
+            return res.status(400).json({ error: '无效的模板 VMID', code: 'INVALID_TPL_VMID' });
         }
         // 校验 template_vmid 在 PVE 中确实是模板
         const vms = await pveApi.getVms({ templateOnly: true });
         if (!vms.find(v => v.vmid === templateVmid)) {
-            return res.status(400).json({ error: '指定的 VMID 在 PVE 中不是模板' });
+            return res.status(400).json({ error: '指定的 VMID 在 PVE 中不是模板', code: 'VMID_NOT_TEMPLATE' });
         }
         const id = await db.osTemplates.create({
             name: String(data.name).slice(0, 255),
@@ -226,7 +226,7 @@ router.post('/admin/os-templates', async (req, res) => {
         } catch (e) {}
         res.json({ success: true, id });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -253,9 +253,9 @@ const OS_TEMPLATE_DIFF_FIELDS = [
 router.put('/admin/os-templates/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID' });
+        if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID', code: 'INVALID_ID_2' });
         const existing = await db.osTemplates.getById(id);
-        if (!existing) return res.status(404).json({ error: '模板不存在' });
+        if (!existing) return res.status(404).json({ error: '模板不存在', code: 'TEMPLATE_NOT_FOUND' });
 
         const allowedFields = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
         const updates = {};
@@ -267,12 +267,12 @@ router.put('/admin/os-templates/:id', async (req, res) => {
         if (updates.template_vmid !== undefined) {
             const vmid = parseInt(updates.template_vmid);
             if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
-                return res.status(400).json({ error: '无效的模板 VMID' });
+                return res.status(400).json({ error: '无效的模板 VMID', code: 'INVALID_TPL_VMID' });
             }
         }
         // 目标磁盘格式白名单（跨存储切换时作为 PVE move_disk 的 format 参数，非法值会导致切换失败）
         if (updates.disk_format !== undefined && !['', 'raw', 'qcow2', 'vmdk'].includes(updates.disk_format)) {
-            return res.status(400).json({ error: '无效的目标磁盘格式' });
+            return res.status(400).json({ error: '无效的目标磁盘格式', code: 'INVALID_DISK_FORMAT' });
         }
         const result = await db.osTemplates.update(id, updates);
         // 操作审计：更新 OS 模板（DB 新旧记录字段级 diff，只记实际变更字段；空更新/无变化不写）
@@ -288,7 +288,7 @@ router.put('/admin/os-templates/:id', async (req, res) => {
         } catch (e) {}
         res.json({ success: true, data: result });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -296,15 +296,15 @@ router.put('/admin/os-templates/:id', async (req, res) => {
 router.delete('/admin/os-templates/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID' });
+        if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID', code: 'INVALID_ID_2' });
         const tpl = await db.osTemplates.getById(id);
-        if (!tpl) return res.status(404).json({ error: '模板不存在' });
+        if (!tpl) return res.status(404).json({ error: '模板不存在', code: 'TEMPLATE_NOT_FOUND' });
         // 检查是否有 VM 正在使用该 OS 模板
         const vms = await db.vms.getAll();
         const usedBy = vms.filter(v => v.current_os_template_id === id);
         if (usedBy.length > 0) {
             return res.status(400).json({
-                error: `有 ${usedBy.length} 个 VM 正在使用该系统模板，请先迁移后再删除`,
+                error: `有 ${usedBy.length} 个 VM 正在使用该系统模板，请先迁移后再删除`, code: 'OS_TPL_IN_USE', params: [usedBy.length],
                 used_by_vms: usedBy.map(v => ({ vm_id: v.vm_id, name: v.name }))
             });
         }
@@ -316,7 +316,7 @@ router.delete('/admin/os-templates/:id', async (req, res) => {
         } catch (e) {}
         res.json({ success: true, message: '已删除' });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -324,12 +324,12 @@ router.delete('/admin/os-templates/:id', async (req, res) => {
 router.get('/admin/os-templates/:id/vms', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID' });
+        if (!id || id <= 0) return res.status(400).json({ error: '无效的 ID', code: 'INVALID_ID_2' });
         const vms = await db.vms.getAll();
         const filtered = vms.filter(v => v.current_os_template_id === id);
         res.json({ success: true, data: filtered });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -343,19 +343,19 @@ router.get('/admin/os-switch-logs', async (req, res) => {
     try {
         const status = (req.query.status || '').trim();
         if (status && OS_SWITCH_LOG_STATUS.indexOf(status) === -1) {
-            return res.status(400).json({ error: '无效的日志状态' });
+            return res.status(400).json({ error: '无效的日志状态', code: 'INVALID_LOG_STATUS' });
         }
         const username = (req.query.username || '').trim();
-        if (username.length > 64) return res.status(400).json({ error: '用户名过长' });
+        if (username.length > 64) return res.status(400).json({ error: '用户名过长', code: 'USERNAME_TOO_LONG' });
         const keyword = (req.query.keyword || '').trim();
-        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
+        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' });
         const vmId = (req.query.vm_id || '').trim();
-        if (vmId && !/^\d+$/.test(vmId)) return res.status(400).json({ error: '无效的 VMID' });
+        if (vmId && !/^\d+$/.test(vmId)) return res.status(400).json({ error: '无效的 VMID', code: 'INVALID_VMD' });
         const userId = (req.query.user_id || '').trim();
-        if (userId && !/^\d+$/.test(userId)) return res.status(400).json({ error: '无效的用户ID' });
+        if (userId && !/^\d+$/.test(userId)) return res.status(400).json({ error: '无效的用户ID', code: 'INVALID_USER_ID' });
         const startDate = normalizeDateParam(req.query.start_date || '', false);
         const endDate = normalizeDateParam(req.query.end_date || '', true);
-        if (startDate === null || endDate === null) return res.status(400).json({ error: '无效的日期格式' });
+        if (startDate === null || endDate === null) return res.status(400).json({ error: '无效的日期格式', code: 'INVALID_DATE' });
         const filters = {
             page: Math.min(parseInt(req.query.page) || 1, 1000),
             limit: Math.min(parseInt(req.query.limit) || 20, 200),
@@ -376,7 +376,7 @@ router.get('/admin/os-switch-logs', async (req, res) => {
         const keepAdminCount = parseInt(await db.config.get('log:keep_admin_count')) || 5000;
         res.json({ success: true, data: logs, total: countRow ? (countRow.c || 0) : 0, page: filters.page, limit: filters.limit, keep_count: keepCount, keep_admin_count: keepAdminCount });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -384,14 +384,14 @@ router.get('/admin/os-switch-logs', async (req, res) => {
 router.delete('/admin/os-switch-logs/:id', async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!id || id <= 0) return res.status(400).json({ error: '无效的日志 ID' });
+        if (!id || id <= 0) return res.status(400).json({ error: '无效的日志 ID', code: 'INVALID_LOG_ID' });
         const log = await db.vmOsSwitchLogs.getById(id);
-        if (!log) return res.status(404).json({ error: '日志不存在' });
+        if (!log) return res.status(404).json({ error: '日志不存在', code: 'LOG_NOT_FOUND' });
         if (log.status === 'running') {
-            return res.status(400).json({ error: '运行中的日志禁止删除' });
+            return res.status(400).json({ error: '运行中的日志禁止删除', code: 'LOG_RUNNING_NO_DELETE' });
         }
         if (log.admin_intervention_required && req.query.force !== '1') {
-            return res.status(400).json({ error: '该日志标记为需管理员介入，删除请加 ?force=1 二次确认' });
+            return res.status(400).json({ error: '该日志标记为需管理员介入，删除请加 ?force=1 二次确认', code: 'LOG_ADMIN_FORCE' });
         }
         const result = await db.vmOsSwitchLogs.deleteById(id);
         // 操作审计：删除系统切换日志
@@ -404,7 +404,7 @@ router.delete('/admin/os-switch-logs/:id', async (req, res) => {
         if (e.code === 'LOG_RUNNING') {
             return res.status(400).json({ error: e.message });
         }
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -413,7 +413,7 @@ router.post('/admin/os-switch-logs/batch-delete', async (req, res) => {
     try {
         const { ids, status, vm_id, user_id, before_date } = req.body;
         if (ids && (!Array.isArray(ids) || ids.length === 0 || ids.length > 500)) {
-            return res.status(400).json({ error: 'ids 必须是 1-500 长度的数组' });
+            return res.status(400).json({ error: 'ids 必须是 1-500 长度的数组', code: 'IDS_ARRAY_1_500' });
         }
         const result = await db.vmOsSwitchLogs.batchDelete({ ids, status, vm_id, user_id, before_date });
         // 操作审计：批量删除系统切换日志
@@ -428,7 +428,7 @@ router.post('/admin/os-switch-logs/batch-delete', async (req, res) => {
             skipped_running: result.skipped_running
         });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -436,7 +436,7 @@ router.post('/admin/os-switch-logs/batch-delete', async (req, res) => {
 router.post('/admin/os-switch-logs/clear', async (req, res) => {
     try {
         if (req.body.confirm !== 'CLEAR_ALL_OS_SWITCH_LOGS') {
-            return res.status(400).json({ error: '高危操作，请传入 confirm: "CLEAR_ALL_OS_SWITCH_LOGS" 二次确认' });
+            return res.status(400).json({ error: '高危操作，请传入 confirm: "CLEAR_ALL_OS_SWITCH_LOGS" 二次确认', code: 'LOG_CLEAR_ALL_CONFIRM' });
         }
         const result = await db.vmOsSwitchLogs.clearAllExceptRunningAndIntervention();
         // 操作审计：清空系统切换日志
@@ -452,7 +452,7 @@ router.post('/admin/os-switch-logs/clear', async (req, res) => {
             skipped_intervention: result.skipped_intervention
         });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 

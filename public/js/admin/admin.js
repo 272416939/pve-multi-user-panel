@@ -726,7 +726,7 @@
         $.emailTemplateOriginalContent.value = content;
         window.__emailTemplateQuillBaseline = JSON.stringify(quill.getContents());
         window.__emailTemplateQuill = quill;
-        $.applyEmailToolbarTitles();
+        $.applyQuillLocale();
         $.clampEmailTooltipBounds(quill);
     };
 
@@ -795,12 +795,11 @@
                 var el = tb.querySelector(sel);
                 if (el) el.setAttribute('title', BTN_TITLES[sel]);
             });
-            // 对齐按钮组（4 个独立按钮：左对齐按钮可能无 value 属性，逐个按 value 映射补 title）
+            // 对齐按钮组（4 个独立按钮：左对齐按钮可能无 value 属性，逐个按 value 映射补 title；
+            // 无守卫直设——applyQuillLocale 在语言切换后重跑，允许覆盖为新语言 title）
             var ALIGN_TITLES = { '': window.__i18n.t('admin.quill.alignLeft'), center: window.__i18n.t('admin.quill.alignCenter'), right: window.__i18n.t('admin.quill.alignRight'), justify: window.__i18n.t('admin.quill.alignJustify') };
             tb.querySelectorAll('button.ql-align').forEach(function(el) {
-                if (!el.getAttribute('title')) {
-                    el.setAttribute('title', ALIGN_TITLES[el.getAttribute('value') || ''] || window.__i18n.t('admin.quill.align'));
-                }
+                el.setAttribute('title', ALIGN_TITLES[el.getAttribute('value') || ''] || window.__i18n.t('admin.quill.align'));
             });
             // 下拉选择器（标题/文字颜色/背景颜色）
             var PICKER_TITLES = {
@@ -813,41 +812,66 @@
                 var el = tb.querySelector(sel + ' .ql-picker-label');
                 if (el) el.setAttribute('title', PICKER_TITLES[sel]);
             });
-            // 下拉选项提示（色板/标题选项在 Quill 初始化时已生成（隐藏），直接补一次 title；
-            // MutationObserver 兜底后续新增节点）
+            // 下拉选项提示（色板/标题/字号选项在 Quill 初始化时已生成（隐藏），每次重设；
+            // MutationObserver 只绑一次兜底后续新增节点——防重入只护 observer 不护 title）
+            var applyItemTitles = function() {
+                tb.querySelectorAll('.ql-header .ql-picker-options .ql-picker-item').forEach(function(item) {
+                    var v = item.getAttribute('data-value');
+                    item.setAttribute('title', v === 'false' || v === null ? window.__i18n.t('admin.quill.normal') : window.__i18n.t('admin.quill.headingPrefix') + v);
+                });
+                tb.querySelectorAll('.ql-color .ql-picker-options .ql-picker-item, .ql-background .ql-picker-options .ql-picker-item').forEach(function(item) {
+                    var v = item.getAttribute('data-value');
+                    item.setAttribute('title', v ? window.__i18n.t('admin.quill.colorPrefix') + v : window.__i18n.t('admin.quill.clearColor'));
+                });
+                var SIZE_TITLES = { small: window.__i18n.t('admin.quill.small'), large: window.__i18n.t('admin.quill.large'), huge: window.__i18n.t('admin.quill.huge') };
+                tb.querySelectorAll('.ql-size .ql-picker-options .ql-picker-item').forEach(function(item) {
+                    var v = item.getAttribute('data-value');
+                    item.setAttribute('title', (v && SIZE_TITLES[v]) ? SIZE_TITLES[v] : window.__i18n.t('admin.quill.standardSize'));
+                });
+            };
+            applyItemTitles();
             if (!tb.__qlPickerTitleBound) {
                 tb.__qlPickerTitleBound = true;
-                var applyItemTitles = function() {
-                    tb.querySelectorAll('.ql-header .ql-picker-options .ql-picker-item').forEach(function(item) {
-                        if (!item.getAttribute('title')) {
-                            var v = item.getAttribute('data-value');
-                            item.setAttribute('title', v === 'false' || v === null ? window.__i18n.t('admin.quill.normal') : window.__i18n.t('admin.quill.headingPrefix') + v);
-                        }
-                    });
-                    tb.querySelectorAll('.ql-color .ql-picker-options .ql-picker-item, .ql-background .ql-picker-options .ql-picker-item').forEach(function(item) {
-                        if (!item.getAttribute('title')) {
-                            var v = item.getAttribute('data-value');
-                            item.setAttribute('title', v ? window.__i18n.t('admin.quill.colorPrefix') + v : window.__i18n.t('admin.quill.clearColor'));
-                        }
-                    });
-                    var SIZE_TITLES = { small: window.__i18n.t('admin.quill.small'), large: window.__i18n.t('admin.quill.large'), huge: window.__i18n.t('admin.quill.huge') };
-                    tb.querySelectorAll('.ql-size .ql-picker-options .ql-picker-item').forEach(function(item) {
-                        if (!item.getAttribute('title')) {
-                            var v = item.getAttribute('data-value');
-                            item.setAttribute('title', (v && SIZE_TITLES[v]) ? SIZE_TITLES[v] : window.__i18n.t('admin.quill.standardSize'));
-                        }
-                    });
-                };
-                applyItemTitles();
                 var mo = new MutationObserver(function() {
                     applyItemTitles();
                 });
                 mo.observe(tb, { childList: true, subtree: true });
             }
         } catch (e) {
-            console.warn('工具栏提示设置失败:', e.message);
+            console.warn(window.__i18n.t('admin.quill.tipFail'), e.message);
         }
     };
+
+    // Quill 编辑器 UI 文案随语言刷新（CSS content 类 + title 类）：
+    // - 字号/标题下拉 label 与链接气泡五处文案由 CSS ::before content 渲染（DOM 无文本），
+    //   经 :root CSS 变量驱动（components.css content: var(--ql-*, '中文兜底')）；
+    //   变量值必须 JSON.stringify 包引号——CSS 变量是无引号 token，直接替换进 content: 是非法值会静默失效；
+    // - 工具栏/下拉项 title 由 applyEmailToolbarTitles 重设（守卫已去除）。
+    // 调用时机：Quill init 后 + i18n:localeChanged 事件（编辑器未打开时仅更新变量，下次 init 生效）
+    $.applyQuillLocale = function() {
+        var i18n = window.__i18n;
+        if (!i18n || !i18n.t) return;
+        var rootStyle = document.documentElement.style;
+        var q = function(text) { return JSON.stringify(String(text)); };
+        rootStyle.setProperty('--ql-size-normal', q(i18n.t('admin.quill.sizeNormal')));
+        rootStyle.setProperty('--ql-size-small', q(i18n.t('admin.quill.sizeSmall')));
+        rootStyle.setProperty('--ql-size-large', q(i18n.t('admin.quill.sizeLarge')));
+        rootStyle.setProperty('--ql-size-huge', q(i18n.t('admin.quill.sizeHuge')));
+        rootStyle.setProperty('--ql-header-normal', q(i18n.t('admin.quill.normal')));
+        rootStyle.setProperty('--ql-header-h2', q(i18n.t('admin.quill.headingPrefix') + '2'));
+        rootStyle.setProperty('--ql-header-h3', q(i18n.t('admin.quill.headingPrefix') + '3'));
+        rootStyle.setProperty('--ql-tip-preview', q(i18n.t('admin.quill.tipPreview')));
+        rootStyle.setProperty('--ql-tip-edit', q(i18n.t('admin.quill.tipEdit')));
+        rootStyle.setProperty('--ql-tip-edit-btn', q(i18n.t('common.edit')));
+        rootStyle.setProperty('--ql-tip-remove', q(i18n.t('admin.quill.tipRemove')));
+        rootStyle.setProperty('--ql-tip-save', q(i18n.t('common.save')));
+        $.applyEmailToolbarTitles();
+    };
+
+    // 语言切换后刷新 Quill UI 文案（admin 端唯一 Quill 实例的字号/标题/气泡/title）
+    window.addEventListener('i18n:localeChanged', function() {
+        $.applyQuillLocale();
+    });
 
     $.destroyEmailTemplateQuill = function() {
         if (window.__emailTemplateQuill) {

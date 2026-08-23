@@ -109,7 +109,7 @@ router.get('/subnets/quota', authMiddleware, async (req, res) => {
         const used = (await db.subnets.getByUserId(req.user.id)).length;
         res.json({ used, max });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -144,7 +144,7 @@ router.get('/subnets', authMiddleware, async (req, res) => {
         });
         res.json(result);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -152,7 +152,7 @@ router.get('/subnets', authMiddleware, async (req, res) => {
 router.get('/admin/subnets', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const search = (req.query.search || '').trim();
-        if (search.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
+        if (search.length > 50) return res.status(400).json({ error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' });
 
         const list = await db.subnets.getAllWithOwner(search || undefined);
 
@@ -179,7 +179,7 @@ router.get('/admin/subnets', authMiddleware, adminMiddleware, async (req, res) =
         });
         res.json(result);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -188,7 +188,7 @@ router.post('/subnets', authMiddleware, async (req, res) => {
     // 限速：防止频繁外呼爱快导致外部系统被拖垮
     const rateLimitResult = await checkConfiguredRateLimit('subnet_create', 'ratelimit:subnet-create:' + req.user.id);
     if (!rateLimitResult.allowed) {
-        return res.status(429).json({ error: '创建子网过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+        return res.status(429).json({ error: '创建子网过于频繁，请稍后再试', code: 'RATE_LIMITED_SUBNET_CREATE', retryAfter: rateLimitResult.retryAfter });
         }
     // 每用户子网数量上限（普通用户受限，管理员不限，与端口转发 max_per_user 一致）
     if (req.user.role !== 'admin') {
@@ -196,7 +196,7 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         if (maxPerUser > 0) {
             const userSubnetCount = (await db.subnets.getByUserId(req.user.id)).length;
             if (userSubnetCount >= maxPerUser) {
-                return res.status(400).json({ error: '子网数量已达上限（' + maxPerUser + ' 个），如需更多请联系管理员' });
+                return res.status(400).json({ error: '子网数量已达上限（' + maxPerUser + ' 个），如需更多请联系管理员', code: 'SUBNET_LIMIT_REACHED', params: [maxPerUser] });
             }
         }
     }
@@ -207,10 +207,10 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         const iface = (await db.config.get('vlan:interface') || 'lan1').trim();
         const dns1 = await db.config.get('dhcp:dns1') || '180.76.76.76';
         const dns2 = await db.config.get('dhcp:dns2') || '223.5.5.5';
-        if (!VALID_IP_RE.test(segStart)) return res.status(400).json({ error: 'IP 段开始范围配置无效，请联系管理员' });
-        if (idStart < 2 || idStart > 4090) return res.status(400).json({ error: 'VLANID 开始范围必须在 2~4090 之间' });
-        if (!iface) return res.status(400).json({ error: '所属接口未配置，请联系管理员' });
-        if (!ikuaiApi.isConfigured()) return res.status(400).json({ error: '爱快未配置，无法创建子网' });
+        if (!VALID_IP_RE.test(segStart)) return res.status(400).json({ error: 'IP 段开始范围配置无效，请联系管理员', code: 'SUBNET_RANGE_CFG_INVALID' });
+        if (idStart < 2 || idStart > 4090) return res.status(400).json({ error: 'VLANID 开始范围必须在 2~4090 之间', code: 'VLAN_START_RANGE' });
+        if (!iface) return res.status(400).json({ error: '所属接口未配置，请联系管理员', code: 'SUBNET_IFACE_NOT_CONFIGURED' });
+        if (!ikuaiApi.isConfigured()) return res.status(400).json({ error: '爱快未配置，无法创建子网', code: 'IKUAI_NOT_CONFIGURED' });
 
         // 2. 已占用清单（DB 台账 + 爱快实际，双源合并防冲突）
         const dbVlanIds = await db.subnets.getUsedVlanIds();
@@ -220,7 +220,7 @@ router.post('/subnets', authMiddleware, async (req, res) => {
             ikuaiVlans = await ikuaiApi.getVlans();
         } catch (e) {
             console.error('[subnet] 获取爱快 VLAN 列表失败:', e.message);
-            return res.status(500).json({ error: '获取爱快 VLAN 列表失败，请稍后重试' });
+            return res.status(500).json({ error: '获取爱快 VLAN 列表失败，请稍后重试', code: 'IKUAI_VLAN_LIST_FAILED' });
         }
         const usedVlanIds = new Set(dbVlanIds.concat(ikuaiVlans.map(v => parseInt(v.vlan_id)).filter(n => Number.isInteger(n))));
         const usedGateways = new Set(dbGateways.concat(ikuaiVlans.map(v => v.ip_addr).filter(Boolean)));
@@ -229,7 +229,7 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         // 3. 分配 VLAN ID（从配置起始值递增）
         let vlanId = idStart;
         while (usedVlanIds.has(vlanId)) vlanId++;
-        if (vlanId > 4090) return res.status(400).json({ error: 'VLAN ID 已用尽（上限 4090），请联系管理员调整起始值' });
+        if (vlanId > 4090) return res.status(400).json({ error: 'VLAN ID 已用尽（上限 4090），请联系管理员调整起始值', code: 'VLAN_EXHAUSTED' });
 
         // 4. 分配网关 IP（倒数第二位 +1，直到未占用）
         const baseParts = segStart.split('.').map(Number);
@@ -240,11 +240,11 @@ router.post('/subnets', authMiddleware, async (req, res) => {
             if (!usedGateways.has(candidate)) { gw = candidate; break; }
             seg++;
         }
-        if (!gw) return res.status(400).json({ error: 'IP 段已用尽，请联系管理员调整起始网段' });
+        if (!gw) return res.status(400).json({ error: 'IP 段已用尽，请联系管理员调整起始网段', code: 'IP_POOL_EXHAUSTED' });
 
         // 5. VLAN 名称（系统内置，随机生成）
         const vlanName = generateVlanName(existingNames);
-        if (!vlanName) return res.status(400).json({ error: 'VLAN 名称生成失败，请重试' });
+        if (!vlanName) return res.status(400).json({ error: 'VLAN 名称生成失败，请重试', code: 'VLAN_NAME_GEN_FAILED' });
 
         // 5.5 接口有效性预校验（best-effort：枚举为空时跳过，避免误拦截）
         // 爱快对无效接口返回 30001「写入数据失败」，这里提前给出可读提示
@@ -283,7 +283,7 @@ router.post('/subnets', authMiddleware, async (req, res) => {
                 const created = vlans.find(v => v.vlan_name === vlanName);
                 if (created && created.id) await ikuaiApi.deleteVlan(created.id);
             } catch (_) {}
-            return res.status(500).json({ error: '创建 DHCP 服务端失败: ' + safeError(e) });
+            return res.status(500).json({ error: '创建 DHCP 服务端失败: ' + safeError(e), code: 'DHCP_CREATE_FAILED', params: [safeError(e)] });
         }
 
         // 反查 VLAN id（add 不返回 id）
@@ -340,7 +340,7 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         res.json(subnet);
     } catch (e) {
         console.error('[subnet] 创建子网失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -349,13 +349,13 @@ router.delete('/subnets/:id', authMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const subnet = await db.subnets.getById(id);
-        if (!subnet) return res.status(404).json({ error: '子网不存在' });
+        if (!subnet) return res.status(404).json({ error: '子网不存在', code: 'SUBNET_NOT_FOUND' });
         if (req.user.role !== 'admin' && subnet.user_id !== req.user.id) {
-            return res.status(403).json({ error: '无权限操作此子网' });
+            return res.status(403).json({ error: '无权限操作此子网', code: 'SUBNET_NO_PERM' });
         }
         const bound = await db.subnets.getBoundCount(id);
         if (bound.vm + bound.lxc > 0) {
-            return res.status(400).json({ error: '该子网下已有 ' + (bound.vm + bound.lxc) + ' 台服务器绑定，无法删除' });
+            return res.status(400).json({ error: '该子网下已有 ' + (bound.vm + bound.lxc) + ' 台服务器绑定，无法删除', code: 'SUBNET_HAS_VMS', params: [bound.vm + bound.lxc] });
         }
         // 清理爱快侧资源（尽力而为，失败不阻断 DB 删除）
         if (ikuaiApi.isConfigured()) {
@@ -370,7 +370,7 @@ router.delete('/subnets/:id', authMiddleware, async (req, res) => {
         await auditAction(req, 'subnet.delete', '删除子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')', { resourceType: 'subnet', resourceId: id });
         res.json({ message: '子网已删除' });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -379,7 +379,7 @@ router.delete('/subnets/:id', authMiddleware, async (req, res) => {
 router.post('/subnets/refresh', authMiddleware, async (req, res) => {
     const rateLimitResult = await checkConfiguredRateLimit('subnet_refresh', 'ratelimit:subnet-refresh:' + req.user.id);
     if (!rateLimitResult.allowed) {
-        return res.status(429).json({ error: '刷新过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+        return res.status(429).json({ error: '刷新过于频繁，请稍后再试', code: 'RATE_LIMITED_REFRESH', retryAfter: rateLimitResult.retryAfter });
         }
     try {
         const subnets = await db.subnets.getByUserId(req.user.id);
@@ -432,7 +432,7 @@ router.post('/subnets/refresh', authMiddleware, async (req, res) => {
         await auditAction(req, 'subnet.refresh', '批量刷新子网可用IP: 更新 ' + updated + ' 个子网', { resourceType: 'subnet' });
         res.json({ updated });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -440,21 +440,21 @@ router.post('/subnets/refresh', authMiddleware, async (req, res) => {
 router.post('/subnets/:id/refresh', authMiddleware, async (req, res) => {
     const rateLimitResult = await checkConfiguredRateLimit('subnet_refresh', 'ratelimit:subnet-refresh:' + req.user.id);
     if (!rateLimitResult.allowed) {
-        return res.status(429).json({ error: '刷新过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+        return res.status(429).json({ error: '刷新过于频繁，请稍后再试', code: 'RATE_LIMITED_REFRESH', retryAfter: rateLimitResult.retryAfter });
         }
     try {
         const id = parseInt(req.params.id);
         const subnet = await db.subnets.getById(id);
-        if (!subnet) return res.status(404).json({ error: '子网不存在' });
+        if (!subnet) return res.status(404).json({ error: '子网不存在', code: 'SUBNET_NOT_FOUND' });
         if (req.user.role !== 'admin' && subnet.user_id !== req.user.id) {
-            return res.status(403).json({ error: '无权限操作此子网' });
+            return res.status(403).json({ error: '无权限操作此子网', code: 'SUBNET_NO_PERM' });
         }
         await refreshSubnetAvailable(subnet);
         const updated = await db.subnets.getById(id);
         await auditAction(req, 'subnet.refresh', '刷新子网 ' + subnet.vlan_name + ' 可用IP: ' + (updated ? updated.available : 0), { resourceType: 'subnet', resourceId: id });
         res.json({ available: updated ? updated.available : 0 });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -462,26 +462,26 @@ router.post('/subnets/:id/refresh', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID' });
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID', code: 'INVALID_DEVICE_ID' });
         const subnetId = parseInt(req.body.subnet_id);
-        if (!Number.isInteger(subnetId) || subnetId <= 0) return res.status(400).json({ error: '请选择要绑定的子网' });
+        if (!Number.isInteger(subnetId) || subnetId <= 0) return res.status(400).json({ error: '请选择要绑定的子网', code: 'SUBNET_SELECT_REQUIRED' });
         const subnet = await db.subnets.getById(subnetId);
-        if (!subnet) return res.status(404).json({ error: '子网不存在' });
+        if (!subnet) return res.status(404).json({ error: '子网不存在', code: 'SUBNET_NOT_FOUND' });
 
         const access = await checkDeviceAccess(req, 'vm', vmid, { allowRunning: req.user.role === 'admin' });
-        if (access.error) return res.status(access.error.status).json({ error: access.error.message });
+        if (access.error) return res.status(access.error.status).json({ error: access.error.message, code: access.error.code });
         const vm = access.record;
         // 非管理员：设备与子网必须同属当前用户
         if (req.user.role !== 'admin' && subnet.user_id !== vm.user_id) {
-            return res.status(403).json({ error: '子网与虚拟机不属于同一用户' });
+            return res.status(403).json({ error: '子网与虚拟机不属于同一用户', code: 'SUBNET_VM_OWNER_MISMATCH' });
         }
         // M-2 修复：到期资源拦截（子网绑定属于资源使用）
         if (req.user.role !== 'admin' && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+            return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
         }
         // 已绑定子网的设备必须先解绑
         if (vm.subnet_id) {
-            return res.status(400).json({ error: '该虚拟机已绑定子网，请先解绑后再绑定新的子网' });
+            return res.status(400).json({ error: '该虚拟机已绑定子网，请先解绑后再绑定新的子网', code: 'VM_ALREADY_BOUND_SUBNET' });
         }
 
         // PVE 网卡写入 VLAN tag（保留原 mac/bridge/model）
@@ -490,14 +490,14 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
             const config = await pveApi.getVmConfig(vmid);
             net0 = (config && config.net0) || '';
         } catch (e) {
-            return res.status(500).json({ error: '读取虚拟机配置失败: ' + safeError(e) });
+            return res.status(500).json({ error: '读取虚拟机配置失败: ' + safeError(e), code: 'VM_CFG_READ_FAILED', params: [safeError(e)] });
         }
-        if (!net0) return res.status(400).json({ error: '虚拟机网卡配置异常，无法绑定子网' });
-        if (net0.indexOf('tag=') > -1) return res.status(400).json({ error: '虚拟机网卡已存在 VLAN 标记，请先解绑' });
+        if (!net0) return res.status(400).json({ error: '虚拟机网卡配置异常，无法绑定子网', code: 'VM_NIC_ABNORMAL' });
+        if (net0.indexOf('tag=') > -1) return res.status(400).json({ error: '虚拟机网卡已存在 VLAN 标记，请先解绑', code: 'VM_NIC_VLAN_EXISTS' });
         try {
             await pveApi.updateVmConfig(vmid, { net0: net0 + ',tag=' + subnet.vlan_id });
         } catch (e) {
-            return res.status(500).json({ error: '写入 VLAN 标记失败: ' + safeError(e) });
+            return res.status(500).json({ error: '写入 VLAN 标记失败: ' + safeError(e), code: 'VLAN_TAG_WRITE_FAILED', params: [safeError(e)] });
         }
 
         // 清除旧的 DHCP 静态绑定并立即创建新子网的绑定
@@ -523,7 +523,7 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         await auditAction(req, 'subnet.bind.vm', 'VM ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : '') + (rebuiltCount > 0 ? ', 更新端口转发 ' + rebuiltCount + ' 条' : ''), { resourceType: 'subnet', resourceId: subnetId });
         res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId, port_forwards_rebuilt: rebuiltCount });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -531,24 +531,24 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID' });
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID', code: 'INVALID_DEVICE_ID' });
         const subnetId = parseInt(req.body.subnet_id);
-        if (!Number.isInteger(subnetId) || subnetId <= 0) return res.status(400).json({ error: '请选择要绑定的子网' });
+        if (!Number.isInteger(subnetId) || subnetId <= 0) return res.status(400).json({ error: '请选择要绑定的子网', code: 'SUBNET_SELECT_REQUIRED' });
         const subnet = await db.subnets.getById(subnetId);
-        if (!subnet) return res.status(404).json({ error: '子网不存在' });
+        if (!subnet) return res.status(404).json({ error: '子网不存在', code: 'SUBNET_NOT_FOUND' });
 
         const access = await checkDeviceAccess(req, 'lxc', vmid, { allowRunning: req.user.role === 'admin' });
-        if (access.error) return res.status(access.error.status).json({ error: access.error.message });
+        if (access.error) return res.status(access.error.status).json({ error: access.error.message, code: access.error.code });
         const ct = access.record;
         if (req.user.role !== 'admin' && subnet.user_id !== ct.user_id) {
-            return res.status(403).json({ error: '子网与容器不属于同一用户' });
+            return res.status(403).json({ error: '子网与容器不属于同一用户', code: 'SUBNET_LXC_OWNER_MISMATCH' });
         }
         // M-2 修复：到期资源拦截（子网绑定属于资源使用）
         if (req.user.role !== 'admin' && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '容器已到期，请先续费' });
+            return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
         if (ct.subnet_id) {
-            return res.status(400).json({ error: '该容器已绑定子网，请先解绑后再绑定新的子网' });
+            return res.status(400).json({ error: '该容器已绑定子网，请先解绑后再绑定新的子网', code: 'LXC_ALREADY_BOUND_SUBNET' });
         }
 
         let net0 = '';
@@ -556,14 +556,14 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
             const config = await pveApi.getLxcConfig(vmid);
             net0 = (config && config.net0) || '';
         } catch (e) {
-            return res.status(500).json({ error: '读取容器配置失败: ' + safeError(e) });
+            return res.status(500).json({ error: '读取容器配置失败: ' + safeError(e), code: 'LXC_CFG_READ_FAILED', params: [safeError(e)] });
         }
-        if (!net0) return res.status(400).json({ error: '容器网卡配置异常，无法绑定子网' });
-        if (net0.indexOf('tag=') > -1) return res.status(400).json({ error: '容器网卡已存在 VLAN 标记，请先解绑' });
+        if (!net0) return res.status(400).json({ error: '容器网卡配置异常，无法绑定子网', code: 'LXC_NIC_ABNORMAL' });
+        if (net0.indexOf('tag=') > -1) return res.status(400).json({ error: '容器网卡已存在 VLAN 标记，请先解绑', code: 'LXC_NIC_VLAN_EXISTS' });
         try {
             await pveApi.updateLxcConfig(vmid, { net0: net0 + ',tag=' + subnet.vlan_id });
         } catch (e) {
-            return res.status(500).json({ error: '写入 VLAN 标记失败: ' + safeError(e) });
+            return res.status(500).json({ error: '写入 VLAN 标记失败: ' + safeError(e), code: 'VLAN_TAG_WRITE_FAILED', params: [safeError(e)] });
         }
 
         let dhcpIp = '';
@@ -588,7 +588,7 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         await auditAction(req, 'subnet.bind.lxc', 'LXC ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : '') + (rebuiltCount > 0 ? ', 更新端口转发 ' + rebuiltCount + ' 条' : ''), { resourceType: 'subnet', resourceId: subnetId });
         res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId, port_forwards_rebuilt: rebuiltCount });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -596,15 +596,15 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
 router.post('/vm/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID' });
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID', code: 'INVALID_DEVICE_ID' });
         const access = await checkDeviceAccess(req, 'vm', vmid);
-        if (access.error) return res.status(access.error.status).json({ error: access.error.message });
+        if (access.error) return res.status(access.error.status).json({ error: access.error.message, code: access.error.code });
         const vm = access.record;
         // M-2 修复：到期资源拦截（子网解绑同样属于资源管理操作，仅放行销毁类）
         if (req.user.role !== 'admin' && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+            return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
         }
-        if (!vm.subnet_id) return res.status(400).json({ error: '该虚拟机未绑定子网' });
+        if (!vm.subnet_id) return res.status(400).json({ error: '该虚拟机未绑定子网', code: 'VM_NOT_BOUND_SUBNET' });
         const subnet = await db.subnets.getById(vm.subnet_id);
 
         // PVE 网卡移除 VLAN tag
@@ -613,14 +613,14 @@ router.post('/vm/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
             const config = await pveApi.getVmConfig(vmid);
             net0 = (config && config.net0) || '';
         } catch (e) {
-            return res.status(500).json({ error: '读取虚拟机配置失败: ' + safeError(e) });
+            return res.status(500).json({ error: '读取虚拟机配置失败: ' + safeError(e), code: 'VM_CFG_READ_FAILED', params: [safeError(e)] });
         }
         const newNet0 = net0.replace(/,\s*tag=\d+/, '');
         if (newNet0 !== net0) {
             try {
                 await pveApi.updateVmConfig(vmid, { net0: newNet0 });
             } catch (e) {
-                return res.status(500).json({ error: '移除 VLAN 标记失败: ' + safeError(e) });
+                return res.status(500).json({ error: '移除 VLAN 标记失败: ' + safeError(e), code: 'VLAN_TAG_REMOVE_FAILED', params: [safeError(e)] });
             }
         }
 
@@ -630,7 +630,7 @@ router.post('/vm/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
         await auditAction(req, 'subnet.unbind.vm', 'VM ' + vmid + ' 解绑子网 ' + (subnet ? subnet.vlan_name : String(vm.subnet_id)), { resourceType: 'subnet', resourceId: vm.subnet_id });
         res.json({ message: '解绑成功' });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -638,15 +638,15 @@ router.post('/vm/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
 router.post('/lxc/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID' });
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的设备 ID', code: 'INVALID_DEVICE_ID' });
         const access = await checkDeviceAccess(req, 'lxc', vmid);
-        if (access.error) return res.status(access.error.status).json({ error: access.error.message });
+        if (access.error) return res.status(access.error.status).json({ error: access.error.message, code: access.error.code });
         const ct = access.record;
         // M-2 修复：到期资源拦截（子网解绑同样属于资源管理操作，仅放行销毁类）
         if (req.user.role !== 'admin' && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '容器已到期，请先续费' });
+            return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
-        if (!ct.subnet_id) return res.status(400).json({ error: '该容器未绑定子网' });
+        if (!ct.subnet_id) return res.status(400).json({ error: '该容器未绑定子网', code: 'LXC_NOT_BOUND_SUBNET' });
         const subnet = await db.subnets.getById(ct.subnet_id);
 
         let net0 = '';
@@ -654,14 +654,14 @@ router.post('/lxc/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
             const config = await pveApi.getLxcConfig(vmid);
             net0 = (config && config.net0) || '';
         } catch (e) {
-            return res.status(500).json({ error: '读取容器配置失败: ' + safeError(e) });
+            return res.status(500).json({ error: '读取容器配置失败: ' + safeError(e), code: 'LXC_CFG_READ_FAILED', params: [safeError(e)] });
         }
         const newNet0 = net0.replace(/,\s*tag=\d+/, '');
         if (newNet0 !== net0) {
             try {
                 await pveApi.updateLxcConfig(vmid, { net0: newNet0 });
             } catch (e) {
-                return res.status(500).json({ error: '移除 VLAN 标记失败: ' + safeError(e) });
+                return res.status(500).json({ error: '移除 VLAN 标记失败: ' + safeError(e), code: 'VLAN_TAG_REMOVE_FAILED', params: [safeError(e)] });
             }
         }
 
@@ -671,7 +671,7 @@ router.post('/lxc/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
         await auditAction(req, 'subnet.unbind.lxc', 'LXC ' + vmid + ' 解绑子网 ' + (subnet ? subnet.vlan_name : String(ct.subnet_id)), { resourceType: 'subnet', resourceId: ct.subnet_id });
         res.json({ message: '解绑成功' });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 

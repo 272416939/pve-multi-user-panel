@@ -21,7 +21,7 @@ router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
         if (!isAdmin) {
             const userCts = await db.lxcContainers.getByUserId(req.user.id);
             const owned = userCts.some(c => c.ct_id === vmid);
-            if (!owned) return res.status(403).json({ error: '无权操作此容器' });
+            if (!owned) return res.status(403).json({ error: '无权操作此容器', code: 'LXC_NO_PERM_2' });
         }
 
         const snapshots = await pveApi.getLxcSnapshots(vmid);
@@ -37,7 +37,7 @@ router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
             today_restored: dailyRestore
         });
     } catch (error) {
-        res.status(500).json({ error: '获取快照列表失败' });
+        res.status(500).json({ error: '获取快照列表失败', code: 'SNAPSHOT_LIST_FAILED' });
     }
 });
 
@@ -53,15 +53,15 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权操作此容器' });
+                return res.status(403).json({ error: '无权操作此容器', code: 'LXC_NO_PERM_2' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '容器未分配，无权限' });
+            return res.status(403).json({ error: '容器未分配，无权限', code: 'LXC_UNASSIGNED' });
         }
 
         // M-2 修复：到期资源拦截（快照创建属于资源使用，到期后仅放行清理类操作）
         if (!isAdmin && ct && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '容器已到期，请先续费' });
+            return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
 
         // 非管理员配额限制
@@ -69,11 +69,11 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
             const cfg = await db.snapshotConfig.get();
             const snapshots = await pveApi.getLxcSnapshots(vmid);
             if (snapshots.length >= cfg.max_per_vm) {
-                return res.status(400).json({ error: `每台容器最多保留 ${cfg.max_per_vm} 个快照` });
+                return res.status(400).json({ error: `每台容器最多保留 ${cfg.max_per_vm} 个快照`, code: 'LXC_SNAPSHOT_LIMIT', params: [cfg.max_per_vm] });
             }
             const dailyCreate = await db.snapshotLogs.getDailyCount(req.user.id, 'create');
             if (dailyCreate >= cfg.daily_create_limit) {
-                return res.status(400).json({ error: `今日快照创建次数已达上限（${cfg.daily_create_limit} 次）` });
+                return res.status(400).json({ error: `今日快照创建次数已达上限（${cfg.daily_create_limit} 次）`, code: 'SNAPSHOT_CREATE_DAILY_LIMIT', params: [cfg.daily_create_limit] });
             }
         }
 
@@ -84,17 +84,17 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
         res.json({ message: '快照创建成功' });
     } catch (error) {
         if (error.response?.status === 500 && error.response?.data?.errors?.snapname) {
-            return res.status(400).json({ error: '快照名称已存在' });
+            return res.status(400).json({ error: '快照名称已存在', code: 'SNAPSHOT_NAME_TAKEN' });
         }
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的容器 ID' });
-        if (!/^[a-zA-Z0-9_-]{2,20}$/.test(req.params.snapname)) return res.status(400).json({ error: '无效的快照名称' });
+        if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
+        if (!/^[a-zA-Z0-9_-]{2,20}$/.test(req.params.snapname)) return res.status(400).json({ error: '无效的快照名称', code: 'INVALID_SNAPSHOT_NAME' });
 
         // H-4 修复：统一权限校验模式
         const allCts = await db.lxcContainers.getAll();
@@ -103,27 +103,27 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权操作此容器' });
+                return res.status(403).json({ error: '无权操作此容器', code: 'LXC_NO_PERM_2' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '容器未分配，无权限' });
+            return res.status(403).json({ error: '容器未分配，无权限', code: 'LXC_UNASSIGNED' });
         }
 
         // M-2 修复：到期资源拦截（快照回滚属于资源使用）
         if (!isAdmin && ct && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '容器已到期，请先续费' });
+            return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
 
         // 非管理员额外检查
         if (!isAdmin) {
             const status = await pveApi.getLxcStatus(vmid);
             if (status.status !== 'stopped') {
-                return res.status(400).json({ error: '回滚前请先关闭容器' });
+                return res.status(400).json({ error: '回滚前请先关闭容器', code: 'SHUTDOWN_BEFORE_ROLLBACK_LXC' });
             }
             const cfg = await db.snapshotConfig.get();
             const dailyRestore = await db.snapshotLogs.getDailyCount(req.user.id, 'restore');
             if (dailyRestore >= cfg.daily_restore_limit) {
-                return res.status(400).json({ error: `今日快照恢复次数已达上限（${cfg.daily_restore_limit} 次）` });
+                return res.status(400).json({ error: `今日快照恢复次数已达上限（${cfg.daily_restore_limit} 次）`, code: 'SNAPSHOT_RESTORE_DAILY_LIMIT', params: [cfg.daily_restore_limit] });
             }
         }
 
@@ -132,7 +132,7 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
         await auditAction(req, 'lxc.snapshot.rollback', '恢复 LXC ' + vmid + ' 快照');
         res.json({ message: '快照恢复成功，请稍后启动容器' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -141,11 +141,11 @@ router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res)
         const vmid = parseInt(req.params.vmid);
         // V4-10 修复：vmid 范围白名单（与同文件其余 3 个快照端点一致，规范 C-2）
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
-            return res.status(400).json({ error: '无效的 LXC ID' });
+            return res.status(400).json({ error: '无效的 LXC ID', code: 'INVALID_LXC_ID_2' });
         }
         const snapname = req.params.snapname;
         if (!/^[a-zA-Z0-9_-]{2,20}$/.test(snapname)) {
-            return res.status(400).json({ error: '无效的快照名称' });
+            return res.status(400).json({ error: '无效的快照名称', code: 'INVALID_SNAPSHOT_NAME' });
         }
 
         // H-4 修复：统一权限校验模式
@@ -155,17 +155,17 @@ router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res)
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权操作此容器' });
+                return res.status(403).json({ error: '无权操作此容器', code: 'LXC_NO_PERM_2' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '容器未分配，无权限' });
+            return res.status(403).json({ error: '容器未分配，无权限', code: 'LXC_UNASSIGNED' });
         }
 
         await pveApi.deleteLxcSnapshot(vmid, req.params.snapname);
         await auditAction(req, 'lxc.snapshot.delete', '删除 LXC ' + vmid + ' 快照');
         res.json({ message: '快照已删除' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -178,7 +178,7 @@ router.get('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
             const userVms = await db.vms.getByUserId(req.user.id);
             const owned = userVms.some(v => v.vm_id == vmid);
             if (!owned) {
-                return res.status(403).json({ error: '无权操作此虚拟机' });
+                return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
             }
         }
 
@@ -195,7 +195,7 @@ router.get('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
             today_restored: dailyRestore
         });
     } catch (error) {
-        res.status(500).json({ error: '获取快照列表失败' });
+        res.status(500).json({ error: '获取快照列表失败', code: 'SNAPSHOT_LIST_FAILED' });
     }
 });
 
@@ -211,15 +211,15 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权操作此虚拟机' });
+                return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '虚拟机未分配，无权限' });
+            return res.status(403).json({ error: '虚拟机未分配，无权限', code: 'VM_UNASSIGNED' });
         }
 
         // M-2 修复：到期资源拦截（快照创建属于资源使用）
         if (!isAdmin && vm && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+            return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
         }
 
         // 非管理员配额限制
@@ -227,7 +227,7 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
             const cfg = await db.snapshotConfig.get();
             const snapshots = await pveApi.getSnapshots(vmid);
             if (snapshots.length >= cfg.max_per_vm) {
-                return res.status(400).json({ error: `每台虚拟机最多保留 ${cfg.max_per_vm} 个快照` });
+                return res.status(400).json({ error: `每台虚拟机最多保留 ${cfg.max_per_vm} 个快照`, code: 'VM_SNAPSHOT_LIMIT', params: [cfg.max_per_vm] });
             }
             const dailyCreate = await db.snapshotLogs.getDailyCount(req.user.id, 'create');
             if (dailyCreate >= cfg.daily_create_limit) {
@@ -242,9 +242,9 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
         res.json({ message: '快照创建成功' });
     } catch (error) {
         if (error.response?.status === 500 && error.response?.data?.errors?.snapname) {
-            return res.status(400).json({ error: '快照名称已存在' });
+            return res.status(400).json({ error: '快照名称已存在', code: 'SNAPSHOT_NAME_TAKEN' });
         }
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -252,11 +252,11 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
     try {
         const vmid = parseInt(req.params.vmid);
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
-            return res.status(400).json({ error: '无效的虚拟机 ID' });
+            return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
         }
         // SEC-001 修复：snapname 白名单校验（唯一缺失的端点）
         if (!/^[a-zA-Z0-9_-]{2,20}$/.test(req.params.snapname)) {
-            return res.status(400).json({ error: '无效的快照名称' });
+            return res.status(400).json({ error: '无效的快照名称', code: 'INVALID_SNAPSHOT_NAME' });
         }
 
         // H-4 修复：统一权限校验模式
@@ -266,22 +266,22 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权操作此虚拟机' });
+                return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '虚拟机未分配，无权限' });
+            return res.status(403).json({ error: '虚拟机未分配，无权限', code: 'VM_UNASSIGNED' });
         }
 
         // M-2 修复：到期资源拦截（快照回滚属于资源使用）
         if (!isAdmin && vm && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+            return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
         }
 
         // 非管理员额外检查
         if (!isAdmin) {
             const status = await pveApi.getVmStatus(vmid);
             if (status.status !== 'stopped') {
-                return res.status(400).json({ error: '回滚前请先关闭虚拟机' });
+                return res.status(400).json({ error: '回滚前请先关闭虚拟机', code: 'SHUTDOWN_BEFORE_ROLLBACK_VM' });
             }
             const cfg = await db.snapshotConfig.get();
             const dailyRestore = await db.snapshotLogs.getDailyCount(req.user.id, 'restore');
@@ -295,7 +295,7 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
         await auditAction(req, 'vm.snapshot.rollback', '恢复 VM ' + vmid + ' 快照');
         res.json({ message: '快照恢复成功，请稍后启动虚拟机' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -310,22 +310,22 @@ router.delete('/vm/:vmid/snapshots/:snapname', authMiddleware, async (req, res) 
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权操作此虚拟机' });
+                return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '虚拟机未分配，无权限' });
+            return res.status(403).json({ error: '虚拟机未分配，无权限', code: 'VM_UNASSIGNED' });
         }
 
         // PVE-3 修复：snapname 白名单校验
         if (!/^[a-zA-Z0-9_-]{2,20}$/.test(req.params.snapname)) {
-            return res.status(400).json({ error: '无效的快照名称' });
+            return res.status(400).json({ error: '无效的快照名称', code: 'INVALID_SNAPSHOT_NAME' });
         }
 
         await pveApi.deleteSnapshot(vmid, req.params.snapname);
         await auditAction(req, 'vm.snapshot.delete', '删除 VM ' + vmid + ' 快照');
         res.json({ message: '快照已删除' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

@@ -65,13 +65,13 @@ function validateCnameDomain(str) {
     var domainStr = String(str).trim();
     if (!domainStr) return { ok: true };
     if (domainStr.length > MAX_TOTAL_LEN) {
-        return { ok: false, error: 'CNAME 域名格式无效或过长' };
+        return { ok: false, error: 'CNAME 域名格式无效或过长', code: 'CNAME_INVALID' };
     }
     var entries = domainStr.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
     for (var i = 0; i < entries.length; i++) {
         var item = splitCnameEntry(entries[i]);
         if (!isValidLabel(item.label) || !isValidDomain(item.domain)) {
-            return { ok: false, error: 'CNAME 域名格式无效或过长' };
+            return { ok: false, error: 'CNAME 域名格式无效或过长', code: 'CNAME_INVALID' };
         }
     }
     return { ok: true };

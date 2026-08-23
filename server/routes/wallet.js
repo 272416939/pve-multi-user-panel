@@ -27,7 +27,7 @@ router.get('/wallet/balance', authMiddleware, async (req, res) => {
         res.json({ balance: parseFloat(user.balance || 0).toFixed(2) });
     } catch (e) {
         console.error('[钱包] balance:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -43,7 +43,7 @@ router.get('/wallet/pay-config', authMiddleware, async (req, res) => {
         });
     } catch (e) {
         console.error('[钱包] pay-config:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -52,7 +52,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
     try {
         // M-4 修复：充值下单外呼支付网关，必须限速防刷单（admin 可配置）
         const rechargeRate = await checkConfiguredRateLimit('wallet_recharge', 'ratelimit:wallet-recharge:' + req.user.id);
-        if (!rechargeRate.allowed) return res.status(429).json({ error: '下单过于频繁，请稍后再试', retryAfter: rechargeRate.retryAfter });
+        if (!rechargeRate.allowed) return res.status(429).json({ error: '下单过于频繁，请稍后再试', code: 'RATE_LIMITED_ORDER', retryAfter: rechargeRate.retryAfter });
 
         var result = await paymentService.createRechargeOrder({
             userId: req.user.id,
@@ -63,9 +63,9 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         });
         if (!result.ok) {
             if (result.raw !== undefined) {
-                return res.status(400).json({ error: result.error, raw: result.raw });
+                return res.status(400).json({ error: result.error , code: result.code, raw: result.raw });
             }
-            return res.status(result.status).json({ error: result.error });
+            return res.status(result.status).json({ error: result.error , code: result.code });
         }
         // 操作审计：创建充值订单（D 类缺埋点补全；到账审计在 payment.js 回调侧 order.recharge.confirm）
         try {
@@ -76,7 +76,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
         res.json({ success: true, order_no: result.data.orderNo, redirect_url: result.data.payUrl });
     } catch (e) {
         console.error('[钱包] recharge:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -84,7 +84,7 @@ router.post('/wallet/recharge', authMiddleware, async (req, res) => {
 router.all('/wallet/notify', async (req, res) => {
     const cbRate = await checkCallbackRate(req.ip);
     if (!cbRate.allowed) {
-        return res.status(429).json({ error: '回调过于频繁，请稍后再试', retryAfter: cbRate.retryAfter });
+        return res.status(429).json({ error: '回调过于频繁，请稍后再试', code: 'RATE_LIMITED_CALLBACK', retryAfter: cbRate.retryAfter });
     }
     try {
         // 按请求方法取单一来源，避免 query/body 参数覆盖污染
@@ -104,18 +104,18 @@ router.all('/wallet/notify', async (req, res) => {
 router.get('/wallet/return', async (req, res) => {
     const cbRate = await checkCallbackRate(req.ip);
     if (!cbRate.allowed) {
-        return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: cbRate.retryAfter });
+        return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: cbRate.retryAfter });
     }
     try {
         var params = req.query;
         var result = await paymentService.processPayCallback(params, { mode: 'return' });
         if (!result.ok) {
-            if (result.reason === 'trade_status') return res.json({ success: false, error: '支付未完成' });
-            if (result.reason === 'sign') return res.json({ success: false, error: '签名验证失败' });
-            if (result.reason === 'no_order') return res.json({ success: false, error: '订单记录不存在' });
-            if (result.reason === 'bad_order') return res.json({ success: false, error: '订单记录异常' });
-            if (result.reason === 'no_user') return res.json({ success: false, error: '用户不存在' });
-            return res.json({ success: false, error: '处理异常' });
+            if (result.reason === 'trade_status') return res.json({ success: false, error: '支付未完成', code: 'PAYMENT_INCOMPLETE' });
+            if (result.reason === 'sign') return res.json({ success: false, error: '签名验证失败', code: 'SIGN_VERIFY_FAILED' });
+            if (result.reason === 'no_order') return res.json({ success: false, error: '订单记录不存在', code: 'ORDER_NOT_FOUND' });
+            if (result.reason === 'bad_order') return res.json({ success: false, error: '订单记录异常', code: 'ORDER_ABNORMAL' });
+            if (result.reason === 'no_user') return res.json({ success: false, error: '用户不存在', code: 'USER_NOT_FOUND' });
+            return res.json({ success: false, error: '处理异常', code: 'HANDLE_EXCEPTION' });
         }
         if (result.duplicate) {
             var existingRec = await db.transactionRecords.getByOrderNo(params.out_trade_no);
@@ -125,7 +125,7 @@ router.get('/wallet/return', async (req, res) => {
         res.json({ success: true, order_no: result.orderNo, amount: result.amount, balance: result.balanceAfter });
     } catch (e) {
         console.error('[钱包] 同步回调失败:', e.message);
-        res.json({ success: false, error: '处理异常' });
+        res.json({ success: false, error: '处理异常', code: 'HANDLE_EXCEPTION' });
     }
 });
 
@@ -136,7 +136,7 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
 
         // 订单号格式校验：ZFB/WX 前缀 + 14位时间戳 + 8位随机数字（兼容旧 12 位时间戳的 20 位数字）
         if (!/^(ZFB|WX)[0-9]{20,22}$/.test(orderNo)) {
-            return res.status(400).json({ error: '无效的订单号格式' });
+            return res.status(400).json({ error: '无效的订单号格式', code: 'INVALID_ORDER_NO_FORMAT' });
         }
 
         // 用户级限速：60 次/分钟（轮询间隔 2 秒，每分钟最多 30 次查询，留余量避免卡在阈值）
@@ -151,7 +151,7 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
             if (record.count >= maxRequests) {
                 // 自定义内存限速无 retryAfter，按窗口剩余时间计算供前端倒计时展示
                 var retryAfterSec = Math.ceil((windowMs - (now - record.windowStart)) / 1000);
-                return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: retryAfterSec });
+                return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: retryAfterSec });
             }
             record.count++;
         }
@@ -177,7 +177,7 @@ router.get('/wallet/order-status/:order_no', authMiddleware, async (req, res) =>
         }
     } catch (e) {
         console.error('[钱包] order-status:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -196,12 +196,12 @@ router.post('/wallet/renew', authMiddleware, async (req, res) => {
             req: req
         });
         if (!result.ok) {
-            return res.status(result.status).json({ error: result.error });
+            return res.status(result.status).json({ error: result.error , code: result.code });
         }
         res.json(result.data);
     } catch (e) {
         console.error('[钱包] renew:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -232,7 +232,7 @@ router.get('/wallet/transactions', authMiddleware, async (req, res) => {
         res.json({ data: list, total: total, page: page, limit: limit });
     } catch (e) {
         console.error('[钱包] transactions:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -245,7 +245,7 @@ router.get('/orders', authMiddleware, async (req, res) => {
             var limit = parseInt(req.query.limit) || 20;
             var params = { page: page, limit: limit, user_id: req.user.id };
             var order_no = (req.query.order_no || '').trim();
-            if (order_no.length > 50) return res.status(400).json({ error: '订单号过长' });
+            if (order_no.length > 50) return res.status(400).json({ error: '订单号过长', code: 'ORDER_NO_TOO_LONG' });
             if (order_no) params.order_no = order_no;
             if (req.query.type && ['vm', 'lxc', 'disk'].includes(req.query.type)) params.type = req.query.type;
             if (req.query.status && ORDER_STATUS.includes(req.query.status)) params.status = req.query.status;
@@ -282,7 +282,7 @@ router.get('/orders', authMiddleware, async (req, res) => {
         }));
         res.json(rows);
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

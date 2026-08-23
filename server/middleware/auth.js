@@ -60,12 +60,12 @@ async function invalidateUserActiveCache(userId) {
 const authMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.replace('Bearer ', '');
     if (!token) {
-        return res.status(401).json({ error: '未授权' });
+        return res.status(401).json({ error: '未授权', code: 'UNAUTHORIZED' });
     }
     try {
         const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] });
         if (decoded.twofa_pending) {
-            return res.status(401).json({ error: '2FA 验证未完成' });
+            return res.status(401).json({ error: '2FA 验证未完成', code: '2FA_INCOMPLETE' });
         }
 
         // 1. 检查 JWT 黑名单（登出后立即失效）
@@ -132,13 +132,13 @@ const authMiddleware = async (req, res, next) => {
         if (err.name === 'TokenExpiredError') {
             return res.status(401).json({ error: '令牌已过期', code: 'TOKEN_EXPIRED' });
         }
-        return res.status(401).json({ error: '令牌无效' });
+        return res.status(401).json({ error: '令牌无效', code: 'TOKEN_INVALID' });
     }
 };
 
 const adminMiddleware = (req, res, next) => {
     if (req.user.role !== 'admin') {
-        return res.status(403).json({ error: '需要管理员权限' });
+        return res.status(403).json({ error: '需要管理员权限', code: 'ADMIN_REQUIRED' });
     }
     next();
 };

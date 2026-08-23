@@ -24,8 +24,8 @@ router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
             var limit = parseInt(req.query.limit) || 20;
             var keyword = (req.query.keyword || '').trim();
             var role = req.query.role || '';
-            if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
-            if (role && !['admin', 'user'].includes(role)) return res.status(400).json({ error: '无效的角色' });
+            if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' });
+            if (role && !['admin', 'user'].includes(role)) return res.status(400).json({ error: '无效的角色', code: 'INVALID_ROLE' });
             var result = await db.users.getPaginated({ page: page, limit: limit, keyword: keyword, role: role });
             result.rows = result.rows.map(({ password, password_salt, totp_secret, ...rest }) => rest);
             return res.json(result);
@@ -36,7 +36,7 @@ router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
         await userListCache.set('list', users);
         res.json(users);
     } catch (e) {
-        res.status(500).json({ error: '获取用户列表失败' });
+        res.status(500).json({ error: '获取用户列表失败', code: 'USER_LIST_FAILED' });
     }
 });
 
@@ -45,41 +45,41 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     const { username, password, role, email, emailVerified } = req.body;
 
     if (!password) {
-        return res.status(400).json({ error: '密码不能为空' });
+        return res.status(400).json({ error: '密码不能为空', code: 'PASSWORD_EMPTY' });
     }
 
     if (role && !['admin', 'user'].includes(role)) {
-        return res.status(400).json({ error: '无效的角色' });
+        return res.status(400).json({ error: '无效的角色', code: 'INVALID_ROLE' });
     }
 
     // AUTH-14 修复：用户名黑名单 + 长度校验
     if (!username || username.length < 3 || username.length > 32) {
-        return res.status(400).json({ error: '用户名长度必须为 3-32 个字符' });
+        return res.status(400).json({ error: '用户名长度必须为 3-32 个字符', code: 'USERNAME_LENGTH' });
     }
     if (isUsernameBlacklisted(username)) {
-        return res.status(400).json({ error: '该用户名不可用' });
+        return res.status(400).json({ error: '该用户名不可用', code: 'USERNAME_UNAVAILABLE' });
     }
 
     // AUTH-14 修复：密码强度校验
     if (password.length < 8) {
-        return res.status(400).json({ error: '密码至少8位' });
+        return res.status(400).json({ error: '密码至少8位', code: 'PASSWORD_MIN_8' });
     }
 
     // AUTH-14 修复：邮箱格式校验（单一来源 email-validate.js）
     if (email && !isValidEmail(email)) {
-        return res.status(400).json({ error: '邮箱格式不正确' });
+        return res.status(400).json({ error: '邮箱格式不正确', code: 'EMAIL_INVALID' });
     }
 
     const hashedPassword = await hashPassword(password);
 
     if (await db.users.getByUsername(username)) {
-        return res.status(400).json({ error: '用户名已存在' });
+        return res.status(400).json({ error: '用户名已存在', code: 'USERNAME_TAKEN' });
     }
 
     if (email) {
         const allUsers = await db.users.getAll();
         if (allUsers.find(u => u.email === email)) {
-            return res.status(400).json({ error: '该邮箱已被使用' });
+            return res.status(400).json({ error: '该邮箱已被使用', code: 'EMAIL_TAKEN' });
         }
     }
     
@@ -102,7 +102,7 @@ router.post('/users', authMiddleware, adminMiddleware, async (req, res) => {
     res.json(safeUser);
   } catch (e) {
     console.error('[admin] create user error:', e.message);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -111,14 +111,14 @@ router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) =>
     const userId = parseInt(req.params.id);
 
     if (parseInt(req.params.id) === req.user.id) {
-        return res.status(400).json({ error: '不能删除自己的账号' });
+        return res.status(400).json({ error: '不能删除自己的账号', code: 'CANNOT_DELETE_SELF' });
     }
 
     // 资产盘点：用户名下存在 虚拟机/容器/硬盘/私有网络/余额/备份/待处理订单 任一资产即拦截删除（全部参数化查询）
     const pool = db.getPool();
     const [userRows] = await pool.execute('SELECT username, balance FROM users WHERE id = ?', [userId]);
     if (!userRows || userRows.length === 0) {
-        return res.status(404).json({ error: '用户不存在' });
+        return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
     }
     const [[vmRows], [lxcRows], [diskRows], [subnetRows], [backupRows], [orderRows]] = await Promise.all([
         pool.execute('SELECT COUNT(*) AS c FROM vms WHERE user_id = ?', [userId]),
@@ -147,7 +147,7 @@ router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) =>
     if (assets.backups > 0) assetParts.push('备份记录 ' + assets.backups + ' 条');
     if (assets.pendingOrders > 0) assetParts.push('待处理订单 ' + assets.pendingOrders + ' 笔');
     if (assetParts.length > 0) {
-        return res.status(409).json({ error: '该用户名下仍有资产，无法删除：\n· ' + assetParts.join('\n· '), assets });
+        return res.status(409).json({ error: '该用户名下仍有资产，无法删除：\n· ' + assetParts.join('\n· '), code: 'USER_HAS_ASSETS', params: [assetParts.join('\n· ')], assets });
     }
 
     // V3-14 修复：删除用户审计（对齐创建/修改/重置密码的字符串 details 规范）
@@ -171,7 +171,7 @@ router.delete('/users/:id', authMiddleware, adminMiddleware, async (req, res) =>
     res.json({ message: '用户删除成功' });
   } catch (e) {
     console.error('[admin] delete user error:', e.message);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -182,7 +182,7 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     
     const user = await db.users.getById(userId);
     if (!user) {
-        return res.status(404).json({ error: '用户不存在' });
+        return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
     }
     
     const updates = {};
@@ -190,14 +190,14 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     if (username && username !== user.username) {
         const allUsers = await db.users.getAll();
         if (allUsers.find(u => u.username === username)) {
-            return res.status(400).json({ error: '用户名已存在' });
+            return res.status(400).json({ error: '用户名已存在', code: 'USERNAME_TAKEN' });
         }
         updates.username = username;
     }
     
     if (password) {
         if (password.length < 8) {
-            return res.status(400).json({ error: '密码至少8位' });
+            return res.status(400).json({ error: '密码至少8位', code: 'PASSWORD_MIN_8' });
         }
         updates.password = await hashPassword(password);
         updates.password_salt = null;
@@ -207,10 +207,10 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     }
 
     if (role && !['admin', 'user'].includes(role)) {
-        return res.status(400).json({ error: '无效的角色' });
+        return res.status(400).json({ error: '无效的角色', code: 'INVALID_ROLE' });
     }
     if (role && parseInt(req.params.id) === req.user.id) {
-        return res.status(400).json({ error: '不能修改自己的角色' });
+        return res.status(400).json({ error: '不能修改自己的角色', code: 'CANNOT_CHANGE_OWN_ROLE' });
     }
     if (role) {
         updates.role = role;
@@ -220,11 +220,11 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
         if (email && email !== user.email) {
             // 邮箱格式校验（单一来源 email-validate.js，与创建用户一致——同功能多路径规则必须一致）
             if (!isValidEmail(email)) {
-                return res.status(400).json({ error: '邮箱格式不正确' });
+                return res.status(400).json({ error: '邮箱格式不正确', code: 'EMAIL_INVALID' });
             }
             const allUsers = await db.users.getAll();
             if (allUsers.find(u => u.email === email && u.id !== userId)) {
-                return res.status(400).json({ error: '该邮箱已被使用' });
+                return res.status(400).json({ error: '该邮箱已被使用', code: 'EMAIL_TAKEN' });
             }
             updates.email = email;
             updates.emailVerified = false;
@@ -264,7 +264,7 @@ router.put('/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
     res.json({ message: '用户更新成功' });
   } catch (e) {
     console.error('[admin] update user error:', e.message);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -275,16 +275,16 @@ router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, 
         var amount = parseFloat(req.body.amount);
 
         if (!amount || amount <= 0 || !isFinite(amount)) {
-            return res.status(400).json({ error: '充值金额必须为正数' });
+            return res.status(400).json({ error: '充值金额必须为正数', code: 'RECHARGE_POSITIVE' });
         }
         // L-3 修复：人工充值金额上限（与 pay:max_amount 默认值一致，防误填超大值）
         var maxRecharge = parseFloat(await db.config.get('pay:max_amount')) || 999999.99;
         if (amount > maxRecharge) {
-            return res.status(400).json({ error: '单次充值金额不能超过 ' + maxRecharge.toFixed(2) });
+            return res.status(400).json({ error: '单次充值金额不能超过 ' + maxRecharge.toFixed(2), code: 'RECHARGE_MAX', params: [maxRecharge.toFixed(2)] });
         }
 
         var user = await db.users.getById(userId);
-        if (!user) return res.status(404).json({ error: '用户不存在' });
+        if (!user) return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
 
         var oldBalance = parseFloat(user.balance || '0');
         var newBalance = oldBalance + amount;
@@ -320,7 +320,7 @@ router.post('/users/:id/recharge', authMiddleware, adminMiddleware, async (req, 
         res.json({ success: true, balance: newBalance.toFixed(2), message: '充值成功' });
     } catch (e) {
         console.error('[admin] recharge error:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 

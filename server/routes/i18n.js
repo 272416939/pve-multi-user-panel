@@ -18,7 +18,7 @@ router.get('/i18n/languages', async (req, res) => {
         res.json(await getLanguages());
     } catch (error) {
         console.error('获取语言列表失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -28,13 +28,13 @@ router.get('/i18n/locale/:code', async (req, res) => {
         const code = String(req.params.code || '');
         const dict = await resolveLocale(code);
         if (!dict) {
-            return res.status(404).json({ error: '未知语言' });
+            return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
         }
         res.set('Cache-Control', 'public, max-age=30');
         res.json(dict);
     } catch (error) {
         console.error('解析语言内容失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

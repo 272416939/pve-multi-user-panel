@@ -27,7 +27,8 @@ window.__admin.i18nPage = (function () {
         shared: 'admin.i18n.cat.shared',
         terminal: 'admin.i18n.cat.terminal',
         vnc: 'admin.i18n.cat.vnc',
-        password: 'admin.i18n.cat.password'
+        password: 'admin.i18n.cat.password',
+        err: 'admin.i18n.cat.err'
     };
 
     // ==================== 状态 ====================

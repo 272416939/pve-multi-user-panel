@@ -41,20 +41,20 @@ async function renewByBalance(opts) {
     var { userId, isAdmin, type, vmid, ctid, quantity, period_count, period, req } = opts;
 
     if (!type || !['vm', 'lxc'].includes(type)) {
-        return { ok: false, status: 400, error: '无效的资源类型' };
+        return { ok: false, status: 400, error: '无效的资源类型', code: 'INVALID_RESOURCE_TYPE' };
     }
     var qty = parseInt(period_count || quantity);
     if (!Number.isInteger(parseFloat(quantity)) || qty < 1 || String(quantity).trim() !== String(qty)) {
         if (!period_count) {
-            return { ok: false, status: 400, error: '续费数量必须为正整数' };
+            return { ok: false, status: 400, error: '续费数量必须为正整数', code: 'RENEW_QTY_POSITIVE' };
         }
     }
     if (!Number.isInteger(qty) || qty < 1) {
-        return { ok: false, status: 400, error: '续费数量必须为正整数' };
+        return { ok: false, status: 400, error: '续费数量必须为正整数', code: 'RENEW_QTY_POSITIVE' };
     }
     // V4-11 修复：续费数量上限与开通侧一致（1-99，常量单一来源），防超大数量日期溢出
     if (qty > MAX_PERIOD_COUNT) {
-        return { ok: false, status: 400, error: '续费数量不能超过 ' + MAX_PERIOD_COUNT };
+        return { ok: false, status: 400, error: '续费数量不能超过 ' + MAX_PERIOD_COUNT, code: 'RENEW_QTY_MAX', params: [MAX_PERIOD_COUNT] };
     }
 
     var resource;
@@ -66,19 +66,19 @@ async function renewByBalance(opts) {
         resource = allLxc.find(c => c.ct_id === parseInt(ctid));
     }
 
-    if (!resource) return { ok: false, status: 404, error: '资源不存在' };
+    if (!resource) return { ok: false, status: 404, error: '资源不存在', code: 'RESOURCE_NOT_FOUND' };
 
     if (resource.user_id !== userId && !isAdmin) {
-        return { ok: false, status: 403, error: '无权限操作' };
+        return { ok: false, status: 403, error: '无权限操作', code: 'NO_PERM_OP' };
     }
 
     var price = parseFloat(resource.renewal_price || '0');
-    if (price <= 0) return { ok: false, status: 400, error: '该资源未设置续费价格' };
+    if (price <= 0) return { ok: false, status: 400, error: '该资源未设置续费价格', code: 'RESOURCE_NO_RENEW_PRICE' };
 
     var usePeriod = period || resource.renewal_period || 'month';
     // SEC-04: period 白名单校验
     if (!VALID_PERIODS.includes(usePeriod)) {
-        return { ok: false, status: 400, error: '无效的计费周期' };
+        return { ok: false, status: 400, error: '无效的计费周期', code: 'INVALID_PERIOD' };
     }
 
     // 如果用户选择了不同的周期，重新计算单价
@@ -107,7 +107,7 @@ async function renewByBalance(opts) {
     var balance = parseFloat(user.balance || '0');
 
     if (balance < totalPrice) {
-        return { ok: false, status: 400, error: '当前账户余额不足，无法使用余额抵扣，请先充值后再续费' };
+        return { ok: false, status: 400, error: '当前账户余额不足，无法使用余额抵扣，请先充值后再续费', code: 'BALANCE_INSUFFICIENT_RENEW' };
     }
 
     var addDays = qty * getPeriodDays(usePeriod);

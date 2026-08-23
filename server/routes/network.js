@@ -134,7 +134,7 @@ router.get('/admin/network/config', authMiddleware, adminMiddleware, async (req,
             cname_domain: await db.config.get('cname:domain') || ''
         });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -147,72 +147,72 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         // 私有网络 VLAN 设置校验：IP 段必须为合法 IPv4，VLAN ID 起始值必须在 2~4090
         const ipv4Re = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
         if (vlan_ip_segment_start !== undefined && !ipv4Re.test(String(vlan_ip_segment_start).trim())) {
-            return res.status(400).json({ error: 'IP 段开始范围必须是合法 IPv4 地址' });
+            return res.status(400).json({ error: 'IP 段开始范围必须是合法 IPv4 地址', code: 'IP_START_IPV4' });
         }
         if (vlan_id_start !== undefined) {
             const vlanIdNum = parseInt(vlan_id_start);
             if (!Number.isInteger(vlanIdNum) || vlanIdNum < 2 || vlanIdNum > 4090) {
-                return res.status(400).json({ error: 'VLANID 开始范围必须是 2~4090 的整数' });
+                return res.status(400).json({ error: 'VLANID 开始范围必须是 2~4090 的整数', code: 'VLAN_START_INT' });
             }
         }
         if (vlan_max_per_user !== undefined) {
             const vlanMaxNum = parseInt(vlan_max_per_user);
             if (!Number.isInteger(vlanMaxNum) || vlanMaxNum < 0 || vlanMaxNum > 1000) {
-                return res.status(400).json({ error: '每用户子网数量上限必须是 0~1000 的整数' });
+                return res.status(400).json({ error: '每用户子网数量上限必须是 0~1000 的整数', code: 'SUBNET_LIMIT_INT' });
             }
         }
         // L-1 修复：端口段/max_per_user/DHCP IP 段/接口/cname 域名校验（防负值/非法 IP/超长串入库）
         if (port_range_start !== undefined) {
             const startNum = parseInt(port_range_start);
             if (!Number.isInteger(startNum) || startNum < 1 || startNum > 65535) {
-                return res.status(400).json({ error: '端口段起始值必须是 1~65535 的整数' });
+                return res.status(400).json({ error: '端口段起始值必须是 1~65535 的整数', code: 'PORT_START_INT' });
             }
         }
         if (port_range_end !== undefined) {
             const endNum = parseInt(port_range_end);
             if (!Number.isInteger(endNum) || endNum < 1 || endNum > 65535) {
-                return res.status(400).json({ error: '端口段结束值必须是 1~65535 的整数' });
+                return res.status(400).json({ error: '端口段结束值必须是 1~65535 的整数', code: 'PORT_END_INT' });
             }
         }
         if (port_range_start !== undefined && port_range_end !== undefined) {
             if (parseInt(port_range_start) >= parseInt(port_range_end)) {
-                return res.status(400).json({ error: '端口段起始值必须小于结束值' });
+                return res.status(400).json({ error: '端口段起始值必须小于结束值', code: 'PORT_START_LT_END' });
             }
         }
         if (max_per_user !== undefined) {
             const maxNum = parseInt(max_per_user);
             if (!Number.isInteger(maxNum) || maxNum < 0 || maxNum > 1000) {
-                return res.status(400).json({ error: '每用户端口转发上限必须是 0~1000 的整数' });
+                return res.status(400).json({ error: '每用户端口转发上限必须是 0~1000 的整数', code: 'FORWARD_LIMIT_INT' });
             }
         }
         if (dhcp_ip_range_start !== undefined && !ipv4Re.test(String(dhcp_ip_range_start).trim())) {
-            return res.status(400).json({ error: 'DHCP IP 段起始值必须是合法 IPv4 地址' });
+            return res.status(400).json({ error: 'DHCP IP 段起始值必须是合法 IPv4 地址', code: 'DHCP_START_IPV4' });
         }
         if (dhcp_ip_range_end !== undefined && !ipv4Re.test(String(dhcp_ip_range_end).trim())) {
-            return res.status(400).json({ error: 'DHCP IP 段结束值必须是合法 IPv4 地址' });
+            return res.status(400).json({ error: 'DHCP IP 段结束值必须是合法 IPv4 地址', code: 'DHCP_END_IPV4' });
         }
         if (dhcp_gateway !== undefined && !ipv4Re.test(String(dhcp_gateway).trim())) {
-            return res.status(400).json({ error: 'DHCP 网关必须是合法 IPv4 地址' });
+            return res.status(400).json({ error: 'DHCP 网关必须是合法 IPv4 地址', code: 'DHCP_GW_IPV4' });
         }
         if (dhcp_dns1 !== undefined && !ipv4Re.test(String(dhcp_dns1).trim())) {
-            return res.status(400).json({ error: 'DHCP DNS1 必须是合法 IPv4 地址' });
+            return res.status(400).json({ error: 'DHCP DNS1 必须是合法 IPv4 地址', code: 'DHCP_DNS1_IPV4' });
         }
         if (dhcp_dns2 !== undefined && !ipv4Re.test(String(dhcp_dns2).trim())) {
-            return res.status(400).json({ error: 'DHCP DNS2 必须是合法 IPv4 地址' });
+            return res.status(400).json({ error: 'DHCP DNS2 必须是合法 IPv4 地址', code: 'DHCP_DNS2_IPV4' });
         }
         // 接口名与域名：白名单字符 + 长度限制
         const ifaceRe = /^[a-zA-Z0-9_.:-]{1,32}$/;
         if (dhcp_interface !== undefined && !ifaceRe.test(String(dhcp_interface).trim())) {
-            return res.status(400).json({ error: 'DHCP 接口名格式无效（仅字母数字_.:-，≤32字符）' });
+            return res.status(400).json({ error: 'DHCP 接口名格式无效（仅字母数字_.:-，≤32字符）', code: 'DHCP_IFNAME_INVALID' });
         }
         if (vlan_interface !== undefined && !ifaceRe.test(String(vlan_interface).trim())) {
-            return res.status(400).json({ error: 'VLAN 接口名格式无效（仅字母数字_.:-，≤32字符）' });
+            return res.status(400).json({ error: 'VLAN 接口名格式无效（仅字母数字_.:-，≤32字符）', code: 'VLAN_IFNAME_INVALID' });
         }
         // CNAME 校验：支持前端 label||.domain 逗号分隔多条目格式（含旧格式兼容），逐条校验域名与长度
         if (cname_domain !== undefined) {
             const cnameResult = validateCnameDomain(cname_domain);
             if (!cnameResult.ok) {
-                return res.status(400).json({ error: cnameResult.error || 'CNAME 域名格式无效或过长' });
+                return res.status(400).json({ error: cnameResult.error || 'CNAME 域名格式无效或过长' , code: cnameResult.code });
             }
         }
         // 操作审计前置：读取变更前的配置值（用于按实际变化字段生成审计）
@@ -291,7 +291,7 @@ router.put('/admin/network/config', authMiddleware, adminMiddleware, async (req,
         } catch (e) {}
         res.json({ message: '网络配置已更新' });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -302,7 +302,7 @@ router.get('/cname', authMiddleware, async (req, res) => {
         const domain = await db.config.get('cname:domain') || '';
         res.json({ cname_domain: domain });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -330,7 +330,7 @@ router.get('/ikuai/interfaces', authMiddleware, adminMiddleware, async (req, res
         
         res.json(interfaces);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -391,7 +391,7 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
         } catch (e) {}
         res.json({ updated, skipped, errors, total: bindings.length });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -418,7 +418,7 @@ router.get('/port-forwards', authMiddleware, async (req, res) => {
         }
         res.json(rules);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -427,17 +427,17 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         const isAdmin = req.user.role === 'admin';
         const { type, vm_id, ct_id, name, ip, internal_port, external_port, protocol } = req.body;
         if (!type || !ip || !internal_port || !external_port) {
-            return res.status(400).json({ error: '缺少必要参数' });
+            return res.status(400).json({ error: '缺少必要参数', code: 'PARAM_MISSING' });
         }
         // type 白名单校验
         const allowedTypes = ['vm', 'lxc', 'general'];
         if (!allowedTypes.includes(type)) {
-            return res.status(400).json({ error: '无效的转发类型' });
+            return res.status(400).json({ error: '无效的转发类型', code: 'INVALID_FORWARD_TYPE' });
         }
         // L-4 修复：protocol 白名单（tcp/udp）+ name 长度限制与控制字符剔除
         const finalProtocol = String(protocol || 'tcp').toLowerCase();
         if (!['tcp', 'udp'].includes(finalProtocol)) {
-            return res.status(400).json({ error: '无效的协议，必须为 tcp 或 udp' });
+            return res.status(400).json({ error: '无效的协议，必须为 tcp 或 udp', code: 'INVALID_PROTO' });
         }
         const finalName = String(name || '').replace(/[\x00-\x1f\x7f]/g, '').slice(0, 50);
         // general 类型强制 vm_id/ct_id 为 null
@@ -445,12 +445,12 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         const finalCtId = type === 'lxc' ? (ct_id || null) : null;
         // 基础合法性校验：端口物理范围（TCP/UDP 端口为 16 位无符号整数），对所有用户（含管理员）生效
         if (internal_port < 1 || internal_port > 65535 || external_port < 1 || external_port > 65535) {
-            return res.status(400).json({ error: '端口必须在 1-65535 之间' });
+            return res.status(400).json({ error: '端口必须在 1-65535 之间', code: 'PORT_RANGE_1_65535' });
         }
 
         // L-2 修复：IPv4 格式合法性校验
         if (!/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip)) {
-            return res.status(400).json({ error: '无效的 IP 地址格式' });
+            return res.status(400).json({ error: '无效的 IP 地址格式', code: 'INVALID_IP_FORMAT' });
         }
 
         const config = {
@@ -461,11 +461,11 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         // 普通用户检查端口范围和数量限制；管理员不受此限制
         if (req.user.role !== 'admin') {
             if (external_port < config.port_range_start || external_port > config.port_range_end) {
-                return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内` });
+                return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内`, code: 'PORT_OUT_OF_RANGE', params: [config.port_range_start, config.port_range_end] });
             }
             const count = await db.portForwards.getCountByUserId(req.user.id);
             if (count >= config.max_per_user) {
-                return res.status(400).json({ error: `转发规则数量已达上限（${config.max_per_user} 条），如需新增请联系管理员` });
+                return res.status(400).json({ error: `转发规则数量已达上限（${config.max_per_user} 条），如需新增请联系管理员`, code: 'FORWARD_LIMIT_REACHED', params: [config.max_per_user] });
             }
         }
         // 新增：校验目标资源归属（general 类型 vm_id/ct_id 均为 null，天然跳过）
@@ -473,34 +473,34 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             const userVms = await db.vms.getByUserId(req.user.id);
             const ownedVm = userVms.find(v => v.vm_id == finalVmId);
             if (!ownedVm) {
-                return res.status(403).json({ error: '无权为此虚拟机创建转发规则' });
+                return res.status(403).json({ error: '无权为此虚拟机创建转发规则', code: 'FORWARD_VM_NO_PERM' });
             }
             // M-2 修复：到期资源拦截（端口转发属于资源使用）
             if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
             }
         }
         if (finalCtId && !isAdmin) {
             const userCts = await db.lxcContainers.getByUserId(req.user.id);
             const ownedCt = userCts.find(c => c.ct_id == finalCtId);
             if (!ownedCt) {
-                return res.status(403).json({ error: '无权为此容器创建转发规则' });
+                return res.status(403).json({ error: '无权为此容器创建转发规则', code: 'FORWARD_LXC_NO_PERM' });
             }
             // M-2 修复：到期资源拦截（端口转发属于资源使用）
             if (ownedCt.expiration_date && new Date(ownedCt.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请先续费' });
+                return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
             }
         }
         const existing = await db.portForwards.getByExternalPort(external_port);
         if (existing.length > 0) {
-            return res.status(400).json({ error: '外网端口已被占用，请更换' });
+            return res.status(400).json({ error: '外网端口已被占用，请更换', code: 'EXT_PORT_TAKEN' });
         }
         if (ikuaiApi.isConfigured()) {
             try {
                 const ikuaiRules = await ikuaiApi.getPortForwards();
                 const conflict = ikuaiRules.find(r => String(r.wan_port) === String(external_port));
                 if (conflict) {
-                    return res.status(400).json({ error: '外网端口已被占用，请更换' });
+                    return res.status(400).json({ error: '外网端口已被占用，请更换', code: 'EXT_PORT_TAKEN' });
                 }
             } catch (e) {
                 console.error('[端口转发] ikuai 端口检查失败:', e.message);
@@ -551,7 +551,7 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         await auditAction(req, 'network.port.add', portAuditDetail('新增', rule, finalVmId, finalCtId), { resourceType: 'port-forward', resourceId: rule.id });
         res.json(rule);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -559,34 +559,34 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const existing = await db.portForwards.getById(id);
-        if (!existing) return res.status(404).json({ error: '规则不存在' });
+        if (!existing) return res.status(404).json({ error: '规则不存在', code: 'RULE_NOT_FOUND' });
         if (req.user.role !== 'admin') {
             const userRules = await db.portForwards.getByUserId(req.user.id);
-            if (!userRules.find(r => r.id === id)) return res.status(403).json({ error: '无权限' });
+            if (!userRules.find(r => r.id === id)) return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });
         }
         const { name, ip, internal_port, external_port, protocol, type, vm_id, ct_id } = req.body;
 
         // V6-I2 修复：删除中（deleting）的规则禁止编辑——删除流程先置中间态再外呼爱快，
         // 期间 PUT 会把 sync_status 覆盖回 synced/pending 且改动的规则最终仍被物理删除
         if (existing.sync_status === 'deleting') {
-            return res.status(409).json({ error: '该规则正在删除中，无法编辑' });
+            return res.status(409).json({ error: '该规则正在删除中，无法编辑', code: 'RULE_DELETING' });
         }
 
         // L-2🔶 修复：修改 IP 时同步格式校验（与 POST 端点一致）
         if (ip !== undefined && ip !== null) {
             if (!/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ip)) {
-                return res.status(400).json({ error: '无效的 IP 地址格式' });
+                return res.status(400).json({ error: '无效的 IP 地址格式', code: 'INVALID_IP_FORMAT' });
             }
         }
 
         // 类型变更校验：type 必须是 vm/lxc/general 之一
         if (type !== undefined && type !== null && !['vm', 'lxc', 'general'].includes(type)) {
-            return res.status(400).json({ error: '无效的类型，必须为 vm/lxc/general' });
+            return res.status(400).json({ error: '无效的类型，必须为 vm/lxc/general', code: 'INVALID_REF_TYPE' });
         }
         // L-4 修复：protocol 白名单 + name 长度限制与控制字符剔除（与 POST 端点一致）
         if (protocol !== undefined && protocol !== null) {
             if (!['tcp', 'udp'].includes(String(protocol).toLowerCase())) {
-                return res.status(400).json({ error: '无效的协议，必须为 tcp 或 udp' });
+                return res.status(400).json({ error: '无效的协议，必须为 tcp 或 udp', code: 'INVALID_PROTO' });
             }
         }
         const finalName = name !== undefined && name !== null
@@ -597,25 +597,25 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         const effectiveVmId = effectiveType === 'vm' ? (vm_id !== undefined ? vm_id : existing.vm_id) : null;
         const effectiveCtId = effectiveType === 'lxc' ? (ct_id !== undefined ? ct_id : existing.ct_id) : null;
         // 类型为 vm/lxc 时必须有对应设备 ID
-        if (effectiveType === 'vm' && !effectiveVmId) return res.status(400).json({ error: 'VM 类型必须指定虚拟机' });
-        if (effectiveType === 'lxc' && !effectiveCtId) return res.status(400).json({ error: 'LXC 类型必须指定容器' });
+        if (effectiveType === 'vm' && !effectiveVmId) return res.status(400).json({ error: 'VM 类型必须指定虚拟机', code: 'REF_TYPE_VM_REQUIRED' });
+        if (effectiveType === 'lxc' && !effectiveCtId) return res.status(400).json({ error: 'LXC 类型必须指定容器', code: 'REF_TYPE_LXC_REQUIRED' });
 
         // V3-03 修复：目标资源归属校验（与 POST 端点一致，防止普通用户将转发指向他人资源）
         if (req.user.role !== 'admin') {
             if (effectiveVmId) {
                 const ownedVm = (await db.vms.getByUserId(req.user.id)).find(v => v.vm_id == effectiveVmId);
-                if (!ownedVm) return res.status(403).json({ error: '无权为此虚拟机创建转发规则' });
+                if (!ownedVm) return res.status(403).json({ error: '无权为此虚拟机创建转发规则', code: 'FORWARD_VM_NO_PERM' });
                 // M-2 修复：到期资源拦截（端口转发编辑属于资源使用）
                 if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
-                    return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+                    return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
                 }
             }
             if (effectiveCtId) {
                 const ownedCt = (await db.lxcContainers.getByUserId(req.user.id)).find(c => c.ct_id == effectiveCtId);
-                if (!ownedCt) return res.status(403).json({ error: '无权为此容器创建转发规则' });
+                if (!ownedCt) return res.status(403).json({ error: '无权为此容器创建转发规则', code: 'FORWARD_LXC_NO_PERM' });
                 // M-2 修复：到期资源拦截（端口转发编辑属于资源使用）
                 if (ownedCt.expiration_date && new Date(ownedCt.expiration_date) < new Date()) {
-                    return res.status(403).json({ error: '容器已到期，请先续费' });
+                    return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
                 }
             }
         }
@@ -632,7 +632,7 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                 }
             }
             const conflict = (await db.portForwards.getByExternalPort(external_port)).filter(r => r.id !== id);
-            if (conflict.length > 0) return res.status(400).json({ error: '外网端口已被占用，请更换' });
+            if (conflict.length > 0) return res.status(400).json({ error: '外网端口已被占用，请更换', code: 'EXT_PORT_TAKEN' });
         }
         // 检测端口/IP/类型/设备 ID 变更，需要同步爱快（类型或设备 ID 变化会导致 ikuai comment 变化）
         const portChanged = external_port && Number(external_port) !== Number(existing.external_port);
@@ -693,7 +693,7 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                 }
             } catch (e) {
                 await db.portForwards.update(id, { sync_status: 'failed' });
-                return res.status(500).json({ error: safeError(e) });
+                return res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
             }
         }
         const updates = {};
@@ -724,7 +724,7 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         } catch (e) {}
         res.json(updated);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -732,10 +732,10 @@ router.delete('/port-forwards/:id', authMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         const rule = await db.portForwards.getById(id);
-        if (!rule) return res.status(404).json({ error: '规则不存在' });
+        if (!rule) return res.status(404).json({ error: '规则不存在', code: 'RULE_NOT_FOUND' });
         if (req.user.role !== 'admin') {
             const userRules = await db.portForwards.getByUserId(req.user.id);
-            if (!userRules.find(r => r.id === id)) return res.status(403).json({ error: '无权限' });
+            if (!userRules.find(r => r.id === id)) return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });
         }
         if (rule.sync_status === 'orphan') {
             await db.portForwards.delete(id);
@@ -749,13 +749,13 @@ router.delete('/port-forwards/:id', authMiddleware, async (req, res) => {
         if (!delResult.deleted) {
             await db.portForwards.update(id, { sync_status: rule.sync_status || 'synced' });
             await auditAction(req, 'network.port.delete', portAuditDetail('删除', rule, rule.vm_id, rule.ct_id) + '（失败：爱快删除失败）', { resourceType: 'port-forward', resourceId: id });
-            return res.status(500).json({ error: '爱快删除失败: ' + delResult.error });
+            return res.status(500).json({ error: '爱快删除失败: ' + delResult.error, code: 'IKUAI_DELETE_FAILED', params: [delResult.error] });
         }
         await db.portForwards.delete(id);
         await auditAction(req, 'network.port.delete', portAuditDetail('删除', rule, rule.vm_id, rule.ct_id), { resourceType: 'port-forward', resourceId: id });
         res.json({ message: '规则已删除' });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -763,7 +763,7 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
     try {
         const { ids } = req.body;
         if (!ids || !Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ error: '请选择要删除的规则' });
+            return res.status(400).json({ error: '请选择要删除的规则', code: 'RULE_SELECT_REQUIRED' });
         }
         const results = { success: 0, failed: 0 };
         for (const id of ids) {
@@ -797,7 +797,7 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
         } catch (_) {}
         res.json(results);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -807,7 +807,7 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
         const rateLimitKey = 'ratelimit:random-port:' + req.user.id;
         const rateLimitResult = await checkConfiguredRateLimit('random_port', rateLimitKey);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+            return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: rateLimitResult.retryAfter });
         }
         const portRangeStart = parseInt(await db.config.get('forward:port_range_start')) || 50000;
         const portRangeEnd = parseInt(await db.config.get('forward:port_range_end')) || 60000;
@@ -830,12 +830,12 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
             if (!usedPorts.has(p)) available.push(p);
         }
         if (available.length === 0) {
-            return res.status(400).json({ error: '端口范围内无可用端口' });
+            return res.status(400).json({ error: '端口范围内无可用端口', code: 'NO_FREE_PORT' });
         }
         const randomPort = available[crypto.randomInt(0, available.length)];
         res.json({ port: randomPort });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -843,11 +843,11 @@ router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
     try {
         // M-3 修复：外呼爱快全量端口表，必须限速（admin 可配置）
         const checkRate = await checkConfiguredRateLimit('port_check', 'ratelimit:port-check:' + req.user.id);
-        if (!checkRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: checkRate.retryAfter });
+        if (!checkRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: checkRate.retryAfter });
 
         const port = parseInt(req.query.port);
         if (!port || port < 1 || port > 65535) {
-            return res.status(400).json({ error: '无效端口' });
+            return res.status(400).json({ error: '无效端口', code: 'INVALID_PORT' });
         }
         const existing = await db.portForwards.getByExternalPort(port);
         if (existing.length > 0) {
@@ -863,7 +863,7 @@ router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
         }
         res.json({ available: true });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -879,7 +879,7 @@ router.get('/port-forwards/config', authMiddleware, async (req, res) => {
             remaining: Math.max(0, maxPerUser - totalCount)
         });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -887,7 +887,7 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
     try {
         // M-3 修复：N+1 外呼爱快+PVE，必须限速（admin 可配置）
         const extractRate = await checkConfiguredRateLimit('port_extract_ips', 'ratelimit:port-extract-ips:' + req.user.id);
-        if (!extractRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: extractRate.retryAfter });
+        if (!extractRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: extractRate.retryAfter });
 
         const devices = [];
         const isAdmin = req.user.role === 'admin';
@@ -966,7 +966,7 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
         }
         res.json(devices);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 

@@ -31,7 +31,7 @@ function validateName(name) {
 async function rateLimit(req, res) {
     const opLimit = await checkConfiguredRateLimit('i18n_op', 'ratelimit:i18n-op:' + req.user.id);
     if (!opLimit.allowed) {
-        res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: opLimit.retryAfter });
+        res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: opLimit.retryAfter });
         return false;
     }
     return true;
@@ -42,7 +42,7 @@ router.get('/admin/i18n/languages/:code/entries', authMiddleware, adminMiddlewar
     try {
         const code = String(req.params.code || '');
         const lang = await db.i18n.getLanguage(code);
-        if (!lang) return res.status(404).json({ error: '未知语言' });
+        if (!lang) return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
         const entries = await i18nService.getLocaleEntries(code);
         res.json({
             language: { code: lang.code, name: lang.name, base_code: lang.base_code, is_system: !!lang.is_system },
@@ -50,7 +50,7 @@ router.get('/admin/i18n/languages/:code/entries', authMiddleware, adminMiddlewar
         });
     } catch (error) {
         console.error('获取 i18n 条目失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -61,7 +61,7 @@ router.get('/admin/i18n/summary', authMiddleware, adminMiddleware, async (req, r
         res.json(await i18nService.getI18nSummary());
     } catch (error) {
         console.error('获取 i18n 待翻译汇总失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -73,11 +73,11 @@ router.post('/admin/i18n/languages', authMiddleware, adminMiddleware, async (req
         const nameErr = validateName(name);
         if (nameErr) return res.status(400).json({ error: nameErr });
         if (typeof base_code !== 'string' || !(await i18nService.isSupportedLocale(base_code))) {
-            return res.status(400).json({ error: '复制源语言不存在' });
+            return res.status(400).json({ error: '复制源语言不存在', code: 'I18N_SRC_NOT_FOUND' });
         }
         const base = await db.i18n.getLanguage(base_code);
         if (!base || !base.is_system) {
-            return res.status(400).json({ error: '复制源仅支持内置系统语言' });
+            return res.status(400).json({ error: '复制源仅支持内置系统语言', code: 'I18N_SRC_BUILTIN_ONLY' });
         }
         const result = await i18nService.createCustomLanguage({
             name: name.trim(),
@@ -97,7 +97,7 @@ router.post('/admin/i18n/languages', authMiddleware, adminMiddleware, async (req
     } catch (error) {
         if (error && error.status) return res.status(error.status).json({ error: error.message });
         console.error('新建 i18n 语言失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -107,8 +107,8 @@ router.put('/admin/i18n/languages/:code', authMiddleware, adminMiddleware, async
         if (!(await rateLimit(req, res))) return;
         const code = String(req.params.code || '');
         const lang = await db.i18n.getLanguage(code);
-        if (!lang) return res.status(404).json({ error: '未知语言' });
-        if (lang.is_system) return res.status(400).json({ error: '内置语言不可重命名' });
+        if (!lang) return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
+        if (lang.is_system) return res.status(400).json({ error: '内置语言不可重命名', code: 'I18N_BUILTIN_RENAME' });
         const { name } = req.body || {};
         const nameErr = validateName(name);
         if (nameErr) return res.status(400).json({ error: nameErr });
@@ -127,7 +127,7 @@ router.put('/admin/i18n/languages/:code', authMiddleware, adminMiddleware, async
         res.json({ message: '语言重命名成功' });
     } catch (error) {
         console.error('重命名 i18n 语言失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -138,15 +138,15 @@ router.delete('/admin/i18n/languages/:code', authMiddleware, adminMiddleware, as
         if (!(await rateLimit(req, res))) return;
         const code = String(req.params.code || '');
         const lang = await db.i18n.getLanguage(code);
-        if (!lang) return res.status(404).json({ error: '未知语言' });
-        if (lang.is_system) return res.status(400).json({ error: '内置语言不可删除' });
+        if (!lang) return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
+        if (lang.is_system) return res.status(400).json({ error: '内置语言不可删除', code: 'I18N_BUILTIN_DELETE' });
         const using = await db.i18n.countUsersUsing(code);
         if (using && using.n > 0) {
-            return res.status(409).json({ error: '仍有 ' + using.n + ' 个用户正在使用该语言，请先切换用户语言偏好' });
+            return res.status(409).json({ error: '仍有 ' + using.n + ' 个用户正在使用该语言，请先切换用户语言偏好', code: 'I18N_LANG_IN_USE', params: [using.n] });
         }
         const siteLang = (await db.config.get('site:lang')) || 'zh-CN';
         if (siteLang === code) {
-            return res.status(409).json({ error: '该语言为当前系统默认语言，请先切换' });
+            return res.status(409).json({ error: '该语言为当前系统默认语言，请先切换', code: 'I18N_DEFAULT_LANG' });
         }
         const name = lang.name;
         await db.i18n.deleteLanguage(code);
@@ -164,7 +164,7 @@ router.delete('/admin/i18n/languages/:code', authMiddleware, adminMiddleware, as
         res.json({ message: '语言删除成功' });
     } catch (error) {
         console.error('删除 i18n 语言失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -174,13 +174,13 @@ router.put('/admin/i18n/languages/:code/entries', authMiddleware, adminMiddlewar
         if (!(await rateLimit(req, res))) return;
         const code = String(req.params.code || '');
         const lang = await db.i18n.getLanguage(code);
-        if (!lang) return res.status(404).json({ error: '未知语言' });
+        if (!lang) return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
         const body = req.body || {};
         if (!Array.isArray(body.entries)) {
-            return res.status(400).json({ error: 'entries 必须是数组' });
+            return res.status(400).json({ error: 'entries 必须是数组', code: 'I18N_ENTRIES_ARRAY' });
         }
         if (body.entries.length > MAX_BATCH) {
-            return res.status(400).json({ error: '单次最多保存 ' + MAX_BATCH + ' 个词条' });
+            return res.status(400).json({ error: '单次最多保存 ' + MAX_BATCH + ' 个词条', code: 'I18N_SAVE_LIMIT', params: [MAX_BATCH] });
         }
         // 基线 key 白名单：拒绝任意 key（防覆盖表脏数据/注入非法键）
         const baselineKeys = await i18nService.getBaselineKeys(code);
@@ -189,10 +189,10 @@ router.put('/admin/i18n/languages/:code/entries', authMiddleware, adminMiddlewar
         const deduped = {};
         for (const e of body.entries) {
             if (!e || typeof e.key !== 'string' || !keySet[e.key]) {
-                return res.status(400).json({ error: '包含无效词条 key' });
+                return res.status(400).json({ error: '包含无效词条 key', code: 'I18N_INVALID_KEYS' });
             }
             if (typeof e.value !== 'string' || e.value.length > MAX_VALUE_LEN) {
-                return res.status(400).json({ error: '词条值必须是字符串且不超过 ' + MAX_VALUE_LEN + ' 字符' });
+                return res.status(400).json({ error: '词条值必须是字符串且不超过 ' + MAX_VALUE_LEN + ' 字符', code: 'I18N_VALUE_TOO_LONG', params: [MAX_VALUE_LEN] });
             }
             deduped[e.key] = e.value;
         }
@@ -213,7 +213,7 @@ router.put('/admin/i18n/languages/:code/entries', authMiddleware, adminMiddlewar
         res.json({ message: '保存成功' });
     } catch (error) {
         console.error('保存 i18n 词条失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -223,7 +223,7 @@ router.post('/admin/i18n/languages/:code/reset', authMiddleware, adminMiddleware
         if (!(await rateLimit(req, res))) return;
         const code = String(req.params.code || '');
         const lang = await db.i18n.getLanguage(code);
-        if (!lang) return res.status(404).json({ error: '未知语言' });
+        if (!lang) return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
         await db.i18n.deleteOverrides(code);
         await i18nService.invalidateI18nCache([code]);
         // 操作审计：恢复默认
@@ -238,7 +238,7 @@ router.post('/admin/i18n/languages/:code/reset', authMiddleware, adminMiddleware
         res.json({ message: '已恢复默认' });
     } catch (error) {
         console.error('恢复 i18n 默认失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

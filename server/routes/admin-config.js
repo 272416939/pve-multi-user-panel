@@ -25,7 +25,7 @@ router.get('/admin/storage', authMiddleware, adminMiddleware, async (req, res) =
         const storages = await pveApi.getStorageList();
         res.json(storages.map(s => ({ id: s.storage, type: s.type, path: s.path, content: s.content })));
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -41,7 +41,7 @@ router.post('/check-expired', authMiddleware, adminMiddleware, async (req, res) 
         res.json({ message: '检查完成' });
     } catch (error) {
         console.error('手动检查失败:', error);
-        res.status(500).json({ error: '检查失败' });
+        res.status(500).json({ error: '检查失败', code: 'CHECK_FAILED' });
     }
 });
 
@@ -52,7 +52,7 @@ router.get('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
         res.json(configWithoutPassword);
     } catch (error) {
         console.error('获取 SMTP 配置失败:', error);
-        res.status(500).json({ error: '获取配置失败' });
+        res.status(500).json({ error: '获取配置失败', code: 'CONFIG_LOAD_FAILED' });
     }
 });
 
@@ -99,7 +99,7 @@ router.put('/admin/smtp', authMiddleware, adminMiddleware, async (req, res) => {
         res.json({ message: '配置更新成功', config: configWithoutPassword });
     } catch (error) {
         console.error('更新 SMTP 配置失败:', error);
-        res.status(500).json({ error: '更新配置失败' });
+        res.status(500).json({ error: '更新配置失败', code: 'CONFIG_SAVE_FAILED' });
     }
 });
 
@@ -108,15 +108,15 @@ router.post('/admin/smtp/test', authMiddleware, adminMiddleware, async (req, res
         // V6-M4 修复：真外呼 SMTP 发信端点必须专项限速（防会话被窃后当 SPAM 放大器；先例 pve_test）
         const smtpTestLimit = await checkConfiguredRateLimit('smtp_test', 'ratelimit:smtp-test:' + req.user.id);
         if (!smtpTestLimit.allowed) {
-            return res.status(429).json({ error: '测试邮件发送过于频繁，请稍后再试', retryAfter: smtpTestLimit.retryAfter });
+            return res.status(429).json({ error: '测试邮件发送过于频繁，请稍后再试', code: 'RATE_LIMITED_SMTP_TEST', retryAfter: smtpTestLimit.retryAfter });
         }
         const { testEmail } = req.body;
         if (!testEmail) {
-            return res.status(400).json({ error: '请提供测试邮箱' });
+            return res.status(400).json({ error: '请提供测试邮箱', code: 'TEST_EMAIL_REQUIRED' });
         }
         // 测试邮箱格式校验（单一来源 email-validate.js：防 SMTP RCPT 拒收浪费外呼配额）
         if (!isValidEmail(testEmail)) {
-            return res.status(400).json({ error: '邮箱格式不正确' });
+            return res.status(400).json({ error: '邮箱格式不正确', code: 'EMAIL_INVALID' });
         }
         
         // 测试前失效缓存：确保用最新保存的 SMTP 配置发送（而不是旧 transporter）
@@ -126,7 +126,7 @@ router.post('/admin/smtp/test', authMiddleware, adminMiddleware, async (req, res
         res.json({ message: '测试邮件发送成功' });
     } catch (error) {
         console.error('测试 SMTP 配置失败:', error);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -137,7 +137,7 @@ router.get('/admin/email-queue/stats', authMiddleware, adminMiddleware, async (r
         res.json(stats);
     } catch (error) {
         console.error('获取邮件队列状态失败:', error);
-        res.status(500).json({ error: '获取队列状态失败' });
+        res.status(500).json({ error: '获取队列状态失败', code: 'QUEUE_STATS_FAILED' });
     }
 });
 
@@ -147,7 +147,7 @@ router.get('/admin/reminder', authMiddleware, adminMiddleware, async (req, res) 
         res.json(config);
     } catch (error) {
         console.error('获取提醒配置失败:', error);
-        res.status(500).json({ error: '获取配置失败' });
+        res.status(500).json({ error: '获取配置失败', code: 'CONFIG_LOAD_FAILED' });
     }
 });
 
@@ -180,7 +180,7 @@ router.put('/admin/reminder', authMiddleware, adminMiddleware, async (req, res) 
         res.json({ message: '提醒配置更新成功', config: newReminder });
     } catch (error) {
         console.error('更新提醒配置失败:', error);
-        res.status(500).json({ error: '更新配置失败' });
+        res.status(500).json({ error: '更新配置失败', code: 'CONFIG_SAVE_FAILED' });
     }
 });
 
@@ -199,7 +199,7 @@ router.get('/admin/system/update/check', authMiddleware, adminMiddleware, async 
 router.post('/admin/system/update/execute', authMiddleware, adminMiddleware, async (req, res) => {
     const result = await executeUpdate((req.body && req.body.source) || 'gitee');
     if (!result.ok) {
-        return res.status(result.status).json({ error: result.error });
+        return res.status(result.status).json({ error: result.error , code: result.code });
     }
     // 操作审计：执行系统更新
     try {
@@ -242,7 +242,7 @@ router.get('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         });
     } catch (e) {
         console.error('[支付配置]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -304,15 +304,15 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         var maxNum = maxHasVal ? parseFloat(max_amount) : NaN;
 
         if (minHasVal) {
-            if (isNaN(minNum)) return res.status(400).json({ error: '最低充值金额必须为有效数字' });
-            if (minNum <= 0) return res.status(400).json({ error: '最低充值金额不能为负数或零' });
+            if (isNaN(minNum)) return res.status(400).json({ error: '最低充值金额必须为有效数字', code: 'MIN_RECHARGE_NUMERIC' });
+            if (minNum <= 0) return res.status(400).json({ error: '最低充值金额不能为负数或零', code: 'MIN_RECHARGE_POSITIVE' });
         }
         if (maxHasVal) {
-            if (isNaN(maxNum)) return res.status(400).json({ error: '最大充值金额必须为有效数字' });
-            if (maxNum <= 0) return res.status(400).json({ error: '最大充值金额不能为负数或零' });
+            if (isNaN(maxNum)) return res.status(400).json({ error: '最大充值金额必须为有效数字', code: 'MAX_RECHARGE_NUMERIC' });
+            if (maxNum <= 0) return res.status(400).json({ error: '最大充值金额不能为负数或零', code: 'MAX_RECHARGE_POSITIVE' });
         }
         if (minHasVal && maxHasVal && maxNum < minNum) {
-            return res.status(400).json({ error: '最大充值金额不能小于最低充值金额' });
+            return res.status(400).json({ error: '最大充值金额不能小于最低充值金额', code: 'MAX_RECHARGE_GE_MIN' });
         }
 
         if (minHasVal) await setConfig('pay:min_amount', String(minNum));
@@ -340,7 +340,7 @@ router.put('/admin/pay/config', authMiddleware, adminMiddleware, async (req, res
         res.json({ message: '支付配置保存成功' });
     } catch (e) {
         console.error('[支付配置]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -353,7 +353,7 @@ router.get('/admin/uapipro/config', authMiddleware, adminMiddleware, async (req,
         res.json({ enabled, api_key: maskSecret(apiKey) });
     } catch (e) {
         console.error('[UApiPro配置]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -385,7 +385,7 @@ router.put('/admin/uapipro/config', authMiddleware, adminMiddleware, async (req,
         res.json({ message: 'UApiPro 配置保存成功' });
     } catch (e) {
         console.error('[UApiPro配置]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -394,16 +394,16 @@ router.post('/admin/uapipro/test', authMiddleware, adminMiddleware, async (req, 
     try {
         var rateLimitResult = await checkConfiguredRateLimit('uapipro_test', 'ratelimit:uapipro-test:' + req.user.id);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '测试过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+            return res.status(429).json({ error: '测试过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
         }
         var ip = String(req.body.ip || '').trim();
-        if (!ip) return res.status(400).json({ error: '请输入要查询的 IP 地址' });
+        if (!ip) return res.status(400).json({ error: '请输入要查询的 IP 地址', code: 'QUERY_IP_REQUIRED' });
         var result = await queryIpLocation(ip);
         res.json(result);
     } catch (e) {
         console.error('[UApiPro测试]', e.message);
         // L-8 修复：不向客户端透传第三方接口错误原文，统一走 safeError（详情见服务端日志）
-        res.status(400).json({ error: safeError(e) });
+        res.status(400).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -435,7 +435,7 @@ router.get('/admin/rate-limit/config', authMiddleware, adminMiddleware, async (r
         res.json({ master_enabled: config.master_enabled, categories: categories });
     } catch (e) {
         console.error('[限速配置]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -488,15 +488,15 @@ router.put('/admin/rate-limit/config', authMiddleware, adminMiddleware, async (r
             for (var j = 0; j < catRules.length; j++) {
                 var r = catRules[j];
                 if (!r || !RATE_LIMIT_RULES[r.key]) {
-                    return res.status(400).json({ error: '存在未知限速规则: ' + (r && r.key) });
+                    return res.status(400).json({ error: '存在未知限速规则: ' + (r && r.key), code: 'RL_UNKNOWN_RULE', params: [r && r.key] });
                 }
                 var max = parseInt(r.max);
                 var windowSec = parseInt(r.windowSec);
                 if (!Number.isInteger(max) || max < 1 || max > 10000) {
-                    return res.status(400).json({ error: '限速次数须为 1-10000 的整数（规则: ' + r.key + '）' });
+                    return res.status(400).json({ error: '限速次数须为 1-10000 的整数（规则: ' + r.key + '）', code: 'RL_MAX_INVALID', params: [r.key] });
                 }
                 if (!Number.isInteger(windowSec) || windowSec < 1 || windowSec > 86400) {
-                    return res.status(400).json({ error: '时间窗须为 1-86400 秒的整数（规则: ' + r.key + '）' });
+                    return res.status(400).json({ error: '时间窗须为 1-86400 秒的整数（规则: ' + r.key + '）', code: 'RL_WINDOW_INVALID', params: [r.key] });
                 }
                 rules[r.key] = { enabled: r.enabled !== false, max: max, windowSec: windowSec };
             }
@@ -529,7 +529,7 @@ router.put('/admin/rate-limit/config', authMiddleware, adminMiddleware, async (r
         res.json({ message: '限速配置保存成功' });
     } catch (e) {
         console.error('[限速配置]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -538,7 +538,7 @@ router.get('/admin/storages/all', authMiddleware, adminMiddleware, async (req, r
         const storages = await pveApi.getAllStorages();
         res.json(storages);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -553,7 +553,7 @@ router.get('/admin/register/config', authMiddleware, adminMiddleware, async (req
         });
     } catch (e) {
         console.error('[注册配置]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -579,7 +579,7 @@ router.put('/admin/register/config', authMiddleware, adminMiddleware, async (req
         res.json({ message: '注册配置保存成功' });
     } catch (e) {
         console.error('[注册配置]', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -605,7 +605,7 @@ router.get('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         });
     } catch (e) {
         console.error('[admin] site config get:', e.message);
-        res.status(500).json({ error: '获取站点配置失败' });
+        res.status(500).json({ error: '获取站点配置失败', code: 'SITE_CONFIG_LOAD_FAILED' });
     }
 });
 
@@ -628,31 +628,31 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         var oldSite = await getSiteSnapshot();
         if (name !== undefined) {
             if (typeof name !== 'string' || name.length > 50 || /[<>]/.test(name)) {
-                return res.status(400).json({ error: '站点名称不能超过50字符且不能包含<>符号' });
+                return res.status(400).json({ error: '站点名称不能超过50字符且不能包含<>符号', code: 'SITE_NAME_INVALID' });
             }
         }
         if (logo_text !== undefined) {
             if (typeof logo_text !== 'string' || logo_text.length > 30 || /[<>]/.test(logo_text)) {
-                return res.status(400).json({ error: 'LOGO文字不能超过30字符且不能包含<>符号' });
+                return res.status(400).json({ error: 'LOGO文字不能超过30字符且不能包含<>符号', code: 'LOGO_TEXT_INVALID' });
             }
         }
         if (login_title !== undefined) {
             if (typeof login_title !== 'string' || login_title.length > 100 || /[<>]/.test(login_title)) {
-                return res.status(400).json({ error: '登录页标题不能超过100字符且不能包含<>符号' });
+                return res.status(400).json({ error: '登录页标题不能超过100字符且不能包含<>符号', code: 'LOGIN_TITLE_INVALID' });
             }
         }
         if (template !== undefined) {
             // UI_TEMPLATES 白名单校验，禁止非法值入库
             var { UI_TEMPLATES } = require('../constants');
             if (typeof template !== 'string' || !UI_TEMPLATES.includes(template)) {
-                return res.status(400).json({ error: '界面模板参数不合法' });
+                return res.status(400).json({ error: '界面模板参数不合法', code: 'UI_TPL_PARAM_INVALID' });
             }
         }
         if (lang !== undefined) {
             // 动态白名单校验（系统语言 + 自定义语言），禁止非法值入库
             const { isSupportedLocale } = require('../services/i18n');
             if (typeof lang !== 'string' || !(await isSupportedLocale(lang))) {
-                return res.status(400).json({ error: '语言参数不合法' });
+                return res.status(400).json({ error: '语言参数不合法', code: 'LANG_PARAM_INVALID' });
             }
         }
         if (name !== undefined) await setConfig('site:name', name);
@@ -696,7 +696,7 @@ router.put('/admin/site/config', authMiddleware, adminMiddleware, async (req, re
         res.json({ message: '站点配置保存成功' });
     } catch (e) {
         console.error('[admin] site config set:', e.message);
-        res.status(500).json({ error: '保存站点配置失败' });
+        res.status(500).json({ error: '保存站点配置失败', code: 'SITE_CONFIG_SAVE_FAILED' });
     }
 });
 
@@ -712,7 +712,7 @@ router.post('/admin/cache/clear', authMiddleware, adminMiddleware, async (req, r
         res.json({ message: '所有缓存已清除' });
     } catch (e) {
         console.error('[admin] cache clear:', e.message);
-        res.status(500).json({ error: '清除缓存失败' });
+        res.status(500).json({ error: '清除缓存失败', code: 'CACHE_CLEAR_FAILED' });
     }
 });
 
@@ -729,7 +729,7 @@ router.get('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, r
         });
     } catch (error) {
         console.error('获取爱快配置失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -739,11 +739,11 @@ router.put('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, r
         host = String(host || '').trim();
         // 协议白名单 + 长度校验（SSRF 防护：仅 http/https；留空表示停用爱快）
         if (host && !/^https?:\/\/\S+$/i.test(host)) {
-            return res.status(400).json({ error: '爱快地址必须以 http:// 或 https:// 开头' });
+            return res.status(400).json({ error: '爱快地址必须以 http:// 或 https:// 开头', code: 'IKUAI_URL_SCHEME' });
         }
-        if (host.length > 200) return res.status(400).json({ error: '爱快地址过长' });
+        if (host.length > 200) return res.status(400).json({ error: '爱快地址过长', code: 'IKUAI_URL_TOO_LONG' });
         username = String(username || '').trim();
-        if (username.length > 64) return res.status(400).json({ error: '用户名过长' });
+        if (username.length > 64) return res.status(400).json({ error: '用户名过长', code: 'USERNAME_TOO_LONG' });
         // 保存前取旧配置（审计 diff 用；密码只记「已更新」标记，不记录原文）
         var oldIkuai = await db.config.getIkuai();
         // V6-I4 修复：空字符串视为未修改（保留旧密码），与 PVE 配置对称
@@ -774,7 +774,7 @@ router.put('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, r
         res.json({ message: '爱快配置保存成功' });
     } catch (error) {
         console.error('更新爱快配置失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -784,14 +784,14 @@ router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, re
         // 外呼真实设备：走可配置限速（与 ikuai_query 同规则，独立 key）
         var rateLimitResult = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-test:' + req.user.id);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '测试过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+            return res.status(429).json({ error: '测试过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
         }
         var info = await ikuaiApi.testConnection();
         res.json({ message: '连接成功', info: info || null });
     } catch (e) {
         console.error('[ikuai] 测试连接失败:', e.message);
         // 不透传第三方错误原文，统一走 safeError（详情见服务端日志）
-        res.status(400).json({ error: safeError(e) });
+        res.status(400).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -811,7 +811,7 @@ router.get('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
         });
     } catch (error) {
         console.error('获取 PVE 配置失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -859,7 +859,7 @@ router.put('/admin/pve/config', authMiddleware, adminMiddleware, async (req, res
         res.json({ message: 'PVE 配置保存成功' });
     } catch (error) {
         console.error('更新 PVE 配置失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -869,7 +869,7 @@ router.post('/admin/pve/test', authMiddleware, adminMiddleware, async (req, res)
         // 外呼真实 PVE/SSH：走可配置限速（独立 key）
         var rateLimitResult = await checkConfiguredRateLimit('pve_test', 'ratelimit:pve-test:' + req.user.id);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '测试过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+            return res.status(429).json({ error: '测试过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
         }
         var { host, api_token, ssh_host, ssh_port, ssh_user, ssh_password, strict_tls } = req.body || {};
         // 脱敏值回退读库（用户未改密码/Tok 时表单回显的是打码串）
@@ -883,7 +883,7 @@ router.post('/admin/pve/test', authMiddleware, adminMiddleware, async (req, res)
         res.json({ message: result.message, info: result.info || null });
     } catch (error) {
         console.error('[pve] 测试连接失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -901,7 +901,7 @@ router.get('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
         });
     } catch (error) {
         console.error('获取 Redis 配置失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -942,7 +942,7 @@ router.put('/admin/redis/config', authMiddleware, adminMiddleware, async (req, r
         res.json({ message: 'Redis 配置保存成功' });
     } catch (error) {
         console.error('更新 Redis 配置失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -955,7 +955,7 @@ router.get('/admin/log/config', authMiddleware, adminMiddleware, async (req, res
         res.json({ keep_count: keepCount, keep_admin_count: keepAdminCount });
     } catch (error) {
         console.error('获取日志配置失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -965,10 +965,10 @@ router.put('/admin/log/config', authMiddleware, adminMiddleware, async (req, res
         var keepAdminCount = req.body.keep_admin_count !== undefined ? parseInt(req.body.keep_admin_count) : null;
         // 上限校验：100-100000，防止误填 0 或超大值导致日志被清空/爆库
         if (!Number.isInteger(keepCount) || keepCount < 100 || keepCount > 100000) {
-            return res.status(400).json({ error: '用户日志上限须为 100-100000 的整数' });
+            return res.status(400).json({ error: '用户日志上限须为 100-100000 的整数', code: 'USER_LOG_LIMIT_INT' });
         }
         if (keepAdminCount !== null && (!Number.isInteger(keepAdminCount) || keepAdminCount < 100 || keepAdminCount > 100000)) {
-            return res.status(400).json({ error: '后台操作日志上限须为 100-100000 的整数' });
+            return res.status(400).json({ error: '后台操作日志上限须为 100-100000 的整数', code: 'ADMIN_LOG_LIMIT_INT' });
         }
         // 保存前取旧配置（审计 diff 用）
         var oldLogConfig = {
@@ -996,7 +996,7 @@ router.put('/admin/log/config', authMiddleware, adminMiddleware, async (req, res
         res.json({ message: '日志配置保存成功' });
     } catch (error) {
         console.error('更新日志配置失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -1013,7 +1013,7 @@ router.post('/admin/redis/test', authMiddleware, adminMiddleware, async (req, re
         res.json(result);
     } catch (error) {
         console.error('测试 Redis 连接失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

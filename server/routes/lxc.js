@@ -60,7 +60,7 @@ router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         res.json({ available, assigned });
     } catch (error) {
         console.error('获取 LXC 容器列表错误:', error);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -68,7 +68,7 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
         const listRate = await checkConfiguredRateLimit('user_lxc', 'ratelimit:user-lxc:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: listRate.retryAfter });
 
         let userCts;
         if (req.user.role === 'admin') {
@@ -180,18 +180,18 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     const { ct_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id, monthly_price, quarterly_discount, yearly_discount } = req.body;
  
     if (!ct_id || !user_id) {
-        return res.status(400).json({ error: '请选择容器和用户' });
+        return res.status(400).json({ error: '请选择容器和用户', code: 'LXC_USER_REQUIRED' });
     }
  
     const parsedCtId = parseInt(ct_id);
     const parsedUserId = parseInt(user_id);
  
     if (isNaN(parsedCtId) || isNaN(parsedUserId)) {
-        return res.status(400).json({ error: '无效的容器或用户ID' });
+        return res.status(400).json({ error: '无效的容器或用户ID', code: 'INVALID_LXC_OR_USER_ID' });
     }
     // L-5 修复：ct_id 严格白名单校验
     if (!Number.isInteger(parsedCtId) || parsedCtId < 100 || parsedCtId > 999999999) {
-        return res.status(400).json({ error: '无效的容器 ID' });
+        return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
     }
 
     // SEC-03: 价格/折扣参数服务端校验
@@ -207,12 +207,12 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     // SEC-04: period 白名单校验
     var validPeriod = renewal_period || 'month';
     if (!VALID_PERIODS.includes(validPeriod)) {
-        return res.status(400).json({ error: '无效的计费周期' });
+        return res.status(400).json({ error: '无效的计费周期', code: 'INVALID_PERIOD' });
     }
  
     const existingCts = await db.lxcContainers.getAll();
     if (existingCts.find(ct => ct.ct_id === parsedCtId && ct.user_id === parsedUserId)) {
-        return res.status(400).json({ error: '该容器已分配给此用户' });
+        return res.status(400).json({ error: '该容器已分配给此用户', code: 'LXC_ALREADY_ASSIGNED' });
     }
  
     const newCt = await db.lxcContainers.create({
@@ -300,7 +300,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     res.json(newCt);
     } catch (e) {
         console.error('[lxc] 操作失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -311,14 +311,14 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
  
     const ct = await db.lxcContainers.getById(ctId);
     if (!ct) {
-        return res.status(404).json({ error: 'LXC 容器不存在' });
+        return res.status(404).json({ error: 'LXC 容器不存在', code: 'LXC_NOT_FOUND' });
     }
  
     const isAdmin = req.user.role === 'admin';
     const isOwner = req.user.id === ct.user_id;
  
     if (!isAdmin && !isOwner) {
-        return res.status(403).json({ error: '无权限操作此容器' });
+        return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
     }
  
     const updates = {};
@@ -344,7 +344,7 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     if (isAdmin && user_id !== undefined && user_id !== ct.user_id) {
         const newUserId = parseInt(user_id);
         if (isNaN(newUserId)) {
-            return res.status(400).json({ error: '无效的用户ID' });
+            return res.status(400).json({ error: '无效的用户ID', code: 'INVALID_USER_ID' });
         }
         updates.user_id = newUserId;
  
@@ -442,7 +442,7 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     res.json({ message: '容器信息更新成功' });
     } catch (e) {
         console.error('[lxc] 操作失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -459,7 +459,7 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
         try {
             const status = await pveApi.getLxcStatus(ct.ct_id);
             if (status && status.status === 'running') {
-                return res.status(400).json({ error: '容器正在运行，请先关机后再移除' });
+                return res.status(400).json({ error: '容器正在运行，请先关机后再移除', code: 'LXC_RUNNING_REMOVE' });
             }
         } catch (e) {
             console.warn(`[lxc] 查询 ${ct.ct_id} 状态失败（继续执行移除）:`, e.message);
@@ -529,14 +529,14 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
     res.json({ message: '容器移除成功' });
     } catch (e) {
         console.error('[lxc] 操作失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -544,22 +544,22 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此容器' });
+                return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费', code: 'LXC_EXPIRED_ADMIN' });
             }
             if (isOwner && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，无法开机' });
+                return res.status(403).json({ error: '容器已到期，无法开机', code: 'LXC_EXPIRED_NO_START' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
         // 私有网络：未绑定子网的存量设备关机后拒绝开机（全角色生效，含管理员）
         if (ct && !ct.subnet_id) {
-            return res.status(400).json({ error: '该容器尚未绑定子网，请先在「更多→绑定子网」中绑定后再开机' });
+            return res.status(400).json({ error: '该容器尚未绑定子网，请先在「更多→绑定子网」中绑定后再开机', code: 'LXC_NO_SUBNET_START' });
         }
 
         await pveApi.startLxc(vmid);
@@ -592,14 +592,14 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
         await auditAction(req, 'lxc.start', '开机 LXC ' + vmid);
         res.json({ message: 'LXC 容器启动成功' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -607,14 +607,14 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此容器' });
+                return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费', code: 'LXC_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
         await pveApi.shutdownLxc(vmid);
@@ -623,14 +623,14 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
         await auditAction(req, 'lxc.shutdown', '关机 LXC ' + vmid);
         res.json({ message: 'LXC 容器关机命令已发送' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -638,14 +638,14 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此容器' });
+                return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费', code: 'LXC_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
         await pveApi.stopLxc(vmid);
@@ -654,14 +654,14 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
         await auditAction(req, 'lxc.stop', '强制停止 LXC ' + vmid);
         res.json({ message: 'LXC 容器已强制停止' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -669,21 +669,21 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此容器' });
+                return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费', code: 'LXC_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
         await pveApi.rebootLxc(vmid);
         await auditAction(req, 'lxc.reboot', '重启 LXC ' + vmid);
         res.json({ message: 'LXC 容器重启命令已发送' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -691,10 +691,10 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
     try {
         // L-6 修复：VNC 会话创建限速（admin 可配置），防并发打满 PVE SSH/VNC 连接
         const vncRate = await checkConfiguredRateLimit('terminal_open', 'ratelimit:terminal-open:' + req.user.id);
-        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: vncRate.retryAfter });
+        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: vncRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -702,17 +702,17 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         // V-1 修复：统一权限模式 — 管理员可连接未分配容器进行运维
         if (!ct) {
             if (!isAdmin) {
-                return res.status(403).json({ error: '容器未分配，无权限' });
+                return res.status(403).json({ error: '容器未分配，无权限', code: 'LXC_UNASSIGNED' });
             }
             // 管理员允许继续（用于运维未分配的容器）
         } else {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权操作此容器' });
+                return res.status(403).json({ error: '无权操作此容器', code: 'LXC_NO_PERM_2' });
             }
             // M-2 修复：到期资源拦截（VNC 控制台属于资源使用）
             if (!isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请先续费' });
+                return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
             }
         }
  
@@ -721,10 +721,10 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         try {
             ctStatus = await pveApi.getLxcStatus(vmid);
         } catch (e) {
-            return res.status(500).json({ error: '无法获取容器状态' });
+            return res.status(500).json({ error: '无法获取容器状态', code: 'LXC_STATE_FAILED' });
         }
         if (!ctStatus || ctStatus.status !== 'running') {
-            return res.status(400).json({ error: '容器未运行，请先开机' });
+            return res.status(400).json({ error: '容器未运行，请先开机', code: 'LXC_NOT_RUNNING' });
         }
  
         const result = await pveApi.getLxcVncConsole(vmid);
@@ -741,7 +741,7 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC VNC 控制台失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -749,10 +749,10 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
     try {
         // L-6 修复：SSH 终端会话创建限速（admin 可配置），防并发打满 PVE 节点 SSH 连接
         const termRate = await checkConfiguredRateLimit('terminal_open', 'ratelimit:terminal-open:' + req.user.id);
-        if (!termRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: termRate.retryAfter });
+        if (!termRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: termRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -760,29 +760,29 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此容器' });
+                return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费', code: 'LXC_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
         // M-2 修复：到期资源拦截（SSH 终端属于资源使用）
         if (!isAdmin && ct && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-            return res.status(403).json({ error: '容器已到期，请先续费' });
+            return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
 
         let ctStatus;
         try {
             ctStatus = await pveApi.getLxcStatus(vmid);
         } catch (e) {
-            return res.status(500).json({ error: '无法获取容器状态' });
+            return res.status(500).json({ error: '无法获取容器状态', code: 'LXC_STATE_FAILED' });
         }
         if (!ctStatus || ctStatus.status !== 'running') {
-            return res.status(400).json({ error: '容器未运行，请先开机' });
+            return res.status(400).json({ error: '容器未运行，请先开机', code: 'LXC_NOT_RUNNING' });
         }
 
         // 安全修复：用不透明的 session ID 替代 URL 中的 JWT token
@@ -797,7 +797,7 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC 终端失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -805,10 +805,10 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：状态查询端点限速（30次/分钟）
         const statusRate = await checkConfiguredRateLimit('lxc_status', 'ratelimit:lxc-status:' + req.user.id);
-        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: statusRate.retryAfter });
+        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: statusRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         const allCts = await db.lxcContainers.getAll();
         const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -816,10 +816,10 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限查看此容器状态' });
+                return res.status(403).json({ error: '无权限查看此容器状态', code: 'LXC_STATE_NO_PERM' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限查看此容器状态，资源未分配' });
+            return res.status(403).json({ error: '无权限查看此容器状态，资源未分配', code: 'LXC_STATE_NO_PERM_UNASSIGNED' });
         }
 
         const [rawStatus, config] = await Promise.all([
@@ -829,7 +829,7 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
         const status = _applyRate('lxc:' + req.params.vmid, rawStatus);
         res.json({ status, config });
     } catch (error) {
-        res.status(500).json({ error: '获取容器状态失败' });
+        res.status(500).json({ error: '获取容器状态失败', code: 'LXC_STATE_LOAD_FAILED' });
     }
 });
 
@@ -852,7 +852,7 @@ router.get('/lxc/templates', authMiddleware, adminMiddleware, async (req, res) =
         const results = await Promise.all(templatePromises);
         res.json(results.flat());
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -861,7 +861,7 @@ router.get('/lxc/storages', authMiddleware, adminMiddleware, async (req, res) =>
         const storages = await pveApi.getLxcStorageList();
         res.json(storages.map(s => ({ id: s.storage, type: s.type, path: s.path, content: s.content })));
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -870,7 +870,7 @@ router.post('/lxc/create', authMiddleware, adminMiddleware, async (req, res) => 
         const { ostemplate, hostname, password, storage, cores, memory, swap, disk, net0, unprivileged, start, description, features } = req.body;
  
         if (!ostemplate) {
-            return res.status(400).json({ error: '请选择模板' });
+            return res.status(400).json({ error: '请选择模板', code: 'TEMPLATE_REQUIRED' });
         }
  
         // 获取可用空闲 VMID（取当前最大 ID + 1）
@@ -904,7 +904,7 @@ router.post('/lxc/create', authMiddleware, adminMiddleware, async (req, res) => 
         res.json({ upid, ct_id: newVmid, message: 'LXC 容器创建任务已提交' });
     } catch (error) {
         console.error('创建 LXC 容器失败:', error.response?.data || error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -915,12 +915,12 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
 
         // P0-C3 修复：vmid 白名单校验，防止命令注入
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
-            return res.status(400).json({ error: '无效的容器 ID' });
+            return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         }
 
         var passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,13}$/;
         if (!password || !passwordRegex.test(password)) {
-            return res.status(400).json({ error: '密码需8-13位，包含大小写英文、数字和特殊字符' });
+            return res.status(400).json({ error: '密码需8-13位，包含大小写英文、数字和特殊字符', code: 'PASSWORD_RULE_8_13' });
         }
  
         const allCts = await db.lxcContainers.getAll();
@@ -930,27 +930,27 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此容器' });
+                return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费', code: 'LXC_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
         // 检查容器状态
         const status = await pveApi.getLxcStatus(vmid);
         if (status.status !== 'running') {
-            return res.status(400).json({ error: '容器未运行，请先开机再重置密码' });
+            return res.status(400).json({ error: '容器未运行，请先开机再重置密码', code: 'LXC_NOT_RUNNING_RESET_PWD' });
         }
  
         // C-3 最终修复：使用 stdin 管道传密码，彻底消除 shell 注入
         const { getPveSshConfig } = require('../api/ssh-exec');
         const sshConfig = await getPveSshConfig();
-        if (!sshConfig.host) { return res.status(500).json({ error: 'SSH 配置不完整：请在面板设置 PVE SSH 连接信息' }); }
-        if (!sshConfig.password) { return res.status(500).json({ error: 'SSH 配置不完整：请在面板设置 PVE SSH 密码' }); }
+        if (!sshConfig.host) { return res.status(500).json({ error: 'SSH 配置不完整：请在面板设置 PVE SSH 连接信息', code: 'SSH_NOT_CONFIGURED' }); }
+        if (!sshConfig.password) { return res.status(500).json({ error: 'SSH 配置不完整：请在面板设置 PVE SSH 密码', code: 'SSH_NO_PASSWORD' }); }
 
         // 密码通过 stdin 传入 chpasswd，完全不接触 shell 解释器
         const { code, stderr } = await execSSHWithStdin(
@@ -963,12 +963,12 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
         if (code !== 0) {
             // V3-06 修复：不回显 SSH stderr（防内部信息泄露），详情仅记服务端日志
             console.error(`[lxc] 重置密码失败（vmid=${vmid}）:`, stderr || 'lxc-attach 命令执行出错');
-            return res.status(500).json({ error: '密码重置失败，请稍后重试' });
+            return res.status(500).json({ error: '密码重置失败，请稍后重试', code: 'RESET_PWD_FAILED' });
         }
         await auditAction(req, 'password.reset.lxc', '重置 LXC ' + vmid + ' 密码');
         res.json({ message: '密码重置成功' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -977,31 +977,31 @@ router.get('/lxc/random-ip', authMiddleware, async (req, res) => {
     try {
         // L-12 修复：随机 IP 需扫描 IP 池，加用户级限速（admin 可配置）
         const ipRate = await checkConfiguredRateLimit('random_ip', 'ratelimit:random-ip:' + req.user.id);
-        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试', retryAfter: ipRate.retryAfter });
+        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试', code: 'RATE_LIMITED_FETCH', retryAfter: ipRate.retryAfter });
 
         const subnetId = parseInt(req.query.subnet_id);
         if (subnetId) {
             // 私有网络：随机 IP 从子网 IP 池选取，且非管理员仅限使用自己的子网
             const subnet = await db.subnets.getById(subnetId);
             if (!subnet) {
-                return res.status(400).json({ error: '子网不存在' });
+                return res.status(400).json({ error: '子网不存在', code: 'SUBNET_NOT_FOUND' });
             }
             if (req.user.role !== 'admin' && subnet.user_id !== req.user.id) {
-                return res.status(403).json({ error: '无权限使用该子网' });
+                return res.status(403).json({ error: '无权限使用该子网', code: 'SUBNET_NO_PERM_USE' });
             }
             const ip = await pickUnusedStaticIp(subnet);
             if (!ip) {
-                return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
+                return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP', code: 'SUBNET_POOL_EMPTY' });
             }
             return res.json({ ip });
         }
         const ip = await pickUnusedStaticIp();
         if (!ip) {
-            return res.status(400).json({ error: '无可用 IP' });
+            return res.status(400).json({ error: '无可用 IP', code: 'NO_FREE_IP' });
         }
         res.json({ ip });
     } catch (error) {
-        res.status(500).json({ error: '获取随机 IP 失败' });
+        res.status(500).json({ error: '获取随机 IP 失败', code: 'RANDOM_IP_FAILED' });
     }
 });
 
@@ -1009,12 +1009,12 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         // L-5 修复：vmid 严格白名单校验
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
         const { ip_mode, ip } = req.body; // ip_mode: 'dhcp' 或 'static'
 
         // 参数校验
         if (!ip_mode || !['dhcp', 'static', 'random'].includes(ip_mode)) {
-            return res.status(400).json({ error: '无效的 IP 模式，请选择 DHCP、静态 IP 或随机' });
+            return res.status(400).json({ error: '无效的 IP 模式，请选择 DHCP、静态 IP 或随机', code: 'INVALID_IP_MODE' });
         }
 
         // 权限检查
@@ -1024,14 +1024,14 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此容器' });
+                return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '容器已到期，请联系管理员续费', code: 'LXC_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此容器，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
         // 私有网络：重置 IP 必须已绑定子网，随机/静态 IP 均取自绑定的子网 IP 池
@@ -1040,19 +1040,19 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
             subnet = await db.subnets.getById(ct.subnet_id);
         }
         if (!subnet) {
-            return res.status(400).json({ error: '该容器尚未绑定子网，请先绑定后再重置 IP' });
+            return res.status(400).json({ error: '该容器尚未绑定子网，请先绑定后再重置 IP', code: 'LXC_NO_SUBNET_RESET_IP' });
         }
 
         // 获取当前配置
         const config = await pveApi.getLxcConfig(vmid);
         if (!config || !config.net0) {
-            return res.status(400).json({ error: '无法获取容器网络配置' });
+            return res.status(400).json({ error: '无法获取容器网络配置', code: 'LXC_NETCFG_FAILED' });
         }
 
         // 解析 net0 中的 MAC 和其他参数
         const macMatch = config.net0.match(/([0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5})/);
         if (!macMatch) {
-            return res.status(400).json({ error: '无法解析容器 MAC 地址' });
+            return res.status(400).json({ error: '无法解析容器 MAC 地址', code: 'LXC_MAC_PARSE_FAILED' });
         }
         const mac = macMatch[1];
 
@@ -1079,16 +1079,16 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
             // DHCP 模式不添加 gw 和 firewall
         } else if (ip_mode === 'static') {
             if (!ip) {
-                return res.status(400).json({ error: '请输入 IP 地址' });
+                return res.status(400).json({ error: '请输入 IP 地址', code: 'IP_REQUIRED' });
             }
             // 验证 IP 格式
             const ipBase = ip.split('/')[0];
             if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ipBase)) {
-                return res.status(400).json({ error: 'IP 地址格式不正确' });
+                return res.status(400).json({ error: 'IP 地址格式不正确', code: 'IP_INVALID' });
             }
             // 已绑定子网：手动输入 IP 必须在绑定的子网 IP 池内
             if (!isIpInAddrPool(ipBase, subnet.addr_pool)) {
-                return res.status(400).json({ error: 'IP 不在当前绑定的子网 IP 池范围内，请选择池内地址或使用随机 IP' });
+                return res.status(400).json({ error: 'IP 不在当前绑定的子网 IP 池范围内，请选择池内地址或使用随机 IP', code: 'IP_NOT_IN_POOL' });
             }
             const cidr = ip.includes('/') ? ip : ip + '/24';
             newNet0Parts.push('ip=' + cidr);
@@ -1098,7 +1098,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         } else if (ip_mode === 'random') {
             const randomIp = await pickUnusedStaticIp(subnet);
             if (!randomIp) {
-                return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
+                return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP', code: 'SUBNET_POOL_EMPTY' });
             }
             newNet0Parts.push('ip=' + randomIp + '/24');
             newNet0Parts.push('ip6=dhcp');
@@ -1155,7 +1155,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
             if (wasRunning) {
                 try { await pveApi.startLxc(vmid); } catch (_) {}
             }
-            return res.status(500).json({ error: safeError(pveErr) });
+            return res.status(500).json({ error: safeError(pveErr), code: 'INTERNAL_ERROR' });
         }
 
         // 如果之前是运行状态，重新开机
@@ -1238,7 +1238,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         res.json({ message: 'IP 重置成功', ip: newIp || 'DHCP', net0: newNet0 });
     } catch (error) {
         console.error('重置 LXC IP 失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -1250,7 +1250,7 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
         try {
             const status = await pveApi.getLxcStatus(vmid);
             if (status && status.status === 'running') {
-                return res.status(400).json({ error: '容器正在运行，请先关机后再销毁' });
+                return res.status(400).json({ error: '容器正在运行，请先关机后再销毁', code: 'LXC_RUNNING_DESTROY' });
             }
         } catch (e) {
             console.warn(`[lxc] 查询 ${vmid} 状态失败（继续执行销毁）:`, e.message);
@@ -1294,7 +1294,7 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
         await pveApi.deleteLxc(vmid);
         res.json({ message: 'LXC 容器已销毁' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

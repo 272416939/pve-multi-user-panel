@@ -10,7 +10,7 @@ router.get('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, r
         var list = await db.vmTemplates.getAll();
         res.json(list);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -26,7 +26,7 @@ router.post('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, 
         } catch (e) {}
         res.json(t);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -67,7 +67,7 @@ router.put('/admin/vm-templates/:id', authMiddleware, adminMiddleware, async (re
         } catch (e) {}
         res.json(t);
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -77,7 +77,7 @@ router.delete('/admin/vm-templates/:id', authMiddleware, adminMiddleware, async 
         var id = parseInt(req.params.id);
         var packages = await db.vmPackages.getAll();
         var ref = packages.find(function(p) { return p.template_id === id; });
-        if (ref) return res.status(400).json({ error: '该模板被套餐 [' + ref.name + '] 引用，请先删除套餐' });
+        if (ref) return res.status(400).json({ error: '该模板被套餐 [' + ref.name + '] 引用，请先删除套餐', code: 'TPL_IN_USE_PKGS', params: [ref.name] });
         await db.vmTemplates.delete(id);
         // 操作审计：删除 VM 模板
         try {
@@ -86,13 +86,13 @@ router.delete('/admin/vm-templates/:id', authMiddleware, adminMiddleware, async 
         } catch (e) {}
         res.json({ message: '已删除' });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
 // LXC 模板列表
 router.get('/admin/lxc-templates', authMiddleware, adminMiddleware, async (req, res) => {
-    try { var list = await db.lxcTemplates.getAll(); res.json(list); } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    try { var list = await db.lxcTemplates.getAll(); res.json(list); } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 // LXC 模板创建
@@ -106,7 +106,7 @@ router.post('/admin/lxc-templates', authMiddleware, adminMiddleware, async (req,
             await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.template.create', resourceType: 'lxc-template', resourceId: t.id, details: '创建LXC模板:' + (req.body.name || t.id), req });
         } catch (e) {}
         res.json(t);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 // LXC 模板更新
@@ -149,7 +149,7 @@ router.put('/admin/lxc-templates/:id', authMiddleware, adminMiddleware, async (r
             }
         } catch (e) {}
         res.json(t);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 // LXC 模板删除
@@ -166,7 +166,7 @@ router.delete('/admin/lxc-templates/:id', authMiddleware, adminMiddleware, async
             await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.template.delete', resourceType: 'lxc-template', resourceId: id, details: '删除LXC模板 #' + id, req });
         } catch (e) {}
         res.json({ message: '已删除' });
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 module.exports = router;

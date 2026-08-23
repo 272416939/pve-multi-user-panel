@@ -50,7 +50,7 @@ async function validateDiskFormat(storagePool, diskFormat) {
   if (FILE_SYSTEM_STORAGE_TYPES.indexOf(pveStorageType) !== -1) {
     var allowed = DISK_FORMATS_BY_STORAGE_TYPE[pveStorageType] || [];
     if (!diskFormat || allowed.indexOf(diskFormat) === -1) {
-      return { ok: false, error: '该存储类型（' + pveStorageType + '）必须选择磁盘格式，支持：' + allowed.join('/') };
+      return { ok: false, error: '该存储类型（' + pveStorageType + '）必须选择磁盘格式，支持：' + allowed.join('/'), code: 'STORAGE_TYPE_NEED_FORMAT', params: [pveStorageType, allowed.join('/')] };
     }
     return { ok: true, diskFormat: diskFormat };
   }
@@ -84,7 +84,7 @@ router.get('/pve-storages', authMiddleware, adminMiddleware, async (req, res) =>
     });
     res.json(result);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -96,7 +96,7 @@ router.get('/storage-groups', authMiddleware, adminMiddleware, async (req, res) 
     var groups = await groupCache.get('all', function() { return db.storageGroups.getAll(); });
     res.json(groups);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -106,8 +106,8 @@ router.post('/storage-groups', authMiddleware, adminMiddleware, async (req, res)
     var name = (req.body.name || '').toString().trim();
     var sortOrder = parseInt(req.body.sort_order) || 0;
 
-    if (!name) return res.status(400).json({ error: '请输入分组名称' });
-    if (name.length > 50) return res.status(400).json({ error: '分组名称不能超过 50 字符' });
+    if (!name) return res.status(400).json({ error: '请输入分组名称', code: 'GROUP_NAME_REQUIRED' });
+    if (name.length > 50) return res.status(400).json({ error: '分组名称不能超过 50 字符', code: 'GROUP_NAME_MAX_50' });
 
     var group = await db.storageGroups.create({ name: name, sort_order: sortOrder });
     clearDiskCache();
@@ -119,9 +119,9 @@ router.post('/storage-groups', authMiddleware, adminMiddleware, async (req, res)
     res.json(group);
   } catch (e) {
     if (e && e.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ error: '分组名称已存在' });
+      return res.status(400).json({ error: '分组名称已存在', code: 'GROUP_NAME_TAKEN' });
     }
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -129,7 +129,7 @@ router.post('/storage-groups', authMiddleware, adminMiddleware, async (req, res)
 router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     var order = req.body.order;
-    if (!Array.isArray(order)) return res.status(400).json({ error: '无效的排序数据' });
+    if (!Array.isArray(order)) return res.status(400).json({ error: '无效的排序数据', code: 'INVALID_SORT_DATA' });
     
     var ids = [];
     for (var i = 0; i < order.length; i++) {
@@ -137,7 +137,7 @@ router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, 
       var val = (item && item.id) ? item.id : item;
       var n = parseInt(val);
       if (!Number.isInteger(n) || n < 1) {
-        return res.status(400).json({ error: '无效的ID', value: val });
+        return res.status(400).json({ error: '无效的ID', code: 'INVALID_ID', value: val });
       }
       ids.push(n);
     }
@@ -154,7 +154,7 @@ router.put('/storage-groups/sort', authMiddleware, adminMiddleware, async (req, 
     res.json({ success: true });
   } catch (e) {
     console.error('[storage-groups] sort error:', e.message);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -165,13 +165,13 @@ router.put('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, r
     var name = (req.body.name || '').toString().trim();
     var sortOrder = parseInt(req.body.sort_order) || 0;
 
-    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID' });
-    if (!name) return res.status(400).json({ error: '请输入分组名称' });
-    if (name.length > 50) return res.status(400).json({ error: '分组名称不能超过 50 字符' });
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID', code: 'INVALID_ID' });
+    if (!name) return res.status(400).json({ error: '请输入分组名称', code: 'GROUP_NAME_REQUIRED' });
+    if (name.length > 50) return res.status(400).json({ error: '分组名称不能超过 50 字符', code: 'GROUP_NAME_MAX_50' });
 
     // 保存前取旧记录（审计 diff 用）
     var oldGroup = await db.storageGroups.getById(id);
-    if (!oldGroup) return res.status(404).json({ error: '存储分组不存在' });
+    if (!oldGroup) return res.status(404).json({ error: '存储分组不存在', code: 'STORAGE_GROUP_NOT_FOUND' });
     var group = await db.storageGroups.update(id, { name: name, sort_order: sortOrder });
     clearDiskCache();
     // 操作审计：编辑存储分组（字段级 diff）
@@ -188,9 +188,9 @@ router.put('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, r
     res.json(group);
   } catch (e) {
     if (e && e.code === 'ER_DUP_ENTRY') {
-      return res.status(400).json({ error: '分组名称已存在' });
+      return res.status(400).json({ error: '分组名称已存在', code: 'GROUP_NAME_TAKEN' });
     }
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -198,12 +198,12 @@ router.put('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, r
 router.delete('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     var id = parseInt(req.params.id);
-    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID' });
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID', code: 'INVALID_ID' });
 
     // 检查是否有在用磁盘
     var countResult = await db.storageGroups.countDisksByGroup(id);
     if (countResult && countResult.cnt > 0) {
-      return res.status(400).json({ error: '该分组下仍有 ' + countResult.cnt + ' 个在用磁盘，请先迁移' });
+      return res.status(400).json({ error: '该分组下仍有 ' + countResult.cnt + ' 个在用磁盘，请先迁移', code: 'GROUP_IN_USE', params: [countResult.cnt] });
     }
 
     await db.storageGroups.delete(id);
@@ -215,7 +215,7 @@ router.delete('/storage-groups/:id', authMiddleware, adminMiddleware, async (req
     } catch (e) {}
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -228,7 +228,7 @@ router.get('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => {
     var specs = await specCache.get('all', function() { return db.diskSpecs.getAll(); });
     res.json(specs);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -237,20 +237,20 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
   try {
     var data = req.body;
     // 参数校验
-    if (!data.name || !data.name.trim()) return res.status(400).json({ error: '请输入规格名称' });
-    if (data.name.length > 100) return res.status(400).json({ error: '规格名称不能超过 100 字符' });
-    if (DISK_TYPES.indexOf(data.disk_type) === -1) return res.status(400).json({ error: '无效的硬盘类型' });
-    if (!data.storage_group_id) return res.status(400).json({ error: '请选择存储分组' });
-    if (!data.storage_pool || !data.storage_pool.trim()) return res.status(400).json({ error: '请选择存储位置' });
-    if (!data.min_size_gb || data.min_size_gb < 1) return res.status(400).json({ error: '最低容量必须大于 0' });
-    if (!data.max_size_gb || data.max_size_gb < data.min_size_gb) return res.status(400).json({ error: '最大容量必须大于等于最低容量' });
-    if (data.price_per_gb === undefined || data.price_per_gb === null || data.price_per_gb < 0) return res.status(400).json({ error: '请输入有效的单价' });
+    if (!data.name || !data.name.trim()) return res.status(400).json({ error: '请输入规格名称', code: 'SPEC_NAME_REQUIRED' });
+    if (data.name.length > 100) return res.status(400).json({ error: '规格名称不能超过 100 字符', code: 'SPEC_NAME_MAX_100' });
+    if (DISK_TYPES.indexOf(data.disk_type) === -1) return res.status(400).json({ error: '无效的硬盘类型', code: 'INVALID_DISK_TYPE' });
+    if (!data.storage_group_id) return res.status(400).json({ error: '请选择存储分组', code: 'STORAGE_GROUP_REQUIRED' });
+    if (!data.storage_pool || !data.storage_pool.trim()) return res.status(400).json({ error: '请选择存储位置', code: 'STORAGE_REQUIRED' });
+    if (!data.min_size_gb || data.min_size_gb < 1) return res.status(400).json({ error: '最低容量必须大于 0', code: 'MIN_CAPACITY_POSITIVE' });
+    if (!data.max_size_gb || data.max_size_gb < data.min_size_gb) return res.status(400).json({ error: '最大容量必须大于等于最低容量', code: 'MAX_CAPACITY_GE_MIN' });
+    if (data.price_per_gb === undefined || data.price_per_gb === null || data.price_per_gb < 0) return res.status(400).json({ error: '请输入有效的单价', code: 'PRICE_REQUIRED' });
     // 价格精度统一 2 位小数，超过 2 位时按 2 位舍入（避免 DECIMAL(10,2) 静默截断）
     var pricePerGbVal = Math.round(parseFloat(data.price_per_gb) * 100) / 100;
 
     // 校验磁盘格式与存储类型联动
     var fmtResult = await validateDiskFormat(data.storage_pool.trim(), data.disk_format);
-    if (!fmtResult.ok) return res.status(400).json({ error: fmtResult.error });
+    if (!fmtResult.ok) return res.status(400).json({ error: fmtResult.error , code: fmtResult.code });
 
     var spec = await db.diskSpecs.create({
       name: data.name.trim(),
@@ -278,7 +278,7 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
     } catch (e) {}
     res.json(spec);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -287,20 +287,20 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
   try {
     var id = parseInt(req.params.id);
     var data = req.body;
-    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID' });
-    if (!data.name || !data.name.trim()) return res.status(400).json({ error: '请输入规格名称' });
-    if (DISK_TYPES.indexOf(data.disk_type) === -1) return res.status(400).json({ error: '无效的硬盘类型' });
-    if (!data.storage_group_id) return res.status(400).json({ error: '请选择存储分组' });
-    if (!data.storage_pool || !data.storage_pool.trim()) return res.status(400).json({ error: '请选择存储位置' });
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID', code: 'INVALID_ID' });
+    if (!data.name || !data.name.trim()) return res.status(400).json({ error: '请输入规格名称', code: 'SPEC_NAME_REQUIRED' });
+    if (DISK_TYPES.indexOf(data.disk_type) === -1) return res.status(400).json({ error: '无效的硬盘类型', code: 'INVALID_DISK_TYPE' });
+    if (!data.storage_group_id) return res.status(400).json({ error: '请选择存储分组', code: 'STORAGE_GROUP_REQUIRED' });
+    if (!data.storage_pool || !data.storage_pool.trim()) return res.status(400).json({ error: '请选择存储位置', code: 'STORAGE_REQUIRED' });
     var pricePerGbVal2 = Math.round(parseFloat(data.price_per_gb) * 100) / 100;
 
     // 校验磁盘格式与存储类型联动
     var fmtResult2 = await validateDiskFormat(data.storage_pool.trim(), data.disk_format);
-    if (!fmtResult2.ok) return res.status(400).json({ error: fmtResult2.error });
+    if (!fmtResult2.ok) return res.status(400).json({ error: fmtResult2.error , code: fmtResult2.code });
 
     // 保存前取旧记录（审计 diff 用；资金面定价字段全量纳入）
     var oldSpec = await db.diskSpecs.getById(id);
-    if (!oldSpec) return res.status(404).json({ error: '磁盘规格不存在' });
+    if (!oldSpec) return res.status(404).json({ error: '磁盘规格不存在', code: 'DISK_SPEC_NOT_FOUND' });
     var spec = await db.diskSpecs.update(id, {
       name: data.name.trim(),
       disk_type: data.disk_type,
@@ -351,7 +351,7 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
     } catch (e) {}
     res.json(spec);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -359,12 +359,12 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
 router.delete('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) => {
   try {
     var id = parseInt(req.params.id);
-    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID' });
+    if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID', code: 'INVALID_ID' });
 
     // 检查是否有已购磁盘
     var countResult = await db.diskSpecs.countDisksBySpec(id);
     if (countResult && countResult.cnt > 0) {
-      return res.status(400).json({ error: '该规格下有 ' + countResult.cnt + ' 个已购磁盘，无法删除' });
+      return res.status(400).json({ error: '该规格下有 ' + countResult.cnt + ' 个已购磁盘，无法删除', code: 'SPEC_IN_USE', params: [countResult.cnt] });
     }
 
     await db.diskSpecs.delete(id);
@@ -376,7 +376,7 @@ router.delete('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, re
     } catch (e) {}
     res.json({ success: true });
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -392,7 +392,7 @@ router.get('/lifecycle-config', authMiddleware, adminMiddleware, async (req, res
     }
     res.json(config);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -429,7 +429,7 @@ router.put('/lifecycle-config', authMiddleware, adminMiddleware, async (req, res
     } catch (e) {}
     res.json(config);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -448,7 +448,7 @@ router.post('/disk-import', authMiddleware, adminMiddleware, async (req, res) =>
     } catch (e) {}
     res.json(report);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -460,7 +460,7 @@ router.get('/admin/disks', authMiddleware, adminMiddleware, async (req, res) => 
     var disks = await db.disks.getAll();
     res.json({ rows: disks });
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -469,7 +469,7 @@ router.put('/admin/disks/:id', authMiddleware, adminMiddleware, async (req, res)
   try {
     var id = parseInt(req.params.id);
     if (!Number.isInteger(id) || id < 1) {
-      return res.status(400).json({ error: '无效的磁盘ID' });
+      return res.status(400).json({ error: '无效的磁盘ID', code: 'INVALID_DISK_ID' });
     }
 
     var diskName = (req.body.disk_name || '').toString().trim();
@@ -478,23 +478,23 @@ router.put('/admin/disks/:id', authMiddleware, adminMiddleware, async (req, res)
 
     // 名称长度限制：30 字符
     if (diskName.length > 30) {
-      return res.status(400).json({ error: '硬盘名称不能超过30字符' });
+      return res.status(400).json({ error: '硬盘名称不能超过30字符', code: 'DISK_NAME_MAX_30' });
     }
     // XSS 防护
     diskName = diskName.replace(/<[^>]*>/g, '').substring(0, 30);
 
     // 验证磁盘存在
     var disk = await db.disks.getById(id);
-    if (!disk) return res.status(404).json({ error: '磁盘不存在' });
+    if (!disk) return res.status(404).json({ error: '磁盘不存在', code: 'DISK_NOT_FOUND' });
 
     // 验证存储分组存在
     var group = await db.storageGroups.getById(storageGroupId);
-    if (!group) return res.status(400).json({ error: '存储分组不存在' });
+    if (!group) return res.status(400).json({ error: '存储分组不存在', code: 'STORAGE_GROUP_NOT_FOUND' });
 
     // 验证规格存在（如果指定）
     if (specId !== null) {
       var spec = await db.diskSpecs.getById(specId);
-      if (!spec) return res.status(400).json({ error: '规格不存在' });
+      if (!spec) return res.status(400).json({ error: '规格不存在', code: 'SPEC_NOT_FOUND' });
     }
 
     // 审计 diff 用：补查旧分组/旧规格名称（disks.getById 无 JOIN，手动补名称便于日志可读）
@@ -535,7 +535,7 @@ router.put('/admin/disks/:id', authMiddleware, adminMiddleware, async (req, res)
     } catch (e) {}
     res.json(updated);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -546,15 +546,15 @@ router.put('/admin/disks/batch/storage-group', authMiddleware, adminMiddleware, 
     var storageGroupId = parseInt(req.body.storage_group_id);
 
     if (!Array.isArray(diskIds) || diskIds.length === 0) {
-      return res.status(400).json({ error: '请选择要修改的磁盘' });
+      return res.status(400).json({ error: '请选择要修改的磁盘', code: 'DISK_SELECT_REQUIRED' });
     }
     if (!Number.isInteger(storageGroupId) || storageGroupId < 1) {
-      return res.status(400).json({ error: '请选择有效的存储分组' });
+      return res.status(400).json({ error: '请选择有效的存储分组', code: 'STORAGE_GROUP_INVALID' });
     }
 
     // 验证存储分组存在
     var group = await db.storageGroups.getById(storageGroupId);
-    if (!group) return res.status(400).json({ error: '存储分组不存在' });
+    if (!group) return res.status(400).json({ error: '存储分组不存在', code: 'STORAGE_GROUP_NOT_FOUND' });
 
     // 批量更新
     var updated = 0;
@@ -577,7 +577,7 @@ router.put('/admin/disks/batch/storage-group', authMiddleware, adminMiddleware, 
 
     res.json({ success: true, updated: updated, total: diskIds.length });
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -585,12 +585,12 @@ router.put('/admin/disks/batch/storage-group', authMiddleware, adminMiddleware, 
 router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (req, res) => {
   var diskId = parseInt(req.params.id);
   if (!Number.isInteger(diskId) || diskId < 1) {
-    return res.status(400).json({ error: '无效的磁盘ID' });
+    return res.status(400).json({ error: '无效的磁盘ID', code: 'INVALID_DISK_ID' });
   }
 
   try {
     var disk = await db.disks.getById(diskId);
-    if (!disk) return res.status(404).json({ error: '磁盘不存在' });
+    if (!disk) return res.status(404).json({ error: '磁盘不存在', code: 'DISK_NOT_FOUND' });
 
     // 已销毁的记录：硬删除
     if (disk.status === 'destroyed') {
@@ -605,7 +605,7 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
 
     // 已挂载的磁盘必须先卸载
     if (disk.status === 'bound') {
-      return res.status(400).json({ error: '请先卸载磁盘再销毁' });
+      return res.status(400).json({ error: '请先卸载磁盘再销毁', code: 'UNMOUNT_BEFORE_DESTROY' });
     }
 
     var refundAmount = 0;
@@ -772,7 +772,7 @@ router.post('/admin/disks/:id/destroy', authMiddleware, adminMiddleware, async (
     res.json({ success: true, refund: refundAmount > 0, refund_amount: refundAmount, refund_desc: refundDesc });
   } catch (e) {
     console.error('[admin disk destroy] 失败:', e);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 

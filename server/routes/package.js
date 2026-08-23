@@ -94,7 +94,7 @@ router.get('/vm-packages', authMiddleware, async (req, res) => {
         var list = await db.vmPackages.getAll();
         await vmPackageCache.set('all', list);
         res.json(list);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.get('/lxc-packages', authMiddleware, async (req, res) => {
@@ -104,7 +104,7 @@ router.get('/lxc-packages', authMiddleware, async (req, res) => {
         var list = await db.lxcPackages.getAll();
         await lxcPackageCache.set('all', list);
         res.json(list);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 // 用户端：获取按分组归类的套餐列表
@@ -116,7 +116,7 @@ router.get('/package-groups', authMiddleware, async (req, res) => {
         // 只返回 active 套餐
         packages = packages.filter(function(p) { return p.status === 'active'; });
         res.json({ groups: groups, packages: packages });
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 // ===== 用户侧：套餐订购（自动取当前用户；业务在 services/provisioning.js） =====
@@ -125,7 +125,7 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
         var period = req.body.period || 'month';
         // SEC-04: period 白名单校验
         if (!VALID_PERIODS.includes(period)) {
-            return res.status(400).json({ error: '无效的计费周期' });
+            return res.status(400).json({ error: '无效的计费周期', code: 'INVALID_PERIOD' });
         }
         var period_count = req.body.period_count || 1;
         period_count = parseInt(period_count);
@@ -142,12 +142,12 @@ router.post('/vm-packages/:id/order', authMiddleware, async (req, res) => {
             subnetId: parseInt(req.body.subnet_id) || 0
         });
         if (!result.ok) {
-            return res.status(result.status).json({ error: result.error });
+            return res.status(result.status).json({ error: result.error , code: result.code });
         }
         res.json(result.data);
     } catch (e) {
         console.error('[package] 用户订购 VM 失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -156,7 +156,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
         var period = req.body.period || 'month';
         // SEC-04: period 白名单校验
         if (!VALID_PERIODS.includes(period)) {
-            return res.status(400).json({ error: '无效的计费周期' });
+            return res.status(400).json({ error: '无效的计费周期', code: 'INVALID_PERIOD' });
         }
         var period_count = req.body.period_count || 1;
         period_count = parseInt(period_count);
@@ -172,12 +172,12 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
             subnetId: parseInt(req.body.subnet_id) || 0
         });
         if (!result.ok) {
-            return res.status(result.status).json({ error: result.error });
+            return res.status(result.status).json({ error: result.error , code: result.code });
         }
         res.json(result.data);
     } catch (e) {
         console.error('[package] 用户订购 LXC 失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -185,7 +185,7 @@ router.post('/lxc-packages/:id/order', authMiddleware, async (req, res) => {
 router.get('/vm-packages/:id/available-os-templates', authMiddleware, async (req, res) => {
     try {
         var pkg = await db.vmPackages.getById(req.params.id);
-        if (!pkg) return res.status(404).json({ error: '套餐不存在' });
+        if (!pkg) return res.status(404).json({ error: '套餐不存在', code: 'PKG_NOT_FOUND' });
 
         var allTemplates = await db.osTemplates.getEnabled();
         var available = allTemplates.filter(function(t) {
@@ -208,7 +208,7 @@ router.get('/vm-packages/:id/available-os-templates', authMiddleware, async (req
             default_id: pkg.default_os_template_id || null
         });
     } catch (e) {
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -220,7 +220,7 @@ router.get('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, re
         var list = await db.vmPackages.getAll();
         await vmPackageCache.set('all', list);
         res.json(list);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.post('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, res) => {
@@ -230,7 +230,7 @@ router.post('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, r
         // 操作审计：创建 VM 套餐
         await adminAudit(req, 'admin.package.create', '创建VM套餐:' + packageSpec(req.body));
         res.json(r);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.put('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
@@ -245,7 +245,7 @@ router.put('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req
             await adminAudit(req, 'admin.package.update', buildPkgUpdateDetail('VM', oldPkg, newPkg));
         }
         res.json(r);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.delete('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
@@ -255,19 +255,19 @@ router.delete('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (
         // 操作审计：删除 VM 套餐
         await adminAudit(req, 'admin.package.delete', '删除VM套餐 #' + parseInt(req.params.id));
         res.json({ message: '已删除' });
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.post('/admin/vm-packages/reorder', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var ids = req.body.ids;
         if (!Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ error: 'ids 参数无效' });
+            return res.status(400).json({ error: 'ids 参数无效', code: 'IDS_INVALID' });
         }
         for (var i = 0; i < ids.length; i++) {
             ids[i] = parseInt(ids[i]);
             if (!Number.isInteger(ids[i]) || ids[i] <= 0) {
-                return res.status(400).json({ error: 'id 必须为正整数' });
+                return res.status(400).json({ error: 'id 必须为正整数', code: 'ID_POSITIVE_INT' });
             }
         }
         await db.vmPackages.batchUpdateSortOrder(ids);
@@ -277,7 +277,7 @@ router.post('/admin/vm-packages/reorder', authMiddleware, adminMiddleware, async
         res.json({ success: true });
     } catch (e) {
         console.error('[package] vm-packages reorder error:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -287,7 +287,7 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
         var period = req.body.period || 'month';
         // SEC-04: period 白名单校验
         if (!VALID_PERIODS.includes(period)) {
-            return res.status(400).json({ error: '无效的计费周期' });
+            return res.status(400).json({ error: '无效的计费周期', code: 'INVALID_PERIOD' });
         }
         var period_count = req.body.period_count || 1;
         period_count = parseInt(period_count);
@@ -304,14 +304,14 @@ router.post('/admin/vm-packages/:id/provision', authMiddleware, adminMiddleware,
             subnetId: parseInt(req.body.subnet_id) || 0
         });
         if (!result.ok) {
-            return res.status(result.status).json({ error: result.error });
+            return res.status(result.status).json({ error: result.error , code: result.code });
         }
         // 操作审计：管理员代开 VM（资源创建，含套餐/用户）
         await adminAudit(req, 'admin.order.provision', '为 用户#' + (parseInt(req.body.user_id) || '-') + ' 代开 VM(套餐#' + parseInt(req.params.id) + ')' + (result.data && result.data.vmid ? ',VMID:' + result.data.vmid : ''));
         res.json(result.data);
     } catch (e) {
         console.error('[package] VM 套餐开通失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -323,7 +323,7 @@ router.get('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, r
         var list = await db.lxcPackages.getAll();
         await lxcPackageCache.set('all', list);
         res.json(list);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, res) => {
@@ -333,7 +333,7 @@ router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, 
         // 操作审计：创建 LXC 套餐
         await adminAudit(req, 'admin.package.create', '创建LXC套餐:' + packageSpec(req.body));
         res.json(r);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.put('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
@@ -348,7 +348,7 @@ router.put('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (re
             await adminAudit(req, 'admin.package.update', buildPkgUpdateDetail('LXC', oldPkg, newPkg));
         }
         res.json(r);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.delete('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
@@ -358,19 +358,19 @@ router.delete('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async 
         // 操作审计：删除 LXC 套餐
         await adminAudit(req, 'admin.package.delete', '删除LXC套餐 #' + parseInt(req.params.id));
         res.json({ message: '已删除' });
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.post('/admin/lxc-packages/reorder', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var ids = req.body.ids;
         if (!Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ error: 'ids 参数无效' });
+            return res.status(400).json({ error: 'ids 参数无效', code: 'IDS_INVALID' });
         }
         for (var i = 0; i < ids.length; i++) {
             ids[i] = parseInt(ids[i]);
             if (!Number.isInteger(ids[i]) || ids[i] <= 0) {
-                return res.status(400).json({ error: 'id 必须为正整数' });
+                return res.status(400).json({ error: 'id 必须为正整数', code: 'ID_POSITIVE_INT' });
             }
         }
         await db.lxcPackages.batchUpdateSortOrder(ids);
@@ -380,7 +380,7 @@ router.post('/admin/lxc-packages/reorder', authMiddleware, adminMiddleware, asyn
         res.json({ success: true });
     } catch (e) {
         console.error('[package] lxc-packages reorder error:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -390,7 +390,7 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
         var period = req.body.period || 'month';
         // SEC-04: period 白名单校验
         if (!VALID_PERIODS.includes(period)) {
-            return res.status(400).json({ error: '无效的计费周期' });
+            return res.status(400).json({ error: '无效的计费周期', code: 'INVALID_PERIOD' });
         }
         var period_count = req.body.period_count || 1;
         period_count = parseInt(period_count);
@@ -407,14 +407,14 @@ router.post('/admin/lxc-packages/:id/provision', authMiddleware, adminMiddleware
             subnetId: parseInt(req.body.subnet_id) || 0
         });
         if (!result.ok) {
-            return res.status(result.status).json({ error: result.error });
+            return res.status(result.status).json({ error: result.error , code: result.code });
         }
         // 操作审计：管理员代开 LXC（资源创建，含套餐/用户）
         await adminAudit(req, 'admin.order.provision', '为 用户#' + (parseInt(req.body.user_id) || '-') + ' 代开 LXC(套餐#' + parseInt(req.params.id) + ')' + (result.data && result.data.ctid ? ',CTID:' + result.data.ctid : ''));
         res.json(result.data);
     } catch (e) {
         console.error('[package] LXC 套餐开通失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -424,7 +424,7 @@ router.get('/admin/package-groups', authMiddleware, adminMiddleware, async (req,
         var type = req.query.type;
         var groups = type ? await db.packageGroups.getByType(type) : await db.packageGroups.getAll();
         res.json(groups);
-    } catch (e) { res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.post('/admin/package-groups', authMiddleware, adminMiddleware, async (req, res) => {
@@ -433,7 +433,7 @@ router.post('/admin/package-groups', authMiddleware, adminMiddleware, async (req
         // 操作审计：创建套餐分组
         await adminAudit(req, 'admin.package-group.create', '创建套餐分组:' + (req.body.name || r.id) + '(类型:' + (req.body.type || '-') + ')');
         res.json(r);
-    } catch (e) { console.error('[package] create group error:', e.message); res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { console.error('[package] create group error:', e.message); res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.put('/admin/package-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
@@ -454,7 +454,7 @@ router.put('/admin/package-groups/:id', authMiddleware, adminMiddleware, async (
             }
         }
         res.json(r);
-    } catch (e) { console.error('[package] update group error:', e.message); res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { console.error('[package] update group error:', e.message); res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.delete('/admin/package-groups/:id', authMiddleware, adminMiddleware, async (req, res) => {
@@ -463,19 +463,19 @@ router.delete('/admin/package-groups/:id', authMiddleware, adminMiddleware, asyn
         // 操作审计：删除套餐分组
         await adminAudit(req, 'admin.package-group.delete', '删除套餐分组 #' + parseInt(req.params.id));
         res.json({ message: '已删除' });
-    } catch (e) { console.error('[package] delete group error:', e.message); res.status(500).json({ error: safeError(e) }); }
+    } catch (e) { console.error('[package] delete group error:', e.message); res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
 router.post('/admin/package-groups/reorder', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var ids = req.body.ids;
         if (!Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ error: 'ids 参数无效' });
+            return res.status(400).json({ error: 'ids 参数无效', code: 'IDS_INVALID' });
         }
         for (var i = 0; i < ids.length; i++) {
             ids[i] = parseInt(ids[i]);
             if (!Number.isInteger(ids[i]) || ids[i] <= 0) {
-                return res.status(400).json({ error: 'id 必须为正整数' });
+                return res.status(400).json({ error: 'id 必须为正整数', code: 'ID_POSITIVE_INT' });
             }
         }
         await db.packageGroups.batchUpdateSortOrder(ids);
@@ -484,7 +484,7 @@ router.post('/admin/package-groups/reorder', authMiddleware, adminMiddleware, as
         res.json({ success: true });
     } catch (e) {
         console.error('[package] package-groups reorder error:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -493,14 +493,14 @@ router.get('/provision-status', authMiddleware, async (req, res) => {
     try {
         var resourceId = parseInt(req.query.resourceId);
         var type = req.query.type;
-        if (!resourceId || resourceId <= 0) return res.status(400).json({ error: '缺少 resourceId' });
-        if (type !== 'vm' && type !== 'lxc') return res.status(400).json({ error: '无效的资源类型' });
+        if (!resourceId || resourceId <= 0) return res.status(400).json({ error: '缺少 resourceId', code: 'RESOURCE_ID_MISSING' });
+        if (type !== 'vm' && type !== 'lxc') return res.status(400).json({ error: '无效的资源类型', code: 'INVALID_RESOURCE_TYPE' });
 
         // SEC-02: 速率限制（每用户每分钟 30 次，略高于前端 3 秒轮询频率）
         var rateLimitKey = 'ratelimit:provision-status:' + req.user.id;
         var rateLimitResult = await checkConfiguredRateLimit('provision_status', rateLimitKey);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+            return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: rateLimitResult.retryAfter });
         }
 
         // SEC-01: 归属校验 — 按 resourceId 查 DB 记录，确认属于当前用户，防止 IDOR 越权查询
@@ -508,11 +508,11 @@ router.get('/provision-status', authMiddleware, async (req, res) => {
             ? await db.vms.getById(resourceId)
             : await db.lxcContainers.getById(resourceId);
         if (!ownerRecord) {
-            return res.status(404).json({ error: '任务不存在' });
+            return res.status(404).json({ error: '任务不存在', code: 'TASK_NOT_FOUND' });
         }
         var isAdmin = req.user.role === 'admin';
         if (ownerRecord.user_id !== req.user.id && !isAdmin) {
-            return res.status(403).json({ error: '无权限查询此任务' });
+            return res.status(403).json({ error: '无权限查询此任务', code: 'TASK_NO_PERM' });
         }
 
         // pve_upid 为空表示开通已完成，无需再查 PVE
@@ -530,7 +530,7 @@ router.get('/provision-status', authMiddleware, async (req, res) => {
         });
     } catch (e) {
         console.error('[package] 查询开通状态失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 

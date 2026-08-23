@@ -74,7 +74,7 @@ async function checkForUpdates(source) {
                 return {
                     current_version: pkg.version,
                     has_update: false,
-                    error: '无法连接更新服务器（Gitee / GitHub 均不可达）'
+                    error: '无法连接更新服务器（Gitee / GitHub 均不可达）', code: 'UPDATE_SERVER_UNREACHABLE'
                 };
             }
         } else {
@@ -87,7 +87,7 @@ async function checkForUpdates(source) {
                 return {
                     current_version: pkg.version,
                     has_update: false,
-                    error: '无法连接更新服务器（GitHub / Gitee 均不可达）'
+                    error: '无法连接更新服务器（GitHub / Gitee 均不可达）', code: 'UPDATE_SERVER_UNREACHABLE_2'
                 };
             }
         }
@@ -224,7 +224,7 @@ async function checkForUpdates(source) {
         return {
             current_version: pkg.version,
             has_update: false,
-            error: '解析版本信息失败: ' + safeError(error)
+            error: '解析版本信息失败: ' + safeError(error), code: 'VERSION_PARSE_FAILED', params: [safeError(error)]
         };
     }
 }

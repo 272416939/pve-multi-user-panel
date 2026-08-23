@@ -19,7 +19,7 @@ async function executeUpdate(source) {
     try {
         // 检查是否为 git 仓库
         if (!fs.existsSync(path.join(projectRoot, '.git'))) {
-            return { ok: false, status: 400, error: '更新失败: 当前项目不是 git 仓库，无法使用在线更新。请手动下载最新版本覆盖更新。' };
+            return { ok: false, status: 400, error: '更新失败: 当前项目不是 git 仓库，无法使用在线更新。请手动下载最新版本覆盖更新。', code: 'UPDATE_NOT_GIT' };
         }
 
         // 添加 safe.directory 避免 dubious ownership 检测报错
@@ -74,7 +74,7 @@ async function executeUpdate(source) {
             if (!tryFetchUrl(fallbackUrl)) {
                 return {
                     ok: false, status: 500,
-                    error: `更新失败: git fetch 失败（${userSource} 源和 ${userSource === 'gitee' ? 'github' : 'gitee'} 源均不可达），请检查网络连接`
+                    error: `更新失败: git fetch 失败（${userSource} 源和 ${userSource === 'gitee' ? 'github' : 'gitee'} 源均不可达），请检查网络连接`, code: 'UPDATE_GIT_FETCH_FAILED', params: [userSource, userSource === 'gitee' ? 'github' : 'gitee']
                 };
             }
             usedFallback = true;
@@ -121,13 +121,13 @@ async function executeUpdate(source) {
                     console.error('[系统更新] 回滚失败，请手动恢复:', rollbackErr.message);
                 }
             }
-            return { ok: false, status: 500, error: '更新失败: git reset 失败，已尝试回滚，请检查仓库状态' };
+            return { ok: false, status: 500, error: '更新失败: git reset 失败，已尝试回滚，请检查仓库状态', code: 'UPDATE_GIT_RESET_FAILED' };
         }
         try {
             execSync('npm install --production', { cwd: projectRoot, timeout: 120000, stdio: 'pipe' });
         } catch (error) {
             const stderr = error.stderr ? error.stderr.toString().trim() : error.message;
-            return { ok: false, status: 500, error: '更新失败: npm install 失败，请检查网络或依赖配置' };
+            return { ok: false, status: 500, error: '更新失败: npm install 失败，请检查网络或依赖配置', code: 'UPDATE_NPM_FAILED' };
         }
         console.log('\n[系统更新] 自动更新完成，服务即将重启（此为正常行为，非异常崩溃）\n');
 
@@ -162,7 +162,7 @@ async function executeUpdate(source) {
         const errMsg = error.message || String(error);
         // 避免泄露敏感路径/凭据，仅返回关键错误描述
         const safeMsg = errMsg.replace(/\/[^\s]+\/\.git/g, '<repo>').replace(/https:\/\/[^\s]+/g, '<url>');
-        return { ok: false, status: 500, error: '更新失败: ' + safeMsg };
+        return { ok: false, status: 500, error: '更新失败: ' + safeMsg, code: 'UPDATE_FAILED', params: [safeMsg] };
     }
 }
 

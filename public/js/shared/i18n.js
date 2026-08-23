@@ -191,6 +191,7 @@
       applyStatic();
       _setLocaleCache(locale);
       _reveal();
+      _emitLocaleChanged();
       return true;
     } catch (e) {
       console.error('[i18n] 切换语言失败:', locale, e.message);
@@ -210,6 +211,7 @@
       document.documentElement.lang = _locale;
       applyStatic();
       _reveal();
+      _emitLocaleChanged();
       return true;
     } catch (e) {
       console.error('[i18n] 刷新语言失败:', _locale, e.message);
@@ -272,6 +274,26 @@
     return text;
   }
 
+  // 词条存在返回译文，否则返回 null（不 warn）——供「有则翻译、无则回退原文」的场景
+  // （后端错误 code 映射：tOrNull('err.' + code) 为 null 时前端回退后端中文原文）
+  function tOrNull(key) {
+    _ensureReactive();
+    var val = _translations.value[key];
+    if (val !== undefined) return String(val);
+    if (_locale !== _fallbackLocale && _fallbackTranslations[key] !== undefined) {
+      return String(_fallbackTranslations[key]);
+    }
+    return null;
+  }
+
+  // 语言切换/词条刷新完成后的广播：供非 Vue 响应式的组件（Quill 编辑器等）
+  // 监听 window 'i18n:localeChanged' 事件自行刷新一次性渲染的文案
+  function _emitLocaleChanged() {
+    try {
+      window.dispatchEvent(new CustomEvent('i18n:localeChanged', { detail: { locale: _locale } }));
+    } catch (_) { }
+  }
+
   // 检查是否已加载
   function isLoaded() {
     return _loaded;
@@ -302,6 +324,7 @@
     init: init,
     t: t,
     tFormat: tFormat,
+    tOrNull: tOrNull,
     setLocale: setLocale,
     refreshLocale: refreshLocale,
     getLocale: getLocale,

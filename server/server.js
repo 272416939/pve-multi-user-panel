@@ -250,7 +250,7 @@ app.use('/api', async (req, res, next) => {
     try {
         var limit = await checkConfiguredRateLimit('global', 'ratelimit:global:' + req.ip);
         if (!limit.allowed) {
-            return res.status(429).json({ error: '请求过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+            return res.status(429).json({ error: '请求过于频繁，请稍后再试', code: 'RATE_LIMITED_REQ', retryAfter: limit.retryAfter });
         }
     } catch (e) {
         // 限速器异常不应阻断请求
@@ -436,12 +436,12 @@ app.get('/user-center', (req, res) => res.render('pages/user-center', { title: '
 app.get('/vnc', async (req, res) => {
     const sessionId = req.query.session;
     if (!sessionId) {
-        return res.render('pages/vnc', { error: '缺少会话参数', ticket: null, vmid: '', type: 'qemu' });
+        return res.render('pages/vnc', { error: '缺少会话参数', code: 'SESSION_PARAM_MISSING', ticket: null, vmid: '', type: 'qemu' });
     }
     const consoleSession = require('./utils/console-session');
     const sessionData = await consoleSession.getSession(sessionId);
     if (!sessionData) {
-        return res.render('pages/vnc', { error: '会话已失效，请重新打开控制台', ticket: null, vmid: '', type: 'qemu' });
+        return res.render('pages/vnc', { error: '会话已失效，请重新打开控制台', code: 'CONSOLE_SESSION_EXPIRED', ticket: null, vmid: '', type: 'qemu' });
     }
     res.render('pages/vnc', {
         ticket: sessionData.ticket,
@@ -452,12 +452,12 @@ app.get('/vnc', async (req, res) => {
 app.get('/terminal', async (req, res) => {
     const sessionId = req.query.session;
     if (!sessionId) {
-        return res.render('pages/terminal', { vmid: '', error: '缺少会话参数' });
+        return res.render('pages/terminal', { vmid: '', error: '缺少会话参数', code: 'SESSION_PARAM_MISSING' });
     }
     const consoleSession = require('./utils/console-session');
     const sessionData = await consoleSession.getSession(sessionId);
     if (!sessionData) {
-        return res.render('pages/terminal', { vmid: '', error: '会话已失效，请重新打开终端' });
+        return res.render('pages/terminal', { vmid: '', error: '会话已失效，请重新打开终端', code: 'TERMINAL_SESSION_EXPIRED' });
     }
     res.render('pages/terminal', { vmid: String(sessionData.vmid) });
 });

@@ -26,20 +26,20 @@ var groupCache = cacheStore.create('storage_groups', FRONTEND_CACHE_TTL);
 async function checkDiskOwnership(req, res, next) {
   var diskId = parseInt(req.params.id);
   if (!Number.isInteger(diskId) || diskId < 1) {
-    return res.status(400).json({ error: '无效的磁盘ID' });
+    return res.status(400).json({ error: '无效的磁盘ID', code: 'INVALID_DISK_ID' });
   }
   try {
     var disk = await db.disks.getById(diskId);
-    if (!disk) return res.status(404).json({ error: '磁盘不存在' });
+    if (!disk) return res.status(404).json({ error: '磁盘不存在', code: 'DISK_NOT_FOUND' });
     // 管理员可操作所有，用户只能操作自己的
     if (req.user.role !== 'admin' && disk.user_id !== req.user.id) {
       console.warn('[SECURITY] 用户 ' + req.user.id + ' 尝试越权操作磁盘 ' + diskId + '（归属 ' + disk.user_id + '）');
-      return res.status(403).json({ error: '无权操作此磁盘' });
+      return res.status(403).json({ error: '无权操作此磁盘', code: 'DISK_NO_PERM' });
     }
     req.disk = disk;
     next();
   } catch (e) {
-    return res.status(500).json({ error: safeError(e) });
+    return res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 }
 
@@ -47,19 +47,19 @@ async function checkDiskOwnership(req, res, next) {
 async function checkVmOwnership(req, res, next) {
   var vmid = parseInt(req.body.vmid);
   if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
-    return res.status(400).json({ error: '无效的虚拟机ID' });
+    return res.status(400).json({ error: '无效的虚拟机ID', code: 'INVALID_VM_ID_3' });
   }
   try {
     var vm = await db.vms.getByVmid(vmid);
-    if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+    if (!vm) return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
     if (req.user.role !== 'admin' && vm.user_id !== req.user.id) {
       console.warn('[SECURITY] 用户 ' + req.user.id + ' 尝试越权操作 VM ' + vmid + '（归属 ' + vm.user_id + '）');
-      return res.status(403).json({ error: '无权操作此虚拟机' });
+      return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
     }
     req.vm = vm;
     next();
   } catch (e) {
-    return res.status(500).json({ error: safeError(e) });
+    return res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 }
 
@@ -77,7 +77,7 @@ router.get('/disks', authMiddleware, async (req, res) => {
     }
     res.json(disks);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -99,7 +99,7 @@ router.get('/disk-options', authMiddleware, async (req, res) => {
     });
     res.json({ groups: groups, specs: specs });
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -107,7 +107,7 @@ router.get('/disk-options', authMiddleware, async (req, res) => {
 router.post('/disks/purchase', authMiddleware, async (req, res) => {
   // 限速：每用户 60 秒 2 次
   var limit = await checkConfiguredRateLimit('disk_purchase', 'disk_purchase:' + req.user.id);
-  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: limit.retryAfter });
 
   try {
     var specId = parseInt(req.body.spec_id);
@@ -116,21 +116,21 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
     var periodCount = parseInt(req.body.period_count) || 1;
     var quantity = parseInt(req.body.quantity);
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) {
-      return res.status(400).json({ error: '购买数量必须为 1-10' });
+      return res.status(400).json({ error: '购买数量必须为 1-10', code: 'PURCHASE_QTY_1_10' });
     }
     var autoRenew = req.body.auto_renew ? 1 : 0;
     var diskName = (req.body.disk_name || '').toString().trim();
     // 长度限制：最多 30 字符（适配导入磁盘名称如 imported-108-scsi1）
     if (diskName.length > 30) {
-      return res.status(400).json({ error: '硬盘名称不能超过30字符' });
+      return res.status(400).json({ error: '硬盘名称不能超过30字符', code: 'DISK_NAME_MAX_30' });
     }
     // XSS 防护：剥离 HTML 标签（Vue 模板已自动转义，后端也做防御）
     diskName = diskName.replace(/<[^>]*>/g, '').substring(0, 30);
 
     // 参数校验
-    if (!Number.isInteger(specId) || specId < 1) return res.status(400).json({ error: '无效的规格ID' });
-    if (VALID_PERIODS.indexOf(period) === -1) return res.status(400).json({ error: '无效的计费周期' });
-    if (!Number.isInteger(capacityGb) || capacityGb < 1) return res.status(400).json({ error: '无效的容量' });
+    if (!Number.isInteger(specId) || specId < 1) return res.status(400).json({ error: '无效的规格ID', code: 'INVALID_SPEC_ID' });
+    if (VALID_PERIODS.indexOf(period) === -1) return res.status(400).json({ error: '无效的计费周期', code: 'INVALID_PERIOD' });
+    if (!Number.isInteger(capacityGb) || capacityGb < 1) return res.status(400).json({ error: '无效的容量', code: 'INVALID_CAPACITY' });
 
     var result = await diskService.purchaseDisk({
       userId: req.user.id,
@@ -144,19 +144,19 @@ router.post('/disks/purchase', authMiddleware, async (req, res) => {
       req: req
     });
     if (!result.ok) {
-      return res.status(result.status).json({ error: result.error });
+      return res.status(result.status).json({ error: result.error , code: result.code });
     }
     res.json(result.data);
   } catch (e) {
     console.error('[disk purchase] 失败:', e);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
 // 挂载磁盘到虚拟机（业务在 services/disk.js）
 router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwnership, async (req, res) => {
   var limit = await checkConfiguredRateLimit('disk_bind', 'disk_bind:' + req.user.id);
-  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', retryAfter: limit.retryAfter });
+  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', code: 'RATE_LIMITED_BRIEF', retryAfter: limit.retryAfter });
 
   try {
     var result = await diskService.bindDiskToVm({
@@ -166,19 +166,19 @@ router.post('/disks/:id/bind', authMiddleware, checkDiskOwnership, checkVmOwners
       req: req
     });
     if (!result.ok) {
-      return res.status(result.status).json({ error: result.error });
+      return res.status(result.status).json({ error: result.error , code: result.code });
     }
     res.json(result.data);
   } catch (e) {
     console.error('[disk bind] 挂载失败:', e.stack || e.message);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
 // 卸载磁盘（业务在 services/disk.js）
 router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req, res) => {
   var limit = await checkConfiguredRateLimit('disk_unbind', 'disk_unbind:' + req.user.id);
-  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', retryAfter: limit.retryAfter });
+  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', code: 'RATE_LIMITED_BRIEF', retryAfter: limit.retryAfter });
 
   try {
     var result = await diskService.unbindDiskFromVm({
@@ -187,24 +187,24 @@ router.post('/disks/:id/unbind', authMiddleware, checkDiskOwnership, async (req,
       req: req
     });
     if (!result.ok) {
-      return res.status(result.status).json({ error: result.error });
+      return res.status(result.status).json({ error: result.error , code: result.code });
     }
     res.json(result.data);
   } catch (e) {
     console.error('[disk unbind] 卸载失败:', e.stack || e.message);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
 // 扩容磁盘（业务在 services/disk.js）
 router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req, res) => {
   var limit = await checkConfiguredRateLimit('disk_resize', 'disk_resize:' + req.user.id);
-  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', retryAfter: limit.retryAfter });
+  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', code: 'RATE_LIMITED_BRIEF', retryAfter: limit.retryAfter });
 
   try {
     var newSize = parseInt(req.body.capacity_gb);
     if (!Number.isInteger(newSize) || newSize <= 0) {
-      return res.status(400).json({ error: '无效的容量' });
+      return res.status(400).json({ error: '无效的容量', code: 'INVALID_CAPACITY' });
     }
 
     var result = await diskService.resizeDisk({
@@ -214,19 +214,19 @@ router.post('/disks/:id/resize', authMiddleware, checkDiskOwnership, async (req,
       req: req
     });
     if (!result.ok) {
-      return res.status(result.status).json({ error: result.error });
+      return res.status(result.status).json({ error: result.error , code: result.code });
     }
     res.json(result.data);
   } catch (e) {
     console.error('[disk resize] 失败:', e);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
 // 销毁磁盘（业务在 services/disk.js）
 router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req, res) => {
   var limit = await checkConfiguredRateLimit('disk_destroy', 'disk_destroy:' + req.user.id);
-  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', retryAfter: limit.retryAfter });
+  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', code: 'RATE_LIMITED_BRIEF', retryAfter: limit.retryAfter });
 
   try {
     var result = await diskService.destroyDisk({
@@ -235,25 +235,25 @@ router.post('/disks/:id/destroy', authMiddleware, checkDiskOwnership, async (req
       req: req
     });
     if (!result.ok) {
-      return res.status(result.status).json({ error: result.error });
+      return res.status(result.status).json({ error: result.error , code: result.code });
     }
     res.json(result.data);
   } catch (e) {
     console.error('[disk destroy] 失败:', e);
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
 // 续费磁盘（业务在 services/disk.js）
 router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, res) => {
   var limit = await checkConfiguredRateLimit('disk_renew', 'disk_renew:' + req.user.id);
-  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', retryAfter: limit.retryAfter });
+  if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁', code: 'RATE_LIMITED_BRIEF', retryAfter: limit.retryAfter });
 
   try {
     var period = req.body.period;
     var periodCount = parseInt(req.body.period_count) || 1;
 
-    if (VALID_PERIODS.indexOf(period) === -1) return res.status(400).json({ error: '无效的计费周期' });
+    if (VALID_PERIODS.indexOf(period) === -1) return res.status(400).json({ error: '无效的计费周期', code: 'INVALID_PERIOD' });
 
     var result = await diskService.renewDisk({
       userId: req.user.id,
@@ -263,11 +263,11 @@ router.post('/disks/:id/renew', authMiddleware, checkDiskOwnership, async (req, 
       req: req
     });
     if (!result.ok) {
-      return res.status(result.status).json({ error: result.error });
+      return res.status(result.status).json({ error: result.error , code: result.code });
     }
     res.json(result.data);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -280,11 +280,11 @@ router.post('/disks/:id/auto-renew', authMiddleware, checkDiskOwnership, async (
       req: req
     });
     if (!result.ok) {
-      return res.status(result.status).json({ error: result.error });
+      return res.status(result.status).json({ error: result.error , code: result.code });
     }
     res.json(result.data);
   } catch (e) {
-    res.status(500).json({ error: safeError(e) });
+    res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
   }
 });
 

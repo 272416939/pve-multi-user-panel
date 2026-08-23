@@ -65,7 +65,7 @@ router.get('/admin/email-templates', authMiddleware, adminMiddleware, async (req
         });
     } catch (error) {
         console.error('获取邮件模板列表失败:', error.message);
-        res.status(500).json({ error: '获取邮件模板失败' });
+        res.status(500).json({ error: '获取邮件模板失败', code: 'MAIL_TPL_LIST_FAILED' });
     }
 });
 
@@ -75,29 +75,29 @@ router.put('/admin/email-templates/:code', authMiddleware, adminMiddleware, asyn
         // V6-M4 修复：写操作端点专项限速（渲染/审计链路防刷）
         const opLimit = await checkConfiguredRateLimit('email_template_op', 'ratelimit:email-template-op:' + req.user.id);
         if (!opLimit.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: opLimit.retryAfter });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: opLimit.retryAfter });
         }
         const code = String(req.params.code || '');
         if (!isKnownCode(code)) {
-            return res.status(400).json({ error: '未知的邮件模板: ' + code });
+            return res.status(400).json({ error: '未知的邮件模板: ' + code, code: 'ETPL_NOT_FOUND', params: [code] });
         }
         const { subject, title, content } = req.body || {};
         if (typeof subject !== 'string' || subject.trim().length === 0 || subject.length > MAX_SUBJECT_LEN) {
-            return res.status(400).json({ error: '邮件主题必填且不超过 ' + MAX_SUBJECT_LEN + ' 字符' });
+            return res.status(400).json({ error: '邮件主题必填且不超过 ' + MAX_SUBJECT_LEN + ' 字符', code: 'MAIL_SUBJECT_TOO_LONG', params: [MAX_SUBJECT_LEN] });
         }
         if (typeof title !== 'string' || title.length > MAX_SUBJECT_LEN) {
-            return res.status(400).json({ error: '副标题不超过 ' + MAX_SUBJECT_LEN + ' 字符' });
+            return res.status(400).json({ error: '副标题不超过 ' + MAX_SUBJECT_LEN + ' 字符', code: 'MAIL_SUBTITLE_TOO_LONG', params: [MAX_SUBJECT_LEN] });
         }
         if (typeof content !== 'string' || content.trim().length === 0) {
-            return res.status(400).json({ error: '邮件正文不能为空' });
+            return res.status(400).json({ error: '邮件正文不能为空', code: 'MAIL_CONTENT_REQUIRED' });
         }
         if (content.length > MAX_CONTENT_LEN) {
-            return res.status(400).json({ error: '邮件正文过长（上限 64KB）' });
+            return res.status(400).json({ error: '邮件正文过长（上限 64KB）', code: 'MAIL_CONTENT_TOO_LONG' });
         }
         // 变量白名单校验（防拼错变量）
         const badVars = validateTemplateVars(code, subject, title, content);
         if (badVars.length > 0) {
-            return res.status(400).json({ error: '包含未声明变量: ' + badVars.map(function (v) { return '{' + v + '}'; }).join(', ') + '，请从可用变量中选择' });
+            return res.status(400).json({ error: '包含未声明变量: ' + badVars.map(function (v) { return '{' + v + '}'; }).join(', ') + '，请从可用变量中选择', code: 'ETPL_UNDECLARED_VARS', params: [badVars.map(function (v) { return '{' + v + '}'; }).join(', ')] });
         }
 
         // 保存前取旧记录（审计 diff 用）
@@ -123,7 +123,7 @@ router.put('/admin/email-templates/:code', authMiddleware, adminMiddleware, asyn
         res.json({ message: '模板保存成功', template: parseVariables(await db.emailTemplates.getByCode(code)) });
     } catch (error) {
         console.error('保存邮件模板失败:', error.message);
-        res.status(500).json({ error: '保存模板失败' });
+        res.status(500).json({ error: '保存模板失败', code: 'TPL_SAVE_FAILED' });
     }
 });
 
@@ -134,19 +134,19 @@ router.post('/admin/email-templates/:code/preview', authMiddleware, adminMiddlew
         // V6-M4 修复：预览走完整渲染链路，挂与保存同规则的专项限速
         const opLimit = await checkConfiguredRateLimit('email_template_op', 'ratelimit:email-template-op:' + req.user.id);
         if (!opLimit.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: opLimit.retryAfter });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: opLimit.retryAfter });
         }
         const code = String(req.params.code || '');
         const def = EMAIL_TEMPLATES[code];
         if (!def) {
-            return res.status(400).json({ error: '未知的邮件模板: ' + code });
+            return res.status(400).json({ error: '未知的邮件模板: ' + code, code: 'ETPL_NOT_FOUND', params: [code] });
         }
         const { subject, title, content } = req.body || {};
         if (typeof subject !== 'string' || subject.trim().length === 0) {
-            return res.status(400).json({ error: '邮件主题必填' });
+            return res.status(400).json({ error: '邮件主题必填', code: 'MAIL_SUBJECT_REQUIRED' });
         }
         if (typeof content !== 'string' || content.trim().length === 0) {
-            return res.status(400).json({ error: '邮件正文不能为空' });
+            return res.status(400).json({ error: '邮件正文不能为空', code: 'MAIL_CONTENT_REQUIRED' });
         }
         const badVars = validateTemplateVars(code, subject, title, content);
         if (badVars.length > 0) {
@@ -180,7 +180,7 @@ router.post('/admin/email-templates/:code/preview', authMiddleware, adminMiddlew
         res.json({ subject: rendered.subject, html: html });
     } catch (error) {
         console.error('预览邮件模板失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -190,7 +190,7 @@ router.post('/admin/email-templates/:code/reset', authMiddleware, adminMiddlewar
         const code = String(req.params.code || '');
         const def = EMAIL_TEMPLATES[code];
         if (!def) {
-            return res.status(400).json({ error: '未知的邮件模板: ' + code });
+            return res.status(400).json({ error: '未知的邮件模板: ' + code, code: 'ETPL_NOT_FOUND', params: [code] });
         }
         await db.emailTemplates.resetToDefault(def, req.user.id);
         await invalidateTemplateCache();
@@ -204,7 +204,7 @@ router.post('/admin/email-templates/:code/reset', authMiddleware, adminMiddlewar
         res.json({ message: '已恢复默认模板', template: parseVariables(await db.emailTemplates.getByCode(code)) });
     } catch (error) {
         console.error('恢复邮件模板默认失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -239,7 +239,7 @@ router.get('/admin/email-shell', authMiddleware, adminMiddleware, async (req, re
         res.json({ params: EMAIL_SHELL_PARAMS, values: values });
     } catch (error) {
         console.error('获取邮件外壳样式失败:', error.message);
-        res.status(500).json({ error: '获取邮件外壳样式失败' });
+        res.status(500).json({ error: '获取邮件外壳样式失败', code: 'SHELL_LOAD_FAILED' });
     }
 });
 
@@ -287,7 +287,7 @@ router.put('/admin/email-shell', authMiddleware, adminMiddleware, async (req, re
         res.json({ message: '邮件外壳样式保存成功', values: await db.config.getEmailShell() });
     } catch (error) {
         console.error('保存邮件外壳样式失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -308,7 +308,7 @@ router.post('/admin/email-shell/reset', authMiddleware, adminMiddleware, async (
         res.json({ message: '已恢复默认邮件外壳样式', values: await db.config.getEmailShell() });
     } catch (error) {
         console.error('恢复邮件外壳样式失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

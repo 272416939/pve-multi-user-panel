@@ -17,10 +17,10 @@ router.get('/logs/operation', authMiddleware, async (req, res) => {
     try {
         var category = (req.query.category || '').trim();
         if (category && AUDIT_CATEGORIES.indexOf(category) === -1) {
-            return res.status(400).json({ error: '无效的操作类型' });
+            return res.status(400).json({ error: '无效的操作类型', code: 'INVALID_ACTION' });
         }
         var keyword = (req.query.keyword || '').trim();
-        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
+        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' });
 
         var result = await db.auditLogs.getListWithPaging({
             userId: req.user.id,
@@ -50,7 +50,7 @@ router.get('/logs/operation', authMiddleware, async (req, res) => {
         res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit, keep_count: keepCount });
     } catch (e) {
         console.error('[logs] 操作日志查询失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -59,10 +59,10 @@ router.get('/logs/login', authMiddleware, async (req, res) => {
     try {
         var status = (req.query.status || '').trim();
         if (status && ['success', 'failed'].indexOf(status) === -1) {
-            return res.status(400).json({ error: '无效的登录状态' });
+            return res.status(400).json({ error: '无效的登录状态', code: 'INVALID_LOGIN_STATE' });
         }
         var keyword = (req.query.keyword || '').trim();
-        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
+        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' });
 
         var result = await db.loginLogs.getListWithPaging({
             userId: req.user.id,
@@ -92,7 +92,7 @@ router.get('/logs/login', authMiddleware, async (req, res) => {
         res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit, keep_count: keepCount });
     } catch (e) {
         console.error('[logs] 登录日志查询失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -104,10 +104,10 @@ router.get('/logs/operation/export', authMiddleware, async (req, res) => {
     try {
         var category = (req.query.category || '').trim();
         if (category && AUDIT_CATEGORIES.indexOf(category) === -1) {
-            return res.status(400).json({ error: '无效的操作类型' });
+            return res.status(400).json({ error: '无效的操作类型', code: 'INVALID_ACTION' });
         }
         var keyword = (req.query.keyword || '').trim();
-        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
+        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' });
 
         var result = await db.auditLogs.getListWithPaging({
             userId: req.user.id,
@@ -137,7 +137,7 @@ router.get('/logs/operation/export', authMiddleware, async (req, res) => {
         res.send(csv);
     } catch (e) {
         console.error('[logs] 操作日志导出失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -145,10 +145,10 @@ router.get('/logs/login/export', authMiddleware, async (req, res) => {
     try {
         var status = (req.query.status || '').trim();
         if (status && ['success', 'failed'].indexOf(status) === -1) {
-            return res.status(400).json({ error: '无效的登录状态' });
+            return res.status(400).json({ error: '无效的登录状态', code: 'INVALID_LOGIN_STATE' });
         }
         var keyword = (req.query.keyword || '').trim();
-        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长' });
+        if (keyword.length > 50) return res.status(400).json({ error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' });
 
         var result = await db.loginLogs.getListWithPaging({
             userId: req.user.id,
@@ -178,7 +178,7 @@ router.get('/logs/login/export', authMiddleware, async (req, res) => {
         res.send(csv);
     } catch (e) {
         console.error('[logs] 登录日志导出失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -186,30 +186,30 @@ router.get('/logs/login/export', authMiddleware, async (req, res) => {
 router.post('/logs/operation/clear', authMiddleware, async (req, res) => {
     try {
         if (req.body.confirm !== 'CLEAR_OPERATION_LOGS') {
-            return res.status(400).json({ error: '确认串不正确' });
+            return res.status(400).json({ error: '确认串不正确', code: 'CONFIRM_MISMATCH' });
         }
         var limit = await checkConfiguredRateLimit('log_clear_op', 'log-clear-op:' + req.user.id);
-        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: limit.retryAfter });
         await db.auditLogs.clearByUser(req.user.id);
         res.json({ message: '操作日志已清空' });
     } catch (e) {
         console.error('[logs] 清空操作日志失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.post('/logs/login/clear', authMiddleware, async (req, res) => {
     try {
         if (req.body.confirm !== 'CLEAR_LOGIN_LOGS') {
-            return res.status(400).json({ error: '确认串不正确' });
+            return res.status(400).json({ error: '确认串不正确', code: 'CONFIRM_MISMATCH' });
         }
         var limit = await checkConfiguredRateLimit('log_clear_login', 'log-clear-login:' + req.user.id);
-        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+        if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: limit.retryAfter });
         await db.loginLogs.clearByUser(req.user.id);
         res.json({ message: '登录日志已清空' });
     } catch (e) {
         console.error('[logs] 清空登录日志失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 

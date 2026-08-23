@@ -4,6 +4,28 @@ function isLoginPage() {
     return p === '/login' || p === '/login.html' || p === '';
 }
 
+// 后端错误 code 统一翻译：响应带 code 且存在 'err.<code>' 词条时返回译文（params 数组走 {0} 插值），
+// 否则回退后端中文原文（data.error）——所有 alert(e.message)/表单内联 ref 零改动自动获得翻译
+function translateApiError(data) {
+    if (data && data.code) {
+        const i18n = window.__i18n;
+        if (i18n && i18n.tOrNull) {
+            const translated = i18n.tOrNull('err.' + data.code);
+            if (translated !== null) {
+                if (Array.isArray(data.params) && data.params.length) {
+                    let text = translated;
+                    for (let i = 0; i < data.params.length; i++) {
+                        text = text.replace('{' + i + '}', data.params[i]);
+                    }
+                    return text;
+                }
+                return translated;
+            }
+        }
+    }
+    return (data && data.error) || '';
+}
+
 const api = (endpoint, options = {}) => {
     return ensureValidToken().then(token => {
         // 会话已失效（ensureValidToken 已触发带参跳转）：短路，避免无 token 请求与兜底跳转覆盖参数
@@ -54,10 +76,10 @@ const api = (endpoint, options = {}) => {
                                     if (!isLoginPage()) {
                                         window.location.href = 'login.html';
                                     }
-                                    throw new Error(d.error || window.__i18n.t('shared.mustChangePwd'));
+                                    throw new Error(translateApiError(d) || window.__i18n.t('shared.mustChangePwd'));
                                 }
                                 // 限速 429：错误文案统一拼接剩余等待秒数（全局倒计时提示，所有页面生效）
-                                const err = new Error(d.error || window.__i18n.t('shared.requestFailed'));
+                                const err = new Error(translateApiError(d) || window.__i18n.t('shared.requestFailed'));
                                 if (d.retryAfter != null) {
                                     err.retryAfter = d.retryAfter;
                                     err.message = err.message + window.__i18n.t('shared.retryPrefix') + Math.ceil(d.retryAfter) + window.__i18n.t('shared.retrySuffix');
@@ -74,7 +96,7 @@ const api = (endpoint, options = {}) => {
                         localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
                         window.__sessionExpired = true;
                         window.location.href = 'login?expired=1';
-                        throw new Error(refreshErr.error || window.__i18n.t('shared.sessionExpired'));
+                        throw new Error(translateApiError(refreshErr) || window.__i18n.t('shared.sessionExpired'));
                     }
                 }
             }
@@ -84,7 +106,7 @@ const api = (endpoint, options = {}) => {
                 localStorage.removeItem(window.__storageKeys.REFRESH_TOKEN);
                 window.location.href = 'login.html';
             }
-            throw new Error(data.error || window.__i18n.t('shared.requestFailed'));
+            throw new Error(translateApiError(data) || window.__i18n.t('shared.requestFailed'));
         }
         const data = await res.json();
         if (!res.ok) {
@@ -94,10 +116,10 @@ const api = (endpoint, options = {}) => {
                 if (!isLoginPage()) {
                     window.location.href = 'login.html';
                 }
-                throw new Error(data.error || window.__i18n.t('shared.mustChangePwd'));
+                throw new Error(translateApiError(data) || window.__i18n.t('shared.mustChangePwd'));
             }
             // 限速 429：错误文案统一拼接剩余等待秒数（全局倒计时提示，所有页面生效）
-            const err = new Error(data.error || window.__i18n.t('shared.requestFailed'));
+            const err = new Error(translateApiError(data) || window.__i18n.t('shared.requestFailed'));
             if (data.retryAfter != null) {
                 err.retryAfter = data.retryAfter;
                 err.message = err.message + window.__i18n.t('shared.retryPrefix') + Math.ceil(data.retryAfter) + window.__i18n.t('shared.retrySuffix');

@@ -15,7 +15,7 @@ router.get('/user/notification-settings', authMiddleware, async (req, res) => {
         res.json(settings);
     } catch (e) {
         console.error('[user-settings] 获取通知设置失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -23,7 +23,7 @@ router.get('/user/notification-settings', authMiddleware, async (req, res) => {
 router.put('/user/notification-settings', authMiddleware, async (req, res) => {
     // SEC-02: 速率限制 - 每用户 60 秒 30 次
     var limit = await checkConfiguredRateLimit('notification_settings', 'settings:' + req.user.id);
-    if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+    if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: limit.retryAfter });
 
     try {
         const db = require('../api/db');
@@ -58,7 +58,7 @@ router.put('/user/notification-settings', authMiddleware, async (req, res) => {
         res.json(settings);
     } catch (e) {
         console.error('[user-settings] 更新通知设置失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -76,7 +76,7 @@ router.get('/user/template', authMiddleware, async (req, res) => {
         res.json({ template: template || '', siteDefault: siteDefault });
     } catch (e) {
         console.error('[user-settings] 获取界面模板失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -84,7 +84,7 @@ router.get('/user/template', authMiddleware, async (req, res) => {
 router.put('/user/template', authMiddleware, async (req, res) => {
     // SEC-02: 速率限制 - 每用户 60 秒 30 次
     var limit = await checkConfiguredRateLimit('notification_settings', 'settings:' + req.user.id);
-    if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+    if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: limit.retryAfter });
 
     try {
         const db = require('../api/db');
@@ -92,7 +92,7 @@ router.put('/user/template', authMiddleware, async (req, res) => {
         var template = req.body && req.body.template;
         // B-1: 只操作 req.user.id 的记录，不接受 user_id 参数；白名单校验
         if (typeof template !== 'string' || (template !== '' && !UI_TEMPLATES.includes(template))) {
-            return res.status(400).json({ error: '界面模板参数不合法' });
+            return res.status(400).json({ error: '界面模板参数不合法', code: 'UI_TPL_PARAM_INVALID' });
         }
         var settings = await db.userSettings.upsert(req.user.id, { template: template });
         var siteDefault = await db.config.get('site:template') || 'default';
@@ -106,7 +106,7 @@ router.put('/user/template', authMiddleware, async (req, res) => {
         res.json({ template: (settings && settings.template) || '', siteDefault: siteDefault });
     } catch (e) {
         console.error('[user-settings] 更新界面模板失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -124,7 +124,7 @@ router.get('/user/lang', authMiddleware, async (req, res) => {
         res.json({ lang: lang || '', siteDefault: siteDefault });
     } catch (e) {
         console.error('[user-settings] 获取语言偏好失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -132,7 +132,7 @@ router.get('/user/lang', authMiddleware, async (req, res) => {
 router.put('/user/lang', authMiddleware, async (req, res) => {
     // SEC-02: 速率限制 - 每用户 60 秒 30 次
     var limit = await checkConfiguredRateLimit('notification_settings', 'settings:' + req.user.id);
-    if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: limit.retryAfter });
+    if (!limit.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: limit.retryAfter });
 
     try {
         const db = require('../api/db');
@@ -140,7 +140,7 @@ router.put('/user/lang', authMiddleware, async (req, res) => {
         var lang = req.body && req.body.lang;
         // B-1: 只操作 req.user.id 的记录，不接受 user_id 参数；动态白名单校验（系统语言 + 自定义语言）
         if (typeof lang !== 'string' || (lang !== '' && !(await isSupportedLocale(lang)))) {
-            return res.status(400).json({ error: '语言参数不合法' });
+            return res.status(400).json({ error: '语言参数不合法', code: 'LANG_PARAM_INVALID' });
         }
         var settings = await db.userSettings.upsert(req.user.id, { lang: lang });
         var siteDefault = await db.config.get('site:lang') || 'zh-CN';
@@ -154,7 +154,7 @@ router.put('/user/lang', authMiddleware, async (req, res) => {
         res.json({ lang: (settings && settings.lang) || '', siteDefault: siteDefault });
     } catch (e) {
         console.error('[user-settings] 更新语言偏好失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 

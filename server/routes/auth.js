@@ -66,7 +66,7 @@ router.post('/login', async (req, res) => {
     const rateLimit = await checkLoginRateLimit(ip, username);
     if (!rateLimit.allowed) {
         return res.status(429).json({
-            error: '登录尝试过于频繁，请稍后再试',
+            error: '登录尝试过于频繁，请稍后再试', code: 'RATE_LIMITED_LOGIN',
             retryAfter: rateLimit.retryAfter
         });
     }
@@ -76,7 +76,7 @@ router.post('/login', async (req, res) => {
     if (isEmail) {
         user = await db.users.getByEmail(username);
         if (user && !user.emailVerified) {
-            return res.status(400).json({ error: '用户名或密码不正确，请核对信息后重试' });
+            return res.status(400).json({ error: '用户名或密码不正确，请核对信息后重试', code: 'LOGIN_FAILED' });
         }
     } else {
         user = await db.users.getByUsername(username);
@@ -84,7 +84,7 @@ router.post('/login', async (req, res) => {
 
     if (!user) {
         await writeLoginLog({ username: username, ip, ua: req.headers['user-agent'] || '', status: 'failed', details: '用户名不存在' });
-        return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
+        return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试', code: 'LOGIN_FAILED' });
     }
 
     let passwordMatch = await verifyPassword(password, user.password, user.password_salt);
@@ -100,12 +100,12 @@ if (passwordMatch && needsUpgrade(user.password)) {
 
     if (!passwordMatch) {
         await writeLoginLog({ userId: user.id, username: user.username, ip, ua: req.headers['user-agent'] || '', status: 'failed', details: '密码错误' });
-        return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试' });
+        return res.status(401).json({ error: '用户名或密码不正确，请核对信息后重试', code: 'LOGIN_FAILED' });
     }
 
     if (!user.is_active) {
         await writeLoginLog({ userId: user.id, username: user.username, ip, ua: req.headers['user-agent'] || '', status: 'failed', details: '账号已被禁用' });
-        return res.status(403).json({ error: '账号已被禁用' });
+        return res.status(403).json({ error: '账号已被禁用', code: 'ACCOUNT_DISABLED' });
     }
 
     // V6-H2 修复：2FA 开启的用户在第一步（仅验证密码）不下发任何可用会话凭证——
@@ -167,12 +167,12 @@ router.post('/login/2fa', async (req, res) => {
 
     const tfaLimit = await checkConfiguredRateLimit('login_2fa', `ratelimit:2fa:${req.ip}:${rateLimitUserId || 'unknown'}`);
     if (!tfaLimit.allowed) {
-        return res.status(429).json({ error: '2FA 验证过于频繁，请稍后再试', retryAfter: tfaLimit.retryAfter });
+        return res.status(429).json({ error: '2FA 验证过于频繁，请稍后再试', code: 'RATE_LIMITED_2FA', retryAfter: tfaLimit.retryAfter });
     }
 
     const { partial_token, code, refresh_token: reqRefreshToken } = req.body;
     if (!partial_token || !code) {
-        return res.status(400).json({ error: '缺少参数' });
+        return res.status(400).json({ error: '缺少参数', code: 'PARAM_MISSING_2' });
     }
     // 2FA 第二步重建记录时沿用第一步勾选的「7天内无需登录」标记（前端 verifyTwofa 会带 remember）
     const remember = (req.body.remember === true || req.body.remember === 1 || req.body.remember === '1') ? 1 : 0;
@@ -181,15 +181,15 @@ router.post('/login/2fa', async (req, res) => {
     try {
         decoded = jwt.verify(partial_token, JWT_SECRET, { algorithms: ['HS256'] });
         if (!decoded.twofa_pending) {
-            return res.status(400).json({ error: '无效的令牌' });
+            return res.status(400).json({ error: '无效的令牌', code: 'TOKEN_INVALID_2' });
         }
     } catch (err) {
-        return res.status(401).json({ error: '令牌已过期或无效，请重新登录' });
+        return res.status(401).json({ error: '令牌已过期或无效，请重新登录', code: 'TOKEN_EXPIRED_RELOGIN' });
     }
 
     const user = await db.users.getById(decoded.id);
     if (!user) {
-        return res.status(404).json({ error: '用户不存在' });
+        return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
     }
 
     let isValidTotp = false;
@@ -290,23 +290,23 @@ router.post('/login/2fa', async (req, res) => {
     }
 
     await writeLoginLog({ userId: user.id, username: user.username, ip: req.ip, ua: req.headers['user-agent'] || '', status: 'failed', details: '2FA验证码错误' });
-    return res.status(401).json({ error: '验证码错误' });
+    return res.status(401).json({ error: '验证码错误', code: 'CODE_INVALID' });
 });
 
 router.post('/auth/refresh', async (req, res) => {
     try {
         var rateLimitResult = await checkConfiguredRateLimit('refresh', 'ratelimit:refresh:' + req.ip);
-        if (!rateLimitResult.allowed) return res.status(429).json({ error: '请求过于频繁，请稍后再试', retryAfter: rateLimitResult.retryAfter });
+        if (!rateLimitResult.allowed) return res.status(429).json({ error: '请求过于频繁，请稍后再试', code: 'RATE_LIMITED_REQ', retryAfter: rateLimitResult.retryAfter });
 
         const { refreshToken } = req.body;
-        if (!refreshToken) return res.status(400).json({ error: '缺少 refreshToken' });
+        if (!refreshToken) return res.status(400).json({ error: '缺少 refreshToken', code: 'REFRESH_TOKEN_MISSING' });
 
         // R3-1 修复：refreshToken 是纯随机字符串（非 JWT），直接用 DB 查询校验，移除无效的 jwt.verify
         const record = await db.refreshTokens.getByToken(refreshToken);
         // V6-H1 修复：已撤销（revoked）的 token 一律拒绝——登出/改密/管理员强制下线均只置
         // revoked=1 保留行至每日清理，此前漏检该项导致被撤销 token 仍可续期「复活」会话
         if (!record || !record.user_id || record.revoked) {
-            return res.status(401).json({ error: 'refreshToken 已失效' });
+            return res.status(401).json({ error: 'refreshToken 已失效', code: 'REFRESH_TOKEN_INVALID' });
         }
 
         // 会话策略门禁：未勾选且 2 小时无操作 / 勾选但已超 7 天且 2 小时无操作 → 拒绝续期，要求重新登录
@@ -320,7 +320,7 @@ router.post('/auth/refresh', async (req, res) => {
 
         const user = await db.users.getById(record.user_id);
         if (!user || !user.is_active) {
-            return res.status(401).json({ error: '用户不存在或已被禁用' });
+            return res.status(401).json({ error: '用户不存在或已被禁用', code: 'USER_NOT_FOUND_OR_DISABLED' });
         }
 
         // 签发新的 access token + 新的 refresh token
@@ -352,7 +352,7 @@ router.post('/auth/refresh', async (req, res) => {
         res.json({ token: newAccessToken, refreshToken: newRefreshToken });
     } catch (error) {
         console.error('[auth] refresh token 错误:', error.message);
-        res.status(500).json({ error: 'token 刷新失败' });
+        res.status(500).json({ error: 'token 刷新失败', code: 'TOKEN_REFRESH_FAILED' });
     }
 });
 
@@ -360,7 +360,7 @@ router.post('/logout', async (req, res) => {
     // L-12 修复：登出端点按 IP 限速（匿名可调，防 DoS；保持 token 过期也可登出）
     const logoutRate = await checkConfiguredRateLimit('logout', 'ratelimit:logout:' + req.ip);
     if (!logoutRate.allowed) {
-        return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: logoutRate.retryAfter });
+        return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: logoutRate.retryAfter });
     }
     const { refreshToken } = req.body;
     // 将 access token 加入黑名单（从 Authorization header 读取）
@@ -387,17 +387,17 @@ router.post('/logout', async (req, res) => {
 router.post('/auth/forgot-password', async (req, res) => {
     const forgotLimit = await checkConfiguredRateLimit('forgot', `ratelimit:forgot:${req.ip}`);
     if (!forgotLimit.allowed) {
-        return res.status(429).json({ error: '密码重置邮件发送过于频繁，请稍后再试', retryAfter: forgotLimit.retryAfter });
+        return res.status(429).json({ error: '密码重置邮件发送过于频繁，请稍后再试', code: 'RATE_LIMITED_PWD_RESET_MAIL', retryAfter: forgotLimit.retryAfter });
     }
 
     try {
         const { email } = req.body;
         if (!email) {
-            return res.status(400).json({ error: '请提供邮箱地址' });
+            return res.status(400).json({ error: '请提供邮箱地址', code: 'EMAIL_REQUIRED' });
         }
         // 邮箱格式校验（单一来源 email-validate.js；格式非法直接 400，不进入用户枚举查询）
         if (!isValidEmail(email)) {
-            return res.status(400).json({ error: '邮箱格式不正确' });
+            return res.status(400).json({ error: '邮箱格式不正确', code: 'EMAIL_INVALID' });
         }
 
         const allUsers = await db.users.getAll();
@@ -424,7 +424,7 @@ router.post('/auth/forgot-password', async (req, res) => {
         // H-10 修复：检查 SITE_URL 是否已配置
         const siteUrl = getSiteUrl(req);
         if (!siteUrl) {
-            return res.status(500).json({ error: '邮件服务未正确配置，无法发送密码重置链接' });
+            return res.status(500).json({ error: '邮件服务未正确配置，无法发送密码重置链接', code: 'MAIL_NOT_CONFIGURED' });
         }
 
         const resetUrl = `${siteUrl}?resetPassword=${token}`;
@@ -435,7 +435,7 @@ router.post('/auth/forgot-password', async (req, res) => {
         await sendTemplateEmail(user.email, 'password_reset', { username: user.username, link: resetUrl });
         res.json({ message: '如果邮箱已绑定，重置链接已发送' });
     } catch (error) {
-        res.status(500).json({ error: '请求失败' });
+        res.status(500).json({ error: '请求失败', code: 'REQUEST_FAILED' });
     }
 });
 
@@ -443,19 +443,19 @@ router.get('/auth/reset-password/:token', async (req, res) => {
     try {
         const resetLimit = await checkConfiguredRateLimit('reset_pwd', `ratelimit:reset-pwd:${req.ip}`);
         if (!resetLimit.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: resetLimit.retryAfter });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: resetLimit.retryAfter });
         }
 
         const { token } = req.params;
 
         const userId = await tokenStore.getResetToken(token);
         if (!userId) {
-            return res.status(400).json({ error: '链接无效或已过期' });
+            return res.status(400).json({ error: '链接无效或已过期', code: 'LINK_INVALID_OR_EXPIRED' });
         }
 
         res.json({ valid: true });
     } catch (error) {
-        res.status(500).json({ error: '验证失败' });
+        res.status(500).json({ error: '验证失败', code: 'VERIFY_FAILED' });
     }
 });
 
@@ -463,29 +463,29 @@ router.post('/auth/reset-password', async (req, res) => {
     try {
         const resetLimit = await checkConfiguredRateLimit('reset_pwd', `ratelimit:reset-pwd:${req.ip}`);
         if (!resetLimit.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: resetLimit.retryAfter });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: resetLimit.retryAfter });
         }
 
         const { token, newPassword } = req.body;
         
         if (!token || !newPassword) {
-            return res.status(400).json({ error: '缺少必要参数' });
+            return res.status(400).json({ error: '缺少必要参数', code: 'PARAM_MISSING' });
         }
         
         // V6-M2 收敛：公共强度校验函数（与注册/改密一致）
         if (!isStrongPassword(newPassword)) {
-            return res.status(400).json({ error: '密码至少8位，需包含大小写字母和特殊字符' });
+            return res.status(400).json({ error: '密码至少8位，需包含大小写字母和特殊字符', code: 'PASSWORD_RULE_8' });
         }
         
         const userId = await tokenStore.getResetToken(token);
         if (!userId) {
-            return res.status(400).json({ error: '链接无效或已过期' });
+            return res.status(400).json({ error: '链接无效或已过期', code: 'LINK_INVALID_OR_EXPIRED' });
         }
 
         const user = await db.users.getById(userId);
 
         if (!user) {
-            return res.status(404).json({ error: '用户不存在' });
+            return res.status(404).json({ error: '用户不存在', code: 'USER_NOT_FOUND' });
         }
 
         const hashedPassword = await hashPassword(newPassword);
@@ -512,7 +512,7 @@ router.post('/auth/reset-password', async (req, res) => {
 
         res.json({ message: '密码重置成功，请使用新密码登录' });
     } catch (error) {
-        res.status(500).json({ error: '重置失败' });
+        res.status(500).json({ error: '重置失败', code: 'RESET_FAILED' });
     }
 });
 
@@ -538,18 +538,18 @@ router.post('/register/send-code', async (req, res) => {
     const { RATE_LIMIT_RULES } = require('../constants');
     const inflightLimit = (RATE_LIMIT_RULES['register_code_global'] && RATE_LIMIT_RULES['register_code_global'].max) || 20;
     if (_registerCodeInflight >= inflightLimit) {
-        return res.status(429).json({ error: '当前注册请求较多，请稍后再试', retryAfter: 30 });
+        return res.status(429).json({ error: '当前注册请求较多，请稍后再试', code: 'REGISTER_BUSY', retryAfter: 30 });
     }
     _registerCodeInflight++;
     try {
         const { email } = req.body;
         if (!email) {
-            return res.status(400).json({ error: '请提供邮箱地址' });
+            return res.status(400).json({ error: '请提供邮箱地址', code: 'EMAIL_REQUIRED' });
         }
 
         // 邮箱格式校验（单一来源 email-validate.js）
         if (!isValidEmail(email)) {
-            return res.status(400).json({ error: '邮箱格式不正确' });
+            return res.status(400).json({ error: '邮箱格式不正确', code: 'EMAIL_INVALID' });
         }
 
         // AUTH-9 修复：不泄露邮箱是否已注册，统一返回成功响应
@@ -562,7 +562,7 @@ router.post('/register/send-code', async (req, res) => {
         const emailLimit = await checkConfiguredRateLimit('register_code', `ratelimit:register-code:${email}`);
         if (!emailLimit.allowed) {
             return res.status(429).json({
-                error: '验证码发送过于频繁，请稍后再试',
+                error: '验证码发送过于频繁，请稍后再试', code: 'RATE_LIMITED_SEND_CODE',
                 retryAfter: emailLimit.retryAfter
             });
         }
@@ -571,7 +571,7 @@ router.post('/register/send-code', async (req, res) => {
         const ipLimit = await checkConfiguredRateLimit('register_code_ip', `ratelimit:register-code-ip:${req.ip}`);
         if (!ipLimit.allowed) {
             return res.status(429).json({
-                error: '请求过于频繁，请稍后再试',
+                error: '请求过于频繁，请稍后再试', code: 'RATE_LIMITED_REQ',
                 retryAfter: ipLimit.retryAfter
             });
         }
@@ -587,13 +587,13 @@ router.post('/register/send-code', async (req, res) => {
             await sendTemplateEmail(email, 'register_code', { code: code }, { sync: true });
         } catch (sendErr) {
             console.error('[register] 邮件发送失败:', sendErr.message);
-            return res.status(500).json({ error: '邮件发送失败，请检查邮箱配置或联系管理员' });
+            return res.status(500).json({ error: '邮件发送失败，请检查邮箱配置或联系管理员', code: 'MAIL_SEND_FAILED' });
         }
 
         res.json({ success: true, message: '验证码已发送' });
     } catch (error) {
         console.error('[register/send-code] 错误:', error.message);
-        res.status(500).json({ error: '操作失败，请稍后重试' });
+        res.status(500).json({ error: '操作失败，请稍后重试', code: 'OP_FAILED_RETRY' });
     } finally {
         // 无论成败释放并发闸（防止泄漏后永久 429）
         _registerCodeInflight--;
@@ -606,14 +606,14 @@ router.post('/register', async (req, res) => {
         // 校验注册开关
         const enabled = await db.config.get('register:enabled');
         if (enabled !== '1') {
-            return res.status(403).json({ error: '注册功能已关闭' });
+            return res.status(403).json({ error: '注册功能已关闭', code: 'REGISTER_DISABLED' });
         }
 
         // 限速：同一 IP 3 次/小时
         const ipLimit = await checkConfiguredRateLimit('register', `ratelimit:register:${req.ip}`);
         if (!ipLimit.allowed) {
             return res.status(429).json({
-                error: '注册请求过于频繁，请稍后再试',
+                error: '注册请求过于频繁，请稍后再试', code: 'RATE_LIMITED_REGISTER',
                 retryAfter: ipLimit.retryAfter
             });
         }
@@ -622,34 +622,34 @@ router.post('/register', async (req, res) => {
 
         // 校验用户名
         if (!username || username.length < 3 || username.length > 32) {
-            return res.status(400).json({ error: '用户名长度必须为 3-32 个字符' });
+            return res.status(400).json({ error: '用户名长度必须为 3-32 个字符', code: 'USERNAME_LENGTH' });
         }
         if (isUsernameBlacklisted(username)) {
-            return res.status(400).json({ error: '该用户名不可用' });
+            return res.status(400).json({ error: '该用户名不可用', code: 'USERNAME_UNAVAILABLE' });
         }
         const existingUsername = await db.users.getByUsername(username);
         if (existingUsername) {
-            return res.status(400).json({ error: '注册失败，请检查输入信息' });
+            return res.status(400).json({ error: '注册失败，请检查输入信息', code: 'REGISTER_FAILED_INPUT' });
         }
 
         // 校验密码强度（V6-M2 收敛：公共校验函数）
         if (!isStrongPassword(password)) {
-            return res.status(400).json({ error: '密码必须至少 8 位，包含大小写字母和特殊字符' });
+            return res.status(400).json({ error: '密码必须至少 8 位，包含大小写字母和特殊字符', code: 'PASSWORD_RULE_MUST8' });
         }
 
         // 校验邮箱（单一来源 email-validate.js）
         if (!email || !isValidEmail(email)) {
-            return res.status(400).json({ error: '邮箱格式不正确' });
+            return res.status(400).json({ error: '邮箱格式不正确', code: 'EMAIL_INVALID' });
         }
         const existingEmail = await db.users.getByEmail(email);
         if (existingEmail) {
-            return res.status(400).json({ error: '注册失败，请检查输入信息' });
+            return res.status(400).json({ error: '注册失败，请检查输入信息', code: 'REGISTER_FAILED_INPUT' });
         }
 
         // 校验验证码（通过 token-store，优先 Redis）
         const storedCode = await tokenStore.getRegisterCode(email);
         if (!storedCode || storedCode !== code) {
-            return res.status(400).json({ error: '验证码错误或已过期' });
+            return res.status(400).json({ error: '验证码错误或已过期', code: 'CODE_INVALID_OR_EXPIRED' });
         }
 
         // 创建用户
@@ -674,7 +674,7 @@ router.post('/register', async (req, res) => {
         res.json({ success: true, message: '注册成功，请登录' });
     } catch (error) {
         console.error('[register] 错误:', error.message);
-        res.status(500).json({ error: '注册失败，请稍后重试' });
+        res.status(500).json({ error: '注册失败，请稍后重试', code: 'REGISTER_FAILED_RETRY' });
     }
 });
 

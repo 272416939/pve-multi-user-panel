@@ -66,7 +66,7 @@ router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
         });
     } catch (error) {
         console.error('获取虚拟机列表错误:', error);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -74,7 +74,7 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：列表/状态轮询类端点加速率限制，防止滥用打爆 PVE API
         var listRate = await checkConfiguredRateLimit('user_vms', 'ratelimit:user-vms:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: listRate.retryAfter });
 
         let userVms;
         if (req.user.role === 'admin') {
@@ -190,18 +190,18 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id, monthly_price, quarterly_discount, yearly_discount } = req.body;
  
     if (!vm_id || !user_id) {
-        return res.status(400).json({ error: '请选择虚拟机和用户' });
+        return res.status(400).json({ error: '请选择虚拟机和用户', code: 'VM_USER_REQUIRED' });
     }
  
     const parsedVmId = parseInt(vm_id);
     const parsedUserId = parseInt(user_id);
  
     if (isNaN(parsedVmId) || isNaN(parsedUserId)) {
-        return res.status(400).json({ error: '无效的虚拟机或用户ID' });
+        return res.status(400).json({ error: '无效的虚拟机或用户ID', code: 'INVALID_VM_OR_USER_ID' });
     }
     // L-5 修复：vmid 严格白名单校验
     if (!Number.isInteger(parsedVmId) || parsedVmId < 100 || parsedVmId > 999999999) {
-        return res.status(400).json({ error: '无效的虚拟机 ID' });
+        return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
     }
 
     // SEC-03: 价格/折扣参数服务端校验
@@ -217,12 +217,12 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     // SEC-04: period 白名单校验
     var validPeriod = renewal_period || 'month';
     if (!['month', 'quarter', 'year'].includes(validPeriod)) {
-        return res.status(400).json({ error: '无效的计费周期' });
+        return res.status(400).json({ error: '无效的计费周期', code: 'INVALID_PERIOD' });
     }
  
     const existingVms = await db.vms.getAll();
     if (existingVms.find(vm => vm.vm_id === parsedVmId && vm.user_id === parsedUserId)) {
-        return res.status(400).json({ error: '该虚拟机已分配给此用户' });
+        return res.status(400).json({ error: '该虚拟机已分配给此用户', code: 'VM_ALREADY_ASSIGNED' });
     }
 
     // 如果该 VMID 之前已分配给其他用户，先清理旧记录并同步 legacy 磁盘 user_id
@@ -328,7 +328,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
 
 	    } catch (e) {
         console.error('[vm] 操作失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -339,7 +339,7 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     
     const vm = await db.vms.getById(vmId);
     if (!vm) {
-        return res.status(404).json({ error: '虚拟机不存在' });
+        return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
     }
     
     // 检查权限：管理员或所有者
@@ -347,7 +347,7 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     const isOwner = req.user.id === vm.user_id;
     
     if (!isAdmin && !isOwner) {
-        return res.status(403).json({ error: '无权限操作此虚拟机' });
+        return res.status(403).json({ error: '无权限操作此虚拟机', code: 'VM_NO_PERM_2' });
     }
     
     const updates = {};
@@ -464,7 +464,7 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     res.json({ message: '虚拟机信息更新成功' });
     } catch (e) {
         console.error('[vm] 操作失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -481,7 +481,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
         try {
             const status = await pveApi.getVmStatus(vm.vm_id);
             if (status && status.status === 'running') {
-                return res.status(400).json({ error: '虚拟机正在运行，请先关机后再移除' });
+                return res.status(400).json({ error: '虚拟机正在运行，请先关机后再移除', code: 'VM_RUNNING_REMOVE' });
             }
         } catch (e) {
             console.warn(`[vm] 查询 ${vm.vm_id} 状态失败（继续执行移除）:`, e.message);
@@ -565,14 +565,14 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     res.json({ message: '虚拟机移除成功' });
     } catch (e) {
         console.error('[vm] 操作失败:', e.message);
-        res.status(500).json({ error: safeError(e) });
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 
 router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -580,22 +580,22 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此虚拟机' });
+                return res.status(403).json({ error: '无权限操作此虚拟机', code: 'VM_NO_PERM_2' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费', code: 'VM_EXPIRED_ADMIN' });
             }
             if (isOwner && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，无法开机' });
+                return res.status(403).json({ error: '虚拟机已到期，无法开机', code: 'VM_EXPIRED_NO_START' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
         // 私有网络：未绑定子网的存量设备关机后拒绝开机（全角色生效，含管理员）
         if (vm && !vm.subnet_id) {
-            return res.status(400).json({ error: '该虚拟机尚未绑定子网，请先在「更多→绑定子网」中绑定后再开机' });
+            return res.status(400).json({ error: '该虚拟机尚未绑定子网，请先在「更多→绑定子网」中绑定后再开机', code: 'VM_NO_SUBNET_START' });
         }
 
         await pveApi.startVm(vmid);
@@ -628,14 +628,14 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
         await auditAction(req, 'vm.start', '开机 VM ' + vmid);
         res.json({ message: '虚拟机启动成功' });
     } catch (error) {
-        res.status(500).json({ error: '启动虚拟机失败' });
+        res.status(500).json({ error: '启动虚拟机失败', code: 'VM_START_FAILED' });
     }
 });
 
 router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -643,14 +643,14 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此虚拟机' });
+                return res.status(403).json({ error: '无权限操作此虚拟机', code: 'VM_NO_PERM_2' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费', code: 'VM_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
         await pveApi.shutdownVm(vmid);
@@ -659,14 +659,14 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
         await auditAction(req, 'vm.shutdown', '关机 VM ' + vmid);
         res.json({ message: '虚拟机关机成功' });
     } catch (error) {
-        res.status(500).json({ error: '关闭虚拟机失败' });
+        res.status(500).json({ error: '关闭虚拟机失败', code: 'VM_STOP_FAILED' });
     }
 });
 
 router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -674,14 +674,14 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此虚拟机' });
+                return res.status(403).json({ error: '无权限操作此虚拟机', code: 'VM_NO_PERM_2' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费', code: 'VM_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
         await pveApi.stopVm(vmid);
@@ -690,14 +690,14 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
         await auditAction(req, 'vm.stop', '强制停止 VM ' + vmid);
         res.json({ message: '虚拟机已强制停止' });
     } catch (error) {
-        res.status(500).json({ error: '停止虚拟机失败' });
+        res.status(500).json({ error: '停止虚拟机失败', code: 'VM_KILL_FAILED' });
     }
 });
 
 router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -705,21 +705,21 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此虚拟机' });
+                return res.status(403).json({ error: '无权限操作此虚拟机', code: 'VM_NO_PERM_2' });
             }
             // R3-10 修复：非管理员用户关机/停止时检查到期时间
             if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费', code: 'VM_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
         await pveApi.rebootVm(vmid);
         await auditAction(req, 'vm.reboot', '重启 VM ' + vmid);
         res.json({ message: '虚拟机重启成功' });
     } catch (error) {
-        res.status(500).json({ error: '重启虚拟机失败' });
+        res.status(500).json({ error: '重启虚拟机失败', code: 'VM_RESTART_FAILED' });
     }
 });
 
@@ -727,10 +727,10 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
     try {
         // L-6 修复：VNC 会话创建限速（admin 可配置），防并发打满 PVE SSH/VNC 连接
         const vncRate = await checkConfiguredRateLimit('terminal_open', 'ratelimit:terminal-open:' + req.user.id);
-        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: vncRate.retryAfter });
+        if (!vncRate.allowed) return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: vncRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -738,17 +738,17 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         // V-1 修复：统一权限模式 — 管理员可连接未分配 VM 进行运维
         if (!vm) {
             if (!isAdmin) {
-                return res.status(403).json({ error: '虚拟机未分配，无权限' });
+                return res.status(403).json({ error: '虚拟机未分配，无权限', code: 'VM_UNASSIGNED' });
             }
             // 管理员允许继续（用于运维未分配的 VM）
         } else {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权操作此虚拟机' });
+                return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
             }
             // M-2 修复：到期资源拦截（VNC 控制台属于资源使用）
             if (!isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
             }
         }
         
@@ -757,11 +757,11 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         try {
             vmStatus = await pveApi.getVmStatus(vmid);
         } catch (e) {
-            return res.status(500).json({ error: '无法获取虚拟机状态' });
+            return res.status(500).json({ error: '无法获取虚拟机状态', code: 'VM_STATE_FAILED' });
         }
         
         if (!vmStatus || vmStatus.status !== 'running') {
-            return res.status(400).json({ error: '虚拟机未运行，请先开机' });
+            return res.status(400).json({ error: '虚拟机未运行，请先开机', code: 'VM_NOT_RUNNING' });
         }
         
         // 获取 VNC proxy ticket
@@ -781,7 +781,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 VNC 控制台失败:', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -789,10 +789,10 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
     try {
         // V3-08 修复：状态查询端点限速（30次/分钟，前端正常轮询远低于该值）
         var statusRate = await checkConfiguredRateLimit('vm_status', 'ratelimit:vm-status:' + req.user.id);
-        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: statusRate.retryAfter });
+        if (!statusRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: statusRate.retryAfter });
 
         const vmid = parseInt(req.params.vmid);
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
         const allVms = await db.vms.getAll();
         const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
@@ -800,10 +800,10 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限查看此虚拟机状态' });
+                return res.status(403).json({ error: '无权限查看此虚拟机状态', code: 'VM_STATE_NO_PERM' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限查看此虚拟机状态，资源未分配' });
+            return res.status(403).json({ error: '无权限查看此虚拟机状态，资源未分配', code: 'VM_STATE_NO_PERM_UNASSIGNED' });
         }
 
         const rawStatus = await pveApi.getVmStatus(vmid);
@@ -811,7 +811,7 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
         const config = await pveApi.getVmConfig(req.params.vmid);
         res.json({ status, config });
     } catch (error) {
-        res.status(500).json({ error: '获取虚拟机状态失败' });
+        res.status(500).json({ error: '获取虚拟机状态失败', code: 'VM_STATE_LOAD_FAILED' });
     }
 });
 
@@ -821,25 +821,25 @@ router.get('/vm/random-ip', authMiddleware, async (req, res) => {
     try {
         // L-12 修复：随机 IP 需扫描 IP 池，加用户级限速（admin 可配置）
         const ipRate = await checkConfiguredRateLimit('random_ip', 'ratelimit:random-ip:' + req.user.id);
-        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试', retryAfter: ipRate.retryAfter });
+        if (!ipRate.allowed) return res.status(429).json({ error: '获取过于频繁，请稍后再试', code: 'RATE_LIMITED_FETCH', retryAfter: ipRate.retryAfter });
 
         const subnetId = parseInt(req.query.subnet_id);
         if (subnetId) {
             // 私有网络：随机 IP 从子网 IP 池选取，且非管理员仅限使用自己的子网
             const subnet = await db.subnets.getById(subnetId);
-            if (!subnet) return res.status(400).json({ error: '子网不存在' });
+            if (!subnet) return res.status(400).json({ error: '子网不存在', code: 'SUBNET_NOT_FOUND' });
             if (req.user.role !== 'admin' && subnet.user_id !== req.user.id) {
-                return res.status(403).json({ error: '无权限使用该子网' });
+                return res.status(403).json({ error: '无权限使用该子网', code: 'SUBNET_NO_PERM_USE' });
             }
             const ip = await pickUnusedStaticIp(subnet);
-            if (!ip) return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
+            if (!ip) return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP', code: 'SUBNET_POOL_EMPTY' });
             return res.json({ ip });
         }
         const ip = await pickUnusedStaticIp();
-        if (!ip) return res.status(400).json({ error: '无可用 IP' });
+        if (!ip) return res.status(400).json({ error: '无可用 IP', code: 'NO_FREE_IP' });
         res.json({ ip });
     } catch (error) {
-        res.status(500).json({ error: '获取随机 IP 失败' });
+        res.status(500).json({ error: '获取随机 IP 失败', code: 'RANDOM_IP_FAILED' });
     }
 });
 
@@ -847,12 +847,12 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         // L-5 修复：vmid 严格白名单校验
-        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID' });
+        if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
         const { ip_mode, ip } = req.body;
 
         // 参数校验
         if (!ip_mode || !['dhcp', 'static', 'random'].includes(ip_mode)) {
-            return res.status(400).json({ error: '无效的 IP 模式，请选择 DHCP、静态 IP 或随机' });
+            return res.status(400).json({ error: '无效的 IP 模式，请选择 DHCP、静态 IP 或随机', code: 'INVALID_IP_MODE' });
         }
 
         // 权限检查（用正确的查询方法）
@@ -861,13 +861,13 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
         const isAdmin = req.user.role === 'admin';
         if (vmRecord) {
             const isOwner = req.user.id === vmRecord.user_id;
-            if (!isOwner && !isAdmin) return res.status(403).json({ error: '无权限操作此虚拟机' });
+            if (!isOwner && !isAdmin) return res.status(403).json({ error: '无权限操作此虚拟机', code: 'VM_NO_PERM_2' });
             // 非管理员用户重置 IP 时检查到期时间
             if (isOwner && !isAdmin && vmRecord.expiration_date && new Date(vmRecord.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费', code: 'VM_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
         // 私有网络：重置 IP 必须已绑定子网，随机/静态 IP 均取自绑定的子网 IP 池
@@ -876,7 +876,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
             subnet = await db.subnets.getById(vmRecord.subnet_id);
         }
         if (!subnet) {
-            return res.status(400).json({ error: '该虚拟机尚未绑定子网，请先绑定后再重置 IP' });
+            return res.status(400).json({ error: '该虚拟机尚未绑定子网，请先绑定后再重置 IP', code: 'VM_NO_SUBNET_RESET_IP' });
         }
 
         if (ip_mode === 'dhcp') {
@@ -890,24 +890,24 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
         // static 或 random 模式：更新/创建爱快DHCP静态绑定
         let targetIp = '';
         if (ip_mode === 'static') {
-            if (!ip) return res.status(400).json({ error: '请输入 IP 地址' });
+            if (!ip) return res.status(400).json({ error: '请输入 IP 地址', code: 'IP_REQUIRED' });
             const ipBase = ip.split('/')[0];
-            if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ipBase)) return res.status(400).json({ error: 'IP 格式不正确' });
+            if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ipBase)) return res.status(400).json({ error: 'IP 格式不正确', code: 'IP_INVALID_2' });
             // 已绑定子网：手动输入 IP 必须在绑定的子网 IP 池内
             if (!isIpInAddrPool(ipBase, subnet.addr_pool)) {
-                return res.status(400).json({ error: 'IP 不在当前绑定的子网 IP 池范围内，请选择池内地址或使用随机 IP' });
+                return res.status(400).json({ error: 'IP 不在当前绑定的子网 IP 池范围内，请选择池内地址或使用随机 IP', code: 'IP_NOT_IN_POOL' });
             }
             targetIp = ipBase;
         } else if (ip_mode === 'random') {
             targetIp = await pickUnusedStaticIp(subnet);
-            if (!targetIp) return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP' });
+            if (!targetIp) return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP', code: 'SUBNET_POOL_EMPTY' });
         }
 
         // 获取VM的MAC地址用于创建/更新DHCP绑定
         const config = await pveApi.getVmConfig(vmid);
-        if (!config || !config.net0) return res.status(400).json({ error: '无法获取虚拟机配置' });
+        if (!config || !config.net0) return res.status(400).json({ error: '无法获取虚拟机配置', code: 'VM_NETCFG_FAILED' });
         const macMatch = config.net0.match(/([0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5})/);
-        if (!macMatch) return res.status(400).json({ error: '无法解析虚拟机 MAC 地址' });
+        if (!macMatch) return res.status(400).json({ error: '无法解析虚拟机 MAC 地址', code: 'VM_MAC_PARSE_FAILED' });
 
         // 更新爱快DHCP绑定（先尝试更新已有绑定，不存在则创建）
         let finalIp = targetIp;
@@ -917,7 +917,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
             const boundIp = await createDhcpStaticBinding('vm', vmid, macMatch[1], finalIp, subnet);
             finalIp = boundIp || finalIp;
         }
-        if (!finalIp) return res.status(500).json({ error: '设置DHCP绑定失败' });
+        if (!finalIp) return res.status(500).json({ error: '设置DHCP绑定失败', code: 'DHCP_BIND_FAILED' });
 
         // 更新数据库记录
         if (vmRecord) await db.vms.update(vmRecord.id, { dhcp_static_ip: finalIp });
@@ -964,7 +964,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
         res.json({ success: true, ip: finalIp, message: `已设置静态IP ${finalIp}（通过爱快DHCP绑定）` });
     } catch (error) {
         dbg('[vm/reset-ip]', error.message);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -974,12 +974,12 @@ router.post('/vm/:vmid/reset-password', authMiddleware, async (req, res) => {
         const { password } = req.body;
 
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
-            return res.status(400).json({ error: '无效的虚拟机 ID' });
+            return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
         }
 
         var passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*(),.?":{}|<>]).{8,13}$/;
         if (!password || !passwordRegex.test(password)) {
-            return res.status(400).json({ error: '密码需8-13位，包含大小写英文、数字和特殊字符' });
+            return res.status(400).json({ error: '密码需8-13位，包含大小写英文、数字和特殊字符', code: 'PASSWORD_RULE_8_13' });
         }
 
         const allVms = await db.vms.getAll();
@@ -989,23 +989,23 @@ router.post('/vm/:vmid/reset-password', authMiddleware, async (req, res) => {
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
             if (!isOwner && !isAdmin) {
-                return res.status(403).json({ error: '无权限操作此虚拟机' });
+                return res.status(403).json({ error: '无权限操作此虚拟机', code: 'VM_NO_PERM_2' });
             }
             if (isOwner && !isAdmin && vm.expiration_date && new Date(vm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费' });
+                return res.status(403).json({ error: '虚拟机已到期，请联系管理员续费', code: 'VM_EXPIRED_ADMIN' });
             }
         } else if (!isAdmin) {
-            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配' });
+            return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
         const config = await pveApi.getVmConfig(vmid);
         if (!config || !config.ciuser) {
-            return res.status(400).json({ error: '当前虚拟机未配置Cloud-init驱动，请联系管理员！' });
+            return res.status(400).json({ error: '当前虚拟机未配置Cloud-init驱动，请联系管理员！', code: 'VM_NO_CLOUDINIT' });
         }
 
         const status = await pveApi.getVmStatus(vmid);
         if (status && status.status !== 'stopped') {
-            return res.status(400).json({ error: '请先关机后再重置密码' });
+            return res.status(400).json({ error: '请先关机后再重置密码', code: 'SHUTDOWN_BEFORE_RESET_PWD' });
         }
 
         await pveApi.updateVmConfig(vmid, { cipassword: password });
@@ -1013,7 +1013,7 @@ router.post('/vm/:vmid/reset-password', authMiddleware, async (req, res) => {
         await auditAction(req, 'password.reset.vm', '重置 VM ' + vmid + ' 密码');
         res.json({ message: '密码重置成功' });
     } catch (error) {
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -1031,7 +1031,7 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             try {
                 const status = await pveApi.getVmStatus(vmid);
                 if (status && status.status === 'running') {
-                    return res.status(400).json({ error: '虚拟机正在运行，请先关机后再销毁' });
+                    return res.status(400).json({ error: '虚拟机正在运行，请先关机后再销毁', code: 'VM_RUNNING_DESTROY' });
                 }
             } catch (e) {
                 console.warn(`[vm] 查询 ${vmid} 状态失败（继续执行销毁）:`, e.message);
@@ -1069,7 +1069,7 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                 });
                 if (activeDisks.length > 0) {
                     return res.status(400).json({
-                        error: '该虚拟机下挂载了 ' + activeDisks.length + ' 个数据盘，请先卸载再销毁虚拟机'
+                        error: '该虚拟机下挂载了 ' + activeDisks.length + ' 个数据盘，请先卸载再销毁虚拟机', code: 'VM_HAS_DISKS', params: [activeDisks.length]
                     });
                 }
             } catch (e) { console.error('[vm] 查询数据盘失败:', e.message); }
@@ -1090,13 +1090,13 @@ try {
             console.log(`[vm] PVE 虚拟机 ${vmid} 已销毁`);
         } catch (e) {
             console.error(`[vm] PVE 销毁 ${vmid} 失败:`, e.message);
-            return res.status(500).json({ error: safeError(e, 'PVE 操作失败') });
+            return res.status(500).json({ error: safeError(e, 'PVE 操作失败'), code: 'INTERNAL_ERROR' });
         }
 
 	res.json({ message: '虚拟机已销毁' });
         } catch (error) {
             console.error('销毁虚拟机失败:', error);
-            res.status(500).json({ error: safeError(error, '系统运行错误，请联系管理人员') });
+            res.status(500).json({ error: safeError(error, '系统运行错误，请联系管理人员'), code: 'INTERNAL_ERROR' });
         }
     });
 
@@ -1107,41 +1107,41 @@ try {
         const vmid = parseInt(req.params.vmid);
         const rateLimit = await checkConfiguredRateLimit('os_switch', 'ratelimit:os-switch:' + req.user.id);
         if (!rateLimit.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试', retryAfter: rateLimit.retryAfter });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: rateLimit.retryAfter });
         }
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
-            return res.status(400).json({ error: '无效的 VMID' });
+            return res.status(400).json({ error: '无效的 VMID', code: 'INVALID_VMD' });
         }
         const vm = await db.vms.getByVmid(vmid);
-        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
         const isAdmin = req.user.role === 'admin';
         if (vm.user_id !== req.user.id && !isAdmin) {
-            return res.status(403).json({ error: '无权限操作' });
+            return res.status(403).json({ error: '无权限操作', code: 'NO_PERM_OP' });
         }
         if (vm.expiration_date && new Date(vm.expiration_date) < new Date() && !isAdmin) {
-            return res.status(403).json({ error: '虚拟机已到期，请先续费' });
+            return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
         }
         const runningSwitch = await db.vmOsSwitchLogs.getRunningByVmid(vmid);
         if (runningSwitch) {
-            return res.status(409).json({ error: '该虚拟机正在切换系统中，请稍候' });
+            return res.status(409).json({ error: '该虚拟机正在切换系统中，请稍候', code: 'VM_OS_SWITCHING' });
         }
         const osTemplateId = parseInt(req.body.os_template_id);
         if (!Number.isInteger(osTemplateId) || osTemplateId < 1) {
-            return res.status(400).json({ error: '无效的 OS 模板 ID' });
+            return res.status(400).json({ error: '无效的 OS 模板 ID', code: 'INVALID_OS_TPL_ID' });
         }
         const osTemplate = await db.osTemplates.getById(osTemplateId);
         if (!osTemplate || !osTemplate.enabled || osTemplate.status !== 'active') {
-            return res.status(400).json({ error: 'OS 模板不存在或已下架' });
+            return res.status(400).json({ error: 'OS 模板不存在或已下架', code: 'OS_TPL_NOT_FOUND' });
         }
         if (osTemplate.allowed_package_ids) {
             const allowedIds = osTemplate.allowed_package_ids.split(',').map(s => parseInt(s.trim())).filter(Number.isInteger);
             if (allowedIds.length > 0 && vm.package_id && !allowedIds.includes(vm.package_id)) {
-                return res.status(403).json({ error: '当前套餐不允许切换到该系统' });
+                return res.status(403).json({ error: '当前套餐不允许切换到该系统', code: 'PKG_OS_NOT_ALLOWED' });
             }
         }
         const vmStatus = await pveApi.getVmStatus(vmid);
         if (vmStatus.status !== 'stopped') {
-            return res.status(400).json({ error: '请先关机后再切换系统' });
+            return res.status(400).json({ error: '请先关机后再切换系统', code: 'SHUTDOWN_BEFORE_OS_SWITCH' });
         }
         let oldSysDiskSizeGb = 0;
         try {
@@ -1229,11 +1229,11 @@ try {
     router.get('/vm/:vmid/switch-os/status', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const rateLimit = await checkConfiguredRateLimit('os_switch_status', 'ratelimit:os-switch-status:' + req.user.id);
-        if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁', retryAfter: rateLimit.retryAfter });
+        if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁', code: 'RATE_LIMITED_QUERY_BRIEF', retryAfter: rateLimit.retryAfter });
         const vm = await db.vms.getByVmid(vmid);
-        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
         if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ error: '无权限' });
+            return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });
         }
         const log = await db.vmOsSwitchLogs.getRunningByVmid(vmid);
         if (!log) return res.json({ status: 'idle' });
@@ -1248,9 +1248,9 @@ try {
     router.get('/vm/:vmid/switch-os/logs', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const vm = await db.vms.getByVmid(vmid);
-        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
         if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ error: '无权限' });
+            return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });
         }
         const page = Math.min(parseInt(req.query.page) || 1, 1000);
         const limit = Math.min(parseInt(req.query.limit) || 10, 50);
@@ -1287,9 +1287,9 @@ try {
     router.get('/vm/:vmid/switchable-os', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
         const vm = await db.vms.getByVmid(vmid);
-        if (!vm) return res.status(404).json({ error: '虚拟机不存在' });
+        if (!vm) return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
         if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
-            return res.status(403).json({ error: '无权限' });
+            return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });
         }
         const allOsTemplates = await db.osTemplates.getEnabled();
         let filtered = allOsTemplates;

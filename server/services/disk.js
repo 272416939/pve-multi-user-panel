@@ -24,12 +24,12 @@ async function purchaseDisk(opts) {
     var { userId, specId, capacityGb, period, periodCount, quantity, autoRenew, diskName, req } = opts;
 
     var spec = await db.diskSpecs.getById(specId);
-    if (!spec) return { ok: false, status: 400, error: '规格不存在' };
-    if (!spec.enabled) return { ok: false, status: 400, error: '该规格已禁用' };
+    if (!spec) return { ok: false, status: 400, error: '规格不存在', code: 'SPEC_NOT_FOUND' };
+    if (!spec.enabled) return { ok: false, status: 400, error: '该规格已禁用', code: 'SPEC_DISABLED' };
 
     // 容量范围校验
     if (capacityGb < spec.min_size_gb || capacityGb > spec.max_size_gb) {
-        return { ok: false, status: 400, error: '容量超出规格范围（' + spec.min_size_gb + '-' + spec.max_size_gb + ' GiB）' };
+        return { ok: false, status: 400, error: '容量超出规格范围（' + spec.min_size_gb + '-' + spec.max_size_gb + ' GiB）', code: 'CAPACITY_OUT_OF_RANGE', params: [spec.min_size_gb + '-' + spec.max_size_gb] };
     }
 
     // 计算单盘价格和总价
@@ -37,13 +37,13 @@ async function purchaseDisk(opts) {
     var totalAmount = singleAmount * quantity;
 
     // 扣款金额校验
-    if (totalAmount <= 0) return { ok: false, status: 400, error: '金额必须大于0' };
+    if (totalAmount <= 0) return { ok: false, status: 400, error: '金额必须大于0', code: 'AMOUNT_POSITIVE' };
 
     // 余额检查
     var user = await db.users.getById(userId);
     var balanceBefore = parseFloat(user.balance || '0');
     if (balanceBefore < totalAmount) {
-        return { ok: false, status: 400, error: '余额不足，需要 ' + totalAmount + ' 元' };
+        return { ok: false, status: 400, error: '余额不足，需要 ' + totalAmount + ' 元', code: 'BALANCE_INSUFFICIENT', params: [totalAmount] };
     }
 
     // 存储池容量检查
@@ -206,7 +206,7 @@ async function purchaseDisk(opts) {
             }
         }
     } catch (emailErr) { console.error('[disk purchase] 退款邮件发送失败:', emailErr.message); }
-    return { ok: false, status: 500, error: '创建磁盘失败，已退款，请稍后重试' };
+    return { ok: false, status: 500, error: '创建磁盘失败，已退款，请稍后重试', code: 'DISK_CREATE_REFUNDED' };
 }
 
 /**
@@ -218,7 +218,7 @@ async function bindDiskToVm(opts) {
 
     // legacy 磁盘不允许独立操作（随 VM 管理）
     if (disk.is_legacy) {
-        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作' };
+        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作', code: 'DISK_LEGACY_VM' };
     }
 
     // 文档 7.8：竞争条件防护 - SELECT ... FOR UPDATE 行锁 + 条件更新
@@ -281,14 +281,14 @@ async function unbindDiskFromVm(opts) {
 
     // legacy 磁盘不允许独立操作（随 VM 管理）
     if (disk.is_legacy) {
-        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作' };
+        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作', code: 'DISK_LEGACY_VM' };
     }
 
     if (disk.status !== 'bound') {
-        return { ok: false, status: 400, error: '磁盘当前未绑定任何虚拟机' };
+        return { ok: false, status: 400, error: '磁盘当前未绑定任何虚拟机', code: 'DISK_UNBOUND' };
     }
     if (!disk.bind_vmid || !disk.bind_bus || !disk.bind_dev) {
-        return { ok: false, status: 400, error: '磁盘绑定信息不完整' };
+        return { ok: false, status: 400, error: '磁盘绑定信息不完整', code: 'DISK_BIND_INCOMPLETE' };
     }
 
     // 文档 7.8：竞争条件防护 - SELECT ... FOR UPDATE 行锁
@@ -339,36 +339,36 @@ async function resizeDisk(opts) {
 
     // legacy 磁盘不允许独立操作（随 VM 管理）
     if (disk.is_legacy) {
-        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作' };
+        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作', code: 'DISK_LEGACY_VM' };
     }
 
     // 不支持扩容的磁盘格式（vmdk/subvol qemu 不支持 resize；DIR 上的 raw 文件扩容不可靠）
     // qcow2 和 NULL（块设备存储）支持扩容
     var UNSUPPORTED_RESIZE_FORMATS = ['vmdk', 'subvol', 'raw'];
     if (disk.disk_format && UNSUPPORTED_RESIZE_FORMATS.indexOf(disk.disk_format) !== -1) {
-        return { ok: false, status: 403, error: '该磁盘格式（' + disk.disk_format + '）不支持扩容' };
+        return { ok: false, status: 403, error: '该磁盘格式（' + disk.disk_format + '）不支持扩容', code: 'DISK_FORMAT_NO_RESIZE', params: [disk.disk_format] };
     }
 
     // 前置校验
     if (!Number.isInteger(newSize) || newSize <= 0) {
-        return { ok: false, status: 400, error: '无效的容量' };
+        return { ok: false, status: 400, error: '无效的容量', code: 'INVALID_CAPACITY' };
     }
     if (newSize <= disk.capacity_gb) {
-        return { ok: false, status: 400, error: '新容量必须大于当前容量（' + disk.capacity_gb + ' GiB）' };
+        return { ok: false, status: 400, error: '新容量必须大于当前容量（' + disk.capacity_gb + ' GiB）', code: 'RESIZE_LT_CURRENT', params: [disk.capacity_gb] };
     }
     if (disk.status === 'destroyed' || disk.status === 'expired') {
-        return { ok: false, status: 400, error: '磁盘已过期或已销毁，无法扩容' };
+        return { ok: false, status: 400, error: '磁盘已过期或已销毁，无法扩容', code: 'DISK_EXPIRED_DESTROYED' };
     }
     // 已过期时间校验
     if (disk.expire_time && new Date(disk.expire_time) <= new Date()) {
-        return { ok: false, status: 400, error: '磁盘已过期，无法扩容' };
+        return { ok: false, status: 400, error: '磁盘已过期，无法扩容', code: 'DISK_EXPIRED_RESIZE' };
     }
 
     // 校验规格最大容量
     if (disk.spec_id) {
         var spec = await db.diskSpecs.getById(disk.spec_id);
         if (spec && newSize > spec.max_size_gb) {
-            return { ok: false, status: 400, error: '新容量超出规格上限（' + spec.max_size_gb + ' GiB）' };
+            return { ok: false, status: 400, error: '新容量超出规格上限（' + spec.max_size_gb + ' GiB）', code: 'RESIZE_OVER_MAX', params: [spec.max_size_gb] };
         }
     }
 
@@ -379,14 +379,14 @@ async function resizeDisk(opts) {
     // 计算扩容费用
     var resizeAmount = diskBilling.calcResizeAmount(disk.capacity_gb, newSize, currentPricePerGb, disk.expire_time);
     if (resizeAmount < 0) {
-        return { ok: false, status: 400, error: '磁盘已过期，无法扩容' };
+        return { ok: false, status: 400, error: '磁盘已过期，无法扩容', code: 'DISK_EXPIRED_RESIZE' };
     }
 
     // 余额检查
     var user = await db.users.getById(userId);
     var balanceBefore = parseFloat(user.balance || '0');
     if (balanceBefore < resizeAmount) {
-        return { ok: false, status: 400, error: '余额不足，扩容费用 ' + resizeAmount + ' 元，当前余额 ' + balanceBefore.toFixed(2) + ' 元' };
+        return { ok: false, status: 400, error: '余额不足，扩容费用 ' + resizeAmount + ' 元，当前余额 ' + balanceBefore.toFixed(2) + ' 元', code: 'BALANCE_INSUFFICIENT_RESIZE', params: [resizeAmount, balanceBefore.toFixed(2)] };
     }
 
     var resizeOrderNo = generateOrderNo('disk');
@@ -464,7 +464,7 @@ async function resizeDisk(opts) {
                 }
             }
         } catch (emailErr) { console.error('[disk resize] 退款邮件发送失败:', emailErr.message); }
-        return { ok: false, status: 500, error: 'PVE 扩容失败，已退款' };
+        return { ok: false, status: 500, error: 'PVE 扩容失败，已退款', code: 'PVE_RESIZE_REFUNDED' };
     }
 
     // 订单标记完成
@@ -504,12 +504,12 @@ async function destroyDisk(opts) {
 
     // legacy 磁盘不允许独立操作（随 VM 管理）
     if (disk.is_legacy) {
-        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作' };
+        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作', code: 'DISK_LEGACY_VM' };
     }
 
     // 已绑定的磁盘必须先卸载
     if (disk.status === 'bound') {
-        return { ok: false, status: 400, error: '请先卸载磁盘再销毁' };
+        return { ok: false, status: 400, error: '请先卸载磁盘再销毁', code: 'UNMOUNT_BEFORE_DESTROY' };
     }
     if (disk.status === 'destroyed') {
         // 已销毁的记录：硬删除清理（PVE 卷早已释放）
@@ -684,22 +684,22 @@ async function renewDisk(opts) {
 
     // legacy 磁盘不允许独立操作（随 VM 管理）
     if (disk.is_legacy) {
-        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作' };
+        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作', code: 'DISK_LEGACY_VM' };
     }
 
-    if (disk.status === 'destroyed') return { ok: false, status: 400, error: '磁盘已销毁，无法续费' };
+    if (disk.status === 'destroyed') return { ok: false, status: 400, error: '磁盘已销毁，无法续费', code: 'DISK_DESTROYED_NO_RENEW' };
 
     // 使用磁盘购买时的价格快照计算续费金额
     var amount = diskBilling.calcRenewAmount(disk, period, periodCount);
 
     // 扣款金额校验
-    if (amount <= 0) return { ok: false, status: 400, error: '金额必须大于0' };
+    if (amount <= 0) return { ok: false, status: 400, error: '金额必须大于0', code: 'AMOUNT_POSITIVE' };
 
     // 余额检查
     var user = await db.users.getById(userId);
     var balanceBefore = parseFloat(user.balance || '0');
     if (balanceBefore < amount) {
-        return { ok: false, status: 400, error: '余额不足，需要 ' + amount + ' 元' };
+        return { ok: false, status: 400, error: '余额不足，需要 ' + amount + ' 元', code: 'BALANCE_INSUFFICIENT', params: [amount] };
     }
 
     // 计算续费后到期时间
@@ -784,7 +784,7 @@ async function toggleAutoRenew(opts) {
 
     // legacy 磁盘不允许独立操作（随 VM 管理）
     if (disk.is_legacy) {
-        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作' };
+        return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作', code: 'DISK_LEGACY_VM' };
     }
 
     var enabledVal = enabled ? 1 : 0;

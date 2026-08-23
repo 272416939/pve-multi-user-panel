@@ -19,7 +19,7 @@ router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, 
         const { duration_days, expires_at } = req.body;
  
         if (!duration_days || duration_days < 1) {
-            return res.status(400).json({ error: '请提供有效的续费天数' });
+            return res.status(400).json({ error: '请提供有效的续费天数', code: 'RENEW_DAYS_REQUIRED' });
         }
  
         const code = await generateUniqueCdkCode();
@@ -38,7 +38,7 @@ router.post('/admin/cdk/generate', authMiddleware, adminMiddleware, async (req, 
         res.json(newCdk);
     } catch (error) {
         console.error('生成 CDK 失败:', error);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -53,7 +53,7 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
             created_by: req.user.id
         });
         if (!result.ok) {
-            return res.status(result.status).json({ error: result.error });
+            return res.status(result.status).json({ error: result.error , code: result.code });
         }
         // 操作审计：批量生成 CDK
         try {
@@ -65,7 +65,7 @@ router.post('/admin/cdk/batch-generate', authMiddleware, adminMiddleware, async 
         res.json(result.data);
     } catch (error) {
         console.error('批量生成 CDK 失败:', error);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 
@@ -78,7 +78,7 @@ router.get('/admin/cdk/list', authMiddleware, adminMiddleware, async (req, res) 
         res.json(result);
     } catch (error) {
         console.error('获取 CDK 列表失败:', error);
-        res.status(500).json({ error: '获取 CDK 列表失败' });
+        res.status(500).json({ error: '获取 CDK 列表失败', code: 'CDK_LIST_FAILED' });
     }
 });
 
@@ -121,7 +121,7 @@ router.get('/admin/cdk/export', authMiddleware, adminMiddleware, async (req, res
         res.send(csv);
     } catch (error) {
         console.error('导出 CDK 失败:', error);
-        res.status(500).json({ error: '导出 CDK 失败' });
+        res.status(500).json({ error: '导出 CDK 失败', code: 'CDK_EXPORT_FAILED' });
     }
 });
 
@@ -131,7 +131,7 @@ router.delete('/admin/cdk/:id', authMiddleware, adminMiddleware, async (req, res
         const cdk = await db.cdk.getById(id);
         
         if (!cdk) {
-            return res.status(404).json({ error: 'CDK 不存在' });
+            return res.status(404).json({ error: 'CDK 不存在', code: 'CDK_NOT_FOUND' });
         }
  
         await db.cdk.delete(id);
@@ -143,7 +143,7 @@ router.delete('/admin/cdk/:id', authMiddleware, adminMiddleware, async (req, res
         res.json({ message: 'CDK 删除成功' });
     } catch (error) {
         console.error('删除 CDK 失败:', error);
-        res.status(500).json({ error: '删除 CDK 失败' });
+        res.status(500).json({ error: '删除 CDK 失败', code: 'CDK_DELETE_FAILED' });
     }
 });
 
@@ -158,7 +158,7 @@ router.post('/admin/cdk/cleanup', authMiddleware, adminMiddleware, async (req, r
         res.json({ message: '清理完成', deleted: result.changes });
     } catch (error) {
         console.error('清理 CDK 失败:', error);
-        res.status(500).json({ error: '清理 CDK 失败' });
+        res.status(500).json({ error: '清理 CDK 失败', code: 'CDK_CLEAN_FAILED' });
     }
 });
 
@@ -166,7 +166,7 @@ router.post('/admin/cdk/batch-delete', authMiddleware, adminMiddleware, async (r
     try {
         const { ids } = req.body;
         if (!Array.isArray(ids) || ids.length === 0) {
-            return res.status(400).json({ error: '请提供要删除的 CDK ID 列表' });
+            return res.status(400).json({ error: '请提供要删除的 CDK ID 列表', code: 'CDK_IDS_REQUIRED' });
         }
         await db.cdk.deleteBatch(ids.map(id => parseInt(id)));
         // 操作审计：批量删除 CDK
@@ -177,7 +177,7 @@ router.post('/admin/cdk/batch-delete', authMiddleware, adminMiddleware, async (r
         res.json({ message: `成功删除 ${ids.length} 个 CDK` });
     } catch (error) {
         console.error('批量删除 CDK 失败:', error);
-        res.status(500).json({ error: '批量删除 CDK 失败' });
+        res.status(500).json({ error: '批量删除 CDK 失败', code: 'CDK_BATCH_DELETE_FAILED' });
     }
 });
 
@@ -185,7 +185,7 @@ router.get('/user/cdk/redeemable-vms', authMiddleware, async (req, res) => {
     try {
         // L-12 修复：对每台 VM 外呼 PVE，加用户级限速（admin 可配置）
         const listRate = await checkConfiguredRateLimit('cdk_redeemable', 'ratelimit:cdk-redeemable:' + req.user.id);
-        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', retryAfter: listRate.retryAfter });
+        if (!listRate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: listRate.retryAfter });
 
         let userVms;
         userVms = await db.vms.getByUserId(req.user.id);
@@ -214,7 +214,7 @@ router.get('/user/cdk/redeemable-vms', authMiddleware, async (req, res) => {
         
         res.json(vmsWithDetails);
     } catch (error) {
-        res.status(500).json({ error: '获取虚拟机列表失败' });
+        res.status(500).json({ error: '获取虚拟机列表失败', code: 'VM_LIST_LOAD_FAILED' });
     }
 });
 
@@ -223,7 +223,7 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
     try {
         const cdkRate = await checkCdkRateLimit(req.user.id, req.ip);
         if (!cdkRate.allowed) {
-            return res.status(429).json({ error: 'CDK 兑换操作过于频繁，请稍后再试', retryAfter: cdkRate.retryAfter });
+            return res.status(429).json({ error: 'CDK 兑换操作过于频繁，请稍后再试', code: 'RATE_LIMITED_CDK_REDEEM', retryAfter: cdkRate.retryAfter });
         }
 
         const result = await cdkService.redeemCdk({
@@ -234,12 +234,12 @@ router.post('/user/cdk/redeem', authMiddleware, async (req, res) => {
             req: req
         });
         if (!result.ok) {
-            return res.status(result.status).json({ error: result.error });
+            return res.status(result.status).json({ error: result.error , code: result.code });
         }
         res.json(result.data);
     } catch (error) {
         console.error('兑换 CDK 失败:', error);
-        res.status(500).json({ error: safeError(error) });
+        res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
     }
 });
 

@@ -18,7 +18,7 @@ router.get('/messages', authMiddleware, async (req, res) => {
         res.json(result);
     } catch (error) {
         console.error('获取消息列表失败:', error);
-        res.status(500).json({ error: '获取消息列表失败' });
+        res.status(500).json({ error: '获取消息列表失败', code: 'MESSAGE_LIST_FAILED' });
     }
 });
 
@@ -30,21 +30,21 @@ router.get('/messages/unread-count', authMiddleware, async (req, res) => {
         await unreadCache.set(String(req.user.id), count);
         res.json({ count });
     } catch (error) {
-        res.status(500).json({ error: '获取未读数失败' });
+        res.status(500).json({ error: '获取未读数失败', code: 'UNREAD_LOAD_FAILED' });
     }
 });
 
 router.get('/messages/:id', authMiddleware, async (req, res) => {
     try {
         const msg = await db.messages.getById(parseInt(req.params.id));
-        if (!msg) return res.status(404).json({ error: '消息不存在' });
-        if (msg.uid !== 0 && msg.uid !== req.user.id) return res.status(403).json({ error: '无权限' });
+        if (!msg) return res.status(404).json({ error: '消息不存在', code: 'MESSAGE_NOT_FOUND' });
+        if (msg.uid !== 0 && msg.uid !== req.user.id) return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });
         await db.messages.markRead(msg.id);
         res.json(msg);
         await unreadCache.del(String(req.user.id));
         pushUnreadCount();
     } catch (error) {
-        res.status(500).json({ error: '获取消息失败' });
+        res.status(500).json({ error: '获取消息失败', code: 'MESSAGE_LOAD_FAILED' });
     }
 });
 
@@ -52,16 +52,16 @@ router.put('/messages/:id/read', authMiddleware, async (req, res) => {
     try {
         const msgId = parseInt(req.params.id);
         const msg = await db.messages.getById(msgId);
-        if (!msg) return res.status(404).json({ error: '消息不存在' });
+        if (!msg) return res.status(404).json({ error: '消息不存在', code: 'MESSAGE_NOT_FOUND' });
         if (msg.uid !== 0 && msg.uid !== req.user.id) {
-            return res.status(403).json({ error: '无权限' });
+            return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });
         }
         await db.messages.markRead(msgId);
         res.json({ message: '已标记已读' });
         await unreadCache.del(String(req.user.id));
         pushUnreadCount();
     } catch (error) {
-        res.status(500).json({ error: '标记已读失败' });
+        res.status(500).json({ error: '标记已读失败', code: 'MARK_READ_FAILED' });
     }
 });
 
@@ -72,7 +72,7 @@ router.put('/messages/read-all', authMiddleware, async (req, res) => {
         await unreadCache.del(String(req.user.id));
         pushUnreadCount();
     } catch (error) {
-        res.status(500).json({ error: '标记已读失败' });
+        res.status(500).json({ error: '标记已读失败', code: 'MARK_READ_FAILED' });
     }
 });
 
@@ -88,7 +88,7 @@ router.delete('/messages/:id', authMiddleware, async (req, res) => {
         await unreadCache.del(String(req.user.id));
         pushUnreadCount();
     } catch (error) {
-        res.status(500).json({ error: '删除消息失败' });
+        res.status(500).json({ error: '删除消息失败', code: 'MESSAGE_DELETE_FAILED' });
     }
 });
 
@@ -112,14 +112,14 @@ router.delete('/messages', authMiddleware, async (req, res) => {
         await unreadCache.del(String(req.user.id));
         pushUnreadCount();
     } catch (error) {
-        res.status(500).json({ error: '清空消息失败' });
+        res.status(500).json({ error: '清空消息失败', code: 'MESSAGE_CLEAR_FAILED' });
     }
 });
 
 router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { uids, title, content, type, link_url, link_text } = req.body;
-        if (!title || !content) return res.status(400).json({ error: '标题和内容不能为空' });
+        if (!title || !content) return res.status(400).json({ error: '标题和内容不能为空', code: 'TITLE_CONTENT_REQUIRED' });
         // V3-04/V4-05 修复：发送前净化标题与内容（服务端纵深防御，与 create 统一净化幂等）
         const safeTitle = sanitizeTitle(title);
         const safeContent = sanitizeMessageContent(content);
@@ -180,7 +180,7 @@ router.post('/admin/messages/send', authMiddleware, adminMiddleware, async (req,
         }
     } catch (error) {
         console.error('发送消息失败:', error);
-        res.status(500).json({ error: '发送消息失败' });
+        res.status(500).json({ error: '发送消息失败', code: 'MESSAGE_SEND_FAILED' });
     }
 });
 
@@ -189,7 +189,7 @@ router.get('/admin/messages/stats', authMiddleware, adminMiddleware, async (req,
         const stats = await db.messages.getStats();
         res.json(stats);
     } catch (error) {
-        res.status(500).json({ error: '获取统计失败' });
+        res.status(500).json({ error: '获取统计失败', code: 'STATS_LOAD_FAILED' });
     }
 });
 

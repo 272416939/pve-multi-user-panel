@@ -42,12 +42,12 @@ function logPveError(e) {
 // 返回 { subnet } 或 { error }
 async function validateSubnetForUser(subnetId, userId, required) {
     if (!subnetId || !Number.isInteger(subnetId) || subnetId <= 0) {
-        if (required) return { error: '请选择网络（子网）后再购买' };
+        if (required) return { error: '请选择网络（子网）后再购买', code: 'SUBNET_REQUIRED_PURCHASE' };
         return { subnet: null };
     }
     const subnet = await db.subnets.getById(subnetId);
-    if (!subnet) return { error: '子网不存在' };
-    if (subnet.user_id !== userId) return { error: '无权使用该子网' };
+    if (!subnet) return { error: '子网不存在', code: 'SUBNET_NOT_FOUND' };
+    if (subnet.user_id !== userId) return { error: '无权使用该子网', code: 'SUBNET_NO_PERM_USE_2' };
     return { subnet };
 }
 
@@ -100,39 +100,39 @@ async function provisionVm(opts) {
     var { userId, username, req, packageId, period, period_count, macGroupId, osTemplateId, subnetId } = opts;
 
     if (!VALID_PERIODS.includes(period)) {
-        return { ok: false, status: 400, error: '无效的计费周期' };
+        return { ok: false, status: 400, error: '无效的计费周期', code: 'INVALID_PERIOD' };
     }
     if (!Number.isInteger(period_count) || period_count < 1 || period_count > MAX_PERIOD_COUNT) {
-        return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
+        return { ok: false, status: 400, error: '订购数量必须为1-99的正整数', code: 'ORDER_QTY_1_99' };
     }
 
     var pkg = await db.vmPackages.getById(packageId);
-    if (!pkg) return { ok: false, status: 404, error: '套餐不存在' };
+    if (!pkg) return { ok: false, status: 404, error: '套餐不存在', code: 'PKG_NOT_FOUND' };
     // 库存校验：-1 表示不限量，0 表示售罄，null 兼容旧数据视为不限量
     if (pkg.stock !== null && pkg.stock !== -1 && pkg.stock <= 0) {
-        return { ok: false, status: 400, error: '该套餐已售罄' };
+        return { ok: false, status: 400, error: '该套餐已售罄', code: 'PKG_SOLD_OUT' };
     }
 
     var template = await db.vmTemplates.getById(pkg.template_id);
-    if (!template) return { ok: false, status: 404, error: '关联模板不存在' };
-    if (template.status !== 'active') return { ok: false, status: 400, error: '关联模板已停用' };
+    if (!template) return { ok: false, status: 404, error: '关联模板不存在', code: 'LINKED_TEMPLATE_NOT_FOUND' };
+    if (template.status !== 'active') return { ok: false, status: 400, error: '关联模板已停用', code: 'LINKED_TEMPLATE_DISABLED' };
 
     // 新购必须选择 OS 模板
     var osTemplate = null;
     if (osTemplateId && osTemplateId > 0) {
         osTemplate = await db.osTemplates.getById(osTemplateId);
         if (!osTemplate || osTemplate.status !== 'active') {
-            return { ok: false, status: 400, error: 'OS 模板不存在或已下架' };
+            return { ok: false, status: 400, error: 'OS 模板不存在或已下架', code: 'OS_TPL_NOT_FOUND' };
         }
         // 校验 allowed_package_ids 约束
         if (osTemplate.allowed_package_ids && osTemplate.allowed_package_ids.length > 0) {
             var allowedIds = osTemplate.allowed_package_ids.split(',').map(function(s) { return parseInt(s.trim()); }).filter(Number.isInteger);
             if (allowedIds.length > 0 && allowedIds.indexOf(pkg.id) === -1) {
-                return { ok: false, status: 400, error: '该系统模板不适用于当前套餐' };
+                return { ok: false, status: 400, error: '该系统模板不适用于当前套餐', code: 'OS_TPL_PKG_MISMATCH' };
             }
         }
     } else {
-        return { ok: false, status: 400, error: '请选择系统模板' };
+        return { ok: false, status: 400, error: '请选择系统模板', code: 'OS_TEMPLATE_REQUIRED' };
     }
 
     // 私有网络：新购必须选择并绑定子网（VLAN）
@@ -185,7 +185,7 @@ async function provisionVm(opts) {
         var tmplStatus = await pveApi.getVmStatus(cloneSourceVmid);
         if (tmplStatus && tmplStatus.status === 'running') {
             console.error('[provisioning] 模板 VM ' + cloneSourceVmid + ' 正在运行，无法进行 full clone');
-            return { ok: false, status: 400, error: '模板虚拟机正在运行，请先停止后再订购' };
+            return { ok: false, status: 400, error: '模板虚拟机正在运行，请先停止后再订购', code: 'TPL_VM_RUNNING' };
         }
     } catch (statusErr) {
         console.error('[provisioning] 检查模板 VM 状态失败:', statusErr.message);
@@ -413,22 +413,22 @@ async function provisionLxc(opts) {
     var { userId, username, req, packageId, period, period_count, macGroupId, subnetId } = opts;
 
     if (!VALID_PERIODS.includes(period)) {
-        return { ok: false, status: 400, error: '无效的计费周期' };
+        return { ok: false, status: 400, error: '无效的计费周期', code: 'INVALID_PERIOD' };
     }
     if (!Number.isInteger(period_count) || period_count < 1 || period_count > MAX_PERIOD_COUNT) {
-        return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
+        return { ok: false, status: 400, error: '订购数量必须为1-99的正整数', code: 'ORDER_QTY_1_99' };
     }
 
     var pkg = await db.lxcPackages.getById(packageId);
-    if (!pkg) return { ok: false, status: 404, error: '套餐不存在' };
+    if (!pkg) return { ok: false, status: 404, error: '套餐不存在', code: 'PKG_NOT_FOUND' };
     // 库存校验：-1 表示不限量，0 表示售罄，null 兼容旧数据视为不限量
     if (pkg.stock !== null && pkg.stock !== -1 && pkg.stock <= 0) {
-        return { ok: false, status: 400, error: '该套餐已售罄' };
+        return { ok: false, status: 400, error: '该套餐已售罄', code: 'PKG_SOLD_OUT' };
     }
 
     var template = await db.lxcTemplates.getById(pkg.template_id);
-    if (!template) return { ok: false, status: 404, error: '关联模板不存在' };
-    if (template.status !== 'active') return { ok: false, status: 400, error: '关联模板已停用' };
+    if (!template) return { ok: false, status: 404, error: '关联模板不存在', code: 'LINKED_TEMPLATE_NOT_FOUND' };
+    if (template.status !== 'active') return { ok: false, status: 400, error: '关联模板已停用', code: 'LINKED_TEMPLATE_DISABLED' };
 
     var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
@@ -674,12 +674,12 @@ async function adminProvisionVm(opts) {
     var { userId, packageId, name, expDate, renewalPrice, renewalPeriod, period, period_count, subnetId } = opts;
 
     if (!VALID_PERIODS.includes(period)) {
-        return { ok: false, status: 400, error: '无效的计费周期' };
+        return { ok: false, status: 400, error: '无效的计费周期', code: 'INVALID_PERIOD' };
     }
     if (!Number.isInteger(period_count) || period_count < 1 || period_count > MAX_PERIOD_COUNT) {
-        return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
+        return { ok: false, status: 400, error: '订购数量必须为1-99的正整数', code: 'ORDER_QTY_1_99' };
     }
-    if (!userId) return { ok: false, status: 400, error: '请选择用户' };
+    if (!userId) return { ok: false, status: 400, error: '请选择用户', code: 'USER_REQUIRED' };
 
     // 私有网络：admin 代开可选绑定子网（不传则以关机状态交付，用户开机时需先绑定子网）
     var subnetCheck = await validateSubnetForUser(subnetId, userId, false);
@@ -687,10 +687,10 @@ async function adminProvisionVm(opts) {
     var subnet = subnetCheck.subnet;
 
     var pkg = await db.vmPackages.getById(packageId);
-    if (!pkg) return { ok: false, status: 404, error: '套餐不存在' };
+    if (!pkg) return { ok: false, status: 404, error: '套餐不存在', code: 'PKG_NOT_FOUND' };
 
     var template = await db.vmTemplates.getById(pkg.template_id);
-    if (!template) return { ok: false, status: 404, error: '关联模板不存在' };
+    if (!template) return { ok: false, status: 404, error: '关联模板不存在', code: 'LINKED_TEMPLATE_NOT_FOUND' };
 
     var macGroupId = template.mac_group_id || null;
 
@@ -856,12 +856,12 @@ async function adminProvisionLxc(opts) {
     var { userId, packageId, name, expDate, renewalPrice, renewalPeriod, period, period_count, subnetId } = opts;
 
     if (!VALID_PERIODS.includes(period)) {
-        return { ok: false, status: 400, error: '无效的计费周期' };
+        return { ok: false, status: 400, error: '无效的计费周期', code: 'INVALID_PERIOD' };
     }
     if (!Number.isInteger(period_count) || period_count < 1 || period_count > MAX_PERIOD_COUNT) {
-        return { ok: false, status: 400, error: '订购数量必须为1-99的正整数' };
+        return { ok: false, status: 400, error: '订购数量必须为1-99的正整数', code: 'ORDER_QTY_1_99' };
     }
-    if (!userId) return { ok: false, status: 400, error: '请选择用户' };
+    if (!userId) return { ok: false, status: 400, error: '请选择用户', code: 'USER_REQUIRED' };
 
     // 私有网络：admin 代开可选绑定子网（不传则以关机状态交付，用户开机时需先绑定子网）
     var subnetCheck = await validateSubnetForUser(subnetId, userId, false);
@@ -869,10 +869,10 @@ async function adminProvisionLxc(opts) {
     var subnet = subnetCheck.subnet;
 
     var pkg = await db.lxcPackages.getById(packageId);
-    if (!pkg) return { ok: false, status: 404, error: '套餐不存在' };
+    if (!pkg) return { ok: false, status: 404, error: '套餐不存在', code: 'PKG_NOT_FOUND' };
 
     var template = await db.lxcTemplates.getById(pkg.template_id);
-    if (!template) return { ok: false, status: 404, error: '关联模板不存在' };
+    if (!template) return { ok: false, status: 404, error: '关联模板不存在', code: 'LINKED_TEMPLATE_NOT_FOUND' };
 
     var macGroupId = template.mac_group_id || null;
 
