@@ -11,10 +11,14 @@ const router = express.Router();
 const { safeError } = require('../utils/safe-error');
 const { getLanguages, resolveLocale } = require('../services/i18n');
 
-// PUBLIC: no auth required —— 语言列表（注册表 + overrides 标志，60s 缓存）
+// PUBLIC: no auth required —— 语言列表（注册表 + overrides 标志）
+// Cache-Control 必须 no-store：本接口的新鲜度由服务端无 TTL 缓存 + 写时失效保证
+// （开关/新建/删除语言即时生效）。此前 public, max-age=30 会被 nginx proxy_cache
+// 缓存——前端 cache:'reload' 只绕过浏览器缓存绕不过代理缓存，写后 30s 内拿旧列表，
+// 曾致语言开关 UI 回弹且无法重新打开。
 router.get('/i18n/languages', async (req, res) => {
     try {
-        res.set('Cache-Control', 'public, max-age=30');
+        res.set('Cache-Control', 'no-store');
         res.json(await getLanguages());
     } catch (error) {
         console.error('获取语言列表失败:', error.message);
@@ -23,6 +27,7 @@ router.get('/i18n/languages', async (req, res) => {
 });
 
 // PUBLIC: no auth required —— 合并翻译内容（覆盖/自定义语言解析；未知语言 404）
+// 同上 no-store：词条保存/开关后即时可见，HTTP 层缓存与服务端写时失效语义冲突
 router.get('/i18n/locale/:code', async (req, res) => {
     try {
         const code = String(req.params.code || '');
@@ -30,7 +35,7 @@ router.get('/i18n/locale/:code', async (req, res) => {
         if (!dict) {
             return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
         }
-        res.set('Cache-Control', 'public, max-age=30');
+        res.set('Cache-Control', 'no-store');
         res.json(dict);
     } catch (error) {
         console.error('解析语言内容失败:', error.message);

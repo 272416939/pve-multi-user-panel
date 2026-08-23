@@ -424,21 +424,34 @@ window.__admin.i18nPage = (function () {
 
     // 语言启用开关（关闭后用户端不可选择/不展示，admin 后台不受影响；
     // zh-CN 兜底语言与站点默认语言由后端守卫拒绝，错误经 code 词条翻译弹出后开关回滚）
+    // 成功后本地直写开关与列表（不依赖列表接口重拉——HTTP 缓存层在写后可能短暂返回
+    // 旧列表，曾致开关回弹且无法重新打开）；shared 层（用户端白名单）尽力刷新，失败不影响 UI
     async function toggleEnabled(ev) {
         var target = ev && ev.target ? ev.target.checked : !langSwitchChecked.value;
+        var code = selectedCode.value;
         try {
-            await api('/admin/i18n/languages/' + encodeURIComponent(selectedCode.value) + '/enabled', {
+            await api('/admin/i18n/languages/' + encodeURIComponent(code) + '/enabled', {
                 method: 'PUT',
                 body: JSON.stringify({ enabled: target })
             });
-            languages.value = await window.__i18n.refreshLanguages();
-            langSwitchChecked.value = selectedEnabled.value;
+            // 本地同步列表（开关不改变语言集合，无需整体重拉）
+            var list = languages.value.slice();
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].code === code) { list[i] = Object.assign({}, list[i], { enabled: target }); break; }
+            }
+            languages.value = list;
+            langSwitchChecked.value = target;
             alert(window.__i18n.t(target ? 'admin.i18n.enableOk' : 'admin.i18n.disableOk'));
         } catch (e) {
             console.error('设置 i18n 语言开关失败', e && e.message);
             langSwitchChecked.value = selectedEnabled.value; // 服务端拒绝：回滚开关显示
             alert(window.__i18n.t('admin.i18n.createFail') + (e && e.message ? ' ' + e.message : ''));
+            return;
         }
+        // 后台刷新 shared 层注册表（用户端下拉/白名单即时同步；失败静默，下次页面加载自愈）
+        try {
+            await window.__i18n.refreshLanguages();
+        } catch (_) {}
     }
 
     return {
