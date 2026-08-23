@@ -50,7 +50,7 @@
                     <div class="col-auto">
                         <label class="form-label">{{ t('admin.i18n.enabledLabel') }}</label>
                         <div class="form-check form-switch mt-2">
-                            <input class="form-check-input" type="checkbox" role="switch" id="i18nLangEnabledSwitch" :checked="i18nPage.selectedEnabled.value" @change="i18nPage.toggleEnabled()">
+                            <input class="form-check-input" type="checkbox" role="switch" id="i18nLangEnabledSwitch" v-model="i18nPage.langSwitchChecked.value" @change="i18nPage.toggleEnabled($event)">
                             <label class="form-check-label" for="i18nLangEnabledSwitch" :title="t('admin.i18n.enabledHint')">{{ t('admin.i18n.enabledHint') }}</label>
                         </div>
                     </div>

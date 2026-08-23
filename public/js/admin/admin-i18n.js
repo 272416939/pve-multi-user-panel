@@ -61,6 +61,10 @@ window.__admin.i18nPage = (function () {
     var creating = ref(false);
     var search = ref('');
     var collapsed = reactive({});    // {category: false=展开}；缺省=折叠
+
+    // 语言启用开关受控状态（v-model 本地 ref，load/toggle 同步——失败回滚时值翻转触发重渲染；
+    // 非 :checked 单向绑定：服务端拒绝（zh-CN 守卫）后 computed 值未变，浏览器翻转的 checkbox 状态会残留）
+    var langSwitchChecked = ref(true);
     var dirty = reactive({});        // 草稿 {key: ''}；'' 表示删除覆盖恢复基线
     var shown = reactive({});        // 每组已渲染条数（分组缓存）
     var createForm = reactive({ name: '', baseCode: 'en' });
@@ -207,6 +211,7 @@ window.__admin.i18nPage = (function () {
             entries.value = (data && data.entries) || [];
             currentLanguage.value = (data && data.language) || null;
             isCustom.value = !!(data && data.language && !data.language.is_system);
+            langSwitchChecked.value = selectedEnabled.value; // 切语言后开关跟随新语言的启用状态
             clearDirty();
             await summaryPromise;
         } catch (e) {
@@ -228,21 +233,23 @@ window.__admin.i18nPage = (function () {
         shown[cat] = (shown[cat] || PAGE_CHUNK) + PAGE_CHUNK;
     }
 
+    // 展开状态整体重置为缺省（全收起）：逐 key 删除恢复「缺省折叠」语义
+    function resetCollapsed() {
+        Object.keys(collapsed).forEach(function (k) { delete collapsed[k]; });
+    }
+
     // 只看待翻译（顶部横幅「查看待翻译」；打开时清空搜索避免过滤叠加；
-    // 主动展开全部分类作为初始视图——分组头仍可点击收起/再展开，词条多时便于分组操作）
+    // 分类默认收起——词条多时按需点开关注的分组，分组头可随时收起/再展开）
     function openPending() {
         search.value = '';
         showOnlyPending.value = true;
-        var set = {};
-        entries.value.forEach(function (r) {
-            set[r.key.split('.')[0] || '_'] = 1;
-        });
-        Object.keys(set).forEach(function (cat) { collapsed[cat] = false; });
+        resetCollapsed();
     }
 
-    // 退出待翻译视图
+    // 退出待翻译视图（展开状态一并重置为缺省收起，不残留待翻译视图中的展开操作）
     function closePending() {
         showOnlyPending.value = false;
+        resetCollapsed();
     }
 
     // ==================== 词条输入/回显（3. 保存后回显改动值） ====================
@@ -416,18 +423,20 @@ window.__admin.i18nPage = (function () {
     });
 
     // 语言启用开关（关闭后用户端不可选择/不展示，admin 后台不受影响；
-    // zh-CN 兜底语言与站点默认语言由后端守卫拒绝，错误经 code 词条翻译弹出）
-    async function toggleEnabled() {
-        var target = !selectedEnabled.value;
+    // zh-CN 兜底语言与站点默认语言由后端守卫拒绝，错误经 code 词条翻译弹出后开关回滚）
+    async function toggleEnabled(ev) {
+        var target = ev && ev.target ? ev.target.checked : !langSwitchChecked.value;
         try {
             await api('/admin/i18n/languages/' + encodeURIComponent(selectedCode.value) + '/enabled', {
                 method: 'PUT',
                 body: JSON.stringify({ enabled: target })
             });
             languages.value = await window.__i18n.refreshLanguages();
+            langSwitchChecked.value = selectedEnabled.value;
             alert(window.__i18n.t(target ? 'admin.i18n.enableOk' : 'admin.i18n.disableOk'));
         } catch (e) {
             console.error('设置 i18n 语言开关失败', e && e.message);
+            langSwitchChecked.value = selectedEnabled.value; // 服务端拒绝：回滚开关显示
             alert(window.__i18n.t('admin.i18n.createFail') + (e && e.message ? ' ' + e.message : ''));
         }
     }
@@ -462,6 +471,7 @@ window.__admin.i18nPage = (function () {
         toggleGroup: toggleGroup,
         toggleEnabled: toggleEnabled,
         selectedEnabled: selectedEnabled,
+        langSwitchChecked: langSwitchChecked,
         loadMore: loadMore,
         openPending: openPending,
         closePending: closePending,
