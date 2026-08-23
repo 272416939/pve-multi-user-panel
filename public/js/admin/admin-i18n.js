@@ -9,6 +9,7 @@ window.__admin.i18nPage = (function () {
     var ref = Vue.ref;
     var computed = Vue.computed;
     var reactive = Vue.reactive;
+    var watch = Vue.watch;
 
     var PAGE_CHUNK = 200;        // 每组展开的分页条数（增量「加载更多」）
     var SAVE_BATCH = 500;        // 与后端单次保存上限对齐
@@ -35,16 +36,32 @@ window.__admin.i18nPage = (function () {
     var languages = ref([]);         // 注册表（系统 + 自定义）
     var systemLanguages = ref([]);   // 复制源下拉（仅系统语言）
     var selectedCode = ref('zh-CN'); // 当前查看/编辑语言（默认简体中文）
-    var entries = ref([]);           // [{key, original, value, override, is_new, zh}]
     var currentLanguage = ref(null); // {code,name,base_code,is_system}
+    // 分组元数据（管理界面打开只拉这份轻量数据：分类/计数/待翻译；展开分组才分页拉条目）
+    var groupsMeta = ref([]);        // [{cat,count,pending,percent,hasPending}]
+    // 分组条目分页缓存：key = `${lang}|${cat}|${mode}` → {rows,page,total,loading}
+    var loaded = reactive({});
+    // 搜索平铺结果（搜索跨组分页）
+    var searchRows = ref([]);
+    var searchMeta = reactive({ total: 0, page: 0, loading: false });
+    // 已加载条目聚合（驱动 languageMeta 覆盖数/dirtyCount/resetDisabled 等既有消费点）
+    var entries = computed(function () {
+        var out = [];
+        Object.keys(loaded).forEach(function (k) {
+            out = out.concat(loaded[k].rows);
+        });
+        return out;
+    });
     // 元信息（响应式 computed：语言切换/覆盖数变化时自动重建，避免 load 时一次性快照残留中文）
     var languageMeta = computed(function () {
         var lang = currentLanguage.value;
         if (!lang) return '';
         var list = entries.value;
+        var totalCount = 0;
+        groupsMeta.value.forEach(function (g) { totalCount += g.count; });
         var parts = [
             window.__i18n.t('admin.i18n.code') + ': ' + lang.code,
-            window.__i18n.t('admin.i18n.entries') + ': ' + list.length
+            window.__i18n.t('admin.i18n.entries') + ': ' + totalCount
         ];
         if (lang.base_code && !lang.is_system) {
             parts.push(window.__i18n.t('admin.i18n.copyFrom') + ': ' + lang.base_code);
@@ -66,10 +83,14 @@ window.__admin.i18nPage = (function () {
     // 非 :checked 单向绑定：服务端拒绝（zh-CN 守卫）后 computed 值未变，浏览器翻转的 checkbox 状态会残留）
     var langSwitchChecked = ref(true);
     var dirty = reactive({});        // 草稿 {key: ''}；'' 表示删除覆盖恢复基线
-    var shown = reactive({});        // 每组已渲染条数（分组缓存）
     var createForm = reactive({ name: '', baseCode: 'en' });
     var summary = ref(null);         // 待翻译汇总（跨语言，侧边栏红点 + 页内横幅）
     var showOnlyPending = ref(false); // 只看待翻译（顶部横幅「查看待翻译」）
+
+    // 搜索模式（非空关键词 → 跨组平铺分页结果，不走分组结构）
+    var searchMode = computed(function () {
+        return !!(search.value || '').trim();
+    });
 
     // 清理草稿（切语言/重载时丢弃旧草稿；分组折叠/已展示条数保留，
     // 避免保存或切语言后所有分类收起——展开状态属通用视图状态，跨语言复用）
@@ -78,13 +99,13 @@ window.__admin.i18nPage = (function () {
     }
 
     // 待翻译统计（当前语言）：待翻译 = is_new && !override；快照词条视为已完成
+    // 用分组元数据聚合（全量口径，非已加载分页条目）
     var pendingInfo = computed(function () {
-        var list = entries.value;
-        var total = list.length;
-        var pending = 0;
-        for (var i = 0; i < list.length; i++) {
-            if (list[i].is_new && !list[i].override) pending++;
-        }
+        var total = 0, pending = 0;
+        groupsMeta.value.forEach(function (g) {
+            total += g.count;
+            pending += g.pending;
+        });
         return { total: total, pending: pending, percent: total > 0 ? Math.round((total - pending) / total * 100) : 100 };
     });
 
@@ -106,35 +127,19 @@ window.__admin.i18nPage = (function () {
         load();
     }
 
-    // 分类折叠组（分组 = key 首个点分前缀；搜索时强制展开并按 500 条上限显示）
+    // 分组视图（元数据骨架 + 展开分组的已加载条目；搜索模式走 searchRows 平铺，不走这里）
     var groups = computed(function () {
-        var kw = (search.value || '').trim().toLowerCase();
-        var map = {};
-        var order = [];
-        entries.value.forEach(function (r) {
-            if (kw) {
-                var hit = r.key.toLowerCase().indexOf(kw) !== -1 ||
-                    String(r.value).toLowerCase().indexOf(kw) !== -1 ||
-                    String(r.original).toLowerCase().indexOf(kw) !== -1;
-                if (!hit) return;
-            }
-            // 只看待翻译：过滤掉已翻译（非 is_new 或已覆盖）词条
-            if (showOnlyPending.value && !(r.is_new && !r.override)) return;
-            var cat = r.key.split('.')[0] || '_';
-            if (!map[cat]) { map[cat] = []; order.push(cat); }
-            map[cat].push(r);
-        });
-        return order.map(function (cat) {
-            var rows = map[cat];
-            // 仅搜索时强制展开（结果跨组分散，收起无意义）；待翻译视图走通用折叠状态
-            // （openPending 打开时已主动展开全部分类，词条多时可逐组收起，可再次点击展开）
-            var effectiveExpand = !!kw;
-            var collapsedFlag = effectiveExpand ? false : collapsed[cat] !== false; // 缺省折叠
-            var limit = collapsedFlag ? 0 : (showOnlyPending.value ? rows.length : (shown[cat] || PAGE_CHUNK));
+        if (searchMode.value) return [];
+        var mode = showOnlyPending.value ? 'p' : 'n';
+        return groupsMeta.value.map(function (g) {
+            var cat = g.cat;
+            var load = loaded[selectedCode.value + '|' + cat + '|' + mode];
+            var rows = load ? load.rows : [];
+            var collapsedFlag = collapsed[cat] !== false; // 缺省折叠；展开才加载
             // 每行 dirty 判定：逐 key 直接读 dirty[r.key] 建立响应式依赖
             // （hasOwnProperty.call 不经过 Vue 的 get trap（无 getOwnPropertyDescriptor），
             //  且短路写法在 key 首次写入前从未触发 get → computed 不重算，badge/脏色不出现）
-            var visible = collapsedFlag ? [] : rows.slice(0, limit).map(function (r) {
+            var visible = collapsedFlag ? [] : rows.map(function (r) {
                 var d = dirty[r.key];
                 return {
                     key: r.key,
@@ -146,21 +151,18 @@ window.__admin.i18nPage = (function () {
                     dirty: d !== undefined && d !== r.value
                 };
             });
-            var pending = 0;
-            for (var i = 0; i < rows.length; i++) {
-                if (rows[i].is_new && !rows[i].override) pending++;
-            }
             return {
                 key: cat,
                 label: cat,
                 // 描述走 t()（读 _translations → 响应式依赖），语言切换时 groups 自动重算更新
                 desc: CATEGORY_DESC[cat] ? window.__i18n.t(CATEGORY_DESC[cat]) : '',
-                count: rows.length,
-                pending: pending,
-                percent: rows.length > 0 ? Math.round((rows.length - pending) / rows.length * 100) : 100,
-                hasPending: pending > 0,
+                count: g.count,
+                pending: g.pending,
+                percent: g.percent,
+                hasPending: g.hasPending,
                 visible: visible,
-                hasMore: !collapsedFlag && rows.length > visible.length
+                hasMore: !collapsedFlag && !!load && rows.length < load.total,
+                loading: !!load && load.loading
             };
         });
     });
@@ -197,7 +199,13 @@ window.__admin.i18nPage = (function () {
                 selectedCode.value = 'zh-CN';
             }
             var code = selectedCode.value;
-            var entriesPromise = api('/admin/i18n/languages/' + encodeURIComponent(code) + '/entries');
+            // 拉分组元数据（无 cat/kw → groups；轻量，不返回条目）
+            var metaPromise = api('/admin/i18n/languages/' + encodeURIComponent(code) + '/entries' + (showOnlyPending.value ? '?pending=1' : '')).then(function (d) {
+                groupsMeta.value = (d && d.groups) || [];
+                currentLanguage.value = (d && d.language) || null;
+                isCustom.value = !!(d && d.language && !d.language.is_system);
+                return d;
+            });
             // 并行拉待翻译汇总（页内横幅 + 侧边栏红点）；失败不阻塞条目展示
             var summaryPromise = api('/admin/i18n/summary').then(function (s) {
                 summary.value = s;
@@ -207,30 +215,117 @@ window.__admin.i18nPage = (function () {
                 console.error('加载 i18n 待翻译汇总失败', e && e.message);
                 return null;
             });
-            var data = await entriesPromise;
-            entries.value = (data && data.entries) || [];
-            currentLanguage.value = (data && data.language) || null;
-            isCustom.value = !!(data && data.language && !data.language.is_system);
+            await metaPromise;
             langSwitchChecked.value = selectedEnabled.value; // 切语言后开关跟随新语言的启用状态
             clearDirty();
+            resetLoaded(); // 清分页/搜索缓存（语言/模式变了）
+            // 已展开的分组（跨语言复用展开状态）重拉当前语言第 1 页；搜索态恢复搜索结果
+            var cats = [];
+            Object.keys(collapsed).forEach(function (k) { if (collapsed[k] === false) cats.push(k); });
+            cats.forEach(function (cat) { ensureLoaded(cat); });
+            if (searchMode.value) doSearch(1);
             await summaryPromise;
         } catch (e) {
             console.error('加载 i18n 条目失败', e && e.message);
             alert(window.__i18n.t('admin.i18n.loadFail'));
-            entries.value = [];
+            groupsMeta.value = [];
         } finally {
             loading.value = false;
         }
     }
 
-    // 分组折叠/展开（缺省折叠；记录已展开集合）
-    function toggleGroup(cat) {
-        collapsed[cat] = collapsed[cat] === false ? true : false;
+    // 分组分页缓存 key（语言 + 分组 + 视图模式隔离：切换语言/待翻译模式互不串扰）
+    function keyFor(cat) {
+        return selectedCode.value + '|' + cat + '|' + (showOnlyPending.value ? 'p' : 'n');
     }
 
-    // 分组增量加载（展开超过 200 条时）
+    // 清空分组分页与搜索缓存（切语言/切换待翻译模式/保存后重建）
+    function resetLoaded() {
+        Object.keys(loaded).forEach(function (k) { delete loaded[k]; });
+        searchRows.value = [];
+        searchMeta.total = 0;
+        searchMeta.page = 0;
+        searchMeta.loading = false;
+    }
+
+    // 展开分组时按需加载第 1 页（已加载/加载中则跳过）
+    async function ensureLoaded(cat) {
+        var k = keyFor(cat);
+        var cur = loaded[k];
+        if (cur && (cur.rows.length > 0 || cur.loading)) return;
+        await loadCat(cat, 1);
+    }
+
+    // 分页拉取分组条目（page=1 重置，>1 追加）
+    async function loadCat(cat, page) {
+        var k = keyFor(cat);
+        var cur = loaded[k] || { rows: [], page: 0, total: 0, loading: false };
+        if (cur.loading) return;
+        cur.loading = true;
+        try {
+            var q = new URLSearchParams({ cat: cat, page: page, limit: PAGE_CHUNK });
+            if (showOnlyPending.value) q.set('pending', '1');
+            var res = await api('/admin/i18n/languages/' + encodeURIComponent(selectedCode.value) + '/entries?' + q.toString());
+            cur.rows = page === 1 ? (res.entries || []) : cur.rows.concat(res.entries || []);
+            cur.page = page;
+            cur.total = res.total || cur.rows.length;
+        } catch (e) {
+            console.error('加载 i18n 分组条目失败', e && e.message);
+        } finally {
+            cur.loading = false;
+            loaded[k] = cur;
+        }
+    }
+
+    // 搜索分页（跨组分页平铺；kw 变化经 watch 防抖触发）
+    async function doSearch(page) {
+        var kw = (search.value || '').trim();
+        if (!kw) { searchRows.value = []; searchMeta.total = 0; return; }
+        if (searchMeta.loading) return;
+        searchMeta.loading = true;
+        try {
+            var q = new URLSearchParams({ kw: kw, page: page || 1, limit: PAGE_CHUNK });
+            if (showOnlyPending.value) q.set('pending', '1');
+            var res = await api('/admin/i18n/languages/' + encodeURIComponent(selectedCode.value) + '/entries?' + q.toString());
+            var p = page || 1;
+            searchRows.value = p === 1 ? (res.entries || []) : searchRows.value.concat(res.entries || []);
+            searchMeta.total = res.total || searchRows.value.length;
+            searchMeta.page = p;
+        } catch (e) {
+            console.error('搜索 i18n 词条失败', e && e.message);
+        } finally {
+            searchMeta.loading = false;
+        }
+    }
+
+    // 搜索输入防抖（250ms）触发跨组分页搜索
+    var searchTimer = null;
+    watch(search, function () {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function () {
+            if (searchMode.value) doSearch(1);
+            else { searchRows.value = []; searchMeta.total = 0; }
+        }, 250);
+    });
+
+    // 分组折叠/展开（缺省折叠；展开时按需加载第 1 页，收起保留已加载缓存）
+    function toggleGroup(cat) {
+        var willExpand = collapsed[cat] !== false;
+        collapsed[cat] = willExpand ? false : true;
+        if (willExpand) ensureLoaded(cat);
+    }
+
+    // 分组增量加载（下一页追加）
     function loadMore(cat) {
-        shown[cat] = (shown[cat] || PAGE_CHUNK) + PAGE_CHUNK;
+        var cur = loaded[keyFor(cat)];
+        if (!cur || cur.loading) return;
+        loadCat(cat, cur.page + 1);
+    }
+
+    // 搜索平铺结果加载更多
+    function searchLoadMore() {
+        if (searchMeta.loading) return;
+        doSearch(searchMeta.page + 1);
     }
 
     // 展开状态整体重置为缺省（全收起）：逐 key 删除恢复「缺省折叠」语义
@@ -244,12 +339,14 @@ window.__admin.i18nPage = (function () {
         search.value = '';
         showOnlyPending.value = true;
         resetCollapsed();
+        load(); // 重新拉元数据（pending 过滤）+ 清分页缓存
     }
 
     // 退出待翻译视图（展开状态一并重置为缺省收起，不残留待翻译视图中的展开操作）
     function closePending() {
         showOnlyPending.value = false;
         resetCollapsed();
+        load();
     }
 
     // ==================== 词条输入/回显（3. 保存后回显改动值） ====================
@@ -472,6 +569,11 @@ window.__admin.i18nPage = (function () {
         summary: summary,
         showOnlyPending: showOnlyPending,
         groups: groups,
+        groupsMeta: groupsMeta,
+        loaded: loaded,
+        searchMode: searchMode,
+        searchRows: searchRows,
+        searchMeta: searchMeta,
         pendingInfo: pendingInfo,
         pendingLanguages: pendingLanguages,
         dirtyCount: dirtyCount,
@@ -486,6 +588,7 @@ window.__admin.i18nPage = (function () {
         selectedEnabled: selectedEnabled,
         langSwitchChecked: langSwitchChecked,
         loadMore: loadMore,
+        searchLoadMore: searchLoadMore,
         openPending: openPending,
         closePending: closePending,
         fieldValue: fieldValue,

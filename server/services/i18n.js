@@ -156,6 +156,70 @@ async function getLocaleName(code) {
 }
 
 /**
+ * 语言分组元数据（分组 = key 首个点分前缀；供管理页分组骨架展示，不返回条目——
+ * 管理界面打开只拉这份轻量元数据 + 展开分组才分页拉条目，避免全量 2800+ 条词条一次下发）
+ * @param {string} code 语言 code
+ * @param {boolean} [pendingOnly] 只看待翻译（is_new && !override）
+ * @returns {Promise<Array<{cat,count,pending,percent,hasPending}>|null>}
+ */
+async function getLocaleGroups(code, pendingOnly) {
+    const entries = await getLocaleEntries(code);
+    if (!entries) return null;
+    const map = {};
+    const order = [];
+    entries.forEach(function (r) {
+        if (pendingOnly && !(r.is_new && !r.override)) return;
+        const cat = r.key.split('.')[0] || '_';
+        if (!map[cat]) { map[cat] = { rows: 0, pending: 0 }; order.push(cat); }
+        map[cat].rows++;
+        if (r.is_new && !r.override) map[cat].pending++;
+    });
+    return order.map(function (cat) {
+        const g = map[cat];
+        return {
+            cat: cat,
+            count: g.rows,
+            pending: g.pending,
+            percent: g.rows > 0 ? Math.round((g.rows - g.pending) / g.rows * 100) : 100,
+            hasPending: g.pending > 0
+        };
+    });
+}
+
+/**
+ * 语言条目分页查询（在无 TTL 缓存的全量条目上做分组/搜索/待翻译过滤 + 分页 slice，
+ * 服务端过滤保证管理页展开大分组只下发 200 条）
+ * @param {string} code 语言 code
+ * @param {object} opts { cat?, kw?, pendingOnly?, page=1, limit=200 }
+ * @returns {Promise<{total:number, entries:Array}|null>}
+ */
+async function paginateLocaleEntries(code, opts) {
+    const entries = await getLocaleEntries(code);
+    if (!entries) return null;
+    const o = opts || {};
+    const page = Math.max(parseInt(o.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(o.limit, 10) || 200, 1), 500);
+    const kw = typeof o.kw === 'string' ? o.kw.trim().toLowerCase() : '';
+    const filtered = entries.filter(function (r) {
+        if (o.cat && (r.key.split('.')[0] || '_') !== o.cat) return false;
+        if (o.pendingOnly && !(r.is_new && !r.override)) return false;
+        if (kw) {
+            return r.key.toLowerCase().indexOf(kw) !== -1 ||
+                String(r.value).toLowerCase().indexOf(kw) !== -1 ||
+                String(r.original).toLowerCase().indexOf(kw) !== -1;
+        }
+        return true;
+    });
+    const start = (page - 1) * limit;
+    return {
+        total: filtered.length,
+        page: page,
+        limit: limit,
+        entries: filtered.slice(start, start + limit)
+    };
+}
+
+/**
  * 解析语言合并内容（覆盖 + 基线全量 dict；60s 缓存，写操作失效）
  * @returns {Promise<object|null>} 未知语言返回 null
  */
@@ -357,6 +421,8 @@ module.exports = {
     isSupportedLocale,
     setLanguageEnabled,
     getLocaleName,
+    getLocaleGroups,
+    paginateLocaleEntries,
     resolveLocale,
     getBaselineKeys,
     getLocaleEntries,

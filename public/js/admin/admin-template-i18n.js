@@ -89,7 +89,7 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" :style="{ transform: i18nPage.collapsed[cat.key] === false ? 'rotate(90deg)' : 'rotate(0deg)' }"><polyline points="9 18 15 12 9 6"/></svg>
                     </span>
                 </div>
-                <div v-if="i18nPage.collapsed[cat.key] === false || i18nPage.search.value" class="notification-group-items">
+                <div v-if="i18nPage.collapsed[cat.key] === false" class="notification-group-items">
                     <div v-for="row in cat.visible" :key="row.key" class="notification-item-row p-3">
                         <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
                             <code class="i18n-key-text" :title="row.key">{{ row.key }}</code>
@@ -114,11 +114,40 @@
                         </div>
                     </div>
                     <div v-if="cat.hasMore" class="p-2 text-center">
-                        <pv-button variant="outline" size="lg" @click="i18nPage.loadMore(cat.key)">{{ t('admin.i18n.loadMore') }}</pv-button>
+                        <pv-button variant="outline" size="lg" :disabled="cat.loading" @click="i18nPage.loadMore(cat.key)">{{ t('admin.i18n.loadMore') }}</pv-button>
                     </div>
                 </div>
             </div>
-            <div v-if="!i18nPage.groups.value.length && !i18nPage.loading.value" class="text-muted text-center py-4">
+            <!-- 搜索态：跨组分页平铺结果（打开时只下载匹配分组条目，不再全量拉取） -->
+            <div v-if="i18nPage.searchMode.value">
+                <div v-for="row in i18nPage.searchRows.value" :key="row.key" class="notification-item-row p-3">
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                        <code class="i18n-key-text" :title="row.key">{{ row.key }}</code>
+                        <span v-if="row.is_new" class="i18n-badge i18n-badge--new">{{ t('admin.i18n.isNew') }}</span>
+                        <span v-if="row.is_new && !row.override" class="i18n-pending-warn" :title="t('admin.i18n.isNew')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        </span>
+                        <span v-if="row.override && !row.dirty" class="i18n-badge i18n-badge--override">{{ t('admin.i18n.overridden') }}</span>
+                        <span v-if="row.dirty" class="i18n-badge i18n-badge--dirty">{{ t('admin.i18n.dirty') }}</span>
+                        <span class="ms-auto">
+                            <pv-button v-if="i18nPage.rowOverridable(row)" variant="outline-danger" @click="i18nPage.restoreKey(row)">{{ t('admin.i18n.resetOne') }}</pv-button>
+                        </span>
+                    </div>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-md-4">
+                            <div class="i18n-original-text text-muted small" :title="row.original">{{ row.original }}</div>
+                            <div v-if="row.zh !== undefined" class="i18n-zh-ref small" :title="row.zh">{{ t('admin.i18n.zhRef') }}：{{ row.zh }}</div>
+                        </div>
+                        <div class="col-md-8">
+                            <input type="text" class="form-control form-control-sm i18n-edit-input" :class="{ 'i18n-edit-dirty': row.dirty }" :placeholder="row.original" :value="i18nPage.fieldValue(row)" @input="i18nPage.onFieldInput(row, $event)" autocomplete="off">
+                        </div>
+                    </div>
+                </div>
+                <div v-if="i18nPage.searchRows.value.length < i18nPage.searchMeta.total" class="p-2 text-center">
+                    <pv-button variant="outline" size="lg" :disabled="i18nPage.searchMeta.loading" @click="i18nPage.searchLoadMore()">{{ t('admin.i18n.loadMore') }}</pv-button>
+                </div>
+            </div>
+            <div v-if="!i18nPage.groups.value.length && !i18nPage.searchRows.value.length && !i18nPage.loading.value" class="text-muted text-center py-4">
                 {{ (i18nPage.search.value || i18nPage.showOnlyPending.value) ? t('admin.i18n.emptySearch') : t('admin.i18n.empty') }}
             </div>
         </div>

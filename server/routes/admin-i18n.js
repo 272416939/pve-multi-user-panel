@@ -37,17 +37,33 @@ async function rateLimit(req, res) {
     return true;
 }
 
-// GET /admin/i18n/languages/:code/entries - 条目列表（全量逻辑 key：key/original/value/override/is_new）
+// GET /admin/i18n/languages/:code/entries - 条目列表
+// 参数：cat=分组前缀（展开分组分页拉取）；page/limit 分页（默认 200/页上限 500）；
+// kw=搜索关键词（跨组分页平铺）；pending=1 只看待翻译（is_new && !override）
+// 无 cat/kw 时返回分组元数据（groups: 分类/计数/待翻译——管理界面打开只拉这份轻量数据，
+// 展开分组才分页拉条目，避免 2800+ 条词条全量一次下发）
 router.get('/admin/i18n/languages/:code/entries', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const code = String(req.params.code || '');
         const lang = await db.i18n.getLanguage(code);
         if (!lang) return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
-        const entries = await i18nService.getLocaleEntries(code);
-        res.json({
-            language: { code: lang.code, name: lang.name, base_code: lang.base_code, is_system: !!lang.is_system },
-            entries: entries
-        });
+        const base = { code: lang.code, name: lang.name, base_code: lang.base_code, is_system: !!lang.is_system };
+        const cat = req.query.cat ? String(req.query.cat).slice(0, 50) : '';
+        const kw = typeof req.query.kw === 'string' ? String(req.query.kw) : '';
+        if (cat || kw) {
+            const result = await i18nService.paginateLocaleEntries(code, {
+                cat: cat || undefined,
+                kw: kw || undefined,
+                pendingOnly: req.query.pending === '1',
+                page: req.query.page,
+                limit: req.query.limit
+            });
+            if (!result) return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
+            return res.json(Object.assign({ language: base }, result));
+        }
+        const groups = await i18nService.getLocaleGroups(code, req.query.pending === '1');
+        if (!groups) return res.status(404).json({ error: '未知语言', code: 'UNKNOWN_LANG' });
+        res.json({ language: base, groups: groups });
     } catch (error) {
         console.error('获取 i18n 条目失败:', error.message);
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
