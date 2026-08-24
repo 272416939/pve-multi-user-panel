@@ -785,6 +785,75 @@ async function initDb() {
         ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
 
+    // ========== 区域管理体系（地域/可用区/PVE节点/爱快节点） ==========
+    await execute(`
+        CREATE TABLE IF NOT EXISTS regions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL UNIQUE,
+            remark VARCHAR(255) NOT NULL DEFAULT '',
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await execute(`
+        CREATE TABLE IF NOT EXISTS zones (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            region_id INT NOT NULL,
+            name VARCHAR(100) NOT NULL,
+            remark VARCHAR(255) NOT NULL DEFAULT '',
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uk_zones_region_name (region_id, name),
+            INDEX idx_zones_region (region_id)
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await execute(`
+        CREATE TABLE IF NOT EXISTS ikuai_nodes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            version VARCHAR(10) NOT NULL DEFAULT 'v3',
+            host VARCHAR(255) NOT NULL DEFAULT '',
+            username VARCHAR(100) NOT NULL DEFAULT '',
+            password TEXT,
+            api_key TEXT,
+            strict_tls TINYINT(1) NOT NULL DEFAULT 0,
+            enabled TINYINT(1) NOT NULL DEFAULT 1,
+            latency_ms INT DEFAULT NULL,
+            last_check_at DATETIME DEFAULT NULL,
+            last_ok_at DATETIME DEFAULT NULL,
+            last_error VARCHAR(500) NOT NULL DEFAULT '',
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await execute(`
+        CREATE TABLE IF NOT EXISTS pve_nodes (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            zone_id INT NOT NULL,
+            ikuai_node_id INT DEFAULT NULL,
+            api_host VARCHAR(255) NOT NULL DEFAULT '',
+            api_token TEXT,
+            ssh_host VARCHAR(255) NOT NULL DEFAULT '',
+            ssh_port INT NOT NULL DEFAULT 22,
+            ssh_user VARCHAR(64) NOT NULL DEFAULT 'root',
+            ssh_password TEXT,
+            strict_tls TINYINT(1) NOT NULL DEFAULT 0,
+            backup_storage VARCHAR(100) NOT NULL DEFAULT 'local',
+            enabled TINYINT(1) NOT NULL DEFAULT 1,
+            latency_ms INT DEFAULT NULL,
+            last_check_at DATETIME DEFAULT NULL,
+            last_ok_at DATETIME DEFAULT NULL,
+            last_error VARCHAR(500) NOT NULL DEFAULT '',
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_pve_nodes_zone (zone_id)
+        ) CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
     // 初始化 i18n 系统语言（INSERT IGNORE：已存在不覆盖）
     await initI18nLanguages();
 
@@ -1005,6 +1074,128 @@ async function migrateSchema() {
 
     // 注：孤立端口转发规则（vm_id 和 ct_id 均为 NULL）不再自动迁移为 general 类型
     // 如需修改类型，请管理员在端口转发管理界面手动编辑
+
+    // ========== 区域/节点体系迁移：业务表加节点归属列 + 存量数据自动绑定默认节点 ==========
+    // 资产/商品表挂 PVE 节点（vmid 不再全局唯一）
+    await safeAlter('vms', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('lxc_containers', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('disks', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('backups', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('vm_packages', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('lxc_packages', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('vm_templates', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('lxc_templates', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('os_templates', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('disk_specs', 'pve_node_id', 'INT DEFAULT NULL');
+    // NAT/私有网络挂爱快节点
+    await safeAlter('port_forwards', 'ikuai_node_id', 'INT DEFAULT NULL');
+    await safeAlter('subnets', 'ikuai_node_id', 'INT DEFAULT NULL');
+
+    await safeAddIndex('vms', 'idx_vms_pve_node', 'pve_node_id, vm_id');
+    await safeAddIndex('lxc_containers', 'idx_lxc_pve_node', 'pve_node_id, ct_id');
+    await safeAddIndex('disks', 'idx_disks_pve_node', 'pve_node_id');
+    await safeAddIndex('backups', 'idx_backups_pve_node', 'pve_node_id');
+    await safeAddIndex('port_forwards', 'idx_port_forwards_iknode', 'ikuai_node_id');
+    await safeAddIndex('subnets', 'idx_subnets_iknode', 'ikuai_node_id');
+
+    await migrateRegionNodes();
+}
+
+// 区域/节点体系迁移（幂等）：默认地域/可用区种子 + 旧单节点配置导入为节点行 + 业务表回填节点 ID
+async function migrateRegionNodes() {
+    try {
+        const regionCount = (await queryOne('SELECT COUNT(*) AS c FROM regions')).c;
+        let defaultZoneId;
+        if (!regionCount) {
+            const [regionResult] = await execute(
+                "INSERT INTO regions (name, remark, sort_order) VALUES ('默认地域', '系统自动创建', 100)");
+            const [zoneResult] = await execute(
+                "INSERT INTO zones (region_id, name, remark, sort_order) VALUES (?, '默认可用区', '系统自动创建', 100)",
+                [regionResult.insertId]);
+            defaultZoneId = zoneResult.insertId;
+            console.log('[db] 已创建默认地域/默认可用区');
+        } else {
+            const z = await queryOne('SELECT id FROM zones ORDER BY sort_order DESC, id ASC LIMIT 1');
+            defaultZoneId = z ? z.id : null;
+        }
+
+        // 旧全局 PVE 配置 → 导入为首条 PVE 节点
+        const pveCount = (await queryOne('SELECT COUNT(*) AS c FROM pve_nodes')).c;
+        if (!pveCount) {
+            const legacyHost = (await queryOne('SELECT value FROM config WHERE `key` = ?', ['pve:host']))?.value;
+            if (legacyHost && defaultZoneId) {
+                const cfg = await require('./db-config').config.getPve();
+                const { encrypt } = require('../utils/crypto-utils');
+                await execute(
+                    `INSERT INTO pve_nodes (name, zone_id, ikuai_node_id, api_host, api_token, ssh_host, ssh_port,
+                     ssh_user, ssh_password, strict_tls, backup_storage, enabled)
+                     VALUES ('默认节点', ?, NULL, ?, ?, ?, ?, ?, ?, ?,
+                     COALESCE((SELECT value FROM config WHERE \`key\` = 'backup:default_storage'), 'local'), 1)`,
+                    [defaultZoneId, cfg.host || '', encrypt(cfg.api_token || ''), cfg.ssh_host || '',
+                     cfg.ssh_port || 22, cfg.ssh_user || 'root', encrypt(cfg.ssh_password || ''),
+                     cfg.strict_tls ? 1 : 0]
+                );
+                console.log('[db] 已将旧 PVE 配置导入为「默认节点」');
+            }
+        }
+
+        // 旧全局爱快配置 → 导入为首条爱快节点，并把网络四组设置复制进该节点作用域键
+        const ikCount = (await queryOne('SELECT COUNT(*) AS c FROM ikuai_nodes')).c;
+        if (!ikCount) {
+            const legacyHost = (await queryOne('SELECT value FROM config WHERE `key` = ?', ['ikuai:host']))?.value;
+            if (legacyHost) {
+                const cfg = await require('./db-config').config.getIkuai();
+                const { encrypt } = require('../utils/crypto-utils');
+                const [ikResult] = await execute(
+                    `INSERT INTO ikuai_nodes (name, version, host, username, password, api_key, strict_tls, enabled)
+                     VALUES ('默认爱快', ?, ?, ?, ?, ?, ?, 1)`,
+                    [cfg.version === 'v4' ? 'v4' : 'v3', cfg.host || '', cfg.username || '',
+                     encrypt(cfg.password || ''), encrypt(cfg.api_key || ''), cfg.strict_tls ? 1 : 0]
+                );
+                // 网络四组设置迁入节点作用域键 ikuai:<nodeId>:<key>（仅导入的首节点）
+                const NET_KEYS = [
+                    'forward:port_range_start', 'forward:port_range_end', 'forward:default_protocol',
+                    'forward:wan_interface', 'forward:max_per_user',
+                    'dhcp:ip_range_start', 'dhcp:ip_range_end', 'dhcp:interface',
+                    'dhcp:gateway', 'dhcp:dns1', 'dhcp:dns2',
+                    'vlan:ip_segment_start', 'vlan:id_start', 'vlan:interface', 'vlan:max_per_user',
+                    'cname:domain'
+                ];
+                for (const key of NET_KEYS) {
+                    // 先读已迁入的 ikuai:<key> 前缀键，再回退更早的全局键（与 getIkuaiSetting 回退链一致）
+                    const r1 = await queryOne('SELECT value FROM config WHERE `key` = ?', ['ikuai:' + key]);
+                    if (process.env.DEBUG_MIGRATE === '1') console.log('[db][L1]', key, JSON.stringify(r1));
+                    let val = r1 ? r1.value : undefined;
+                    if (val === undefined || val === null) {
+                        const r2 = await queryOne('SELECT value FROM config WHERE `key` = ?', [key]);
+                        if (process.env.DEBUG_MIGRATE === '1') console.log('[db][L2]', key, JSON.stringify(r2));
+                        val = r2 ? r2.value : undefined;
+                    }
+                    if (val !== undefined && val !== null) {
+                        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:' + ikResult.insertId + ':' + key, val]);
+                    }
+                }
+                console.log('[db] 已将旧爱快配置导入为「默认爱快」（含网络四组设置作用域迁移）');
+            }
+        }
+
+        // 业务表回填首节点 ID（vmid 不再全局唯一，资产必须挂到具体节点）
+        const firstPve = (await queryOne('SELECT id FROM pve_nodes ORDER BY sort_order DESC, id ASC LIMIT 1'))?.id;
+        if (firstPve) {
+            const pveTables = ['vms', 'lxc_containers', 'disks', 'backups',
+                'vm_packages', 'lxc_packages', 'vm_templates', 'lxc_templates', 'os_templates', 'disk_specs'];
+            for (const t of pveTables) {
+                try { await execute(`UPDATE ${t} SET pve_node_id = ? WHERE pve_node_id IS NULL`, [firstPve]); } catch (_) {}
+            }
+        }
+        const firstIk = (await queryOne('SELECT id FROM ikuai_nodes ORDER BY sort_order DESC, id ASC LIMIT 1'))?.id;
+        if (firstIk) {
+            try { await execute('UPDATE port_forwards SET ikuai_node_id = ? WHERE ikuai_node_id IS NULL', [firstIk]); } catch (_) {}
+            try { await execute('UPDATE subnets SET ikuai_node_id = ? WHERE ikuai_node_id IS NULL', [firstIk]); } catch (_) {}
+        }
+    } catch (e) {
+        console.error('[db] 区域/节点体系迁移失败:', e.message);
+    }
 }
 
 // 初始化 i18n 系统语言（异步）

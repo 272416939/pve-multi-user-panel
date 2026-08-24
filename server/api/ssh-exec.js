@@ -63,16 +63,37 @@ const { Client } = require('ssh2');
 
 /**
  * 从数据库获取 PVE SSH 配置（解密密码）
- * @returns {Promise<{host: string, username: string, password: string, port: number}>}
+ * @param {number|null} nodeId - pve_nodes.id；null=默认节点（无节点时回退旧全局 config 键）
+ * @returns {Promise<{host: string, username: string, password: string, port: number, nodeId: number|null}>}
  */
-async function getPveSshConfig() {
+async function getPveSshConfig(nodeId = null) {
     const db = require('./db');
-    const config = await db.config.getPve();
+    var config;
+    var resolvedNodeId = null;
+    if (nodeId != null) {
+        const node = await db.pveNodes.get(nodeId);
+        if (!node) throw new Error('PVE 节点不存在 (#' + nodeId + ')');
+        config = { ssh_host: node.ssh_host, ssh_user: node.ssh_user, ssh_password: node.ssh_password, ssh_port: node.ssh_port };
+        resolvedNodeId = nodeId;
+    } else {
+        const defaultId = await db.pveNodes.getDefaultId();
+        if (defaultId != null) {
+            const node = await db.pveNodes.get(defaultId);
+            if (node && node.ssh_host) {
+                config = { ssh_host: node.ssh_host, ssh_user: node.ssh_user, ssh_password: node.ssh_password, ssh_port: node.ssh_port };
+                resolvedNodeId = defaultId;
+            }
+        }
+        if (!config) {
+            config = await db.config.getPve(); // 全新安装/尚未建节点的引导路径
+        }
+    }
     return {
         host: config.ssh_host || '',
         username: config.ssh_user || 'root',
         password: config.ssh_password || '',
-        port: config.ssh_port || 22
+        port: config.ssh_port || 22,
+        nodeId: resolvedNodeId
     };
 }
 

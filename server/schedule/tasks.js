@@ -258,6 +258,9 @@ async function cleanupExpiredRefreshTokens() {
 }
 
 function initScheduledTasks() {
+    // 节点连接监测（每 30s 轻量探测爱快/PVE 节点，回写延迟与失败原因）
+    require('./node-monitor').initNodeMonitor();
+
     // 过期/已撤销 refresh_tokens 清理（每日凌晨 3 点：登录/刷新/登出只增不删，防表无限膨胀）
     schedule.scheduleJob('0 3 * * *', async () => {
         if (await tryAcquireLock('lock:refresh-tokens-cleanup')) {

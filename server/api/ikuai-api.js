@@ -1,7 +1,12 @@
 const db = require('./db');
 
 class IkuaiApi {
-    constructor() {
+    /**
+     * @param {number|null} nodeId - 绑定的 ikuai_nodes.id；null=默认节点（过渡兼容：
+     *   先取默认节点行，无任何节点时回退旧全局 config 键 / .env 引导）
+     */
+    constructor(nodeId = null) {
+        this.nodeId = nodeId;
         // 配置不再于模块加载时读 .env，改为惰性从面板 DB 加载（60s 内存缓存）；
         // 保存配置后 reloadConfig() 清缓存立即生效，无需重启
         this.config = null;          // { host, username, password, api_key, version, strict_tls }
@@ -26,31 +31,53 @@ class IkuaiApi {
         return !!(c.host && c.username && c.password);
     }
 
-    // 配置加载：面板 DB 优先；仅当从未在面板配置过（DB 无 ikuai:host 行）且 .env 存在 IKUAI_* 时，
-    // 用 .env 一次性迁移入 DB。面板显式清空地址 = 停用，不回退 .env（绝不覆盖面板已有配置）。
+    // 配置加载（多节点）：
+    // - 绑定节点：读 ikuai_nodes 行（解密后的连接信息），行不存在/停用视为未配置
+    // - 默认客户端：先解析默认节点行；无任何节点时回退旧全局 ikuai:* 配置键与 .env 引导
     async ensureConfig() {
         var now = Date.now();
         if (this.config && (now - this._configLoadedAt) < this._configTTL) return this.config;
         try {
-            var cfg = await db.config.getIkuai();
-            var hostRow = await db.config.get('ikuai:host'); // undefined = 从未在面板保存过
-            if (!cfg.host && hostRow === undefined) {
-                var envHost = process.env.IKUAI_HOST || '';
-                var envUser = process.env.IKUAI_USER || '';
-                var envPass = process.env.IKUAI_PASSWORD || '';
-                if (envHost && envUser && envPass) {
-                    cfg = { host: envHost, username: envUser, password: envPass, api_key: '', version: 'v3', strict_tls: false };
-                    try {
-                        await db.config.setIkuai(cfg);
-                        console.log(`[ikuai] 已从 .env 迁移配置到面板 DB (${envHost})`);
-                    } catch (e) {
-                        console.error('[ikuai] .env 配置迁移写入 DB 失败（本次继续使用 env 兜底）:', e.message);
-                    }
-                } else {
-                    cfg = null;
+            var cfg = null;
+            if (this.nodeId != null) {
+                const node = await db.ikuaNodes.get(this.nodeId);
+                if (node && node.enabled && node.host) {
+                    cfg = { host: node.host, username: node.username, password: node.password,
+                            api_key: node.api_key, version: node.version || 'v3', strict_tls: !!node.strict_tls };
                 }
-            } else if (!cfg.host) {
-                cfg = null; // 面板已显式清空地址：保持停用
+            } else {
+                const defaultId = await db.ikuaNodes.getDefaultId();
+                if (defaultId != null) {
+                    const node = await db.ikuaNodes.get(defaultId);
+                    if (node && node.enabled && node.host) {
+                        cfg = { host: node.host, username: node.username, password: node.password,
+                                api_key: node.api_key, version: node.version || 'v3', strict_tls: !!node.strict_tls };
+                    }
+                }
+                if (!cfg) {
+                    // 旧全局配置路径：面板 DB 优先；仅当从未在面板配置过（DB 无 ikuai:host 行）且 .env 存在 IKUAI_* 时，
+                    // 用 .env 一次性迁移入 DB。面板显式清空地址 = 停用，不回退 .env（绝不覆盖面板已有配置）。
+                    cfg = await db.config.getIkuai();
+                    var hostRow = await db.config.get('ikuai:host'); // undefined = 从未在面板保存过
+                    if (!cfg.host && hostRow === undefined) {
+                        var envHost = process.env.IKUAI_HOST || '';
+                        var envUser = process.env.IKUAI_USER || '';
+                        var envPass = process.env.IKUAI_PASSWORD || '';
+                        if (envHost && envUser && envPass) {
+                            cfg = { host: envHost, username: envUser, password: envPass, api_key: '', version: 'v3', strict_tls: false };
+                            try {
+                                await db.config.setIkuai(cfg);
+                                console.log(`[ikuai] 已从 .env 迁移配置到面板 DB (${envHost})`);
+                            } catch (e) {
+                                console.error('[ikuai] .env 配置迁移写入 DB 失败（本次继续使用 env 兜底）:', e.message);
+                            }
+                        } else {
+                            cfg = null;
+                        }
+                    } else if (!cfg.host) {
+                        cfg = null; // 面板已显式清空地址：保持停用
+                    }
+                }
             }
             this.config = cfg;
             this._configLoadedAt = Date.now();
@@ -713,3 +740,5 @@ class IkuaiApi {
 }
 
 module.exports = new IkuaiApi();
+// 类引用挂在单例上，供 ikuai-clients.js 工厂创建多节点实例
+module.exports.IkuaiApi = IkuaiApi;

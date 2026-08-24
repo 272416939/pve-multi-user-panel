@@ -25,6 +25,7 @@ const dbBilling = require('./db-billing');
 const dbIp = require('./db-ip');
 const dbEmailTemplates = require('./db-email-templates');
 const dbI18n = require('./db-i18n');
+const dbNodes = require('./db-nodes');
 
 module.exports = {
     // 数据库连接
@@ -162,4 +163,11 @@ module.exports = {
 
     // i18n 语言（i18n_languages + i18n_entries）
     i18n: dbI18n.i18n,
+
+    // 区域管理（地域/可用区/PVE节点/爱快节点）
+    regions: dbNodes.regions,
+    zones: dbNodes.zones,
+    ikuaNodes: dbNodes.ikuaNodes,
+    pveNodes: dbNodes.pveNodes,
+    nodeOverviews: dbNodes.overviews,
 };

@@ -172,16 +172,41 @@ const config = {
     get: async (key) => (await queryOne('SELECT value FROM config WHERE `key` = ?', [key]))?.value,
     set: (key, value) => execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', [key, value]),
 
-    // ========== 爱快节点作用域配置（多节点预留） ==========
-    // 键规则：ikuai:<key>（如 ikuai:forward:port_range_start）。当前单节点，ikuai: 前缀即节点作用域；
-    // 将来多节点时给 getIkuaiSetting/setIkuaiSetting 增加 nodeId 参数即可，消费方零改动。
-    // 兼容策略：新作用域键未配置时回退读旧全局键（forward:* 等存量数据），保存后写入作用域键——无需迁移脚本。
-    getIkuaiSetting: async (key) => {
-        const scoped = await config.get('ikuai:' + key);
-        if (scoped !== undefined && scoped !== null) return scoped;
+    // ========== 爱快节点作用域配置 ==========
+    // 键规则：多节点后为 ikuai:<nodeId>:<key>（如 ikuai:1:forward:port_range_start）；
+    // 网络四组设置是「路由本地命名空间」（各爱快独立），新节点未配置时回退旧前缀/全局键作为缺省模板。
+    // 回退链：显式 nodeId → ikuai:<nodeId>:<key> → ikuai:<key> → <key>；
+    //         未传 nodeId → 默认节点作用域键 → ikuai:<key> → <key>（兼容未迁移调用点）。
+    getIkuaiSetting: async (key, nodeId) => {
+        if (nodeId != null) {
+            const scoped = await config.get('ikuai:' + nodeId + ':' + key);
+            if (scoped !== undefined && scoped !== null) return scoped;
+        } else {
+            // 兼容旧调用：解析默认爱快节点作用域
+            try {
+                const defId = await require('./db-nodes').ikuaNodes.getDefaultId();
+                if (defId != null) {
+                    const scoped = await config.get('ikuai:' + defId + ':' + key);
+                    if (scoped !== undefined && scoped !== null) return scoped;
+                }
+            } catch (_) { /* 表尚未建立时静默回退 */ }
+        }
+        const legacyPrefixed = await config.get('ikuai:' + key);
+        if (legacyPrefixed !== undefined && legacyPrefixed !== null) return legacyPrefixed;
         return await config.get(key);
     },
-    setIkuaiSetting: (key, value) => config.set('ikuai:' + key, value),
+    setIkuaiSetting: async (key, value, nodeId) => {
+        var target = 'ikuai:' + key;
+        if (nodeId != null) {
+            target = 'ikuai:' + nodeId + ':' + key;
+        } else {
+            try {
+                const defId = await require('./db-nodes').ikuaNodes.getDefaultId();
+                if (defId != null) target = 'ikuai:' + defId + ':' + key;
+            } catch (_) { /* 表尚未建立时写旧前缀键 */ }
+        }
+        return config.set(target, value);
+    },
 
     // ========== 邮件外壳样式（邮件样式编辑） ==========
     // 键规则：mail:shell_<key>，参数定义与默认值单一来源 constants/email-templates.js 的 EMAIL_SHELL_PARAMS

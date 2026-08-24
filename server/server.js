@@ -284,6 +284,9 @@ app.use('/api', require('./routes/admin-logs'));
 app.use('/api', require('./routes/admin-email-template'));
 app.use('/api', require('./routes/i18n'));
 app.use('/api', require('./routes/admin-i18n'));
+app.use('/api', require('./routes/admin-regions'));
+app.use('/api', require('./routes/admin-ikuai-nodes'));
+app.use('/api', require('./routes/admin-pve-nodes'));
 
 const vncProxy = require('./websocket/vnc-proxy');
 const terminalProxy = require('./websocket/terminal-proxy');

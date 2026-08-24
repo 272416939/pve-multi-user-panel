@@ -38,10 +38,30 @@ async function withRetry(fn, maxRetries = 2) {
   throw lastErr;
 }
 
+// pve_nodes 行 → PveApi 配置形状（api_host→host 对齐旧全局键字段名）
+function mapNodeRow(node) {
+  return {
+    host: node.api_host || '',
+    api_token: node.api_token || '',
+    ssh_host: node.ssh_host || '',
+    ssh_port: node.ssh_port || 22,
+    ssh_user: node.ssh_user || 'root',
+    ssh_password: node.ssh_password || '',
+    strict_tls: !!node.strict_tls,
+    backup_storage: node.backup_storage || 'local'
+  };
+}
+
 class PveApi {
-  constructor() {
+  /**
+   * @param {number|null} nodeId - 绑定的 pve_nodes.id；null=默认节点（过渡兼容：
+   *   先取默认节点行，无任何节点时回退旧全局 config 键，保证未迁移调用点行为不变）
+   */
+  constructor(nodeId = null) {
+    this.nodeId = nodeId;
+    this._resolvedNodeId = null; // 实际绑定的节点 ID（_getConfig 内解析，缓存键前缀用）
     this.node = null;
-    // 内部缓存（从 DB 读取，保存 PVE 配置后 reloadConfig() 即时失效，TTL 仅兜底）
+    // 内部缓存（从 DB 读取，保存节点配置后 reloadConfig()/invalidatePveClient() 即时失效，TTL 仅兜底）
     this._configCache = null;
     this._configCacheTime = 0;
     this._configTTL = 300000; // 5 分钟
@@ -80,7 +100,8 @@ class PveApi {
     });
   }
 
-  // 从 DB 读取 PVE 配置（带缓存）
+  // 从 DB 读取 PVE 配置（带缓存）。多节点：按 nodeId 读 pve_nodes 行；
+  // 默认客户端：先解析默认节点行，无任何节点时回退旧全局 pve:* 配置键
   async _getConfig() {
     var now = Date.now();
     if (this._configCache && now - this._configCacheTime < this._configTTL) {
@@ -88,14 +109,38 @@ class PveApi {
     }
     try {
       const db = require('./db');
-      const config = await db.config.getPve();
+      var config = null;
+      if (this.nodeId != null) {
+        const node = await db.pveNodes.get(this.nodeId);
+        if (!node) throw new Error('PVE 节点不存在 (#' + this.nodeId + ')');
+        config = mapNodeRow(node);
+        this._resolvedNodeId = this.nodeId;
+      } else {
+        const defaultId = await db.pveNodes.getDefaultId();
+        if (defaultId != null) {
+          const node = await db.pveNodes.get(defaultId);
+          if (node && node.api_host) {
+            config = mapNodeRow(node);
+            this._resolvedNodeId = defaultId;
+          }
+        }
+        if (!config) {
+          config = await db.config.getPve(); // 全新安装/尚未建节点时的引导路径
+          this._resolvedNodeId = null;
+        }
+      }
       this._configCache = config;
       this._configCacheTime = now;
       return config;
     } catch (e) {
-      console.error('[pve-api] 读取 PVE 配置失败:', e.message);
+      console.error('[pve-api] 读取 PVE 节点配置失败:', e.message);
       return { host: '', api_token: '', ssh_host: '', ssh_port: 22, ssh_user: 'root', ssh_password: '' };
     }
+  }
+
+  // 只读缓存键：必须带节点作用域前缀（不同节点的 storages/vms/vmconfig 互不相同）
+  _ck(key) {
+    return 'n' + (this._resolvedNodeId != null ? this._resolvedNodeId : 'x') + ':' + key;
   }
 
   // 保存配置后刷新缓存
@@ -135,14 +180,14 @@ class PveApi {
   }
 
   async getNodes() {
-    return pveCache.get('nodes', async () => {
+    return pveCache.get(this._ck('nodes'), async () => {
       const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes`);
       return response.data.data;
     });
   }
 
   async getVms(options) {
-    var cacheKey = options && options.templateOnly ? 'vms:tpl' : 'vms';
+    var cacheKey = this._ck(options && options.templateOnly ? 'vms:tpl' : 'vms');
     var self = this;
     return pveCache.get(cacheKey, async () => {
       if (!self.node) {
@@ -179,7 +224,7 @@ class PveApi {
 
   async getVmConfig(vmid) {
     var self = this;
-    return pveCache.get('vmconfig:' + vmid, async () => {
+    return pveCache.get(self._ck('vmconfig:' + vmid), async () => {
       if (!self.node) {
         await self.detectNode();
       }
@@ -254,7 +299,7 @@ class PveApi {
 
   async getSnapshots(vmid) {
     var self = this;
-    return pveCache.get('snapshots:' + vmid, async () => {
+    return pveCache.get(self._ck('snapshots:' + vmid), async () => {
       if (!self.node) {
         await self.detectNode();
       }
@@ -376,7 +421,7 @@ class PveApi {
   }
 
   async getStorageList() {
-    return pveCache.get('storages', async () => {
+    return pveCache.get(this._ck('storages'), async () => {
       if (!this.node) {
         await this.detectNode();
       }
@@ -387,7 +432,7 @@ class PveApi {
   }
 
   async getAllStorages() {
-    return pveCache.get('all-storages', async () => {
+    return pveCache.get(this._ck('all-storages'), async () => {
       if (!this.node) {
         await this.detectNode();
       }
@@ -397,7 +442,7 @@ class PveApi {
   }
 
   async getLxcStorageList() {
-    return pveCache.get('lxc-storages', async () => {
+    return pveCache.get(this._ck('lxc-storages'), async () => {
       if (!this.node) {
         await this.detectNode();
       }
@@ -492,7 +537,7 @@ class PveApi {
 
   async getLxcContainers() {
     var self = this;
-    return pveCache.get('lxc-vms', async () => {
+    return pveCache.get(self._ck('lxc-vms'), async () => {
       if (!self.node) {
         await self.detectNode();
       }
@@ -522,7 +567,7 @@ class PveApi {
 
   async getLxcConfig(vmid) {
     var self = this;
-    return pveCache.get('lxc-config:' + vmid, async () => {
+    return pveCache.get(self._ck('lxc-config:' + vmid), async () => {
       if (!self.node) {
         await self.detectNode();
       }
@@ -634,7 +679,7 @@ class PveApi {
 
   async getLxcSnapshots(vmid) {
     var self = this;
-    return pveCache.get('lxc-snapshots:' + vmid, async () => {
+    return pveCache.get(self._ck('lxc-snapshots:' + vmid), async () => {
       if (!self.node) {
         await self.detectNode();
       }
@@ -679,7 +724,7 @@ class PveApi {
   }
 
   async getTemplates(storage) {
-    return pveCache.get('templates:' + storage, async () => {
+    return pveCache.get(this._ck('templates:' + storage), async () => {
       if (!this.node) {
         await this.detectNode();
       }
@@ -776,3 +821,5 @@ class PveApi {
 }
 
 module.exports = new PveApi();
+// 类引用挂在单例上，供 pve-clients.js 工厂创建多节点实例
+module.exports.PveApi = PveApi;
