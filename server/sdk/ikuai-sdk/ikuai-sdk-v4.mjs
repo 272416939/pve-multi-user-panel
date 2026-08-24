@@ -100,16 +100,21 @@ export class IKuaiV4Client {
     if (status === 401) {
       throw new Error('爱快 V4 认证失败：API Token 无效或已过期');
     }
-    if (status >= 400) {
+    // 非 2xx（含 3xx 重定向到登录页等）：不是有效 API 响应，明确报错防假成功
+    if (status < 200 || status >= 300) {
       const msg = (data && data.message) ? data.message : ('HTTP ' + status);
-      throw new Error('爱快 V4 请求失败：' + msg);
+      throw new Error('爱快 V4 请求失败：' + msg + (status >= 300 && status < 400 ? '（重定向，请确认地址为爱快 V4 设备且 REST API 已开放）' : ''));
     }
     // 业务层：HTTP 成功但 code != 0（文档：code=0 成功，非 0 业务失败）
-    if (data && typeof data === 'object' && typeof data.code === 'number' && data.code !== 0) {
+    if (data && typeof data === 'object' && !Array.isArray(data) && typeof data.code === 'number' && data.code !== 0) {
       const details = Array.isArray(data.details)
         ? ' (' + data.details.map(d => d.msg || d.message || JSON.stringify(d)).join('; ') + ')'
         : '';
       throw new Error((data.message || ('业务错误 code=' + data.code)) + details);
+    }
+    // 非 JSON 对象响应（V3 设备对 /api/v4.0/* 返回 302/200 HTML 等）→ 假成功防护：明确报错
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      throw new Error('爱快 V4 API 响应格式异常（请确认地址为爱快 V4 设备，且 REST API 已开放）');
     }
     return data;
   }

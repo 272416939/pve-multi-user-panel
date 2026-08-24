@@ -76,10 +76,14 @@ class IkuaiV4Api {
 
     // ===== 测试连接 =====
     // V4 用 monitoring/system（一次请求验证令牌 + 返回设备版本/主机名）
+    // 必须校验响应结构（results.sysinfo.verinfo）：指向非 V4 设备时 302/200 HTML 已被 SDK 拦截，此处双保险
     async testConnection() {
         const api = await this._api();
         const resp = await api.get('/monitoring/system');
         const sysinfo = (resp && resp.results && resp.results.sysinfo) || {};
+        if (!sysinfo || typeof sysinfo !== 'object' || !sysinfo.verinfo) {
+            throw new Error('爱快 V4 响应格式异常（请确认该地址是爱快 V4 设备，且 REST API 已开放）');
+        }
         const verinfo = sysinfo.verinfo || {};
         return {
             leaseCount: 0,
