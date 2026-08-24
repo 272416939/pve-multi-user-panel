@@ -167,6 +167,7 @@
   "admin.disk.orphanCleaned": "고립 레코드 정리: ",
   "admin.disk.pickDisk": "먼저 디스크를 선택하세요",
   "admin.disk.pickFirst": "먼저 수정할 디스크를 선택하세요",
+  "admin.disk.pickNodeFirst": "먼저 노드를 선택하십시오",
   "admin.disk.pickStorage": "저장 위치를 선택하세요",
   "admin.disk.pickTargetGroup": "대상 스토리지 그룹 선택",
   "admin.disk.pleaseSelect": "선택",

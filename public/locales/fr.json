@@ -167,6 +167,7 @@
   "admin.disk.orphanCleaned": "Orphelins nettoyés : ",
   "admin.disk.pickDisk": "Sélectionnez d'abord un disque",
   "admin.disk.pickFirst": "Sélectionnez d'abord des disques",
+  "admin.disk.pickNodeFirst": "Sélectionnez d'abord un nœud",
   "admin.disk.pickStorage": "Choisissez un emplacement",
   "admin.disk.pickTargetGroup": "Choisissez le groupe cible",
   "admin.disk.pleaseSelect": "Sélectionner",

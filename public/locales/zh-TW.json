@@ -167,6 +167,7 @@
   "admin.disk.orphanCleaned": "清理孤立記錄: ",
   "admin.disk.pickDisk": "請先選擇磁碟",
   "admin.disk.pickFirst": "請先選擇要修改的磁碟",
+  "admin.disk.pickNodeFirst": "請先選擇所屬節點",
   "admin.disk.pickStorage": "請選擇儲存位置",
   "admin.disk.pickTargetGroup": "請選擇目標儲存分組",
   "admin.disk.pleaseSelect": "請選擇",

@@ -242,7 +242,16 @@
 
   // 所属节点变更：按所选节点重新加载存储池下拉（无节点 = 默认节点）
   $.diskPage.onNodeChange = function() {
-    $.diskPage.loadPveStorages($.diskPage.diskSpecForm.value.pve_node_id || null);
+    var nid = $.diskPage.diskSpecForm.value.pve_node_id || null;
+    // 切节点时清空旧存储池（旧节点存储对该节点无效）
+    $.diskPage.diskSpecForm.value.storage_pool = '';
+    $.diskPage.diskSpecForm.value.disk_format = 'qcow2';
+    if (nid) {
+      $.diskPage.loadPveStorages(nid);
+    } else {
+      // 未选择节点：存储位置不显示任何存储
+      $.diskPage.diskSpecStorages.value = [];
+    }
   };
 
   // 格式化存储容量显示
@@ -329,9 +338,14 @@
       };
     }
     $.diskPage.showQosSection.value = false;
-    // 先加载 PVE 节点列表，再按所选节点加载存储池（无节点 = 默认节点）
+    // 先加载 PVE 节点列表；有节点才加载该节点存储池（未选节点时存储位置为空）
     await $.diskPage.loadNodeOptions();
-    await $.diskPage.loadPveStorages($.diskPage.diskSpecForm.value.pve_node_id || null);
+    var nid = $.diskPage.diskSpecForm.value.pve_node_id || null;
+    if (nid) {
+      await $.diskPage.loadPveStorages(nid);
+    } else {
+      $.diskPage.diskSpecStorages.value = [];
+    }
     $.diskPage.showDiskSpecModal.value = true;
     $.bsModalShow('diskSpecModal');
   };

@@ -167,6 +167,7 @@
   "admin.disk.orphanCleaned": "孤立レコード削除: ",
   "admin.disk.pickDisk": "先にディスクを選択してください",
   "admin.disk.pickFirst": "先に変更するディスクを選択してください",
+  "admin.disk.pickNodeFirst": "先にノードを選択してください",
   "admin.disk.pickStorage": "保存先を選択してください",
   "admin.disk.pickTargetGroup": "移動先グループを選択",
   "admin.disk.pleaseSelect": "選択してください",

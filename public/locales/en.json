@@ -167,6 +167,7 @@
   "admin.disk.orphanCleaned": "Orphans cleaned: ",
   "admin.disk.pickDisk": "Select a disk first",
   "admin.disk.pickFirst": "Select disks to modify first",
+  "admin.disk.pickNodeFirst": "Select a node first",
   "admin.disk.pickStorage": "Select a storage location",
   "admin.disk.pickTargetGroup": "Select the target storage group",
   "admin.disk.pleaseSelect": "Select",

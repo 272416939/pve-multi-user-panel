@@ -290,6 +290,15 @@
               <option v-for="n in diskPage.pveNodeOptions.value" :key="n.id" :value="n.id">{{ n.name }}{{ n.zone_name ? ' (' + n.zone_name + ')' : '' }}</option>
             </select>
           </div>
+          <!-- 存储位置：紧跟所属节点；未选节点时不显示存储并禁用 -->
+          <div class="col-md-6">
+            <label class="form-label">{{ t('admin.disk.storageLocation') }}</label>
+            <select class="form-select" v-model="diskPage.diskSpecForm.value.storage_pool" @change="diskPage.onStoragePoolChange()" :disabled="!diskPage.diskSpecForm.value.pve_node_id">
+              <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
+              <option v-for="s in diskPage.diskSpecStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} ({{ s.type || t('admin.disk.unknown') }}，{{ t('admin.disk.remaining') }}{{ diskPage.formatStorageSize(s.avail_gb) }})</option>
+            </select>
+            <div class="form-text" v-if="!diskPage.diskSpecForm.value.pve_node_id">{{ t('admin.disk.pickNodeFirst') }}</div>
+          </div>
           <div class="col-md-3">
             <label class="form-label">{{ t('admin.disk.enabledStatus') }}</label>
             <div class="form-check form-switch mt-2">
@@ -324,13 +333,6 @@
               <span class="input-group-text">￥</span>
               <input class="form-control" type="number" step="0.01" v-model.number="diskPage.diskSpecForm.value.price_per_gb" min="0">
             </div>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">{{ t('admin.disk.storageLocation') }}</label>
-            <select class="form-select" v-model="diskPage.diskSpecForm.value.storage_pool" @change="diskPage.onStoragePoolChange()">
-              <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
-              <option v-for="s in diskPage.diskSpecStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} ({{ s.type || t('admin.disk.unknown') }}，{{ t('admin.disk.remaining') }}{{ diskPage.formatStorageSize(s.avail_gb) }})</option>
-            </select>
           </div>
           <div class="col-md-3">
             <label class="form-label">{{ t('admin.disk.diskFormat') }}</label>

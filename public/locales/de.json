@@ -167,6 +167,7 @@
   "admin.disk.orphanCleaned": "Waisen bereinigt: ",
   "admin.disk.pickDisk": "Zuerst Festplatte wählen",
   "admin.disk.pickFirst": "Zuerst Festplatten wählen",
+  "admin.disk.pickNodeFirst": "Bitte zuerst Knoten wählen",
   "admin.disk.pickStorage": "Speicherort wählen",
   "admin.disk.pickTargetGroup": "Ziel-Speichergruppe wählen",
   "admin.disk.pleaseSelect": "Auswählen",
