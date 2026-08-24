@@ -169,6 +169,11 @@ window.__admin.ikuaiNodesPage = (function () {
         }
         $.bsModalShow('ikuaiFormModal');
         refreshInterfaces();
+        // 玻璃多选下拉：弹窗渲染后绑定容器并同步已选文本
+        setTimeout(function () {
+            attachWanMultiSelect(document.getElementById('wanIfaceSelectWrap'));
+            syncWanSelectText();
+        }, 0);
     }
 
     // 外网接口列表：编辑态按节点拉取，新增态无 node_id（服务端回退旧全局配置，失败静默）
@@ -197,6 +202,116 @@ window.__admin.ikuaiNodesPage = (function () {
 
     function clearWanInterfaces() {
         networkForm.wan_interface = [];
+        syncWanSelectText();
+    }
+
+    // ==================== 外网接口玻璃多选下拉（复用 select-glass 统一样式类） ====================
+    var _wanActive = null;
+    var _wanTextEl = null; // attach 时保存，供弹层未打开时也能同步 trigger 文本
+    // 打开其他玻璃下拉/点击外部/滚动时关闭当前 WAN 弹层
+    function closeAllWan() {
+        if (_wanActive && _wanActive.close) _wanActive.close();
+        _wanActive = null;
+    }
+    document.addEventListener('click', function (e) {
+        if (_wanActive && !_wanActive.wrapper.contains(e.target) && !_wanActive.dropdown.contains(e.target)) closeAllWan();
+    });
+    window.addEventListener('scroll', function () { closeAllWan(); }, true);
+
+    function syncWanSelectText() {
+        var textEl = (_wanActive && _wanActive.textEl) || _wanTextEl;
+        if (!textEl) return;
+        var sel = (networkForm.wan_interface || []).filter(Boolean);
+        if (sel.length) {
+            textEl.textContent = sel.join(', ');
+            textEl.className = 'custom-select-text';
+        } else {
+            textEl.textContent = window.__i18n.t('settings.network.wanIfacePh');
+            textEl.className = 'custom-select-text custom-select-placeholder';
+        }
+    }
+
+    // 绑定容器为玻璃多选下拉（幂等）。选项实时取 wanInterfaceList（仅 WAN，无 WAN 回退全部）
+    function attachWanMultiSelect(container) {
+        if (!container || container.__wanBound) return;
+        container.__wanBound = true;
+        container.classList.add('custom-select');
+        container.style.width = '100%';
+        var trigger = document.createElement('div');
+        trigger.className = 'custom-select-trigger';
+        trigger.setAttribute('role', 'button');
+        trigger.setAttribute('tabindex', '0');
+        var textEl = document.createElement('span');
+        textEl.className = 'custom-select-text';
+        trigger.appendChild(textEl);
+        _wanTextEl = textEl; // 供任意时刻同步（弹层未打开时也生效）
+        container.appendChild(trigger);
+        var dropdown = document.createElement('div');
+        dropdown.className = 'custom-select-dropdown';
+        dropdown.style.display = 'none';
+        document.body.appendChild(dropdown);
+
+        function renderOptions() {
+            dropdown.innerHTML = '';
+            var list = wanInterfaceList.value || [];
+            if (list.length === 0) {
+                var empty = document.createElement('div');
+                empty.className = 'option disabled';
+                empty.textContent = window.__i18n.t('nodes.noIface');
+                dropdown.appendChild(empty);
+                return;
+            }
+            list.forEach(function (iface) {
+                var el = document.createElement('div');
+                el.className = 'option' + (isWanIfaceSelected(iface.name) ? ' selected' : '');
+                el.textContent = iface.name + (iface.ip ? ' (' + iface.ip + ')' : '');
+                el.addEventListener('click', function (e) {
+                    e.stopPropagation();
+                    toggleWanIface(iface.name);
+                    syncWanSelectText();
+                    renderOptions(); // 多选：保持打开并刷新勾选
+                });
+                dropdown.appendChild(el);
+            });
+            // 清空已选（与旧版下拉一致）
+            var clearEl = document.createElement('div');
+            clearEl.className = 'option';
+            clearEl.textContent = window.__i18n.t('settings.network.clear');
+            clearEl.style.color = 'var(--color-danger, #dc3545)';
+            clearEl.addEventListener('click', function (e) {
+                e.stopPropagation();
+                clearWanInterfaces();
+                renderOptions();
+            });
+            dropdown.appendChild(clearEl);
+        }
+        function position() {
+            var r = trigger.getBoundingClientRect();
+            dropdown.style.minWidth = r.width + 'px';
+            dropdown.style.left = r.left + 'px';
+            dropdown.style.top = (r.bottom + 4) + 'px';
+        }
+        function open() {
+            closeAllWan();
+            syncWanSelectText();
+            renderOptions();
+            position();
+            dropdown.style.display = 'block';
+            container.classList.add('open');
+            _wanActive = { wrapper: container, dropdown: dropdown, textEl: textEl, close: close };
+        }
+        function close() {
+            container.classList.remove('open');
+            dropdown.style.display = 'none';
+            if (window.releaseFixedDropdown) window.releaseFixedDropdown(dropdown);
+            if (_wanActive && _wanActive.dropdown === dropdown) _wanActive = null;
+        }
+        trigger.addEventListener('click', function (e) { e.stopPropagation(); if (dropdown.style.display === 'block') close(); else open(); });
+        trigger.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (dropdown.style.display === 'block') close(); else open(); }
+            else if (e.key === 'Escape') { e.preventDefault(); close(); }
+        });
+        syncWanSelectText();
     }
 
     // ==================== CNAME 域名行编辑 ====================
@@ -379,6 +494,7 @@ window.__admin.ikuaiNodesPage = (function () {
         toggleWanIface: toggleWanIface,
         isWanIfaceSelected: isWanIfaceSelected,
         clearWanInterfaces: clearWanInterfaces,
+        attachWanMultiSelect: attachWanMultiSelect,
         parseCnameEntries: parseCnameEntries,
         addCnameEntry: addCnameEntry,
         removeCnameEntry: removeCnameEntry,
