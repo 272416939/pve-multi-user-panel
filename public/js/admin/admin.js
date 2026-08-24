@@ -341,7 +341,15 @@
     $.loadIkuaiConfig = async function() {
         try {
             var config = await api('/admin/ikuai/config');
-            $.ikuaiConfig.value = config;
+            // 只取连接配置字段（节点网络设置字段由 loadNetworkConfig 负责，避免污染整对象提交）
+            $.ikuaiConfig.value = {
+                host: config.host || '',
+                username: config.username || '',
+                password: config.password || '',
+                api_key: config.api_key || '',
+                version: config.version || 'v3',
+                strict_tls: !!config.strict_tls
+            };
         } catch (e) {
             console.warn('爱快配置加载失败（服务可能需要重启）:', e.message || e);
         }

@@ -543,10 +543,10 @@ class IkuaiApi {
     async addDhcpStaticBinding(mac, ip, comment, iface, gateway, dns1, dns2) {
         if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).addDhcpStaticBinding(mac, ip, comment, iface, gateway, dns1, dns2);
         // 从数据库读取 DHCP 配置作为默认值
-        const cfgGateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
-        const cfgInterface = await db.config.get('dhcp:interface') || 'lan2';
-        const cfgDns1 = await db.config.get('dhcp:dns1') || '119.29.29.29';
-        const cfgDns2 = await db.config.get('dhcp:dns2') || '223.5.5.5';
+        const cfgGateway = await db.config.getIkuaiSetting('dhcp:gateway') || '10.0.0.1';
+        const cfgInterface = await db.config.getIkuaiSetting('dhcp:interface') || 'lan2';
+        const cfgDns1 = await db.config.getIkuaiSetting('dhcp:dns1') || '180.76.76.76';
+        const cfgDns2 = await db.config.getIkuaiSetting('dhcp:dns2') || '223.5.5.5';
         const result = await this._call('dhcp_static', 'add', {
             id: Math.floor(Date.now() / 1000),
             newRow: true,
@@ -567,10 +567,10 @@ class IkuaiApi {
     // DHCP 静态绑定：编辑（修改 IP）
     async editDhcpStaticBinding(bindingId, mac, newIp, comment, iface, gateway, dns1, dns2) {
         if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).editDhcpStaticBinding(bindingId, mac, newIp, comment, iface, gateway, dns1, dns2);
-        const cfgGateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
-        const cfgInterface = await db.config.get('dhcp:interface') || 'lan2';
-        const cfgDns1 = await db.config.get('dhcp:dns1') || '119.29.29.29';
-        const cfgDns2 = await db.config.get('dhcp:dns2') || '223.5.5.5';
+        const cfgGateway = await db.config.getIkuaiSetting('dhcp:gateway') || '10.0.0.1';
+        const cfgInterface = await db.config.getIkuaiSetting('dhcp:interface') || 'lan2';
+        const cfgDns1 = await db.config.getIkuaiSetting('dhcp:dns1') || '180.76.76.76';
+        const cfgDns2 = await db.config.getIkuaiSetting('dhcp:dns2') || '223.5.5.5';
         const result = await this._call('dhcp_static', 'edit', {
             id: Number(bindingId),
             ip_addr: newIp,

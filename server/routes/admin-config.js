@@ -19,6 +19,8 @@ const { buildFieldDiff } = require('../utils/audit-diff');
 const { checkForUpdates } = require('../services/release-check');
 const { executeUpdate } = require('../services/system-update');
 const redisAdmin = require('../services/redis-admin');
+// CNAME 域名配置校验纯函数（utils/cname-validate.js，格式与前端 parseCnameEntries 对齐；随节点网络配置迁移至此）
+const { validateCnameDomain, splitCnameEntry } = require('../utils/cname-validate');
 
 router.get('/admin/storage', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -721,13 +723,44 @@ router.post('/admin/cache/clear', authMiddleware, adminMiddleware, async (req, r
 router.get('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var config = await db.config.getIkuai();
+        // 节点网络设置（端口转发/DHCP/VLAN/CNAME，ikuai: 作用域；未配置回退旧全局键兼容存量）
+        var ifaceList = [];
+        try { ifaceList = JSON.parse(await db.config.getIkuaiSetting('forward:iface_list') || '[]'); } catch (_) {}
+        // wan_interface 返回逗号分隔字符串（前端文本框使用），兼容旧格式（单值字符串）和新格式（JSON 数组）
+        var wanInterface = '';
+        var rawWan = await db.config.getIkuaiSetting('forward:wan_interface');
+        if (rawWan) {
+            try {
+                var parsed = JSON.parse(rawWan);
+                if (Array.isArray(parsed)) wanInterface = parsed.filter(Boolean).join(',');
+                else if (typeof parsed === 'string') wanInterface = parsed;
+            } catch (_) { wanInterface = rawWan; }
+        }
         res.json({
             host: config.host || '',
             username: config.username || '',
             password: maskSecret(config.password),
             api_key: maskSecret(config.api_key),
             version: config.version || 'v3',
-            strict_tls: config.strict_tls || false
+            strict_tls: config.strict_tls || false,
+            // ---- 节点网络设置（随爱快节点独立配置）----
+            port_range_start: parseInt(await db.config.getIkuaiSetting('forward:port_range_start')) || 50000,
+            port_range_end: parseInt(await db.config.getIkuaiSetting('forward:port_range_end')) || 60000,
+            default_protocol: await db.config.getIkuaiSetting('forward:default_protocol') || 'tcp',
+            wan_interface: wanInterface,
+            max_per_user: parseInt(await db.config.getIkuaiSetting('forward:max_per_user')) || 10,
+            iface_list: ifaceList,
+            dhcp_ip_range_start: await db.config.getIkuaiSetting('dhcp:ip_range_start') || '10.0.0.110',
+            dhcp_ip_range_end: await db.config.getIkuaiSetting('dhcp:ip_range_end') || '10.0.0.199',
+            dhcp_interface: await db.config.getIkuaiSetting('dhcp:interface') || 'lan2',
+            dhcp_gateway: await db.config.getIkuaiSetting('dhcp:gateway') || '10.0.0.1',
+            dhcp_dns1: await db.config.getIkuaiSetting('dhcp:dns1') || '180.76.76.76',
+            dhcp_dns2: await db.config.getIkuaiSetting('dhcp:dns2') || '223.5.5.5',
+            vlan_ip_segment_start: await db.config.getIkuaiSetting('vlan:ip_segment_start') || '172.16.0.1',
+            vlan_id_start: parseInt(await db.config.getIkuaiSetting('vlan:id_start')) || 1000,
+            vlan_interface: await db.config.getIkuaiSetting('vlan:interface') || 'lan1',
+            vlan_max_per_user: parseInt(await db.config.getIkuaiSetting('vlan:max_per_user')) || 5,
+            cname_domain: await db.config.getIkuaiSetting('cname:domain') || ''
         });
     } catch (error) {
         console.error('获取爱快配置失败:', error.message);
@@ -810,6 +843,241 @@ router.put('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, r
     } catch (error) {
         console.error('更新爱快配置失败:', error.message);
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
+    }
+});
+
+// ============ 爱快节点网络配置（端口转发/DHCP/VLAN/CNAME，ikuai: 作用域，随节点独立配置） ============
+
+// 节点网络配置字段审计标签：请求字段 → 中文标签 → 默认值（与 GET /admin/ikuai/config 返回一致）
+const IKUAI_NETWORK_CHANGE_FIELDS = {
+    port_range_start: { label: '端口段起始', fallback: '50000' },
+    port_range_end: { label: '端口段结束', fallback: '60000' },
+    default_protocol: { label: '默认协议', fallback: 'tcp' },
+    max_per_user: { label: '每用户端口上限', fallback: '10' },
+    dhcp_ip_range_start: { label: 'DHCP起始IP', fallback: '10.0.0.110' },
+    dhcp_ip_range_end: { label: 'DHCP结束IP', fallback: '10.0.0.199' },
+    dhcp_interface: { label: 'DHCP接口', fallback: 'lan2' },
+    dhcp_gateway: { label: 'DHCP网关', fallback: '10.0.0.1' },
+    dhcp_dns1: { label: 'DHCP DNS1', fallback: '180.76.76.76' },
+    dhcp_dns2: { label: 'DHCP DNS2', fallback: '223.5.5.5' },
+    vlan_ip_segment_start: { label: 'VLAN IP段', fallback: '172.16.0.1' },
+    vlan_id_start: { label: 'VLAN起始ID', fallback: '1000' },
+    vlan_interface: { label: 'VLAN接口', fallback: 'lan1' },
+    vlan_max_per_user: { label: '每用户子网上限', fallback: '5' }
+};
+
+// 按实际变化的字段生成审计详情（返回 ['中文标签:新值', ...]，无变化返回空数组）
+// 外网接口特殊处理：入库为 JSON 数组，排序后比较（顺序变化不算变更）
+function buildIkuaiNetworkChanges(before, after) {
+    var changes = [];
+    Object.keys(IKUAI_NETWORK_CHANGE_FIELDS).forEach(function(k) {
+        var raw = before[k];
+        if (raw === null || raw === undefined || raw === '') raw = IKUAI_NETWORK_CHANGE_FIELDS[k].fallback;
+        var oldV = String(raw).trim();
+        var newV = String(after[k] == null ? IKUAI_NETWORK_CHANGE_FIELDS[k].fallback : after[k]).trim();
+        if (oldV !== newV) changes.push(IKUAI_NETWORK_CHANGE_FIELDS[k].label + ':' + newV);
+    });
+    var oldWan = before.wan_interface || '';
+    var oldWanArr = [];
+    try { oldWanArr = JSON.parse(oldWan); if (!Array.isArray(oldWanArr)) oldWanArr = []; } catch (_) { oldWanArr = oldWan ? oldWan.split(',') : []; }
+    var oldWanKey = oldWanArr.filter(Boolean).map(function(s) { return String(s).trim(); }).sort().join(',');
+    var newWanKey = (after.wan_interface || []).filter(Boolean).map(function(s) { return String(s).trim(); }).sort().join(',');
+    if (oldWanKey !== newWanKey) changes.push('外网接口:' + (newWanKey || '空'));
+    return changes;
+}
+
+// CNAME 域名变更审计详情：条目级 diff（新增/删除/修改），无变化返回空串
+function buildIkuaiCnameDetail(oldStr, newStr) {
+    function parseCname(str) {
+        return (str || '').split(',').map(function(s) { return s.trim(); }).filter(Boolean).map(function(entry) {
+            return splitCnameEntry(entry);
+        });
+    }
+    var oldItems = parseCname(oldStr);
+    var newItems = parseCname(newStr);
+    var oldKeys = {}, newKeys = {};
+    oldItems.forEach(function(it) { oldKeys[it.label + '||' + it.domain] = true; });
+    newItems.forEach(function(it) { newKeys[it.label + '||' + it.domain] = true; });
+    var added = [], removed = [], modified = [];
+    newItems.forEach(function(ni) {
+        var key = ni.label + '||' + ni.domain;
+        if (oldKeys[key]) return;
+        var oldSameLabel = null;
+        for (var i = 0; i < oldItems.length; i++) {
+            if (oldItems[i].label === ni.label) { oldSameLabel = oldItems[i]; break; }
+        }
+        if (oldSameLabel) modified.push(ni.label + '||' + oldSameLabel.domain + '→' + ni.domain);
+        else added.push(key);
+    });
+    oldItems.forEach(function(oi) {
+        var key = oi.label + '||' + oi.domain;
+        if (newKeys[key]) return;
+        var newSameLabel = newItems.some(function(ni) { return ni.label === oi.label; });
+        if (!newSameLabel) removed.push(key);
+    });
+    var parts = [];
+    if (added.length) parts.push('新增:' + added.join(','));
+    if (removed.length) parts.push('删除:' + removed.join(','));
+    if (modified.length) parts.push('修改:' + modified.join(','));
+    if (!parts.length) return '';
+    return '更新CNAME域名(' + parts.join(',') + ')';
+}
+
+// 保存爱快节点网络配置（端口转发/DHCP/VLAN/CNAME；写入 ikuai: 作用域键，不影响连接配置与 client 会话）
+router.put('/admin/ikuai/network-config', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { port_range_start, port_range_end, default_protocol, wan_interface, max_per_user,
+                dhcp_ip_range_start, dhcp_ip_range_end, dhcp_interface, dhcp_gateway, dhcp_dns1, dhcp_dns2,
+                vlan_ip_segment_start, vlan_id_start, vlan_interface, vlan_max_per_user,
+                cname_domain } = req.body;
+        // 私有网络 VLAN 设置校验：IP 段必须为合法 IPv4，VLAN ID 起始值必须在 2~4090
+        const ipv4Re = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
+        if (vlan_ip_segment_start !== undefined && !ipv4Re.test(String(vlan_ip_segment_start).trim())) {
+            return res.status(400).json({ error: 'IP 段开始范围必须是合法 IPv4 地址', code: 'IP_START_IPV4' });
+        }
+        if (vlan_id_start !== undefined) {
+            const vlanIdNum = parseInt(vlan_id_start);
+            if (!Number.isInteger(vlanIdNum) || vlanIdNum < 2 || vlanIdNum > 4090) {
+                return res.status(400).json({ error: 'VLANID 开始范围必须是 2~4090 的整数', code: 'VLAN_START_INT' });
+            }
+        }
+        if (vlan_max_per_user !== undefined) {
+            const vlanMaxNum = parseInt(vlan_max_per_user);
+            if (!Number.isInteger(vlanMaxNum) || vlanMaxNum < 0 || vlanMaxNum > 1000) {
+                return res.status(400).json({ error: '每用户子网数量上限必须是 0~1000 的整数', code: 'SUBNET_LIMIT_INT' });
+            }
+        }
+        // L-1 修复：端口段/max_per_user/DHCP IP 段/接口/cname 域名校验（防负值/非法 IP/超长串入库）
+        if (port_range_start !== undefined) {
+            const startNum = parseInt(port_range_start);
+            if (!Number.isInteger(startNum) || startNum < 1 || startNum > 65535) {
+                return res.status(400).json({ error: '端口段起始值必须是 1~65535 的整数', code: 'PORT_START_INT' });
+            }
+        }
+        if (port_range_end !== undefined) {
+            const endNum = parseInt(port_range_end);
+            if (!Number.isInteger(endNum) || endNum < 1 || endNum > 65535) {
+                return res.status(400).json({ error: '端口段结束值必须是 1~65535 的整数', code: 'PORT_END_INT' });
+            }
+        }
+        if (port_range_start !== undefined && port_range_end !== undefined) {
+            if (parseInt(port_range_start) >= parseInt(port_range_end)) {
+                return res.status(400).json({ error: '端口段起始值必须小于结束值', code: 'PORT_START_LT_END' });
+            }
+        }
+        if (max_per_user !== undefined) {
+            const maxNum = parseInt(max_per_user);
+            if (!Number.isInteger(maxNum) || maxNum < 0 || maxNum > 1000) {
+                return res.status(400).json({ error: '每用户端口转发上限必须是 0~1000 的整数', code: 'FORWARD_LIMIT_INT' });
+            }
+        }
+        if (dhcp_ip_range_start !== undefined && !ipv4Re.test(String(dhcp_ip_range_start).trim())) {
+            return res.status(400).json({ error: 'DHCP IP 段起始值必须是合法 IPv4 地址', code: 'DHCP_START_IPV4' });
+        }
+        if (dhcp_ip_range_end !== undefined && !ipv4Re.test(String(dhcp_ip_range_end).trim())) {
+            return res.status(400).json({ error: 'DHCP IP 段结束值必须是合法 IPv4 地址', code: 'DHCP_END_IPV4' });
+        }
+        if (dhcp_gateway !== undefined && !ipv4Re.test(String(dhcp_gateway).trim())) {
+            return res.status(400).json({ error: 'DHCP 网关必须是合法 IPv4 地址', code: 'DHCP_GW_IPV4' });
+        }
+        if (dhcp_dns1 !== undefined && !ipv4Re.test(String(dhcp_dns1).trim())) {
+            return res.status(400).json({ error: 'DHCP DNS1 必须是合法 IPv4 地址', code: 'DHCP_DNS1_IPV4' });
+        }
+        if (dhcp_dns2 !== undefined && !ipv4Re.test(String(dhcp_dns2).trim())) {
+            return res.status(400).json({ error: 'DHCP DNS2 必须是合法 IPv4 地址', code: 'DHCP_DNS2_IPV4' });
+        }
+        // 接口名与域名：白名单字符 + 长度限制
+        const ifaceRe = /^[a-zA-Z0-9_.:-]{1,32}$/;
+        if (dhcp_interface !== undefined && !ifaceRe.test(String(dhcp_interface).trim())) {
+            return res.status(400).json({ error: 'DHCP 接口名格式无效（仅字母数字_.:-，≤32字符）', code: 'DHCP_IFNAME_INVALID' });
+        }
+        if (vlan_interface !== undefined && !ifaceRe.test(String(vlan_interface).trim())) {
+            return res.status(400).json({ error: 'VLAN 接口名格式无效（仅字母数字_.:-，≤32字符）', code: 'VLAN_IFNAME_INVALID' });
+        }
+        // CNAME 校验：支持前端 label||.domain 逗号分隔多条目格式（含旧格式兼容），逐条校验域名与长度
+        if (cname_domain !== undefined) {
+            const cnameResult = validateCnameDomain(cname_domain);
+            if (!cnameResult.ok) {
+                return res.status(400).json({ error: cnameResult.error || 'CNAME 域名格式无效或过长' , code: cnameResult.code });
+            }
+        }
+        // 操作审计前置：读取变更前的配置值（用于按实际变化字段生成审计）
+        const before = {
+            port_range_start: await db.config.getIkuaiSetting('forward:port_range_start'),
+            port_range_end: await db.config.getIkuaiSetting('forward:port_range_end'),
+            default_protocol: await db.config.getIkuaiSetting('forward:default_protocol'),
+            wan_interface: await db.config.getIkuaiSetting('forward:wan_interface'),
+            max_per_user: await db.config.getIkuaiSetting('forward:max_per_user'),
+            dhcp_ip_range_start: await db.config.getIkuaiSetting('dhcp:ip_range_start'),
+            dhcp_ip_range_end: await db.config.getIkuaiSetting('dhcp:ip_range_end'),
+            dhcp_interface: await db.config.getIkuaiSetting('dhcp:interface'),
+            dhcp_gateway: await db.config.getIkuaiSetting('dhcp:gateway'),
+            dhcp_dns1: await db.config.getIkuaiSetting('dhcp:dns1'),
+            dhcp_dns2: await db.config.getIkuaiSetting('dhcp:dns2'),
+            vlan_ip_segment_start: await db.config.getIkuaiSetting('vlan:ip_segment_start'),
+            vlan_id_start: await db.config.getIkuaiSetting('vlan:id_start'),
+            vlan_interface: await db.config.getIkuaiSetting('vlan:interface'),
+            vlan_max_per_user: await db.config.getIkuaiSetting('vlan:max_per_user'),
+            cname_domain: await db.config.getIkuaiSetting('cname:domain')
+        };
+        // wan_interface 存储为 JSON 数组，兼容前端传入逗号分隔字符串、数组或单值
+        let wanIfaceToStore = [];
+        if (Array.isArray(wan_interface)) {
+            wanIfaceToStore = wan_interface.filter(Boolean);
+        } else if (typeof wan_interface === 'string') {
+            wanIfaceToStore = wan_interface.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        // 归一化后的新值（入库值与审计 diff 共用，避免两处口径不一致）
+        const after = {
+            port_range_start: String(port_range_start ?? 50000),
+            port_range_end: String(port_range_end ?? 60000),
+            default_protocol: default_protocol || 'tcp',
+            wan_interface: wanIfaceToStore,
+            max_per_user: String(max_per_user ?? 10),
+            dhcp_ip_range_start: dhcp_ip_range_start || '10.0.0.110',
+            dhcp_ip_range_end: dhcp_ip_range_end || '10.0.0.199',
+            dhcp_interface: dhcp_interface || 'lan2',
+            dhcp_gateway: dhcp_gateway || '10.0.0.1',
+            dhcp_dns1: dhcp_dns1 || '180.76.76.76',
+            dhcp_dns2: dhcp_dns2 || '223.5.5.5',
+            vlan_ip_segment_start: String(vlan_ip_segment_start || '172.16.0.1').trim(),
+            vlan_id_start: String(vlan_id_start ?? 1000),
+            vlan_interface: (vlan_interface || 'lan1').trim(),
+            vlan_max_per_user: String(vlan_max_per_user ?? 5),
+            cname_domain: (cname_domain || '').trim()
+        };
+        const setConfig = db.config.setIkuaiSetting;
+        await setConfig('forward:port_range_start', after.port_range_start);
+        await setConfig('forward:port_range_end', after.port_range_end);
+        await setConfig('forward:default_protocol', after.default_protocol);
+        await setConfig('forward:wan_interface', JSON.stringify(after.wan_interface));
+        await setConfig('forward:max_per_user', after.max_per_user);
+        await setConfig('dhcp:ip_range_start', after.dhcp_ip_range_start);
+        await setConfig('dhcp:ip_range_end', after.dhcp_ip_range_end);
+        await setConfig('dhcp:interface', after.dhcp_interface);
+        await setConfig('dhcp:gateway', after.dhcp_gateway);
+        await setConfig('dhcp:dns1', after.dhcp_dns1);
+        await setConfig('dhcp:dns2', after.dhcp_dns2);
+        await setConfig('vlan:ip_segment_start', after.vlan_ip_segment_start);
+        await setConfig('vlan:id_start', after.vlan_id_start);
+        await setConfig('vlan:interface', after.vlan_interface);
+        await setConfig('vlan:max_per_user', after.vlan_max_per_user);
+        await setConfig('cname:domain', after.cname_domain);
+        // 操作审计：按实际变化的字段记录（改了什么记什么；CNAME 单独成条）
+        try {
+            const { auditLog } = require('../utils/audit-log');
+            const changes = buildIkuaiNetworkChanges(before, after);
+            const cnameDetail = buildIkuaiCnameDetail(before.cname_domain, after.cname_domain);
+            if (changes.length) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.network', resourceType: 'config', resourceId: 'network', details: '更新爱快节点网络配置(' + changes.join(',') + ')', req });
+            }
+            if (cnameDetail) {
+                await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.cname', resourceType: 'config', resourceId: 'cname', details: cnameDetail, req });
+            }
+        } catch (e) {}
+        res.json({ message: '网络配置已更新' });
+    } catch (e) {
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });
 

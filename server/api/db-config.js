@@ -172,6 +172,17 @@ const config = {
     get: async (key) => (await queryOne('SELECT value FROM config WHERE `key` = ?', [key]))?.value,
     set: (key, value) => execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', [key, value]),
 
+    // ========== 爱快节点作用域配置（多节点预留） ==========
+    // 键规则：ikuai:<key>（如 ikuai:forward:port_range_start）。当前单节点，ikuai: 前缀即节点作用域；
+    // 将来多节点时给 getIkuaiSetting/setIkuaiSetting 增加 nodeId 参数即可，消费方零改动。
+    // 兼容策略：新作用域键未配置时回退读旧全局键（forward:* 等存量数据），保存后写入作用域键——无需迁移脚本。
+    getIkuaiSetting: async (key) => {
+        const scoped = await config.get('ikuai:' + key);
+        if (scoped !== undefined && scoped !== null) return scoped;
+        return await config.get(key);
+    },
+    setIkuaiSetting: (key, value) => config.set('ikuai:' + key, value),
+
     // ========== 邮件外壳样式（邮件样式编辑） ==========
     // 键规则：mail:shell_<key>，参数定义与默认值单一来源 constants/email-templates.js 的 EMAIL_SHELL_PARAMS
     getEmailShell: async () => {

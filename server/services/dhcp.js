@@ -50,9 +50,9 @@ async function pickUnusedStaticIp(subnet) {
             subnetPrefix = parsed.prefix;
         } else {
             // 回退：未绑定子网时使用旧的 DHCP 配置范围
-            rangeStart = parseInt((await db.config.get('dhcp:ip_range_start') || '10.0.0.110').split('.').pop()) || 110;
-            rangeEnd = parseInt((await db.config.get('dhcp:ip_range_end') || '10.0.0.199').split('.').pop()) || 199;
-            subnetPrefix = ((await db.config.get('dhcp:ip_range_start') || '10.0.0.110').split('.').slice(0, 3).join('.') || '10.0.0') + '.';
+            rangeStart = parseInt((await db.config.getIkuaiSetting('dhcp:ip_range_start') || '10.0.0.110').split('.').pop()) || 110;
+            rangeEnd = parseInt((await db.config.getIkuaiSetting('dhcp:ip_range_end') || '10.0.0.199').split('.').pop()) || 199;
+            subnetPrefix = ((await db.config.getIkuaiSetting('dhcp:ip_range_start') || '10.0.0.110').split('.').slice(0, 3).join('.') || '10.0.0') + '.';
         }
 
         const bindings = await ikuaiApi.getDhcpStaticBindings();
@@ -103,10 +103,10 @@ async function createDhcpStaticBinding(type, vmid, mac, preferredIp, subnet) {
 
         const comment = type === 'vm' ? `VM-${vmid}` : `CT-${vmid}`;
         // 已绑定子网时使用子网的 VLAN 接口/网关，否则回退旧 DHCP 配置
-        const iface = (subnet && subnet.vlan_name) ? subnet.vlan_name : (await db.config.get('dhcp:interface') || 'lan2');
-        const gateway = (subnet && subnet.gateway) ? subnet.gateway : (await db.config.get('dhcp:gateway') || '10.0.0.1');
-        const dns1 = await db.config.get('dhcp:dns1') || '180.76.76.76';
-        const dns2 = await db.config.get('dhcp:dns2') || '223.5.5.5';
+        const iface = (subnet && subnet.vlan_name) ? subnet.vlan_name : (await db.config.getIkuaiSetting('dhcp:interface') || 'lan2');
+        const gateway = (subnet && subnet.gateway) ? subnet.gateway : (await db.config.getIkuaiSetting('dhcp:gateway') || '10.0.0.1');
+        const dns1 = await db.config.getIkuaiSetting('dhcp:dns1') || '180.76.76.76';
+        const dns2 = await db.config.getIkuaiSetting('dhcp:dns2') || '223.5.5.5';
 
         await ikuaiApi.addDhcpStaticBinding(mac, ip, comment, iface, gateway, dns1, dns2);
         console.log(`[DHCP] 静态绑定创建成功: ${type}/${vmid} ${mac} → ${ip} (${iface})`);
@@ -168,7 +168,7 @@ async function getWanInterface() {
 
 // 支持多外网线路：返回所有已配置的外网接口数组
 async function getWanInterfaces() {
-    const raw = await db.config.get('forward:wan_interface');
+    const raw = await db.config.getIkuaiSetting('forward:wan_interface');
     // 新格式：JSON 数组字符串 ["wan1","wan2"]
     if (raw) {
         try {
@@ -190,7 +190,7 @@ async function getWanInterfaces() {
         const wanIfaces = ifaces.filter(i => i.type === 'wan');
         if (wanIfaces.length > 0) {
             const firstWan = wanIfaces[0].name;
-            await db.config.set('forward:wan_interface', JSON.stringify([firstWan]));
+            await db.config.setIkuaiSetting('forward:wan_interface', JSON.stringify([firstWan]));
             console.log('[端口转发] 自动检测到外网接口:', firstWan);
             return [firstWan];
         }

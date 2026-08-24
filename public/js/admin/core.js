@@ -690,7 +690,7 @@ watch($.user, function(u) {
     $.switchAdminTab = function(tab) {
         // Determine which group this tab belongs to
         var manageTabs = ['users', 'cdk', 'messages'];
-        var settingsTabs = ['smtp', 'ikuai', 'pve', 'snapshot-backup', 'network', 'pay', 'site', 'uapipro'];
+        var settingsTabs = ['smtp', 'ikuai', 'pve', 'snapshot-backup', 'pay', 'site', 'uapipro'];
         var section;
         var submenuId;
 
@@ -725,7 +725,6 @@ watch($.user, function(u) {
             'ikuai': 'settings-ikuai',
             'pve': 'settings-pve',
             'snapshot-backup': 'settings-snapshot-backup',
-            'network': 'settings-network',
             'pay': 'settings-pay',
             'site': 'settings-site',
             'uapipro': 'settings-uapipro'
@@ -1032,9 +1031,6 @@ $.initDetailCharts = function() {
                 if ($.activeTab.value === 'site') {
                     $.loadSiteConfig();
                 }
-                if ($.activeTab.value === 'network') {
-                    $.loadForwardRules('all');
-                }
                 if ($.activeTab.value === 'transactions') {
                     $.loadTransactions(1);
                 }
@@ -1085,9 +1081,6 @@ $.initDetailCharts = function() {
             localStorage.setItem(window.__storageKeys.ADMIN_ACTIVE_TAB, newTab);
             if (newTab === 'messages') {
                 $.loadUnreadCount();
-            }
-            if (newTab === 'network') {
-                $.loadForwardRules('all');
             }
             if (newTab === 'pay') {
                 $.loadPayConfig();

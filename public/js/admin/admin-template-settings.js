@@ -327,6 +327,146 @@
                             </form>
                         </div>
                     </div>
+
+                    <!-- 端口转发配置（随爱快节点独立配置） -->
+                    <div class="card mt-3" style="position: relative; z-index: 3; overflow: visible;">
+                        <div class="card-header"><h5 class="mb-0">{{ t('settings.network.portForward') }}</h5></div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.portStart') }}</label>
+                                    <input type="number" class="form-control" v-model.number="networkConfig.port_range_start" min="1024" max="65535">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.portEnd') }}</label>
+                                    <input type="number" class="form-control" v-model.number="networkConfig.port_range_end" min="1024" max="65535">
+                                </div>
+                                <div class="col-md-4 d-flex align-items-center" style="padding-top: 24px;">
+                                    <small class="text-muted">{{ t('settings.network.portRangeHint') }}</small>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.maxPerUser') }}</label>
+                                    <input type="number" class="form-control" v-model.number="networkConfig.max_per_user" min="0" max="100">
+                                    <small class="text-muted">{{ t('settings.network.maxPerUserHint') }}</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.wanIface') }}</label>
+                                    <div class="input-group">
+                                        <input type="text" class="form-control" v-model="networkConfig.wan_interface" :placeholder="t('settings.network.wanIfacePh')" readonly>
+                                        <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" :disabled="wanInterfaceList.length === 0">{{ t('settings.select') }}</button>
+                                        <ul class="dropdown-menu dropdown-menu-end" style="z-index: 1080;">
+                                            <li v-for="iface in wanInterfaceList" :key="iface.name">
+                                                <a class="dropdown-item d-flex justify-content-between align-items-center" :class="{ 'active': isWanInterfaceSelected(iface.name) }" href="#" @click.prevent="toggleWanInterface(iface.name)">
+                                                    <span>{{ iface.name }} ({{ iface.ip || t('settings.network.dialup') }})</span>
+                                                    <i v-if="isWanInterfaceSelected(iface.name)" class="bi bi-check-circle-fill text-primary ms-2"></i>
+                                                </a>
+                                            </li>
+                                            <li v-if="wanInterfaceList.length === 0"><span class="dropdown-item text-muted">{{ t('settings.network.noIface') }}</span></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li><a class="dropdown-item text-danger" href="#" @click.prevent="networkConfig.wan_interface = ''">{{ t('settings.network.clear') }}</a></li>
+                                        </ul>
+                                    </div>
+                                    <small class="text-muted">{{ t('settings.network.wanIfaceHint') }}</small>
+                                </div>
+                                <div class="col-md-4 d-flex align-items-center" style="padding-top: 24px;">
+                                    <pv-button variant="outline" size="lg" @click="refreshIfaceList">{{ t('settings.network.refreshIface') }}</pv-button>
+                                    <small class="text-muted" v-if="ifaceUpdateTime" style="white-space: nowrap;">{{ t('settings.network.lastUpdate') }}{{ ifaceUpdateTime }}</small>
+                                </div>
+                            </div>
+                            <pv-button variant="glass" @click="saveNetworkConfig">{{ t('settings.saveConfig') }}</pv-button>
+                        </div>
+                    </div>
+
+                    <!-- CNAME 域名配置（随爱快节点独立配置） -->
+                    <div class="card mt-3" style="position: relative; z-index: 1;">
+                        <div class="card-header"><h5 class="mb-0">{{ t('settings.network.cnameTitle') }}</h5></div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">{{ t('settings.network.cnameDesc') }}</p>
+                            <div v-for="(entry, idx) in cnameEntries" :key="idx" class="row g-2 mb-2 align-items-center">
+                                <div class="col-md-3">
+                                    <input type="text" class="form-control form-control-sm" v-model="entry.label" :placeholder="t('settings.network.cnameLabelPh')">
+                                </div>
+                                <div class="col-md-7">
+                                    <input type="text" class="form-control form-control-sm" v-model="entry.domain" :placeholder="t('settings.network.cnameDomainPh')">
+                                </div>
+                                <div class="col-md-2">
+                                    <pv-button @click="removeCnameEntry(idx)" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 mt-2">
+                                <pv-button @click="addCnameEntry" variant="outline" size="lg">{{ t('settings.network.addNode') }}</pv-button>
+                                <pv-button @click="saveNetworkConfig" variant="glass">{{ t('settings.network.saveCname') }}</pv-button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DHCP 服务端设置（随爱快节点独立配置） -->
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5 class="mb-0">{{ t('settings.network.dhcpTitle') }}</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.dns1') }}</label>
+                                    <input type="text" class="form-control" v-model="networkConfig.dhcp_dns1" placeholder="180.76.76.76">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.dns2') }}</label>
+                                    <input type="text" class="form-control" v-model="networkConfig.dhcp_dns2" placeholder="223.5.5.5">
+                                </div>
+                            </div>
+                            <small class="text-muted">{{ t('settings.network.dhcpDesc') }}</small>
+                            <div class="mt-3 d-flex gap-2">
+                                <pv-button @click="saveNetworkConfig" variant="glass">{{ t('settings.saveConfig') }}</pv-button>
+                                <pv-button variant="outline" size="lg" @click="syncDhcpBindings">{{ t('settings.network.syncIkuai') }}</pv-button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 私有网络 - VLAN 设置（随爱快节点独立配置） -->
+                    <div class="card mt-3" style="position: relative; z-index: 2;">
+                        <div class="card-header">
+                            <h5 class="mb-0">{{ t('settings.network.vlanTitle') }}</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.vlanIpStart') }}</label>
+                                    <input type="text" class="form-control" v-model="networkConfig.vlan_ip_segment_start" placeholder="172.16.0.1">
+                                    <small class="text-muted">{{ t('settings.network.vlanIpStartHint') }}</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.vlanIdStart') }}</label>
+                                    <input type="number" class="form-control" v-model.number="networkConfig.vlan_id_start" min="2" max="4090" placeholder="1000">
+                                    <small class="text-muted">{{ t('settings.network.vlanIdHint') }}</small>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.vlanIface') }}</label>
+                                    <select class="form-select" v-model="networkConfig.vlan_interface">
+                                        <option value="" disabled>{{ t('settings.network.selectLan') }}</option>
+                                        <option v-for="iface in lanInterfaceList" :key="iface.name" :value="iface.name">
+                                            {{ iface.name }}{{ iface.comment ? ' (' + iface.comment + ')' : '' }}
+                                        </option>
+                                    </select>
+                                    <small class="text-muted">{{ t('settings.network.vlanIfaceHint') }}</small>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('settings.network.vlanMaxPerUser') }}</label>
+                                    <input type="number" class="form-control" v-model.number="networkConfig.vlan_max_per_user" min="0" max="1000" placeholder="5">
+                                    <small class="text-muted">{{ t('settings.network.vlanMaxHint') }}</small>
+                                </div>
+                            </div>
+                            <small class="text-muted">{{ t('settings.network.vlanDesc') }}</small>
+                            <div class="mt-3 d-flex gap-2">
+                                <pv-button @click="saveNetworkConfig" variant="glass">{{ t('settings.saveConfig') }}</pv-button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <!-- end settings(ikuai) -->
 
@@ -452,151 +592,6 @@
                                 </div>
                                 <p class="text-muted small mb-3">{{ t('settings.snapBackup.limitUserOnlyAdminFree') }}</p>
                                 <pv-button @click="saveBackupConfig" variant="glass">{{ t('settings.snapBackup.saveBackup') }}</pv-button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 网络管理 -->
-                    <div v-if="activeTab === 'network'">
-                        <div class="module-header">
-                            <h4 class="module-title">{{ t('settings.network.title') }}</h4>
-                        </div>
-                        <div class="card" style="position: relative; z-index: 3; overflow: visible;">
-                            <div class="card-header"><h5 class="mb-0">{{ t('settings.network.portForward') }}</h5></div>
-                            <div class="card-body">
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.portStart') }}</label>
-                                        <input type="number" class="form-control" v-model.number="networkConfig.port_range_start" min="1024" max="65535">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.portEnd') }}</label>
-                                        <input type="number" class="form-control" v-model.number="networkConfig.port_range_end" min="1024" max="65535">
-                                    </div>
-                                    <div class="col-md-4 d-flex align-items-center" style="padding-top: 24px;">
-                                        <small class="text-muted">{{ t('settings.network.portRangeHint') }}</small>
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.maxPerUser') }}</label>
-                                        <input type="number" class="form-control" v-model.number="networkConfig.max_per_user" min="0" max="100">
-                                        <small class="text-muted">{{ t('settings.network.maxPerUserHint') }}</small>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.wanIface') }}</label>
-                                        <div class="input-group">
-                                            <input type="text" class="form-control" v-model="networkConfig.wan_interface" :placeholder="t('settings.network.wanIfacePh')" readonly>
-                                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" :disabled="wanInterfaceList.length === 0">{{ t('settings.select') }}</button>
-                                            <ul class="dropdown-menu dropdown-menu-end" style="z-index: 1080;">
-                                                <li v-for="iface in wanInterfaceList" :key="iface.name">
-                                                    <a class="dropdown-item d-flex justify-content-between align-items-center" :class="{ 'active': isWanInterfaceSelected(iface.name) }" href="#" @click.prevent="toggleWanInterface(iface.name)">
-                                                        <span>{{ iface.name }} ({{ iface.ip || t('settings.network.dialup') }})</span>
-                                                        <i v-if="isWanInterfaceSelected(iface.name)" class="bi bi-check-circle-fill text-primary ms-2"></i>
-                                                    </a>
-                                                </li>
-                                                <li v-if="wanInterfaceList.length === 0"><span class="dropdown-item text-muted">{{ t('settings.network.noIface') }}</span></li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li><a class="dropdown-item text-danger" href="#" @click.prevent="networkConfig.wan_interface = ''">{{ t('settings.network.clear') }}</a></li>
-                                            </ul>
-                                        </div>
-                                        <small class="text-muted">{{ t('settings.network.wanIfaceHint') }}</small>
-                                    </div>
-                                    <div class="col-md-4 d-flex align-items-center" style="padding-top: 24px;">
-                                        <pv-button variant="outline" size="lg" @click="refreshIfaceList">{{ t('settings.network.refreshIface') }}</pv-button>
-                                        <small class="text-muted" v-if="ifaceUpdateTime" style="white-space: nowrap;">{{ t('settings.network.lastUpdate') }}{{ ifaceUpdateTime }}</small>
-                                    </div>
-                                </div>
-                                <pv-button variant="glass" @click="saveNetworkConfig">{{ t('settings.saveConfig') }}</pv-button>
-                            </div>
-                        </div>
-
-                        <!-- CNAME 域名配置 -->
-                        <div class="card mt-3" style="position: relative; z-index: 1;">
-                            <div class="card-header"><h5 class="mb-0">{{ t('settings.network.cnameTitle') }}</h5></div>
-                            <div class="card-body">
-                                <p class="text-muted small mb-3">{{ t('settings.network.cnameDesc') }}</p>
-                                <div v-for="(entry, idx) in cnameEntries" :key="idx" class="row g-2 mb-2 align-items-center">
-                                    <div class="col-md-3">
-                                        <input type="text" class="form-control form-control-sm" v-model="entry.label" :placeholder="t('settings.network.cnameLabelPh')">
-                                    </div>
-                                    <div class="col-md-7">
-                                        <input type="text" class="form-control form-control-sm" v-model="entry.domain" :placeholder="t('settings.network.cnameDomainPh')">
-                                    </div>
-                                    <div class="col-md-2">
-                                        <pv-button @click="removeCnameEntry(idx)" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
-                                    </div>
-                                </div>
-                                <div class="d-flex gap-2 mt-2">
-                                    <pv-button @click="addCnameEntry" variant="outline" size="lg">{{ t('settings.network.addNode') }}</pv-button>
-                                    <pv-button @click="saveNetworkConfig" variant="glass">{{ t('settings.network.saveCname') }}</pv-button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- DHCP 服务端设置 -->
-                        <div class="card mt-3">
-                            <div class="card-header">
-                                <h5 class="mb-0">{{ t('settings.network.dhcpTitle') }}</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.dns1') }}</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.dhcp_dns1" placeholder="180.76.76.76">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.dns2') }}</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.dhcp_dns2" placeholder="223.5.5.5">
-                                    </div>
-                                </div>
-                                <small class="text-muted">{{ t('settings.network.dhcpDesc') }}</small>
-                                <div class="mt-3 d-flex gap-2">
-                                    <pv-button @click="saveNetworkConfig" variant="glass">{{ t('settings.saveConfig') }}</pv-button>
-                                    <pv-button variant="outline" size="lg" @click="syncDhcpBindings">{{ t('settings.network.syncIkuai') }}</pv-button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- 私有网络 - VLAN 设置 -->
-                        <div class="card mt-3" style="position: relative; z-index: 2;">
-                            <div class="card-header">
-                                <h5 class="mb-0">{{ t('settings.network.vlanTitle') }}</h5>
-                            </div>
-                            <div class="card-body">
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.vlanIpStart') }}</label>
-                                        <input type="text" class="form-control" v-model="networkConfig.vlan_ip_segment_start" placeholder="172.16.0.1">
-                                        <small class="text-muted">{{ t('settings.network.vlanIpStartHint') }}</small>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.vlanIdStart') }}</label>
-                                        <input type="number" class="form-control" v-model.number="networkConfig.vlan_id_start" min="2" max="4090" placeholder="1000">
-                                        <small class="text-muted">{{ t('settings.network.vlanIdHint') }}</small>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.vlanIface') }}</label>
-                                        <select class="form-select" v-model="networkConfig.vlan_interface">
-                                            <option value="" disabled>{{ t('settings.network.selectLan') }}</option>
-                                            <option v-for="iface in lanInterfaceList" :key="iface.name" :value="iface.name">
-                                                {{ iface.name }}{{ iface.comment ? ' (' + iface.comment + ')' : '' }}
-                                            </option>
-                                        </select>
-                                        <small class="text-muted">{{ t('settings.network.vlanIfaceHint') }}</small>
-                                    </div>
-                                </div>
-                                <div class="row mb-3">
-                                    <div class="col-md-4">
-                                        <label class="form-label">{{ t('settings.network.vlanMaxPerUser') }}</label>
-                                        <input type="number" class="form-control" v-model.number="networkConfig.vlan_max_per_user" min="0" max="1000" placeholder="5">
-                                        <small class="text-muted">{{ t('settings.network.vlanMaxHint') }}</small>
-                                    </div>
-                                </div>
-                                <small class="text-muted">{{ t('settings.network.vlanDesc') }}</small>
-                                <div class="mt-3 d-flex gap-2">
-                                    <pv-button @click="saveNetworkConfig" variant="glass">{{ t('settings.saveConfig') }}</pv-button>
-                                </div>
                             </div>
                         </div>
                     </div>

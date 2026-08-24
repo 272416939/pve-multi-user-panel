@@ -104,8 +104,27 @@
     // ==================== 函数 ====================
     $.loadNetworkConfig = async function() {
         try {
-            var res = await api('/admin/network/config');
-            Object.assign($.networkConfig, res);
+            var res = await api('/admin/ikuai/config');
+            // 只取节点网络设置字段（连接配置字段由 loadIkuaiConfig 负责，避免污染整对象提交）
+            var net = {
+                port_range_start: res.port_range_start,
+                port_range_end: res.port_range_end,
+                default_protocol: res.default_protocol,
+                wan_interface: res.wan_interface,
+                max_per_user: res.max_per_user,
+                dhcp_ip_range_start: res.dhcp_ip_range_start,
+                dhcp_ip_range_end: res.dhcp_ip_range_end,
+                dhcp_interface: res.dhcp_interface,
+                dhcp_gateway: res.dhcp_gateway,
+                dhcp_dns1: res.dhcp_dns1,
+                dhcp_dns2: res.dhcp_dns2,
+                vlan_ip_segment_start: res.vlan_ip_segment_start,
+                vlan_id_start: res.vlan_id_start,
+                vlan_interface: res.vlan_interface,
+                vlan_max_per_user: res.vlan_max_per_user,
+                cname_domain: res.cname_domain
+            };
+            Object.assign($.networkConfig, net);
             // 确保 wan_interface 是字符串（后端已返回逗号分隔字符串，兼容旧数组格式）
             if (Array.isArray(res.wan_interface)) {
                 $.networkConfig.wan_interface = res.wan_interface.filter(Boolean).join(',');
@@ -163,7 +182,7 @@
                 .map(function(e) { return (e.label || '').trim() + '||' + (e.domain || '').trim(); })
                 .filter(function(s) { return s.replace(/\|\|/g, '').trim(); })
                 .join(',');
-            await api('/admin/network/config', { method: 'PUT', body: $.networkConfig });
+            await api('/admin/ikuai/network-config', { method: 'PUT', body: $.networkConfig });
             alert(window.__i18n.t('settings.saved'));
             $.parseCnameEntries();
         } catch (e) { alert(window.__i18n.t('common.saveFailedMsg') + e.message); }
@@ -206,8 +225,7 @@
             $.ifaceList.value = list || [];
             $.ifaceUpdateTime.value = new Date().toLocaleString();
             // 刷新后重新加载配置（接口可能被自动修正）
-            var config = await api('/admin/network/config');
-            Object.assign($.networkConfig, config);
+            await $.loadNetworkConfig();
         } catch (e) { alert(window.__i18n.t('admin.net.ifListFail') + e.message); }
     };
 

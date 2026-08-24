@@ -336,10 +336,10 @@ class IkuaiV4Api {
     async addDhcpStaticBinding(mac, ip, comment, iface, gateway, dns1, dns2) {
         const api = await this._api();
         // 与 V3 同源：未显式传入时读 DB 配置作为默认值
-        const cfgGateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
-        const cfgInterface = await db.config.get('dhcp:interface') || 'lan2';
-        const cfgDns1 = await db.config.get('dhcp:dns1') || '119.29.29.29';
-        const cfgDns2 = await db.config.get('dhcp:dns2') || '223.5.5.5';
+        const cfgGateway = await db.config.getIkuaiSetting('dhcp:gateway') || '10.0.0.1';
+        const cfgInterface = await db.config.getIkuaiSetting('dhcp:interface') || 'lan2';
+        const cfgDns1 = await db.config.getIkuaiSetting('dhcp:dns1') || '180.76.76.76';
+        const cfgDns2 = await db.config.getIkuaiSetting('dhcp:dns2') || '223.5.5.5';
         const finalComment = this._comment(comment);
         const result = await api.post('/network/dhcp/static', {
             enabled: 'yes',
@@ -359,10 +359,10 @@ class IkuaiV4Api {
 
     async editDhcpStaticBinding(bindingId, mac, newIp, comment, iface, gateway, dns1, dns2) {
         const api = await this._api();
-        const cfgGateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
-        const cfgInterface = await db.config.get('dhcp:interface') || 'lan2';
-        const cfgDns1 = await db.config.get('dhcp:dns1') || '119.29.29.29';
-        const cfgDns2 = await db.config.get('dhcp:dns2') || '223.5.5.5';
+        const cfgGateway = await db.config.getIkuaiSetting('dhcp:gateway') || '10.0.0.1';
+        const cfgInterface = await db.config.getIkuaiSetting('dhcp:interface') || 'lan2';
+        const cfgDns1 = await db.config.getIkuaiSetting('dhcp:dns1') || '180.76.76.76';
+        const cfgDns2 = await db.config.getIkuaiSetting('dhcp:dns2') || '223.5.5.5';
         const finalComment = this._comment(comment);
         // V4 PUT 为全量修改，必须携带全部字段
         const result = await api.put('/network/dhcp/static/' + Number(bindingId), {

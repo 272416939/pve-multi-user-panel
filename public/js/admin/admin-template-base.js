@@ -142,7 +142,6 @@
                     <a :title="t('nav.ikuaiNodeSettings')" class="nav-item" data-subsection="settings-ikuai" href="#" @click.prevent="switchAdminTab('ikuai')"><span class="nav-text">{{ t('nav.ikuaiNodeSettings') }}</span></a>
                     <a :title="t('nav.pveNodeSettings')" class="nav-item" data-subsection="settings-pve" href="#" @click.prevent="switchAdminTab('pve')"><span class="nav-text">{{ t('nav.pveNodeSettings') }}</span></a>
                     <a :title="t('nav.backupConfig')" class="nav-item" data-subsection="settings-snapshot-backup" href="#" @click.prevent="switchAdminTab('snapshot-backup')"><span class="nav-text">{{ t('nav.backupConfig') }}</span></a>
-                    <a :title="t('nav.networkConfig')" class="nav-item" data-subsection="settings-network" href="#" @click.prevent="switchAdminTab('network')"><span class="nav-text">{{ t('nav.networkConfig') }}</span></a>
                     <a :title="t('nav.payConfig')" class="nav-item" data-subsection="settings-pay" href="#" @click.prevent="switchAdminTab('pay')"><span class="nav-text">{{ t('nav.payConfig') }}</span></a>
                     <a :title="t('nav.siteSettings')" class="nav-item" data-subsection="settings-site" href="#" @click.prevent="switchAdminTab('site')"><span class="nav-text">{{ t('nav.siteSettings') }}</span></a>
                     <a :title="t('nav.uapipro')" class="nav-item" data-subsection="settings-uapipro" href="#" @click.prevent="switchAdminTab('uapipro')"><span class="nav-text">{{ t('nav.uapipro') }}</span></a>
