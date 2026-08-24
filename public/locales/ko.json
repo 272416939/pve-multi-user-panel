@@ -1757,6 +1757,7 @@
   "err.IKUAI_NOT_CONFIGURED": "iKuai가 설정되지 않아 서브넷을 만들 수 없습니다.",
   "err.IKUAI_PORT_INVALID": "포트 번호는 1-65535 사이여야 합니다",
   "err.IKUAI_URL_INVALID": "아이쿠아이 주소 형식이 잘못되었습니다",
+  "err.IKUAI_URL_REQUIRED": "아이쿠아이 주소를 입력하세요",
   "err.IKUAI_URL_SCHEME": "iKuai 주소는 http:// 또는 https://로 시작해야 합니다.",
   "err.IKUAI_URL_TOO_LONG": "iKuai 주소가 너무 깁니다.",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 API는 HTTPS만 지원합니다. 주소는 https:// 로 시작해야 합니다(포트 생략 시 443)",

@@ -1757,6 +1757,7 @@
   "err.IKUAI_NOT_CONFIGURED": "iKuaiが未設定のため、サブネットを作成できません。",
   "err.IKUAI_PORT_INVALID": "ポート番号は 1〜65535 の範囲である必要があります",
   "err.IKUAI_URL_INVALID": "愛快アドレスの形式が無効です",
+  "err.IKUAI_URL_REQUIRED": "愛快アドレスを入力してください",
   "err.IKUAI_URL_SCHEME": "iKuaiアドレスは http:// または https:// で始める必要があります。",
   "err.IKUAI_URL_TOO_LONG": "iKuaiアドレスが長すぎます。",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 API は HTTPS のみ対応。アドレスは https:// で始める必要があります（ポート指定可、未指定は 443）",

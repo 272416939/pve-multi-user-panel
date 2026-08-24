@@ -370,7 +370,8 @@
     $.testIkuaiConfig = async function() {
         $.ikuaiTesting.value = true;
         try {
-            var result = await api('/admin/ikuai/test', { method: 'POST', body: {} });
+            // 传表单当前值（未保存即可测）：后端按表单 host/账号/Token 测试，打码值回退读库
+            var result = await api('/admin/ikuai/test', { method: 'POST', body: $.ikuaiConfig.value });
             alert(result.message || window.__i18n.t('admin.pve.testOk'));
         } catch (e) {
             alert(window.__i18n.t('admin.pve.testFailed') + (e.message || window.__i18n.t('common.unknownError')));

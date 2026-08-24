@@ -1757,6 +1757,7 @@
   "err.IKUAI_NOT_CONFIGURED": "愛快未配置，無法建立子網",
   "err.IKUAI_PORT_INVALID": "連接埠號必須在 1-65535 之間",
   "err.IKUAI_URL_INVALID": "愛快位址格式無效",
+  "err.IKUAI_URL_REQUIRED": "請先填寫愛快位址",
   "err.IKUAI_URL_SCHEME": "愛快位址必須以 http:// 或 https:// 開頭",
   "err.IKUAI_URL_TOO_LONG": "愛快位址過長",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 介面僅支援 HTTPS，位址必須以 https:// 開頭（可帶連接埠，未填預設 443）",

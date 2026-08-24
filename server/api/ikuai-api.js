@@ -170,6 +170,25 @@ class IkuaiApi {
         return { leaseCount: total };
     }
 
+    // 按传入配置测试连接（测试连接按钮统一模式：表单当前值测试，未保存即可测；不落库、不改单例 client/登录态）
+    // params: { host, username, password, api_key, version, strict_tls }（敏感字段已由路由层做打码回退读库）
+    async testConnectionWith({ host, username, password, api_key, version, strict_tls }) {
+        if (!host) throw new Error('爱快地址未填写');
+        if (version === 'v4') {
+            if (!api_key) throw new Error('V4 模式需要填写 API Token');
+            var { IkuaiV4Api } = require('./ikuai-v4');
+            var impl = new IkuaiV4Api({ host, token: api_key, insecure: !strict_tls, debug: process.env.DEBUG === 'true' });
+            return await impl.testConnection();
+        }
+        if (!username || !password) throw new Error('用户名与密码未填写');
+        var { IKuaiClient } = await import('../sdk/ikuai-sdk/ikuai-sdk.mjs');
+        var client = new IKuaiClient(host, { debug: process.env.DEBUG === 'true', insecure: !strict_tls });
+        await client.login(username, password);
+        var data = await client.call('dhcp_lease', 'show', { TYPE: 'total,data', ORDER_BY: 'timeout', ORDER: 'desc', limit: '0,1000' });
+        var total = (data && data.total !== undefined) ? data.total : (data && Array.isArray(data.data) ? data.data.length : 0);
+        return { leaseCount: total };
+    }
+
     async getPortForwards() {
         if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getPortForwards();
         const data = await this._call('dnat', 'show', { TYPE: 'data,total', limit: '0,9999', ORDER_BY: 'id', ORDER: '', orderType: '' });

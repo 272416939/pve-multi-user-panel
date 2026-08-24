@@ -1757,6 +1757,7 @@
   "err.IKUAI_NOT_CONFIGURED": "爱快未配置，无法创建子网",
   "err.IKUAI_PORT_INVALID": "端口号必须在 1-65535 之间",
   "err.IKUAI_URL_INVALID": "爱快地址格式无效",
+  "err.IKUAI_URL_REQUIRED": "请先填写爱快地址",
   "err.IKUAI_URL_SCHEME": "爱快地址必须以 http:// 或 https:// 开头",
   "err.IKUAI_URL_TOO_LONG": "爱快地址过长",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 接口仅支持 HTTPS，地址必须以 https:// 开头（可带端口，未填默认 443）",

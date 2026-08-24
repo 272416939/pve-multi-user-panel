@@ -1081,7 +1081,7 @@ router.put('/admin/ikuai/network-config', authMiddleware, adminMiddleware, async
     }
 });
 
-// 测试连接：真实登录爱快并执行只读查询验证连通性（不产生任何写操作）
+// 测试连接：按表单当前值真实登录爱快并执行只读查询验证连通性（未保存即可测；不产生任何写操作、不落库）
 router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         // 外呼真实设备：走可配置限速（与 ikuai_query 同规则，独立 key）
@@ -1089,7 +1089,27 @@ router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, re
         if (!rateLimitResult.allowed) {
             return res.status(429).json({ error: '测试过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
         }
-        var info = await ikuaiApi.testConnection();
+        // 表单当前值测试（未保存即可测）：敏感字段打码/空值回退读库解密（与 PVE 测试连接同款模式）
+        var body = req.body || {};
+        var saved = await db.config.getIkuai();
+        var host = String(body.host !== undefined ? body.host : (saved.host || '')).trim();
+        var version = body.version === 'v4' ? 'v4' : (saved.version === 'v4' ? 'v4' : 'v3');
+        var username = String(body.username !== undefined ? body.username : (saved.username || '')).trim();
+        // 留空/打码视为未修改 → 用已保存值（解密后）
+        var pwdChanged = body.password !== undefined && body.password !== '' && !isMasked(body.password);
+        var apiKeyChanged = body.api_key !== undefined && body.api_key !== '' && !isMasked(body.api_key);
+        var password = pwdChanged ? body.password : saved.password;
+        var apiKey = apiKeyChanged ? body.api_key : saved.api_key;
+        var strictTls = body.strict_tls !== undefined ? !!body.strict_tls : !!saved.strict_tls;
+        // host 校验（协议白名单防 SSRF + V4 强制 https，与保存端点一致）
+        if (!host) return res.status(400).json({ error: '请先填写爱快地址', code: 'IKUAI_URL_REQUIRED' });
+        if (!/^https?:\/\/\S+$/i.test(host)) {
+            return res.status(400).json({ error: '爱快地址必须以 http:// 或 https:// 开头', code: 'IKUAI_URL_SCHEME' });
+        }
+        if (version === 'v4' && !/^https:\/\/\S+$/i.test(host)) {
+            return res.status(400).json({ error: 'V4 接口仅支持 HTTPS，地址必须以 https:// 开头（可带端口，未填默认 443）', code: 'IKUAI_V4_HTTPS_REQUIRED' });
+        }
+        var info = await ikuaiApi.testConnectionWith({ host, username, password, api_key: apiKey, version, strict_tls: strictTls });
         res.json({ message: '连接成功', info: info || null });
     } catch (e) {
         console.error('[ikuai] 测试连接失败:', e.message);

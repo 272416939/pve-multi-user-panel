@@ -1757,6 +1757,7 @@
   "err.IKUAI_NOT_CONFIGURED": "iKuai non configuré ; création impossible.",
   "err.IKUAI_PORT_INVALID": "Le port doit être compris entre 1 et 65535",
   "err.IKUAI_URL_INVALID": "Format d'adresse iKuai invalide",
+  "err.IKUAI_URL_REQUIRED": "Veuillez saisir l'adresse iKuai",
   "err.IKUAI_URL_SCHEME": "L'URL iKuai doit commencer par http:// ou https://.",
   "err.IKUAI_URL_TOO_LONG": "URL iKuai trop longue.",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 ne prend en charge que HTTPS ; l'adresse doit commencer par https:// (port facultatif, 443 par défaut)",

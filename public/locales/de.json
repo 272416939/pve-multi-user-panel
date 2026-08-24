@@ -1757,6 +1757,7 @@
   "err.IKUAI_NOT_CONFIGURED": "iKuai nicht konfiguriert; Subnetzerstellung nicht möglich.",
   "err.IKUAI_PORT_INVALID": "Port muss zwischen 1-65535 liegen",
   "err.IKUAI_URL_INVALID": "Ungültiges iKuai-Adressformat",
+  "err.IKUAI_URL_REQUIRED": "Bitte geben Sie die iKuai-Adresse ein",
   "err.IKUAI_URL_SCHEME": "iKuai-URL muss mit http:// oder https:// beginnen.",
   "err.IKUAI_URL_TOO_LONG": "iKuai-URL zu lang.",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 nur über HTTPS; Adresse muss mit https:// beginnen (Port optional, Standard 443)",
