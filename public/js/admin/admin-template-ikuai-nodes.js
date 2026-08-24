@@ -137,9 +137,22 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label">{{ t('nodes.wanInterface') }}</label>
-                                <div class="d-flex flex-wrap gap-2 align-items-center">
-                                    <span v-for="iface in ikuaiNodesPage.interfaces.value" :key="iface.name" class="badge" :class="ikuaiNodesPage.isWanIfaceSelected(iface.name) ? 'bg-primary' : 'bg-secondary'" role="button" style="cursor:pointer" @click="ikuaiNodesPage.toggleWanIface(iface.name)">{{ iface.name }}</span>
-                                    <span v-if="ikuaiNodesPage.interfaces.value.length === 0" class="text-muted small">{{ t('nodes.noIface') }}</span>
+                                <div class="input-group" style="position: relative; z-index: 1080; overflow: visible;">
+                                    <input type="text" class="form-control" :value="ikuaiNodesPage.wanIfaceText.value" :placeholder="t('settings.network.wanIfacePh')" readonly>
+                                    <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" :disabled="ikuaiNodesPage.wanInterfaceList.value.length === 0">{{ t('settings.select') }}</button>
+                                    <ul class="dropdown-menu dropdown-menu-end" style="z-index: 1080;">
+                                        <li v-for="iface in ikuaiNodesPage.wanInterfaceList.value" :key="iface.name">
+                                            <a class="dropdown-item d-flex justify-content-between align-items-center" :class="{ 'active': ikuaiNodesPage.isWanIfaceSelected(iface.name) }" href="#" @click.prevent="ikuaiNodesPage.toggleWanIface(iface.name)">
+                                                <span>{{ iface.name }} ({{ iface.ip || t('settings.network.dialup') }})</span>
+                                                <i v-if="ikuaiNodesPage.isWanIfaceSelected(iface.name)" class="bi bi-check-circle-fill text-primary ms-2"></i>
+                                            </a>
+                                        </li>
+                                        <li v-if="ikuaiNodesPage.wanInterfaceList.value.length === 0"><span class="dropdown-item text-muted">{{ t('nodes.noIface') }}</span></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><a class="dropdown-item text-danger" href="#" @click.prevent="ikuaiNodesPage.clearWanInterfaces()">{{ t('settings.network.clear') }}</a></li>
+                                    </ul>
+                                </div>
+                                <div class="d-flex gap-2 mt-2 align-items-center">
                                     <pv-button type="button" variant="outline" size="lg" @click="ikuaiNodesPage.refreshInterfaces()">{{ t('nodes.refreshIface') }}</pv-button>
                                 </div>
                                 <small class="text-muted">{{ t('nodes.wanIfaceHint') }}</small>

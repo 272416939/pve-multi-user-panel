@@ -35,6 +35,12 @@ window.__admin.ikuaiNodesPage = (function () {
         return (networkForm.wan_interface || []).join(', ');
     });
 
+    // 外网接口下拉（多选）：仅显示 WAN 类型接口，无 WAN 时回退全部（与旧版一致）
+    var wanInterfaceList = computed(function () {
+        var wan = interfaces.value.filter(function (i) { return i.type === 'wan'; });
+        return wan.length > 0 ? wan : interfaces.value;
+    });
+
     // CNAME 域名行编辑列表（存储格式 label||.domain 逗号分隔，与既有 cname 校验/展示兼容）
     var cnameEntries = ref([]);
 
@@ -187,6 +193,10 @@ window.__admin.ikuaiNodesPage = (function () {
 
     function isWanIfaceSelected(name) {
         return (networkForm.wan_interface || []).indexOf(name) > -1;
+    }
+
+    function clearWanInterfaces() {
+        networkForm.wan_interface = [];
     }
 
     // ==================== CNAME 域名行编辑 ====================
@@ -357,6 +367,7 @@ window.__admin.ikuaiNodesPage = (function () {
         networkForm: networkForm,
         cnameEntries: cnameEntries,
         wanIfaceText: wanIfaceText,
+        wanInterfaceList: wanInterfaceList,
         load: load,
         loadNodes: loadNodes,
         loadStop: stopPoll,
@@ -367,6 +378,7 @@ window.__admin.ikuaiNodesPage = (function () {
         refreshInterfaces: refreshInterfaces,
         toggleWanIface: toggleWanIface,
         isWanIfaceSelected: isWanIfaceSelected,
+        clearWanInterfaces: clearWanInterfaces,
         parseCnameEntries: parseCnameEntries,
         addCnameEntry: addCnameEntry,
         removeCnameEntry: removeCnameEntry,
