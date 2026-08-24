@@ -1097,11 +1097,14 @@ router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, re
         var host = String(body.host !== undefined ? body.host : (saved.host || '')).trim();
         var version = body.version === 'v4' ? 'v4' : (saved.version === 'v4' ? 'v4' : 'v3');
         var username = String(body.username !== undefined ? body.username : (saved.username || '')).trim();
-        // 留空/打码视为未修改 → 用已保存值（解密后）
-        var pwdChanged = body.password !== undefined && body.password !== '' && !isMasked(body.password);
-        var apiKeyChanged = body.api_key !== undefined && body.api_key !== '' && !isMasked(body.api_key);
+        // 表单当前值测试（未保存即可测）：敏感字段占位判定 = 与 maskSecret(已保存值) 精确相等才回退——
+        // 宽松 isMasked(includes '****') 会把「占位值末尾追加/修改」（如 test****528@x）也当未修改回退，
+        // 掩盖被测凭据（V4 占位 Token 末尾追加仍提示成功）；精确匹配后追加/修改一律按真实输入测试
+        var savedPwdMask = maskSecret(saved.password);
+        var savedApiKeyMask = maskSecret(saved.api_key);
         var apiKeyEmpty = body.api_key === undefined || body.api_key === '';
-        var apiKeyMasked = body.api_key !== undefined && body.api_key !== '' && isMasked(body.api_key);
+        var pwdChanged = body.password !== undefined && body.password !== '' && body.password !== savedPwdMask;
+        var apiKeyChanged = !apiKeyEmpty && body.api_key !== savedApiKeyMask;
         var password = pwdChanged ? body.password : saved.password;
         var apiKey = apiKeyChanged ? body.api_key : saved.api_key;
         var strictTls = body.strict_tls !== undefined ? !!body.strict_tls : !!saved.strict_tls;
@@ -1113,15 +1116,9 @@ router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, re
         if (version === 'v4' && !/^https:\/\/\S+$/i.test(host)) {
             return res.status(400).json({ error: 'V4 接口仅支持 HTTPS，地址必须以 https:// 开头（可带端口，未填默认 443）', code: 'IKUAI_V4_HTTPS_REQUIRED' });
         }
-        // V4 测试必须用真实 Token：打码占位/空值拒绝（回退读库会静默用已保存 Token 测试，掩盖被测凭据——
-        // 造成「用错误/占位 Token 也提示成功」的未校验假象；测试的目的就是验证你填的 Token）
-        if (version === 'v4' && !apiKeyChanged) {
-            if (apiKeyMasked) {
-                return res.status(400).json({ error: 'API Token 为打码占位值，请输入完整 Token 后再测试', code: 'IKUAI_V4_TOKEN_MASKED' });
-            }
-            if (apiKeyEmpty) {
-                return res.status(400).json({ error: 'V4 模式需要填写 API Token', code: 'IKUAI_V4_KEY_REQUIRED' });
-            }
+        // V4 测试必须用真实 Token：空值拒绝（测试的目的就是验证你填的 Token）
+        if (version === 'v4' && apiKeyEmpty) {
+            return res.status(400).json({ error: 'V4 模式需要填写 API Token', code: 'IKUAI_V4_KEY_REQUIRED' });
         }
         var info = await ikuaiApi.testConnectionWith({ host, username, password, api_key: apiKey, version, strict_tls: strictTls });
         res.json({ message: '连接成功', info: info || null });
@@ -1211,10 +1208,14 @@ router.post('/admin/pve/test', authMiddleware, adminMiddleware, async (req, res)
             return res.status(429).json({ error: '测试过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
         }
         var { host, api_token, ssh_host, ssh_port, ssh_user, ssh_password, strict_tls } = req.body || {};
-        // 脱敏值回退读库（用户未改密码/Tok 时表单回显的是打码串）
+        // 占位判定 = 与 maskSecret(已保存值) 精确相等才回退（与爱快测试同款：宽松 isMasked 会把占位值末尾追加/修改当未修改）
         var saved = await db.config.getPve();
-        if (isMasked(api_token)) api_token = saved.api_token || '';
-        if (isMasked(ssh_password)) ssh_password = saved.ssh_password || '';
+        if (!(api_token !== undefined && api_token !== '' && api_token !== maskSecret(saved.api_token))) {
+            api_token = saved.api_token || '';
+        }
+        if (!(ssh_password !== undefined && ssh_password !== '' && ssh_password !== maskSecret(saved.ssh_password))) {
+            ssh_password = saved.ssh_password || '';
+        }
         var result = await pveApi.testConnection({ host, api_token, strict_tls: !!strict_tls, ssh_host, ssh_port, ssh_user, ssh_password });
         if (!result.success) {
             return res.status(400).json({ error: result.message, info: result.info || null });

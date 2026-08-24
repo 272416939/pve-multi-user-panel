@@ -1763,7 +1763,6 @@
   "err.IKUAI_URL_TOO_LONG": "iKuai 주소가 너무 깁니다.",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 API는 HTTPS만 지원합니다. 주소는 https:// 로 시작해야 합니다(포트 생략 시 443)",
   "err.IKUAI_V4_KEY_REQUIRED": "V4 모드에서는 API 토큰이 필요합니다",
-  "err.IKUAI_V4_TOKEN_MASKED": "API 토큰이 마스킹된 자리 표시자입니다. 테스트 전에 전체 토큰을 입력하세요",
   "err.IKUAI_VERSION_INVALID": "API 버전이 잘못되었습니다. v3 또는 v4여야 합니다",
   "err.IKUAI_VLAN_LIST_FAILED": "iKuai VLAN 목록 조회에 실패했습니다. 잠시 후 다시 시도하세요.",
   "err.INTERNAL_ERROR": "시스템 오류가 발생했습니다. 잠시 후 다시 시도하세요",

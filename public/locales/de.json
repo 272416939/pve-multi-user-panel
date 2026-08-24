@@ -1763,7 +1763,6 @@
   "err.IKUAI_URL_TOO_LONG": "iKuai-URL zu lang.",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 nur über HTTPS; Adresse muss mit https:// beginnen (Port optional, Standard 443)",
   "err.IKUAI_V4_KEY_REQUIRED": "API-Token ist im V4-Modus erforderlich",
-  "err.IKUAI_V4_TOKEN_MASKED": "Das API-Token ist ein maskierter Platzhalter; bitte das vollständige Token eingeben, bevor Sie testen",
   "err.IKUAI_VERSION_INVALID": "Ungültige API-Version, muss v3 oder v4 sein",
   "err.IKUAI_VLAN_LIST_FAILED": "iKuai-VLAN-Liste konnte nicht geladen werden.",
   "err.INTERNAL_ERROR": "Systemfehler, bitte später erneut versuchen",
