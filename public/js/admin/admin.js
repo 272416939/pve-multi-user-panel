@@ -17,12 +17,6 @@
     $.assignForm = ref({ vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' });
     $.smtpConfig = ref({ host: '', port: 587, secure: false, user: '', password: '', from: '', from_name: '', enabled: false });
     $.emailQueueStats = ref(null);
-    $.pveConfig = ref({ host: '', api_token: '', ssh_host: '', ssh_port: 22, ssh_user: 'root', ssh_password: '', strict_tls: false });
-    $.ikuaiConfig = ref({ host: '', username: '', password: '', api_key: '', version: 'v3', strict_tls: false });
-    $.ikuaiTesting = ref(false);
-    $.ikuaiConfigSaving = ref(false);
-    $.pveTesting = ref(false);
-    $.pveConfigSaving = ref(false);
     $.reminderConfig = ref({ days1: 7, days2: 3, days3: 1 });
     $.snapshotConfig = ref({ max_per_vm: 5, daily_create_limit: 20, daily_restore_limit: 10 });
     $.storageList = ref([]);
@@ -300,83 +294,6 @@
         } catch (e) {
             console.warn('邮件队列状态加载失败:', e.message || e);
         }
-    };
-
-    // PVE 节点配置
-    $.loadPveConfig = async function() {
-        try {
-            var config = await api('/admin/pve/config');
-            $.pveConfig.value = config;
-        } catch (e) {
-            // 端点不存在（旧版本服务）或服务未重启，静默处理不阻塞加载
-            console.warn('PVE 配置加载失败（服务可能需要重启）:', e.message || e);
-        }
-    };
-
-    $.savePveConfig = async function() {
-        $.pveConfigSaving.value = true;
-        try {
-            await api('/admin/pve/config', { method: 'PUT', body: $.pveConfig.value });
-            alert(window.__i18n.t('admin.pve.saveOk'));
-            await $.loadPveConfig();
-        } catch (e) {
-            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
-        }
-        $.pveConfigSaving.value = false;
-    };
-
-    // PVE 测试连接（对表单当前值测试；Token/SSH 密码为打码值时后端自动回退读库）
-    $.testPveConfig = async function() {
-        $.pveTesting.value = true;
-        try {
-            var result = await api('/admin/pve/test', { method: 'POST', body: $.pveConfig.value });
-            alert(result.message || window.__i18n.t('admin.pve.testOk'));
-        } catch (e) {
-            alert(window.__i18n.t('admin.pve.testFailed') + (e.message || window.__i18n.t('common.unknownError')));
-        }
-        $.pveTesting.value = false;
-    };
-
-    // 爱快节点配置（保存后服务端热加载，立即生效）
-    $.loadIkuaiConfig = async function() {
-        try {
-            var config = await api('/admin/ikuai/config');
-            // 只取连接配置字段（节点网络设置字段由 loadNetworkConfig 负责，避免污染整对象提交）
-            $.ikuaiConfig.value = {
-                host: config.host || '',
-                username: config.username || '',
-                password: config.password || '',
-                api_key: config.api_key || '',
-                version: config.version || 'v3',
-                strict_tls: !!config.strict_tls
-            };
-        } catch (e) {
-            console.warn('爱快配置加载失败（服务可能需要重启）:', e.message || e);
-        }
-    };
-
-    $.saveIkuaiConfig = async function() {
-        $.ikuaiConfigSaving.value = true;
-        try {
-            await api('/admin/ikuai/config', { method: 'PUT', body: $.ikuaiConfig.value });
-            alert(window.__i18n.t('admin.ikuai.saveOk'));
-            await $.loadIkuaiConfig();
-        } catch (e) {
-            alert(window.__i18n.t('common.saveFailedMsg') + (e.message || window.__i18n.t('common.unknownError')));
-        }
-        $.ikuaiConfigSaving.value = false;
-    };
-
-    $.testIkuaiConfig = async function() {
-        $.ikuaiTesting.value = true;
-        try {
-            // 传表单当前值（未保存即可测）：后端按表单 host/账号/Token 测试，打码值回退读库
-            var result = await api('/admin/ikuai/test', { method: 'POST', body: $.ikuaiConfig.value });
-            alert(result.message || window.__i18n.t('admin.pve.testOk'));
-        } catch (e) {
-            alert(window.__i18n.t('admin.pve.testFailed') + (e.message || window.__i18n.t('common.unknownError')));
-        }
-        $.ikuaiTesting.value = false;
     };
 
     $.testSmtpConfig = async function() {

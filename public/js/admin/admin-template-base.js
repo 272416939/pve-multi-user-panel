@@ -139,13 +139,32 @@
                 </a>
                 <div class="nav-submenu" id="submenu-settings">
                     <a :title="t('nav.smtpConfig')" class="nav-item" data-subsection="settings-smtp" href="#" @click.prevent="switchAdminTab('smtp')"><span class="nav-text">{{ t('nav.smtpConfig') }}</span></a>
-                    <a :title="t('nav.ikuaiNodeSettings')" class="nav-item" data-subsection="settings-ikuai" href="#" @click.prevent="switchAdminTab('ikuai')"><span class="nav-text">{{ t('nav.ikuaiNodeSettings') }}</span></a>
-                    <a :title="t('nav.pveNodeSettings')" class="nav-item" data-subsection="settings-pve" href="#" @click.prevent="switchAdminTab('pve')"><span class="nav-text">{{ t('nav.pveNodeSettings') }}</span></a>
-                    <a :title="t('nav.backupConfig')" class="nav-item" data-subsection="settings-snapshot-backup" href="#" @click.prevent="switchAdminTab('snapshot-backup')"><span class="nav-text">{{ t('nav.backupConfig') }}</span></a>
                     <a :title="t('nav.payConfig')" class="nav-item" data-subsection="settings-pay" href="#" @click.prevent="switchAdminTab('pay')"><span class="nav-text">{{ t('nav.payConfig') }}</span></a>
                     <a :title="t('nav.siteSettings')" class="nav-item" data-subsection="settings-site" href="#" @click.prevent="switchAdminTab('site')"><span class="nav-text">{{ t('nav.siteSettings') }}</span></a>
                     <a :title="t('nav.uapipro')" class="nav-item" data-subsection="settings-uapipro" href="#" @click.prevent="switchAdminTab('uapipro')"><span class="nav-text">{{ t('nav.uapipro') }}</span></a>
                 </div>
+
+                <!-- 区域管理（父菜单，仅admin） -->
+                <a :title="t('nav.regionList')" v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('zone-mgmt')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg></span>
+                    <span class="nav-text">{{ t('nav.regionList') }}</span>
+                    <span class="nav-arrow"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+                </a>
+                <div v-if="user && user.role === 'admin'" class="nav-submenu" id="submenu-zone-mgmt">
+                    <a :title="t('nav.regionList')" class="nav-item" :class="{ active: activeSection === 'regions' }" data-subsection="regions" href="#" @click.prevent="switchPage('regions')"><span class="nav-text">{{ t('nav.regionList') }}</span></a>
+                    <a :title="t('nav.zoneList')" class="nav-item" :class="{ active: activeSection === 'zones' }" data-subsection="zones" href="#" @click.prevent="switchPage('zones')"><span class="nav-text">{{ t('nav.zoneList') }}</span></a>
+                </div>
+
+                <!-- 爱快节点（独立一级菜单，仅admin） -->
+                <a :title="t('nav.ikuaiNodes')" v-if="user && user.role === 'admin'" class="nav-item" :class="{ active: activeSection === 'ikuai-nodes' }" href="#" @click.prevent="switchPage('ikuai-nodes')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></span>
+                    <span class="nav-text">{{ t('nav.ikuaiNodes') }}</span>
+                </a>
+                <!-- PVE 节点（独立一级菜单，仅admin） -->
+                <a :title="t('nav.pveNodes')" v-if="user && user.role === 'admin'" class="nav-item" :class="{ active: activeSection === 'pve-nodes' }" href="#" @click.prevent="switchPage('pve-nodes')">
+                    <span class="nav-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>
+                    <span class="nav-text">{{ t('nav.pveNodes') }}</span>
+                </a>
 
                 <!-- 安全防护（父菜单，仅admin） -->
                 <a :title="t('nav.security')" v-if="user && user.role === 'admin'" class="nav-item has-children" href="#" @click.prevent="toggleSubmenu('security')">

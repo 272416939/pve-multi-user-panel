@@ -52,7 +52,7 @@ function probeUrl(rawUrl, strictTls) {
         try {
             url = new URL(rawUrl);
         } catch (_) {
-            return resolve({ ok: false, latency_ms: null, error: '地址格式无效' });
+            return resolve({ ok: false, latency_ms: null, error: '地址格式无效', code: 'PROBE_URL_INVALID' });
         }
         const isHttps = url.protocol === 'https:';
         const mod = isHttps ? https : http;

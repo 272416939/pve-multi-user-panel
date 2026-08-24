@@ -28,9 +28,9 @@ async function audit(req, action, resourceType, resourceId, details) {
 
 function validateNodeBase(body) {
     const name = String(body.name || '').trim();
-    if (!name) return { error: '请填写节点名称', code: 'NAME_REQUIRED' };
-    if (name.length > 100) return { error: '节点名称最长 100 个字符', code: 'NAME_TOO_LONG' };
-    if (/[<>]/.test(name)) return { error: '节点名称不能包含 HTML 标签', code: 'NAME_INVALID_CHARS' };
+    if (!name) return { error: '请填写节点名称', code: 'NODE_NAME_REQUIRED' };
+    if (name.length > 100) return { error: '节点名称最长 100 个字符', code: 'NODE_NAME_TOO_LONG' };
+    if (/[<>]/.test(name)) return { error: '节点名称不能包含 HTML 标签', code: 'NODE_NAME_INVALID_CHARS' };
     const zoneId = parseInt(body.zone_id);
     if (!Number.isInteger(zoneId)) return { error: '请选择所属可用区', code: 'ZONE_REQUIRED' };
     const apiHost = String(body.api_host || '').trim();
@@ -212,15 +212,15 @@ router.post('/admin/pve/nodes', authMiddleware, adminMiddleware, async (req, res
     try {
         var rateLimitResult = await checkConfiguredRateLimit('pve_test', 'ratelimit:pve-node-save:' + req.user.id);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: rateLimitResult.retryAfter });
         }
         var body = req.body || {};
         var base = validateNodeBase(body);
         if (base.error) return res.status(400).json({ error: base.error, code: base.code });
         const zone = await db.zones.get(base.value.zone_id);
-        if (!zone) return res.status(404).json({ error: '所属可用区不存在', code: 'ZONE_NOT_FOUND' });
+        if (!zone) return res.status(404).json({ error: '所属可用区不存在', code: 'ZONE_BELONG_NOT_FOUND' });
         const ik = await db.ikuaNodes.get(base.value.ikuai_node_id);
-        if (!ik) return res.status(404).json({ error: '关联的爱快节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
+        if (!ik) return res.status(404).json({ error: '关联的爱快节点不存在', code: 'IKUAI_PAIR_NOT_FOUND' });
         var resolved = await resolveTestParams(body);
         if (resolved.error) return res.status(400).json({ error: resolved.error, code: resolved.code });
         var p = resolved.params;
@@ -254,7 +254,7 @@ router.put('/admin/pve/nodes/:id', authMiddleware, adminMiddleware, async (req, 
     try {
         var rateLimitResult = await checkConfiguredRateLimit('pve_test', 'ratelimit:pve-node-save:' + req.user.id);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: rateLimitResult.retryAfter });
         }
         const id = parseInt(req.params.id);
         const existing = await db.pveNodes.get(id);
@@ -264,9 +264,9 @@ router.put('/admin/pve/nodes/:id', authMiddleware, adminMiddleware, async (req, 
         var base = validateNodeBase(body);
         if (base.error) return res.status(400).json({ error: base.error, code: base.code });
         const zone = await db.zones.get(base.value.zone_id);
-        if (!zone) return res.status(404).json({ error: '所属可用区不存在', code: 'ZONE_NOT_FOUND' });
+        if (!zone) return res.status(404).json({ error: '所属可用区不存在', code: 'ZONE_BELONG_NOT_FOUND' });
         const ik = await db.ikuaNodes.get(base.value.ikuai_node_id);
-        if (!ik) return res.status(404).json({ error: '关联的爱快节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
+        if (!ik) return res.status(404).json({ error: '关联的爱快节点不存在', code: 'IKUAI_PAIR_NOT_FOUND' });
         var resolved = await resolveTestParams(body);
         if (resolved.error) return res.status(400).json({ error: resolved.error, code: resolved.code });
         var p = resolved.params;
@@ -331,7 +331,7 @@ router.get('/admin/pve/nodes/storages', authMiddleware, adminMiddleware, async (
         }
         const nodeId = req.query.node_id ? parseInt(req.query.node_id) : null;
         if (nodeId == null) {
-            return res.status(400).json({ error: '缺少 node_id 参数', code: 'PVE_NODE_NOT_FOUND' });
+            return res.status(400).json({ error: '缺少 node_id 参数', code: 'PVE_NODE_ID_REQUIRED' });
         }
         const client = await getPveClient(nodeId);
         const list = await client.getStorageList();

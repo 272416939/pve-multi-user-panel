@@ -19,6 +19,8 @@
     $.activeSection = ref(urlSection || 'overview');
     $.navItems = ref([]);
     var savedTab = localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB);
+    // 设置页旧 tab（爱快/PVE/快照备份）已迁移到独立节点管理页：清除残留值回退 smtp
+    if (['ikuai', 'pve', 'snapshot-backup'].indexOf(savedTab) !== -1) savedTab = 'smtp';
     $.activeTab = ref((savedTab === 'assign' ? 'users' : savedTab) || 'users');
     $.activeTabLxc = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_LXC) || 'create');
     $.activeTabVm = ref(localStorage.getItem(window.__storageKeys.ADMIN_ACTIVE_TAB_VM) || 'manage');
@@ -233,12 +235,28 @@ watch($.user, function(u) {
             subId = 'logs';
             // 容错调用：点击路径显式加载（与刷新/直达路径复用同一函数，规范第四节）
             if ($.loadLogs) $.loadLogs(1);
+        } else if (page === 'regions') {
+            section = 'regions';
+            subId = 'regions';
+            if (window.__admin.regionsPage) window.__admin.regionsPage.load();
+        } else if (page === 'zones') {
+            section = 'zones';
+            subId = 'zones';
+            if (window.__admin.regionsPage) window.__admin.regionsPage.load();
+        } else if (page === 'ikuai-nodes') {
+            section = 'ikuai-nodes';
+            subId = 'ikuai-nodes';
+            if (window.__admin.ikuaiNodesPage) window.__admin.ikuaiNodesPage.load();
+        } else if (page === 'pve-nodes') {
+            section = 'pve-nodes';
+            subId = 'pve-nodes';
+            if (window.__admin.pveNodesPage) window.__admin.pveNodesPage.load();
         }
         if (!section) return;
         $.switchSection(section);
         $.expandedSections.value[section] = true;
         // section 与父菜单 id 可能不同（templates-os → submenu-templates）；logs 为一级菜单，菜单键即 section 名
-        var menuKey = section === 'templates-os' ? 'templates' : section;
+        var menuKey = section === 'templates-os' ? 'templates' : (section === 'regions' || section === 'zones') ? 'zone-mgmt' : section;
         var el = document.getElementById('submenu-' + menuKey);
         if (el) el.classList.add('open');
         var parent = el ? el.previousElementSibling : null;
@@ -311,8 +329,6 @@ watch($.user, function(u) {
                 $.loadEmailTemplates ? $.loadEmailTemplates() : Promise.resolve(),
                 $.loadEmailShell ? $.loadEmailShell() : Promise.resolve(),
                 $.loadI18nSummary ? $.loadI18nSummary() : Promise.resolve(),
-                $.loadPveConfig(),
-                $.loadIkuaiConfig(),
                 $.loadRedisConfig(),
                 $.loadLogConfig ? $.loadLogConfig() : Promise.resolve(),
                 $.loadSnapshotConfig(),
@@ -690,7 +706,8 @@ watch($.user, function(u) {
     $.switchAdminTab = function(tab) {
         // Determine which group this tab belongs to
         var manageTabs = ['users', 'cdk', 'messages'];
-        var settingsTabs = ['smtp', 'ikuai', 'pve', 'snapshot-backup', 'pay', 'site', 'uapipro'];
+        // 系统设置 tab（爱快/PVE/快照备份已迁移到独立节点管理页，移除）
+        var settingsTabs = ['smtp', 'pay', 'site', 'uapipro'];
         var section;
         var submenuId;
 
@@ -722,9 +739,6 @@ watch($.user, function(u) {
             'cdk': 'manage-cdk',
             'messages': 'manage-messages',
             'smtp': 'settings-smtp',
-            'ikuai': 'settings-ikuai',
-            'pve': 'settings-pve',
-            'snapshot-backup': 'settings-snapshot-backup',
             'pay': 'settings-pay',
             'site': 'settings-site',
             'uapipro': 'settings-uapipro'
@@ -911,8 +925,8 @@ $.initDetailCharts = function() {
                 // Auto-expand submenu based on current section
                 // section 名与父菜单 id 不相同的做映射（templates-os → submenu-templates）；
                 // logs 为一级菜单（active 由模板 :class 绑定），无需展开子菜单
-                var expandSections = ['vms', 'lxc', 'network', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'port-forward', 'private-network', 'i18n'];
-                var submenuIdMap = { 'templates-os': 'templates', 'port-forward': 'network', 'private-network': 'network', 'i18n': 'other' };
+                var expandSections = ['vms', 'lxc', 'network', 'manage', 'settings', 'security', 'templates', 'packages', 'finance', 'disk-settings', 'templates-os', 'port-forward', 'private-network', 'i18n', 'regions', 'zones'];
+                var submenuIdMap = { 'templates-os': 'templates', 'port-forward': 'network', 'private-network': 'network', 'i18n': 'other', 'regions': 'zone-mgmt', 'zones': 'zone-mgmt' };
                 if (expandSections.indexOf($.activeSection.value) !== -1) {
                     setTimeout(function() {
                         var section = $.activeSection.value;
@@ -1062,6 +1076,18 @@ $.initDetailCharts = function() {
                 if ($.activeSection.value === 'i18n' && $.i18nPage) {
                     $.i18nPage.load();
                 }
+                // 刷新后停留在区域管理（地域/可用区）时主动加载数据
+                if (($.activeSection.value === 'regions' || $.activeSection.value === 'zones') && $.regionsPage) {
+                    $.regionsPage.load();
+                }
+                // 刷新后停留在爱快节点时主动加载并启动轮询
+                if ($.activeSection.value === 'ikuai-nodes' && $.ikuaiNodesPage) {
+                    $.ikuaiNodesPage.load();
+                }
+                // 刷新后停留在 PVE 节点时主动加载数据
+                if ($.activeSection.value === 'pve-nodes' && $.pveNodesPage) {
+                    $.pveNodesPage.load();
+                }
                 // 周期性 token 刷新：每10分钟检查一次，确保长时间挂机不会退出登录
                 setInterval(function() {
                     var token = localStorage.getItem(window.__storageKeys.TOKEN);
@@ -1144,6 +1170,21 @@ $.initDetailCharts = function() {
             // i18n 管理：点击/路由/刷新复用同一加载函数（规范第四节：点击路径与刷新路径必须同源）
             if (val === 'i18n' && $.i18nPage) {
                 $.i18nPage.load();
+            }
+            // 区域管理（地域/可用区）
+            if ((val === 'regions' || val === 'zones') && $.regionsPage) {
+                $.regionsPage.load();
+            }
+            // 爱快节点：进入加载并启动 30s 轮询；离开时停止轮询（防定时器泄漏）
+            if (val === 'ikuai-nodes' && $.ikuaiNodesPage) {
+                $.ikuaiNodesPage.load();
+            }
+            if (val !== 'ikuai-nodes' && $.ikuaiNodesPage && $.ikuaiNodesPage.loadStop) {
+                $.ikuaiNodesPage.loadStop();
+            }
+            // PVE 节点
+            if (val === 'pve-nodes' && $.pveNodesPage) {
+                $.pveNodesPage.load();
             }
         });
 

@@ -28,18 +28,18 @@ async function audit(req, action, resourceType, resourceId, details) {
 
 function validateNodeBase(body) {
     const name = String(body.name || '').trim();
-    if (!name) return { error: '请填写节点名称', code: 'NAME_REQUIRED' };
-    if (name.length > 100) return { error: '节点名称最长 100 个字符', code: 'NAME_TOO_LONG' };
-    if (/[<>]/.test(name)) return { error: '节点名称不能包含 HTML 标签', code: 'NAME_INVALID_CHARS' };
+    if (!name) return { error: '请填写节点名称', code: 'NODE_NAME_REQUIRED' };
+    if (name.length > 100) return { error: '节点名称最长 100 个字符', code: 'NODE_NAME_TOO_LONG' };
+    if (/[<>]/.test(name)) return { error: '节点名称不能包含 HTML 标签', code: 'NODE_NAME_INVALID_CHARS' };
     const version = body.version === 'v4' ? 'v4' : 'v3';
     const host = String(body.host || '').trim();
-    if (!host) return { error: '请填写爱快地址', code: 'IKUAI_URL_REQUIRED' };
+    if (!host) return { error: '请先填写爱快地址', code: 'IKUAI_URL_REQUIRED' };
     if (!/^https?:\/\/\S+$/i.test(host)) {
         return { error: '爱快地址必须以 http:// 或 https:// 开头', code: 'IKUAI_URL_SCHEME' };
     }
     // SSRF 防护：禁止携带用户凭据片段的 URL 形态（与既有保存端点一致的白名单思路）
     if (version === 'v4' && !/^https:\/\/\S+$/i.test(host)) {
-        return { error: 'V4 接口仅支持 HTTPS，地址必须以 https:// 开头', code: 'IKUAI_V4_HTTPS_REQUIRED' };
+        return { error: 'V4 接口仅支持 HTTPS，地址必须以 https:// 开头（可带端口，未填默认 443）', code: 'IKUAI_V4_HTTPS_REQUIRED' };
     }
     return { value: { name, version, host } };
 }
@@ -201,7 +201,7 @@ router.post('/admin/ikuai/nodes/:id/test', authMiddleware, adminMiddleware, asyn
             api_key: node.api_key, version: node.version, strict_tls: !!node.strict_tls
         });
         if (!result.ok) {
-            await db.ikuaNodes.updateProbe(id, { latency_ms: null, ok: false, error: '手动测试失败' });
+            await db.ikuaNodes.updateProbe(id, { latency_ms: null, ok: false, error: '手动测试失败', code: 'MANUAL_TEST_FAILED' });
             return;
         }
         var latency = Date.now() - started;
@@ -285,7 +285,7 @@ router.post('/admin/ikuai/nodes', authMiddleware, adminMiddleware, async (req, r
     try {
         var rateLimitResult = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-node-save:' + req.user.id);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: rateLimitResult.retryAfter });
         }
         var body = req.body || {};
         var base = validateNodeBase(body);
@@ -327,7 +327,7 @@ router.put('/admin/ikuai/nodes/:id', authMiddleware, adminMiddleware, async (req
     try {
         var rateLimitResult = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-node-save:' + req.user.id);
         if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
+            return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: rateLimitResult.retryAfter });
         }
         const id = parseInt(req.params.id);
         const existing = await db.ikuaNodes.get(id);

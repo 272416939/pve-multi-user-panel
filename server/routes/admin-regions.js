@@ -80,7 +80,7 @@ router.post('/admin/regions', authMiddleware, adminMiddleware, async (req, res) 
 router.put('/admin/regions/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!Number.isInteger(id)) return res.status(400).json({ error: '无效的地域 ID', code: 'REGION_NOT_FOUND' });
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '无效的地域 ID', code: 'REGION_INVALID_ID' });
         const region = await db.regions.get(id);
         if (!region) return res.status(404).json({ error: '地域不存在', code: 'REGION_NOT_FOUND' });
         const nameCheck = validateName(req.body.name);
@@ -104,7 +104,7 @@ router.put('/admin/regions/:id', authMiddleware, adminMiddleware, async (req, re
 router.delete('/admin/regions/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!Number.isInteger(id)) return res.status(400).json({ error: '无效的地域 ID', code: 'REGION_NOT_FOUND' });
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '无效的地域 ID', code: 'REGION_INVALID_ID' });
         const region = await db.regions.get(id);
         if (!region) return res.status(404).json({ error: '地域不存在', code: 'REGION_NOT_FOUND' });
         const zoneCount = (await require('../api/db-core').queryOne(
@@ -112,7 +112,8 @@ router.delete('/admin/regions/:id', authMiddleware, adminMiddleware, async (req,
         if (zoneCount > 0) {
             return res.status(409).json({
                 error: '该地域下还有 ' + zoneCount + ' 个可用区，请先删除或迁移可用区',
-                code: 'REGION_HAS_ZONES'
+                code: 'REGION_HAS_ZONES',
+                params: [zoneCount]
             });
         }
         await db.regions.remove(id);
@@ -151,7 +152,7 @@ router.post('/admin/zones', authMiddleware, adminMiddleware, async (req, res) =>
         const regionId = parseInt(req.body.region_id);
         if (!Number.isInteger(regionId)) return res.status(400).json({ error: '请选择所属地域', code: 'ZONE_REGION_REQUIRED' });
         const region = await db.regions.get(regionId);
-        if (!region) return res.status(404).json({ error: '所属地域不存在', code: 'REGION_NOT_FOUND' });
+        if (!region) return res.status(404).json({ error: '所属地域不存在', code: 'REGION_BELONG_NOT_FOUND' });
         const nameCheck = validateName(req.body.name);
         if (nameCheck.error) return res.status(400).json({ error: nameCheck.error, code: nameCheck.code });
         const remarkCheck = validateRemark(req.body.remark);
@@ -173,13 +174,13 @@ router.post('/admin/zones', authMiddleware, adminMiddleware, async (req, res) =>
 router.put('/admin/zones/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!Number.isInteger(id)) return res.status(400).json({ error: '无效的可用区 ID', code: 'ZONE_NOT_FOUND' });
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '无效的可用区 ID', code: 'ZONE_INVALID_ID' });
         const zone = await db.zones.get(id);
         if (!zone) return res.status(404).json({ error: '可用区不存在', code: 'ZONE_NOT_FOUND' });
         const regionId = parseInt(req.body.region_id);
         if (!Number.isInteger(regionId)) return res.status(400).json({ error: '请选择所属地域', code: 'ZONE_REGION_REQUIRED' });
         const region = await db.regions.get(regionId);
-        if (!region) return res.status(404).json({ error: '所属地域不存在', code: 'REGION_NOT_FOUND' });
+        if (!region) return res.status(404).json({ error: '所属地域不存在', code: 'REGION_BELONG_NOT_FOUND' });
         const nameCheck = validateName(req.body.name);
         if (nameCheck.error) return res.status(400).json({ error: nameCheck.error, code: nameCheck.code });
         const remarkCheck = validateRemark(req.body.remark);
@@ -201,7 +202,7 @@ router.put('/admin/zones/:id', authMiddleware, adminMiddleware, async (req, res)
 router.delete('/admin/zones/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (!Number.isInteger(id)) return res.status(400).json({ error: '无效的可用区 ID', code: 'ZONE_NOT_FOUND' });
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '无效的可用区 ID', code: 'ZONE_INVALID_ID' });
         const zone = await db.zones.get(id);
         if (!zone) return res.status(404).json({ error: '可用区不存在', code: 'ZONE_NOT_FOUND' });
         const nodeCount = (await require('../api/db-core').queryOne(
@@ -209,7 +210,8 @@ router.delete('/admin/zones/:id', authMiddleware, adminMiddleware, async (req, r
         if (nodeCount > 0) {
             return res.status(409).json({
                 error: '该可用区下仍有 ' + nodeCount + ' 个 PVE 节点，请先删除或迁移节点',
-                code: 'ZONE_IN_USE'
+                code: 'ZONE_IN_USE',
+                params: [nodeCount]
             });
         }
         await db.zones.remove(id);
