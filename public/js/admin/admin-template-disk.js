@@ -78,6 +78,7 @@
               <div><strong>{{ t('admin.disk.quarterlyPrice') }}</strong><span v-if="spec.quarterly_discount">{{ tFormat('admin.disk.discountMonthly', spec.quarterly_discount, diskPage.calcDiscountedPrice(spec).quarterly) }}</span><span v-else>-</span></div>
               <div><strong>{{ t('admin.disk.yearlyPrice') }}</strong><span v-if="spec.yearly_discount">{{ tFormat('admin.disk.discountMonthly', spec.yearly_discount, diskPage.calcDiscountedPrice(spec).yearly) }}</span><span v-else>-</span></div>
               <div><strong>{{ t('admin.disk.storagePool') }}</strong>{{ spec.storage_pool || '-' }}</div>
+              <div><strong>{{ t('admin.disk.node') }}</strong>{{ spec.pve_node_name || '-' }}</div>
               <div><strong>{{ t('admin.disk.diskFormat') }}</strong>{{ spec.disk_format || t('admin.disk.default') }}</div>
               <div><strong>{{ t('admin.disk.bandwidthLimit') }}</strong>{{ t('admin.disk.read') }} {{ spec.mbps_rd || t('admin.disk.none') }} MB/s ({{ t('admin.disk.burst') }} {{ spec.mbps_rd_max || t('admin.disk.none') }}) / {{ t('admin.disk.write') }} {{ spec.mbps_wr || t('admin.disk.none') }} MB/s ({{ t('admin.disk.burst') }} {{ spec.mbps_wr_max || t('admin.disk.none') }})</div>
               <div><strong>{{ t('admin.disk.iopsLimit') }}</strong>{{ t('admin.disk.read') }} {{ spec.iops_rd || t('admin.disk.none') }} ({{ t('admin.disk.burst') }} {{ spec.iops_rd_max || t('admin.disk.none') }}) / {{ t('admin.disk.write') }} {{ spec.iops_wr || t('admin.disk.none') }} ({{ t('admin.disk.burst') }} {{ spec.iops_wr_max || t('admin.disk.none') }})</div>
@@ -331,15 +332,15 @@
               <option v-for="s in diskPage.diskSpecStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} ({{ s.type || t('admin.disk.unknown') }}，{{ t('admin.disk.remaining') }}{{ diskPage.formatStorageSize(s.avail_gb) }})</option>
             </select>
           </div>
-          <div class="col-md-3" v-if="diskPage.isFileSystemStorage(diskPage.diskSpecForm.value.storage_pool)">
+          <div class="col-md-3">
             <label class="form-label">{{ t('admin.disk.diskFormat') }}</label>
-            <select class="form-select" v-model="diskPage.diskSpecForm.value.disk_format">
+            <select class="form-select" v-model="diskPage.diskSpecForm.value.disk_format" :disabled="!diskPage.isFileSystemStorage(diskPage.diskSpecForm.value.storage_pool)">
               <option value="qcow2">{{ t('admin.disk.qcow2') }}</option>
               <option value="raw">{{ t('admin.disk.raw') }}</option>
               <option value="vmdk" v-if="diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool) && diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool).type !== 'btrfs'">{{ t('admin.disk.vmdk') }}</option>
               <option value="subvol" v-if="diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool) && diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool).type === 'btrfs'">{{ t('admin.disk.subvol') }}</option>
             </select>
-            <div class="form-text">{{ t('admin.disk.formatHint') }}</div>
+            <div class="form-text">{{ diskPage.isFileSystemStorage(diskPage.diskSpecForm.value.storage_pool) ? t('admin.disk.formatHint') : t('admin.disk.formatNotNeeded') }}</div>
           </div>
           <div class="col-md-3">
             <label class="form-label">{{ t('admin.disk.quarterlyDiscount') }}</label>
