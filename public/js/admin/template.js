@@ -8,10 +8,10 @@
 
     tp.vmTemplateForm = ref({ id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20,
         network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', target_storage: 'local-lvm', clone_mode: 'full',
-        cpu_affinity: '', mac_group_id: '', description: '', status: 'active' });
+        cpu_affinity: '', mac_group_id: '', description: '', status: 'active', pve_node_id: null });
     tp.lxcTemplateForm = ref({ id: null, name: '', ostemplate: '', storage: 'local', cores: 1, memory: 512,
         swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', unprivileged: 1,
-        features: '', mac_group_id: '', description: '', status: 'active' });
+        features: '', mac_group_id: '', description: '', status: 'active', pve_node_id: null });
     tp.vmTemplates = ref([]);
     tp.lxcTemplates = ref([]);
     tp.templateVmIdList = ref([]);
@@ -19,6 +19,14 @@
     tp.lxctemplateStorageList = ref([]);
     tp.lxcStorages = ref([]);
     tp.lxcOstemplates = ref([]);
+    tp.pveNodeOptions = ref([]);
+
+    tp.loadNodeOptions = async function() {
+        try {
+            var res = await api('/admin/pve/nodes');
+            tp.pveNodeOptions.value = (res && res.nodes) || [];
+        } catch (e) { console.error('加载 PVE 节点列表失败', e); }
+    };
 
     tp.loadLxcStorages = async function() {
         try { tp.lxcStorages.value = await api('/lxc/storages'); } catch (e) {}
@@ -59,8 +67,9 @@
             tp.vmTemplateForm.value = { id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20,
                 network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', ciuser: '',
                 target_storage: 'local-lvm', clone_mode: 'full',
-                cpu_affinity: '', mac_group_id: '', description: '', status: 'active' };
+                cpu_affinity: '', mac_group_id: '', description: '', status: 'active', pve_node_id: null };
         }
+        tp.loadNodeOptions();
         tp.loadPveTemplateVms();
         tp.loadAllStorages();
         $.bsModalShow('vmTemplateModal');
@@ -97,8 +106,9 @@
             tp.lxcTemplateForm.value = { id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512,
                 swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp',
                 ipv6_enabled: 1, ip6_mode: 'dhcp', ip6_addr: '', ip4_addr: '',
-                unprivileged: 1, features: '', mac_group_id: '', description: '', status: 'active' };
+                unprivileged: 1, features: '', mac_group_id: '', description: '', status: 'active', pve_node_id: null };
         }
+        tp.loadNodeOptions();
         tp.loadLxcStorages();
         if (tp.lxcTemplateForm.value.storage) {
             tp.loadLxcOstemplates(tp.lxcTemplateForm.value.storage);

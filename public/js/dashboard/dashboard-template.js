@@ -501,13 +501,18 @@
 
 <!-- 套餐订购页 -->
 <div v-if="activeSection === 'order'">
+    <div class="mb-3 d-flex flex-wrap gap-2 align-items-center">
+        <span class="text-muted small me-1">{{ t('order.pickZone') }}</span>
+        <button type="button" class="btn btn-sm" :class="!selectedOrderZone ? 'btn-primary' : 'btn-outline-secondary'" @click="selectOrderZone(null)">{{ t('common.all') }}</button>
+        <button type="button" class="btn btn-sm" v-for="z in orderZones" :key="z.id" :class="Number(selectedOrderZone) === Number(z.id) ? 'btn-primary' : 'btn-outline-secondary'" @click="selectOrderZone(z.id)">{{ z.name }}</button>
+    </div>
     <div v-if="activeTabOrder === 'vm'">
         <h4 class="module-title">{{ t('dash.order.vmTitle') }}</h4>
-        <div v-for="grp in vmGroupedPackages" :key="grp.group_name" class="package-group-section">
+        <div v-for="grp in filteredVmGroupedPackages" :key="grp.group_name" class="package-group-section">
             <h5 class="package-group-title" v-if="grp.group_name !== t('admin.disk.default')">{{ grp.group_name }}</h5>
             <div class="package-cards">
                 <div class="package-card" v-for="p in grp.packages" :key="p.id" v-show="p.status === 'active'">
-                    <div class="package-card-header">{{ p.name }}</div>
+                    <div class="package-card-header">{{ p.name }}<span v-if="p.zone_name" class="badge bg-info ms-1">{{ p.zone_name }}</span></div>
                     <div class="package-card-body">
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.cpuModel') }}</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.vcpu') }}</span><span class="spec-value">{{ p.cores }} {{ t('dash.detail.coresSuffix') }}</span></div>
@@ -541,15 +546,15 @@
             </div>
             <div class="package-empty" v-if="grp.packages.length === 0">{{ t('dash.order.noPackage') }}</div>
         </div>
-        <div class="package-empty" v-if="vmGroupedPackages.length === 0">{{ t('dash.order.noPackages') }}</div>
+        <div class="package-empty" v-if="filteredVmGroupedPackages.length === 0">{{ t('dash.order.noPackages') }}</div>
     </div>
     <div v-if="activeTabOrder === 'lxc'">
         <h4 class="module-title">{{ t('dash.order.lxcTitle') }}</h4>
-        <div v-for="grp in lxcGroupedPackages" :key="grp.group_name" class="package-group-section">
+        <div v-for="grp in filteredLxcGroupedPackages" :key="grp.group_name" class="package-group-section">
             <h5 class="package-group-title" v-if="grp.group_name !== t('admin.disk.default')">{{ grp.group_name }}</h5>
             <div class="package-cards">
                 <div class="package-card" v-for="p in grp.packages" :key="p.id" v-show="p.status === 'active'">
-                    <div class="package-card-header">{{ p.name }}</div>
+                    <div class="package-card-header">{{ p.name }}<span v-if="p.zone_name" class="badge bg-info ms-1">{{ p.zone_name }}</span></div>
                     <div class="package-card-body">
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.cpuModel') }}</span><span class="spec-value">{{ p.cpu_model || '-' }}</span></div>
                         <div class="package-spec"><span class="spec-label">{{ t('dash.order.vcpu') }}</span><span class="spec-value">{{ p.cores }} {{ t('dash.detail.coresSuffix') }}</span></div>
@@ -583,7 +588,7 @@
             </div>
             <div class="package-empty" v-if="grp.packages.length === 0">{{ t('dash.order.noPackage') }}</div>
         </div>
-        <div class="package-empty" v-if="lxcGroupedPackages.length === 0">{{ t('dash.order.noPackages') }}</div>
+        <div class="package-empty" v-if="filteredLxcGroupedPackages.length === 0">{{ t('dash.order.noPackages') }}</div>
     </div>
 </div>
 

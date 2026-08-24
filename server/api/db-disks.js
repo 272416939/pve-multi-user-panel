@@ -35,7 +35,16 @@ const storageGroups = {
 
 // 硬盘规格
 const diskSpecs = {
-    getAll: () => queryAll('SELECT ds.*, sg.name AS group_name FROM disk_specs ds LEFT JOIN storage_groups sg ON ds.storage_group_id = sg.id ORDER BY sg.sort_order, ds.id'),
+    // 带出所属 PVE 节点/可用区/地域（用户端硬盘购买按区域筛选）
+    getAll: () => queryAll(
+        'SELECT ds.*, sg.name AS group_name, n.name AS pve_node_name, ' +
+        'z.id AS zone_id, z.name AS zone_name, r.id AS region_id, r.name AS region_name ' +
+        'FROM disk_specs ds ' +
+        'LEFT JOIN storage_groups sg ON ds.storage_group_id = sg.id ' +
+        'LEFT JOIN pve_nodes n ON ds.pve_node_id = n.id ' +
+        'LEFT JOIN zones z ON n.zone_id = z.id ' +
+        'LEFT JOIN regions r ON z.region_id = r.id ' +
+        'ORDER BY sg.sort_order, ds.id'),
     getById: (id) => queryOne('SELECT * FROM disk_specs WHERE id = ?', [parseInt(id)]),
     getByGroup: (groupId) => queryAll('SELECT * FROM disk_specs WHERE storage_group_id = ? AND enabled = 1 ORDER BY id', [parseInt(groupId)]),
     create: async (data) => {

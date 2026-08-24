@@ -1,9 +1,27 @@
 const { execute, queryOne, queryAll, mysqlNow } = require('./db-core');
 
+// 套餐查询统一带出所属 PVE 节点/可用区/地域（多节点：admin 编辑与用户端区域筛选都需要）
+const VM_PKG_SELECT = 'SELECT p.*, t.name as template_name, g.name as group_name, ' +
+    'n.name as pve_node_name, z.id as zone_id, z.name as zone_name, r.id as region_id, r.name as region_name ' +
+    'FROM vm_packages p ' +
+    'LEFT JOIN vm_templates t ON p.template_id = t.id ' +
+    'LEFT JOIN package_groups g ON p.group_id = g.id ' +
+    'LEFT JOIN pve_nodes n ON p.pve_node_id = n.id ' +
+    'LEFT JOIN zones z ON n.zone_id = z.id ' +
+    'LEFT JOIN regions r ON z.region_id = r.id ';
+const LXC_PKG_SELECT = 'SELECT p.*, t.name as template_name, g.name as group_name, ' +
+    'n.name as pve_node_name, z.id as zone_id, z.name as zone_name, r.id as region_id, r.name as region_name ' +
+    'FROM lxc_packages p ' +
+    'LEFT JOIN lxc_templates t ON p.template_id = t.id ' +
+    'LEFT JOIN package_groups g ON p.group_id = g.id ' +
+    'LEFT JOIN pve_nodes n ON p.pve_node_id = n.id ' +
+    'LEFT JOIN zones z ON n.zone_id = z.id ' +
+    'LEFT JOIN regions r ON z.region_id = r.id ';
+
 // VM 套餐操作
 const vmPackages = {
-    getAll: () => queryAll('SELECT p.*, t.name as template_name, g.name as group_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id LEFT JOIN package_groups g ON p.group_id = g.id ORDER BY p.sort_order DESC, p.id DESC'),
-    getById: (id) => queryOne('SELECT p.*, t.name as template_name, g.name as group_name FROM vm_packages p LEFT JOIN vm_templates t ON p.template_id = t.id LEFT JOIN package_groups g ON p.group_id = g.id WHERE p.id = ?', [id]),
+    getAll: () => queryAll(VM_PKG_SELECT + 'ORDER BY p.sort_order DESC, p.id DESC'),
+    getById: (id) => queryOne(VM_PKG_SELECT + 'WHERE p.id = ?', [id]),
     create: async (data) => {
         const [result] = await execute(
             `INSERT INTO vm_packages (name, template_id, cores, memory, disk_size, monthly_price, quarterly_price, yearly_price, stock, sort_order, cpu_model, bandwidth, description, status, group_id, quarterly_discount, yearly_discount, pve_node_id)
@@ -52,8 +70,8 @@ const vmPackages = {
 
 // LXC 套餐操作
 const lxcPackages = {
-    getAll: () => queryAll('SELECT p.*, t.name as template_name, g.name as group_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id LEFT JOIN package_groups g ON p.group_id = g.id ORDER BY p.sort_order DESC, p.id DESC'),
-    getById: (id) => queryOne('SELECT p.*, t.name as template_name, g.name as group_name FROM lxc_packages p LEFT JOIN lxc_templates t ON p.template_id = t.id LEFT JOIN package_groups g ON p.group_id = g.id WHERE p.id = ?', [id]),
+    getAll: () => queryAll(LXC_PKG_SELECT + 'ORDER BY p.sort_order DESC, p.id DESC'),
+    getById: (id) => queryOne(LXC_PKG_SELECT + 'WHERE p.id = ?', [id]),
     create: async (data) => {
         const [result] = await execute(
             `INSERT INTO lxc_packages (name, template_id, cores, memory, swap, disk_size, monthly_price, quarterly_price, yearly_price, stock, sort_order, cpu_model, bandwidth, description, status, group_id, quarterly_discount, yearly_discount, pve_node_id)

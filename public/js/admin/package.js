@@ -7,18 +7,26 @@
 
     $.vmPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
         monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1, sort_order: 0,
-        cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0 });
+        cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0, pve_node_id: null });
     $.lxcPackageForm = Vue.ref({ id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
         monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1, sort_order: 0,
-        cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0 });
+        cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0, pve_node_id: null });
     $.vmPackages = Vue.ref([]);
     $.lxcPackages = Vue.ref([]);
     $.vmTemplateOptions = Vue.ref([]);
     $.lxcTemplateOptions = Vue.ref([]);
     $.vmPackageGroups = Vue.ref([]);
     $.lxcPackageGroups = Vue.ref([]);
+    $.pveNodeOptions = Vue.ref([]);
     $.vmGroupForm = Vue.ref({ id: null, name: '', type: 'vm', sort_order: 0 });
     $.lxcGroupForm = Vue.ref({ id: null, name: '', type: 'lxc', sort_order: 0 });
+
+    $.loadNodeOptions = async function() {
+        try {
+            var res = await api('/admin/pve/nodes');
+            $.pveNodeOptions.value = (res && res.nodes) || [];
+        } catch (e) { console.error('加载 PVE 节点列表失败', e); }
+    };
 
     $.vmProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
     $.lxcProvisionForm = Vue.ref({ package_id: '', user_id: '', name: '', expiration_date: '', renewal_period: 'month', mac_group_id: '' });
@@ -55,8 +63,9 @@
         } else {
             $.vmPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
                 monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1,
-                cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0 };
+                cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0, pve_node_id: null };
         }
+        $.loadNodeOptions();
         $.loadVmTemplateOptions().then(function() { admin.bsModalShow('vmPackageModal'); });
     };
 
@@ -89,8 +98,9 @@
         } else {
             $.lxcPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
                 monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1,
-                cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0 };
+                cpu_model: '', bandwidth: 0, group_id: null, quarterly_discount: 0, yearly_discount: 0, pve_node_id: null };
         }
+        $.loadNodeOptions();
         $.loadLxcTemplateOptions().then(function() { admin.bsModalShow('lxcPackageModal'); });
     };
 

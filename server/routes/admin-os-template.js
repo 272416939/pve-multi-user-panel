@@ -200,7 +200,7 @@ router.post('/admin/os-templates', async (req, res) => {
             return res.status(400).json({ error: '无效的模板 VMID', code: 'INVALID_TPL_VMID' });
         }
         // 校验 template_vmid 在 PVE 中确实是模板（多节点：按数据行节点，缺省=默认节点）
-        const tplNode = data.pve_node_id !== undefined ? parseInt(data.pve_node_id) : null;
+        const tplNode = (data.pve_node_id !== undefined && data.pve_node_id !== null && data.pve_node_id !== '') ? parseInt(data.pve_node_id) : null;
         const tplPve = await getPveClient(tplNode);
         const vms = await tplPve.getVms({ templateOnly: true });
         if (!vms.find(v => v.vmid === templateVmid)) {
@@ -221,7 +221,8 @@ router.post('/admin/os-templates', async (req, res) => {
             sort_order: parseInt(data.sort_order) || 0,
             allowed_package_ids: String(data.allowed_package_ids || '').slice(0, 500),
             enabled: data.enabled === false ? 0 : 1,
-            status: TEMPLATE_STATUS.includes(data.status) ? data.status : 'active'
+            status: TEMPLATE_STATUS.includes(data.status) ? data.status : 'active',
+            pve_node_id: tplNode
         });
         // 操作审计：创建 OS 模板
         try {
@@ -261,7 +262,7 @@ router.put('/admin/os-templates/:id', async (req, res) => {
         const existing = await db.osTemplates.getById(id);
         if (!existing) return res.status(404).json({ error: '模板不存在', code: 'TEMPLATE_NOT_FOUND' });
 
-        const allowedFields = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
+        const allowedFields = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status', 'pve_node_id'];
         const updates = {};
         for (const key of allowedFields) {
             if (req.body[key] !== undefined) {

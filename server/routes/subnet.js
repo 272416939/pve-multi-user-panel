@@ -199,8 +199,19 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         return res.status(429).json({ error: '创建子网过于频繁，请稍后再试', code: 'RATE_LIMITED_SUBNET_CREATE', retryAfter: rateLimitResult.retryAfter });
         }
     // 每用户子网数量上限（普通用户受限，管理员不限，与端口转发 max_per_user 一致）
+    // 多节点：请求可指定所属 PVE 节点 node_id → 解析其配对的上级爱快节点；缺省=默认爱快节点
+    let ikNodeId = null;
+    const reqNodeId = req.body && req.body.node_id ? parseInt(req.body.node_id) : null;
+    if (reqNodeId != null) {
+        const pn = await db.pveNodes.get(reqNodeId);
+        if (!pn) return res.status(400).json({ error: '所属 PVE 节点不存在', code: 'PVE_NODE_BELONG_NOT_FOUND' });
+        ikNodeId = pn.ikuai_node_id;
+        if (!ikNodeId) return res.status(400).json({ error: '该 PVE 节点未配置关联爱快节点', code: 'IKUAI_PAIR_MISSING' });
+    } else {
+        ikNodeId = await db.ikuaNodes.getDefaultId();
+    }
     if (req.user.role !== 'admin') {
-        const maxPerUser = parseInt(await db.config.getIkuaiSetting('vlan:max_per_user')) || 5;
+        const maxPerUser = parseInt(await db.config.getIkuaiSetting('vlan:max_per_user', ikNodeId)) || 5;
         if (maxPerUser > 0) {
             const userSubnetCount = (await db.subnets.getByUserId(req.user.id)).length;
             if (userSubnetCount >= maxPerUser) {
@@ -209,15 +220,13 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         }
     }
     try {
-        // 多节点：当前创建流程无节点选择，子网归属默认爱快节点（R3）
-        const ikNodeId = await db.ikuaNodes.getDefaultId();
         const ik = await getIkuaiClient(ikNodeId);
-        // 1. 读取 admin 配置
-        const segStart = (await db.config.getIkuaiSetting('vlan:ip_segment_start') || '172.16.0.1').trim();
-        const idStart = parseInt(await db.config.getIkuaiSetting('vlan:id_start')) || 1000;
-        const iface = (await db.config.getIkuaiSetting('vlan:interface') || 'lan1').trim();
-        const dns1 = await db.config.getIkuaiSetting('dhcp:dns1') || '180.76.76.76';
-        const dns2 = await db.config.getIkuaiSetting('dhcp:dns2') || '223.5.5.5';
+        // 1. 读取 admin 配置（按爱快节点作用域）
+        const segStart = (await db.config.getIkuaiSetting('vlan:ip_segment_start', ikNodeId) || '172.16.0.1').trim();
+        const idStart = parseInt(await db.config.getIkuaiSetting('vlan:id_start', ikNodeId)) || 1000;
+        const iface = (await db.config.getIkuaiSetting('vlan:interface', ikNodeId) || 'lan1').trim();
+        const dns1 = await db.config.getIkuaiSetting('dhcp:dns1', ikNodeId) || '180.76.76.76';
+        const dns2 = await db.config.getIkuaiSetting('dhcp:dns2', ikNodeId) || '223.5.5.5';
         if (!VALID_IP_RE.test(segStart)) return res.status(400).json({ error: 'IP 段开始范围配置无效，请联系管理员', code: 'SUBNET_RANGE_CFG_INVALID' });
         if (idStart < 2 || idStart > 4090) return res.status(400).json({ error: 'VLANID 开始范围必须在 2~4090 之间', code: 'VLAN_START_RANGE' });
         if (!iface) return res.status(400).json({ error: '所属接口未配置，请联系管理员', code: 'SUBNET_IFACE_NOT_CONFIGURED' });

@@ -241,8 +241,8 @@ const lxcTemplates = {
     getById: (id) => queryOne('SELECT * FROM lxc_templates WHERE id = ?', [id]),
     create: async (data) => {
         const [result] = await execute(
-            `INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, ipv6_enabled, ip6_mode, ip6_addr, ip4_addr, unprivileged, features, mac_group_id, description, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO lxc_templates (name, ostemplate, storage, rootfs_storage, cores, memory, swap, disk_size, network_bridge, network_mode, ipv6_enabled, ip6_mode, ip6_addr, ip4_addr, unprivileged, features, mac_group_id, description, status, pve_node_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 data.name || '', data.ostemplate || '', data.storage || 'local',
                 data.rootfs_storage || 'local-lvm',
@@ -252,7 +252,8 @@ const lxcTemplates = {
                 data.ipv6_enabled !== undefined ? data.ipv6_enabled : 1,
                 data.ip6_mode || 'dhcp', data.ip6_addr || '', data.ip4_addr || '',
                 data.unprivileged !== undefined ? data.unprivileged : 1,
-                data.features || '', data.mac_group_id || '', data.description || '', data.status || 'active'
+                data.features || '', data.mac_group_id || '', data.description || '', data.status || 'active',
+                data.pve_node_id || null
             ]
         );
         return queryOne('SELECT * FROM lxc_templates WHERE id = ?', [result.insertId]);

@@ -96,6 +96,42 @@
     $.orderSubnets = ref([]);           // 当前用户可选的子网列表
     $.orderSubnetsLoading = ref(false); // 加载子网列表时的 loading
     $.lxcGroupedPackages = ref([]);
+    // 订购页区域筛选（/api/user/zones）：orderZones = 可用区 chips，selectedOrderZone = 当前选中区(null=全部)
+    $.orderZones = ref([]);
+    $.selectedOrderZone = ref(null);
+
+    $.loadOrderZones = async function() {
+        try {
+            var res = await api('/user/zones');
+            $.orderZones.value = (res && res.zones) || [];
+            // 若当前选中区已不在售区列表，回退为全部
+            if ($.selectedOrderZone.value) {
+                var found = ($.orderZones.value || []).some(function(z) { return Number(z.id) === Number($.selectedOrderZone.value); });
+                if (!found) $.selectedOrderZone.value = null;
+            }
+        } catch (e) { console.error('加载可用区失败', e); }
+    };
+
+    $.selectOrderZone = function(zoneId) {
+        $.selectedOrderZone.value = zoneId;
+    };
+
+    // 按选中区过滤分组套餐（null=全部）；过滤后剔除空分组
+    $.filteredVmGroupedPackages = computed(function() {
+        var zid = $.selectedOrderZone.value;
+        if (!zid) return $.vmGroupedPackages.value;
+        return $.vmGroupedPackages.value.map(function(g) {
+            return { group_id: g.group_id, group_name: g.group_name, packages: g.packages.filter(function(p) { return Number(p.zone_id) === Number(zid); }) };
+        }).filter(function(g) { return g.packages.length > 0; });
+    });
+
+    $.filteredLxcGroupedPackages = computed(function() {
+        var zid = $.selectedOrderZone.value;
+        if (!zid) return $.lxcGroupedPackages.value;
+        return $.lxcGroupedPackages.value.map(function(g) {
+            return { group_id: g.group_id, group_name: g.group_name, packages: g.packages.filter(function(p) { return Number(p.zone_id) === Number(zid); }) };
+        }).filter(function(g) { return g.packages.length > 0; });
+    });
 
     $.orderTotal = computed(function() {
         var p = $.orderPackage.value;
@@ -1375,6 +1411,7 @@
     // order/disk/logs 的懒加载钩子由 core 注册（各模块私有函数通过判空调用，保持容错）
     $.registerSectionLoader('order', function() {
         $.loadPackages();
+        $.loadOrderZones();
     });
     $.registerSectionLoader('disk', function() {
         if ($.loadDisks) $.loadDisks();
@@ -1414,6 +1451,7 @@
                 $.restoreProvisioningState();
                 if ($.activeSection.value === 'order') {
                     await $.loadPackages();
+                    await $.loadOrderZones();
                 }
                 if ($.activeSection.value === 'logs') {
                     // 刷新后加载当前 tab 数据（tab 状态已由 localStorage 恢复）

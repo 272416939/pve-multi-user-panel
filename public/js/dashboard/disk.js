@@ -25,6 +25,20 @@
     period: 'month', period_count: 1, quantity: 1, auto_renew: false
   });
   $.purchasePrice = ref(0);
+  // 硬盘购买可用区筛选（null=全部），自 specs 的 zone_id/zone_name 派生
+  $.purchaseZone = ref(null);
+  $.diskPurchaseZones = computed(function() {
+    var specs = $.diskOptions.value && $.diskOptions.value.specs ? $.diskOptions.value.specs : [];
+    var seen = {};
+    var zones = [];
+    (specs || []).forEach(function(s) {
+      if (s.zone_id && !seen[s.zone_id]) {
+        seen[s.zone_id] = true;
+        zones.push({ id: s.zone_id, name: s.zone_name || ('#' + s.zone_id) });
+      }
+    });
+    return zones;
+  });
 
   // 挂载弹窗状态
   $.showBindModal = ref(false);
@@ -114,12 +128,15 @@
     $.purchasePrice.value = parseFloat(amount.toFixed(2));
   };
 
-  // 按存储分组过滤规格
+  // 按存储分组 + 可用区过滤规格（purchaseZone 为 null 时不过滤区）
   $.getSpecsByGroup = function(groupId) {
     if (!groupId) return [];
     var specs = $.diskOptions.value && $.diskOptions.value.specs ? $.diskOptions.value.specs : [];
+    var zid = $.purchaseZone.value;
     return specs.filter(function(s) {
-      return s.storage_group_id === parseInt(groupId) && s.enabled;
+      if (s.storage_group_id !== parseInt(groupId) || !s.enabled) return false;
+      if (zid && Number(s.zone_id) !== Number(zid)) return false;
+      return true;
     });
   };
 
@@ -168,6 +185,7 @@
       capacity_gb: 100, disk_name: '',
       period: 'month', period_count: 1, quantity: 1, auto_renew: false
     };
+    $.purchaseZone.value = null;
     $.purchasePrice.value = 0;
     $.showCreateDiskModal.value = true;
     $.bsModalShow('createDiskModal');

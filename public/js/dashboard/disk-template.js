@@ -101,6 +101,13 @@
       </div>
       <div class="modal-body">
         <div class="mb-3">
+          <label class="form-label">{{ t('order.pickZone') }}</label>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm" :class="!purchaseZone ? 'btn-primary' : 'btn-outline-secondary'" @click="purchaseZone = null; diskPurchaseForm.spec_id = ''; calcDiskPrice()">{{ t('common.all') }}</button>
+            <button type="button" class="btn btn-sm" v-for="z in diskPurchaseZones" :key="z.id" :class="Number(purchaseZone) === Number(z.id) ? 'btn-primary' : 'btn-outline-secondary'" @click="purchaseZone = z.id; diskPurchaseForm.spec_id = ''; calcDiskPrice()">{{ z.name }}</button>
+          </div>
+        </div>
+        <div class="mb-3">
           <label class="form-label">{{ t('dash.disk.storageGroupRequired') }}</label>
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-sm" v-for="g in diskOptionsGroups" :key="g.id" :class="diskPurchaseForm.storage_group_id === g.id ? 'btn-primary' : 'btn-outline-secondary'" @click="diskPurchaseForm.storage_group_id = g.id; diskPurchaseForm.spec_id = ''; calcDiskPrice()">{{ g.name }}</button>
@@ -134,6 +141,10 @@
             <strong>{{ t('dash.disk.iopsLimit') }}</strong>{{ t('dash.disk.read') }} {{ selectedSpec.iops_rd || t('dash.none') }} ({{ t('dash.disk.burst') }} {{ selectedSpec.iops_rd_max || t('dash.none') }}) / {{ t('dash.disk.write') }} {{ selectedSpec.iops_wr || t('dash.none') }} ({{ t('dash.disk.burst') }} {{ selectedSpec.iops_wr_max || t('dash.none') }})
           </div>
           <p class="text-muted small mb-0">{{ selectedSpec.description || t('dash.disk.noDesc') }}</p>
+          <div v-if="selectedSpec.zone_name || selectedSpec.pve_node_name" class="small mb-1">
+            <strong>{{ t('nodes.belongZone') }}</strong><span v-if="selectedSpec.zone_name">{{ selectedSpec.zone_name }}</span><span v-if="selectedSpec.zone_name && selectedSpec.pve_node_name"> · </span><span v-if="selectedSpec.pve_node_name">{{ selectedSpec.pve_node_name }}</span>
+          </div>
+          <div v-if="selectedSpec.storage_pool" class="small mb-1"><strong>{{ t('admin.disk.storageLocation') }}</strong>{{ selectedSpec.storage_pool }}</div>
           <div v-if="selectedSpec.disk_format && ['vmdk','subvol','raw'].indexOf(selectedSpec.disk_format) !== -1" class="alert alert-warning small py-1 px-2 mt-2 mb-0">
             <i class="bi bi-exclamation-triangle"></i> {{ t('dash.disk.formatNoResizeBuy') }}
           </div>

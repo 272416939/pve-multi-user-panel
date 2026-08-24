@@ -11,6 +11,19 @@
     $.subnetRefreshing = ref(false);
     // 子网配额（创建弹窗展示已用/上限，admin max=0 不限）
     $.subnetQuota = ref({ used: 0, max: 0 });
+    // 新建子网所属可用区/节点下拉（来源 /api/user/zones；后端当前按默认爱快节点创建，见报告）
+    $.subnetZones = ref([]);
+    $.subnetZoneId = ref(null);
+
+    $.loadSubnetZones = async function() {
+        try {
+            var res = await api('/user/zones');
+            $.subnetZones.value = (res && res.zones) || [];
+        } catch (e) {
+            console.error('加载可用区失败', e);
+            $.subnetZones.value = [];
+        }
+    };
     // 绑定子网弹窗状态
     $.bindSubnetDevice = reactive({ type: 'vm', vm_id: null, ct_id: null, name: '', status: null, dhcp_static_ip: '' });
     $.bindSubnetCurrentSubnet = ref(null);
@@ -61,6 +74,9 @@
     $.openCreateSubnet = function() {
         // 打开弹窗时刷新配额（已用/上限），保证提示最新
         $.loadSubnetQuota();
+        // 重新加载可用区 + 重置选中（默认不指定 = 后端默认节点）
+        $.loadSubnetZones();
+        $.subnetZoneId.value = null;
         $.bsModalShow('createSubnetModal');
     };
 
@@ -68,7 +84,7 @@
         if ($.subnetCreating.value) return;
         $.subnetCreating.value = true;
         try {
-            await api('/subnets', { method: 'POST' });
+            await api('/subnets', { method: 'POST', body: { node_id: $.subnetZoneId.value } });
             $.bsModalHide('createSubnetModal');
             await $.loadSubnets();
             alert(window.__i18n.t('dash.subnet.created'));

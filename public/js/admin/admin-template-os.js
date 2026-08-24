@@ -116,6 +116,13 @@
                             <input class="form-control" type="number" v-model="osTemplatePage.formData.sort_order">
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label">{{ t('pkg.node') }}</label>
+                            <select class="form-select" v-model="osTemplatePage.formData.pve_node_id">
+                                <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
+                                <option v-for="n in osTemplatePage.pveNodeOptions.value" :key="n.id" :value="n.id">{{ n.name }}{{ n.zone_name ? ' (' + n.zone_name + ')' : '' }}</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
                             <label class="form-label">{{ t('common.status') }}</label>
                             <select class="form-select" v-model="osTemplatePage.formData.status">
                                 <option value="active">{{ t('admin.common.enabled') }}</option>

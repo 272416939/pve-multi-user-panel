@@ -108,6 +108,20 @@ router.get('/lxc-packages', authMiddleware, async (req, res) => {
     } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
 });
 
+// 用户端：区域/可用区筛选列表（供订购页地域 chips；仅含「有在售套餐或硬盘规格」的可用区）
+router.get('/user/zones', authMiddleware, async (req, res) => {
+    try {
+        const dbAll = require('../api/db');
+        const zones = await dbAll.nodeOverviews.zonesOverview();
+        const result = zones
+            .filter(z => z.package_count > 0)
+            .map(z => ({ id: z.id, name: z.name, region_id: z.region_id, region_name: z.region_name }));
+        res.json({ zones: result });
+    } catch (e) {
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
+    }
+});
+
 // 用户端：获取按分组归类的套餐列表
 router.get('/package-groups', authMiddleware, async (req, res) => {
     try {

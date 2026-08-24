@@ -932,6 +932,13 @@
                 <span v-if="subnetQuota.max > 0" class="text-muted small">{{ tFormat('dash.subnet.remaining', Math.max(0, subnetQuota.max - subnetQuota.used)) }}</span>
                 <span v-else class="text-muted small">{{ t('dash.subnet.adminUnlimited') }}</span>
             </div>
+            <div class="mb-3">
+                <label class="form-label">{{ t('nodes.belongZone') }}</label>
+                <select class="form-select" v-model="subnetZoneId">
+                    <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
+                    <option v-for="z in subnetZones" :key="z.id" :value="z.id">{{ z.name }}{{ z.region_name ? ' (' + z.region_name + ')' : '' }}</option>
+                </select>
+            </div>
             <div v-if="subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max" class="alert alert-warning py-2 small mb-3">
                 {{ t('dash.subnet.limitReached') }}
             </div>

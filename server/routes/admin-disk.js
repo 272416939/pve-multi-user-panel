@@ -272,7 +272,8 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
       iops_wr: data.iops_wr || null, iops_wr_max: data.iops_wr_max || null,
       storage_pool: data.storage_pool.trim(),
       disk_format: fmtResult.diskFormat,
-      description: data.description || null
+      description: data.description || null,
+      pve_node_id: data.pve_node_id || null
     });
     clearDiskCache();
     // 操作审计：创建磁盘规格（资金面定价，含单价）
@@ -321,7 +322,8 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
       iops_wr: data.iops_wr || null, iops_wr_max: data.iops_wr_max || null,
       storage_pool: data.storage_pool.trim(),
       disk_format: fmtResult2.diskFormat,
-      description: data.description || null
+      description: data.description || null,
+      pve_node_id: data.pve_node_id || null
     });
     clearDiskCache();
     // 操作审计：编辑磁盘规格（字段级 diff，资金面定价含单价）

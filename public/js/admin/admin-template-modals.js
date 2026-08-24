@@ -1176,6 +1176,12 @@
                                     </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.modal.nicModel') }}</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.network_model"></div>
                                     <div class="col-md-6"><label class="form-label">{{ t('common.status') }}</label><select class="form-select" v-model="templatePage.vmTemplateForm.value.status"><option value="active">{{ t('admin.common.enabled') }}</option><option value="inactive">{{ t('admin.common.disabled') }}</option></select></div>
+                                    <div class="col-md-6"><label class="form-label">{{ t('pkg.node') }}</label>
+                                        <select class="form-select" v-model="templatePage.vmTemplateForm.value.pve_node_id">
+                                            <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
+                                            <option v-for="n in templatePage.pveNodeOptions.value" :key="n.id" :value="n.id">{{ n.name }}{{ n.zone_name ? ' (' + n.zone_name + ')' : '' }}</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('dash.macGroup') }}</label>
                                         <select class="form-select" v-model="templatePage.vmTemplateForm.value.mac_group_id">
                                             <option value="">{{ t('dash.noGroup') }}</option>
@@ -1254,6 +1260,12 @@
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.modal.unprivileged') }}</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.unprivileged"><option :value="1">{{ t('common.yes') }}</option><option :value="0">{{ t('common.no') }}</option></select></div>
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.lxc.features') }}</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.features" placeholder="nesting=1,fuse=1"></div>
                                     <div class="col-md-6"><label class="form-label">{{ t('common.status') }}</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.status"><option value="active">{{ t('admin.common.enabled') }}</option><option value="inactive">{{ t('admin.common.disabled') }}</option></select></div>
+                                    <div class="col-md-6"><label class="form-label">{{ t('pkg.node') }}</label>
+                                        <select class="form-select" v-model="templatePage.lxcTemplateForm.value.pve_node_id">
+                                            <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
+                                            <option v-for="n in templatePage.pveNodeOptions.value" :key="n.id" :value="n.id">{{ n.name }}{{ n.zone_name ? ' (' + n.zone_name + ')' : '' }}</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('dash.macGroup') }}</label>
                                         <select class="form-select" v-model="templatePage.lxcTemplateForm.value.mac_group_id">
                                             <option value="">{{ t('dash.noGroup') }}</option>

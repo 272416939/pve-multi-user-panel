@@ -282,6 +282,13 @@
               <option v-for="g in diskPage.storageGroups.value" :key="g.id" :value="g.id">{{ g.name }}</option>
             </select>
           </div>
+          <div class="col-md-6">
+            <label class="form-label">{{ t('pkg.node') }}</label>
+            <select class="form-select" v-model="diskPage.diskSpecForm.value.pve_node_id" @change="diskPage.onNodeChange()">
+              <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
+              <option v-for="n in diskPage.pveNodeOptions.value" :key="n.id" :value="n.id">{{ n.name }}{{ n.zone_name ? ' (' + n.zone_name + ')' : '' }}</option>
+            </select>
+          </div>
           <div class="col-md-3">
             <label class="form-label">{{ t('admin.disk.enabledStatus') }}</label>
             <div class="form-check form-switch mt-2">
@@ -321,7 +328,7 @@
             <label class="form-label">{{ t('admin.disk.storageLocation') }}</label>
             <select class="form-select" v-model="diskPage.diskSpecForm.value.storage_pool" @change="diskPage.onStoragePoolChange()">
               <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
-              <option v-for="s in diskPage.pveStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} ({{ s.type || t('admin.disk.unknown') }}，{{ t('admin.disk.remaining') }}{{ diskPage.formatStorageSize(s.avail_gb) }})</option>
+              <option v-for="s in diskPage.diskSpecStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }} ({{ s.type || t('admin.disk.unknown') }}，{{ t('admin.disk.remaining') }}{{ diskPage.formatStorageSize(s.avail_gb) }})</option>
             </select>
           </div>
           <div class="col-md-3" v-if="diskPage.isFileSystemStorage(diskPage.diskSpecForm.value.storage_pool)">

@@ -15,7 +15,7 @@ window.__admin.osTemplatePage = (function () {
         name: '', template_vmid: '', os_type: '', os_version: '', ostype: '', arch: 'x86_64',
         target_storage: 'local-lvm', disk_format: '', ciuser: '',
         description: '', icon: '', sort_order: 0,
-        allowed_package_ids: '', enabled: 1, status: 'active'
+        allowed_package_ids: '', enabled: 1, status: 'active', pve_node_id: null
     });
     const saving = ref(false);
     // 编辑/新增模式由 formData.id 判断（reactive 引用，模板可响应；
@@ -24,6 +24,18 @@ window.__admin.osTemplatePage = (function () {
     // （用户关闭弹窗后旧请求才返回，会把上次模板的数据写进新表单——同 admin.js userLoadSeq 模式）
     let vmidConfigSeq = 0;
     const allStorages = ref([]);  // PVE 存储列表（目标存储下拉用）
+    const pveNodeOptions = ref([]);  // PVE 节点列表（所属节点下拉用）
+
+    // 加载 PVE 节点列表
+    async function loadNodeOptions() {
+        try {
+            var res = await api('/admin/pve/nodes');
+            pveNodeOptions.value = (res && res.nodes) || [];
+        } catch (e) {
+            console.error('加载 PVE 节点列表失败', e);
+            pveNodeOptions.value = [];
+        }
+    }
 
     // 加载 PVE 模板 VM 列表（仅 template=1）
     async function loadPveTemplates() {
@@ -98,6 +110,7 @@ window.__admin.osTemplatePage = (function () {
         vmidConfigSeq++;
         loadPveTemplates();
         loadAllStorages();
+        loadNodeOptions();
         if (row) {
             Object.assign(formData, row);
         } else {
@@ -107,6 +120,7 @@ window.__admin.osTemplatePage = (function () {
                 else if (k === 'target_storage') formData[k] = 'local-lvm';
                 else if (k === 'arch') formData[k] = 'x86_64';
                 else if (k === 'sort_order') formData[k] = 0;
+                else if (k === 'pve_node_id') formData[k] = null;
                 else formData[k] = '';
             });
         }
@@ -406,5 +420,5 @@ window.__admin.osTemplatePage = (function () {
         }
     }
 
-    return { osTemplates, formVisible, formData, saving, pveTemplateVms, pveConfigLoading, allStorages, dragState, load, openForm, closeForm, save, deleteRow, onTemplateVmidChange, loadPveTemplates, loadAllStorages, handleDragStart, handleDragOver, handleContainerDragOver, handleDragLeave, handleDrop, handleDropOnContainer, handleDragEnd, handleTouchStart, handleTouchMove, handleTouchEnd };
+    return { osTemplates, formVisible, formData, saving, pveTemplateVms, pveConfigLoading, allStorages, pveNodeOptions, dragState, load, openForm, closeForm, save, deleteRow, onTemplateVmidChange, loadPveTemplates, loadAllStorages, loadNodeOptions, handleDragStart, handleDragOver, handleContainerDragOver, handleDragLeave, handleDrop, handleDropOnContainer, handleDragEnd, handleTouchStart, handleTouchMove, handleTouchEnd };
 })();

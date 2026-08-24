@@ -188,14 +188,27 @@
 
   // ===== 硬盘规格管理 =====
   $.diskPage.diskSpecs = ref([]);
-  $.diskPage.pveStorages = ref([]);
+  $.diskPage.pveStorages = ref([]);       // PVE 存储（卡片用量展示 + 弹窗存储池默认；默认节点）
+  $.diskPage.diskSpecStorages = ref([]);  // 硬盘规格弹窗存储池下拉（按所选节点加载）
+  $.diskPage.pveNodeOptions = ref([]);    // PVE 节点列表（所属节点下拉用）
+
+  $.diskPage.loadNodeOptions = async function() {
+    try {
+      var res = await authFetch('/api/admin/pve/nodes');
+      var data = await res.json();
+      $.diskPage.pveNodeOptions.value = (data && data.nodes) || [];
+    } catch (e) {
+      console.error('[disk] 加载 PVE 节点列表失败:', e.message);
+    }
+  };
+
   $.diskPage.diskSpecForm = ref({
     name: '', disk_type: 'NVME', storage_group_id: '', enabled: true,
     min_size_gb: 10, max_size_gb: 2000, price_per_gb: 0.8,
     quarterly_discount: 0, yearly_discount: 0, storage_pool: '', disk_format: 'qcow2',
     mbps_rd: '', mbps_rd_max: '', mbps_wr: '', mbps_wr_max: '',
     iops_rd: '', iops_rd_max: '', iops_wr: '', iops_wr_max: '',
-    description: ''
+    description: '', pve_node_id: null
   });
   $.diskPage.editingDiskSpec = ref(null);
   $.diskPage.showDiskSpecModal = ref(false);
@@ -211,15 +224,25 @@
     }
   };
 
-  // 加载 PVE 存储列表（供存储位置下拉）
-  $.diskPage.loadPveStorages = async function() {
+  // 加载 PVE 存储列表（供存储位置下拉）。多节点：可选 nodeId 指定节点；无 nodeId 时加载默认节点并同步卡片用量列表
+  $.diskPage.loadPveStorages = async function(nodeId) {
     try {
-      var res = await authFetch('/api/pve-storages');
+      var url = '/api/pve-storages' + (nodeId ? '?node_id=' + nodeId : '');
+      var res = await authFetch(url);
       if (!res.ok) throw new Error(window.__i18n.t('common.loadFailed'));
-      $.diskPage.pveStorages.value = await res.json();
+      var list = await res.json();
+      $.diskPage.diskSpecStorages.value = list;
+      if (!nodeId) {
+        $.diskPage.pveStorages.value = list;
+      }
     } catch (e) {
       console.error('[disk] 加载 PVE 存储列表失败:', e.message);
     }
+  };
+
+  // 所属节点变更：按所选节点重新加载存储池下拉（无节点 = 默认节点）
+  $.diskPage.onNodeChange = function() {
+    $.diskPage.loadPveStorages($.diskPage.diskSpecForm.value.pve_node_id || null);
   };
 
   // 格式化存储容量显示
@@ -243,12 +266,16 @@
     return '#198754';
   };
 
-  // 根据存储池名称查找 PVE 存储信息
+  // 根据存储池名称查找 PVE 存储信息（卡片用量用 pveStorages，弹窗存储池用 diskSpecStorages，双源兜底）
   $.diskPage.getStorageInfo = function(poolName) {
     if (!poolName) return null;
     var storages = $.diskPage.pveStorages.value || [];
     for (var i = 0; i < storages.length; i++) {
       if (storages[i].storage === poolName) return storages[i];
+    }
+    var specStorages = $.diskPage.diskSpecStorages.value || [];
+    for (var j = 0; j < specStorages.length; j++) {
+      if (specStorages[j].storage === poolName) return specStorages[j];
     }
     return null;
   };
@@ -274,8 +301,6 @@
   };
 
   $.diskPage.openDiskSpecForm = async function(spec) {
-    // 先加载 PVE 存储列表（供存储位置下拉）
-    await $.diskPage.loadPveStorages();
     $.diskPage.editingDiskSpec.value = spec;
     if (spec) {
       $.diskPage.diskSpecForm.value = {
@@ -290,7 +315,8 @@
         mbps_wr: spec.mbps_wr || '', mbps_wr_max: spec.mbps_wr_max || '',
         iops_rd: spec.iops_rd || '', iops_rd_max: spec.iops_rd_max || '',
         iops_wr: spec.iops_wr || '', iops_wr_max: spec.iops_wr_max || '',
-        description: spec.description || ''
+        description: spec.description || '',
+        pve_node_id: spec.pve_node_id || null
       };
     } else {
       $.diskPage.diskSpecForm.value = {
@@ -299,10 +325,13 @@
         quarterly_discount: 0, yearly_discount: 0, storage_pool: '', disk_format: 'qcow2',
         mbps_rd: '', mbps_rd_max: '', mbps_wr: '', mbps_wr_max: '',
         iops_rd: '', iops_rd_max: '', iops_wr: '', iops_wr_max: '',
-        description: ''
+        description: '', pve_node_id: null
       };
     }
     $.diskPage.showQosSection.value = false;
+    // 先加载 PVE 节点列表，再按所选节点加载存储池（无节点 = 默认节点）
+    await $.diskPage.loadNodeOptions();
+    await $.diskPage.loadPveStorages($.diskPage.diskSpecForm.value.pve_node_id || null);
     $.diskPage.showDiskSpecModal.value = true;
     $.bsModalShow('diskSpecModal');
   };
@@ -335,7 +364,8 @@
           mbps_wr: f.mbps_wr || null, mbps_wr_max: f.mbps_wr_max || null,
           iops_rd: f.iops_rd || null, iops_rd_max: f.iops_rd_max || null,
           iops_wr: f.iops_wr || null, iops_wr_max: f.iops_wr_max || null,
-          description: f.description || ''
+          description: f.description || '',
+          pve_node_id: f.pve_node_id || null
         })
       });
       var data = await res.json();
