@@ -3,7 +3,7 @@
 // 从 routes/admin-config.js 抽取：Redis 热更新、测试连接、一键清缓存
 
 const db = require('../api/db');
-const { safeError } = require('../utils/safe-error');
+const { friendlyTestError } = require('../utils/friendly-test-error');
 
 /**
  * 应用 Redis 配置（写 process.env + 重置客户端连接）
@@ -70,7 +70,7 @@ async function testRedisConnection(opts) {
         }
         return { success: true, message: 'Redis 连接成功（响应: ' + pong + '）' };
     } catch (e) {
-        return { success: false, message: '连接失败: ' + safeError(e) };
+        return { success: false, message: '连接失败: ' + friendlyTestError(e) };
     } finally {
         try { testClient.disconnect(); } catch (e) {}
     }

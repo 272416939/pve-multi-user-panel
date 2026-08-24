@@ -732,7 +732,7 @@ class PveApi {
    * @returns {Promise<{success: boolean, message: string, info?: {nodes: number, ssh: boolean|null}}>}
    */
   async testConnection(params) {
-    var { safeError } = require('../utils/safe-error');
+    var { friendlyTestError } = require('../utils/friendly-test-error');
     var host = String(params.host || '').trim().replace(/\/+$/, '');
     if (!host) return { success: false, message: '请填写 PVE API 地址再测试' };
     // SSRF 防护：仅允许 http/https 协议（与保存接口校验一致）
@@ -748,7 +748,7 @@ class PveApi {
         timeout: 10000
       });
     } catch (e) {
-      return { success: false, message: 'PVE API 连接失败: ' + safeError(e) };
+      return { success: false, message: 'PVE API 连接失败: ' + friendlyTestError(e) };
     }
     var nodes = response.data && response.data.data;
     if (!Array.isArray(nodes)) return { success: false, message: 'PVE API 响应格式异常' };
@@ -764,7 +764,7 @@ class PveApi {
         }
         ssh = true;
       } catch (e) {
-        return { success: false, message: 'SSH 连接失败: ' + safeError(e) };
+        return { success: false, message: 'SSH 连接失败: ' + friendlyTestError(e) };
       }
     }
     return {
