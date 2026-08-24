@@ -193,7 +193,7 @@ window.__admin.pveNodesPage = (function () {
         if (!(form.api_host || '').trim()) { alert(window.__i18n.t('nodes.apiHostRequired')); return; }
         if (!(form.api_token || '').trim() && !editing.value) { alert(window.__i18n.t('nodes.apiTokenRequired')); return; }
         if (!(form.ssh_host || '').trim()) { alert(window.__i18n.t('nodes.sshHostRequired')); return; }
-        if (!(form.ssh_port || '').trim()) { alert(window.__i18n.t('nodes.sshPortRequired')); return; }
+        if (!form.ssh_port) { alert(window.__i18n.t('nodes.sshPortRequired')); return; } // ssh_port 为 number（v-model.number），勿 .trim
         if (!(form.ssh_user || '').trim()) { alert(window.__i18n.t('nodes.sshUserRequired')); return; }
         if (!form.ikuai_node_id) { alert(window.__i18n.t('nodes.relatedIkuaiRequired')); return; }
         if (!(form.backup_storage || '').trim()) { alert(window.__i18n.t('nodes.backupStorageRequired')); return; }

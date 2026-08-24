@@ -2304,6 +2304,7 @@
   "nodes.assetOverview": "Aperçu des actifs",
   "nodes.backupConfig": "Config de sauvegarde",
   "nodes.backupStorage": "Stockage de sauvegarde",
+  "nodes.backupStorageByNode": "Le stockage de sauvegarde suit la config du nœud PVE (champ \"Stockage de sauvegarde\") ; les sauvegardes VM utilisent le stockage du nœud",
   "nodes.backupStorageRequired": "Veuillez sélectionner le stockage de sauvegarde",
   "nodes.baseInfo": "Informations de base",
   "nodes.belongRegion": "Région",

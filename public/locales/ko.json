@@ -2304,6 +2304,7 @@
   "nodes.assetOverview": "자산 개요",
   "nodes.backupConfig": "백업 설정",
   "nodes.backupStorage": "백업 저장소",
+  "nodes.backupStorageByNode": "백업 저장소는 각 PVE 노드 구성(노드 양식의 \"백업 저장소\")을 따르며 VM 백업은 소속 노드의 저장소를 사용합니다",
   "nodes.backupStorageRequired": "백업 저장소를 선택하세요",
   "nodes.baseInfo": "기본 정보",
   "nodes.belongRegion": "소속 지역",

@@ -178,10 +178,8 @@
                         <h6 class="section-label">{{ t('nodes.backupConfig') }}</h6>
                         <div class="row g-3">
                             <div class="col-12">
-                                <label class="form-label">{{ t('settings.snapBackup.backupStorage') }}</label>
-                                <select class="form-select" v-model="backupConfigForm.default_storage">
-                                    <option v-for="s in storageList.value" :key="s.id" :value="s.id">{{ s.id }} ({{ s.type }})</option>
-                                </select>
+                                <!-- 备份存储按节点配置（各 PVE 节点表单的「备份存储」），无需全局默认 -->
+                                <p class="text-muted small mb-1">{{ t('nodes.backupStorageByNode') }}</p>
                             </div>
                             <div class="col-6">
                                 <label class="form-label">{{ t('settings.snapBackup.backupPerVm') }}</label>

@@ -2304,6 +2304,7 @@
   "nodes.assetOverview": "Asset-Übersicht",
   "nodes.backupConfig": "Backup-Einstellungen",
   "nodes.backupStorage": "Backupspeicher",
+  "nodes.backupStorageByNode": "Backup-Speicher folgt der Knoten-Konfiguration (Feld \"Backup-Speicher\"); VM-Backups nutzen den Speicher des zugehörigen Knotens",
   "nodes.backupStorageRequired": "Bitte Backupspeicher auswählen",
   "nodes.baseInfo": "Basisinformationen",
   "nodes.belongRegion": "Region",

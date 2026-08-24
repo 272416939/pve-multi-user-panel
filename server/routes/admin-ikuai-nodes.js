@@ -206,6 +206,7 @@ router.post('/admin/ikuai/nodes/:id/test', authMiddleware, adminMiddleware, asyn
             return res.status(429).json({ error: '测试过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
         }
         const id = parseInt(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
         const node = await db.ikuaNodes.get(id);
         if (!node) return res.status(404).json({ error: '节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
         var started = Date.now();
@@ -248,10 +249,28 @@ router.get('/admin/ikuai/nodes/status', authMiddleware, adminMiddleware, async (
     }
 });
 
+// 节点外网接口列表（表单 WAN 下拉实时刷新）
+router.get('/admin/ikuai/nodes/interfaces', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var rateLimitResult = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-ifaces:' + req.user.id);
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: rateLimitResult.retryAfter });
+        }
+        const nodeId = req.query.node_id ? parseInt(req.query.node_id) : null;
+        var client = await getIkuaiClient(nodeId);
+        var list = await client.getInterfaces();
+        res.json({ interfaces: list || [] });
+    } catch (e) {
+        console.error('[ikuai-nodes] 获取接口失败:', e.message);
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
+    }
+});
+
 // 详情（编辑预填：连接字段掩码 + 节点作用域网络设置）
 router.get('/admin/ikuai/nodes/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
         const node = await db.ikuaNodes.get(id);
         if (!node) return res.status(404).json({ error: '节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
         const g = (k) => db.config.getIkuaiSetting(k, id);
@@ -343,6 +362,7 @@ router.put('/admin/ikuai/nodes/:id', authMiddleware, adminMiddleware, async (req
             return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: rateLimitResult.retryAfter });
         }
         const id = parseInt(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
         const existing = await db.ikuaNodes.get(id);
         if (!existing) return res.status(404).json({ error: '节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
         var body = req.body || {};
@@ -383,6 +403,7 @@ router.put('/admin/ikuai/nodes/:id', authMiddleware, adminMiddleware, async (req
 router.delete('/admin/ikuai/nodes/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
         const node = await db.ikuaNodes.get(id);
         if (!node) return res.status(404).json({ error: '节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
         const refs = await db.ikuaNodes.countReferences(id);
@@ -402,23 +423,6 @@ router.delete('/admin/ikuai/nodes/:id', authMiddleware, adminMiddleware, async (
         res.json({ message: '节点已删除' });
     } catch (e) {
         console.error('[ikuai-nodes] 删除失败:', e.message);
-        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
-    }
-});
-
-// 节点外网接口列表（表单 WAN 下拉实时刷新）
-router.get('/admin/ikuai/nodes/interfaces', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        var rateLimitResult = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-ifaces:' + req.user.id);
-        if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: rateLimitResult.retryAfter });
-        }
-        const nodeId = req.query.node_id ? parseInt(req.query.node_id) : null;
-        var client = await getIkuaiClient(nodeId);
-        var list = await client.getInterfaces();
-        res.json({ interfaces: list || [] });
-    } catch (e) {
-        console.error('[ikuai-nodes] 获取接口失败:', e.message);
         res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });

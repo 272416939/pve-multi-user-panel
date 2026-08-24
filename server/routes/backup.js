@@ -101,9 +101,10 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
             }
         }
  
-        // 获取存储位置：优先使用前端传入的存储，否则使用全局默认
+        // 获取存储位置：优先前端传入，否则按容器所在 PVE 节点的「备份存储」配置（多节点按节点内全局配置，废弃面板全局默认）
         // V3-02 修复：storage 参数必须白名单校验（防存储名注入/指向任意 PVE 存储）
-        const storage = reqStorage || lxcCfg.default_storage || cfg.default_storage || 'local';
+        const ctNodeStorage = ct.pve_node_id ? (await db.pveNodes.get(ct.pve_node_id))?.backup_storage : '';
+        const storage = reqStorage || ctNodeStorage || 'local';
         if (!/^[a-zA-Z0-9_-]+$/.test(storage)) {
             return res.status(400).json({ error: '无效的存储名称', code: 'INVALID_STORAGE_NAME' });
         }
@@ -362,7 +363,8 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
         let storage = req.body.storage || '';
         if (req.user.role !== 'admin') {
             const vmRecord = (await db.vms.getByUserId(req.user.id)).find(v => v.vm_id == vmid);
-            storage = (vmRecord && vmRecord.backup_storage) || (await db.backupConfig.get()).default_storage;
+            const vmNodeStorage = vmRow?.pve_node_id ? (await db.pveNodes.get(vmRow.pve_node_id))?.backup_storage : '';
+            storage = (vmRecord && vmRecord.backup_storage) || vmNodeStorage || 'local';
             const cfg = await db.backupConfig.get();
             const backupCount = await db.backups.getCountByVmId(vmid, req.user.id);
             if (backupCount >= cfg.max_per_vm) {
@@ -376,7 +378,11 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
             // V4-09 修复：admin 自定义 storage 白名单校验（与 LXC 路径 V3-02 一致），空值走下方默认存储
             return res.status(400).json({ error: '无效的存储位置', code: 'INVALID_STORAGE' });
         }
-        if (!storage) storage = (await db.backupConfig.get()).default_storage;
+        if (!storage) {
+            // 按虚拟机所在 PVE 节点的备份存储配置（多节点按节点内全局配置）
+            const vmNodeStorage = vmRow?.pve_node_id ? (await db.pveNodes.get(vmRow.pve_node_id))?.backup_storage : '';
+            storage = vmNodeStorage || 'local';
+        }
         const backup = await db.backups.create({ vm_id: vmid, user_id: req.user.id, storage, notes: req.body.notes || '', pve_node_id: vmRow?.pve_node_id });
         await db.backupLogs.add(req.user.id, vmid, 'create');
         try {

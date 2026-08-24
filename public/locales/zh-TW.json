@@ -2304,6 +2304,7 @@
   "nodes.assetOverview": "資產概覽",
   "nodes.backupConfig": "備份設定",
   "nodes.backupStorage": "備份儲存",
+  "nodes.backupStorageByNode": "備份儲存按各 PVE 節點配置（節點表單「備份儲存」欄位），虛擬機備份自動使用所在節點的儲存",
   "nodes.backupStorageRequired": "請選擇備份儲存",
   "nodes.baseInfo": "基本資訊",
   "nodes.belongRegion": "所屬地域",

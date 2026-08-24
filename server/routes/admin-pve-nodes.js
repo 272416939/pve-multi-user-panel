@@ -120,6 +120,7 @@ router.post('/admin/pve/nodes/:id/test', authMiddleware, adminMiddleware, async 
             return res.status(429).json({ error: '测试过于频繁，请稍后再试', code: 'RATE_LIMITED_TEST', retryAfter: rateLimitResult.retryAfter });
         }
         const id = parseInt(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '节点不存在', code: 'PVE_NODE_NOT_FOUND' });
         const node = await db.pveNodes.get(id);
         if (!node) return res.status(404).json({ error: '节点不存在', code: 'PVE_NODE_NOT_FOUND' });
         var pveApiSingleton = require('../api/pve-api');
@@ -178,10 +179,31 @@ router.get('/admin/pve/nodes/form-options', authMiddleware, adminMiddleware, asy
     }
 });
 
+// 备份存储列表：按已保存节点的客户端实时拉取（编辑态下拉）
+router.get('/admin/pve/nodes/storages', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        var rateLimitResult = await checkConfiguredRateLimit('pve_test', 'ratelimit:pve-storages:' + req.user.id);
+        if (!rateLimitResult.allowed) {
+            return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: rateLimitResult.retryAfter });
+        }
+        const nodeId = req.query.node_id ? parseInt(req.query.node_id) : null;
+        if (nodeId == null) {
+            return res.status(400).json({ error: '缺少 node_id 参数', code: 'PVE_NODE_ID_REQUIRED' });
+        }
+        const client = await getPveClient(nodeId);
+        const list = await client.getStorageList();
+        res.json({ storages: list || [] });
+    } catch (e) {
+        console.error('[pve-nodes] 获取存储列表失败:', e.message);
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
+    }
+});
+
 // 详情（编辑预填：凭据掩码）
 router.get('/admin/pve/nodes/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '节点不存在', code: 'PVE_NODE_NOT_FOUND' });
         const node = await db.pveNodes.get(id);
         if (!node) return res.status(404).json({ error: '节点不存在', code: 'PVE_NODE_NOT_FOUND' });
         res.json({
@@ -257,6 +279,7 @@ router.put('/admin/pve/nodes/:id', authMiddleware, adminMiddleware, async (req, 
             return res.status(429).json({ error: '操作过于频繁，请稍后再试', code: 'RATE_LIMITED_OP', retryAfter: rateLimitResult.retryAfter });
         }
         const id = parseInt(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '节点不存在', code: 'PVE_NODE_NOT_FOUND' });
         const existing = await db.pveNodes.get(id);
         if (!existing) return res.status(404).json({ error: '节点不存在', code: 'PVE_NODE_NOT_FOUND' });
         var body = req.body || {};
@@ -301,6 +324,7 @@ router.put('/admin/pve/nodes/:id', authMiddleware, adminMiddleware, async (req, 
 router.delete('/admin/pve/nodes/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
+        if (!Number.isInteger(id)) return res.status(400).json({ error: '节点不存在', code: 'PVE_NODE_NOT_FOUND' });
         const node = await db.pveNodes.get(id);
         if (!node) return res.status(404).json({ error: '节点不存在', code: 'PVE_NODE_NOT_FOUND' });
         const refs = await db.pveNodes.countReferences(id);
@@ -318,26 +342,6 @@ router.delete('/admin/pve/nodes/:id', authMiddleware, adminMiddleware, async (re
         res.json({ message: '节点已删除' });
     } catch (e) {
         console.error('[pve-nodes] 删除失败:', e.message);
-        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
-    }
-});
-
-// 备份存储列表：按已保存节点的客户端实时拉取（编辑态下拉）
-router.get('/admin/pve/nodes/storages', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        var rateLimitResult = await checkConfiguredRateLimit('pve_test', 'ratelimit:pve-storages:' + req.user.id);
-        if (!rateLimitResult.allowed) {
-            return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: rateLimitResult.retryAfter });
-        }
-        const nodeId = req.query.node_id ? parseInt(req.query.node_id) : null;
-        if (nodeId == null) {
-            return res.status(400).json({ error: '缺少 node_id 参数', code: 'PVE_NODE_ID_REQUIRED' });
-        }
-        const client = await getPveClient(nodeId);
-        const list = await client.getStorageList();
-        res.json({ storages: list || [] });
-    } catch (e) {
-        console.error('[pve-nodes] 获取存储列表失败:', e.message);
         res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
 });

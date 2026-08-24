@@ -1104,6 +1104,8 @@ async function migrateSchema() {
 // 区域/节点体系迁移（幂等）：默认地域/可用区种子 + 旧单节点配置导入为节点行 + 业务表回填节点 ID
 async function migrateRegionNodes() {
     try {
+        // 存量导入标志（用于导入的默认 PVE 节点自动配对导入的默认爱快）
+        let pveImported = false, ikuaiImported = false, firstPveId = null, firstIkId = null;
         const regionCount = (await queryOne('SELECT COUNT(*) AS c FROM regions')).c;
         let defaultZoneId;
         if (!regionCount) {
@@ -1126,7 +1128,7 @@ async function migrateRegionNodes() {
             if (legacyHost && defaultZoneId) {
                 const cfg = await require('./db-config').config.getPve();
                 const { encrypt } = require('../utils/crypto-utils');
-                await execute(
+                const [pveResult] = await execute(
                     `INSERT INTO pve_nodes (name, zone_id, ikuai_node_id, api_host, api_token, ssh_host, ssh_port,
                      ssh_user, ssh_password, strict_tls, backup_storage, enabled)
                      VALUES ('默认节点', ?, NULL, ?, ?, ?, ?, ?, ?, ?,
@@ -1135,6 +1137,8 @@ async function migrateRegionNodes() {
                      cfg.ssh_port || 22, cfg.ssh_user || 'root', encrypt(cfg.ssh_password || ''),
                      cfg.strict_tls ? 1 : 0]
                 );
+                pveImported = true;
+                firstPveId = pveResult.insertId;
                 console.log('[db] 已将旧 PVE 配置导入为「默认节点」');
             }
         }
@@ -1152,6 +1156,8 @@ async function migrateRegionNodes() {
                     [cfg.version === 'v4' ? 'v4' : 'v3', cfg.host || '', cfg.username || '',
                      encrypt(cfg.password || ''), encrypt(cfg.api_key || ''), cfg.strict_tls ? 1 : 0]
                 );
+                ikuaiImported = true;
+                firstIkId = ikResult.insertId;
                 // 网络四组设置迁入节点作用域键 ikuai:<nodeId>:<key>（仅导入的首节点）
                 const NET_KEYS = [
                     'forward:port_range_start', 'forward:port_range_end', 'forward:default_protocol',
@@ -1180,6 +1186,27 @@ async function migrateRegionNodes() {
         }
 
         // 业务表回填首节点 ID（vmid 不再全局唯一，资产必须挂到具体节点）
+        // 旧 PVE/爱快均从存量导入时，把「默认节点」自动配对到「默认爱快」（存量迁移补配对，幂等：仅未配对的首节点）
+        if (pveImported && ikuaiImported && firstPveId != null && firstIkId != null) {
+            try {
+                await execute('UPDATE pve_nodes SET ikuai_node_id = ? WHERE id = ? AND ikuai_node_id IS NULL', [firstIkId, firstPveId]);
+                console.log('[db] 已将「默认节点」配对到「默认爱快」');
+            } catch (e) {
+                console.error('[db] 默认节点配对失败:', e.message);
+            }
+        }
+
+        // 兼容「已迁移但当时未配对」的存量单 PVE 环境：仅 1 个 PVE 节点且存在爱快节点时，自动配对到首个（默认）爱快
+        try {
+            const pveTotal = (await queryOne('SELECT COUNT(*) AS c FROM pve_nodes')).c;
+            const pveUnpaired = (await queryOne('SELECT COUNT(*) AS c FROM pve_nodes WHERE ikuai_node_id IS NULL')).c;
+            const ikTotal = (await queryOne('SELECT COUNT(*) AS c FROM ikuai_nodes')).c;
+            if (pveTotal === 1 && pveUnpaired > 0 && ikTotal >= 1) {
+                await execute('UPDATE pve_nodes SET ikuai_node_id = (SELECT id FROM ikuai_nodes ORDER BY id ASC LIMIT 1) WHERE ikuai_node_id IS NULL');
+                console.log('[db] 存量单节点环境自动配对 PVE/爱快');
+            }
+        } catch (_) {}
+
         const firstPve = (await queryOne('SELECT id FROM pve_nodes ORDER BY sort_order DESC, id ASC LIMIT 1'))?.id;
         if (firstPve) {
             const pveTables = ['vms', 'lxc_containers', 'disks', 'backups',

@@ -2304,6 +2304,7 @@
   "nodes.assetOverview": "資産概要",
   "nodes.backupConfig": "バックアップ設定",
   "nodes.backupStorage": "バックアップ保存先",
+  "nodes.backupStorageByNode": "バックアップストレージは各PVEノードの設定（ノードフォームの「バックアップストレージ」）に従います",
   "nodes.backupStorageRequired": "バックアップ保存先を選択してください",
   "nodes.baseInfo": "基本情報",
   "nodes.belongRegion": "所属地域",

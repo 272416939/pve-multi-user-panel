@@ -2304,6 +2304,7 @@
   "nodes.assetOverview": "Asset Overview",
   "nodes.backupConfig": "Backup Config",
   "nodes.backupStorage": "Backup Storage",
+  "nodes.backupStorageByNode": "Backup storage follows each PVE node's config (node form \"Backup storage\"); VM backups use the owning node's storage",
   "nodes.backupStorageRequired": "Please select backup storage",
   "nodes.baseInfo": "Basic Info",
   "nodes.belongRegion": "Region",
