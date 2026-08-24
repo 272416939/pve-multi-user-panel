@@ -725,6 +725,8 @@ router.get('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, r
             host: config.host || '',
             username: config.username || '',
             password: maskSecret(config.password),
+            api_key: maskSecret(config.api_key),
+            version: config.version || 'v3',
             strict_tls: config.strict_tls || false
         });
     } catch (error) {
@@ -735,38 +737,71 @@ router.get('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, r
 
 router.put('/admin/ikuai/config', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        var { host, username, password, strict_tls } = req.body;
+        var { host, username, password, api_key, version, strict_tls } = req.body;
+        // 版本白名单（默认 v3，兼容存量生产环境；非法值显式 400）
+        var finalVersion = version === undefined ? 'v3' : version;
+        if (finalVersion !== 'v3' && finalVersion !== 'v4') {
+            return res.status(400).json({ error: '接口版本无效，必须为 v3 或 v4', code: 'IKUAI_VERSION_INVALID' });
+        }
         host = String(host || '').trim();
         // 协议白名单 + 长度校验（SSRF 防护：仅 http/https；留空表示停用爱快）
         if (host && !/^https?:\/\/\S+$/i.test(host)) {
             return res.status(400).json({ error: '爱快地址必须以 http:// 或 https:// 开头', code: 'IKUAI_URL_SCHEME' });
         }
         if (host.length > 200) return res.status(400).json({ error: '爱快地址过长', code: 'IKUAI_URL_TOO_LONG' });
+        // V4：REST API 仅 HTTPS（http 入口对 /api/v4.0/* 直接 403），强制 https 前缀 + 端口合法性（内嵌地址，未填默认 443）
+        if (finalVersion === 'v4' && host) {
+            if (!/^https:\/\/\S+$/i.test(host)) {
+                return res.status(400).json({ error: 'V4 接口仅支持 HTTPS，地址必须以 https:// 开头（可带端口，未填默认 443）', code: 'IKUAI_V4_HTTPS_REQUIRED' });
+            }
+            // 端口：显式声明的端口必须是 1-65535（未填默认 443；URL 解析对越界端口直接抛错，需先提取）
+            var portMatch = host.match(/^https:\/\/[^/]+:(\d{1,5})\b/);
+            if (portMatch) {
+                var p = parseInt(portMatch[1], 10);
+                if (p < 1 || p > 65535) {
+                    return res.status(400).json({ error: '端口号必须在 1-65535 之间', code: 'IKUAI_PORT_INVALID' });
+                }
+            }
+            try {
+                new URL(host);
+            } catch (_) {
+                return res.status(400).json({ error: '爱快地址格式无效', code: 'IKUAI_URL_INVALID' });
+            }
+        }
         username = String(username || '').trim();
         if (username.length > 64) return res.status(400).json({ error: '用户名过长', code: 'USERNAME_TOO_LONG' });
-        // 保存前取旧配置（审计 diff 用；密码只记「已更新」标记，不记录原文）
+        // 保存前取旧配置（审计 diff 用；敏感字段只记「已更新」标记，不记录原文）
         var oldIkuai = await db.config.getIkuai();
-        // V6-I4 修复：空字符串视为未修改（保留旧密码），与 PVE 配置对称
+        // V6-I4 修复：空字符串视为未修改（保留旧值），与 PVE 配置对称；API Token 同模式
         var pwdChanged = password !== undefined && password !== '' && !isMasked(password);
+        var apiKeyChanged = api_key !== undefined && api_key !== '' && !isMasked(api_key);
+        // V4 且填写了地址时 API Token 必填（掩码/空值视为保留旧值，需已有旧 key）
+        if (finalVersion === 'v4' && host && !apiKeyChanged && !oldIkuai.api_key) {
+            return res.status(400).json({ error: 'V4 模式需要填写 API Token', code: 'IKUAI_V4_KEY_REQUIRED' });
+        }
         // 脱敏值跳过，不覆盖原值
         var configToSave = {
             host: host,
             username: username,
-            password: (password !== undefined && password !== '' && !isMasked(password)) ? password : undefined,
+            password: pwdChanged ? password : undefined,
+            api_key: apiKeyChanged ? api_key : undefined,
+            version: finalVersion,
             strict_tls: !!strict_tls
         };
         await db.config.setIkuai(configToSave);
         // 热加载：清空配置缓存并重置登录态，下次调用立即使用新配置（无需重启）
         await ikuaiApi.reloadConfig();
-        // 操作审计：更新爱快节点配置（DB 新旧值字段级 diff，不记录密码原文）
+        // 操作审计：更新爱快节点配置（DB 新旧值字段级 diff，不记录密码/API Token 原文）
         try {
             const { auditLog } = require('../utils/audit-log');
             var changes = buildFieldDiff(oldIkuai, await db.config.getIkuai(), [
                 { key: 'host', label: '爱快地址' },
                 { key: 'username', label: '用户名' },
+                { key: 'version', label: '接口版本' },
                 { key: 'strict_tls', label: '严格TLS', bool: true }
             ]);
             if (pwdChanged) changes.push('密码 已更新');
+            if (apiKeyChanged) changes.push('API Token 已更新');
             if (changes.length) {
                 await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.config.ikuai', resourceType: 'config', resourceId: 'ikuai', details: '更新爱快节点配置；变更:' + changes.join(', '), req });
             }

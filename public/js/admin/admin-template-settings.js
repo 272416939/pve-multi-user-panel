@@ -274,21 +274,37 @@
                             <form @submit.prevent="saveIkuaiConfig">
                                 <div class="row mb-3">
                                     <div class="col-md-8">
-                                        <label class="form-label">{{ t('settings.ikuai.host') }}</label>
-                                        <input type="text" class="form-control" v-model="ikuaiConfig.host" :placeholder="t('settings.ikuai.hostPh')">
-                                        <small class="text-muted">{{ t('settings.ikuai.hostHint') }}</small>
+                                        <label class="form-label">{{ t('settings.ikuai.version') }}</label>
+                                        <select class="form-select" v-model="ikuaiConfig.version">
+                                            <option value="v3">{{ t('settings.ikuai.versionV3') }}</option>
+                                            <option value="v4">{{ t('settings.ikuai.versionV4') }}</option>
+                                        </select>
                                     </div>
                                 </div>
                                 <div class="row mb-3">
+                                    <div class="col-md-8">
+                                        <label class="form-label">{{ t('settings.ikuai.host') }}</label>
+                                        <input type="text" class="form-control" v-model="ikuaiConfig.host" :placeholder="t('settings.ikuai.hostPh')">
+                                        <small class="text-muted">{{ ikuaiConfig.version === 'v4' ? t('settings.ikuai.hostHintV4') : t('settings.ikuai.hostHint') }}</small>
+                                    </div>
+                                </div>
+                                <div class="row mb-3" v-if="ikuaiConfig.version !== 'v4'">
                                     <div class="col-md-8">
                                         <label class="form-label">{{ t('settings.username') }}</label>
                                         <input type="text" class="form-control" v-model="ikuaiConfig.username" :placeholder="t('settings.ikuai.userPh')" autocomplete="off">
                                     </div>
                                 </div>
-                                <div class="row mb-3">
+                                <div class="row mb-3" v-if="ikuaiConfig.version !== 'v4'">
                                     <div class="col-md-8">
                                         <label class="form-label">{{ t('settings.password') }}</label>
                                         <input type="password" class="form-control" v-model="ikuaiConfig.password" :placeholder="t('settings.keepBlank')" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="row mb-3" v-if="ikuaiConfig.version === 'v4'">
+                                    <div class="col-md-8">
+                                        <label class="form-label">{{ t('settings.ikuai.apiKey') }}</label>
+                                        <input type="password" class="form-control" v-model="ikuaiConfig.api_key" :placeholder="t('settings.keepBlank')" autocomplete="off">
+                                        <small class="text-muted">{{ t('settings.ikuai.apiKeyHint') }}</small>
                                     </div>
                                 </div>
                                 <div class="row mb-3">

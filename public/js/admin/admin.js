@@ -18,7 +18,7 @@
     $.smtpConfig = ref({ host: '', port: 587, secure: false, user: '', password: '', from: '', from_name: '', enabled: false });
     $.emailQueueStats = ref(null);
     $.pveConfig = ref({ host: '', api_token: '', ssh_host: '', ssh_port: 22, ssh_user: 'root', ssh_password: '', strict_tls: false });
-    $.ikuaiConfig = ref({ host: '', username: '', password: '', strict_tls: false });
+    $.ikuaiConfig = ref({ host: '', username: '', password: '', api_key: '', version: 'v3', strict_tls: false });
     $.ikuaiTesting = ref(false);
     $.ikuaiConfigSaving = ref(false);
     $.pveTesting = ref(false);

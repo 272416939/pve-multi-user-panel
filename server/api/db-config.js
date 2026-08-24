@@ -97,7 +97,7 @@ const config = {
     },
     // 爱快路由器配置（面板在线管理；.env 仅作首次迁移种子，迁移后即清空）
     getIkuai: async () => {
-        const keys = ['ikuai:host', 'ikuai:username', 'ikuai:password', 'ikuai:strict_tls'];
+        const keys = ['ikuai:host', 'ikuai:username', 'ikuai:password', 'ikuai:api_key', 'ikuai:version', 'ikuai:strict_tls'];
         const placeholders = keys.map(() => '?').join(',');
         const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
         const map = {};
@@ -107,6 +107,8 @@ const config = {
             host: map['ikuai:host'] || '',
             username: map['ikuai:username'] || '',
             password: decrypt(map['ikuai:password'] || ''),
+            api_key: decrypt(map['ikuai:api_key'] || ''),
+            version: map['ikuai:version'] || 'v3', // v3=用户名密码 / v4=API Token
             strict_tls: map['ikuai:strict_tls'] === '1'
         };
     },
@@ -120,9 +122,18 @@ const config = {
         } else {
             password = encrypt(current.password); // 保留旧值（重新加密）
         }
+        // V4 API Token 与密码同模式：掩码/空值保留旧值（AES-256-GCM 加密存储）
+        var apiKey = ikuaiConfig.api_key;
+        if (apiKey !== undefined && !isMasked(apiKey)) {
+            apiKey = encrypt(String(apiKey).trim());
+        } else {
+            apiKey = encrypt(current.api_key); // 保留旧值（重新加密）
+        }
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:host', ikuaiConfig.host ?? '']);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:username', ikuaiConfig.username ?? '']);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:password', password]);
+        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:api_key', apiKey]);
+        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:version', ikuaiConfig.version === 'v4' ? 'v4' : 'v3']);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['ikuai:strict_tls', ikuaiConfig.strict_tls ? '1' : '0']);
     },
     getRedis: async () => {

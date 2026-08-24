@@ -4,11 +4,13 @@ class IkuaiApi {
     constructor() {
         // 配置不再于模块加载时读 .env，改为惰性从面板 DB 加载（60s 内存缓存）；
         // 保存配置后 reloadConfig() 清缓存立即生效，无需重启
-        this.config = null;          // { host, username, password, strict_tls }
+        this.config = null;          // { host, username, password, api_key, version, strict_tls }
         this._configLoadedAt = 0;
         this._configTTL = 60000;
         this.client = null;
         this._clientConfigKey = '';  // 当前 client 对应的配置签名，变化时重建 client
+        this._v4ApiImpl = null;      // V4 业务实现（REST + Bearer Token），按配置签名惰性建立
+        this._v4Key = '';            // 当前 V4 实现对应的配置签名
     }
 
     isConfigured() {
@@ -19,6 +21,8 @@ class IkuaiApi {
             this.ensureConfig().catch(function () {});
             return false;
         }
+        // v3=用户名密码；v4=API Token（host + api_key）
+        if (c.version === 'v4') return !!(c.host && c.api_key);
         return !!(c.host && c.username && c.password);
     }
 
@@ -35,7 +39,7 @@ class IkuaiApi {
                 var envUser = process.env.IKUAI_USER || '';
                 var envPass = process.env.IKUAI_PASSWORD || '';
                 if (envHost && envUser && envPass) {
-                    cfg = { host: envHost, username: envUser, password: envPass, strict_tls: false };
+                    cfg = { host: envHost, username: envUser, password: envPass, api_key: '', version: 'v3', strict_tls: false };
                     try {
                         await db.config.setIkuai(cfg);
                         console.log(`[ikuai] 已从 .env 迁移配置到面板 DB (${envHost})`);
@@ -66,12 +70,24 @@ class IkuaiApi {
             try { this.client.logout(); } catch (e) {}
             this.client = null;
         }
+        this._v4ApiImpl = null;
+        this._v4Key = '';
         await this.ensureConfig();
     }
 
     async _ensureLogin() {
         var cfg = await this.ensureConfig();
-        if (!cfg || !cfg.host || !cfg.username || !cfg.password) {
+        if (!cfg || !cfg.host) {
+            throw new Error('爱快未配置（请在 系统设置 → 爱快节点设置 中配置）');
+        }
+        // V4：无登录态（Bearer Token 由 _v4Api() 按配置签名惰性建立，认证失败在请求层 401 直接报错）
+        if (cfg.version === 'v4') {
+            if (!cfg.api_key) {
+                throw new Error('爱快 V4 未配置 API Token（请在 系统设置 → 爱快节点设置 中配置）');
+            }
+            return;
+        }
+        if (!cfg.username || !cfg.password) {
             throw new Error('爱快未配置（请在 系统设置 → 爱快节点设置 中配置）');
         }
         var key = cfg.host + '|' + cfg.username + '|' + cfg.password + '|' + (cfg.strict_tls ? '1' : '0');
@@ -104,6 +120,23 @@ class IkuaiApi {
         }
     }
 
+    // V4 业务实现：按配置签名（host|api_key|strict_tls）惰性建立，配置变化时重建（与 V3 client 同模式）
+    async _v4Api() {
+        var cfg = await this.ensureConfig();
+        var key = cfg ? (cfg.host + '|' + (cfg.api_key || '') + '|' + (cfg.strict_tls ? '1' : '0')) : '';
+        if (!this._v4ApiImpl || this._v4Key !== key) {
+            var { IkuaiV4Api } = require('./ikuai-v4');
+            this._v4ApiImpl = new IkuaiV4Api({
+                host: cfg.host,
+                token: cfg.api_key || '',
+                insecure: !cfg.strict_tls,
+                debug: process.env.DEBUG === 'true'
+            });
+            this._v4Key = key;
+        }
+        return this._v4ApiImpl;
+    }
+
     async _call(funcName, action, param) {
         await this._ensureLogin();
         try {
@@ -131,12 +164,14 @@ class IkuaiApi {
 
     // 测试连接（只读验证：登录 + 拉取 DHCP 租约；设备不支持 system/sysstat 等函数名，用业务只读接口验证连通性）
     async testConnection() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).testConnection();
         var data = await this._call('dhcp_lease', 'show', { TYPE: 'total,data', ORDER_BY: 'timeout', ORDER: 'desc', limit: '0,1000' });
         var total = (data && data.total !== undefined) ? data.total : (data && Array.isArray(data.data) ? data.data.length : 0);
         return { leaseCount: total };
     }
 
     async getPortForwards() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getPortForwards();
         const data = await this._call('dnat', 'show', { TYPE: 'data,total', limit: '0,9999', ORDER_BY: 'id', ORDER: '', orderType: '' });
         const list = data?.data || data?.rows || data || [];
         return list.map(item => ({
@@ -153,6 +188,7 @@ class IkuaiApi {
     }
 
     async addPortForward(rule) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).addPortForward(rule);
         const comment = rule.comment || '';
         const result = await this._call('dnat', 'add', {
             lan_addr: rule.ip,
@@ -168,6 +204,7 @@ class IkuaiApi {
     }
 
     async editPortForward(ruleId, rule) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).editPortForward(ruleId, rule);
         const comment = ((rule.comment || '').replace(/[^\x20-\x7E\u4E00-\u9FA5a-zA-Z0-9\s\-_,.]/g, '')).substring(0, 50);
         const result = await this._call('dnat', 'edit', {
             id: Number(ruleId),
@@ -184,12 +221,14 @@ class IkuaiApi {
     }
 
     async deletePortForward(ruleId) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).deletePortForward(ruleId);
         const result = await this._call('dnat', 'del', { id: Number(ruleId) });
         console.log(`[ikuai] 端口映射删除成功: ID=${ruleId}`);
         return result;
     }
 
     async getDhcpLeases() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getDhcpLeases();
         const data = await this._call('dhcp_lease', 'show', {
             TYPE: 'total,data',
             ORDER_BY: 'timeout',
@@ -208,6 +247,7 @@ class IkuaiApi {
     }
 
     async getLanIps() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getLanIps();
         const data = await this._call('monitor_lanip', 'show', {
             TYPE: 'data,total',
             ORDER_BY: 'ip_addr_int',
@@ -224,6 +264,7 @@ class IkuaiApi {
     }
 
     async getInterfaces() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getInterfaces();
         const interfaces = [];
         const seen = new Set();
 
@@ -337,6 +378,7 @@ class IkuaiApi {
     // ===== 私有网络：VLAN 接口 =====
     // VLAN 列表（创建子网时查重、反查 id 用）
     async getVlans() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getVlans();
         const data = await this._call('vlan', 'show', {
             TYPE: 'data,total',
             limit: '0,1000',
@@ -358,6 +400,7 @@ class IkuaiApi {
     // VLAN 可用父接口枚举（vlan show TYPE interface，与爱快后台 VLAN 下拉同源）
     // 失败回退：dhcp 服务端 + 现有 vlan 的接口并集（best-effort，空数组表示不可枚举）
     async getVlanInterfaces() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getVlanInterfaces();
         try {
             const data = await this._call('vlan', 'show', { TYPE: 'interface' });
             const list = data?.interface || [];
@@ -381,6 +424,7 @@ class IkuaiApi {
 
     // VLAN 新增（私有网络子网创建）
     async addVlan({ vlan_id, vlan_name, ip_addr, interface: iface, netmask, comment }) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).addVlan({ vlan_id, vlan_name, ip_addr, interface: iface, netmask, comment });
         try {
             const result = await this._call('vlan', 'add', {
                 vlan_id: String(vlan_id),
@@ -403,6 +447,7 @@ class IkuaiApi {
 
     // VLAN 删除（子网删除）
     async deleteVlan(id) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).deleteVlan(id);
         const result = await this._call('vlan', 'del', { id: Number(id) });
         console.log(`[ikuai] VLAN 删除成功: ID=${id}`);
         return result;
@@ -411,6 +456,7 @@ class IkuaiApi {
     // ===== 私有网络：DHCP 服务端 =====
     // DHCP 服务端列表（反查 id/available 用）
     async getDhcpServers() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getDhcpServers();
         const data = await this._call('dhcp_server', 'show', {
             TYPE: 'total,data',
             limit: '0,1000',
@@ -440,6 +486,7 @@ class IkuaiApi {
 
     // DHCP 服务端新增（私有网络子网创建）
     async addDhcpServer({ interface: iface, addr_pool, netmask, gateway, dns1, dns2 }) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).addDhcpServer({ interface: iface, addr_pool, netmask, gateway, dns1, dns2 });
         const result = await this._call('dhcp_server', 'add', {
             interface: iface,
             addr_pool: addr_pool,
@@ -466,6 +513,7 @@ class IkuaiApi {
 
     // DHCP 服务端删除（子网删除）
     async deleteDhcpServer(id) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).deleteDhcpServer(id);
         const result = await this._call('dhcp_server', 'del', { id: Number(id) });
         console.log(`[ikuai] DHCP 服务端删除成功: ID=${id}`);
         return result;
@@ -473,6 +521,7 @@ class IkuaiApi {
 
     // DHCP 静态绑定：查询所有已绑定的 MAC/IP
     async getDhcpStaticBindings() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getDhcpStaticBindings();
         const data = await this._call('dhcp_static', 'show', {
             TYPE: 'static_total,static_data',
             limit: '0,1000',
@@ -492,6 +541,7 @@ class IkuaiApi {
 
     // DHCP 静态绑定：新增
     async addDhcpStaticBinding(mac, ip, comment, iface, gateway, dns1, dns2) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).addDhcpStaticBinding(mac, ip, comment, iface, gateway, dns1, dns2);
         // 从数据库读取 DHCP 配置作为默认值
         const cfgGateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
         const cfgInterface = await db.config.get('dhcp:interface') || 'lan2';
@@ -516,6 +566,7 @@ class IkuaiApi {
 
     // DHCP 静态绑定：编辑（修改 IP）
     async editDhcpStaticBinding(bindingId, mac, newIp, comment, iface, gateway, dns1, dns2) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).editDhcpStaticBinding(bindingId, mac, newIp, comment, iface, gateway, dns1, dns2);
         const cfgGateway = await db.config.get('dhcp:gateway') || '10.0.0.1';
         const cfgInterface = await db.config.get('dhcp:interface') || 'lan2';
         const cfgDns1 = await db.config.get('dhcp:dns1') || '119.29.29.29';
@@ -537,6 +588,7 @@ class IkuaiApi {
 
     // DHCP 静态绑定：删除
     async deleteDhcpStaticBinding(id) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).deleteDhcpStaticBinding(id);
         const result = await this._call('dhcp_static', 'del', { id: Number(id) });
         console.log(`[ikuai] DHCP 静态绑定删除成功: ID=${id}`);
         return result;
@@ -545,6 +597,7 @@ class IkuaiApi {
     // MAC 分组（爱快对象组）：获取分组列表
     // func_name: macgroup, action: show
     async getMacGroups() {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getMacGroups();
         try {
             const data = await this._call('macgroup', 'show', {
                 TYPE: 'total,data',
@@ -576,6 +629,7 @@ class IkuaiApi {
 
     // MAC 分组：添加 MAC 到分组（addr_pool 空格分隔 → 追加 → edit）
     async addMacToGroup(groupId, mac, comment) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).addMacToGroup(groupId, mac, comment);
         var current = await this._getMacGroupById(groupId);
         if (!current) throw new Error('MAC 分组 ID=' + groupId + ' 不存在');
         var pool = (current.addr_pool || '').trim();
@@ -597,6 +651,7 @@ class IkuaiApi {
 
     // MAC 分组：从分组删除 MAC（addr_pool → 过滤 → edit）
     async removeMacFromGroup(groupId, mac) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).removeMacFromGroup(groupId, mac);
         var current = await this._getMacGroupById(groupId);
         if (!current) throw new Error('MAC 分组 ID=' + groupId + ' 不存在');
         var pool = (current.addr_pool || '').trim();
@@ -619,6 +674,7 @@ class IkuaiApi {
 
     // MAC 分组：更新分组内 MAC（先删旧，再加新）
     async updateMacInGroup(groupId, oldMac, newMac, comment) {
+        if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).updateMacInGroup(groupId, oldMac, newMac, comment);
         if (oldMac && oldMac !== newMac) {
             try { await this.removeMacFromGroup(groupId, oldMac); } catch (e) {}
         }
