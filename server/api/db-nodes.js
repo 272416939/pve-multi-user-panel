@@ -74,7 +74,7 @@ const ikuaNodes = {
     get: async (id) => {
         const row = await queryOne('SELECT * FROM ikuai_nodes WHERE id = ?', [id]);
         if (row) {
-            const { decrypt } = require('./crypto-utils');
+            const { decrypt } = require('../utils/crypto-utils');
             row.password = decrypt(row.password || '');
             row.api_key = decrypt(row.api_key || '');
         }
@@ -95,7 +95,7 @@ const ikuaNodes = {
         return id ? ikuaNodes.get(id) : null;
     },
     create: async (n) => {
-        const { encrypt } = require('./crypto-utils');
+        const { encrypt } = require('../utils/crypto-utils');
         const [result] = await execute(
             `INSERT INTO ikuai_nodes (name, version, host, username, password, api_key, strict_tls, enabled, sort_order)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -115,7 +115,7 @@ const ikuaNodes = {
         return result.insertId;
     },
     update: async (id, n) => {
-        const { encrypt, isMasked } = require('./crypto-utils');
+        const { encrypt, isMasked } = require('../utils/crypto-utils');
         const current = await ikuaNodes.get(id);
         if (!current) return 0;
         // 掩码值/空值保留旧密码（重新加密写回），与 smtp/pve 同模式
@@ -187,7 +187,7 @@ const pveNodes = {
     get: async (id) => {
         const row = await queryOne('SELECT * FROM pve_nodes WHERE id = ?', [id]);
         if (row) {
-            const { decrypt } = require('./crypto-utils');
+            const { decrypt } = require('../utils/crypto-utils');
             row.api_token = decrypt(row.api_token || '');
             row.ssh_password = decrypt(row.ssh_password || '');
         }
@@ -207,7 +207,7 @@ const pveNodes = {
         return id ? pveNodes.get(id) : null;
     },
     create: async (n) => {
-        const { encrypt } = require('./crypto-utils');
+        const { encrypt } = require('../utils/crypto-utils');
         const [result] = await execute(
             `INSERT INTO pve_nodes (name, zone_id, ikuai_node_id, api_host, api_token, ssh_host, ssh_port, ssh_user,
              ssh_password, strict_tls, backup_storage, enabled, sort_order)
@@ -232,7 +232,7 @@ const pveNodes = {
         return result.insertId;
     },
     update: async (id, n) => {
-        const { encrypt, isMasked } = require('./crypto-utils');
+        const { encrypt, isMasked } = require('../utils/crypto-utils');
         const current = await pveNodes.get(id);
         if (!current) return 0;
         var apiToken = current.api_token;

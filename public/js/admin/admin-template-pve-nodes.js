@@ -158,15 +158,15 @@
                         <div class="row g-3">
                             <div class="col-12">
                                 <label class="form-label">{{ t('settings.snapBackup.snapPerVm') }}</label>
-                                <input type="number" class="form-control" v-model.number="snapshotConfig.value.max_per_vm" min="1">
+                                <input type="number" class="form-control" v-model.number="snapshotConfig.max_per_vm" min="1">
                             </div>
                             <div class="col-12">
                                 <label class="form-label">{{ t('settings.snapBackup.snapDailyCreate') }}</label>
-                                <input type="number" class="form-control" v-model.number="snapshotConfig.value.daily_create_limit" min="1">
+                                <input type="number" class="form-control" v-model.number="snapshotConfig.daily_create_limit" min="1">
                             </div>
                             <div class="col-12">
                                 <label class="form-label">{{ t('settings.snapBackup.snapDailyRestore') }}</label>
-                                <input type="number" class="form-control" v-model.number="snapshotConfig.value.daily_restore_limit" min="1">
+                                <input type="number" class="form-control" v-model.number="snapshotConfig.daily_restore_limit" min="1">
                             </div>
                             <div class="col-12">
                                 <pv-button variant="glass" @click="saveSnapshotConfig()">{{ t('settings.snapBackup.saveSnap') }}</pv-button>
@@ -179,17 +179,17 @@
                         <div class="row g-3">
                             <div class="col-12">
                                 <label class="form-label">{{ t('settings.snapBackup.backupStorage') }}</label>
-                                <select class="form-select" v-model="backupConfigForm.value.default_storage">
+                                <select class="form-select" v-model="backupConfigForm.default_storage">
                                     <option v-for="s in storageList.value" :key="s.id" :value="s.id">{{ s.id }} ({{ s.type }})</option>
                                 </select>
                             </div>
                             <div class="col-6">
                                 <label class="form-label">{{ t('settings.snapBackup.backupPerVm') }}</label>
-                                <input type="number" class="form-control" v-model.number="backupConfigForm.value.max_per_vm" min="1">
+                                <input type="number" class="form-control" v-model.number="backupConfigForm.max_per_vm" min="1">
                             </div>
                             <div class="col-6">
                                 <label class="form-label">{{ t('settings.snapBackup.backupDaily') }}</label>
-                                <input type="number" class="form-control" v-model.number="backupConfigForm.value.daily_limit" min="1">
+                                <input type="number" class="form-control" v-model.number="backupConfigForm.daily_limit" min="1">
                             </div>
                             <div class="col-12">
                                 <pv-button variant="glass" @click="saveBackupConfig()">{{ t('settings.snapBackup.saveBackup') }}</pv-button>

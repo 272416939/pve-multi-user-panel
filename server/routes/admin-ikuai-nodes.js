@@ -175,9 +175,22 @@ router.post('/admin/ikuai/nodes/test', authMiddleware, adminMiddleware, async (r
         }
         var resolved = await resolveTestParams(req.body || {});
         if (resolved.error) return res.status(400).json({ error: resolved.error, code: resolved.code });
-        var base = validateNodeBase(Object.assign({}, req.body || {}, resolved.params));
-        if (base.error) return res.status(400).json({ error: base.error, code: base.code });
-        var result = await runTest(res, resolved.params);
+        // 测试端点是连通性验证：不需要节点名称/区域等基础信息，只校验地址与凭据
+        var p = resolved.params;
+        if (!p.host) return res.status(400).json({ error: '请先填写爱快地址', code: 'IKUAI_URL_REQUIRED' });
+        if (!/^https?:\/\/\S+$/i.test(p.host)) {
+            return res.status(400).json({ error: '爱快地址必须以 http:// 或 https:// 开头', code: 'IKUAI_URL_SCHEME' });
+        }
+        if (p.version === 'v4' && !/^https:\/\/\S+$/i.test(p.host)) {
+            return res.status(400).json({ error: 'V4 接口仅支持 HTTPS，地址必须以 https:// 开头（可带端口，未填默认 443）', code: 'IKUAI_V4_HTTPS_REQUIRED' });
+        }
+        if (p.version === 'v4' && !p.api_key) {
+            return res.status(400).json({ error: 'V4 模式需要填写 API Token', code: 'IKUAI_V4_KEY_REQUIRED' });
+        }
+        if (p.version !== 'v4' && (!p.username || !p.password)) {
+            return res.status(400).json({ error: 'V3 模式需要填写用户名与密码', code: 'IKUAI_CREDENTIALS_REQUIRED' });
+        }
+        var result = await runTest(res, p);
         if (result.ok) res.json({ message: '连接成功', info: result.info });
     } catch (e) {
         console.error('[ikuai-nodes] 测试端点异常:', e.message);
