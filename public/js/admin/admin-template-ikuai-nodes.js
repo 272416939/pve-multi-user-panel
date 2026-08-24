@@ -167,13 +167,27 @@
                         </div>
 
                         <hr class="my-4">
-                        <!-- CNAME -->
+                        <!-- CNAME 域名设置（行编辑，label||.domain） -->
                         <h6 class="section-label">{{ t('nodes.cname') }}</h6>
                         <div class="row g-3">
                             <div class="col-12">
                                 <label class="form-label">{{ t('settings.network.cnameTitle') }}</label>
-                                <textarea class="form-control" rows="2" v-model="ikuaiNodesPage.networkForm.cname_domain" :placeholder="t('nodes.cnamePh')"></textarea>
-                                <small class="text-muted">{{ t('nodes.cnameHint') }}</small>
+                                <p class="text-muted small mb-2">{{ t('settings.network.cnameDesc') }}</p>
+                                <div v-for="(entry, idx) in ikuaiNodesPage.cnameEntries.value" :key="idx" class="row g-2 mb-2 align-items-center">
+                                    <div class="col-md-4">
+                                        <input type="text" class="form-control form-control-sm" v-model="entry.label" :placeholder="t('settings.network.cnameLabelPh')">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input type="text" class="form-control form-control-sm" v-model="entry.domain" :placeholder="t('settings.network.cnameDomainPh')">
+                                    </div>
+                                    <div class="col-md-2">
+                                        <pv-button @click="ikuaiNodesPage.removeCnameEntry(idx)" variant="outline-danger" size="sm">{{ t('common.delete') }}</pv-button>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2 mt-2">
+                                    <pv-button @click="ikuaiNodesPage.addCnameEntry()" variant="outline" size="lg">{{ t('settings.network.addNode') }}</pv-button>
+                                </div>
+                                <small class="text-muted d-block mt-2">{{ t('nodes.cnameHint') }}</small>
                             </div>
                         </div>
 

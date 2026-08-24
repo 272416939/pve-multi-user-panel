@@ -35,6 +35,9 @@ window.__admin.ikuaiNodesPage = (function () {
         return (networkForm.wan_interface || []).join(', ');
     });
 
+    // CNAME 域名行编辑列表（存储格式 label||.domain 逗号分隔，与既有 cname 校验/展示兼容）
+    var cnameEntries = ref([]);
+
     // ==================== 加载 ====================
     // 统一入口：core.js watch/onMounted 同源调用
     async function load() {
@@ -97,6 +100,7 @@ window.__admin.ikuaiNodesPage = (function () {
         networkForm.vlan_interface = '';
         networkForm.vlan_max_per_user = '';
         networkForm.cname_domain = '';
+        cnameEntries.value = [{ label: '', domain: '' }];
     }
 
     function parseWanIface(val) {
@@ -152,6 +156,7 @@ window.__admin.ikuaiNodesPage = (function () {
                 networkForm.vlan_interface = net.vlan_interface || '';
                 networkForm.vlan_max_per_user = net.vlan_max_per_user != null ? parseInt(net.vlan_max_per_user) : '';
                 networkForm.cname_domain = net.cname_domain || '';
+                parseCnameEntries();
             } catch (e) {
                 console.error('加载爱快节点详情失败', e && e.message);
             }
@@ -182,6 +187,42 @@ window.__admin.ikuaiNodesPage = (function () {
 
     function isWanIfaceSelected(name) {
         return (networkForm.wan_interface || []).indexOf(name) > -1;
+    }
+
+    // ==================== CNAME 域名行编辑 ====================
+    // 将 cname_domain 逗号分隔字符串解析为 {label, domain} 数组（与既有存储/校验格式兼容）
+    function parseCnameEntries() {
+        var raw = networkForm.cname_domain || '';
+        var items = raw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        cnameEntries.value = items.map(function (item) {
+            var sep = item.indexOf('||');
+            if (sep > -1) {
+                // 新格式: label||.domain（双侧 trim，防空格入库导致列表页错位）
+                return { label: item.substring(0, sep).trim(), domain: item.substring(sep + 2).trim() };
+            }
+            var match = item.match(/^([\u4e00-\u9fa5]+)(\..+)$/);
+            if (match) return { label: match[1], domain: match[2] }; // 旧格式: 中文前缀.域名
+            if (item.startsWith('.')) return { label: '', domain: item };
+            return { label: '', domain: item };
+        });
+        if (cnameEntries.value.length === 0) cnameEntries.value.push({ label: '', domain: '' });
+    }
+
+    function addCnameEntry() {
+        cnameEntries.value.push({ label: '', domain: '' });
+    }
+
+    function removeCnameEntry(idx) {
+        cnameEntries.value.splice(idx, 1);
+        if (cnameEntries.value.length === 0) cnameEntries.value.push({ label: '', domain: '' });
+    }
+
+    // 行列表拼接回存储串：label||.domain 逗号分隔
+    function stringifyCnameEntries() {
+        return cnameEntries.value
+            .map(function (e) { return (e.label || '').trim() + '||' + (e.domain || '').trim(); })
+            .filter(function (s) { return s.replace(/\|\|/g, '').trim(); })
+            .join(',');
     }
 
     // ==================== 测试连接 ====================
@@ -278,6 +319,10 @@ window.__admin.ikuaiNodesPage = (function () {
             if (v === '') return;
             net[k] = v;
         });
+        // CNAME 以行编辑列表为准，拼回 label||.domain 逗号分隔格式提交
+        var cnameStr = stringifyCnameEntries();
+        net.cname_domain = cnameStr;
+        if (!cnameStr) delete net.cname_domain;
         return net;
     }
 
@@ -310,6 +355,7 @@ window.__admin.ikuaiNodesPage = (function () {
         saving: saving,
         form: form,
         networkForm: networkForm,
+        cnameEntries: cnameEntries,
         wanIfaceText: wanIfaceText,
         load: load,
         loadNodes: loadNodes,
@@ -321,6 +367,9 @@ window.__admin.ikuaiNodesPage = (function () {
         refreshInterfaces: refreshInterfaces,
         toggleWanIface: toggleWanIface,
         isWanIfaceSelected: isWanIfaceSelected,
+        parseCnameEntries: parseCnameEntries,
+        addCnameEntry: addCnameEntry,
+        removeCnameEntry: removeCnameEntry,
         testConnection: testConnection,
         rowTest: rowTest,
         saveNode: saveNode,

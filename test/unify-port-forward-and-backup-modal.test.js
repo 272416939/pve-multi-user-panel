@@ -47,7 +47,7 @@ describe('端口转发统一与备份弹窗修复', function() {
 
         it('爱快节点页包含网络四组配置', function() {
             expect(ikuaiNodesSrc).to.match(/port_range_start/);
-            expect(ikuaiNodesSrc).to.match(/cname_domain/);
+            expect(ikuaiNodesSrc).to.match(/cnameEntries/); // CNAME 行编辑列表（label||.domain）
             expect(ikuaiNodesSrc).to.match(/vlan_id_start/);
         });
 
