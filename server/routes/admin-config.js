@@ -1081,6 +1081,20 @@ router.put('/admin/ikuai/network-config', authMiddleware, adminMiddleware, async
     }
 });
 
+// 测试连接错误 → 友好中文（管理员调试自家设备用：给可操作的原因；不透传面板内部路径/堆栈）
+function friendlyIkuaiTestError(e) {
+    var msg = (e && e.message) ? String(e.message) : String(e || '未知错误');
+    if (/超时|timed? ?out/i.test(msg)) return '连接超时，请检查爱快地址与网络连通性';
+    if (/ECONNREFUSED|连接被拒绝/i.test(msg)) return '无法连接爱快（连接被拒绝），请检查地址与端口';
+    if (/ENOTFOUND|EAI_AGAIN|getaddrinfo/i.test(msg)) return '无法解析爱快主机名，请检查地址';
+    if (/认证失败|Token 无效|token.*(?:invalid|expired)/i.test(msg)) return msg; // V4 令牌错误已有明确文案
+    // V3 登录失败：提取设备返回的可读错误（ErrMsg），否则给通用提示
+    var m = msg.match(/ErrMsg["']?\s*[:=]\s*["']([^"']+)["']/);
+    if (m) return '登录失败：' + m[1];
+    if (/登录失败/i.test(msg)) return '登录失败，请检查用户名与密码';
+    return msg;
+}
+
 // 测试连接：按表单当前值真实登录爱快并执行只读查询验证连通性（未保存即可测；不产生任何写操作、不落库）
 router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -1113,8 +1127,10 @@ router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, re
         res.json({ message: '连接成功', info: info || null });
     } catch (e) {
         console.error('[ikuai] 测试连接失败:', e.message);
-        // 不透传第三方错误原文，统一走 safeError（详情见服务端日志）
-        res.status(400).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
+        // 测试端点是管理员调试自家设备：返回可操作的具体原因（err.IKUAI_TEST_FAILED 词条="{0}" 透传该原因），
+        // 不透传面板内部路径/堆栈；连接失败原因非敏感信息（超时/拒绝/认证）
+        var reason = friendlyIkuaiTestError(e);
+        res.status(400).json({ error: reason, code: 'IKUAI_TEST_FAILED', params: [reason] });
     }
 });
 

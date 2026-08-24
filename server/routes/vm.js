@@ -1096,7 +1096,7 @@ try {
 	res.json({ message: '虚拟机已销毁' });
         } catch (error) {
             console.error('销毁虚拟机失败:', error);
-            res.status(500).json({ error: safeError(error, '系统运行错误，请联系管理人员'), code: 'INTERNAL_ERROR' });
+            res.status(500).json({ error: safeError(error, '系统运行错误，请稍后重试'), code: 'INTERNAL_ERROR' });
         }
     });
 

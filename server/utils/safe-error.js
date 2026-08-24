@@ -3,7 +3,7 @@
  * 生产环境返回通用错误信息，DEBUG 模式返回脱敏后的详细错误
  * @param {Error} e - 异常对象
  * @param {string} [context] - 可选的自定义上下文文案（如 "PVE 操作失败"）
- *                             不传时默认返回 '系统运行错误，请联系管理人员'
+ *                             不传时默认返回 '系统运行错误，请稍后重试'
  * @returns {string} 安全的错误消息
  */
 
@@ -27,7 +27,7 @@ function safeError(e, context) {
         var cleaned = sanitizeErrorMsg(raw);
         return context ? context + ': ' + cleaned : cleaned;
     }
-    return context || '系统运行错误，请联系管理人员';
+    return context || '系统运行错误，请稍后重试';
 }
 
 /**
