@@ -5,7 +5,8 @@ var express = require('express');
 var router = express.Router();
 var { authMiddleware, adminMiddleware } = require('../middleware/auth');
 var db = require('../api/db');
-var pveApi = require('../api/pve-api');
+// 多节点：按资源归属 PVE 节点取客户端（工厂缓存复用；null=默认节点）
+var { getPveClient } = require('../api/pve-clients');
 var cacheStore = require('../utils/cache-store');
 var { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
@@ -521,6 +522,8 @@ router.get('/provision-status', authMiddleware, async (req, res) => {
             return res.json({ status: 'stopped', exitstatus: 'OK', isCompleted: true, isSuccess: true });
         }
 
+        // 多节点：按资源归属 PVE 节点解析客户端（查不到节点行回退默认）
+        var pveApi = await getPveClient(ownerRecord.pve_node_id);
         var taskStatus = await pveApi.getTaskStatus(upid);
         res.json({
             status: taskStatus.status,

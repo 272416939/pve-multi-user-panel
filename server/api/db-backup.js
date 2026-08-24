@@ -65,9 +65,9 @@ const backupConfig = {
 const backups = {
     create: async (data) => {
         const [result] = await execute(
-            `INSERT INTO backups (vm_id, ct_id, user_id, storage, notes, type, rootfs_storage, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
-            [data.vm_id, data.ct_id || null, data.user_id, data.storage, data.notes || '', data.type || 'vm', data.rootfs_storage || '']
+            `INSERT INTO backups (vm_id, ct_id, user_id, storage, notes, type, rootfs_storage, pve_node_id, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
+            [data.vm_id, data.ct_id || null, data.user_id, data.storage, data.notes || '', data.type || 'vm', data.rootfs_storage || '', data.pve_node_id || null]
         );
         return { id: result.insertId };
     },

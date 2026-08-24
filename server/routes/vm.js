@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-const ikuaiApi = require('../api/ikuai-api');
+// 多节点：按资产所在节点取 PVE/爱快客户端（与旧单例同接口）
+const { getPveClient } = require('../api/pve-clients');
+const { getIkuaiClientForPve } = require('../api/ikuai-clients');
 const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
 const { getStatusCache } = require('../services/status-cache');
@@ -31,7 +32,9 @@ function isValidVmid(v) {
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const vms = await pveApi.getVms(req.query.template_only ? { templateOnly: true } : {});
+        // 无单一资产上下文（跨节点列表）：回退默认节点
+        const pve = await getPveClient(null); // 按资产所在节点取客户端（无资产上下文，默认节点）
+        const vms = await pve.getVms(req.query.template_only ? { templateOnly: true } : {});
         
         // 获取已分配的VMID
         const assignedVms = await db.vms.getAll();
@@ -132,10 +135,11 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
         for (let i = 0; i < vmsWithDetails.length; i += batchSize) {
             const batch = vmsWithDetails.slice(i, i + batchSize);
             await Promise.all(batch.map(async (vmData) => {
+                const pve = await getPveClient(vmData.pve_node_id); // 按资产所在节点取客户端
                 try {
                     var cachedStatus = getStatusCache('vm:' + vmData.vm_id, req.user.id);
-                    var rawStatus = cachedStatus || await pveApi.getVmStatus(vmData.vm_id);
-                    var config = await pveApi.getVmConfig(vmData.vm_id);
+                    var rawStatus = cachedStatus || await pve.getVmStatus(vmData.vm_id);
+                    var config = await pve.getVmConfig(vmData.vm_id);
                     vmData.status = cachedStatus || _applyRate('vm:' + vmData.vm_id, rawStatus);
                     vmData.config = config;
                     vmData.error = null;
@@ -249,10 +253,12 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     // MAC 分组同步
     if (mac_group_id) {
         try {
-            var macCfg = await pveApi.getVmConfig(parsedVmId);
+            const pve = await getPveClient(newVm.pve_node_id); // 按资产所在节点取客户端（新分配行未带节点，回退默认）
+            const ik = await getIkuaiClientForPve(newVm.pve_node_id);
+            var macCfg = await pve.getVmConfig(parsedVmId);
             var vmac = macCfg?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (vmac) {
-                await ikuaiApi.addMacToGroup(mac_group_id, vmac[0], (name || 'VM ' + vm_id) + ' 虚拟机');
+                await ik.addMacToGroup(mac_group_id, vmac[0], (name || 'VM ' + vm_id) + ' 虚拟机');
                 await db.vms.update(newVm.id, { ikuai_mac_group_id: mac_group_id });
             }
         } catch (e) { console.error('VM ' + parsedVmId + ' MAC分组同步失败:', e.message); }
@@ -260,14 +266,15 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     
     // DHCP 静态绑定：分配 IP
     try {
-        const config = await pveApi.getVmConfig(parsedVmId);
+        const pve = await getPveClient(newVm.pve_node_id); // 按资产所在节点取客户端（新分配行未带节点，回退默认）
+        const config = await pve.getVmConfig(parsedVmId);
         if (config && config.net0) {
             const macMatch = config.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (macMatch) {
                 // 如果 VM 已有 dhcp_static_ip，优先使用
                 const existingVm = (await db.vms.getAll()).find(v => v.vm_id === parsedVmId);
                 const preferredIp = existingVm?.dhcp_static_ip || '';
-                const ip = await createDhcpStaticBinding('vm', parsedVmId, macMatch[0], preferredIp);
+                const ip = await createDhcpStaticBinding('vm', parsedVmId, macMatch[0], preferredIp, null, { pveNodeId: newVm.pve_node_id });
                 if (ip) await db.vms.update(newVm.id, { dhcp_static_ip: ip });
             }
         }
@@ -349,7 +356,9 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     if (!isAdmin && !isOwner) {
         return res.status(403).json({ error: '无权限操作此虚拟机', code: 'VM_NO_PERM_2' });
     }
-    
+
+    const pve = await getPveClient(vm.pve_node_id); // 按资产所在节点取客户端
+
     const updates = {};
     
     // 更新名称（所有用户都可以）
@@ -385,14 +394,15 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
     const newMacGroupId = req.body.mac_group_id;
     if (isAdmin && newMacGroupId !== undefined && newMacGroupId !== vm.ikuai_mac_group_id) {
         try {
-            const macConfig = await pveApi.getVmConfig(vm.vm_id);
+            const ik = await getIkuaiClientForPve(vm.pve_node_id);
+            const macConfig = await pve.getVmConfig(vm.vm_id);
             const vmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (vmac) {
                 if (vm.ikuai_mac_group_id) {
-                    try { await ikuaiApi.removeMacFromGroup(vm.ikuai_mac_group_id, vmac[0]); } catch (e) {}
+                    try { await ik.removeMacFromGroup(vm.ikuai_mac_group_id, vmac[0]); } catch (e) {}
                 }
                 if (newMacGroupId) {
-                    await ikuaiApi.addMacToGroup(newMacGroupId, vmac[0], (vm.name || 'VM ' + vm.vm_id) + ' 虚拟机');
+                    await ik.addMacToGroup(newMacGroupId, vmac[0], (vm.name || 'VM ' + vm.vm_id) + ' 虚拟机');
                 }
                 updates.ikuai_mac_group_id = newMacGroupId || '';
             }
@@ -450,9 +460,9 @@ router.put('/user/vms/:id', authMiddleware, async (req, res) => {
         try {
             const newExp = new Date(expiration_date);
             if (newExp > new Date()) {
-                const currentStatus = await pveApi.getVmStatus(vm.vm_id);
+                const currentStatus = await pve.getVmStatus(vm.vm_id);
                 if (currentStatus && currentStatus.status === 'stopped') {
-                    await pveApi.startVm(vm.vm_id);
+                    await pve.startVm(vm.vm_id);
                     dbg(`虚拟机 ${vm.vm_id} 已自动开机（到期时间延长后）`);
                 }
             }
@@ -477,9 +487,10 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
         removedVmInfo = { name: vm.name, vm_id: vm.vm_id, user_id: vm.user_id };
     }
     // 检查虚拟机状态，必须关机才能移除
+    const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
     if (vm && vm.vm_id) {
         try {
-            const status = await pveApi.getVmStatus(vm.vm_id);
+            const status = await pve.getVmStatus(vm.vm_id);
             if (status && status.status === 'running') {
                 return res.status(400).json({ error: '虚拟机正在运行，请先关机后再移除', code: 'VM_RUNNING_REMOVE' });
             }
@@ -490,25 +501,27 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     await db.vms.reminders.clear(vmId);
     // 级联清理端口转发
     try {
+        const ik = await getIkuaiClientForPve(vm ? vm.pve_node_id : null);
         const vmForwards = await db.portForwards.getByVmId(removedVmInfo?.vm_id || vmId);
         for (const fw of vmForwards) {
             if (fw.ikuai_id) {
-                try { ikuaiApi.deletePortForward(fw.ikuai_id); } catch (e) {}
+                try { ik.deletePortForward(fw.ikuai_id); } catch (e) {}
             }
         }
         await db.portForwards.deleteByDevice('vm', removedVmInfo?.vm_id || vmId);
     } catch (e) { console.error('清理端口转发失败:', e.message); }
     // 清理 DHCP 静态绑定
     if (vm && vm.vm_id) {
-        removeDhcpStaticBinding('vm', vm.vm_id);
+        removeDhcpStaticBinding('vm', vm.vm_id, { pveNodeId: vm.pve_node_id });
     }
     // MAC 分组清理
     if (vm && vm.vm_id && vm.ikuai_mac_group_id) {
         try {
-            const macConfig = await pveApi.getVmConfig(vm.vm_id);
+            const ik = await getIkuaiClientForPve(vm.pve_node_id);
+            const macConfig = await pve.getVmConfig(vm.vm_id);
             const vmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (vmac) {
-                await ikuaiApi.removeMacFromGroup(vm.ikuai_mac_group_id, vmac[0]);
+                await ik.removeMacFromGroup(vm.ikuai_mac_group_id, vmac[0]);
             }
         } catch (e) { console.error('VM MAC分组删除失败:', e.message); }
     }
@@ -598,7 +611,8 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '该虚拟机尚未绑定子网，请先在「更多→绑定子网」中绑定后再开机', code: 'VM_NO_SUBNET_START' });
         }
 
-        await pveApi.startVm(vmid);
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.startVm(vmid);
         // 启动成功后清除关机原因标记
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: null }); } catch (_) {}
 
@@ -607,10 +621,10 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
             if (vm && vm.subnet_id) {
                 const subnet = await db.subnets.getById(vm.subnet_id);
                 if (subnet && (!vm.dhcp_static_ip || !isIpInAddrPool(vm.dhcp_static_ip, subnet.addr_pool))) {
-                    const cfg = await pveApi.getVmConfig(vmid);
+                    const cfg = await pve.getVmConfig(vmid);
                     const mac = ((cfg && cfg.net0) || '').match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
                     if (mac) {
-                        const newIp = await rebindDhcpForDevice('vm', vmid, subnet, mac[0]);
+                        const newIp = await rebindDhcpForDevice('vm', vmid, subnet, mac[0], { pveNodeId: vm.pve_node_id });
                         if (newIp) {
                             await db.vms.update(vm.id, { dhcp_static_ip: newIp });
                             // 端口转发同步：IP 变化时重建规则（绑定后首次开机/绑定丢失恢复场景）
@@ -653,7 +667,8 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
-        await pveApi.shutdownVm(vmid);
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.shutdownVm(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: 'manual' }); } catch (_) {}
         await auditAction(req, 'vm.shutdown', '关机 VM ' + vmid);
@@ -684,7 +699,8 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
-        await pveApi.stopVm(vmid);
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.stopVm(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: 'manual' }); } catch (_) {}
         await auditAction(req, 'vm.stop', '强制停止 VM ' + vmid);
@@ -715,7 +731,8 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
-        await pveApi.rebootVm(vmid);
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.rebootVm(vmid);
         await auditAction(req, 'vm.reboot', '重启 VM ' + vmid);
         res.json({ message: '虚拟机重启成功' });
     } catch (error) {
@@ -753,9 +770,10 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         }
         
         // 先检查 VM 是否在运行
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
         let vmStatus;
         try {
-            vmStatus = await pveApi.getVmStatus(vmid);
+            vmStatus = await pve.getVmStatus(vmid);
         } catch (e) {
             return res.status(500).json({ error: '无法获取虚拟机状态', code: 'VM_STATE_FAILED' });
         }
@@ -765,7 +783,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         }
         
         // 获取 VNC proxy ticket
-        const result = await pveApi.getVncConsole(vmid);
+        const result = await pve.getVncConsole(vmid);
 
         // 安全修复：用不透明的 session ID 替代 URL 中的敏感参数
         // session 数据存服务端（Redis+内存回退），避免 ticket/node/port 在浏览器历史/日志/Referer 中泄露
@@ -806,9 +824,10 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限查看此虚拟机状态，资源未分配', code: 'VM_STATE_NO_PERM_UNASSIGNED' });
         }
 
-        const rawStatus = await pveApi.getVmStatus(vmid);
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
+        const rawStatus = await pve.getVmStatus(vmid);
         const status = _applyRate('vm:' + req.params.vmid, rawStatus);
-        const config = await pveApi.getVmConfig(req.params.vmid);
+        const config = await pve.getVmConfig(req.params.vmid);
         res.json({ status, config });
     } catch (error) {
         res.status(500).json({ error: '获取虚拟机状态失败', code: 'VM_STATE_LOAD_FAILED' });
@@ -881,7 +900,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
 
         if (ip_mode === 'dhcp') {
             // DHCP模式：删除爱快静态绑定（如果有），VM将自动从爱快获取动态IP
-            await removeDhcpStaticBinding('vm', vmid);
+            await removeDhcpStaticBinding('vm', vmid, { pveNodeId: vmRecord ? vmRecord.pve_node_id : null });
             if (vmRecord) await db.vms.update(vmRecord.id, { dhcp_static_ip: '' });
             await auditAction(req, 'vm.reset-ip', 'VM ' + vmid + ' 切换为 DHCP 模式');
             return res.json({ success: true, ip: null, message: '已切换为DHCP模式' });
@@ -899,22 +918,23 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
             }
             targetIp = ipBase;
         } else if (ip_mode === 'random') {
-            targetIp = await pickUnusedStaticIp(subnet);
+            targetIp = await pickUnusedStaticIp(subnet, { pveNodeId: vmRecord.pve_node_id });
             if (!targetIp) return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP', code: 'SUBNET_POOL_EMPTY' });
         }
 
         // 获取VM的MAC地址用于创建/更新DHCP绑定
-        const config = await pveApi.getVmConfig(vmid);
+        const pve = await getPveClient(vmRecord ? vmRecord.pve_node_id : null); // 按资产所在节点取客户端
+        const config = await pve.getVmConfig(vmid);
         if (!config || !config.net0) return res.status(400).json({ error: '无法获取虚拟机配置', code: 'VM_NETCFG_FAILED' });
         const macMatch = config.net0.match(/([0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5})/);
         if (!macMatch) return res.status(400).json({ error: '无法解析虚拟机 MAC 地址', code: 'VM_MAC_PARSE_FAILED' });
 
         // 更新爱快DHCP绑定（先尝试更新已有绑定，不存在则创建）
         let finalIp = targetIp;
-        const updated = await updateDhcpStaticBindingIp('vm', vmid, finalIp);
+        const updated = await updateDhcpStaticBindingIp('vm', vmid, finalIp, { pveNodeId: vmRecord.pve_node_id });
         if (!updated) {
             // 没有已有绑定，创建新的（绑定子网时使用子网的 VLAN 接口/网关/DNS）
-            const boundIp = await createDhcpStaticBinding('vm', vmid, macMatch[1], finalIp, subnet);
+            const boundIp = await createDhcpStaticBinding('vm', vmid, macMatch[1], finalIp, subnet, { pveNodeId: vmRecord.pve_node_id });
             finalIp = boundIp || finalIp;
         }
         if (!finalIp) return res.status(500).json({ error: '设置DHCP绑定失败', code: 'DHCP_BIND_FAILED' });
@@ -925,6 +945,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
         // 更新端口转发规则中的 IP
         if (finalIp) {
             try {
+                const ik = await getIkuaiClientForPve(vmRecord ? vmRecord.pve_node_id : null); // NAT 类操作按资产所在节点取爱快客户端
                 const rules = await db.portForwards.getByVmId(vmid);
                 for (const rule of rules) {
                     await db.portForwards.update(rule.id, { ip: finalIp });
@@ -941,7 +962,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
                         for (const item of ikuaiIds) {
                             try {
                                 if (!item.id) continue;
-                                await ikuaiApi.editPortForward(item.id, {
+                                await ik.editPortForward(item.id, {
                                     ip: finalIp,
                                     internal_port: rule.internal_port,
                                     external_port: rule.external_port,
@@ -998,17 +1019,18 @@ router.post('/vm/:vmid/reset-password', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限操作此虚拟机，资源未分配', code: 'VM_NO_PERM_UNASSIGNED' });
         }
 
-        const config = await pveApi.getVmConfig(vmid);
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
+        const config = await pve.getVmConfig(vmid);
         if (!config || !config.ciuser) {
             return res.status(400).json({ error: '当前虚拟机未配置Cloud-init驱动，请联系管理员！', code: 'VM_NO_CLOUDINIT' });
         }
 
-        const status = await pveApi.getVmStatus(vmid);
+        const status = await pve.getVmStatus(vmid);
         if (status && status.status !== 'stopped') {
             return res.status(400).json({ error: '请先关机后再重置密码', code: 'SHUTDOWN_BEFORE_RESET_PWD' });
         }
 
-        await pveApi.updateVmConfig(vmid, { cipassword: password });
+        await pve.updateVmConfig(vmid, { cipassword: password });
 
         await auditAction(req, 'password.reset.vm', '重置 VM ' + vmid + ' 密码');
         res.json({ message: '密码重置成功' });
@@ -1027,9 +1049,11 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
         const destroyTargets = assignedVms.map(v => (v.name || 'VM ' + v.vm_id) + '(用户#' + v.user_id + ')').join('/');
         await auditAction(req, 'admin.vm.destroy', '销毁 VM ' + vmid + (destroyTargets ? ':' + destroyTargets : '') + (force ? '（强制）' : ''), { resourceType: 'vm' });
 
+        const pve = await getPveClient(assignedVms[0]?.pve_node_id); // 按资产所在节点取客户端
+
         if (!force) {
             try {
-                const status = await pveApi.getVmStatus(vmid);
+                const status = await pve.getVmStatus(vmid);
                 if (status && status.status === 'running') {
                     return res.status(400).json({ error: '虚拟机正在运行，请先关机后再销毁', code: 'VM_RUNNING_DESTROY' });
                 }
@@ -1040,24 +1064,25 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
 
         for (const vm of assignedVms) {
             await db.vms.reminders.clear(vm.id);
+            const ik = await getIkuaiClientForPve(vm.pve_node_id); // NAT 类操作按资产所在节点取爱快客户端
             try {
                 const vmForwards = await db.portForwards.getByVmId(vm.vm_id);
                 for (const fw of vmForwards) {
                     if (fw.ikuai_id) {
-                        try { await ikuaiApi.deletePortForward(fw.ikuai_id); } catch (e) {}
+                        try { await ik.deletePortForward(fw.ikuai_id); } catch (e) {}
                     }
                 }
                 await db.portForwards.deleteByDevice('vm', vm.vm_id);
             } catch (e) { console.error('清理端口转发失败:', e.message); }
             if (vm && vm.vm_id) {
-                removeDhcpStaticBinding('vm', vm.vm_id);
+                removeDhcpStaticBinding('vm', vm.vm_id, { pveNodeId: vm.pve_node_id });
             }
             if (vm && vm.vm_id && vm.ikuai_mac_group_id) {
                 try {
-                    const macConfig = await pveApi.getVmConfig(vm.vm_id);
+                    const macConfig = await pve.getVmConfig(vm.vm_id);
                     const vmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
                     if (vmac) {
-                        await ikuaiApi.removeMacFromGroup(vm.ikuai_mac_group_id, vmac[0]);
+                        await ik.removeMacFromGroup(vm.ikuai_mac_group_id, vmac[0]);
                     }
                 } catch (e) { console.error('VM MAC分组删除失败:', e.message); }
             }
@@ -1086,7 +1111,7 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
         }
 
 try {
-            await pveApi.destroyVm(vmid);
+            await pve.destroyVm(vmid);
             console.log(`[vm] PVE 虚拟机 ${vmid} 已销毁`);
         } catch (e) {
             console.error(`[vm] PVE 销毁 ${vmid} 失败:`, e.message);
@@ -1139,13 +1164,14 @@ try {
                 return res.status(403).json({ error: '当前套餐不允许切换到该系统', code: 'PKG_OS_NOT_ALLOWED' });
             }
         }
-        const vmStatus = await pveApi.getVmStatus(vmid);
+        const pve = await getPveClient(vm.pve_node_id); // 按资产所在节点取客户端
+        const vmStatus = await pve.getVmStatus(vmid);
         if (vmStatus.status !== 'stopped') {
             return res.status(400).json({ error: '请先关机后再切换系统', code: 'SHUTDOWN_BEFORE_OS_SWITCH' });
         }
         let oldSysDiskSizeGb = 0;
         try {
-            const oldConfig = await pveApi.getVmConfig(vmid);
+            const oldConfig = await pve.getVmConfig(vmid);
             for (const bus of ['scsi', 'sata', 'virtio']) {
                 const raw = String(oldConfig[bus + '0'] || '');
                 const m = raw.match(/size=(\d+)([GM])/i);

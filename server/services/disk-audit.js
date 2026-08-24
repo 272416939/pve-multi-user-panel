@@ -9,10 +9,20 @@
 // - 只销毁 PVE 中存在、DB 完全无记录（含 legacy）的未知槽位幽灵盘
 
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
+const { getPveClient } = require('../api/pve-clients');
 // 磁盘域拆分（规范第七节）：纯函数走 utils/disk-validation.js，PVE 命令走 services/disk-ops.js
 const { getVmDiskVolumes } = require('../utils/disk-validation');
 const diskOps = require('./disk-ops');
+
+// ==================== 节点上下文解析 ====================
+// 按 VM 行解析节点 id（查不到行/字段为空时返回 null → 回退默认节点，兼容旧单节点数据）
+async function resolveNodeIdByVmid(vmid) {
+  try {
+    var row = await db.vms.getByVmid(vmid);
+    if (row && row.pve_node_id != null) return row.pve_node_id;
+  } catch (e) {}
+  return null;
+}
 
 /**
  * 获取 VM 当前的磁盘快照，并持久化到 vm_disk_snapshots 表
@@ -22,8 +32,10 @@ const diskOps = require('./disk-ops');
  */
 async function takeDiskSnapshot(vmId, userId) {
   var config = null;
+  // 多节点：按 VM 行解析节点
+  var pve = await getPveClient(await resolveNodeIdByVmid(vmId));
   try {
-    config = await pveApi.getVmConfig(vmId);
+    config = await pve.getVmConfig(vmId);
   } catch (e) {
     console.error('[盘审计] 获取 VM ' + vmId + ' 配置失败:', e.message);
     config = {};
@@ -79,13 +91,17 @@ async function takeDiskSnapshot(vmId, userId) {
 async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
   console.log('[盘审计] === 开始对账 VM ' + vmId + '（用户 ' + userId + '）===');
 
+  // 多节点：按 VM 行解析节点（全流程 PVE/SSH/清理均按该节点路由）
+  var nodeId = await resolveNodeIdByVmid(vmId);
+  var pve = await getPveClient(nodeId != null ? nodeId : null);
+
   // 等 1 秒让 PVE 刷新配置缓存
   await new Promise(function(resolve) { setTimeout(resolve, 1000); });
 
   // 1. 获取恢复后 PVE 配置
   var afterConfig;
   try {
-    afterConfig = await pveApi.getVmConfig(vmId);
+    afterConfig = await pve.getVmConfig(vmId);
   } catch (e) {
     console.error('[盘审计] 获取恢复后 VM ' + vmId + ' 配置失败:', e.message);
     return;
@@ -144,7 +160,7 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
             console.log('[盘审计] 数据盘 ' + knownDisk.id + ' volume_id 已更新: ' + oldVolId + ' -> ' + volPart);
             // 释放旧卷（PVE 恢复后旧卷仍残留在存储池，不释放会变成孤儿）
             try {
-              await diskOps._internal.destroySystemDisk(oldVolId);
+              await diskOps._internal.destroySystemDisk(oldVolId, nodeId);
               console.log('[盘审计] 旧卷 ' + oldVolId + ' 已释放');
             } catch (oldErr) {
               console.error('[盘审计] 释放旧卷 ' + oldVolId + ' 失败:', oldErr.message);
@@ -177,7 +193,7 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
         //       pvesm free 后 unused 行仍残留，需额外清理
         try {
           var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
-          var sshCfg = await getPveSshConfig();
+          var sshCfg = await getPveSshConfig(nodeId != null ? nodeId : null);
 
           // 第一步：用 qm unlink 彻底 detach（比 qm set --delete 更干净）
           var unlinkCmd = 'qm unlink ' + vmId + ' --idlist ' + slotKey;
@@ -189,7 +205,7 @@ async function auditAfterRestore(vmId, userId, preSnapshotRaw) {
           }
 
           // 第二步：销毁卷（宽松校验路径，不拦截 disk-0 卷名）
-          await diskOps._internal.destroySystemDisk(volPart);
+          await diskOps._internal.destroySystemDisk(volPart, nodeId);
           console.log('[盘审计] 幽灵盘 ' + volPart + ' 已销毁');
 
           // 第三步：清理 PVE 可能留下的 unused0~unused9 残留配置行

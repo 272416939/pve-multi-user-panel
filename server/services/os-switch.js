@@ -5,7 +5,9 @@
 // 磁盘域拆分（规范第七节）：校验纯函数走 utils/disk-validation.js，PVE 命令走 services/disk-ops.js
 const { validateParam, inferDiskFormat } = require('../utils/disk-validation');
 const diskOps = require('./disk-ops');
-const pveApi = require('../api/pve-api');
+// 多节点：按 VM 行所在 PVE 节点动态取客户端（不再使用全局单例）
+const { getPveClient } = require('../api/pve-clients');
+const { getIkuaiClientForPve } = require('../api/ikuai-clients');
 const db = require('../api/db');
 const crypto = require('crypto');
 const logger = require('../utils/logger');
@@ -14,9 +16,10 @@ const logger = require('../utils/logger');
 
 // SSH 命令执行（复用 disk-utils 的 SSH 工具，检查退出码）
 // V4-08 修复：错误消息不包含完整命令串（防存储型信息泄露，与 SEC-002 同原则），保留 exit code + stderr 供排障
-async function runSsh(cmd) {
+// nodeId：目标 VM 行的 pve_node_id（缺省=默认节点，旧单节点行为兼容）
+async function runSsh(cmd, nodeId) {
     const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
-    const sshConfig = await getPveSshConfig();
+    const sshConfig = await getPveSshConfig(nodeId != null ? nodeId : null);
     const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 60000, sshConfig.port);
     if (result.code !== 0) {
         const errDetail = (result.stderr || result.stdout || '').trim();
@@ -57,8 +60,9 @@ function extractMacFromNet0(net0) {
 // ==================== 核心 PVE 操作函数 ====================
 
 // 解析 VM 配置中的所有非系统盘（dev 1-30）
-async function parseDataDisks(vmid) {
-    const config = await pveApi.getVmConfig(vmid);
+async function parseDataDisks(vmid, nodeId) {
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+    const config = await pve.getVmConfig(vmid);
     const buses = ['scsi', 'sata', 'virtio'];
     const dataDisks = [];
     for (const bus of buses) {
@@ -110,17 +114,18 @@ function parseSystemDisk(config) {
 
 // 2. 克隆模板系统盘到临时 VMID（仅取 disk-0）
 // 注意：不在此销毁临时 VM，而是返回 tempVmid 由调用方在 move_volume 后销毁
-async function cloneOsTemplateDisk(templateVmid, targetStorage) {
-    const tempVmid = await pveApi.getNextAvailableVmid();
-    const upid = await pveApi.cloneVm(templateVmid, tempVmid, {
+async function cloneOsTemplateDisk(templateVmid, targetStorage, nodeId) {
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+    const tempVmid = await pve.getNextAvailableVmid();
+    const upid = await pve.cloneVm(templateVmid, tempVmid, {
         name: `os-switch-tmp-${tempVmid}-${Date.now()}`,
         storage: targetStorage,
         clone_mode: 'full'
     });
-    await pveApi.waitForTask(upid, 300000);
+    await pve.waitForTask(upid, 300000);
 
     // 从临时 VM config 读取实际克隆的硬盘卷路径（DIR/BTRFS 存储含子目录和扩展名）
-    const tempConfig = await pveApi.getVmConfig(tempVmid);
+    const tempConfig = await pve.getVmConfig(tempVmid);
     let actualVolumeId = '';
     const bus = ['scsi', 'sata', 'virtio'].find(b => tempConfig[`${b}0`]) || 'scsi';
     const raw = tempConfig[`${bus}0`];
@@ -135,8 +140,9 @@ async function cloneOsTemplateDisk(templateVmid, targetStorage) {
 }
 
 // 2.5 查询存储类型
-async function getStorageType(storage) {
-    const storages = await pveApi.getAllStorages();
+async function getStorageType(storage, nodeId) {
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+    const storages = await pve.getAllStorages();
     const s = storages.find(x => x.storage === storage);
     return s ? s.type : '';
 }
@@ -156,7 +162,7 @@ async function runSshWithTimeout(cmd, timeout = 60000) {
 
 // 2.6 根据存储类型将磁盘从临时 VM 移动到目标 VM
 // 统一使用 PVE move_disk API，兼容所有存储类型（lvm/lvmthin/zfs/dir/btrfs/nfs/cephfs）
-async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, tempVmid) {
+async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, tempVmid, nodeId) {
     const safeStorage = validateParam('storage', storage);
     const safeVmid = validateParam('vmid', targetVmid);
     // 验证 volume id 格式
@@ -164,12 +170,12 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
         throw new Error('无效的 volume id: ' + sourceVolumeId);
     }
 
-    const storageType = await getStorageType(storage);
+    const storageType = await getStorageType(storage, nodeId);
 
     // 从临时 VM 解绑系统盘（使卷变为 unused）
     logger.info(`[os-switch] 存储 ${safeStorage} (${storageType})，unlink 临时 VM 的磁盘，准备 move_disk`);
     try {
-        await diskOps._internal.unbindSystemDisk(tempVmid, sourceBus);
+        await diskOps._internal.unbindSystemDisk(tempVmid, sourceBus, nodeId);
         logger.info(`[os-switch] 临时 VM ${tempVmid} 的 ${sourceBus}0 已 unlink`);
     } catch (e) {
         logger.info(`[os-switch] 临时 VM unlink 失败: ${e.message.substring(0, 100)}`);
@@ -180,42 +186,47 @@ async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, 
 }
 
 // 2.7 清理临时 VM（unlink 系统盘 + destroy，磁盘已被移走所以安全）
-async function cleanupTempVm(tempVmid, bus) {
+async function cleanupTempVm(tempVmid, bus, nodeId) {
     // unlink 可能已由 moveDiskToTarget 执行过，失败不阻断
     try {
-        await diskOps._internal.unbindSystemDisk(tempVmid, bus);
+        await diskOps._internal.unbindSystemDisk(tempVmid, bus, nodeId);
     } catch (e) {
         logger.info(`[os-switch] cleanupTempVm unlink 失败（可能已解绑）: ${e.message.substring(0, 100)}`);
     }
-    await pveApi.destroyVm(tempVmid);
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+    await pve.destroyVm(tempVmid);
 }
 
 // 4. 更新 cloud-init 配置
-async function updateCloudInit(vmid, ciuser) {
+async function updateCloudInit(vmid, ciuser, nodeId) {
     const newPassword = generateRandomPassword();
     const cfg = {};
     if (ciuser) {
         cfg.ciuser = ciuser;
         cfg.cipassword = newPassword;
     }
-    await pveApi.updateVmConfig(vmid, cfg);
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+    await pve.updateVmConfig(vmid, cfg);
     return { password: newPassword, ciuser };
 }
 
 // 5.5 MAC 同步（爱快 MAC 分组 + DHCP 静态绑定 + 端口转发）
-async function verifyAndSyncMac(vmid, oldMac, logId) {
+async function verifyAndSyncMac(vmid, oldMac, logId, nodeId) {
     const syncResult = {
         mac_group: { ok: false, error: '' },
         dhcp: { ok: false, error: '' },
         port_forwards: { ok: false, error: '' }
     };
-    const newConfig = await pveApi.getVmConfig(vmid);
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+    const newConfig = await pve.getVmConfig(vmid);
     const newMac = extractMacFromNet0(newConfig.net0);
 
     // 1. MAC 分组同步
     try {
-        const ikuaiApi = require('../api/ikuai-api');
-        await ikuaiApi.updateMacInGroup(oldMac, newMac);
+        // 多节点：按 VM 所在 PVE 节点的配对爱快路由
+        // 注：沿用历史调用形态（未显式传 groupId，由门面按 MAC 检索），不在本次改造中修改签名
+        const ik = await getIkuaiClientForPve(nodeId != null ? nodeId : null);
+        await ik.updateMacInGroup(oldMac, newMac);
         syncResult.mac_group.ok = true;
     } catch (e) {
         syncResult.mac_group.error = e.message;
@@ -224,7 +235,7 @@ async function verifyAndSyncMac(vmid, oldMac, logId) {
     // 2. DHCP 静态绑定
     try {
         const { createDhcpStaticBinding } = require('../services/dhcp');
-        await createDhcpStaticBinding('vm', vmid, newMac, '');
+        await createDhcpStaticBinding('vm', vmid, newMac, '', null, { pveNodeId: nodeId != null ? nodeId : null });
         syncResult.dhcp.ok = true;
     } catch (e) {
         syncResult.dhcp.error = e.message;
@@ -275,14 +286,20 @@ async function markRolledBack(logId, error) {
 async function performOsSwitch(vmid, osTemplate, logId) {
     const ctx = {};
     try {
+        // 多节点：目标节点取自 VM 行（vms.pve_node_id），全流程 PVE/SSH/爱快均按该节点路由
+        const vmRow = await db.vms.getByVmid(vmid);
+        const nodeId = vmRow && vmRow.pve_node_id != null ? vmRow.pve_node_id : null;
+        const pve = await getPveClient(nodeId);
+        ctx.pveNodeId = nodeId;
+
         // Stage 1: 解析当前配置
-        const { dataDisks, systemDisk } = await parseDataDisks(vmid);
+        const { dataDisks, systemDisk } = await parseDataDisks(vmid, nodeId);
         ctx.dataDisks = dataDisks;
         ctx.oldSystemDisk = systemDisk;
-        ctx.oldMac = systemDisk ? extractMacFromNet0((await pveApi.getVmConfig(vmid)).net0) : '';
+        ctx.oldMac = systemDisk ? extractMacFromNet0((await pve.getVmConfig(vmid)).net0) : '';
 
         // Stage 2: 克隆模板系统盘到临时 VM（不销毁）
-        const cloneResult = await cloneOsTemplateDisk(osTemplate.template_vmid, osTemplate.target_storage);
+        const cloneResult = await cloneOsTemplateDisk(osTemplate.template_vmid, osTemplate.target_storage, nodeId);
         ctx.tempVmid = cloneResult.tempVmid;
         ctx.tempBus = cloneResult.bus;
         await updateLogStage(logId, 'move_volume');
@@ -293,7 +310,8 @@ async function performOsSwitch(vmid, osTemplate, logId) {
             cloneResult.systemVolumeId,
             vmid,
             cloneResult.bus,
-            cloneResult.tempVmid
+            cloneResult.tempVmid,
+            nodeId
         );
 
         // Stage 5: 替换目标 VM 系统盘（统一使用 move_disk API，兼容所有存储类型）
@@ -301,12 +319,12 @@ async function performOsSwitch(vmid, osTemplate, logId) {
 
         // 先 unlink 目标 VM 旧系统盘 + 释放旧卷
         // 注意！必须用 systemDisk.bus（旧盘总线），而非 newSysDisk.bus（模板总线）
-        await runSsh(`qm unlink ${vmid} --idlist ${systemDisk.bus}0`);
+        await runSsh(`qm unlink ${vmid} --idlist ${systemDisk.bus}0`, nodeId);
         try {
             const checkCmd = `pvesm list $(echo ${systemDisk.volume_id} | cut -d: -f1) 2>/dev/null | grep -F '${systemDisk.volume_id.split(':')[1]}'`;
-            const checkResult = await runSsh(checkCmd);
+            const checkResult = await runSsh(checkCmd, nodeId);
             if (checkResult) {
-                await diskOps._internal.destroySystemDisk(systemDisk.volume_id);
+                await diskOps._internal.destroySystemDisk(systemDisk.volume_id, nodeId);
             }
         } catch (e) { /* ignore */ }
 
@@ -315,11 +333,11 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         // 仅文件系统类存储（dir/btrfs/nfs/cephfs）需传 format，LVM/ZFS 不需要
         const needFormat = ['dir', 'btrfs', 'nfs', 'cephfs'].includes(moveResult.storageType);
         const sourceFormat = needFormat ? (osTemplate.disk_format || inferDiskFormat(cloneResult.systemVolumeId) || undefined) : undefined;
-        const upid = await pveApi.moveDisk(cloneResult.tempVmid, 'unused0', vmid, `${newSysDisk.bus}0`, sourceFormat);
+        const upid = await pve.moveDisk(cloneResult.tempVmid, 'unused0', vmid, `${newSysDisk.bus}0`, sourceFormat);
         // 等待任务完成
-        await pveApi.waitForTask(upid, 300000);
+        await pve.waitForTask(upid, 300000);
         // 获取目标 VM 配置，提取新挂载的卷 ID
-        const targetConfig = await pveApi.getVmConfig(vmid);
+        const targetConfig = await pve.getVmConfig(vmid);
         const raw = targetConfig[`${newSysDisk.bus}0`] || '';
         const newVolumeId = raw.split(',')[0] || '';
         ctx.newVolumeId = newVolumeId;
@@ -330,7 +348,7 @@ async function performOsSwitch(vmid, osTemplate, logId) {
             const filteredQos = filterQosParams(systemDisk.params_without_size);
             if (filteredQos) {
                 const qosConfig = `${newVolumeId},${filteredQos}`;
-                await runSsh(`qm set ${vmid} --${newSysDisk.bus}0 ${qosConfig}`);
+                await runSsh(`qm set ${vmid} --${newSysDisk.bus}0 ${qosConfig}`, nodeId);
                 logger.info(`[os-switch] 恢复 QOS 参数: ${filteredQos}`);
             } else {
                 logger.info(`[os-switch] QOS 参数已全部过滤，无需恢复`);
@@ -340,54 +358,54 @@ async function performOsSwitch(vmid, osTemplate, logId) {
         // 扩容到目标 VM 原系统盘容量
         const targetSizeGb = systemDisk ? (systemDisk.size_gb || 0) : 0;
         if (targetSizeGb > 0) {
-            await runSsh(`qm resize ${vmid} ${newSysDisk.bus}0 ${targetSizeGb}G`);
+            await runSsh(`qm resize ${vmid} ${newSysDisk.bus}0 ${targetSizeGb}G`, nodeId);
             const filteredQos = systemDisk.params_without_size ? filterQosParams(systemDisk.params_without_size) : '';
             const finalParams = filteredQos
                 ? `${filteredQos},size=${targetSizeGb}G`
                 : `size=${targetSizeGb}G`;
-            await runSsh(`qm set ${vmid} --${newSysDisk.bus}0 ${newVolumeId},${finalParams}`);
+            await runSsh(`qm set ${vmid} --${newSysDisk.bus}0 ${newVolumeId},${finalParams}`, nodeId);
             logger.info(`[os-switch] 扩容到 ${targetSizeGb}G`);
         }
 
         // 清理临时 VM
-        await cleanupTempVm(cloneResult.tempVmid, cloneResult.bus);
+        await cleanupTempVm(cloneResult.tempVmid, cloneResult.bus, nodeId);
 
         // 清理旧系统盘残留（unlink 后还剩余 unused 引用）
-        const curConfig = await pveApi.getVmConfig(vmid);
+        const curConfig = await pve.getVmConfig(vmid);
         for (const key of Object.keys(curConfig)) {
             if (key.startsWith('unused')) {
                 try {
-                    await runSsh(`qm unlink ${vmid} --idlist ${key} 2>/dev/null`);
+                    await runSsh(`qm unlink ${vmid} --idlist ${key} 2>/dev/null`, nodeId);
                 } catch (e) { /* ignore */ }
             }
         }
 
         // 设置引导顺序为新系统盘
-        await runSsh(`qm set ${vmid} --boot 'order=${newSysDisk.bus}0;net0'`);
+        await runSsh(`qm set ${vmid} --boot 'order=${newSysDisk.bus}0;net0'`, nodeId);
         logger.info(`[os-switch] 设置引导顺序: ${newSysDisk.bus}0;net0`);
 
         await updateLogStage(logId, 'cloudinit');
 
         // Stage 6: 先更新 VM ostype 与模板一致（影响 cloud-init ISO 生成）
         if (osTemplate.ostype) {
-            await pveApi.updateVmConfig(vmid, { ostype: osTemplate.ostype });
+            await pve.updateVmConfig(vmid, { ostype: osTemplate.ostype });
         }
 
         // Stage 8: 再更新 cloud-init（此时 ostype 已正确）
-        const ciResult = await updateCloudInit(vmid, osTemplate.ciuser);
+        const ciResult = await updateCloudInit(vmid, osTemplate.ciuser, nodeId);
         ctx.ciResult = ciResult;
 
         await updateLogStage(logId, 'start');
 
         // Stage 8: 启动 VM
-        await pveApi.startVm(vmid);
+        await pve.startVm(vmid);
 
         // Stage 9: MAC 同步
-        const newConfig = await pveApi.getVmConfig(vmid);
+        const newConfig = await pve.getVmConfig(vmid);
         ctx.newMac = extractMacFromNet0(newConfig.net0);
         if (ctx.oldMac && ctx.newMac && ctx.oldMac !== ctx.newMac) {
             await updateLogStage(logId, 'sync_mac');
-            const macSyncResult = await verifyAndSyncMac(vmid, ctx.oldMac, logId);
+            const macSyncResult = await verifyAndSyncMac(vmid, ctx.oldMac, logId, nodeId);
             ctx.macSyncResult = macSyncResult;
             if (macSyncResult.syncStatus === 'partial' || macSyncResult.syncStatus === 'failed') {
                 console.warn(`[os-switch] MAC 同步不完整: VM ${vmid}, 状态: ${macSyncResult.syncStatus}`);
@@ -409,8 +427,9 @@ async function rollbackOsSwitch(vmid, ctx, logId, originalError) {
 }
 
 // 容量预检
-async function checkTargetStorageCapacity(targetStorage, requiredGb) {
-    const storages = await pveApi.getAllStorages();
+async function checkTargetStorageCapacity(targetStorage, requiredGb, nodeId) {
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+    const storages = await pve.getAllStorages();
     const s = storages.find(x => x.storage === targetStorage);
     if (!s) throw new Error('目标存储不存在');
     const availGb = Math.floor(s.avail / (1024 * 1024 * 1024));

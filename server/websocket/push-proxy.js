@@ -67,8 +67,10 @@ function pushToUser(userId, data) {
 let pveApiCache = null;
 let dbCache = null;
 
-function getPveApi() {
-    if (!pveApiCache) pveApiCache = require('../api/pve-api');
+// 多节点：推送状态轮询为全局聚合查询（跨节点 vmid 集合），此处用默认 PVE 节点客户端兜底
+//（按节点分组轮询留待后续，见改造报告标注）
+async function getPveApi() {
+    if (!pveApiCache) pveApiCache = await require('../api/pve-clients').getPveClient(null);
     return pveApiCache;
 }
 
@@ -88,7 +90,7 @@ async function pushUnreadCount() {
 }
 
 async function pushStatus() {
-    const pveApi = getPveApi();
+    const pveApi = await getPveApi();
     const vms = new Set();
     const lxcs = new Set();
 

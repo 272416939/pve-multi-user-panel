@@ -8,7 +8,7 @@ const { generateUniqueCdkCode } = require('../utils/cdk-generator');
 const { shouldSendEmail } = require('../utils/email');
 const { sendTemplateEmail } = require('./email-template');
 const { formatLocalDate } = require('../utils/date');
-const pveApi = require('../api/pve-api');
+const { getPveClient } = require('../api/pve-clients');
 const dbg = require('../utils/debug');
 
 /**
@@ -111,9 +111,12 @@ async function redeemCdk(opts) {
 
         // 续费后尝试自动开机
         try {
-            var currentStatus = await pveApi.getLxcStatus(ct.ct_id);
+            // 多节点：按容器行 pve_node_id 解析客户端（行无节点回退默认并报告）
+            if (ct.pve_node_id == null) console.warn(`[cdk] LXC 容器 ${ct.ct_id} 无 pve_node_id，回退默认节点`);
+            var cdkLxcPve = await getPveClient(ct.pve_node_id != null ? ct.pve_node_id : null);
+            var currentStatus = await cdkLxcPve.getLxcStatus(ct.ct_id);
             if (currentStatus && currentStatus.status === 'stopped') {
-                await pveApi.startLxc(ct.ct_id);
+                await cdkLxcPve.startLxc(ct.ct_id);
                 dbg(`LXC 容器 ${ct.ct_id} 已自动开机（CDK 续费后）`);
             }
         } catch (startError) {
@@ -224,9 +227,12 @@ async function redeemCdk(opts) {
 
     // 虚拟机之前可能因到期被关机，尝试自动开机
     try {
-        var currentStatus2 = await pveApi.getVmStatus(vm.vm_id);
+        // 多节点：按虚拟机行 pve_node_id 解析客户端（行无节点回退默认并报告）
+        if (vm.pve_node_id == null) console.warn(`[cdk] VM ${vm.vm_id} 无 pve_node_id，回退默认节点`);
+        var cdkVmPve = await getPveClient(vm.pve_node_id != null ? vm.pve_node_id : null);
+        var currentStatus2 = await cdkVmPve.getVmStatus(vm.vm_id);
         if (currentStatus2 && currentStatus2.status === 'stopped') {
-            await pveApi.startVm(vm.vm_id);
+            await cdkVmPve.startVm(vm.vm_id);
             dbg(`虚拟机 ${vm.vm_id} 已自动开机（CDK 续费后）`);
         }
     } catch (startError) {

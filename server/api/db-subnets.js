@@ -34,8 +34,8 @@ const subnets = {
     getById: (id) => queryOne('SELECT * FROM subnets WHERE id = ?', [parseInt(id)]),
     create: async (data) => {
         const [result] = await execute(
-            `INSERT INTO subnets (user_id, vlan_name, vlan_id, gateway, netmask, addr_pool, interface, available, ikuai_vlan_id, ikuai_dhcp_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO subnets (user_id, vlan_name, vlan_id, gateway, netmask, addr_pool, interface, available, ikuai_vlan_id, ikuai_dhcp_id, ikuai_node_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 data.user_id,
                 data.vlan_name,
@@ -47,13 +47,14 @@ const subnets = {
                 data.available || 0,
                 data.ikuai_vlan_id || '',
                 data.ikuai_dhcp_id || '',
+                data.ikuai_node_id || null,
                 mysqlNow()
             ]
         );
         return queryOne('SELECT * FROM subnets WHERE id = ?', [result.insertId]);
     },
     update: async (id, updates) => {
-        const allowedColumns = ['available', 'ikuai_vlan_id', 'ikuai_dhcp_id'];
+        const allowedColumns = ['available', 'ikuai_vlan_id', 'ikuai_dhcp_id', 'ikuai_node_id'];
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }

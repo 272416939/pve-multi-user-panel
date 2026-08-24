@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
+const { getPveClient } = require('../api/pve-clients');
 const { safeError } = require('../utils/safe-error');
 // 单一来源：模板状态白名单统一走 constants（规范第七节）
 const { TEMPLATE_STATUS } = require('../constants');
@@ -23,7 +23,9 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
             return res.status(400).json({ error: '无效的 VMID', code: 'INVALID_VMD' });
         }
-        const config = await pveApi.getVmConfig(vmid);
+        // 多节点：可选 ?node_id= 指定预览节点，缺省=默认节点
+        var pve = await getPveClient(req.query.node_id ? parseInt(req.query.node_id) : null);
+        const config = await pve.getVmConfig(vmid);
         if (!config) {
             return res.status(404).json({ error: 'PVE 模板不存在', code: 'PVE_TEMPLATE_NOT_FOUND' });
         }
@@ -197,8 +199,10 @@ router.post('/admin/os-templates', async (req, res) => {
         if (!Number.isInteger(templateVmid) || templateVmid < 100 || templateVmid > 999999999) {
             return res.status(400).json({ error: '无效的模板 VMID', code: 'INVALID_TPL_VMID' });
         }
-        // 校验 template_vmid 在 PVE 中确实是模板
-        const vms = await pveApi.getVms({ templateOnly: true });
+        // 校验 template_vmid 在 PVE 中确实是模板（多节点：按数据行节点，缺省=默认节点）
+        const tplNode = data.pve_node_id !== undefined ? parseInt(data.pve_node_id) : null;
+        const tplPve = await getPveClient(tplNode);
+        const vms = await tplPve.getVms({ templateOnly: true });
         if (!vms.find(v => v.vmid === templateVmid)) {
             return res.status(400).json({ error: '指定的 VMID 在 PVE 中不是模板', code: 'VMID_NOT_TEMPLATE' });
         }

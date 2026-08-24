@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
-const ikuaiApi = require('../api/ikuai-api');
+// 多节点：按节点/配对关系取客户端（工厂缓存复用；null=默认节点兜底）
+const { getPveClient } = require('../api/pve-clients');
+const { getIkuaiClient } = require('../api/ikuai-clients');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { createDhcpStaticBinding, getWanInterface, getWanInterfaces } = require('../services/dhcp');
 // ikuai_id 解析/序列化单一来源（services/port-forward-sync.js，禁止本地双份拷贝）
@@ -33,10 +34,22 @@ router.get('/cname', authMiddleware, async (req, res) => {
     }
 });
 
+// 多节点：按资产归属 PVE 节点解析配对爱快节点 ID（null=回退默认爱快节点，与 ikuai-clients 兜底一致）
+async function resolvePairedIkNodeId(devNode) {
+    if (devNode == null) return null;
+    try {
+        const pn = await db.pveNodes.get(devNode);
+        return pn ? pn.ikuai_node_id : null;
+    } catch (_) {
+        return null;
+    }
+}
+
 // P2-H1⑤ 修复：iKuai 接口信息需管理员权限（泄露内网拓扑）
 router.get('/ikuai/interfaces', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const interfaces = await ikuaiApi.getInterfaces();
+        const ik = await getIkuaiClient(null); // 系统级查询：默认爱快节点
+        const interfaces = await ik.getInterfaces();
         const wanIfaces = interfaces.filter(i => i.type === 'wan');
         
         // 自动对比：已存储的 WAN 接口中，移除 ikuai 上已不存在的接口
@@ -63,7 +76,8 @@ router.get('/ikuai/interfaces', authMiddleware, adminMiddleware, async (req, res
 
 router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const bindings = await ikuaiApi.getDhcpStaticBindings();
+        const ik = await getIkuaiClient(null); // 管理员全局同步：默认爱快节点
+        const bindings = await ik.getDhcpStaticBindings();
         let updated = 0, skipped = 0, errors = 0;
 
         // PERF-05: 循环外一次性获取所有 VM 和 LXC，构建 Map，避免循环内全表查询（N+1）
@@ -218,13 +232,24 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
             }
         }
+        // 多节点：加载关联资产行确定归属 PVE 节点 → 配对爱快节点（general 无设备回退默认）
+        let devNode = null;
+        if (finalVmId) {
+            const vmRow = await db.vms.getByVmid(finalVmId);
+            devNode = vmRow ? vmRow.pve_node_id : null;
+        } else if (finalCtId) {
+            const ctRows = await db.lxcContainers.getByCtId(finalCtId);
+            devNode = ctRows && ctRows.length > 0 ? ctRows[0].pve_node_id : null;
+        }
+        const ikNodeId = await resolvePairedIkNodeId(devNode);
+        const ik = await getIkuaiClient(ikNodeId);
         const existing = await db.portForwards.getByExternalPort(external_port);
         if (existing.length > 0) {
             return res.status(400).json({ error: '外网端口已被占用，请更换', code: 'EXT_PORT_TAKEN' });
         }
-        if (ikuaiApi.isConfigured()) {
+        if (ik.isConfigured()) {
             try {
-                const ikuaiRules = await ikuaiApi.getPortForwards();
+                const ikuaiRules = await ik.getPortForwards();
                 const conflict = ikuaiRules.find(r => String(r.wan_port) === String(external_port));
                 if (conflict) {
                     return res.status(400).json({ error: '外网端口已被占用，请更换', code: 'EXT_PORT_TAKEN' });
@@ -233,15 +258,16 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
                 console.error('[端口转发] ikuai 端口检查失败:', e.message);
             }
         }
-        // 先写入本地
+        // 先写入本地（ikuai_node_id 记录规则归属爱快节点，多节点对账/删除按此路由）
         const rule = await db.portForwards.create({
             type, vm_id: finalVmId, ct_id: finalCtId,
             name: finalName, ip, internal_port, external_port,
-            protocol: finalProtocol, sync_status: 'pending'
+            protocol: finalProtocol, sync_status: 'pending',
+            ikuai_node_id: ikNodeId
         });
         // 同步到 ikuai（一条规则支持多外网接口，interface 字段传逗号分隔值）
         try {
-            const wanIfaces = await getWanInterfaces();
+            const wanIfaces = await getWanInterfaces({ ikuaiNodeId: ikNodeId });
             // comment 根据 type 区分：general → _GENERAL，lxc → _CT${ct_id}，vm → _VM${vm_id}
             const comment = type === 'general'
                 ? `${finalName || '转发'}_GENERAL`
@@ -251,10 +277,10 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             const ifaceStr = wanIfaces.join(',');
             let ikuaiIds = [];
             try {
-                await ikuaiApi.addPortForward({ ip, internal_port, external_port, protocol: finalProtocol, comment, enabled: true, interface: ifaceStr });
+                await ik.addPortForward({ ip, internal_port, external_port, protocol: finalProtocol, comment, enabled: true, interface: ifaceStr });
                 // 爱快 add 接口不返回 ID，从 ikuai 规则列表反查
                 try {
-                    const ikuaiRules = await ikuaiApi.getPortForwards();
+                    const ikuaiRules = await ik.getPortForwards();
                     const match = ikuaiRules.find(r =>
                         String(r.wan_port) === String(external_port) &&
                         String(r.lan_port) === String(internal_port) &&
@@ -347,10 +373,24 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             }
         }
 
+        // 多节点：按生效设备归属解析配对爱快节点（general/查不到行时沿用原规则归属）
+        let effDevNode = null;
+        if (effectiveType === 'vm' && effectiveVmId) {
+            const vmRow = await db.vms.getByVmid(effectiveVmId);
+            effDevNode = vmRow ? vmRow.pve_node_id : null;
+        } else if (effectiveType === 'lxc' && effectiveCtId) {
+            const ctRows = await db.lxcContainers.getByCtId(effectiveCtId);
+            effDevNode = ctRows && ctRows.length > 0 ? ctRows[0].pve_node_id : null;
+        }
+        const ikNodeId = effDevNode != null ? await resolvePairedIkNodeId(effDevNode) : (existing.ikuai_node_id || null);
+        const ik = await getIkuaiClient(ikNodeId);
+        // 旧规则所在爱快节点（编辑换绑到其他节点时，旧规则须从原节点删除）
+        const oldIk = await getIkuaiClient(existing.ikuai_node_id || null);
+
         if (external_port) {
             const config = {
-                port_range_start: parseInt(await db.config.getIkuaiSetting('forward:port_range_start')) || 50000,
-                port_range_end: parseInt(await db.config.getIkuaiSetting('forward:port_range_end')) || 60000,
+                port_range_start: parseInt(await db.config.getIkuaiSetting('forward:port_range_start', ikNodeId)) || 50000,
+                port_range_end: parseInt(await db.config.getIkuaiSetting('forward:port_range_end', ikNodeId)) || 60000,
             };
             // 普通用户检查端口范围；管理员不受此限制
             if (req.user.role !== 'admin') {
@@ -374,29 +414,29 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         if (needIkuaiSync) {
             await db.portForwards.update(id, { sync_status: 'pending' });
             try {
-                // 删除旧的所有接口上的 ikuai 规则
+                // 删除旧的所有接口上的 ikuai 规则（旧规则在原归属爱快节点上）
                 const oldIds = parseIkuaiIds(existing.ikuai_id);
                 for (const old of oldIds) {
                     try {
-                        if (old.id) await ikuaiApi.deletePortForward(old.id);
+                        if (old.id) await oldIk.deletePortForward(old.id);
                     } catch (e) {
                         console.error(`[端口转发] 删除旧规则 ${old.id} 失败:`, e.message);
                     }
                 }
-                if (oldIds.length === 0 && ikuaiApi.isConfigured()) {
+                if (oldIds.length === 0 && oldIk.isConfigured()) {
                     // 没有 ikuai_id，按旧端口信息匹配删除
-                    const ikuaiRules = await ikuaiApi.getPortForwards();
+                    const ikuaiRules = await oldIk.getPortForwards();
                     const oldMatches = ikuaiRules.filter(r =>
                         String(r.wan_port) === String(existing.external_port) &&
                         String(r.lan_port) === String(existing.internal_port) &&
                         (r.lan_ip || r.lan_addr) === existing.ip
                     );
                     for (const m of oldMatches) {
-                        try { await ikuaiApi.deletePortForward(m.id); } catch (_) {}
+                        try { await oldIk.deletePortForward(m.id); } catch (_) {}
                     }
                 }
                 // 重新创建一条规则，interface 字段传逗号分隔的多接口值
-                const wanIfaces = await getWanInterfaces();
+                const wanIfaces = await getWanInterfaces({ ikuaiNodeId: ikNodeId });
                 // comment 根据生效类型区分：general → _GENERAL，lxc → _CT${ct_id}，vm → _VM${vm_id}
                 const comment = effectiveType === 'general'
                     ? `${finalName || '转发'}_GENERAL`
@@ -406,9 +446,9 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
                 const ifaceStr = wanIfaces.join(',');
                 newIkuaiIds = [];
                 try {
-                    await ikuaiApi.addPortForward({ ip: ip || existing.ip, internal_port: internal_port || existing.internal_port, external_port: external_port || existing.external_port, protocol: protocol || existing.protocol, comment, enabled: true, interface: ifaceStr });
+                    await ik.addPortForward({ ip: ip || existing.ip, internal_port: internal_port || existing.internal_port, external_port: external_port || existing.external_port, protocol: protocol || existing.protocol, comment, enabled: true, interface: ifaceStr });
                     try {
-                        const ikuaiRules = await ikuaiApi.getPortForwards();
+                        const ikuaiRules = await ik.getPortForwards();
                         const match = ikuaiRules.find(r =>
                             String(r.wan_port) === String(external_port || existing.external_port) &&
                             String(r.lan_port) === String(internal_port || existing.internal_port) &&
@@ -440,6 +480,8 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             if (vm_id !== undefined) updates.vm_id = existing.type === 'vm' ? vm_id : null;
             if (ct_id !== undefined) updates.ct_id = existing.type === 'lxc' ? ct_id : null;
         }
+        // 多节点：规则归属爱快节点随生效设备落库（update 白名单已含 ikuai_node_id）
+        updates.ikuai_node_id = ikNodeId;
         if (!needIkuaiSync) updates.sync_status = existing.sync_status;
         else {
             updates.sync_status = newIkuaiIds.length > 0 ? 'synced' : 'failed';
@@ -539,11 +581,17 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
         }
         const portRangeStart = parseInt(await db.config.getIkuaiSetting('forward:port_range_start')) || 50000;
         const portRangeEnd = parseInt(await db.config.getIkuaiSetting('forward:port_range_end')) || 60000;
-        const usedPorts = new Set((await db.portForwards.getUsedPorts()).map(r => r.external_port));
+        // 多节点：随机分配按爱快节点作用域避免与该节点已有规则冲突（端点无设备上下文，取默认爱快节点；
+        // 历史未落 ikuai_node_id 的存量规则视同默认节点一并计入占用）
+        const ikNodeId = await db.ikuaNodes.getDefaultId();
+        const ik = await getIkuaiClient(ikNodeId);
+        const usedPorts = new Set((await db.portForwards.getUsedPorts())
+            .filter(r => ikNodeId == null || r.ikuai_node_id == null || Number(r.ikuai_node_id) === Number(ikNodeId))
+            .map(r => r.external_port));
         // 也从 ikuai 获取已用端口
-        if (ikuaiApi.isConfigured()) {
+        if (ik.isConfigured()) {
             try {
-                const ikuaiRules = await ikuaiApi.getPortForwards();
+                const ikuaiRules = await ik.getPortForwards();
                 ikuaiRules.forEach(r => {
                     if (r.wan_port) usedPorts.add(parseInt(r.wan_port));
                 });
@@ -577,13 +625,18 @@ router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
         if (!port || port < 1 || port > 65535) {
             return res.status(400).json({ error: '无效端口', code: 'INVALID_PORT' });
         }
-        const existing = await db.portForwards.getByExternalPort(port);
+        // 多节点：占用查询按爱快节点作用域（端点无设备上下文，取默认爱快节点；
+        // 历史未落 ikuai_node_id 的存量规则视同默认节点一并计入占用）
+        const ikNodeId = await db.ikuaNodes.getDefaultId();
+        const ik = await getIkuaiClient(ikNodeId);
+        const existing = (await db.portForwards.getByExternalPort(port))
+            .filter(r => ikNodeId == null || r.ikuai_node_id == null || Number(r.ikuai_node_id) === Number(ikNodeId));
         if (existing.length > 0) {
             return res.json({ available: false });
         }
-        if (ikuaiApi.isConfigured()) {
+        if (ik.isConfigured()) {
             try {
-                const ikuaiRules = await ikuaiApi.getPortForwards();
+                const ikuaiRules = await ik.getPortForwards();
                 if (ikuaiRules.some(r => String(r.wan_port) === String(port))) {
                     return res.json({ available: false });
                 }
@@ -621,20 +674,31 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
         const isAdmin = req.user.role === 'admin';
         const myVms = isAdmin ? await db.vms.getAll() : await db.vms.getByUserId(req.user.id);
         const myCts = isAdmin ? await db.lxcContainers.getAll() : await db.lxcContainers.getByUserId(req.user.id);
-        let dhcpLeases = [];
-        let lanIps = [];
-        if (ikuaiApi.isConfigured()) {
-            try { dhcpLeases = await ikuaiApi.getDhcpLeases(); } catch (e) {}
-            try { lanIps = await ikuaiApi.getLanIps(); } catch (e) {}
+        // 多节点：DHCP 租约/LAN IP 按设备配对的爱快节点懒加载缓存（同节点只拉一次）
+        const leaseCacheByIk = new Map();
+        async function getLeaseEntry(ikNodeId) {
+            const key = ikNodeId == null ? '@default' : String(ikNodeId);
+            if (!leaseCacheByIk.has(key)) {
+                const entry = { leases: [], lans: [] };
+                try {
+                    const nik = await getIkuaiClient(ikNodeId);
+                    if (nik.isConfigured()) {
+                        try { entry.leases = await nik.getDhcpLeases(); } catch (e) {}
+                        try { entry.lans = await nik.getLanIps(); } catch (e) {}
+                    }
+                } catch (e) {}
+                leaseCacheByIk.set(key, entry);
+            }
+            return leaseCacheByIk.get(key);
         }
-        function findIpByMac(mac) {
-            if (!mac) return '';
-            if (dhcpLeases.length > 0) {
-                const lease = dhcpLeases.find(l => String(l.mac || l.hwaddr || '').toLowerCase() === mac);
+        function findIpByMac(mac, entry) {
+            if (!mac || !entry) return '';
+            if (entry.leases.length > 0) {
+                const lease = entry.leases.find(l => String(l.mac || l.hwaddr || '').toLowerCase() === mac);
                 if (lease) return lease.ip || lease.ipaddr || '';
             }
-            if (lanIps.length > 0) {
-                const lan = lanIps.find(l => String(l.mac || '').toLowerCase() === mac);
+            if (entry.lans.length > 0) {
+                const lan = entry.lans.find(l => String(l.mac || '').toLowerCase() === mac);
                 if (lan) return lan.ip || '';
             }
             return '';
@@ -648,11 +712,12 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
             } else {
                 let mac = '';
                 try {
-                    const config = await pveApi.getVmConfig(vm.vm_id);
+                    const pc = await getPveClient(vm.pve_node_id);
+                    const config = await pc.getVmConfig(vm.vm_id);
                     const net0 = config?.net0 || '';
                     const macMatch = net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
                     if (macMatch) mac = macMatch[0].toLowerCase();
-                    ip = findIpByMac(mac);
+                    ip = findIpByMac(mac, await getLeaseEntry(await resolvePairedIkNodeId(vm.pve_node_id)));
                     dbg(`[extract-ips] VM ${vm.vm_id}: net0=${net0}, mac=${mac}, ip=${ip}`);
                 } catch (e) {
                     dbg(`[extract-ips] VM ${vm.vm_id} 获取配置失败:`, e.message);
@@ -671,7 +736,8 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
                 ip = ct.dhcp_static_ip;
             } else {
                 try {
-                    const config = await pveApi.getLxcConfig(ct.ct_id);
+                    const pc = await getPveClient(ct.pve_node_id);
+                    const config = await pc.getLxcConfig(ct.ct_id);
                     const net0 = config?.net0 || '';
                     const ipMatch = net0.match(/ip=([0-9.]+)/);
                     if (ipMatch) ip = ipMatch[1];
@@ -679,7 +745,7 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
                     if (!ip) {
                         const hwaddrMatch = net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
                         if (hwaddrMatch) {
-                            ip = findIpByMac(hwaddrMatch[0].toLowerCase());
+                            ip = findIpByMac(hwaddrMatch[0].toLowerCase(), await getLeaseEntry(await resolvePairedIkNodeId(ct.pve_node_id)));
                         }
                     }
                     dbg(`[extract-ips] CT ${ct.ct_id}: net0=${net0}, ip=${ip}`);

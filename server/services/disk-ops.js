@@ -4,14 +4,36 @@
 
 var crypto = require('crypto');
 var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
-var pveApi = require('../api/pve-api');
+// 多节点：按资产（VM/disk 行）所在 PVE 节点动态取客户端与 SSH 配置（不再使用全局单例）
+var { getPveClient } = require('../api/pve-clients');
 var logger = require('../utils/logger');
 // 校验纯函数来自 utils/disk-validation.js（单一来源）
 var { validateParam, validateVolumeId, validateBusDev, inferDiskFormat } = require('../utils/disk-validation');
 
+// ==================== 节点上下文解析 ====================
+// 按 VM 行解析节点 id（查不到行/字段为空时返回 null → 回退默认节点，兼容旧单节点数据）
+async function resolveNodeIdByVmid(vmid) {
+  try {
+    var db = require('../api/db');
+    var row = await db.vms.getByVmid(vmid);
+    if (row && row.pve_node_id != null) return row.pve_node_id;
+  } catch (e) {}
+  return null;
+}
+
+// 按磁盘台账行解析节点 id（游离盘场景）
+async function resolveNodeIdByVolumeId(volumeId) {
+  try {
+    var db = require('../api/db');
+    var row = await db.disks.getByVolumeId(volumeId);
+    if (row && row.pve_node_id != null) return row.pve_node_id;
+  } catch (e) {}
+  return null;
+}
+
 // ==================== SSH 命令执行封装 ====================
-async function runSshCommand(cmd) {
-  var sshConfig = await getPveSshConfig();
+async function runSshCommand(cmd, nodeId) {
+  var sshConfig = await getPveSshConfig(nodeId != null ? nodeId : null);
   if (!sshConfig.host || !sshConfig.password) {
     throw new Error('PVE SSH 配置不完整');
   }
@@ -81,6 +103,9 @@ async function createDisk(storage, sizeGb, userId, tempVmid, diskFormat) {
 //  1. 游离卷直接挂载（disk 未托管在中转 VM 上）：qm set 直接挂载
 //  2. 中转托管盘：调用 holding-vm.moveDiskFromHolding 从 9999 转移到目标 VM
 async function bindDisk(vmid, volumeId, bus, dev, qosParams, holdingVmid, holdingSlot) {
+  // 多节点：按目标 VM 行解析节点
+  var nodeId = await resolveNodeIdByVmid(vmid);
+  var pve = await getPveClient(nodeId);
   // 如果磁盘托管在中转 VM 上，先 moveDisk 到目标 VM
   if (holdingVmid && holdingSlot) {
     var holdingService = require('../services/holding-vm');
@@ -88,7 +113,7 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams, holdingVmid, holdin
     // moveDisk 后 volume_id 会变（PVE 重命名），返回新 volume_id 由调用方更新台账
     var newVolumeId = volumeId;
     try {
-      var newConfig = await pveApi.getVmConfig(vmid);
+      var newConfig = await pve.getVmConfig(vmid);
       var newVolPart = newConfig[bus + dev] ? newConfig[bus + dev].split(',')[0] : '';
       if (newVolPart) newVolumeId = newVolPart;
     } catch (e) {
@@ -116,7 +141,7 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams, holdingVmid, holdin
 
   var cmd = 'qm set ' + safeVmid + ' --' + busDev + ' ' + diskConfig;
   try {
-    await runSshCommand(cmd);
+    await runSshCommand(cmd, nodeId);
     return { bus: bus, dev: parseInt(dev), volume_id: volumeId, moved: false };
   } catch (err) {
     // 自愈：直接挂载失败，可能卷已因 move_disk 被重命名（托管在中转 VM）
@@ -132,7 +157,7 @@ async function bindDisk(vmid, volumeId, bus, dev, qosParams, holdingVmid, holdin
           // 读取转移后的新 volume_id
           var newVolAfterMove = volumeId;
           try {
-            var cfgAfterMove = await pveApi.getVmConfig(safeVmid);
+            var cfgAfterMove = await pve.getVmConfig(safeVmid);
             var volPartAfter = cfgAfterMove[busDev] ? cfgAfterMove[busDev].split(',')[0] : '';
             if (volPartAfter) newVolAfterMove = volPartAfter;
           } catch (_) {}
@@ -153,9 +178,13 @@ async function unbindDisk(vmid, bus, dev, holdingVmid) {
   var safeVmid = validateParam('vmid', vmid);
   var busDev = validateBusDev(bus, dev); // 禁止系统盘位置
 
+  // 多节点：按用户 VM 行解析节点（中转 VM 必须与用户 VM 同节点）
+  var nodeId = await resolveNodeIdByVmid(safeVmid);
+  var pve = await getPveClient(nodeId);
+
   var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + busDev;
   try {
-    await runSshCommand(cmd);
+    await runSshCommand(cmd, nodeId);
   } catch (e) {
     var errMsg = e.message || '';
     // busy 错误（Windows VM 常见）：guest 内磁盘已卸载，PVE 配置仍保留
@@ -164,7 +193,7 @@ async function unbindDisk(vmid, bus, dev, holdingVmid) {
       logger.debug('[unbindDisk] 首次 unlink 报 busy，等待 1 秒后重试...');
       await new Promise(function(resolve) { setTimeout(resolve, 1000); });
       try {
-        await runSshCommand(cmd);
+        await runSshCommand(cmd, nodeId);
         logger.debug('[unbindDisk] 重试 unlink 成功，PVE 配置已清理');
       } catch (e2) {
         // 重试仍失败，提示用户手动处理
@@ -179,7 +208,7 @@ async function unbindDisk(vmid, bus, dev, holdingVmid) {
   // 查找 unused 槽位（unlink 后第一个空闲 unusedN）
   var unusedSlot = null;
   try {
-    var cfgAfterUnlink = await pveApi.getVmConfig(safeVmid);
+    var cfgAfterUnlink = await pve.getVmConfig(safeVmid);
     for (var ui = 0; ui <= 9; ui++) {
       if (cfgAfterUnlink['unused' + ui]) {
         unusedSlot = 'unused' + ui;
@@ -196,8 +225,8 @@ async function unbindDisk(vmid, bus, dev, holdingVmid) {
   // 分配到中转 VM 的空闲槽位
   var holdingService = require('../services/holding-vm');
   var targetHoldingVmid = holdingVmid || await holdingService.getHoldingVmid();
-  await holdingService.ensureHoldingVm(targetHoldingVmid);
-  var freeSlot = await holdingService.findFreeHoldingSlot(targetHoldingVmid);
+  await holdingService.ensureHoldingVm(targetHoldingVmid, nodeId);
+  var freeSlot = await holdingService.findFreeHoldingSlot(targetHoldingVmid, nodeId);
   if (!freeSlot) {
     // 中转 VM 槽位满（当前单节点场景 30 块足够，暂不自动扩容）
     throw new Error('中转 VM ' + targetHoldingVmid + ' 槽位已满，请先挂载部分磁盘后再卸载');
@@ -209,7 +238,7 @@ async function unbindDisk(vmid, bus, dev, holdingVmid) {
   // moveDisk 后 PVE 会重命名卷（vm-<userVM>-disk-N → vm-<holding>-disk-N），需返回新 volume_id
   var newVolumeId = null;
   try {
-    var holdingConfig = await pveApi.getVmConfig(targetHoldingVmid);
+    var holdingConfig = await pve.getVmConfig(targetHoldingVmid);
     if (holdingConfig && holdingConfig[freeSlot]) {
       newVolumeId = holdingConfig[freeSlot].split(',')[0];
     }
@@ -225,12 +254,20 @@ async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid, bindBus, bind
   var safeVol = validateVolumeId(volumeId);
   var safeSize = validateParam('sizeGb', newSizeGb);
 
+  // 多节点：已挂载盘按目标 VM 行取节点，游离盘按台账行取节点（均查不到时回退默认节点）
+  var nodeId = null;
+  if (bindVmid && Number.isInteger(parseInt(bindVmid)) && parseInt(bindVmid) >= 100 && bindBus && bindDev) {
+    nodeId = await resolveNodeIdByVmid(parseInt(bindVmid));
+  } else {
+    nodeId = await resolveNodeIdByVolumeId(volumeId);
+  }
+
   if (bindVmid && Number.isInteger(parseInt(bindVmid)) && parseInt(bindVmid) >= 100 && bindBus && bindDev) {
     // 已挂载磁盘：校验总线设备名（禁止系统盘 scsi0/virtio0/sata0）
     var safeVmid = parseInt(bindVmid);
     var busDev = validateBusDev(bindBus, bindDev);
     var cmd = 'qm resize ' + safeVmid + ' ' + busDev + ' ' + safeSize + 'G';
-    await runSshCommand(cmd);
+    await runSshCommand(cmd, nodeId);
   } else {
     // 游离磁盘：挂载到中转 VM（scsi30 避免冲突，且 != 0 系统盘位置）-> 扩容 -> 卸载
     var transitVmid = parseInt(tempVmid) || 9999;
@@ -240,16 +277,16 @@ async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid, bindBus, bind
     // 挂载到中转 VM（scsi30 固定位置，非系统盘 scsi0）
     // volume_id 已含扩展名，PVE 自动识别格式，无需附加 format=
     var attachCmd = 'qm set ' + transitVmid + ' --scsi30 ' + safeVol;
-    await runSshCommand(attachCmd);
+    await runSshCommand(attachCmd, nodeId);
     try {
       // 执行扩容（scsi30 非 0，安全）
       var resizeCmd = 'qm resize ' + transitVmid + ' scsi30 ' + safeSize + 'G';
-      await runSshCommand(resizeCmd);
+      await runSshCommand(resizeCmd, nodeId);
     } finally {
       // 无论成功失败都卸载
       try {
         var detachCmd = 'qm set ' + transitVmid + ' --delete scsi30';
-        await runSshCommand(detachCmd);
+        await runSshCommand(detachCmd, nodeId);
       } catch (e) {
         logger.error('[disk-ops] 卸载中转磁盘失败:', e.message);
       }
@@ -260,14 +297,18 @@ async function resizeDisk(volumeId, newSizeGb, tempVmid, bindVmid, bindBus, bind
 // 销毁磁盘 - pvesm free <vol>
 async function destroyDisk(volumeId) {
   var safeVol = validateVolumeId(volumeId);
+  // 多节点：按磁盘台账行解析节点（查不到时回退默认节点）
+  var nodeId = await resolveNodeIdByVolumeId(volumeId);
   var cmd = 'pvesm free ' + safeVol;
-  await runSshCommand(cmd);
+  await runSshCommand(cmd, nodeId);
 }
 
 // 读取系统盘总线类型 - qm config <vmid> | grep
 async function getSystemDiskBus(vmid) {
   var safeVmid = validateParam('vmid', vmid);
-  var config = await pveApi.getVmConfig(safeVmid);
+  // 多节点：按 VM 行解析节点
+  var pve = await getPveClient(await resolveNodeIdByVmid(safeVmid));
+  var config = await pve.getVmConfig(safeVmid);
   if (config.scsi0) return 'scsi';
   if (config.sata0) return 'sata';
   if (config.virtio0) return 'virtio';
@@ -278,7 +319,9 @@ async function getSystemDiskBus(vmid) {
 async function getAvailableDevNumber(vmid, bus) {
   var safeVmid = validateParam('vmid', vmid);
   var safeBus = validateParam('bus', bus);
-  var config = await pveApi.getVmConfig(safeVmid);
+  // 多节点：按 VM 行解析节点
+  var pve = await getPveClient(await resolveNodeIdByVmid(safeVmid));
+  var config = await pve.getVmConfig(safeVmid);
 
   // 从 1 号开始查找空闲设备号（永不占用 0 号系统盘）
   for (var dev = 1; dev <= 30; dev++) {
@@ -293,7 +336,9 @@ async function checkStorageCapacity(storage, requestedGb) {
   var safeStorage = validateParam('storage', storage);
   var safeSize = validateParam('sizeGb', requestedGb);
   try {
-    var storageList = await pveApi.getAllStorages();
+    // 无行上下文（仅存储池名）：回退默认节点查询（多节点下存储池名跨节点不唯一时由调用方保证）
+    var pve = await getPveClient(null);
+    var storageList = await pve.getAllStorages();
     var target = null;
     if (storageList && Array.isArray(storageList)) {
       for (var i = 0; i < storageList.length; i++) {
@@ -322,13 +367,13 @@ async function checkStorageCapacity(storage, requestedGb) {
 // ==================== 系统切换内部函数（仅供 os-switch-utils.js 使用） ====================
 // 绕过 dev=0 检查，仅通过 Node.js 进程内 require 访问，不暴露给 HTTP 路由层
 const _internal = {
-  unbindSystemDisk: async (vmid, bus) => {
+  unbindSystemDisk: async (vmid, bus, nodeId) => {
     var safeVmid = validateParam('vmid', vmid);
     if (!['scsi', 'sata', 'virtio'].includes(bus)) throw new Error('invalid bus');
     var cmd = 'qm unlink ' + safeVmid + ' --idlist ' + bus + '0';
-    await runSshCommand(cmd);
+    await runSshCommand(cmd, nodeId);
   },
-  destroySystemDisk: async (volumeId) => {
+  destroySystemDisk: async (volumeId, nodeId) => {
     if (!/^[a-zA-Z0-9_-]+:[a-zA-Z0-9_./\-]+$/.test(volumeId)) {
       throw new Error('invalid volume id');
     }
@@ -341,7 +386,7 @@ const _internal = {
     var cmd = 'pvesm free ' + volumeId;
     // 使用 execSSH 直接调用以便对"卷不存在"做容错
     var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
-    var cfg = await getPveSshConfig();
+    var cfg = await getPveSshConfig(nodeId != null ? nodeId : null);
     var result = await execSSH(cfg.host, cfg.username, cfg.password, cmd, 600000, cfg.port);
     if (result.code !== 0) {
       var errMsg = (result.stderr || result.stdout || '').toLowerCase();

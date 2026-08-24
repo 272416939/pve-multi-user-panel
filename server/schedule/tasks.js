@@ -53,7 +53,8 @@ async function releaseLock(lockKey) {
 // 扫描 pve_upid 非空的记录，查询 PVE 真实任务状态并做善后处理
 async function recoverProvisioningTasks() {
     var db = require('../api/db');
-    var pveApi = require('../api/pve-api');
+    // 多节点：按资源归属 PVE 节点取客户端（工厂缓存复用；null=默认节点）
+    var { getPveClient } = require('../api/pve-clients');
 
     var pendingVms = [];
     var pendingCts = [];
@@ -70,6 +71,8 @@ async function recoverProvisioningTasks() {
 
     var recoverOne = async function(record, type) {
         try {
+            // 多节点：逐条按归属 PVE 节点解析客户端（查不到节点行回退默认）
+            var pveApi = await getPveClient(record.pve_node_id);
             var status = await pveApi.getTaskStatus(record.pve_upid);
             if (status.status === 'stopped') {
                 if (status.exitstatus === 'OK') {
@@ -171,7 +174,8 @@ async function recoverProvisioningTasks() {
 // 扫描 status='running' 且 started_at < NOW() - 30min 的切换记录
 async function recoverOsSwitchTasks() {
     var db = require('../api/db');
-    var pveApi = require('../api/pve-api');
+    // 多节点：按资源归属 PVE 节点取客户端（工厂缓存复用；null=默认节点）
+    var { getPveClient } = require('../api/pve-clients');
 
     var staleLogs = [];
     try {
@@ -188,6 +192,10 @@ async function recoverOsSwitchTasks() {
     for (var i = 0; i < staleLogs.length; i++) {
         var log = staleLogs[i];
         try {
+            // 多节点：按 VM 归属 PVE 节点解析客户端（台账查不到行回退默认）
+            var switchVm = null;
+            try { switchVm = await db.vms.getByVmid(log.vm_id); } catch (_) {}
+            var pveApi = await getPveClient(switchVm ? switchVm.pve_node_id : null);
             var vmStatus = await pveApi.getVmStatus(log.vm_id);
             var config = await pveApi.getVmConfig(log.vm_id);
             var tmpl = await db.osTemplates.getById(log.to_os_template_id);

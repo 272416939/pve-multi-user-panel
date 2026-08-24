@@ -2,7 +2,8 @@ const express = require('express');
 const crypto = require('crypto');
 const router = express.Router();
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
+// 多节点：按资产所在节点取 PVE 客户端（与旧单例同接口）
+const { getPveClient } = require('../api/pve-clients');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { safeError } = require('../utils/safe-error');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
@@ -24,7 +25,9 @@ router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
             if (!owned) return res.status(403).json({ error: '无权操作此容器', code: 'LXC_NO_PERM_2' });
         }
 
-        const snapshots = await pveApi.getLxcSnapshots(vmid);
+        // 多节点：按资产所在节点取客户端（未分配给任何用户时回退默认节点）
+        const pve = await getPveClient((await db.lxcContainers.getByCtId(vmid))[0]?.pve_node_id);
+        const snapshots = await pve.getLxcSnapshots(vmid);
         const cfg = await db.snapshotConfig.get();
         const dailyCreate = await db.snapshotLogs.getDailyCount(req.user.id, 'create');
         const dailyRestore = await db.snapshotLogs.getDailyCount(req.user.id, 'restore');
@@ -64,10 +67,12 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
 
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
+
         // 非管理员配额限制
         if (!isAdmin) {
             const cfg = await db.snapshotConfig.get();
-            const snapshots = await pveApi.getLxcSnapshots(vmid);
+            const snapshots = await pve.getLxcSnapshots(vmid);
             if (snapshots.length >= cfg.max_per_vm) {
                 return res.status(400).json({ error: `每台容器最多保留 ${cfg.max_per_vm} 个快照`, code: 'LXC_SNAPSHOT_LIMIT', params: [cfg.max_per_vm] });
             }
@@ -78,7 +83,7 @@ router.post('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
         }
 
         const name = generateSnapshotName();
-        await pveApi.createLxcSnapshot(vmid, name, description || '');
+        await pve.createLxcSnapshot(vmid, name, description || '');
         db.snapshotLogs.add(req.user.id, vmid, 'create');
         await auditAction(req, 'lxc.snapshot.create', '创建 LXC ' + vmid + ' 快照');
         res.json({ message: '快照创建成功' });
@@ -114,9 +119,11 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
             return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
 
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
+
         // 非管理员额外检查
         if (!isAdmin) {
-            const status = await pveApi.getLxcStatus(vmid);
+            const status = await pve.getLxcStatus(vmid);
             if (status.status !== 'stopped') {
                 return res.status(400).json({ error: '回滚前请先关闭容器', code: 'SHUTDOWN_BEFORE_ROLLBACK_LXC' });
             }
@@ -127,7 +134,7 @@ router.post('/lxc/:vmid/snapshots/:snapname/rollback', authMiddleware, async (re
             }
         }
 
-        await pveApi.rollbackLxcSnapshot(vmid, req.params.snapname);
+        await pve.rollbackLxcSnapshot(vmid, req.params.snapname);
         db.snapshotLogs.add(req.user.id, vmid, 'restore');
         await auditAction(req, 'lxc.snapshot.rollback', '恢复 LXC ' + vmid + ' 快照');
         res.json({ message: '快照恢复成功，请稍后启动容器' });
@@ -161,7 +168,8 @@ router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res)
             return res.status(403).json({ error: '容器未分配，无权限', code: 'LXC_UNASSIGNED' });
         }
 
-        await pveApi.deleteLxcSnapshot(vmid, req.params.snapname);
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.deleteLxcSnapshot(vmid, req.params.snapname);
         await auditAction(req, 'lxc.snapshot.delete', '删除 LXC ' + vmid + ' 快照');
         res.json({ message: '快照已删除' });
     } catch (error) {
@@ -182,7 +190,9 @@ router.get('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
             }
         }
 
-        const snapshots = await pveApi.getSnapshots(vmid);
+        // 多节点：按资产所在节点取客户端（未分配给任何用户时回退默认节点）
+        const pve = await getPveClient((await db.vms.getByVmid(vmid))?.pve_node_id);
+        const snapshots = await pve.getSnapshots(vmid);
         const cfg = await db.snapshotConfig.get();
         const dailyCreate = await db.snapshotLogs.getDailyCount(req.user.id, 'create');
         const dailyRestore = await db.snapshotLogs.getDailyCount(req.user.id, 'restore');
@@ -222,10 +232,12 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
         }
 
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
+
         // 非管理员配额限制
         if (!isAdmin) {
             const cfg = await db.snapshotConfig.get();
-            const snapshots = await pveApi.getSnapshots(vmid);
+            const snapshots = await pve.getSnapshots(vmid);
             if (snapshots.length >= cfg.max_per_vm) {
                 return res.status(400).json({ error: `每台虚拟机最多保留 ${cfg.max_per_vm} 个快照`, code: 'VM_SNAPSHOT_LIMIT', params: [cfg.max_per_vm] });
             }
@@ -236,7 +248,7 @@ router.post('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
         }
 
         const name = generateSnapshotName();
-        await pveApi.createSnapshot(vmid, name, description || '');
+        await pve.createSnapshot(vmid, name, description || '');
         db.snapshotLogs.add(req.user.id, vmid, 'create');
         await auditAction(req, 'vm.snapshot.create', '创建 VM ' + vmid + ' 快照');
         res.json({ message: '快照创建成功' });
@@ -277,9 +289,11 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
             return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
         }
 
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
+
         // 非管理员额外检查
         if (!isAdmin) {
-            const status = await pveApi.getVmStatus(vmid);
+            const status = await pve.getVmStatus(vmid);
             if (status.status !== 'stopped') {
                 return res.status(400).json({ error: '回滚前请先关闭虚拟机', code: 'SHUTDOWN_BEFORE_ROLLBACK_VM' });
             }
@@ -290,7 +304,7 @@ router.post('/vm/:vmid/snapshots/:snapname/rollback', authMiddleware, async (req
             }
         }
 
-        await pveApi.rollbackSnapshot(vmid, req.params.snapname);
+        await pve.rollbackSnapshot(vmid, req.params.snapname);
         db.snapshotLogs.add(req.user.id, vmid, 'restore');
         await auditAction(req, 'vm.snapshot.rollback', '恢复 VM ' + vmid + ' 快照');
         res.json({ message: '快照恢复成功，请稍后启动虚拟机' });
@@ -321,7 +335,8 @@ router.delete('/vm/:vmid/snapshots/:snapname', authMiddleware, async (req, res) 
             return res.status(400).json({ error: '无效的快照名称', code: 'INVALID_SNAPSHOT_NAME' });
         }
 
-        await pveApi.deleteSnapshot(vmid, req.params.snapname);
+        const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.deleteSnapshot(vmid, req.params.snapname);
         await auditAction(req, 'vm.snapshot.delete', '删除 VM ' + vmid + ' 快照');
         res.json({ message: '快照已删除' });
     } catch (error) {

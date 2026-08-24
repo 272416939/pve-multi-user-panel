@@ -3,8 +3,9 @@
 // 从 routes/package.js 抽取：用户侧 VM/LXC 开通（含扣款/退款/通知）、管理端套餐开通
 
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
-const ikuaiApi = require('../api/ikuai-api');
+// 多节点：按资产/套餐所在 PVE 节点动态取客户端（不再使用全局单例）
+const { getPveClient } = require('../api/pve-clients');
+const { getIkuaiClient, getIkuaiClientForPve } = require('../api/ikuai-clients');
 const crypto = require('crypto');
 const cacheStore = require('../utils/cache-store');
 const { generateVmName, generateLxcName } = require('../utils/random-name');
@@ -53,9 +54,12 @@ async function validateSubnetForUser(subnetId, userId, required) {
 
 // 刷新子网 DHCP 剩余可用数（创建 DHCP 绑定后回写）
 async function refreshSubnetAvailableById(subnet) {
-    if (!subnet || !ikuaiApi.isConfigured()) return;
+    if (!subnet) return;
+    // 多节点：按子网归属的爱快节点取客户端（subnets.ikuai_node_id）
+    const ik = await getIkuaiClient(subnet.ikuai_node_id);
+    if (!ik.isConfigured()) return;
     try {
-        const srv = await ikuaiApi.getDhcpServerByInterface(subnet.vlan_name);
+        const srv = await ik.getDhcpServerByInterface(subnet.vlan_name);
         if (srv) await db.subnets.update(subnet.id, { available: srv.available || 0 });
     } catch (_) {}
 }
@@ -113,6 +117,10 @@ async function provisionVm(opts) {
         return { ok: false, status: 400, error: '该套餐已售罄', code: 'PKG_SOLD_OUT' };
     }
 
+    // 多节点：目标节点取自套餐（vm_packages.pve_node_id），后续 PVE/SSH/爱快均按该节点路由
+    var targetNodeId = pkg.pve_node_id;
+    var pve = await getPveClient(targetNodeId);
+
     var template = await db.vmTemplates.getById(pkg.template_id);
     if (!template) return { ok: false, status: 404, error: '关联模板不存在', code: 'LINKED_TEMPLATE_NOT_FOUND' };
     if (template.status !== 'active') return { ok: false, status: 400, error: '关联模板已停用', code: 'LINKED_TEMPLATE_DISABLED' };
@@ -149,7 +157,7 @@ async function provisionVm(opts) {
     var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
 
     var randomName = generateVmName();
-    var newVmid = await pveApi.getNextAvailableVmid();
+    var newVmid = await pve.getNextAvailableVmid();
 
     // 下单即生成订单与扣款流水（先扣款后开通，失败退款）
     // ARCH-09: 扣款+订单创建+流水记录三步放入事务，保证原子性
@@ -182,7 +190,7 @@ async function provisionVm(opts) {
 
     // 检查模板 VM 状态，full clone 需要模板处于停止状态
     try {
-        var tmplStatus = await pveApi.getVmStatus(cloneSourceVmid);
+        var tmplStatus = await pve.getVmStatus(cloneSourceVmid);
         if (tmplStatus && tmplStatus.status === 'running') {
             console.error('[provisioning] 模板 VM ' + cloneSourceVmid + ' 正在运行，无法进行 full clone');
             return { ok: false, status: 400, error: '模板虚拟机正在运行，请先停止后再订购', code: 'TPL_VM_RUNNING' };
@@ -193,7 +201,7 @@ async function provisionVm(opts) {
 
     var newVm = null;
     try {
-        var upid = await pveApi.cloneVm(cloneSourceVmid, newVmid, {
+        var upid = await pve.cloneVm(cloneSourceVmid, newVmid, {
             name: randomName,
             storage: finalTargetStorage || undefined,
             clone_mode: 'full'
@@ -210,11 +218,12 @@ async function provisionVm(opts) {
             yearly_discount: String(pkg.yearly_discount || ''),
             pve_upid: upid,
             current_os_template_id: osTemplate ? osTemplate.id : null,
-            subnet_id: subnet ? subnet.id : null
+            subnet_id: subnet ? subnet.id : null,
+            pve_node_id: targetNodeId
         });
 
         // 等待 clone 任务完成
-        await pveApi.waitForTask(upid);
+        await pve.waitForTask(upid);
 
         // 开通完成，清空 pve_upid（表示开通完成）
         newVm = await db.vms.update(newVm.id, { pve_upid: '' });
@@ -228,7 +237,7 @@ async function provisionVm(opts) {
                 var systemBus = await diskOps.getSystemDiskBus(newVmid);
                 var resizeCmd = systemBus + '0';
                 // 先获取当前系统盘实际容量，只大不小
-                var oldConfig = await pveApi.getVmConfig(newVmid);
+                var oldConfig = await pve.getVmConfig(newVmid);
                 var oldSizeGb = 0;
                 var _buses = ['scsi', 'sata', 'virtio'];
                 for (var _i = 0; _i < _buses.length; _i++) {
@@ -242,7 +251,7 @@ async function provisionVm(opts) {
                 var targetSizeGb = Math.max(oldSizeGb, parseInt(template.disk_size));
                 if (targetSizeGb > oldSizeGb) {
                     var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
-                    var sshConfig = await getPveSshConfig();
+                    var sshConfig = await getPveSshConfig(targetNodeId);
                     await execSSH(sshConfig.host, sshConfig.username, sshConfig.password,
                         'qm resize ' + newVmid + ' ' + resizeCmd + ' ' + targetSizeGb + 'G', 60000, sshConfig.port);
                     console.log('[provisioning] VM ' + newVmid + ' 系统盘已扩容到 ' + targetSizeGb + 'G');
@@ -263,7 +272,7 @@ async function provisionVm(opts) {
         // 私有网络：网卡写入 VLAN tag（保留模板网卡的 MAC/bridge/model）
         if (subnet) {
             try {
-                var cloneCfg = await pveApi.getVmConfig(newVmid);
+                var cloneCfg = await pve.getVmConfig(newVmid);
                 if (cloneCfg && cloneCfg.net0) {
                     vmUpdateCfg.net0 = cloneCfg.net0 + ',tag=' + subnet.vlan_id;
                 }
@@ -271,7 +280,7 @@ async function provisionVm(opts) {
                 console.error('[provisioning] VM 写入 VLAN tag 失败:', netErr.message);
             }
         }
-        await pveApi.updateVmConfig(newVmid, vmUpdateCfg);
+        await pve.updateVmConfig(newVmid, vmUpdateCfg);
 
         if (template.cpu_affinity) {
             await setVmAffinity(newVmid, template.cpu_affinity);
@@ -280,10 +289,12 @@ async function provisionVm(opts) {
         var macCfg = null;
         if (finalMacGroupId) {
             try {
-                macCfg = await pveApi.getVmConfig(newVmid);
+                macCfg = await pve.getVmConfig(newVmid);
                 var vmac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
                 if (vmac) {
-                    await ikuaiApi.addMacToGroup(finalMacGroupId, vmac[0], randomName);
+                    // 多节点：MAC 分组按套餐所在 PVE 节点的配对爱快路由
+                    var ik = await getIkuaiClientForPve(targetNodeId);
+                    await ik.addMacToGroup(finalMacGroupId, vmac[0], randomName);
                     await db.vms.update(newVm.id, { ikuai_mac_group_id: finalMacGroupId });
                 }
             } catch (macErr) { console.error('[provisioning] VM MAC sync failed:', macErr.message); }
@@ -291,10 +302,10 @@ async function provisionVm(opts) {
 
         // DHCP 静态绑定
         try {
-            if (!macCfg) macCfg = await pveApi.getVmConfig(newVmid);
+            if (!macCfg) macCfg = await pve.getVmConfig(newVmid);
             var dhcpMac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
             if (dhcpMac) {
-                var dhcpIp = await createDhcpStaticBinding('vm', newVmid, dhcpMac[0], '', subnet);
+                var dhcpIp = await createDhcpStaticBinding('vm', newVmid, dhcpMac[0], '', subnet, { pveNodeId: targetNodeId });
                 if (dhcpIp) {
                     await db.vms.update(newVm.id, { dhcp_static_ip: dhcpIp });
                     await refreshSubnetAvailableById(subnet);
@@ -382,7 +393,7 @@ async function provisionVm(opts) {
 
     // 自动开机
     try {
-        await pveApi.startVm(newVmid);
+        await pve.startVm(newVmid);
     } catch (startErr) { console.error('[provisioning] VM 自动开机失败:', startErr.message); }
 
     // 操作审计：服务开通（含套餐名称）
@@ -426,6 +437,10 @@ async function provisionLxc(opts) {
         return { ok: false, status: 400, error: '该套餐已售罄', code: 'PKG_SOLD_OUT' };
     }
 
+    // 多节点：目标节点取自套餐（lxc_packages.pve_node_id），后续 PVE/SSH/爱快均按该节点路由
+    var targetNodeId = pkg.pve_node_id;
+    var pve = await getPveClient(targetNodeId);
+
     var template = await db.lxcTemplates.getById(pkg.template_id);
     if (!template) return { ok: false, status: 404, error: '关联模板不存在', code: 'LINKED_TEMPLATE_NOT_FOUND' };
     if (template.status !== 'active') return { ok: false, status: 400, error: '关联模板已停用', code: 'LINKED_TEMPLATE_DISABLED' };
@@ -440,7 +455,7 @@ async function provisionLxc(opts) {
     var totalAmount = calculateAmount(pkg.monthly_price, period, period_count, pkg.quarterly_discount, pkg.yearly_discount);
 
     var randomName = generateLxcName();
-    var newVmid = await pveApi.getNextAvailableVmid();
+    var newVmid = await pve.getNextAvailableVmid();
 
     // 下单即生成订单与扣款流水（先扣款后开通，失败退款）
     // ARCH-09: 扣款+订单创建+流水记录三步放入事务，保证原子性
@@ -473,7 +488,7 @@ async function provisionLxc(opts) {
 
     var newCt = null;
     try {
-        var lxcResp = await pveApi.createLxc({
+        var lxcResp = await pve.createLxc({
             vmid: String(newVmid), ostemplate: template.ostemplate,
             storage: template.storage || 'local', hostname: randomName,
             cores: template.cores, memory: template.memory, swap: template.swap,
@@ -510,11 +525,12 @@ async function provisionLxc(opts) {
             ct_id: newVmid, user_id: userId, name: randomName, expiration_date: formatLocalDate(expDate),
             renewal_price: String(calculateAmount(pkg.monthly_price, period, 1, pkg.quarterly_discount, pkg.yearly_discount)), renewal_period: period,
             pve_upid: lxcUpid,
-            subnet_id: subnet ? subnet.id : null
+            subnet_id: subnet ? subnet.id : null,
+            pve_node_id: targetNodeId
         });
 
         // 等待 LXC 创建任务完成
-        await pveApi.waitForTask(lxcUpid);
+        await pve.waitForTask(lxcUpid);
 
         // 开通完成，清空 pve_upid（表示开通完成）
         newCt = await db.lxcContainers.update(newCt.id, { pve_upid: '' });
@@ -522,17 +538,19 @@ async function provisionLxc(opts) {
         if (finalMacGroupId) {
             try {
                 // LXC 刚创建时 config.net0 可能不含 MAC，先启动再获取
-                var lxcStatus = await pveApi.getLxcStatus(newVmid);
+                var lxcStatus = await pve.getLxcStatus(newVmid);
                 var needStart = lxcStatus && lxcStatus.status === 'stopped';
                 if (needStart) {
-                    await pveApi.startLxc(newVmid);
+                    await pve.startLxc(newVmid);
                     // 等待 PVE 分配 MAC
                     await new Promise(function(r) { setTimeout(r, 3000); });
                 }
-                var lxcCfg = await pveApi.getLxcConfig(newVmid);
+                var lxcCfg = await pve.getLxcConfig(newVmid);
                 var lmac = lxcCfg && lxcCfg.net0 ? lxcCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
                 if (lmac) {
-                    await ikuaiApi.addMacToGroup(finalMacGroupId, lmac[0], randomName);
+                    // 多节点：MAC 分组按套餐所在 PVE 节点的配对爱快路由
+                    var ik = await getIkuaiClientForPve(targetNodeId);
+                    await ik.addMacToGroup(finalMacGroupId, lmac[0], randomName);
                     await db.lxcContainers.update(newCt.id, { ikuai_mac_group_id: finalMacGroupId });
                 }
             } catch (macErr) { console.error('[provisioning] LXC MAC sync failed:', macErr.message); }
@@ -540,10 +558,10 @@ async function provisionLxc(opts) {
 
         // DHCP 静态绑定
         try {
-            var lxcDhcpCfg = await pveApi.getLxcConfig(newVmid);
+            var lxcDhcpCfg = await pve.getLxcConfig(newVmid);
             var dhcpLxcMac = lxcDhcpCfg && lxcDhcpCfg.net0 ? lxcDhcpCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
             if (dhcpLxcMac) {
-                var dhcpLxcIp = await createDhcpStaticBinding('lxc', newVmid, dhcpLxcMac[0], '', subnet);
+                var dhcpLxcIp = await createDhcpStaticBinding('lxc', newVmid, dhcpLxcMac[0], '', subnet, { pveNodeId: targetNodeId });
                 if (dhcpLxcIp) {
                     await db.lxcContainers.update(newCt.id, { dhcp_static_ip: dhcpLxcIp });
                     await refreshSubnetAvailableById(subnet);
@@ -607,9 +625,9 @@ async function provisionLxc(opts) {
 
     // 自动开机
     try {
-        var autoLxcStatus = await pveApi.getLxcStatus(newVmid);
+        var autoLxcStatus = await pve.getLxcStatus(newVmid);
         if (autoLxcStatus && autoLxcStatus.status === 'stopped') {
-            await pveApi.startLxc(newVmid);
+            await pve.startLxc(newVmid);
         }
     } catch (startErr) { console.error('[provisioning] LXC 自动开机失败:', startErr.message); }
 
@@ -618,7 +636,7 @@ async function provisionLxc(opts) {
     try {
         lxcPassword = generateRandomPassword();
         var { getPveSshConfig } = require('../api/ssh-exec');
-        var sshConfig = await getPveSshConfig();
+        var sshConfig = await getPveSshConfig(targetNodeId);
         if (sshConfig.host && sshConfig.password) {
             var { execSSHWithStdin } = require('../api/ssh-exec');
             await execSSHWithStdin(sshConfig.host, sshConfig.username, sshConfig.password,
@@ -694,17 +712,21 @@ async function adminProvisionVm(opts) {
 
     var macGroupId = template.mac_group_id || null;
 
+    // 多节点：admin 代开同样按套餐所在节点（vm_packages.pve_node_id）开通
+    var targetNodeId = pkg.pve_node_id;
+    var pve = await getPveClient(targetNodeId);
+
     // 生成随机名
     var randomName = name || generateVmName();
-    var newVmid = await pveApi.getNextAvailableVmid();
+    var newVmid = await pve.getNextAvailableVmid();
 
     // Clone VM
-    var upid = await pveApi.cloneVm(template.template_vmid, newVmid, {
+    var upid = await pve.cloneVm(template.template_vmid, newVmid, {
         name: randomName,
         storage: template.target_storage || undefined,
         clone_mode: template.clone_mode || 'full'
     });
-    await pveApi.waitForTask(upid);
+    await pve.waitForTask(upid);
 
     // 应用模板配置（CPU/内存）
     var adminVmCfg = { cores: template.cores, memory: template.memory };
@@ -715,7 +737,7 @@ async function adminProvisionVm(opts) {
     // 私有网络：网卡写入 VLAN tag（保留模板网卡的 MAC/bridge/model）
     if (subnet) {
         try {
-            var adminCfg0 = await pveApi.getVmConfig(newVmid);
+            var adminCfg0 = await pve.getVmConfig(newVmid);
             if (adminCfg0 && adminCfg0.net0) {
                 adminVmCfg.net0 = adminCfg0.net0 + ',tag=' + subnet.vlan_id;
             }
@@ -723,7 +745,7 @@ async function adminProvisionVm(opts) {
             console.error('[provisioning] admin VM 写入 VLAN tag 失败:', netErr.message);
         }
     }
-    await pveApi.updateVmConfig(newVmid, adminVmCfg);
+    await pve.updateVmConfig(newVmid, adminVmCfg);
 
     // CPU 亲和性
     if (template.cpu_affinity) {
@@ -741,16 +763,17 @@ async function adminProvisionVm(opts) {
         monthly_price: String(pkg.monthly_price || ''),
         quarterly_discount: String(pkg.quarterly_discount || ''),
         yearly_discount: String(pkg.yearly_discount || ''),
-        subnet_id: subnet ? subnet.id : null
+        subnet_id: subnet ? subnet.id : null,
+        pve_node_id: targetNodeId
     });
 
     // 私有网络：已指定子网时立即创建 DHCP 静态绑定（未指定则以关机状态交付，开机时提示绑定）
     if (subnet) {
         try {
-            var adminMacCfg = await pveApi.getVmConfig(newVmid);
+            var adminMacCfg = await pve.getVmConfig(newVmid);
             var adminMac = adminMacCfg && adminMacCfg.net0 ? adminMacCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
             if (adminMac) {
-                var adminDhcpIp = await createDhcpStaticBinding('vm', newVmid, adminMac[0], '', subnet);
+                var adminDhcpIp = await createDhcpStaticBinding('vm', newVmid, adminMac[0], '', subnet, { pveNodeId: targetNodeId });
                 if (adminDhcpIp) {
                     await db.vms.update(newVm.id, { dhcp_static_ip: adminDhcpIp });
                     await refreshSubnetAvailableById(subnet);
@@ -762,10 +785,12 @@ async function adminProvisionVm(opts) {
     // MAC 分组同步
     if (macGroupId) {
         try {
-            var macCfg = await pveApi.getVmConfig(newVmid);
+            var macCfg = await pve.getVmConfig(newVmid);
             var vmac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
             if (vmac) {
-                await ikuaiApi.addMacToGroup(macGroupId, vmac[0], randomName);
+                // 多节点：MAC 分组按套餐所在 PVE 节点的配对爱快路由
+                var ik = await getIkuaiClientForPve(targetNodeId);
+                await ik.addMacToGroup(macGroupId, vmac[0], randomName);
                 await db.vms.update(newVm.id, { ikuai_mac_group_id: macGroupId });
             }
         } catch (macErr) { console.error('[provisioning] VM MAC sync failed:', macErr.message); }
@@ -876,11 +901,15 @@ async function adminProvisionLxc(opts) {
 
     var macGroupId = template.mac_group_id || null;
 
+    // 多节点：admin 代开同样按套餐所在节点（lxc_packages.pve_node_id）开通
+    var targetNodeId = pkg.pve_node_id;
+    var pve = await getPveClient(targetNodeId);
+
     var randomName = name || generateLxcName();
-    var newVmid = await pveApi.getNextAvailableVmid();
+    var newVmid = await pve.getNextAvailableVmid();
 
     // 创建 LXC
-    await pveApi.createLxc({
+    await pve.createLxc({
         vmid: String(newVmid),
         ostemplate: template.ostemplate,
         storage: template.storage || 'local',
@@ -923,16 +952,17 @@ async function adminProvisionLxc(opts) {
         monthly_price: String(pkg.monthly_price || ''),
         quarterly_discount: String(pkg.quarterly_discount || ''),
         yearly_discount: String(pkg.yearly_discount || ''),
-        subnet_id: subnet ? subnet.id : null
+        subnet_id: subnet ? subnet.id : null,
+        pve_node_id: targetNodeId
     });
 
     // 私有网络：已指定子网时立即创建 DHCP 静态绑定（未指定则以关机状态交付，开机时提示绑定）
     if (subnet) {
         try {
-            var adminLxcCfg = await pveApi.getLxcConfig(newVmid);
+            var adminLxcCfg = await pve.getLxcConfig(newVmid);
             var adminLxcMac = adminLxcCfg && adminLxcCfg.net0 ? adminLxcCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
             if (adminLxcMac) {
-                var adminLxcDhcpIp = await createDhcpStaticBinding('lxc', newVmid, adminLxcMac[0], '', subnet);
+                var adminLxcDhcpIp = await createDhcpStaticBinding('lxc', newVmid, adminLxcMac[0], '', subnet, { pveNodeId: targetNodeId });
                 if (adminLxcDhcpIp) {
                     await db.lxcContainers.update(newCt.id, { dhcp_static_ip: adminLxcDhcpIp });
                     await refreshSubnetAvailableById(subnet);
@@ -944,10 +974,12 @@ async function adminProvisionLxc(opts) {
     // MAC 分组同步
     if (macGroupId) {
         try {
-            var macCfg = await pveApi.getLxcConfig(newVmid);
+            var macCfg = await pve.getLxcConfig(newVmid);
             var cmac = macCfg && macCfg.net0 ? macCfg.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/) : null;
             if (cmac) {
-                await ikuaiApi.addMacToGroup(macGroupId, cmac[0], randomName);
+                // 多节点：MAC 分组按套餐所在 PVE 节点的配对爱快路由
+                var ik = await getIkuaiClientForPve(targetNodeId);
+                await ik.addMacToGroup(macGroupId, cmac[0], randomName);
                 await db.lxcContainers.update(newCt.id, { ikuai_mac_group_id: macGroupId });
             }
         } catch (macErr) { console.error('[provisioning] LXC MAC sync failed:', macErr.message); }
@@ -1000,7 +1032,7 @@ async function adminProvisionLxc(opts) {
     try {
         adminLxcPwd = generateRandomPassword();
         var { getPveSshConfig, execSSHWithStdin } = require('../api/ssh-exec');
-        var sshConfig = await getPveSshConfig();
+        var sshConfig = await getPveSshConfig(targetNodeId);
         if (sshConfig.host && sshConfig.password) {
             await execSSHWithStdin(sshConfig.host, sshConfig.username, sshConfig.password,
                 'lxc-attach -n ' + newVmid + ' -- chpasswd',

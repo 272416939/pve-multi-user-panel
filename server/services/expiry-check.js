@@ -1,5 +1,5 @@
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
+const { getPveClient } = require('../api/pve-clients');
 const { shouldSendEmail } = require('../utils/email');
 const { sendTemplateEmail } = require('./email-template');
 const dbg = require('../utils/debug');
@@ -71,15 +71,7 @@ const checkExpiredVms = async () => {
     isCheckingExpired = true;
     
     try {
-        if (!pveApi.node) {
-            try {
-                await pveApi.detectNode();
-            } catch (error) {
-                console.error('检测节点失败:', error);
-                return;
-            }
-        }
-        
+        // 多节点：不再做全局单例节点探测（pveApi.node/detectNode），改为逐 VM 行解析客户端，配置在其内部按需加载
         const reminderConfig = await db.config.getReminder();
         const reminderDays = [reminderConfig.days1, reminderConfig.days2, reminderConfig.days3].filter(d => d > 0);
         const oneDayMs = 24 * 60 * 60 * 1000;
@@ -209,9 +201,12 @@ const checkExpiredVms = async () => {
                 }
                 
                 try {
-                    const status = await pveApi.getVmStatus(vm.vm_id);
+                    // 多节点：逐 VM 行解析客户端（行无节点回退默认并报告）
+                    if (vm.pve_node_id == null) console.warn(`[expiry] VM ${vm.vm_id} 无 pve_node_id，回退默认节点`);
+                    const pve = await getPveClient(vm.pve_node_id != null ? vm.pve_node_id : null);
+                    const status = await pve.getVmStatus(vm.vm_id);
                     if (status.status === 'running') {
-                        await pveApi.shutdownVm(vm.vm_id);
+                        await pve.shutdownVm(vm.vm_id);
                     }
                     // 标记关机原因为"到期自动关机"，便于续费后判断是否自动开机
                     try {
@@ -333,9 +328,12 @@ async function checkExpiredLxc() {
                 }
 
                 try {
-                    const status = await pveApi.getLxcStatus(ct.ct_id);
+                    // 多节点：逐 CT 行解析客户端（行无节点回退默认并报告）
+                    if (ct.pve_node_id == null) console.warn(`[expiry] CT ${ct.ct_id} 无 pve_node_id，回退默认节点`);
+                    const pve = await getPveClient(ct.pve_node_id != null ? ct.pve_node_id : null);
+                    const status = await pve.getLxcStatus(ct.ct_id);
                     if (status.status === 'running') {
-                        await pveApi.stopLxc(ct.ct_id);
+                        await pve.stopLxc(ct.ct_id);
                         console.log(`[LXC到期] 已自动关机 CT ${ct.ct_id} (${ct.name || ''})`);
                     }
                     // 标记关机原因为"到期自动关机"

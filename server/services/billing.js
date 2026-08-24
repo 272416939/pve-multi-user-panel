@@ -3,7 +3,7 @@
 // 从 utils/order-utils.js（deductBalance）与 routes/wallet.js（余额续费）抽取
 
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
+const { getPveClient } = require('../api/pve-clients');
 const { shouldSendEmail } = require('../utils/email');
 const { sendTemplateEmail } = require('./email-template');
 const { generateOrderNo } = require('../utils/order-utils');
@@ -154,6 +154,9 @@ async function renewByBalance(opts) {
     // 续费后自动开机（PVE 操作不放入事务，避免长事务）
     // 仅当关机原因是"到期自动关机"才自动开机，用户手动关机的资源不自动开机
     try {
+        // 多节点：按资源行 pve_node_id 解析客户端（行无节点回退默认并报告）
+        if (resource.pve_node_id == null) console.warn(`[billing] 资源 ${renewResourceId} 无 pve_node_id，回退默认节点`);
+        var renewPve = await getPveClient(resource.pve_node_id != null ? resource.pve_node_id : null);
         var renewVmid = type === 'vm' ? resource.vm_id : resource.ct_id;
         var freshResource = type === 'vm'
             ? await db.vms.getByVmid(renewVmid)
@@ -161,14 +164,14 @@ async function renewByBalance(opts) {
         var shouldAutoStart = freshResource && freshResource.shutdown_reason === 'expired';
         if (shouldAutoStart) {
             if (type === 'vm') {
-                var renewStatus = await pveApi.getVmStatus(renewVmid);
+                var renewStatus = await renewPve.getVmStatus(renewVmid);
                 if (renewStatus && renewStatus.status === 'stopped') {
-                    await pveApi.startVm(renewVmid);
+                    await renewPve.startVm(renewVmid);
                 }
             } else {
-                var renewLxcStatus = await pveApi.getLxcStatus(renewVmid);
+                var renewLxcStatus = await renewPve.getLxcStatus(renewVmid);
                 if (renewLxcStatus && renewLxcStatus.status === 'stopped') {
-                    await pveApi.startLxc(renewVmid);
+                    await renewPve.startLxc(renewVmid);
                 }
             }
         }

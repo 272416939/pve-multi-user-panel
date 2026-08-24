@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
+// 多节点：按资产所在节点取 PVE 客户端（与旧单例同接口）
+const { getPveClient } = require('../api/pve-clients');
 const { restoreLxcBySSH } = require('../api/ssh-exec');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const dbg = require('../utils/debug');
@@ -69,9 +70,11 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         if (!isAdmin && ct.expiration_date && new Date(ct.expiration_date) < new Date()) {
             return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
+
+        const pve = await getPveClient(ct.pve_node_id); // 按资产所在节点取客户端
  
         // 检查容器是否正在运行
-        const status = await pveApi.getLxcStatus(vmid);
+        const status = await pve.getLxcStatus(vmid);
         if (status.status === 'running') {
             return res.status(400).json({ error: '备份前请先关闭容器', code: 'SHUTDOWN_BEFORE_BACKUP_LXC' });
         }
@@ -108,7 +111,7 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
         // 获取容器的 rootfs 存储位置，用于恢复时指定
         let rootfsStorage = '';
         try {
-            const config = await pveApi.getLxcConfig(vmid);
+            const config = await pve.getLxcConfig(vmid);
             if (config.rootfs) {
                 rootfsStorage = config.rootfs.split(':')[0] || '';
             }
@@ -124,12 +127,13 @@ router.post('/lxc/:vmid/backups', authMiddleware, async (req, res) => {
             storage: storage,
             notes: notes || '',
             type: 'lxc',
-            rootfs_storage: rootfsStorage
+            rootfs_storage: rootfsStorage,
+            pve_node_id: ct.pve_node_id
         });
         const backupId = backupRecord.id;
  
         // 发送备份命令到 PVE
-        const result = await pveApi.createBackup(vmid, storage, 'suspend');
+        const result = await pve.createBackup(vmid, storage, 'suspend');
         const upid = result.data;
  
         await db.backups.updateProgress(backupId, 0, upid);
@@ -162,8 +166,9 @@ router.delete('/lxc/:vmid/backups/:id', authMiddleware, async (req, res) => {
         // 删除 PVE 上的备份文件（失败仅记录，不影响 DB 删除）
         if (backup.filename) {
             const volid = `${backup.storage}:backup/${backup.filename}`;
+            const pve = await getPveClient(backup.pve_node_id); // 优先用备份行所在节点
             try {
-                await pveApi.deleteBackupFile(volid);
+                await pve.deleteBackupFile(volid);
             } catch (e) {
                 console.error('删除 PVE 备份文件失败:', e.message);
             }
@@ -220,7 +225,8 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
         }
  
         // 检查容器是否已关机
-        const status = await pveApi.getLxcStatus(vmid);
+        const pve = await getPveClient(backup.pve_node_id); // 优先用备份行所在节点
+        const status = await pve.getLxcStatus(vmid);
         if (status.status !== 'stopped') {
             return res.status(400).json({ error: '恢复前请先关闭容器', code: 'SHUTDOWN_BEFORE_RESTORE_LXC' });
         }
@@ -343,7 +349,9 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
                 return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
             }
         }
-        const status = await pveApi.getVmStatus(vmid);
+        const vmRow = await db.vms.getByVmid(vmid);
+        const pve = await getPveClient(vmRow?.pve_node_id); // 按资产所在节点取客户端
+        const status = await pve.getVmStatus(vmid);
         if (status.status !== 'stopped') {
             return res.status(400).json({ error: '请先关闭虚拟机后再进行备份', code: 'SHUTDOWN_BEFORE_BACKUP_VM' });
         }
@@ -369,10 +377,10 @@ router.post('/vm/:vmid/backups', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '无效的存储位置', code: 'INVALID_STORAGE' });
         }
         if (!storage) storage = (await db.backupConfig.get()).default_storage;
-        const backup = await db.backups.create({ vm_id: vmid, user_id: req.user.id, storage, notes: req.body.notes || '' });
+        const backup = await db.backups.create({ vm_id: vmid, user_id: req.user.id, storage, notes: req.body.notes || '', pve_node_id: vmRow?.pve_node_id });
         await db.backupLogs.add(req.user.id, vmid, 'create');
         try {
-            const result = await pveApi.createBackup(vmid, storage, 'stop');
+            const result = await pve.createBackup(vmid, storage, 'stop');
             const upid = result.data || result;
             await db.backups.updateProgress(backup.id, 0, upid);
             startBackupPolling(backup.id, upid);
@@ -401,7 +409,8 @@ router.delete('/backups/:id', authMiddleware, async (req, res) => {
         }
         if (backup.filename && backup.status === 'completed') {
             const volid = backup.type === 'lxc' ? `${backup.storage}:backup/${backup.filename}` : backup.filename;
-            try { await pveApi.deleteBackupFile(volid); } catch (e) { console.error('删除备份文件失败:', e.message); }
+            const pve = await getPveClient(backup.pve_node_id); // 优先用备份行所在节点
+            try { await pve.deleteBackupFile(volid); } catch (e) { console.error('删除备份文件失败:', e.message); }
         }
         await db.restoreTasks.deleteByBackupId(parseInt(req.params.id));
         await db.backups.delete(req.params.id);
@@ -443,8 +452,9 @@ router.post('/backups/batch-delete', authMiddleware, async (req, res) => {
             }
             if (backup.filename && backup.status === 'completed') {
                 try {
+                    const pve = await getPveClient(backup.pve_node_id); // 优先用备份行所在节点
                     const volid = backup.type === 'lxc' ? `${backup.storage}:backup/${backup.filename}` : backup.filename;
-                    await pveApi.deleteBackupFile(volid);
+                    await pve.deleteBackupFile(volid);
                 } catch (e) { console.error('删除备份文件失败:', e.message); }
             }
         }
@@ -490,7 +500,8 @@ router.delete('/admin/backups/:id', authMiddleware, adminMiddleware, async (req,
         if (!backup) return res.status(404).json({ error: '备份不存在', code: 'BACKUP_NOT_FOUND' });
         if (backup.filename && backup.status === 'completed') {
             const volid = backup.type === 'lxc' ? `${backup.storage}:backup/${backup.filename}` : backup.filename;
-            try { await pveApi.deleteBackupFile(volid); } catch (e) { console.error('删除备份文件失败:', e.message); }
+            const pve = await getPveClient(backup.pve_node_id); // 优先用备份行所在节点
+            try { await pve.deleteBackupFile(volid); } catch (e) { console.error('删除备份文件失败:', e.message); }
         }
         await db.restoreTasks.deleteByBackupId(parseInt(req.params.id));
         await db.backups.delete(req.params.id);
@@ -531,7 +542,8 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
                 return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
             }
         }
-        const status = await pveApi.getVmStatus(vmid);
+        const pve = await getPveClient(backup.pve_node_id); // 优先用备份行所在节点
+        const status = await pve.getVmStatus(vmid);
         if (status.status !== 'stopped') {
             return res.status(400).json({ error: '请先关闭虚拟机后再进行恢复', code: 'SHUTDOWN_BEFORE_RESTORE_VM' });
         }
@@ -552,7 +564,7 @@ router.post('/vm/:vmid/backups/:id/restore', authMiddleware, async (req, res) =>
             console.error('[恢复] VM ' + vmid + ' 磁盘快照失败:', snapErr.message);
         }
         try {
-            const result = await pveApi.restoreBackup(vmid, backup.filename);
+            const result = await pve.restoreBackup(vmid, backup.filename);
             const upid = result.data || result;
             await db.restoreTasks.updateProgress(restore.id, 0, upid);
             startRestorePolling(restore.id, upid);

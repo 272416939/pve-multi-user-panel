@@ -3,7 +3,7 @@
 // 安全约束：永不执行运行中虚拟机强制拔盘，必须先关机再分离；LXC 全程跳过
 
 var db = require('../api/db');
-var pveApi = require('../api/pve-api');
+var { getPveClient } = require('../api/pve-clients');
 var { shouldSendEmail } = require('../utils/email');
 var { sendTemplateEmail } = require('./email-template');
 var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
@@ -79,7 +79,10 @@ async function detachDiskFromVm(disk) {
       throw new Error('无效的设备号');
     }
 
-    var sshConfig = await getPveSshConfig();
+    // 多节点：按磁盘行定位节点（null=默认节点）
+    var nodeId = disk && disk.pve_node_id != null ? disk.pve_node_id : null;
+    var pve = await getPveClient(nodeId != null ? nodeId : null);
+    var sshConfig = await getPveSshConfig(nodeId != null ? nodeId : null);
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
 
     // qm unlink 卸载磁盘（不留划线状态，Linux VM 完全清理）
@@ -108,17 +111,17 @@ async function detachDiskFromVm(disk) {
     try {
       var holdingService = require('./holding-vm');
       var holdingVmid = await holdingService.getHoldingVmid();
-      await holdingService.ensureHoldingVm(holdingVmid);
+      await holdingService.ensureHoldingVm(holdingVmid, nodeId);
       // 查找 unlink 后产生的 unused 槽位
-      var cfgAfter = await pveApi.getVmConfig(safeVmid);
+      var cfgAfter = await pve.getVmConfig(safeVmid);
       var unusedSlot = null;
       for (var ui3 = 0; ui3 <= 9; ui3++) {
         if (cfgAfter['unused' + ui3]) { unusedSlot = 'unused' + ui3; break; }
       }
       if (unusedSlot) {
-        var freeSlot = await holdingService.findFreeHoldingSlot(holdingVmid);
+        var freeSlot = await holdingService.findFreeHoldingSlot(holdingVmid, nodeId);
         if (freeSlot) {
-          await holdingService.moveDiskToHolding(safeVmid, unusedSlot, holdingVmid, freeSlot);
+          await holdingService.moveDiskToHolding(safeVmid, unusedSlot, holdingVmid, freeSlot, nodeId);
           // 更新台账托管信息
           await db.disks.updateHolding(disk.id, holdingVmid, freeSlot);
           logger.info('[disk-expiry] 磁盘 ' + disk.id + ' 已到期转移到中转 VM ' + holdingVmid + ' 槽位 ' + freeSlot);
@@ -154,7 +157,9 @@ async function destroyExpiredDisk(disk) {
       throw new Error('禁止销毁系统盘');
     }
 
-    var sshConfig = await getPveSshConfig();
+    // 多节点：按磁盘行定位节点（null=默认节点）
+    var nodeId = disk && disk.pve_node_id != null ? disk.pve_node_id : null;
+    var sshConfig = await getPveSshConfig(nodeId != null ? nodeId : null);
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
 
     var cmd = 'pvesm free ' + disk.volume_id;
@@ -274,7 +279,9 @@ async function checkExpiredDisks() {
 
 async function checkStorageCapacityAlert() {
   try {
-    var storages = await pveApi.getAllStorages();
+    // 无行上下文（仅存储池名）：回退默认节点查询（多节点下存储池名跨节点不唯一时由调用方/后续改造保证）
+    var pve = await getPveClient(null);
+    var storages = await pve.getAllStorages();
     if (!storages || storages.length === 0) return;
 
     for (var i = 0; i < storages.length; i++) {
@@ -348,9 +355,13 @@ async function importDisksForVm(vmId, userId) {
   var imported = 0;
   var skipped = 0;
   try {
+    // 多节点：按 VM 行解析节点
+    var vmRow = await db.vms.getByVmid(vmId);
+    var nodeId = vmRow && vmRow.pve_node_id != null ? vmRow.pve_node_id : null;
+    var pve = await getPveClient(nodeId != null ? nodeId : null);
     var allSpecs = await db.diskSpecs.getAll();
     var allGroups = await db.storageGroups.getAll();
-    var config = await pveApi.getVmConfig(vmId);
+    var config = await pve.getVmConfig(vmId);
     if (!config) return { imported: 0, skipped: 0 };
 
     for (var dev = 1; dev <= 30; dev++) {
@@ -547,7 +558,10 @@ async function importExistingDisks() {
     for (var i = 0; i < allVms.length; i++) {
       var vm = allVms[i];
       try {
-        var config = await pveApi.getVmConfig(vm.vm_id);
+        // 多节点：按 VM 行逐行解析节点（不回退整批一个客户端）
+        var nodeId = vm && vm.pve_node_id != null ? vm.pve_node_id : null;
+        var vmPve = await getPveClient(nodeId != null ? nodeId : null);
+        var config = await vmPve.getVmConfig(vm.vm_id);
         if (!config) continue;
 
         // 遍历设备号 1-30，跳过 0 号系统盘

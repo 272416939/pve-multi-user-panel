@@ -74,8 +74,8 @@ const portForwards = {
     },
     create: async (data) => {
         const [result] = await execute(
-            `INSERT INTO port_forwards (type, vm_id, ct_id, name, ip, mac, internal_port, external_port, protocol, enabled, source, sync_status, ikuai_id, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO port_forwards (type, vm_id, ct_id, name, ip, mac, internal_port, external_port, protocol, enabled, source, sync_status, ikuai_id, ikuai_node_id, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 data.type,
                 data.vm_id || null,
@@ -90,6 +90,7 @@ const portForwards = {
                 data.source || 'panel',
                 data.sync_status || 'pending',
                 data.ikuai_id || '',
+                data.ikuai_node_id || null,
                 mysqlNow(),
                 mysqlNow()
             ]
@@ -97,7 +98,7 @@ const portForwards = {
         return queryOne('SELECT * FROM port_forwards WHERE id = ?', [result.insertId]);
     },
     update: async (id, data) => {
-        const allowedColumns = ['name', 'type', 'vm_id', 'ct_id', 'ip', 'mac', 'internal_port', 'external_port', 'protocol', 'enabled', 'source', 'sync_status', 'ikuai_id'];
+        const allowedColumns = ['name', 'type', 'vm_id', 'ct_id', 'ip', 'mac', 'internal_port', 'external_port', 'protocol', 'enabled', 'source', 'sync_status', 'ikuai_id', 'ikuai_node_id'];
         for (const key of Object.keys(data)) {
             if (!allowedColumns.includes(key)) {
                 delete data[key];

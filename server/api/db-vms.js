@@ -5,11 +5,14 @@ const vms = {
     getAll: () => queryAll('SELECT * FROM vms'),
     getByUserId: (userId) => queryAll('SELECT * FROM vms WHERE user_id = ?', [userId]),
     getById: (id) => queryOne('SELECT * FROM vms WHERE id = ?', [id]),
-    getByVmid: (vmid) => queryOne('SELECT * FROM vms WHERE vm_id = ?', [parseInt(vmid)]),
+    // nodeId 可选作用域：多节点后 vmid 不再全局唯一，已知节点时必须带第二参数
+    getByVmid: (vmid, nodeId) => (nodeId != null
+        ? queryOne('SELECT * FROM vms WHERE vm_id = ? AND pve_node_id = ?', [parseInt(vmid), nodeId])
+        : queryOne('SELECT * FROM vms WHERE vm_id = ?', [parseInt(vmid)])),
     create: async (vm) => {
         const [result] = await execute(
-            `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, current_os_template_id, subnet_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+             `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, current_os_template_id, subnet_id, pve_node_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 vm.vm_id,
                 vm.user_id,
@@ -23,6 +26,7 @@ const vms = {
                 vm.pve_upid || '',
                 vm.current_os_template_id || null,
                 vm.subnet_id || null,
+                vm.pve_node_id || null,
                 mysqlNow()
             ]
         );
@@ -31,7 +35,7 @@ const vms = {
     update: async (id, updates) => {
         const allowedColumns = ['name', 'vm_id', 'user_id', 'expiration_date',
             'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'backup_storage', 'reminderSent', 'lastReminderDate', 'shutdown_reason',
-            'current_os_template_id', 'last_os_switch_at', 'os_switch_pve_upid', 'subnet_id'];
+            'current_os_template_id', 'last_os_switch_at', 'os_switch_pve_upid', 'subnet_id', 'pve_node_id'];
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }
@@ -97,12 +101,14 @@ const lxcContainers = {
     getAll: () => queryAll('SELECT * FROM lxc_containers'),
     getByUserId: (userId) => queryAll('SELECT * FROM lxc_containers WHERE user_id = ?', [userId]),
     getById: (id) => queryOne('SELECT * FROM lxc_containers WHERE id = ?', [id]),
-    getByCtId: (ctId) => queryAll('SELECT * FROM lxc_containers WHERE ct_id = ?', [ctId]),
+    getByCtId: (ctId, nodeId) => (nodeId != null
+        ? queryAll('SELECT * FROM lxc_containers WHERE ct_id = ? AND pve_node_id = ?', [ctId, nodeId])
+        : queryAll('SELECT * FROM lxc_containers WHERE ct_id = ?', [ctId])),
     findByUpid: (upid) => queryOne('SELECT * FROM lxc_containers WHERE pve_upid = ? LIMIT 1', [upid]),
     create: async (ct) => {
         const [result] = await execute(
-            `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, subnet_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO lxc_containers (ct_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, subnet_id, pve_node_id, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 ct.ct_id,
                 ct.user_id,
@@ -115,6 +121,7 @@ const lxcContainers = {
                 ct.yearly_discount || '',
                 ct.pve_upid || '',
                 ct.subnet_id || null,
+                ct.pve_node_id || null,
                 mysqlNow()
             ]
         );
@@ -122,7 +129,7 @@ const lxcContainers = {
     },
     update: async (id, updates) => {
         const allowedColumns = ['name', 'ct_id', 'user_id', 'expiration_date',
-            'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate', 'shutdown_reason', 'subnet_id'];
+            'renewal_price', 'renewal_period', 'monthly_price', 'quarterly_discount', 'yearly_discount', 'pve_upid', 'dhcp_static_ip', 'ikuai_mac_group_id', 'reminderSent', 'lastReminderDate', 'shutdown_reason', 'subnet_id', 'pve_node_id'];
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }
@@ -189,8 +196,8 @@ const vmTemplates = {
     getById: (id) => queryOne('SELECT * FROM vm_templates WHERE id = ?', [id]),
     create: async (data) => {
         const [result] = await execute(
-            `INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, ciuser, target_storage, clone_mode, cpu_affinity, mac_group_id, description, status)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO vm_templates (name, template_vmid, cores, memory, disk_size, network_bridge, network_model, os_type, ciuser, target_storage, clone_mode, cpu_affinity, mac_group_id, description, status, pve_node_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 data.name || '', data.template_vmid || 0, data.cores || 1,
                 data.memory || 1024, data.disk_size || 20,
@@ -201,13 +208,14 @@ const vmTemplates = {
                 data.clone_mode || 'full',
                 data.cpu_affinity || '',
                 data.mac_group_id || '',
-                data.description || '', data.status || 'active'
+                data.description || '', data.status || 'active',
+                data.pve_node_id || null
             ]
         );
         return queryOne('SELECT * FROM vm_templates WHERE id = ?', [result.insertId]);
     },
     update: async (id, updates) => {
-        const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'ciuser', 'target_storage', 'clone_mode', 'cpu_affinity', 'mac_group_id', 'description', 'status'];
+        const allowedColumns = ['name', 'template_vmid', 'cores', 'memory', 'disk_size', 'network_bridge', 'network_model', 'os_type', 'ciuser', 'target_storage', 'clone_mode', 'cpu_affinity', 'mac_group_id', 'description', 'status', 'pve_node_id'];
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }
@@ -250,7 +258,7 @@ const lxcTemplates = {
         return queryOne('SELECT * FROM lxc_templates WHERE id = ?', [result.insertId]);
     },
     update: async (id, updates) => {
-        const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'ipv6_enabled', 'ip6_mode', 'ip6_addr', 'ip4_addr', 'unprivileged', 'features', 'description', 'rootfs_storage', 'mac_group_id', 'status'];
+        const allowedColumns = ['name', 'ostemplate', 'storage', 'cores', 'memory', 'swap', 'disk_size', 'network_bridge', 'network_mode', 'ipv6_enabled', 'ip6_mode', 'ip6_addr', 'ip4_addr', 'unprivileged', 'features', 'description', 'rootfs_storage', 'mac_group_id', 'status', 'pve_node_id'];
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }
@@ -278,8 +286,8 @@ const osTemplates = {
     getByTemplateVmid: (vmid) => queryAll('SELECT * FROM os_templates WHERE template_vmid = ?', [parseInt(vmid)]),
     create: async (data) => {
         const [result] = await execute(
-`INSERT INTO os_templates (name, template_vmid, os_type, os_version, ostype, arch, target_storage, disk_format, ciuser, description, icon, sort_order, allowed_package_ids, enabled, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+`INSERT INTO os_templates (name, template_vmid, os_type, os_version, ostype, arch, target_storage, disk_format, ciuser, description, icon, sort_order, allowed_package_ids, enabled, status, pve_node_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 data.name || '', parseInt(data.template_vmid) || 0,
                 data.os_type || '', data.os_version || '',
@@ -288,13 +296,14 @@ const osTemplates = {
                 data.ciuser || '', data.description || '',
                 data.icon || '', parseInt(data.sort_order) || 0,
                 data.allowed_package_ids || '', data.enabled === false ? 0 : 1,
-                data.status || 'active'
+                data.status || 'active',
+                data.pve_node_id || null
             ]
         );
         return queryOne('SELECT * FROM os_templates WHERE id = ?', [result.insertId]);
     },
     update: async (id, updates) => {
-        const allowedColumns = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status'];
+        const allowedColumns = ['name', 'template_vmid', 'os_type', 'os_version', 'ostype', 'arch', 'target_storage', 'disk_format', 'ciuser', 'description', 'icon', 'sort_order', 'allowed_package_ids', 'enabled', 'status', 'pve_node_id'];
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }

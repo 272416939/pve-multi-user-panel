@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const ikuaiApi = require('../api/ikuai-api');
+// 多节点：MAC 分组列表属系统级查询，统一走默认爱快节点客户端（工厂兜底 null=默认节点）
+const { getIkuaiClient } = require('../api/ikuai-clients');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { safeError } = require('../utils/safe-error');
@@ -11,6 +12,7 @@ router.get('/mac-groups', authMiddleware, async (req, res) => {
         // L-12 修复：外呼爱快接口必须限速（admin 可配置）
         const rate = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-query:' + req.user.id);
         if (!rate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: rate.retryAfter });
+        const ikuaiApi = await getIkuaiClient(null); // 系统级查询：默认爱快节点
         // 配置惰性加载（面板 DB 优先 + .env 迁移），加载后同步判断
         await ikuaiApi.ensureConfig();
         if (!ikuaiApi.isConfigured()) return res.json([]);
@@ -26,6 +28,7 @@ router.get('/ikuai/mac-groups', authMiddleware, adminMiddleware, async (req, res
         // L-12 修复：外呼爱快接口必须限速（admin 可配置）
         const rate = await checkConfiguredRateLimit('ikuai_query', 'ratelimit:ikuai-query:' + req.user.id);
         if (!rate.allowed) return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: rate.retryAfter });
+        const ikuaiApi = await getIkuaiClient(null); // 系统级查询：默认爱快节点
         await ikuaiApi.ensureConfig();
         if (!ikuaiApi.isConfigured()) {
             return res.json([]);

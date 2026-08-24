@@ -1,5 +1,5 @@
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
+const { getPveClient } = require('../api/pve-clients');
 const { shouldSendEmail } = require('../utils/email');
 const { sendTemplateEmail } = require('./email-template');
 const { pushToUser } = require('../websocket/push-proxy');
@@ -9,13 +9,21 @@ const { takeDiskSnapshot, auditAfterRestore } = require('./disk-audit');
 
 const lxcBackupPollingMap = new Map();
 
-function startLxcBackupPolling(backupId, upid, vmid) {
+async function startLxcBackupPolling(backupId, upid, vmid) {
     if (lxcBackupPollingMap.has(backupId)) return;
     console.log(`[LXC备份轮询] 开始监控备份 ${backupId} (UPID: ${upid})`);
 
+    // 多节点：按备份行 pve_node_id 解析（无行/无节点回退默认并报告）
+    const backupRow = await db.backups.getById(backupId);
+    if (!backupRow || backupRow.pve_node_id == null) {
+        console.warn(`[LXC备份轮询] 备份 ${backupId} ${backupRow ? '无 pve_node_id' : '行不存在'}，回退默认节点`);
+    }
+    const nodeId = backupRow && backupRow.pve_node_id != null ? backupRow.pve_node_id : null;
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+
     const interval = setInterval(async () => {
         try {
-            const task = await pveApi.getTaskStatus(upid);
+            const task = await pve.getTaskStatus(upid);
             if (!task) return;
 
             const pct = task.percentage || 0;
@@ -30,7 +38,7 @@ function startLxcBackupPolling(backupId, upid, vmid) {
                 let filename = '';
                 let size = 0;
                 try {
-                    const contents = await pveApi.getStorageContent(storage);
+                    const contents = await pve.getStorageContent(storage);
                     const prefix = `vzdump-lxc-${vmid}-`;
                     const match = contents
                         .filter(c => c.volid && c.volid.includes(prefix))
@@ -108,13 +116,23 @@ async function sendLxcBackupNotification(vmid, backupId, status) {
 
 const lxcRestorePollingMap = new Map();
 
-function startLxcRestorePolling(taskId, upid, vmid) {
+async function startLxcRestorePolling(taskId, upid, vmid) {
     if (lxcRestorePollingMap.has(taskId)) return;
     console.log(`[LXC恢复轮询] 开始监控恢复 ${taskId} (UPID: ${upid})`);
 
+    // 多节点：恢复任务无 pve_node_id，经其关联备份行解析（无行/无节点回退默认并报告）
+    const taskRow = await db.restoreTasks.getById(taskId);
+    let nodeId = null;
+    if (taskRow && taskRow.backup_id) {
+        const backupRow = await db.backups.getById(taskRow.backup_id);
+        if (backupRow && backupRow.pve_node_id != null) nodeId = backupRow.pve_node_id;
+    }
+    if (nodeId == null) console.warn(`[LXC恢复轮询] 恢复任务 ${taskId} 无法定位节点，回退默认节点`);
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+
     const interval = setInterval(async () => {
         try {
-            const task = await pveApi.getTaskStatus(upid);
+            const task = await pve.getTaskStatus(upid);
             if (!task) return;
 
             const pct = task.percentage || 0;
@@ -262,11 +280,20 @@ async function sendBackupNotification(userId, vmId, status, filename) {
     }
 }
 
-function startBackupPolling(backupId, upid) {
+async function startBackupPolling(backupId, upid) {
     if (backupPollIntervals.has(backupId)) return;
+
+    // 多节点：按备份行 pve_node_id 解析（无行/无节点回退默认并报告）
+    const backupRow = await db.backups.getById(backupId);
+    if (!backupRow || backupRow.pve_node_id == null) {
+        console.warn(`[备份轮询] 备份 ${backupId} ${backupRow ? '无 pve_node_id' : '行不存在'}，回退默认节点`);
+    }
+    const nodeId = backupRow && backupRow.pve_node_id != null ? backupRow.pve_node_id : null;
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+
     const interval = setInterval(async () => {
         try {
-            const task = await pveApi.getTaskStatus(upid);
+            const task = await pve.getTaskStatus(upid);
             if (!task) return;
             if (task.status === 'stopped' && task.exitstatus === 'OK') {
                 clearInterval(interval);
@@ -276,7 +303,7 @@ function startBackupPolling(backupId, upid) {
                 let size = 0;
                 if (backup) {
                     try {
-                        const contents = await pveApi.getStorageContent(backup.storage);
+                        const contents = await pve.getStorageContent(backup.storage);
                         const vmPrefix = `vzdump-qemu-${backup.vm_id}-`;
                         const backups = contents.filter(c => c.content === 'backup' && c.volid && c.volid.includes(vmPrefix));
                         if (backups.length > 0) {
@@ -368,12 +395,23 @@ async function sendRestoreNotification(userId, vmId, statusMsg) {
     }
 }
 
-function startRestorePolling(taskId, upid) {
+async function startRestorePolling(taskId, upid) {
     const key = 'r-' + taskId;
     if (backupPollIntervals.has(key)) return;
+
+    // 多节点：恢复任务无 pve_node_id，经其关联备份行解析（无行/无节点回退默认并报告）
+    const taskRow = await db.restoreTasks.getById(taskId);
+    let nodeId = null;
+    if (taskRow && taskRow.backup_id) {
+        const backupRow = await db.backups.getById(taskRow.backup_id);
+        if (backupRow && backupRow.pve_node_id != null) nodeId = backupRow.pve_node_id;
+    }
+    if (nodeId == null) console.warn(`[恢复轮询] 恢复任务 ${taskId} 无法定位节点，回退默认节点`);
+    const pve = await getPveClient(nodeId != null ? nodeId : null);
+
     const interval = setInterval(async () => {
         try {
-            const task = await pveApi.getTaskStatus(upid);
+            const task = await pve.getTaskStatus(upid);
             if (!task) return;
             if (task.status === 'stopped' && task.exitstatus === 'OK') {
                 clearInterval(interval);

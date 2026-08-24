@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
 const { authMiddleware, adminMiddleware } = require('../middleware/auth');
-const ikuaiApi = require('../api/ikuai-api');
+// 多节点：按资产所在节点取 PVE/爱快客户端（与旧单例同接口）
+const { getPveClient } = require('../api/pve-clients');
+const { getIkuaiClientForPve } = require('../api/ikuai-clients');
 const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
 const { getStatusCache } = require('../services/status-cache');
@@ -29,7 +30,9 @@ function isValidVmid(v) {
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
 router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const containers = await pveApi.getLxcContainers();
+        // 无单一资产上下文（跨节点列表）：回退默认节点
+        const pve = await getPveClient(null);
+        const containers = await pve.getLxcContainers();
 
         const assignedCts = await db.lxcContainers.getAll();
         const assignedCtIds = new Set(assignedCts.map(ct => ct.ct_id));
@@ -123,10 +126,11 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
         for (let i = 0; i < ctsWithDetails.length; i += batchSize) {
             const batch = ctsWithDetails.slice(i, i + batchSize);
             await Promise.all(batch.map(async (ctData) => {
+                const pve = await getPveClient(ctData.pve_node_id); // 按资产所在节点取客户端
                 try {
                     var cachedStatus = getStatusCache('lxc:' + ctData.ct_id, req.user.id);
-                    var rawStatus = cachedStatus || await pveApi.getLxcStatus(ctData.ct_id);
-                    var config = await pveApi.getLxcConfig(ctData.ct_id);
+                    var rawStatus = cachedStatus || await pve.getLxcStatus(ctData.ct_id);
+                    var config = await pve.getLxcConfig(ctData.ct_id);
                     ctData.status = cachedStatus || _applyRate('lxc:' + ctData.ct_id, rawStatus);
                     ctData.config = config;
                     ctData.error = null;
@@ -230,10 +234,12 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     // MAC 分组同步
     if (mac_group_id) {
         try {
-            var macCfg = await pveApi.getLxcConfig(parsedCtId);
+            const pve = await getPveClient(newCt.pve_node_id); // 按资产所在节点取客户端（新分配行未带节点，回退默认）
+            const ik = await getIkuaiClientForPve(newCt.pve_node_id);
+            var macCfg = await pve.getLxcConfig(parsedCtId);
             var cmac = macCfg?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (cmac) {
-                await ikuaiApi.addMacToGroup(mac_group_id, cmac[0], (name || 'CT ' + ct_id) + ' 容器');
+                await ik.addMacToGroup(mac_group_id, cmac[0], (name || 'CT ' + ct_id) + ' 容器');
                 await db.lxcContainers.update(newCt.id, { ikuai_mac_group_id: mac_group_id });
             }
         } catch (e) { console.error('LXC ' + parsedCtId + ' MAC分组同步失败:', e.message); }
@@ -275,7 +281,8 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 
     // DHCP 静态绑定：分配 IP
     try {
-        const config = await pveApi.getLxcConfig(parsedCtId);
+        const pve = await getPveClient(newCt.pve_node_id); // 按资产所在节点取客户端（新分配行未带节点，回退默认）
+        const config = await pve.getLxcConfig(parsedCtId);
         if (config && config.net0) {
             const macMatch = config.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (macMatch) {
@@ -285,7 +292,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
                 if (ipMatch && !ipMatch[1].startsWith('dhcp')) {
                     manualIp = ipMatch[1];
                 }
-                const ip = await createDhcpStaticBinding('lxc', parsedCtId, macMatch[0], manualIp);
+                const ip = await createDhcpStaticBinding('lxc', parsedCtId, macMatch[0], manualIp, null, { pveNodeId: newCt.pve_node_id });
                 if (ip) await db.lxcContainers.update(newCt.id, { dhcp_static_ip: ip });
             }
         }
@@ -320,7 +327,9 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     if (!isAdmin && !isOwner) {
         return res.status(403).json({ error: '无权限操作此容器', code: 'LXC_NO_PERM' });
     }
- 
+
+    const pve = await getPveClient(ct.pve_node_id); // 按资产所在节点取客户端
+
     const updates = {};
  
     if (name !== undefined) {
@@ -366,14 +375,15 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     const newMacGroupId = req.body.mac_group_id;
     if (isAdmin && newMacGroupId !== undefined && newMacGroupId !== ct.ikuai_mac_group_id) {
         try {
-            const macConfig = await pveApi.getLxcConfig(ct.ct_id);
+            const ik = await getIkuaiClientForPve(ct.pve_node_id); // NAT 类操作按资产所在节点取爱快客户端
+            const macConfig = await pve.getLxcConfig(ct.ct_id);
             const cmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (cmac) {
                 if (ct.ikuai_mac_group_id) {
-                    try { await ikuaiApi.removeMacFromGroup(ct.ikuai_mac_group_id, cmac[0]); } catch (e) {}
+                    try { await ik.removeMacFromGroup(ct.ikuai_mac_group_id, cmac[0]); } catch (e) {}
                 }
                 if (newMacGroupId) {
-                    await ikuaiApi.addMacToGroup(newMacGroupId, cmac[0], (ct.name || 'CT ' + ct.ct_id) + ' 容器');
+                    await ik.addMacToGroup(newMacGroupId, cmac[0], (ct.name || 'CT ' + ct.ct_id) + ' 容器');
                 }
                 updates.ikuai_mac_group_id = newMacGroupId || '';
             }
@@ -429,9 +439,9 @@ router.put('/user/lxc/:id', authMiddleware, async (req, res) => {
     // 换绑后尝试自动开机
     if (isAdmin && user_id !== undefined && user_id !== ct.user_id) {
         try {
-            const currentStatus = await pveApi.getLxcStatus(ct.ct_id);
+            const currentStatus = await pve.getLxcStatus(ct.ct_id);
             if (currentStatus && currentStatus.status === 'stopped') {
-                await pveApi.startLxc(ct.ct_id);
+                await pve.startLxc(ct.ct_id);
                 dbg(`LXC 容器 ${ct.ct_id} 已自动开机（换绑后）`);
             }
         } catch (startError) {
@@ -454,10 +464,11 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
     if (ct) {
         removedCtInfo = { name: ct.name, ct_id: ct.ct_id, user_id: ct.user_id };
     }
+    const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
     // 检查容器状态，必须关机才能移除
     if (ct && ct.ct_id) {
         try {
-            const status = await pveApi.getLxcStatus(ct.ct_id);
+            const status = await pve.getLxcStatus(ct.ct_id);
             if (status && status.status === 'running') {
                 return res.status(400).json({ error: '容器正在运行，请先关机后再移除', code: 'LXC_RUNNING_REMOVE' });
             }
@@ -468,25 +479,27 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
     await db.lxcContainers.reminders.clear(ctId);
     // 级联清理端口转发
     try {
+        const ik = await getIkuaiClientForPve(ct ? ct.pve_node_id : null); // NAT 类操作按资产所在节点取爱快客户端
         const lxcForwards = await db.portForwards.getByCtId(removedCtInfo?.ct_id || ctId);
         for (const fw of lxcForwards) {
             if (fw.ikuai_id) {
-                try { ikuaiApi.deletePortForward(fw.ikuai_id); } catch (e) {}
+                try { ik.deletePortForward(fw.ikuai_id); } catch (e) {}
             }
         }
         await db.portForwards.deleteByDevice('lxc', removedCtInfo?.ct_id || ctId);
     } catch (e) { console.error('清理端口转发失败:', e.message); }
     // 清理 DHCP 静态绑定
     if (ct && ct.ct_id) {
-        removeDhcpStaticBinding('lxc', ct.ct_id);
+        removeDhcpStaticBinding('lxc', ct.ct_id, { pveNodeId: ct.pve_node_id });
     }
     // MAC 分组清理
     if (ct && ct.ct_id && ct.ikuai_mac_group_id) {
         try {
-            const macConfig = await pveApi.getLxcConfig(ct.ct_id);
+            const ik = await getIkuaiClientForPve(ct.pve_node_id); // NAT 类操作按资产所在节点取爱快客户端
+            const macConfig = await pve.getLxcConfig(ct.ct_id);
             const cmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (cmac) {
-                await ikuaiApi.removeMacFromGroup(ct.ikuai_mac_group_id, cmac[0]);
+                await ik.removeMacFromGroup(ct.ikuai_mac_group_id, cmac[0]);
             }
         } catch (e) { console.error('LXC MAC分组删除失败:', e.message); }
     }
@@ -562,7 +575,8 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '该容器尚未绑定子网，请先在「更多→绑定子网」中绑定后再开机', code: 'LXC_NO_SUBNET_START' });
         }
 
-        await pveApi.startLxc(vmid);
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.startLxc(vmid);
         // 启动成功后清除关机原因标记
         try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: null }); } catch (_) {}
 
@@ -571,10 +585,10 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
             if (ct && ct.subnet_id) {
                 const subnet = await db.subnets.getById(ct.subnet_id);
                 if (subnet && (!ct.dhcp_static_ip || !isIpInAddrPool(ct.dhcp_static_ip, subnet.addr_pool))) {
-                    const cfg = await pveApi.getLxcConfig(vmid);
+                    const cfg = await pve.getLxcConfig(vmid);
                     const mac = ((cfg && cfg.net0) || '').match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
                     if (mac) {
-                        const newIp = await rebindDhcpForDevice('lxc', vmid, subnet, mac[0]);
+                        const newIp = await rebindDhcpForDevice('lxc', vmid, subnet, mac[0], { pveNodeId: ct.pve_node_id });
                         if (newIp) {
                             await db.lxcContainers.update(ct.id, { dhcp_static_ip: newIp });
                             // 端口转发同步：IP 变化时重建规则（绑定后首次开机/绑定丢失恢复场景）
@@ -617,7 +631,8 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
-        await pveApi.shutdownLxc(vmid);
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.shutdownLxc(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: 'manual' }); } catch (_) {}
         await auditAction(req, 'lxc.shutdown', '关机 LXC ' + vmid);
@@ -648,7 +663,8 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
-        await pveApi.stopLxc(vmid);
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.stopLxc(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: 'manual' }); } catch (_) {}
         await auditAction(req, 'lxc.stop', '强制停止 LXC ' + vmid);
@@ -679,7 +695,8 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限操作此容器，资源未分配', code: 'LXC_NO_PERM_UNASSIGNED' });
         }
 
-        await pveApi.rebootLxc(vmid);
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
+        await pve.rebootLxc(vmid);
         await auditAction(req, 'lxc.reboot', '重启 LXC ' + vmid);
         res.json({ message: 'LXC 容器重启命令已发送' });
     } catch (error) {
@@ -717,9 +734,10 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         }
  
         // 检查容器是否在运行
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
         let ctStatus;
         try {
-            ctStatus = await pveApi.getLxcStatus(vmid);
+            ctStatus = await pve.getLxcStatus(vmid);
         } catch (e) {
             return res.status(500).json({ error: '无法获取容器状态', code: 'LXC_STATE_FAILED' });
         }
@@ -727,7 +745,7 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '容器未运行，请先开机', code: 'LXC_NOT_RUNNING' });
         }
  
-        const result = await pveApi.getLxcVncConsole(vmid);
+        const result = await pve.getLxcVncConsole(vmid);
 
         // 安全修复：用不透明的 session ID 替代 URL 中的敏感参数
         const sessionId = await consoleSession.createSession({
@@ -775,9 +793,10 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
         }
 
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
         let ctStatus;
         try {
-            ctStatus = await pveApi.getLxcStatus(vmid);
+            ctStatus = await pve.getLxcStatus(vmid);
         } catch (e) {
             return res.status(500).json({ error: '无法获取容器状态', code: 'LXC_STATE_FAILED' });
         }
@@ -822,9 +841,10 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: '无权限查看此容器状态，资源未分配', code: 'LXC_STATE_NO_PERM_UNASSIGNED' });
         }
 
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
         const [rawStatus, config] = await Promise.all([
-            pveApi.getLxcStatus(vmid),
-            pveApi.getLxcConfig(req.params.vmid)
+            pve.getLxcStatus(vmid),
+            pve.getLxcConfig(req.params.vmid)
         ]);
         const status = _applyRate('lxc:' + req.params.vmid, rawStatus);
         res.json({ status, config });
@@ -836,14 +856,16 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
 router.get('/lxc/templates', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var targetStorage = req.query.storage || '';
+        // 无单一资产上下文（全局模板/存储列表）：回退默认节点
+        const pve = await getPveClient(null);
         if (targetStorage) {
-            var templates = await pveApi.getTemplates(targetStorage);
+            var templates = await pve.getTemplates(targetStorage);
             return res.json(templates.map(function(t) { return Object.assign({}, t, { storage: targetStorage }); }));
         }
-        const storages = await pveApi.getAllStorages();
+        const storages = await pve.getAllStorages();
         const templatePromises = storages.map(async (s) => {
             try {
-                const templates = await pveApi.getTemplates(s.storage);
+                const templates = await pve.getTemplates(s.storage);
                 return templates.map(t => ({ ...t, storage: s.storage }));
             } catch (e) {
                 return [];
@@ -858,7 +880,9 @@ router.get('/lxc/templates', authMiddleware, adminMiddleware, async (req, res) =
 
 router.get('/lxc/storages', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const storages = await pveApi.getLxcStorageList();
+        // 无单一资产上下文（全局存储列表）：回退默认节点
+        const pve = await getPveClient(null);
+        const storages = await pve.getLxcStorageList();
         res.json(storages.map(s => ({ id: s.storage, type: s.type, path: s.path, content: s.content })));
     } catch (error) {
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
@@ -874,7 +898,9 @@ router.post('/lxc/create', authMiddleware, adminMiddleware, async (req, res) => 
         }
  
         // 获取可用空闲 VMID（取当前最大 ID + 1）
-        const newVmid = await pveApi.getNextAvailableVmid();
+        // 无单一资产上下文（admin 直开新容器）：回退默认节点
+        const pve = await getPveClient(null);
+        const newVmid = await pve.getNextAvailableVmid();
         const rootfs = (storage || 'local') + ':' + (disk || 8);
         const params = {
             vmid: newVmid,
@@ -892,7 +918,7 @@ router.post('/lxc/create', authMiddleware, adminMiddleware, async (req, res) => 
         };
         if (description) params.description = description;
  
-        const result = await pveApi.createLxc(params);
+        const result = await pve.createLxc(params);
         const upid = result.data;
 
         // 操作审计：管理员直开 LXC（PVE 层创建）
@@ -941,7 +967,8 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
         }
 
         // 检查容器状态
-        const status = await pveApi.getLxcStatus(vmid);
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
+        const status = await pve.getLxcStatus(vmid);
         if (status.status !== 'running') {
             return res.status(400).json({ error: '容器未运行，请先开机再重置密码', code: 'LXC_NOT_RUNNING_RESET_PWD' });
         }
@@ -1044,7 +1071,8 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         }
 
         // 获取当前配置
-        const config = await pveApi.getLxcConfig(vmid);
+        const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
+        const config = await pve.getLxcConfig(vmid);
         if (!config || !config.net0) {
             return res.status(400).json({ error: '无法获取容器网络配置', code: 'LXC_NETCFG_FAILED' });
         }
@@ -1096,7 +1124,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
             newNet0Parts.push('gw=' + gateway);
             newIp = ipBase;
         } else if (ip_mode === 'random') {
-            const randomIp = await pickUnusedStaticIp(subnet);
+            const randomIp = await pickUnusedStaticIp(subnet, { pveNodeId: ct.pve_node_id });
             if (!randomIp) {
                 return res.status(400).json({ error: '子网 IP 池无可用 IP，请手动输入或刷新可用 IP', code: 'SUBNET_POOL_EMPTY' });
             }
@@ -1123,14 +1151,14 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         // 检查容器状态，运行中需要先关机
         let wasRunning = false;
         try {
-            const currentStatus = await pveApi.getLxcStatus(vmid);
+            const currentStatus = await pve.getLxcStatus(vmid);
             if (currentStatus && currentStatus.status === 'running') {
                 wasRunning = true;
-                await pveApi.shutdownLxc(vmid);
+                await pve.shutdownLxc(vmid);
                 // 等待关机完成
                 for (let i = 0; i < 30; i++) {
                     await new Promise(r => setTimeout(r, 2000));
-                    const s = await pveApi.getLxcStatus(vmid);
+                    const s = await pve.getLxcStatus(vmid);
                     if (!s || s.status !== 'running') break;
                 }
             }
@@ -1140,7 +1168,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
 
         // 更新 PVE 容器网络配置
         try {
-            await pveApi.updateLxcConfig(vmid, { net0: newNet0 });
+            await pve.updateLxcConfig(vmid, { net0: newNet0 });
         } catch (pveErr) {
             // 提取 PVE API 的详细错误信息
             let pveDetail = pveErr.message || '未知错误';
@@ -1153,7 +1181,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
             console.error(`LXC ${vmid} 更新网络配置失败:`, pveDetail);
             // 如果之前关机了，尝试恢复开机
             if (wasRunning) {
-                try { await pveApi.startLxc(vmid); } catch (_) {}
+                try { await pve.startLxc(vmid); } catch (_) {}
             }
             return res.status(500).json({ error: safeError(pveErr), code: 'INTERNAL_ERROR' });
         }
@@ -1161,32 +1189,34 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         // 如果之前是运行状态，重新开机
         if (wasRunning) {
             try {
-                await pveApi.startLxc(vmid);
+                await pve.startLxc(vmid);
             } catch (e) {
                 console.error(`LXC ${vmid} 重新开机失败:`, e.message);
             }
         }
 
         // 更新 ikuai DHCP 静态绑定
-        if (newIp && ikuaiApi.isConfigured()) {
+        let ik = null;
+        try { ik = await getIkuaiClientForPve(ct.pve_node_id); } catch (_) { /* 未配对爱快则跳过同步 */ }
+        if (newIp && ik && ik.isConfigured()) {
             try {
-                const bindings = await ikuaiApi.getDhcpStaticBindings();
+                const bindings = await ik.getDhcpStaticBindings();
                 const comment = `CT-${vmid}`;
                 const existing = bindings.find(b => b.comment === comment);
                 if (existing && existing.id) {
-                    await ikuaiApi.editDhcpStaticBinding(existing.id, mac, newIp, comment);
+                    await ik.editDhcpStaticBinding(existing.id, mac, newIp, comment);
                 } else {
                     // 没有已有绑定，创建新的（绑定子网时使用子网的 VLAN 接口/网关/DNS）
-                    const createdIp = await createDhcpStaticBinding('lxc', vmid, mac, newIp, subnet);
+                    const createdIp = await createDhcpStaticBinding('lxc', vmid, mac, newIp, subnet, { pveNodeId: ct.pve_node_id });
                     newIp = createdIp || newIp;
                 }
             } catch (e) {
                 console.error(`LXC ${vmid} 更新 DHCP 静态绑定失败:`, e.message);
             }
-        } else if (ip_mode === 'dhcp' && ikuaiApi.isConfigured()) {
+        } else if (ip_mode === 'dhcp' && ik && ik.isConfigured()) {
             // DHCP 模式下删除静态绑定
             try {
-                await removeDhcpStaticBinding('lxc', vmid);
+                await removeDhcpStaticBinding('lxc', vmid, { pveNodeId: ct.pve_node_id });
             } catch (e) {
                 console.error(`LXC ${vmid} 删除 DHCP 静态绑定失败:`, e.message);
             }
@@ -1215,7 +1245,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
                         for (const item of ikuaiIds) {
                             try {
                                 if (!item.id) continue;
-                                await ikuaiApi.editPortForward(item.id, {
+                                await ik.editPortForward(item.id, {
                                     ip: newIp,
                                     internal_port: rule.internal_port,
                                     external_port: rule.external_port,
@@ -1246,9 +1276,12 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
     try {
         const vmid = parseInt(req.params.vmid);
 
+        const assignedCts = await db.lxcContainers.getByCtId(vmid);
+        const pve = await getPveClient(assignedCts[0]?.pve_node_id); // 按资产所在节点取客户端
+
         // 检查容器状态，必须关机才能销毁
         try {
-            const status = await pveApi.getLxcStatus(vmid);
+            const status = await pve.getLxcStatus(vmid);
             if (status && status.status === 'running') {
                 return res.status(400).json({ error: '容器正在运行，请先关机后再销毁', code: 'LXC_RUNNING_DESTROY' });
             }
@@ -1257,33 +1290,33 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
         }
         
         // 先解除分配记录
-        const assignedCts = await db.lxcContainers.getByCtId(vmid);
         // 操作审计：销毁前记录（含归属；后台操作域）
         const destroyTargets = assignedCts.map(ct => (ct.name || 'CT ' + ct.ct_id) + '(用户#' + ct.user_id + ')').join('/');
         await auditAction(req, 'admin.lxc.destroy', '销毁 LXC ' + vmid + (destroyTargets ? ':' + destroyTargets : ''), { resourceType: 'lxc' });
         for (const ct of assignedCts) {
             await db.lxcContainers.reminders.clear(ct.id);
+            const ik = await getIkuaiClientForPve(ct.pve_node_id); // NAT 类操作按资产所在节点取爱快客户端
             // 级联清理端口转发
             try {
                 const lxcForwards = await db.portForwards.getByCtId(ct.ct_id);
                 for (const fw of lxcForwards) {
                     if (fw.ikuai_id) {
-                        try { ikuaiApi.deletePortForward(fw.ikuai_id); } catch (e) {}
+                        try { ik.deletePortForward(fw.ikuai_id); } catch (e) {}
                     }
                 }
                 await db.portForwards.deleteByDevice('lxc', ct.ct_id);
             } catch (e) { console.error('清理端口转发失败:', e.message); }
             // 清理 DHCP 静态绑定
             if (ct && ct.ct_id) {
-                removeDhcpStaticBinding('lxc', ct.ct_id);
+                removeDhcpStaticBinding('lxc', ct.ct_id, { pveNodeId: ct.pve_node_id });
             }
             // MAC 分组清理
             if (ct && ct.ct_id && ct.ikuai_mac_group_id) {
                 try {
-                    const macConfig = await pveApi.getLxcConfig(ct.ct_id);
+                    const macConfig = await pve.getLxcConfig(ct.ct_id);
                     const cmac = macConfig?.net0?.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
                     if (cmac) {
-                        await ikuaiApi.removeMacFromGroup(ct.ikuai_mac_group_id, cmac[0]);
+                        await ik.removeMacFromGroup(ct.ikuai_mac_group_id, cmac[0]);
                     }
                 } catch (e) { console.error('LXC MAC分组删除失败:', e.message); }
             }
@@ -1291,7 +1324,7 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
         }
  
         // 在 PVE 上销毁
-        await pveApi.deleteLxc(vmid);
+        await pve.deleteLxc(vmid);
         res.json({ message: 'LXC 容器已销毁' });
     } catch (error) {
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });

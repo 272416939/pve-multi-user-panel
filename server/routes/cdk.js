@@ -6,7 +6,8 @@ const { generateUniqueCdkCode } = require('../utils/cdk-generator');
 const { safeError } = require('../utils/safe-error');
 // 业务下沉 services/（规范第七节）：CDK 兑换/批量生成走 services/cdk.js
 const cdkService = require('../services/cdk');
-const pveApi = require('../api/pve-api');
+// 多节点：按资源归属 PVE 节点取客户端（工厂缓存复用；null=默认节点）
+const { getPveClient } = require('../api/pve-clients');
 
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 
@@ -193,6 +194,8 @@ router.get('/user/cdk/redeemable-vms', authMiddleware, async (req, res) => {
         const vmsWithDetails = [];
         for (const vm of userVms) {
             try {
+                // 多节点：逐台按归属 PVE 节点解析客户端（查不到节点行回退默认）
+                const pveApi = await getPveClient(vm.pve_node_id);
                 const status = await pveApi.getVmStatus(vm.vm_id);
                 vmsWithDetails.push({
                     id: vm.id,

@@ -8,7 +8,7 @@ var { safeError } = require('../utils/safe-error');
 var { shouldSendEmail } = require('../utils/email');
 var cacheStore = require('../utils/cache-store');
 var db = require('../api/db');
-var pveApi = require('../api/pve-api');
+var { getPveClient } = require('../api/pve-clients');
 var { importExistingDisks } = require('../services/disk-expiry-check');
 // 单一来源：磁盘类型白名单统一走 constants（规范第七节）
 var { DISK_TYPES, FRONTEND_CACHE_TTL } = require('../constants');
@@ -37,10 +37,12 @@ var DISK_FORMATS_BY_STORAGE_TYPE = {
 
 // 校验并规范化 disk_format：根据所选 storage_pool 对应的 PVE 存储类型联动校验
 // 返回 { ok: true, diskFormat: 'qcow2'|null } 或 { ok: false, error: '...' }
-async function validateDiskFormat(storagePool, diskFormat) {
+// nodeId：硬盘规格所属 PVE 节点（多节点）；缺省=默认节点
+async function validateDiskFormat(storagePool, diskFormat, nodeId) {
   var pveStorageType = '';
   try {
-    var storages = await pveApi.getAllStorages();
+    var pve = await getPveClient(nodeId);
+    var storages = await pve.getAllStorages();
     var matched = (storages || []).find(function(s) { return s.storage === storagePool; });
     pveStorageType = matched ? (matched.type || '') : '';
   } catch (e) {
@@ -60,10 +62,12 @@ async function validateDiskFormat(storagePool, diskFormat) {
 
 // ==================== PVE 存储列表（供规格弹窗存储位置下拉） ====================
 
-// 获取 PVE 所有存储及剩余容量（文档 3.3：下拉展示 PVE 所有存储及剩余容量）
+// 获取 PVE 所有存储及剩余容量（文档 3.3：下拉展示 PVE 所有存储及剩余容量）。多节点：可选 ?node_id= 指定节点
 router.get('/pve-storages', authMiddleware, adminMiddleware, async (req, res) => {
   try {
-    var storages = await pveApi.getAllStorages();
+    var nodeId = req.query.node_id ? parseInt(req.query.node_id) : null;
+    var pve = await getPveClient(nodeId);
+    var storages = await pve.getAllStorages();
     // 格式化返回：{ storage, type, total, used, avail, total_gb, avail_gb }
     var result = (storages || []).map(function(s) {
       var total = parseInt(s.total) || 0;
@@ -249,7 +253,7 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
     var pricePerGbVal = Math.round(parseFloat(data.price_per_gb) * 100) / 100;
 
     // 校验磁盘格式与存储类型联动
-    var fmtResult = await validateDiskFormat(data.storage_pool.trim(), data.disk_format);
+    var fmtResult = await validateDiskFormat(data.storage_pool.trim(), data.disk_format, data.pve_node_id);
     if (!fmtResult.ok) return res.status(400).json({ error: fmtResult.error , code: fmtResult.code });
 
     var spec = await db.diskSpecs.create({
@@ -295,7 +299,7 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
     var pricePerGbVal2 = Math.round(parseFloat(data.price_per_gb) * 100) / 100;
 
     // 校验磁盘格式与存储类型联动
-    var fmtResult2 = await validateDiskFormat(data.storage_pool.trim(), data.disk_format);
+    var fmtResult2 = await validateDiskFormat(data.storage_pool.trim(), data.disk_format, data.pve_node_id);
     if (!fmtResult2.ok) return res.status(400).json({ error: fmtResult2.error , code: fmtResult2.code });
 
     // 保存前取旧记录（审计 diff 用；资金面定价字段全量纳入）

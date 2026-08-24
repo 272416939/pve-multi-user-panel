@@ -3,7 +3,8 @@ const https = require('https');
 const net = require('net');
 const tls = require('tls');
 const crypto = require('crypto');
-const pveApi = require('../api/pve-api');
+// 多节点：按会话资源归属 PVE 节点取客户端（工厂缓存复用；null=默认节点兜底）
+const { getPveClient } = require('../api/pve-clients');
 const dbg = require('../utils/debug');
 const consoleSession = require('../utils/console-session');
 
@@ -71,6 +72,22 @@ vncProxy.on('connection', async (clientWs, request) => {
     // 从 DB 读取 TLS 配置
     const pveConfig = await require('../api/db').config.getPve();
     const strictTls = !!pveConfig.strict_tls;
+
+    // 多节点：按会话资源（vmid+type）查台账行，用其归属 PVE 节点解析客户端
+    // （会话建立处已做 vmid+isLxc+归属校验；此处查不到台账行时回退默认节点）
+    let devNode = null;
+    try {
+        if (type === 'lxc') {
+            const ctRows = await require('../api/db').lxcContainers.getByCtId(parseInt(vmid));
+            devNode = ctRows && ctRows.length > 0 ? ctRows[0].pve_node_id : null;
+        } else {
+            const vmRow = await require('../api/db').vms.getByVmid(parseInt(vmid));
+            devNode = vmRow ? vmRow.pve_node_id : null;
+        }
+    } catch (_) {}
+    const pveApi = await getPveClient(devNode);
+    // 确保 host/apiToken 已从节点配置加载（getter 读内存缓存）
+    try { await pveApi.ensureConfig(); } catch (_) {}
 
     if (type === 'lxc') {
         const pveHost = new URL(pveApi.host).hostname;

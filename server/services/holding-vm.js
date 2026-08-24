@@ -4,13 +4,31 @@
 // 后续扩展：9999 槽位（scsi1-30 + unused0-9）满后可自动创建新的中转 VM。
 
 const db = require('../api/db');
-const pveApi = require('../api/pve-api');
+const { getPveClient } = require('../api/pve-clients');
 const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
 
 // 默认中转 VM ID（从 config 读取，可配置）
 const DEFAULT_HOLDING_VMID = 9999;
 // 中转 VM 最大槽位数（scsi1~scsi30）
 const MAX_SLOTS = 30;
+
+// ==================== 节点上下文解析 ====================
+// 多节点：中转 VM 必须与用户 VM 同节点，按目标 VM/磁盘行的 pve_node_id 解析（查不到回退默认节点）
+async function resolveNodeIdByVmid(vmid) {
+  try {
+    var row = await db.vms.getByVmid(vmid);
+    if (row && row.pve_node_id != null) return row.pve_node_id;
+  } catch (e) {}
+  return null;
+}
+
+async function resolveNodeIdByVolumeId(volumeId) {
+  try {
+    var row = await db.disks.getByVolumeId(volumeId);
+    if (row && row.pve_node_id != null) return row.pve_node_id;
+  } catch (e) {}
+  return null;
+}
 
 /**
  * 获取中转 VM ID（从 DB config 读取，默认 9999）
@@ -25,15 +43,18 @@ async function getHoldingVmid() {
 
 /**
  * 确保中转 VM 存在（不存在则通过 SSH qm create 创建最小 VM）
+ * @param {number} holdingVmid
+ * @param {number|null} nodeId - pve_nodes.id（null=默认节点）
  */
-async function ensureHoldingVm(holdingVmid) {
+async function ensureHoldingVm(holdingVmid, nodeId) {
   var vmid = parseInt(holdingVmid) || DEFAULT_HOLDING_VMID;
+  var pve = await getPveClient(nodeId != null ? nodeId : null);
   try {
-    await pveApi.getVmConfig(vmid);
+    await pve.getVmConfig(vmid);
     return vmid; // 已存在
   } catch (e) {
     // VM 不存在，创建最小配置（无磁盘，仅承载托管数据盘）
-    var sshConfig = await getPveSshConfig();
+    var sshConfig = await getPveSshConfig(nodeId != null ? nodeId : null);
     if (!sshConfig.host || !sshConfig.password) throw new Error('SSH 配置不完整');
     // qm create <vmid> --name holding-disk --memory 64 --cores 1 --net0 none --scsihw virtio-scsi-pci
     var cmd = 'qm create ' + vmid + ' --name holding-disk --memory 64 --cores 1 --scsihw virtio-scsi-pci';
@@ -41,7 +62,7 @@ async function ensureHoldingVm(holdingVmid) {
     if (result.code !== 0) {
       // 可能并发创建，已存在则忽略
       try {
-        await pveApi.getVmConfig(vmid);
+        await pve.getVmConfig(vmid);
         return vmid;
       } catch (e2) {
         throw new Error('创建中转 VM ' + vmid + ' 失败: ' + (result.stderr || result.stdout || ''));
@@ -55,12 +76,14 @@ async function ensureHoldingVm(holdingVmid) {
 /**
  * 扫描中转 VM 配置，查找空闲 scsi 槽位（scsi1~scsi30）
  * @param {number} holdingVmid
+ * @param {number|null} nodeId - pve_nodes.id（null=默认节点）
  * @returns {Promise<string|null>} 空闲槽位键（如 'scsi3'），无空闲返回 null
  */
-async function findFreeHoldingSlot(holdingVmid) {
+async function findFreeHoldingSlot(holdingVmid, nodeId) {
   var config;
+  var pve = await getPveClient(nodeId != null ? nodeId : null);
   try {
-    config = await pveApi.getVmConfig(holdingVmid);
+    config = await pve.getVmConfig(holdingVmid);
   } catch (e) {
     config = {};
   }
@@ -79,8 +102,9 @@ async function findFreeHoldingSlot(holdingVmid) {
  * @param {string} sourceDisk - 源磁盘标识（如 'scsi1' 或 'unused0'）
  * @param {number} holdingVmid - 中转 VM ID
  * @param {string} targetSlot - 目标槽位（如 'scsi3'）
+ * @param {number|null} nodeId - pve_nodes.id（null=默认节点，按 sourceVmid 行回退解析）
  */
-async function moveDiskToHolding(sourceVmid, sourceDisk, holdingVmid, targetSlot) {
+async function moveDiskToHolding(sourceVmid, sourceDisk, holdingVmid, targetSlot, nodeId) {
   // 校验参数（防止注入）
   if (!/^scsi\d+$/.test(String(sourceDisk)) && !/^unused\d+$/.test(String(sourceDisk))) {
     throw new Error('无效的源磁盘标识: ' + sourceDisk);
@@ -88,14 +112,16 @@ async function moveDiskToHolding(sourceVmid, sourceDisk, holdingVmid, targetSlot
   if (!/^scsi\d+$/.test(String(targetSlot))) {
     throw new Error('无效的目标槽位: ' + targetSlot);
   }
-  var upid = await pveApi.moveDisk(sourceVmid, sourceDisk, holdingVmid, targetSlot);
+  nodeId = nodeId != null ? nodeId : await resolveNodeIdByVmid(sourceVmid);
+  var pve = await getPveClient(nodeId != null ? nodeId : null);
+  var upid = await pve.moveDisk(sourceVmid, sourceDisk, holdingVmid, targetSlot);
   try {
-    await pveApi.waitForTask(upid, 300000);
+    await pve.waitForTask(upid, 300000);
   } catch (e) {
     // 任务等待失败：如果目标槽位实际已存在，说明 move 已完成，容错
     var verify = null;
     try {
-      verify = await pveApi.getVmConfig(holdingVmid);
+      verify = await pve.getVmConfig(holdingVmid);
     } catch (_) {}
     if (!(verify && verify[targetSlot])) {
       throw e;
@@ -111,22 +137,25 @@ async function moveDiskToHolding(sourceVmid, sourceDisk, holdingVmid, targetSlot
  * @param {string} sourceSlot - 中转 VM 上的源槽位（如 'scsi3'）
  * @param {number} targetVmid - 用户 VM ID
  * @param {string} targetSlot - 目标槽位（如 'scsi7'）
+ * @param {number|null} nodeId - pve_nodes.id（null=默认节点，按 targetVmid 行回退解析）
  */
-async function moveDiskFromHolding(holdingVmid, sourceSlot, targetVmid, targetSlot) {
+async function moveDiskFromHolding(holdingVmid, sourceSlot, targetVmid, targetSlot, nodeId) {
   if (!/^scsi\d+$/.test(String(sourceSlot)) && !/^unused\d+$/.test(String(sourceSlot))) {
     throw new Error('无效的源槽位: ' + sourceSlot);
   }
   if (!/^scsi\d+$/.test(String(targetSlot))) {
     throw new Error('无效的目标槽位: ' + targetSlot);
   }
-  var upid = await pveApi.moveDisk(holdingVmid, sourceSlot, targetVmid, targetSlot);
+  nodeId = nodeId != null ? nodeId : await resolveNodeIdByVmid(targetVmid);
+  var pve = await getPveClient(nodeId != null ? nodeId : null);
+  var upid = await pve.moveDisk(holdingVmid, sourceSlot, targetVmid, targetSlot);
   try {
-    await pveApi.waitForTask(upid, 300000);
+    await pve.waitForTask(upid, 300000);
   } catch (e) {
     // 任务等待失败：如果目标 VM 槽位实际已存在，说明 move 已完成，容错
     var verify = null;
     try {
-      verify = await pveApi.getVmConfig(targetVmid);
+      verify = await pve.getVmConfig(targetVmid);
     } catch (_) {}
     if (!(verify && verify[targetSlot])) {
       throw e;
@@ -142,13 +171,16 @@ async function moveDiskFromHolding(holdingVmid, sourceSlot, targetVmid, targetSl
  * 但存储前缀和磁盘编号不变。DB 中 volume_id 可能已过期，
  * 用「存储前缀 + disk-编号」在中转 VM 中定位实际卷。
  * @param {string} volumeId - DB 中可能过期的 volume_id
+ * @param {number|null} nodeId - pve_nodes.id（null=默认节点，按 volume_id 磁盘行回退解析）
  * @returns {Promise<object|null>} { holdingVmid, holdingSlot, volume_id } 或 null
  */
-async function findVolumeInHolding(volumeId) {
+async function findVolumeInHolding(volumeId, nodeId) {
   if (!volumeId || typeof volumeId !== 'string') return null;
   var holdingVmid = await getHoldingVmid();
+  nodeId = nodeId != null ? nodeId : await resolveNodeIdByVolumeId(volumeId);
+  var pve = await getPveClient(nodeId != null ? nodeId : null);
   var config = null;
-  try { config = await pveApi.getVmConfig(holdingVmid); } catch (e) { return null; }
+  try { config = await pve.getVmConfig(holdingVmid); } catch (e) { return null; }
   if (!config) return null;
 
   // 解析磁盘编号和存储前缀：hdd5:101/vm-101-disk-0.qcow2 -> idx=0, storage=hdd5
