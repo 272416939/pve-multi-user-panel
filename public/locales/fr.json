@@ -1763,6 +1763,7 @@
   "err.IKUAI_URL_TOO_LONG": "URL iKuai trop longue.",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 ne prend en charge que HTTPS ; l'adresse doit commencer par https:// (port facultatif, 443 par défaut)",
   "err.IKUAI_V4_KEY_REQUIRED": "Un jeton API est requis en mode V4",
+  "err.IKUAI_V4_TOKEN_MASKED": "Le jeton API est un espace réservé masqué ; saisissez le jeton complet avant de tester",
   "err.IKUAI_VERSION_INVALID": "Version d'API invalide, doit être v3 ou v4",
   "err.IKUAI_VLAN_LIST_FAILED": "Échec du chargement VLAN iKuai. Réessayez plus tard.",
   "err.INTERNAL_ERROR": "Erreur système, veuillez réessayer plus tard",

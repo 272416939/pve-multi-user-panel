@@ -1763,6 +1763,7 @@
   "err.IKUAI_URL_TOO_LONG": "iKuaiアドレスが長すぎます。",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 API は HTTPS のみ対応。アドレスは https:// で始める必要があります（ポート指定可、未指定は 443）",
   "err.IKUAI_V4_KEY_REQUIRED": "V4 モードでは API トークンが必要です",
+  "err.IKUAI_V4_TOKEN_MASKED": "API トークンはマスクされたプレースホルダーです。テスト前に完全なトークンを入力してください",
   "err.IKUAI_VERSION_INVALID": "API バージョンが無効です。v3 または v4 を指定してください",
   "err.IKUAI_VLAN_LIST_FAILED": "iKuai VLAN一覧の取得に失敗しました。後でもう一度お試しください。",
   "err.INTERNAL_ERROR": "システムエラーが発生しました。後でもう一度お試しください",

@@ -1100,6 +1100,8 @@ router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, re
         // 留空/打码视为未修改 → 用已保存值（解密后）
         var pwdChanged = body.password !== undefined && body.password !== '' && !isMasked(body.password);
         var apiKeyChanged = body.api_key !== undefined && body.api_key !== '' && !isMasked(body.api_key);
+        var apiKeyEmpty = body.api_key === undefined || body.api_key === '';
+        var apiKeyMasked = body.api_key !== undefined && body.api_key !== '' && isMasked(body.api_key);
         var password = pwdChanged ? body.password : saved.password;
         var apiKey = apiKeyChanged ? body.api_key : saved.api_key;
         var strictTls = body.strict_tls !== undefined ? !!body.strict_tls : !!saved.strict_tls;
@@ -1110,6 +1112,16 @@ router.post('/admin/ikuai/test', authMiddleware, adminMiddleware, async (req, re
         }
         if (version === 'v4' && !/^https:\/\/\S+$/i.test(host)) {
             return res.status(400).json({ error: 'V4 接口仅支持 HTTPS，地址必须以 https:// 开头（可带端口，未填默认 443）', code: 'IKUAI_V4_HTTPS_REQUIRED' });
+        }
+        // V4 测试必须用真实 Token：打码占位/空值拒绝（回退读库会静默用已保存 Token 测试，掩盖被测凭据——
+        // 造成「用错误/占位 Token 也提示成功」的未校验假象；测试的目的就是验证你填的 Token）
+        if (version === 'v4' && !apiKeyChanged) {
+            if (apiKeyMasked) {
+                return res.status(400).json({ error: 'API Token 为打码占位值，请输入完整 Token 后再测试', code: 'IKUAI_V4_TOKEN_MASKED' });
+            }
+            if (apiKeyEmpty) {
+                return res.status(400).json({ error: 'V4 模式需要填写 API Token', code: 'IKUAI_V4_KEY_REQUIRED' });
+            }
         }
         var info = await ikuaiApi.testConnectionWith({ host, username, password, api_key: apiKey, version, strict_tls: strictTls });
         res.json({ message: '连接成功', info: info || null });

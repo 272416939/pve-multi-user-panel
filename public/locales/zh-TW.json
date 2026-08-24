@@ -1763,6 +1763,7 @@
   "err.IKUAI_URL_TOO_LONG": "愛快位址過長",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 介面僅支援 HTTPS，位址必須以 https:// 開頭（可帶連接埠，未填預設 443）",
   "err.IKUAI_V4_KEY_REQUIRED": "V4 模式需要填寫 API Token",
+  "err.IKUAI_V4_TOKEN_MASKED": "API Token 為打碼佔位值，請輸入完整 Token 後再測試",
   "err.IKUAI_VERSION_INVALID": "介面版本無效，必須為 v3 或 v4",
   "err.IKUAI_VLAN_LIST_FAILED": "取得愛快 VLAN 列表失敗，請稍後重試",
   "err.INTERNAL_ERROR": "系統執行錯誤，請稍後重試",

@@ -1763,6 +1763,7 @@
   "err.IKUAI_URL_TOO_LONG": "爱快地址过长",
   "err.IKUAI_V4_HTTPS_REQUIRED": "V4 接口仅支持 HTTPS，地址必须以 https:// 开头（可带端口，未填默认 443）",
   "err.IKUAI_V4_KEY_REQUIRED": "V4 模式需要填写 API Token",
+  "err.IKUAI_V4_TOKEN_MASKED": "API Token 为打码占位值，请输入完整 Token 后再测试",
   "err.IKUAI_VERSION_INVALID": "接口版本无效，必须为 v3 或 v4",
   "err.IKUAI_VLAN_LIST_FAILED": "获取爱快 VLAN 列表失败，请稍后重试",
   "err.INTERNAL_ERROR": "系统运行错误，请稍后重试",
