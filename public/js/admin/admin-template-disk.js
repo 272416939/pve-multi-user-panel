@@ -300,13 +300,23 @@
             <div class="form-text" v-if="!diskPage.diskSpecForm.value.pve_node_id">{{ t('admin.disk.pickNodeFirst') }}</div>
           </div>
           <div class="col-md-3">
+            <label class="form-label">{{ t('admin.disk.diskFormat') }}</label>
+            <select class="form-select" v-model="diskPage.diskSpecForm.value.disk_format" :disabled="!diskPage.isFileSystemStorage(diskPage.diskSpecForm.value.storage_pool)">
+              <option value="qcow2">{{ t('admin.disk.qcow2') }}</option>
+              <option value="raw">{{ t('admin.disk.raw') }}</option>
+              <option value="vmdk" v-if="diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool) && diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool).type !== 'btrfs'">{{ t('admin.disk.vmdk') }}</option>
+              <option value="subvol" v-if="diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool) && diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool).type === 'btrfs'">{{ t('admin.disk.subvol') }}</option>
+            </select>
+            <div class="form-text">{{ diskPage.isFileSystemStorage(diskPage.diskSpecForm.value.storage_pool) ? t('admin.disk.formatHint') : t('admin.disk.formatNotNeeded') }}</div>
+          </div>
+          <div class="col-md-3">
             <label class="form-label">{{ t('admin.disk.enabledStatus') }}</label>
             <div class="form-check form-switch mt-2">
               <input class="form-check-input" type="checkbox" v-model="diskPage.diskSpecForm.value.enabled" id="specEnabled">
               <label class="form-check-label" for="specEnabled">{{ t('admin.disk.enabled') }}</label>
             </div>
           </div>
-          <div class="col-md-9">
+          <div class="col-md-6">
             <label class="form-label">{{ t('admin.disk.specDesc') }}</label>
             <textarea class="form-control" rows="2" v-model="diskPage.diskSpecForm.value.description" maxlength="500" :placeholder="t('admin.disk.specDescPh')"></textarea>
           </div>
@@ -333,16 +343,6 @@
               <span class="input-group-text">￥</span>
               <input class="form-control" type="number" step="0.01" v-model.number="diskPage.diskSpecForm.value.price_per_gb" min="0">
             </div>
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">{{ t('admin.disk.diskFormat') }}</label>
-            <select class="form-select" v-model="diskPage.diskSpecForm.value.disk_format" :disabled="!diskPage.isFileSystemStorage(diskPage.diskSpecForm.value.storage_pool)">
-              <option value="qcow2">{{ t('admin.disk.qcow2') }}</option>
-              <option value="raw">{{ t('admin.disk.raw') }}</option>
-              <option value="vmdk" v-if="diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool) && diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool).type !== 'btrfs'">{{ t('admin.disk.vmdk') }}</option>
-              <option value="subvol" v-if="diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool) && diskPage.getStorageInfo(diskPage.diskSpecForm.value.storage_pool).type === 'btrfs'">{{ t('admin.disk.subvol') }}</option>
-            </select>
-            <div class="form-text">{{ diskPage.isFileSystemStorage(diskPage.diskSpecForm.value.storage_pool) ? t('admin.disk.formatHint') : t('admin.disk.formatNotNeeded') }}</div>
           </div>
           <div class="col-md-3">
             <label class="form-label">{{ t('admin.disk.quarterlyDiscount') }}</label>

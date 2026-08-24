@@ -100,6 +100,17 @@
             'position:absolute;opacity:0;pointer-events:none;';
         select.insertAdjacentElement('beforebegin', wrapper);
         if (select.disabled) wrapper.classList.add('disabled');
+        // 动态 disabled 同步：模板 :disabled 随状态变化（如磁盘格式随存储类型）时，
+        // 同步 wrapper 禁用态，避免「可选时仍残留灰色禁用样式」（opacity 0.5 不恢复）
+        var disabledMo = new MutationObserver(function (muts) {
+            muts.forEach(function (mu) {
+                if (mu.attributeName === 'disabled') {
+                    if (select.disabled) wrapper.classList.add('disabled');
+                    else wrapper.classList.remove('disabled');
+                }
+            });
+        });
+        disabledMo.observe(select, { attributes: true, attributeFilter: ['disabled'] });
 
         // 宽度继承原 select：优先内联 style（如 style="width:140px"），
         // 其次隐藏前实际宽度，再其次 CSS 100%（撑满父容器，弹窗内常见），打开时兜底再取
