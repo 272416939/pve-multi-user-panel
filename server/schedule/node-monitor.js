@@ -150,4 +150,49 @@ function initNodeMonitor() {
     }, 10000);
 }
 
-module.exports = { initNodeMonitor, probeUrl };
+/**
+ * 多节点启动自检：遍历全部启用的 PVE/爱快节点做轻量探测（与 30s 监测同口径），
+ * 逐节点输出可达性与延迟、汇总在线数；仅日志不写库（状态由监测任务回写）。
+ * 由 server.js 启动序列调用，失败不阻断启动。
+ */
+async function bootCheckNodes() {
+    try {
+        const pveList = (await db.pveNodes.list()).filter(n => n.enabled);
+        const ikList = (await db.ikuaNodes.list()).filter(n => n.enabled);
+        if (pveList.length === 0 && ikList.length === 0) {
+            console.log('[节点] 未配置任何启用的 PVE/爱快节点，跳过启动自检');
+            return;
+        }
+        console.log('[节点] 启动自检: PVE ' + pveList.length + ' 个, 爱快 ' + ikList.length + ' 个');
+        let pveOk = 0, ikOk = 0;
+        await Promise.all(pveList.map(async (n) => {
+            const base = String(n.api_host || '').replace(/\/+$/, '');
+            const r = base
+                ? await probeUrl(base + '/api2/json/access/version', !!n.strict_tls)
+                : { ok: false, error: '未配置 API 地址' };
+            if (r.ok) {
+                pveOk++;
+                console.log('[节点] PVE#' + n.id + ' ' + n.name + ' (' + n.api_host + ') 连接正常 ' + r.latency_ms + 'ms');
+            } else {
+                console.error('[节点] PVE#' + n.id + ' ' + n.name + ' (' + n.api_host + ') 连接失败: ' + r.error);
+            }
+        }));
+        await Promise.all(ikList.map(async (n) => {
+            const ver = (n.version || 'v3').toUpperCase();
+            const r = n.host
+                ? await probeUrl(n.host, !!n.strict_tls)
+                : { ok: false, error: '未配置地址' };
+            if (r.ok) {
+                ikOk++;
+                console.log('[节点] 爱快#' + n.id + ' ' + n.name + ' (' + n.host + ', ' + ver + ') 连接正常 ' + r.latency_ms + 'ms');
+            } else {
+                console.error('[节点] 爱快#' + n.id + ' ' + n.name + ' (' + n.host + ', ' + ver + ') 连接失败: ' + r.error);
+            }
+        }));
+        console.log('[节点] 启动自检完成: PVE ' + pveOk + '/' + pveList.length + ' 在线, 爱快 ' + ikOk + '/' + ikList.length + ' 在线');
+    } catch (e) {
+        console.error('[节点] 启动自检失败（不影响启动）:', e.message);
+    }
+}
+
+module.exports = { initNodeMonitor, probeUrl, bootCheckNodes };

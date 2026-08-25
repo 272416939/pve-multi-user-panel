@@ -632,11 +632,12 @@ httpServer.listen(PORT, async () => {
         console.warn('[i18n] 缓存预热失败（不影响运行，请求时自动回源）:', e.message);
     }
 
+    // 多节点启动自检：逐节点探测连通性并汇总在线数（失败不阻断启动；
+    // 认证有效性由各客户端首次业务调用与 30s 监测任务覆盖，此处为可达性+延迟概览）
     try {
-        const pveApi = require('./api/pve-api');
-        await pveApi.detectNode();
+        await require('./schedule/node-monitor').bootCheckNodes();
     } catch (error) {
-        console.error('启动时检测节点失败:', error);
+        console.error('[节点] 启动自检异常（不影响启动）:', error.message);
     }
 
     require('./schedule/tasks').initScheduledTasks();
