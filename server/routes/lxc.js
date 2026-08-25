@@ -953,6 +953,18 @@ router.get('/lxc/templates', authMiddleware, adminMiddleware, async (req, res) =
     }
 });
 
+// 节点网桥列表（直开 LXC 网卡桥接下拉数据源；多节点：按 ?node_id= 指定节点）
+router.get('/admin/pve/bridges', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const node = await findEnabledNode(req.query.node_id);
+        if (!node) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const pve = await getPveClient(node.id);
+        res.json(await pve.getBridges());
+    } catch (e) {
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
+    }
+});
+
 router.get('/lxc/storages', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         // 多节点：按 ?node_id= 指定节点（严格分步选择），未传/无效返回 400

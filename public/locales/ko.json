@@ -501,6 +501,7 @@
   "admin.lxc.assignedLabel": "할당된 컨테이너:",
   "admin.lxc.autoGen": "자동 생성",
   "admin.lxc.bridge": "네트워크 브리지",
+  "admin.lxc.bridgePh": "먼저 노드를 선택하세요(브리지는 노드와 함께 로드됩니다)",
   "admin.lxc.checkExpiredNow": "지금 만료 확인",
   "admin.lxc.createBtn": "컨테이너 생성",
   "admin.lxc.createOk": "컨테이너 생성 성공",

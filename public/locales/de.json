@@ -501,6 +501,7 @@
   "admin.lxc.assignedLabel": "Zugewiesene Container:",
   "admin.lxc.autoGen": "Automatisch",
   "admin.lxc.bridge": "Netzwerk-Bridge",
+  "admin.lxc.bridgePh": "Zuerst Knoten wählen (Brücken werden mit dem Knoten geladen)",
   "admin.lxc.checkExpiredNow": "Abgelaufene jetzt prüfen",
   "admin.lxc.createBtn": "Container erstellen",
   "admin.lxc.createOk": "Container erstellt",

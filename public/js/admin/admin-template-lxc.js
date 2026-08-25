@@ -71,9 +71,10 @@
                                     <div class="row mb-3">
                                         <div class="col-md-4">
                                             <label class="form-label">{{ t('admin.lxc.bridge') }}</label>
-                                            <select class="form-select" v-model="lxcForm.net0Bridge">
-                                                <option value="vmbr0">vmbr0</option>
-                                                <option value="vmbr1">vmbr1</option>
+                                            <!-- 多节点：网桥按所选节点动态加载（PVE 实际 type=bridge），未选节点禁用 -->
+                                            <select class="form-select" v-model="lxcForm.net0Bridge" :disabled="!lxcCreateNodeId || !lxcBridges.length">
+                                                <option value="">{{ t('admin.lxc.bridgePh') }}</option>
+                                                <option v-for="b in lxcBridges" :key="b" :value="b">{{ b }}</option>
                                             </select>
                                         </div>
                                         <div class="col-md-4">

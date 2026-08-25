@@ -501,6 +501,7 @@
   "admin.lxc.assignedLabel": "Conteneurs affectés :",
   "admin.lxc.autoGen": "Généré automatiquement",
   "admin.lxc.bridge": "Pont réseau",
+  "admin.lxc.bridgePh": "Sélectionnez d’abord un nœud (les ponts se chargent avec le nœud)",
   "admin.lxc.checkExpiredNow": "Vérifier les expirations",
   "admin.lxc.createBtn": "Créer le conteneur",
   "admin.lxc.createOk": "Conteneur créé",

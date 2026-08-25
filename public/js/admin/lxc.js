@@ -50,6 +50,8 @@
     $.lxcNodeOptions = ref([]);
     $.lxcCreateNodeId = ref('');
     $.lxcAssignNodeId = ref('');
+    // 直开表单网桥下拉（按所选节点动态加载 PVE 实际网桥，替代硬编码 vmbr0/vmbr1）
+    $.lxcBridges = ref([]);
 
     // LXC 快照
     $.lxcSnapshotVmId = ref(null);
@@ -128,9 +130,11 @@
         if (!nv) {
             $.lxcTemplates.value = [];
             $.lxcStorageList.value = [];
+            $.lxcBridges.value = [];
             return;
         }
         $.loadLxcTemplates();
+        $.loadLxcBridges(nv);
     });
 
     // 切节点（分配池）：重置已选容器、重载该节点池 + 配对爱快 MAC 分组；清空选择则清空全部候选
@@ -148,6 +152,21 @@
         $.loadLxcContainers();
         $.loadMacGroups(nv);
     });
+
+    // 加载所选 PVE 节点的网桥列表（type=bridge）；无 vmbr0 时回退列表首项
+    $.loadLxcBridges = async function(nodeId) {
+        try {
+            if (!nodeId) { $.lxcBridges.value = []; return; }
+            var list = await api('/admin/pve/bridges?node_id=' + encodeURIComponent(nodeId));
+            $.lxcBridges.value = Array.isArray(list) ? list : [];
+            if ($.lxcBridges.value.length && $.lxcBridges.value.indexOf($.lxcForm.value.net0Bridge) === -1) {
+                $.lxcForm.value.net0Bridge = $.lxcBridges.value.indexOf('vmbr0') !== -1 ? 'vmbr0' : $.lxcBridges.value[0];
+            }
+        } catch (e) {
+            console.error('加载 PVE 网桥失败', e);
+            $.lxcBridges.value = [];
+        }
+    };
 
     $.loadLxcTemplates = async function() {
         try {

@@ -501,6 +501,7 @@
   "admin.lxc.assignedLabel": "已分配的容器：",
   "admin.lxc.autoGen": "自動產生",
   "admin.lxc.bridge": "網路橋接",
+  "admin.lxc.bridgePh": "請先選擇節點（網橋隨節點載入）",
   "admin.lxc.checkExpiredNow": "立即檢查過期容器",
   "admin.lxc.createBtn": "建立容器",
   "admin.lxc.createOk": "容器建立成功",

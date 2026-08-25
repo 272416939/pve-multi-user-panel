@@ -452,6 +452,18 @@ class PveApi {
     });
   }
 
+  // 节点网桥列表（type=bridge，如 vmbr0；直开 LXC/VM 的网卡桥接下拉数据源，替代硬编码选项）
+  async getBridges() {
+    return pveCache.get(this._ck('bridges'), async () => {
+      if (!this.node) {
+        await this.detectNode();
+      }
+      const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/network`);
+      const ifaces = response.data.data || [];
+      return ifaces.filter(i => i.type === 'bridge').map(i => i.iface).filter(Boolean);
+    });
+  }
+
   // 存储列表（LXC 相关）：默认过滤 rootdir（容器 rootfs 用）；
   // contentFilter='vztmpl' 时过滤含 vztmpl 的存储（CT 模板来源存储，如 local——rootdir 过滤会漏掉它）
   async getLxcStorageList(contentFilter) {

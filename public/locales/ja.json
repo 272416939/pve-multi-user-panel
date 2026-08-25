@@ -501,6 +501,7 @@
   "admin.lxc.assignedLabel": "割り当て済みコンテナ：",
   "admin.lxc.autoGen": "自動生成",
   "admin.lxc.bridge": "ネットワークブリッジ",
+  "admin.lxc.bridgePh": "先にノードを選択（ブリッジはノードに連動して読み込まれます）",
   "admin.lxc.checkExpiredNow": "今すぐ期限切れをチェック",
   "admin.lxc.createBtn": "コンテナ作成",
   "admin.lxc.createOk": "コンテナを作成しました",

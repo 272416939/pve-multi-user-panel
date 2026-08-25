@@ -501,6 +501,7 @@
   "admin.lxc.assignedLabel": "Assigned containers:",
   "admin.lxc.autoGen": "Auto-generated",
   "admin.lxc.bridge": "Network bridge",
+  "admin.lxc.bridgePh": "Select a node first (bridges load with the node)",
   "admin.lxc.checkExpiredNow": "Check expired containers now",
   "admin.lxc.createBtn": "Create container",
   "admin.lxc.createOk": "Container created",
