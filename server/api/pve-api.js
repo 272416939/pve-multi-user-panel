@@ -10,6 +10,9 @@ require('dotenv').config();
 // 一致性风险仅 30s 窗口，PVE 面板本身也是手动刷新。
 const pveCache = cacheStore.create('pve', 30);
 
+// TLS 提示去重（按 节点id+host 去重，多实例/旧单例只提示一次）
+const _tlsWarned = new Set();
+
 /**
  * 清空 PVE 只读缓存（所有写操作方法调用，防止读到过期配置/列表）
  */
@@ -89,10 +92,15 @@ class PveApi {
           rejectUnauthorized: strictTls
         });
         self._httpsAgentStrictTls = strictTls;
-        if (strictTls) {
-          console.log('[pve-api] TLS 严格证书验证已启用');
-        } else {
-          console.warn('[pve-api] ⚠️ TLS 证书验证已禁用（自签证书模式），生产环境建议启用');
+        // 节点标识 + 全局去重：同一节点（含旧全局单例）只提示一次，多节点日志可区分
+        var tlsIdentity = (self.nodeId != null ? '节点#' + self.nodeId : '默认/旧单例') + ' ' + cfg.host;
+        if (!_tlsWarned.has(tlsIdentity)) {
+          _tlsWarned.add(tlsIdentity);
+          if (strictTls) {
+            console.log('[pve-api] TLS 严格证书验证已启用（' + tlsIdentity + '）');
+          } else {
+            console.warn('[pve-api] ⚠️ TLS 证书验证已禁用（' + tlsIdentity + '，自签证书模式），生产环境建议启用');
+          }
         }
       }
       config.httpsAgent = self._httpsAgent;

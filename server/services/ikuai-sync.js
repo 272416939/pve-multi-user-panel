@@ -19,7 +19,7 @@ async function syncPortForwardsFromIkuai() {
             try {
                 await syncPortForwardsForNode(node);
             } catch (e) {
-                console.error(`[ikuai] 启动同步失败 (爱快节点#${node.id}):`, e.message);
+                console.error(`[ikuai] 启动同步失败 (爱快节点#${node.id}${node.name ? '(' + node.name + ')' : ''}):`, e.message);
             }
         }
     } catch (e) {
@@ -39,7 +39,7 @@ async function syncPortForwardsForNode(n) {
 
     const ikuaiRules = await ik.getPortForwards();
     if (!ikuaiRules.length) {
-        console.log(`[ikuai] 启动同步: 爱快节点#${n.id} 无规则，跳过`);
+        console.log(`[ikuai] 启动同步: 爱快节点#${n.id}${n.name ? '(' + n.name + ')' : ''} 无规则，跳过`);
         return;
     }
     const localRules = (await db.portForwards.getAll()).filter(ownsRule);
@@ -231,7 +231,7 @@ async function syncPortForwardsForNode(n) {
         await auditLog({ userId: 0, username: 'system', action: 'network.port.delete', resourceType: 'port-forward', resourceId: r.id, details: `对账清理孤儿端口转发规则[${r.internal_port}]→[${r.external_port}]（爱快侧已无此规则）` });
         orphaned++;
     }
-    console.log(`[ikuai] 启动同步(爱快节点#${n.id}): ikuai=${ikuaiRules.length}条, 本地=${localRules.length}条, 导入=${imported}, 跳过=${skipped}, 收敛中断删除=${cleaned}${recovered ? `(回滚${recovered})` : ''}, 清理孤儿=${orphaned}`);
+    console.log(`[ikuai] 启动同步(爱快节点#${n.id}${n.name ? '(' + n.name + ')' : ''}): ikuai=${ikuaiRules.length}条, 本地=${localRules.length}条, 导入=${imported}, 跳过=${skipped}, 收敛中断删除=${cleaned}${recovered ? `(回滚${recovered})` : ''}, 清理孤儿=${orphaned}`);
 }
 
 module.exports = { syncPortForwardsFromIkuai };
