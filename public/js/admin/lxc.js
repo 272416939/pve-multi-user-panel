@@ -32,7 +32,8 @@
     $.toggleLxcFeatureDropdown = function() {
         $.lxcFeatureOpen.value = !$.lxcFeatureOpen.value;
     };
-    $.toggleLxcFeature = function(opt) {
+    // 直开表单专用（1 参）：复用 admin.js 共享 toggleLxcFeature（勿同名覆盖，否则自递归栈溢出）
+    $.toggleDirectLxcFeature = function(opt) {
         $.toggleLxcFeature($.lxcFeaturesSet, $.lxcForm, 'features', opt);
     };
     // 点击外部关闭

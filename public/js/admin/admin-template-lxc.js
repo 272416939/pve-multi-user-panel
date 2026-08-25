@@ -96,7 +96,7 @@
                                                 </button>
                                                 <div class="lxc-feature-menu">
                                                     <label v-for="opt in lxcFeatureOptions" :key="opt" class="lxc-feature-item">
-                                                        <input type="checkbox" :checked="lxcFeaturesSet.has(opt)" @change="toggleLxcFeature(opt)">
+                                                        <input type="checkbox" :checked="lxcFeaturesSet.has(opt)" @change="toggleDirectLxcFeature(opt)">
                                                         <span>{{ opt }}</span>
                                                     </label>
                                                 </div>

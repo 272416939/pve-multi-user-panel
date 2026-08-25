@@ -63,6 +63,14 @@ var App = {
         if (!$.templatePage.lxcStorages) $.templatePage.lxcStorages = Vue.ref([]);
         if (!$.templatePage.lxcTplStorages) $.templatePage.lxcTplStorages = Vue.ref([]);
         if (!$.templatePage.lxcOstemplates) $.templatePage.lxcOstemplates = Vue.ref([]);
+        // LXC 特性多选下拉兜底（modal 常驻渲染，template.js 未定义时也不崩）
+        if (!$.templatePage.lxcFeatureOpen) $.templatePage.lxcFeatureOpen = Vue.ref(false);
+        if (!$.templatePage.lxcFeaturesSet) $.templatePage.lxcFeaturesSet = Vue.ref(new Set());
+        if (!$.templatePage.lxcFeatureOptions) $.templatePage.lxcFeatureOptions = Vue.ref(['nesting', 'fuse', 'keyctl', 'mknod', 'mount', 'nfs', 'samba', 'cifs']);
+        if (!$.templatePage.lxcFeatureText) $.templatePage.lxcFeatureText = Vue.computed(function() { return ''; });
+        if (!$.lxcFeatureOpen) $.lxcFeatureOpen = Vue.ref(false);
+        if (!$.lxcFeaturesSet) $.lxcFeaturesSet = Vue.ref(new Set());
+        if (!$.lxcFeatureText) $.lxcFeatureText = Vue.computed(function() { return ''; });
         if (!$.packagePage) $.packagePage = {};
         if (!$.packagePage.vmPackages) $.packagePage.vmPackages = Vue.ref([]);
         if (!$.packagePage.lxcPackages) $.packagePage.lxcPackages = Vue.ref([]);
