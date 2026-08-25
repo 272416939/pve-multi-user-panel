@@ -48,26 +48,35 @@ async function resolvePairedIkNodeId(devNode) {
 // P2-H1⑤ 修复：iKuai 接口信息需管理员权限（泄露内网拓扑）
 router.get('/ikuai/interfaces', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const ik = await getIkuaiClient(null); // 系统级查询：默认爱快节点
+        // 多节点：?node_id=（PVE 节点 id）解析配对爱快，缺省=默认爱快；
+        // WAN 自愈写回与接口缓存键均按该爱快节点作用域（forward:<nodeId>:*）
+        const { findEnabledNode } = require('../utils/locate-asset');
+        let ikNodeId = null;
+        if (req.query.node_id !== undefined && req.query.node_id !== '') {
+            const nodeRow = await findEnabledNode(req.query.node_id);
+            if (!nodeRow) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+            ikNodeId = await resolvePairedIkNodeId(nodeRow.id);
+        }
+        const ik = await getIkuaiClient(ikNodeId); // 缺省=默认爱快节点
         const interfaces = await ik.getInterfaces();
         const wanIfaces = interfaces.filter(i => i.type === 'wan');
-        
-        // 自动对比：已存储的 WAN 接口中，移除 ikuai 上已不存在的接口
-        const storedIfaces = await getWanInterfaces();
+
+        // 自动对比：已存储的 WAN 接口中，移除 ikuai 上已不存在的接口（按节点作用域读写）
+        const storedIfaces = await getWanInterfaces({ ikuaiNodeId: ikNodeId });
         if (storedIfaces.length > 0 && wanIfaces.length > 0) {
             const wanNames = wanIfaces.map(i => i.name);
             const valid = storedIfaces.filter(name => wanNames.includes(name));
             if (valid.length !== storedIfaces.length) {
                 // 全部失效时回退到第一个可用 WAN 接口
                 const toStore = valid.length > 0 ? valid : [wanIfaces[0].name];
-                await db.config.setIkuaiSetting('forward:wan_interface', JSON.stringify(toStore));
-                console.log(`[端口转发] 接口配置已更新: ${storedIfaces.join(',')} → ${toStore.join(',')}`);
+                await db.config.setIkuaiSetting('forward:wan_interface', JSON.stringify(toStore), ikNodeId);
+                console.log(`[端口转发] 接口配置已更新(爱快#${ikNodeId != null ? ikNodeId : 'default'}): ${storedIfaces.join(',')} → ${toStore.join(',')}`);
             }
         }
-        
-        // 缓存完整接口列表到数据库（含 WAN + LAN），前端加载后直接使用
-        await db.config.setIkuaiSetting('forward:iface_list', JSON.stringify(interfaces));
-        
+
+        // 缓存完整接口列表到数据库（含 WAN + LAN），按节点作用域键存储
+        await db.config.setIkuaiSetting('forward:iface_list', JSON.stringify(interfaces), ikNodeId);
+
         res.json(interfaces);
     } catch (e) {
         res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
@@ -221,21 +230,6 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '无效的 IP 地址格式', code: 'INVALID_IP_FORMAT' });
         }
 
-        const config = {
-            port_range_start: parseInt(await db.config.getIkuaiSetting('forward:port_range_start')) || 50000,
-            port_range_end: parseInt(await db.config.getIkuaiSetting('forward:port_range_end')) || 60000,
-            max_per_user: parseInt(await db.config.getIkuaiSetting('forward:max_per_user')) || 10,
-        };
-        // 普通用户检查端口范围和数量限制；管理员不受此限制
-        if (req.user.role !== 'admin') {
-            if (external_port < config.port_range_start || external_port > config.port_range_end) {
-                return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内`, code: 'PORT_OUT_OF_RANGE', params: [config.port_range_start, config.port_range_end] });
-            }
-            const count = await db.portForwards.getCountByUserId(req.user.id);
-            if (count >= config.max_per_user) {
-                return res.status(400).json({ error: `转发规则数量已达上限（${config.max_per_user} 条），如需新增请联系管理员`, code: 'FORWARD_LIMIT_REACHED', params: [config.max_per_user] });
-            }
-        }
         // 新增：校验目标资源归属（general 类型 vm_id/ct_id 均为 null，天然跳过）
         if (finalVmId && !isAdmin) {
             const userVms = await db.vms.getByUserId(req.user.id);
@@ -270,6 +264,24 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         }
         const ikNodeId = await resolvePairedIkNodeId(devNode);
         const ik = await getIkuaiClient(ikNodeId);
+
+        // 限额/端口段配置按规则归属爱快节点作用域读取（与 PUT 端点对齐，多节点各配各的）
+        const config = {
+            port_range_start: parseInt(await db.config.getIkuaiSetting('forward:port_range_start', ikNodeId)) || 50000,
+            port_range_end: parseInt(await db.config.getIkuaiSetting('forward:port_range_end', ikNodeId)) || 60000,
+            max_per_user: parseInt(await db.config.getIkuaiSetting('forward:max_per_user', ikNodeId)) || 10,
+        };
+        // 普通用户检查端口范围和数量限制；管理员不受此限制
+        if (req.user.role !== 'admin') {
+            if (external_port < config.port_range_start || external_port > config.port_range_end) {
+                return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内`, code: 'PORT_OUT_OF_RANGE', params: [config.port_range_start, config.port_range_end] });
+            }
+            const count = await db.portForwards.getCountByUserId(req.user.id);
+            if (count >= config.max_per_user) {
+                return res.status(400).json({ error: `转发规则数量已达上限（${config.max_per_user} 条），如需新增请联系管理员`, code: 'FORWARD_LIMIT_REACHED', params: [config.max_per_user] });
+            }
+        }
+
         const existing = await db.portForwards.getByExternalPort(external_port);
         if (existing.length > 0) {
             return res.status(400).json({ error: '外网端口已被占用，请更换', code: 'EXT_PORT_TAKEN' });

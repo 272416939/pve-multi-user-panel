@@ -20,7 +20,7 @@
     $.reminderConfig = ref({ days1: 7, days2: 3, days3: 1 });
     $.snapshotConfig = ref({ max_per_vm: 5, daily_create_limit: 20, daily_restore_limit: 10 });
     $.storageList = ref([]);
-    $.backupConfigForm = ref({ default_storage: 'local', max_per_vm: 3, daily_limit: 3 });
+    $.backupConfigForm = ref({ max_per_vm: 3, daily_limit: 3 });
     $.testEmail = ref('');
     $.siteLogoText = ref($.__siteLogoText || 'PVE 面板');
     $.siteConfigForm = ref({ name: '', logo_text: '', login_title: '', register_enabled: false });
@@ -1314,7 +1314,8 @@
         try {
             var data = await api('/admin/backup-config');
             if (data) {
-                $.backupConfigForm.value = Object.assign({ default_storage: 'local', max_per_vm: 3, daily_limit: 3 }, data);
+                // 多节点：备份存储按节点配置，全局 default_storage 不再进表单
+                $.backupConfigForm.value = Object.assign({ max_per_vm: 3, daily_limit: 3 }, { max_per_vm: data.max_per_vm, daily_limit: data.daily_limit });
             }
         } catch (e) {
             console.error('加载备份配置失败', e);

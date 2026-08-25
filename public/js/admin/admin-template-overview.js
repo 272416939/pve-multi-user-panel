@@ -85,6 +85,31 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="mb-3">{{ t('dash.overview.zoneDist') }}</h5>
+                            <div class="table-container" style="padding:12px;">
+                                <div class="table-responsive">
+                                    <table class="table table-hover mb-0 table-sm table-align-center">
+                                        <thead>
+                                            <tr><th>{{ t('admin.assetZone') }}</th><th>{{ t('nav.regionList') }}</th><th>PVE</th><th>{{ t('dash.overview.pkgCount') }}</th><th>{{ t('dash.overview.insCount') }}</th></tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="z in overviewZones" :key="z.id">
+                                                <td>{{ z.name }}</td>
+                                                <td>{{ z.region_name || '-' }}</td>
+                                                <td>{{ z.pve_node_count }}</td>
+                                                <td>{{ z.package_count }}</td>
+                                                <td>{{ z.instance_count }}</td>
+                                            </tr>
+                                            <tr v-if="!overviewZones.length"><td colspan="5" class="text-center text-muted">-</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- {{ t('dash.vm.vm') }}管理区域 -->

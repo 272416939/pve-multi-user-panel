@@ -122,13 +122,13 @@
                         <div v-if="!vm._provisioning" class="vm-mobile-card-body">
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('admin.assetZone') }}</span><span class="vm-mobile-card-value">{{ vm.zone_name || '-' }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.privateIp') }}</span><span class="vm-mobile-card-value">{{ vm.ip || vm.dhcp_static_ip || '-' }}</span></div>
-                            <div v-if="cnameDomain" class="vm-mobile-card-cname">
+                            <div v-if="(vm.cname_domain || cnameDomain)" class="vm-mobile-card-cname">
                                 <div class="vm-mobile-card-cname-toggle" @click="vm._cnameOpen = !vm._cnameOpen">
                                     <span class="vm-mobile-card-label">{{ t('dash.vm.cname') }}</span>
                                     <svg :style="{ transform: vm._cnameOpen ? 'rotate(90deg)' : '' }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                                 </div>
                                 <div v-if="vm._cnameOpen" class="vm-mobile-card-cname-list">
-                                    <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
+                                    <div v-for="cname in formatCnameList(vm.cname_domain || cnameDomain, vm.vm_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
                                         <span class="text-primary"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</span>
                                         <button class="cname-copy-btn" @click="copyText(cname.domain)" :title="t('dash.vm.noSubnetHint')">
                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -204,8 +204,8 @@
                                     <td>{{ vm.config?.ciuser || t('dash.vm.noCloudInit') }}</td>
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                     <td>
-                                        <template v-if="cnameDomain && !vm._provisioning">
-                                            <div v-for="cname in formatCnameList(cnameDomain, vm.vm_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
+                                        <template v-if="(vm.cname_domain || cnameDomain) && !vm._provisioning">
+                                            <div v-for="cname in formatCnameList(vm.cname_domain || cnameDomain, vm.vm_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>
@@ -298,13 +298,13 @@
                         <div v-if="!ct._provisioning" class="vm-mobile-card-body">
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('admin.assetZone') }}</span><span class="vm-mobile-card-value">{{ ct.zone_name || '-' }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.privateIp') }}</span><span class="vm-mobile-card-value">{{ ct.ip || ct.dhcp_static_ip || '-' }}</span></div>
-                            <div v-if="cnameDomain" class="vm-mobile-card-cname">
+                            <div v-if="(ct.cname_domain || cnameDomain)" class="vm-mobile-card-cname">
                                 <div class="vm-mobile-card-cname-toggle" @click="ct._cnameOpen = !ct._cnameOpen">
                                     <span class="vm-mobile-card-label">{{ t('dash.vm.cname') }}</span>
                                     <svg :style="{ transform: ct._cnameOpen ? 'rotate(90deg)' : '' }" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
                                 </div>
                                 <div v-if="ct._cnameOpen" class="vm-mobile-card-cname-list">
-                                    <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
+                                    <div v-for="cname in formatCnameList(ct.cname_domain || cnameDomain, ct.ct_id)" :key="cname.domain" class="vm-mobile-card-cname-item">
                                         <span class="text-primary"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</span>
                                         <button class="cname-copy-btn" @click="copyText(cname.domain)" :title="t('dash.vm.noSubnetHint')">
                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
@@ -377,8 +377,8 @@
                                     <td>{{ ct.zone_name || '-' }}</td>
                                     <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
                                     <td>
-                                        <template v-if="cnameDomain && !ct._provisioning">
-                                            <div v-for="cname in formatCnameList(cnameDomain, ct.ct_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
+                                        <template v-if="(ct.cname_domain || cnameDomain) && !ct._provisioning">
+                                            <div v-for="cname in formatCnameList(ct.cname_domain || cnameDomain, ct.ct_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
                                         </template>
                                         <span v-else class="text-muted">-</span>
                                     </td>

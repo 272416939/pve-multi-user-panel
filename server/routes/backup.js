@@ -289,11 +289,11 @@ router.get('/admin/backup-config', authMiddleware, adminMiddleware, async (req, 
 });
 
 router.put('/admin/backup-config', authMiddleware, adminMiddleware, async (req, res) => {
-    const { default_storage, max_per_vm, daily_limit } = req.body;
+    const { max_per_vm, daily_limit } = req.body;
     // 保存前取旧配置（审计 diff 用）
+    // 多节点：备份存储已按节点配置（pve_nodes.backup_storage），全局 default_storage 已废弃不再消费
     const oldCfg = await db.backupConfig.get();
     await db.backupConfig.set({
-        default_storage: default_storage || 'local',
         max_per_vm: Math.max(1, parseInt(max_per_vm) || 3),
         daily_limit: Math.max(1, parseInt(daily_limit) || 3)
     });
@@ -303,7 +303,6 @@ router.put('/admin/backup-config', authMiddleware, adminMiddleware, async (req, 
         const { auditLog } = require('../utils/audit-log');
         const { buildFieldDiff } = require('../utils/audit-diff');
         const changes = buildFieldDiff(oldCfg, newCfg, [
-            { key: 'default_storage', label: '默认存储' },
             { key: 'max_per_vm', label: '每机上限', num: true },
             { key: 'daily_limit', label: '每日上限', num: true }
         ]);

@@ -107,8 +107,8 @@
                                             <td>{{ vm.config?.ciuser || t('dash.vm.noCloudInit') }}</td>
                                             <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                             <td>
-                                                <template v-if="networkConfig.cname_domain">
-                                                    <div v-for="cname in formatCnameList(networkConfig.cname_domain, vm.vm_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
+                                                <template v-if="(vm.cname_domain || networkConfig.cname_domain)">
+                                                    <div v-for="cname in formatCnameList(vm.cname_domain || networkConfig.cname_domain, vm.vm_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
                                                 </template>
                                                 <span v-else class="text-muted">-</span>
                                             </td>

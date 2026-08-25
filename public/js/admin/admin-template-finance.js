@@ -138,7 +138,7 @@
                                         <tr v-for="o in orders" :key="o.id">
                                             <td><code>{{ o.order_no }}</code></td>
                                             <td>{{ o.username }}</td>
-                                            <td>{{ o.order_kind === 'renewal' ? (o.type === 'disk' ? (o.resource_name || '') : (o.resource_name || '') + '（' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + '）') : (o.type === 'disk' ? o.package_name : o.package_name + '[' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + ']') }}</td>
+                                            <td>{{ o.order_kind === 'renewal' ? (o.type === 'disk' ? (o.resource_name || '') : (o.resource_name || '') + '（' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + (o.zone_label ? ' · ' + o.zone_label : '') + '）') : (o.type === 'disk' ? o.package_name : o.package_name + '[' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + (o.zone_label ? ' · ' + o.zone_label : '') + ']') }}</td>
                                             <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.order_kind === 'renewal' ? (o.type === 'vm' ? t('admin.finance.vmRenewal') : o.type === 'lxc' ? t('admin.finance.lxcRenewal') : t('admin.finance.diskRenewal')) : (o.type === 'vm' ? 'VM' : o.type === 'lxc' ? 'LXC' : t('admin.finance.disk')) }}</span></td>
                                             <td>{{ o.period === 'month' ? t('admin.finance.monthly') : o.period === 'quarter' ? t('admin.finance.quarterly') : t('admin.finance.yearly') }}</td>
                                             <td>{{ o.period_count }}</td>

@@ -365,8 +365,8 @@
                                                 <td>{{ ct.name || ('CT ' + ct.ct_id) }}</td>
                                                 <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
                                                 <td>
-                                                    <template v-if="networkConfig.cname_domain">
-                                                        <div v-for="cname in formatCnameList(networkConfig.cname_domain, ct.ct_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
+                                                    <template v-if="(ct.cname_domain || networkConfig.cname_domain)">
+                                                        <div v-for="cname in formatCnameList(ct.cname_domain || networkConfig.cname_domain, ct.ct_id)" :key="cname.domain" class="cname-cell text-primary" :title="cname.label + cname.domain"><span class="cname-label text-muted">{{ cname.label }}</span>{{ cname.domain }}</div>
                                                     </template>
                                                     <span v-else class="text-muted">-</span>
                                                 </td>

@@ -7,7 +7,7 @@ const { getPveClient } = require('../api/pve-clients');
 const { getIkuaiClientForPve } = require('../api/ikuai-clients');
 const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
-const { getStatusCache } = require('../services/status-cache');
+const { getStatusCache, lxcStatusKey } = require('../services/status-cache');
 const { shouldSendEmail } = require('../utils/email');
 const { sendTemplateEmail } = require('../services/email-template');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
@@ -21,6 +21,11 @@ const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 const { auditAction } = require('../utils/audit-log');
 // 多节点资产定位：ct_id 跨节点可重复，按归属/节点消歧（防越权与错节点操作）
 const { locateAssetRow, findEnabledNode } = require('../utils/locate-asset');
+
+// 多节点：审计文案追加可用区后缀（台账行已 JOIN zone_name），跨节点同号可消歧
+function zoneSuffix(row) {
+    return (row && row.zone_name) ? ' @' + row.zone_name : '';
+}
 // 单一来源：周期白名单统一走 constants（规范第七节）
 const { VALID_PERIODS } = require('../constants');
 
@@ -102,10 +107,14 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
             userCts = await db.lxcContainers.getByUserId(req.user.id);
         }
  
+        // 多节点：CNAME 后缀按各容器所在节点的配对爱快解析（旧实现只读默认节点，他区资产后缀错误）
+        const cnameByPve = await require('../services/node-context').buildCnameByPveMap(userCts);
+
         const ctsWithDetails = userCts.map(ct => {
             const { pve_upid, ...rest } = ct;
             return {
                 ...rest,
+                cname_domain: cnameByPve[ct.pve_node_id] || '',
                 _provisioning: !!(pve_upid && pve_upid !== ''),
                 // 备份中/恢复中统一标记（LXC 不含切换系统）
                 _busy: false,
@@ -142,15 +151,16 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
             const batch = ctsWithDetails.slice(i, i + batchSize);
             await Promise.all(batch.map(async (ctData) => {
                 const pve = await getPveClient(ctData.pve_node_id); // 按资产所在节点取客户端
+                const statusKey = lxcStatusKey(ctData.pve_node_id, ctData.ct_id); // 多节点：键带节点维度
                 try {
-                    var cachedStatus = getStatusCache('lxc:' + ctData.ct_id, req.user.id);
+                    var cachedStatus = getStatusCache(statusKey, req.user.id);
                     var rawStatus = cachedStatus || await pve.getLxcStatus(ctData.ct_id);
                     var config = await pve.getLxcConfig(ctData.ct_id);
-                    ctData.status = cachedStatus || _applyRate('lxc:' + ctData.ct_id, rawStatus);
+                    ctData.status = cachedStatus || _applyRate(statusKey, rawStatus);
                     ctData.config = config;
                     ctData.error = null;
                 } catch (innerError) {
-                    var cachedFallback = getStatusCache('lxc:' + ctData.ct_id, req.user.id);
+                    var cachedFallback = getStatusCache(statusKey, req.user.id);
                     if (cachedFallback) {
                         ctData.status = cachedFallback;
                         ctData.error = null;
@@ -646,7 +656,7 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
             }
         } catch (e) { console.error('[lxc.start] 重绑 DHCP 静态绑定失败:', e.message); }
 
-        await auditAction(req, 'lxc.start', '开机 LXC ' + vmid);
+        await auditAction(req, 'lxc.start', '开机 LXC ' + vmid + zoneSuffix(ct));
         res.json({ message: 'LXC 容器启动成功' });
     } catch (error) {
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
@@ -681,7 +691,7 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
         await pve.shutdownLxc(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: 'manual' }); } catch (_) {}
-        await auditAction(req, 'lxc.shutdown', '关机 LXC ' + vmid);
+        await auditAction(req, 'lxc.shutdown', '关机 LXC ' + vmid + zoneSuffix(ct));
         res.json({ message: 'LXC 容器关机命令已发送' });
     } catch (error) {
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
@@ -716,7 +726,7 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
         await pve.stopLxc(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (ct) await db.lxcContainers.update(ct.id, { shutdown_reason: 'manual' }); } catch (_) {}
-        await auditAction(req, 'lxc.stop', '强制停止 LXC ' + vmid);
+        await auditAction(req, 'lxc.stop', '强制停止 LXC ' + vmid + zoneSuffix(ct));
         res.json({ message: 'LXC 容器已强制停止' });
     } catch (error) {
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
@@ -749,7 +759,7 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
 
         const pve = await getPveClient(ct ? ct.pve_node_id : null); // 按资产所在节点取客户端
         await pve.rebootLxc(vmid);
-        await auditAction(req, 'lxc.reboot', '重启 LXC ' + vmid);
+        await auditAction(req, 'lxc.reboot', '重启 LXC ' + vmid + zoneSuffix(ct));
         res.json({ message: 'LXC 容器重启命令已发送' });
     } catch (error) {
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
@@ -811,7 +821,7 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         });
 
         const proxyUrl = `/vnc?session=${sessionId}`;
-        await auditAction(req, 'lxc.vnc', '打开 VNC 控制台 LXC ' + vmid);
+        await auditAction(req, 'lxc.vnc', '打开 VNC 控制台 LXC ' + vmid + zoneSuffix(ct));
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC VNC 控制台失败:', error.message);
@@ -872,7 +882,7 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
         });
 
         const proxyUrl = `/terminal?session=${sessionId}`;
-        await auditAction(req, 'lxc.terminal', '打开终端 LXC ' + vmid);
+        await auditAction(req, 'lxc.terminal', '打开终端 LXC ' + vmid + zoneSuffix(ct));
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 LXC 终端失败:', error.message);

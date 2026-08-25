@@ -529,7 +529,7 @@
                                     <tbody>
                                         <tr v-for="o in myOrders" :key="o.id">
                                             <td><code style="font-size:11px;">{{ o.order_no }}</code></td>
-                                            <td>{{ o.order_kind === 'renewal' ? (o.type === 'disk' ? (o.resource_name || '') : (o.resource_name || '') + '（' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + '）') : (o.type === 'disk' ? o.package_name : o.package_name + '[' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + ']') }}</td>
+                                            <td>{{ o.order_kind === 'renewal' ? (o.type === 'disk' ? (o.resource_name || '') : (o.resource_name || '') + '（' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + (o.zone_label ? ' · ' + o.zone_label : '') + '）') : (o.type === 'disk' ? o.package_name : o.package_name + '[' + (o.type === 'vm' ? 'vm' : 'lxc') + '：' + o.resource_id + (o.zone_label ? ' · ' + o.zone_label : '') + ']') }}</td>
                                             <td><span :class="o.type === 'vm' ? 'badge bg-info' : o.type === 'lxc' ? 'badge bg-success' : 'badge bg-warning'">{{ o.order_kind === 'renewal' ? (o.type === 'vm' ? t('user.order.renewVm') : o.type === 'lxc' ? t('user.order.renewLxc') : t('user.order.renewDisk')) : (o.type === 'vm' ? t('user.order.vm') : o.type === 'lxc' ? t('user.order.lxc') : t('user.order.disk')) }}</span></td>
                                             <td>{{ o.period === 'month' ? t('user.order.periodMonth') : o.period === 'quarter' ? t('user.order.periodQuarter') : t('user.order.periodYear') }}</td>
                                             <td>{{ o.period_count }}</td>

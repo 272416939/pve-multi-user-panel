@@ -69,8 +69,8 @@ async function takeDiskSnapshot(vmId, userId, nodeId = null) {
     known_slots: Object.keys(knownSlots)
   };
 
-  // 写入持久化快照（供后续审计追溯）
-  await db.vmDiskSnapshots.upsert(vmId, userId, snapshot);
+  // 写入持久化快照（供后续审计追溯；多节点：带节点维度防跨节点同号撞键）
+  await db.vmDiskSnapshots.upsert(vmId, userId, snapshot, nodeId);
   console.log('[快照] VM ' + vmId + ' 磁盘快照已更新（系统盘 ' + volumes.system.length + ', 数据盘 ' + volumes.data.length + '）');
   return snapshot;
 }

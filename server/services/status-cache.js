@@ -66,4 +66,16 @@ function isRecentlyCompleted(vmid) {
     return recentlyCompleted.has(vmid);
 }
 
-module.exports = { setStatusCache, getStatusCache, markBackupRestoreComplete, isRecentlyCompleted, pruneCompleted };
+// ==================== 多节点缓存键（单一来源，读写两端共用防漂移） ====================
+// 多节点后 vmid 跨节点可重复，缓存/限速键必须带节点维度：'vm:<nodeId|d>:<id>'
+function nodeKeyPart(nodeId) {
+    return nodeId == null ? 'd' : String(nodeId);
+}
+function vmStatusKey(nodeId, vmid) {
+    return 'vm:' + nodeKeyPart(nodeId) + ':' + vmid;
+}
+function lxcStatusKey(nodeId, ctId) {
+    return 'lxc:' + nodeKeyPart(nodeId) + ':' + ctId;
+}
+
+module.exports = { setStatusCache, getStatusCache, markBackupRestoreComplete, isRecentlyCompleted, pruneCompleted, vmStatusKey, lxcStatusKey, nodeKeyPart };

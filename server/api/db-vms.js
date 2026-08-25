@@ -486,20 +486,25 @@ const vmOsSwitchLogs = {
 };
 
 // VM 磁盘快照（恢复前后对账，防止幽灵盘）
+// 多节点：主键为 (pve_node_id, vm_id)；nodeId 缺省时回退默认节点（与迁移回填口径一致）
 const vmDiskSnapshots = {
-    upsert: (vmId, userId, diskSnapshot) => execute(
-        `REPLACE INTO vm_disk_snapshots (vm_id, user_id, disk_snapshot)
-         VALUES (?, ?, ?)`,
-        [parseInt(vmId), parseInt(userId), JSON.stringify(diskSnapshot)]
-    ),
-    getByVmId: (vmId) => queryOne(
-        'SELECT * FROM vm_disk_snapshots WHERE vm_id = ?',
-        [parseInt(vmId)]
+    upsert: async (vmId, userId, diskSnapshot, nodeId = null) => {
+        var nid = nodeId;
+        if (nid == null) nid = await require('./db-nodes').pveNodes.getDefaultId();
+        return execute(
+            `REPLACE INTO vm_disk_snapshots (vm_id, user_id, disk_snapshot, pve_node_id)
+             VALUES (?, ?, ?, ?)`,
+            [parseInt(vmId), parseInt(userId), JSON.stringify(diskSnapshot), nid]
+        );
+    },
+    getByVmId: (vmId, nodeId) => queryOne(
+        'SELECT * FROM vm_disk_snapshots WHERE vm_id = ?' + (nodeId != null ? ' AND pve_node_id = ?' : ''),
+        nodeId != null ? [parseInt(vmId), nodeId] : [parseInt(vmId)]
     ),
     getAll: () => queryAll('SELECT * FROM vm_disk_snapshots'),
-    delete: (vmId) => execute(
-        'DELETE FROM vm_disk_snapshots WHERE vm_id = ?',
-        [parseInt(vmId)]
+    delete: (vmId, nodeId) => execute(
+        'DELETE FROM vm_disk_snapshots WHERE vm_id = ?' + (nodeId != null ? ' AND pve_node_id = ?' : ''),
+        nodeId != null ? [parseInt(vmId), nodeId] : [parseInt(vmId)]
     ),
 };
 

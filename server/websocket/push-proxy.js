@@ -67,8 +67,8 @@ function pushToUser(userId, data) {
 let pveApiCache = null;
 let dbCache = null;
 
-// 多节点：推送状态轮询为全局聚合查询（跨节点 vmid 集合），此处用默认 PVE 节点客户端兜底
-//（按节点分组轮询留待后续，见改造报告标注）
+// 多节点：推送状态轮询按「资产所在节点」分组——各组用各自节点的 PVE 客户端轮询，
+// 缓存/限速键带节点维度（vm:<nodeId|d>:<vmid>），跨节点同 vmid 不再串状态
 async function getPveApi() {
     if (!pveApiCache) pveApiCache = await require('../api/pve-clients').getPveClient(null);
     return pveApiCache;
@@ -90,43 +90,70 @@ async function pushUnreadCount() {
 }
 
 async function pushStatus() {
-    const pveApi = await getPveApi();
-    const vms = new Set();
-    const lxcs = new Set();
-
+    // 1. 收集订阅目标（带节点维度）：key = 'vm:<node|d>:<id>'
+    const vmTargets = new Map();
+    const lxcTargets = new Map();
     for (const [, info] of SUBSCRIPTIONS) {
-        for (const v of info.vms) { vms.add(v); }
-        for (const l of info.lxcs) { lxcs.add(l); }
+        for (const v of info.vms) {
+            const k = statusCache.vmStatusKey(info.vmNodes.get(v), v);
+            if (!vmTargets.has(k)) vmTargets.set(k, { node: info.vmNodes.get(v), id: v });
+        }
+        for (const l of info.lxcs) {
+            const k = statusCache.lxcStatusKey(info.lxcNodes.get(l), l);
+            if (!lxcTargets.has(k)) lxcTargets.set(k, { node: info.lxcNodes.get(l), id: l });
+        }
     }
 
+    // 2. 按节点分组，各组用各自节点的 PVE 客户端轮询（节点内串行、节点间并行）
     const statusCacheLocal = new Map();
+    const byNode = new Map();
+    function groupOf(node) {
+        const nk = statusCache.nodeKeyPart(node);
+        if (!byNode.has(nk)) byNode.set(nk, { node, vms: [], lxcs: [] });
+        return byNode.get(nk);
+    }
+    for (const t of vmTargets.values()) groupOf(t.node).vms.push(t.id);
+    for (const t of lxcTargets.values()) groupOf(t.node).lxcs.push(t.id);
 
-    for (const vmid of vms) {
+    await Promise.all([...byNode.values()].map(async (g) => {
+        let pveApi;
         try {
-            const raw = await pveApi.getVmStatus(vmid);
-            const s = _applyRate('vm:' + vmid, raw);
-            statusCacheLocal.set('vm:' + vmid, s);
-            statusCache.setStatusCache('vm:' + vmid, s);
-        } catch (e) {}
-    }
-    for (const vmid of lxcs) {
-        try {
-            const raw = await pveApi.getLxcStatus(vmid);
-            const s = _applyRate('lxc:' + vmid, raw);
-            statusCacheLocal.set('lxc:' + vmid, s);
-            statusCache.setStatusCache('lxc:' + vmid, s);
-        } catch (e) {}
-    }
+            pveApi = await require('../api/pve-clients').getPveClient(g.node);
+        } catch (e) {
+            console.error('[pushStatus] 节点客户端获取失败(node=' + statusCache.nodeKeyPart(g.node) + '):', e.message);
+            return;
+        }
+        for (const vmid of g.vms) {
+            try {
+                const raw = await pveApi.getVmStatus(vmid);
+                const s = _applyRate(statusCache.vmStatusKey(g.node, vmid), raw);
+                statusCacheLocal.set(statusCache.vmStatusKey(g.node, vmid), s);
+                statusCache.setStatusCache(statusCache.vmStatusKey(g.node, vmid), s);
+            } catch (e) {}
+        }
+        for (const ctid of g.lxcs) {
+            try {
+                const raw = await pveApi.getLxcStatus(ctid);
+                const s = _applyRate(statusCache.lxcStatusKey(g.node, ctid), raw);
+                statusCacheLocal.set(statusCache.lxcStatusKey(g.node, ctid), s);
+                statusCache.setStatusCache(statusCache.lxcStatusKey(g.node, ctid), s);
+            } catch (e) {}
+        }
+    }));
 
     // 并行查询 DB 台账，合并"进行中"状态到推送，避免 PVE status 与台账竞态造成徽标闪现
-    const busyMap = await computeBusyState(vms, lxcs);
+    const busyMap = await computeBusyState(
+        new Set([...vmTargets.values()].map(t => t.id)),
+        new Set([...lxcTargets.values()].map(t => t.id))
+    );
 
     if (statusCacheLocal.size === 0) return;
 
+    // 3. 按订阅回填：每条订阅用其记录的节点维度取缓存
     for (const [ws, info] of SUBSCRIPTIONS) {
         const updates = [];
         for (const v of info.vms) {
-            const s = statusCacheLocal.get('vm:' + v);
+            const s = statusCacheLocal.get(statusCache.vmStatusKey(info.vmNodes.get(v), v));
             if (s) {
                 const st = Object.assign({}, s);
                 const busy = busyMap.vm.get(v);
@@ -135,7 +162,7 @@ async function pushStatus() {
             }
         }
         for (const l of info.lxcs) {
-            const s = statusCacheLocal.get('lxc:' + l);
+            const s = statusCacheLocal.get(statusCache.lxcStatusKey(info.lxcNodes.get(l), l));
             if (s) {
                 const st = Object.assign({}, s);
                 const busy = busyMap.lxc.get(l);
@@ -210,6 +237,21 @@ async function checkResourceOwnership(userId, role, vmid, isLxc) {
     }
 }
 
+// 多节点：订阅时解析资产所在 PVE 节点（查不到行回退 null=默认节点维度）
+async function resolveDevNode(vmid, isLxc) {
+    try {
+        const db = getDb();
+        if (isLxc) {
+            const rows = await db.lxcContainers.getByCtId(vmid);
+            return rows && rows.length > 0 ? (rows[0].pve_node_id != null ? rows[0].pve_node_id : null) : null;
+        }
+        const row = await db.vms.getByVmid(vmid);
+        return row ? (row.pve_node_id != null ? row.pve_node_id : null) : null;
+    } catch (_) {
+        return null;
+    }
+}
+
 pushProxy.on('connection', async (clientWs, request) => {
     // PERF-30: 连接数上限检查
     if (SUBSCRIPTIONS.size >= MAX_CONNECTIONS) {
@@ -251,6 +293,9 @@ pushProxy.on('connection', async (clientWs, request) => {
         ip: clientIp,
         vms: new Set(),
         lxcs: new Set(),
+        // 多节点：vmid → 资产所在 PVE 节点（订阅时解析；null=默认/未回填，键维度用 'd'）
+        vmNodes: new Map(),
+        lxcNodes: new Map(),
         detailVms: new Set(),
         detailLxcs: new Set(),
         lastPong: Date.now()
@@ -287,10 +332,13 @@ pushProxy.on('connection', async (clientWs, request) => {
                         if (!(await checkResourceOwnership(decoded.userId, info.role, msg.vmid, msg.isLxc))) {
                             break;
                         }
+                        const devNode = await resolveDevNode(msg.vmid, msg.isLxc);
                         if (msg.isLxc) {
                             info.lxcs.add(msg.vmid);
+                            info.lxcNodes.set(msg.vmid, devNode);
                         } else {
                             info.vms.add(msg.vmid);
+                            info.vmNodes.set(msg.vmid, devNode);
                         }
                     }
                     break;
@@ -299,19 +347,24 @@ pushProxy.on('connection', async (clientWs, request) => {
                         if (!(await checkResourceOwnership(decoded.userId, info.role, msg.vmid, msg.isLxc))) {
                             break;
                         }
+                        const devNode2 = await resolveDevNode(msg.vmid, msg.isLxc);
                         if (msg.isLxc) {
                             info.detailLxcs.add(msg.vmid);
                             info.lxcs.add(msg.vmid);
+                            info.lxcNodes.set(msg.vmid, devNode2);
                         } else {
                             info.detailVms.add(msg.vmid);
                             info.vms.add(msg.vmid);
+                            info.vmNodes.set(msg.vmid, devNode2);
                         }
                     }
                     break;
                 case 'unsubscribe':
                     if (msg.vmid) {
                         info.vms.delete(msg.vmid);
+                        info.vmNodes.delete(msg.vmid);
                         info.lxcs.delete(msg.vmid);
+                        info.lxcNodes.delete(msg.vmid);
                     }
                     break;
                 case 'unsubscribe-detail':

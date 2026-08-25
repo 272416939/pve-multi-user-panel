@@ -263,6 +263,8 @@ router.get('/orders', authMiddleware, async (req, res) => {
                 }
                 return Object.assign({}, order, { package_name: packageName });
             }));
+            // 多节点：订单附可用区标签（vmid 跨节点歧义消解）
+            await require('../services/node-context').attachOrderZoneLabels(result.rows || []);
             return res.json({ data: result.rows, total: result.total, page: result.page, limit: result.limit });
         }
         var result = await db.orders.getByUser(req.user.id, { page: 1, limit: 200 });
@@ -280,6 +282,8 @@ router.get('/orders', authMiddleware, async (req, res) => {
             }
             return Object.assign({}, order, { package_name: packageName });
         }));
+        // 多节点：订单附可用区标签
+        await require('../services/node-context').attachOrderZoneLabels(rows);
         res.json(rows);
     } catch (error) {
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });

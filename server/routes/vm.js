@@ -7,7 +7,7 @@ const { getPveClient } = require('../api/pve-clients');
 const { getIkuaiClientForPve } = require('../api/ikuai-clients');
 const { _applyRate } = require('../utils/pve-rate');
 // 状态缓存读写抽离到 services/status-cache.js（规范第七节）
-const { getStatusCache } = require('../services/status-cache');
+const { getStatusCache, vmStatusKey } = require('../services/status-cache');
 const { shouldSendEmail } = require('../utils/email');
 const { sendTemplateEmail } = require('../services/email-template');
 const { createDhcpStaticBinding, removeDhcpStaticBinding, updateDhcpStaticBindingIp, pickUnusedStaticIp, rebindDhcpForDevice, isIpInAddrPool } = require('../services/dhcp');
@@ -25,6 +25,11 @@ const { importDisksForVm } = require('../services/disk-expiry-check');
 const { auditAction } = require('../utils/audit-log');
 // 多节点资产定位：vmid 跨节点可重复，按归属/节点消歧（防越权与错节点操作）
 const { locateAssetRow, findEnabledNode } = require('../utils/locate-asset');
+
+// 多节点：审计文案追加可用区后缀（台账行已 JOIN zone_name），跨节点同号可消歧
+function zoneSuffix(row) {
+    return (row && row.zone_name) ? ' @' + row.zone_name : '';
+}
 
 // L-5 修复：vmid 严格白名单校验（规范 C-2，与 snapshot/backup 端点一致）
 function isValidVmid(v) {
@@ -106,11 +111,15 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
             userVms = await db.vms.getByUserId(req.user.id);
         }
  
+        // 多节点：CNAME 后缀按各 VM 所在节点的配对爱快解析（旧实现只读默认节点，他区资产后缀错误）
+        const cnameByPve = await require('../services/node-context').buildCnameByPveMap(userVms);
+
         // 先构建基础数据（不依赖 PVE 状态查询）；剔除 pve_upid 敏感字段，仅返回 _provisioning 布尔标记
         const vmsWithDetails = userVms.map(vm => {
             const { pve_upid, ...rest } = vm;
             return {
                 ...rest,
+                cname_domain: cnameByPve[vm.pve_node_id] || '',
                 _provisioning: !!(pve_upid && pve_upid !== ''),
                 // 备份中/恢复中/切换中统一标记（详见下方 computeBusyType）
                 _busy: false,
@@ -149,15 +158,16 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
             const batch = vmsWithDetails.slice(i, i + batchSize);
             await Promise.all(batch.map(async (vmData) => {
                 const pve = await getPveClient(vmData.pve_node_id); // 按资产所在节点取客户端
+                const statusKey = vmStatusKey(vmData.pve_node_id, vmData.vm_id); // 多节点：键带节点维度
                 try {
-                    var cachedStatus = getStatusCache('vm:' + vmData.vm_id, req.user.id);
+                    var cachedStatus = getStatusCache(statusKey, req.user.id);
                     var rawStatus = cachedStatus || await pve.getVmStatus(vmData.vm_id);
                     var config = await pve.getVmConfig(vmData.vm_id);
-                    vmData.status = cachedStatus || _applyRate('vm:' + vmData.vm_id, rawStatus);
+                    vmData.status = cachedStatus || _applyRate(statusKey, rawStatus);
                     vmData.config = config;
                     vmData.error = null;
                 } catch (innerError) {
-                    var cachedFallback = getStatusCache('vm:' + vmData.vm_id, req.user.id);
+                    var cachedFallback = getStatusCache(statusKey, req.user.id);
                     if (cachedFallback) {
                         vmData.status = cachedFallback;
                         vmData.error = null;
@@ -567,7 +577,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     // 清理磁盘快照
     try {
         if (vm && vm.vm_id) {
-            await db.vmDiskSnapshots.delete(vm.vm_id);
+            await db.vmDiskSnapshots.delete(vm.vm_id, vm.pve_node_id != null ? vm.pve_node_id : undefined);
             console.log('[快照] VM ' + vm.vm_id + ' 磁盘快照已清理（移除分配）');
         }
     } catch (e) { console.error('清理磁盘快照失败:', e.message); }
@@ -675,7 +685,7 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
             }
         } catch (e) { console.error('[vm.start] 重绑 DHCP 静态绑定失败:', e.message); }
 
-        await auditAction(req, 'vm.start', '开机 VM ' + vmid);
+        await auditAction(req, 'vm.start', '开机 VM ' + vmid + zoneSuffix(vm));
         res.json({ message: '虚拟机启动成功' });
     } catch (error) {
         res.status(500).json({ error: '启动虚拟机失败', code: 'VM_START_FAILED' });
@@ -710,7 +720,7 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
         await pve.shutdownVm(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: 'manual' }); } catch (_) {}
-        await auditAction(req, 'vm.shutdown', '关机 VM ' + vmid);
+        await auditAction(req, 'vm.shutdown', '关机 VM ' + vmid + zoneSuffix(vm));
         res.json({ message: '虚拟机关机成功' });
     } catch (error) {
         res.status(500).json({ error: '关闭虚拟机失败', code: 'VM_STOP_FAILED' });
@@ -745,7 +755,7 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
         await pve.stopVm(vmid);
         // 标记为用户手动关机（续费后不自动开机）
         try { if (vm) await db.vms.update(vm.id, { shutdown_reason: 'manual' }); } catch (_) {}
-        await auditAction(req, 'vm.stop', '强制停止 VM ' + vmid);
+        await auditAction(req, 'vm.stop', '强制停止 VM ' + vmid + zoneSuffix(vm));
         res.json({ message: '虚拟机已强制停止' });
     } catch (error) {
         res.status(500).json({ error: '停止虚拟机失败', code: 'VM_KILL_FAILED' });
@@ -778,7 +788,7 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
 
         const pve = await getPveClient(vm ? vm.pve_node_id : null); // 按资产所在节点取客户端
         await pve.rebootVm(vmid);
-        await auditAction(req, 'vm.reboot', '重启 VM ' + vmid);
+        await auditAction(req, 'vm.reboot', '重启 VM ' + vmid + zoneSuffix(vm));
         res.json({ message: '虚拟机重启成功' });
     } catch (error) {
         res.status(500).json({ error: '重启虚拟机失败', code: 'VM_RESTART_FAILED' });
@@ -844,7 +854,7 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
 
         // 返回代理页面 URL（只暴露 session ID，不含敏感参数）
         const proxyUrl = `/vnc?session=${sessionId}`;
-        await auditAction(req, 'vm.vnc', '打开 VNC 控制台 VM ' + vmid);
+        await auditAction(req, 'vm.vnc', '打开 VNC 控制台 VM ' + vmid + zoneSuffix(vm));
         res.json({ proxyUrl });
     } catch (error) {
         console.error('获取 VNC 控制台失败:', error.message);
@@ -957,7 +967,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
             // DHCP模式：删除爱快静态绑定（如果有），VM将自动从爱快获取动态IP
             await removeDhcpStaticBinding('vm', vmid, { pveNodeId: vmRecord ? vmRecord.pve_node_id : null });
             if (vmRecord) await db.vms.update(vmRecord.id, { dhcp_static_ip: '' });
-            await auditAction(req, 'vm.reset-ip', 'VM ' + vmid + ' 切换为 DHCP 模式');
+            await auditAction(req, 'vm.reset-ip', 'VM ' + vmid + ' 切换为 DHCP 模式' + zoneSuffix(vmRecord));
             return res.json({ success: true, ip: null, message: '已切换为DHCP模式' });
         }
 
@@ -1178,9 +1188,9 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             try {
                 await db.getPool().execute('DELETE FROM disks WHERE bind_vmid = ? AND pve_node_id = ?', [vmid, vm.pve_node_id != null ? vm.pve_node_id : defaultNodeId]);
             } catch (e) { console.error('清理磁盘记录失败:', e.message); }
-            // 清理磁盘快照
+            // 清理磁盘快照（多节点：限定本行节点维度）
             try {
-                await db.vmDiskSnapshots.delete(vmid);
+                await db.vmDiskSnapshots.delete(vmid, vm.pve_node_id != null ? vm.pve_node_id : undefined);
                 console.log('[快照] VM ' + vmid + ' 磁盘快照已清理（销毁）');
             } catch (e) { console.error('清理磁盘快照失败:', e.message); }
             await db.vms.delete(vm.id);
@@ -1325,7 +1335,7 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             }
         })();
 
-        await auditAction(req, 'vm.switch-os', 'VM ' + vmid + ' 切换系统为 ' + osTemplate.name);
+        await auditAction(req, 'vm.switch-os', 'VM ' + vmid + zoneSuffix(vm) + ' 切换系统为 ' + osTemplate.name);
         res.json({
             success: true,
             message: '系统切换已开始，请稍候',

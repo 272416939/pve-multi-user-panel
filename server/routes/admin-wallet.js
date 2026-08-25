@@ -121,6 +121,8 @@ router.get('/admin/orders', authMiddleware, adminMiddleware, async (req, res) =>
         if (req.query.start_time) params.start_time = req.query.start_time;
         if (req.query.end_time) params.end_time = req.query.end_time;
         var result = await db.orders.getAll(params);
+        // 多节点：订单附可用区标签（vmid 跨节点歧义消解）
+        await require('../services/node-context').attachOrderZoneLabels(result.rows || []);
         res.json({ rows: result.rows, total: result.total, page: result.page, limit: result.limit });
     } catch (error) {
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });

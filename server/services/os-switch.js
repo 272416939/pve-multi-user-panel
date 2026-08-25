@@ -147,19 +147,6 @@ async function getStorageType(storage, nodeId) {
     return s ? s.type : '';
 }
 
-// 扩展的 SSH 执行（支持自定义超时）
-// V4-08 修复：错误消息不包含完整命令串
-async function runSshWithTimeout(cmd, timeout = 60000) {
-    const { execSSH, getPveSshConfig } = require('../api/ssh-exec');
-    const sshConfig = await getPveSshConfig();
-    const result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, timeout, sshConfig.port);
-    if (result.code !== 0) {
-        const errDetail = (result.stderr || result.stdout || '').trim();
-        throw new Error(`SSH 命令执行失败 [exit ${result.code}]\n${errDetail}`);
-    }
-    return result.stdout.trim();
-}
-
 // 2.6 根据存储类型将磁盘从临时 VM 移动到目标 VM
 // 统一使用 PVE move_disk API，兼容所有存储类型（lvm/lvmthin/zfs/dir/btrfs/nfs/cephfs）
 async function moveDiskToTarget(storage, sourceVolumeId, targetVmid, sourceBus, tempVmid, nodeId) {

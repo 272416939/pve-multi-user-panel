@@ -43,6 +43,7 @@ const snapshotLogs = {
 // 备份配置操作
 const backupConfig = {
     get: async () => {
+        // 多节点：备份存储按节点（pve_nodes.backup_storage），全局 default_storage 仅保留旧值回显、不再消费
         const keys = ['backup:default_storage', 'backup:max_per_vm', 'backup:daily_limit'];
         const placeholders = keys.map(() => '?').join(',');
         const rows = await queryAll('SELECT `key`, value FROM config WHERE `key` IN (' + placeholders + ')', keys);
@@ -55,7 +56,10 @@ const backupConfig = {
         };
     },
     set: async (cfg) => {
-        await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:default_storage', cfg.default_storage ?? 'local']);
+        // default_storage 已废弃：仅在显式传入时写（不再被任何运行时路径读取）
+        if (cfg.default_storage !== undefined) {
+            await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:default_storage', cfg.default_storage ?? 'local']);
+        }
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:max_per_vm', String(cfg.max_per_vm ?? 3)]);
         await execute('REPLACE INTO config (`key`, value) VALUES (?, ?)', ['backup:daily_limit', String(cfg.daily_limit ?? 3)]);
     }

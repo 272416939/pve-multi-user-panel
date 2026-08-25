@@ -1226,6 +1226,23 @@ async function migrateRegionNodes() {
             try { await execute('UPDATE port_forwards SET ikuai_node_id = ? WHERE ikuai_node_id IS NULL', [firstIk]); } catch (_) {}
             try { await execute('UPDATE subnets SET ikuai_node_id = ? WHERE ikuai_node_id IS NULL', [firstIk]); } catch (_) {}
         }
+
+        // 多节点：vm_disk_snapshots 主键从裸 vm_id 迁移为 (pve_node_id, vm_id)，防跨节点同 vmid 撞键
+        try { await execute('ALTER TABLE vm_disk_snapshots ADD COLUMN pve_node_id INT DEFAULT NULL'); } catch (_) {}
+        if (firstPve) {
+            try { await execute('UPDATE vm_disk_snapshots SET pve_node_id = ? WHERE pve_node_id IS NULL', [firstPve]); } catch (_) {}
+        }
+        try {
+            const snapPkCols = await queryAll("SELECT COLUMN_NAME AS c FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'vm_disk_snapshots' AND CONSTRAINT_NAME = 'PRIMARY' ORDER BY ORDINAL_POSITION");
+            if (snapPkCols.length > 0 && snapPkCols[0].c !== 'pve_node_id') {
+                await execute('ALTER TABLE vm_disk_snapshots DROP PRIMARY KEY');
+                await execute('ALTER TABLE vm_disk_snapshots MODIFY pve_node_id INT NOT NULL');
+                await execute('ALTER TABLE vm_disk_snapshots ADD PRIMARY KEY (pve_node_id, vm_id)');
+                console.log('[db] vm_disk_snapshots 主键已迁移为 (pve_node_id, vm_id)');
+            }
+        } catch (e) {
+            console.error('[db] vm_disk_snapshots 主键迁移失败:', e.message);
+        }
     } catch (e) {
         console.error('[db] 区域/节点体系迁移失败:', e.message);
     }

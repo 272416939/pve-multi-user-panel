@@ -134,6 +134,17 @@ watch($.user, function(u) {
 }, { immediate: true });
 
     // ==================== Overview 总览统计 ====================
+    // 多节点：可用区资源分布（复用 /admin/zones 的 zonesOverview 聚合）
+    $.overviewZones = ref([]);
+    $.loadOverviewZones = async function() {
+        try {
+            var rows = await api('/admin/zones');
+            $.overviewZones.value = Array.isArray(rows) ? rows : (rows && rows.rows) || [];
+        } catch (e) {
+            console.error('加载可用区分布失败', e);
+            $.overviewZones.value = [];
+        }
+    };
     $.overviewVmRunning = computed(function() {
         var vms = $.userVms.value || [];
         return vms.filter(function(v) { return v.status && v.status.status === 'running'; }).length;
@@ -927,6 +938,7 @@ $.initDetailCharts = function() {
                         .then(function() { return $.loadAssignData(); })
                         .catch(function(e) { console.error('加载分配数据失败', e && e.message); }),
                     $.loadData(),
+                    $.loadOverviewZones(),
                     $.loadMacGroups().catch(function(e) { console.error('加载 MAC 分组失败', e && e.message); })
                 ]);
                 // 日志中心数据加载独立于 expandSections 块：即使上方初始化接口异常，
