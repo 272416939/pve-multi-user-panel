@@ -184,8 +184,8 @@
               <th>{{ t('dash.log.user') }}</th>
               <th>{{ t('common.name') }}</th>
               <th>{{ t('admin.disk.pvePath') }}</th>
-              <th>{{ t('admin.disk.storageGroup') }}</th>
               <th>{{ t('admin.disk.groupZone') }}</th>
+              <th>{{ t('admin.disk.storageGroup') }}</th>
               <th>{{ t('admin.disk.spec') }}</th>
               <th>{{ t('admin.disk.type') }}</th>
               <th>{{ t('admin.disk.capacity') }}</th>
@@ -203,8 +203,8 @@
               <td>{{ disk.username || '-' }}</td>
               <td>{{ disk.disk_name || '-' }}<span v-if="disk.is_legacy" class="text-muted small ms-1">({{ t('admin.disk.followVm') }})</span></td>
               <td><code class="small" style="word-break:break-all;white-space:normal">{{ disk.volume_id }}</code></td>
-              <td>{{ disk.group_name || '-' }}</td>
               <td>{{ disk.zone_name || '-' }}</td>
+              <td>{{ disk.group_name || '-' }}</td>
               <td>{{ disk.spec_name || '-' }}</td>
               <td>{{ disk.disk_type }}</td>
               <td>{{ disk.capacity_gb }} GiB</td>

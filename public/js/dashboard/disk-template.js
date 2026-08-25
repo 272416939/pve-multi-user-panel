@@ -41,8 +41,8 @@
             <tr>
               <th class="text-center">ID</th>
               <th>{{ t('common.name') }}</th>
-              <th>{{ t('dash.disk.storageGroup') }}</th>
               <th>{{ t('admin.disk.groupZone') }}</th>
+              <th>{{ t('dash.disk.storageGroup') }}</th>
               <th>{{ t('dash.disk.specName') }}</th>
               <th class="text-center">{{ t('common.type') }}</th>
               <th class="text-center">{{ t('dash.disk.capacity') }}</th>
@@ -58,8 +58,8 @@
             <tr v-for="disk in disks" :key="disk.id" @click="selectDisk(disk.id)" :class="{ 'table-active': selectedDisks.includes(disk.id) }" style="cursor:pointer">
               <td class="text-center">{{ disk.id }}</td>
             <td>{{ disk.disk_name || '-' }}<span v-if="disk.is_legacy" class="text-muted small ms-1">({{ t('dash.disk.followVm') }})</span></td>
-            <td>{{ disk.group_name || '-' }}</td>
             <td>{{ disk.zone_name || '-' }}</td>
+            <td>{{ disk.group_name || '-' }}</td>
             <td>{{ disk.spec_name || '-' }}</td>
             <td class="text-center"><span :class="getDiskTypeBadge(disk.disk_type)">{{ disk.disk_type }}</span></td>
             <td class="text-center">{{ disk.capacity_gb }} GiB</td>
