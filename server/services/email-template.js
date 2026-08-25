@@ -217,6 +217,14 @@ async function renderTemplate(code, vars) {
  */
 async function sendTemplateEmail(to, code, vars, opts) {
     opts = opts || {};
+    // 多节点：传 opts.pveNodeId 时自动注入 zone_name/pve_node_name（资产类模板统一节点信息；
+    // 未声明该变量的模板不受影响，渲染引擎忽略多余变量）
+    if (opts && opts.pveNodeId != null) {
+        try {
+            const { assetNodeVars } = require('./node-context');
+            Object.assign(vars, await assetNodeVars(opts.pveNodeId));
+        } catch (_) {}
+    }
     var rendered = await renderTemplate(code, vars);
     var { createEmailTemplate } = require('../utils/email');
     var html = await createEmailTemplate(rendered.title, rendered.content, rendered.site_name);

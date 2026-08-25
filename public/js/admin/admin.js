@@ -545,7 +545,7 @@
 
     // 变量示例值 i18n：仅中文语义示例（张三/云服务控制台/1个月等）需要翻译，
     // 技术格式示例（URL/日期/金额/订单号）各语言通用原样返回；cdk_list 的 example 是 HTML 演示片段豁免
-    var EMAIL_VAR_EXAMPLE_L10N = { username: 1, renewal_price: 1, disk_name: 1, period: 1, refund_desc: 1, resource_label: 1, duration: 1, status: 1, detail: 1, site_name: 1 };
+    var EMAIL_VAR_EXAMPLE_L10N = { username: 1, renewal_price: 1, disk_name: 1, period: 1, refund_desc: 1, resource_label: 1, duration: 1, status: 1, detail: 1, site_name: 1, zone_name: 1 };
     $.emailVarExample = function(v) {
         if (v && EMAIL_VAR_EXAMPLE_L10N[v.name]) {
             return window.__i18n.t('settings.varExampleVal.' + v.name);

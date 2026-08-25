@@ -1082,4 +1082,46 @@ const EMAIL_TEMPLATES = {
     }
 };
 
+// ==================== 多节点：资产类模板统一附加 节点/可用区 变量 ====================
+// 单一来源循环注入（避免 30+ 模板逐个手拼漂移）；未传值时由渲染引擎置空 + foldEmptyLines 整行折叠，存量库/漏传点不破版
+const V_NODE = [
+    { name: 'zone_name', label: '所属可用区', example: '华东一区', group: '资源' },
+    { name: 'pve_node_name', label: '所属节点', example: 'PVE-01', group: '资源' }
+];
+
+// 涉及资产上下文的模板 code（开通/账号密码/磁盘/续费/到期/CDK/备份恢复等；不含认证/验证码/充值类）
+const ASSET_NODE_TEMPLATE_CODES = [
+    'vm_provisioned', 'vm_removed', 'lxc_provisioned', 'lxc_removed',
+    'server_provisioned', 'lxc_provisioned_user', 'server_provisioned_admin', 'lxc_provisioned_admin',
+    'server_account', 'lxc_root_password', 'provision_failed', 'provision_failed_restore',
+    'disk_purchase', 'disk_purchase_refund', 'disk_resize', 'disk_resize_refund', 'disk_destroy_refund',
+    'disk_admin_destroy', 'disk_renewal', 'resource_renewal',
+    'cdk_renewal_lxc', 'cdk_renewal_vm',
+    'vm_expiry_reminder', 'vm_expiry_alert', 'lxc_expiry_reminder', 'lxc_expiry_alert',
+    'lxc_backup_result', 'lxc_restore_result', 'vm_backup_result', 'vm_restore_result'
+];
+
+for (const nodeTplCode of ASSET_NODE_TEMPLATE_CODES) {
+    const tpl = EMAIL_TEMPLATES[nodeTplCode];
+    if (!tpl) continue;
+    tpl.variables = (tpl.variables || []);
+    for (const nv of V_NODE) {
+        if (!tpl.variables.some(x => x.name === nv.name)) tpl.variables.push(nv);
+    }
+    if (tpl.content && tpl.content.indexOf('{zone_name}') === -1) {
+        // 正文末尾追加节点信息行（变量为空时整行折叠）
+        tpl.content += `\n            <div class="divider"></div>\n            <p style="color: #718096; font-size: 14px; margin: 0;">所属可用区：<strong>{zone_name}</strong>　所属节点：<strong>{pve_node_name}</strong></p>`;
+    }
+}
+
+// storage_alert 单独补 pve_node_name（存储巡检按节点，池名跨节点不唯一）
+(function () {
+    const sa = EMAIL_TEMPLATES['storage_alert'];
+    if (!sa) return;
+    sa.variables = (sa.variables || []);
+    if (!sa.variables.some(v => v.name === 'pve_node_name')) {
+        sa.variables.push({ name: 'pve_node_name', label: '所属节点', example: 'PVE-01', group: '资源' });
+    }
+})();
+
 module.exports = { EMAIL_TEMPLATES, EMAIL_TEMPLATE_CATEGORIES, GLOBAL_VARIABLES, EMAIL_SHELL_PARAMS };

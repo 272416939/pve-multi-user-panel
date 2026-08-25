@@ -79,7 +79,7 @@ async function sendLxcBackupNotification(vmid, backupId, status) {
         const user = await db.users.getById(backup.user_id);
         if (!user) return;
 
-        pushToUser(backup.user_id, { type: 'backup-done', backupId: backupId, ct_id: vmid, status: status });
+        pushToUser(backup.user_id, { type: 'backup-done', backupId: backupId, ct_id: vmid, status: status, pve_node_id: nodeId != null ? nodeId : null });
 
         const title = status === 'completed' ? 'LXC 容器备份完成' : 'LXC 容器备份失败';
         const content = status === 'completed'
@@ -103,7 +103,7 @@ async function sendLxcBackupNotification(vmid, backupId, status) {
                         vmid: vmid,
                         status: status === 'completed' ? '完成' : '失败',
                         detail: status === 'completed' ? '' : '原因：' + (backup.error_msg || '未知错误')
-                    });
+                    }, { pveNodeId: nodeId });
                 }
             } catch (e) {
                 console.error('LXC 备份通知邮件发送失败:', e.message);
@@ -168,7 +168,7 @@ async function sendLxcRestoreNotification(vmid, taskId, status) {
         const user = await db.users.getById(task.user_id);
         if (!user) return;
 
-        pushToUser(task.user_id, { type: 'restore-done', taskId: taskId, ct_id: vmid, status: status });
+        pushToUser(task.user_id, { type: 'restore-done', taskId: taskId, ct_id: vmid, status: status, pve_node_id: nodeId != null ? nodeId : null });
 
         const title = status === 'completed' ? 'LXC 容器恢复完成' : 'LXC 容器恢复失败';
         const content = status === 'completed'
@@ -192,7 +192,7 @@ async function sendLxcRestoreNotification(vmid, taskId, status) {
                         vmid: vmid,
                         status: status === 'completed' ? '完成' : '失败',
                         detail: status === 'completed' ? '' : '原因：' + (task.error_msg || '未知错误')
-                    });
+                    }, { pveNodeId: nodeId });
                 }
             } catch (e) {
                 console.error('LXC 恢复通知邮件发送失败:', e.message);
@@ -238,10 +238,11 @@ async function sendBackupNotification(userId, vmId, status, filename) {
     const user = await db.users.getById(userId);
     if (!user) return;
 
-    pushToUser(userId, { type: 'backup-done', vm_id: vmId, status: status });
+    pushToUser(userId, { type: 'backup-done', vm_id: vmId, status: status, pve_node_id: nodeId != null ? nodeId : null });
 
     const vm = (await db.vms.getByUserId(userId)).find(v => v.vm_id == vmId);
     const vmName = vm?.name || 'VM ' + vmId;
+    const nodeId = vm ? (vm.pve_node_id != null ? vm.pve_node_id : null) : null;
     let title, content;
     if (status === 'completed') {
         title = '备份完成通知';
@@ -272,7 +273,7 @@ async function sendBackupNotification(userId, vmId, status, filename) {
                     vm_name: vmName,
                     status: isSuccess ? '完成' : '失败',
                     detail: isSuccess ? (filename ? '备份文件：' + filename : '') : (filename ? '原因：' + filename : '')
-                });
+                }, { pveNodeId: nodeId });
             }
         } catch (e) {
             console.error('备份通知邮件发送失败:', e.message);
@@ -365,10 +366,11 @@ async function sendRestoreNotification(userId, vmId, statusMsg) {
     const user = await db.users.getById(userId);
     if (!user) return;
 
-    pushToUser(userId, { type: 'restore-done', vm_id: vmId, status: statusMsg === 'completed' ? 'completed' : 'failed' });
+    pushToUser(userId, { type: 'restore-done', vm_id: vmId, status: statusMsg === 'completed' ? 'completed' : 'failed', pve_node_id: nodeId != null ? nodeId : null });
 
     const vm = (await db.vms.getByUserId(userId)).find(v => v.vm_id == vmId);
     const vmName = vm?.name || 'VM ' + vmId;
+    const nodeId = vm ? (vm.pve_node_id != null ? vm.pve_node_id : null) : null;
     const isSuccess = statusMsg === 'completed';
     const title = isSuccess ? '备份恢复完成通知' : '备份恢复失败通知';
     const content = isSuccess
@@ -389,7 +391,7 @@ async function sendRestoreNotification(userId, vmId, statusMsg) {
                     vm_name: vmName,
                     status: isSuccess ? '完成' : '失败',
                     detail: isSuccess ? '' : (statusMsg ? '原因：' + statusMsg : '')
-                });
+                }, { pveNodeId: nodeId });
             }
         } catch (e) { console.error('恢复通知邮件发送失败:', e.message); }
     }

@@ -73,9 +73,20 @@ async function refreshSubnetAvailableById(subnet) {
     } catch (_) {}
 }
 
+// 多节点：站内信内容追加节点行（解析失败/无节点时返回空串，不破版式）
+async function msgNodeTag(pveNodeId) {
+    if (pveNodeId == null) return '';
+    try {
+        const { assetNodeVars } = require('./node-context');
+        const nv = await assetNodeVars(pveNodeId);
+        var label = [nv.zone_name, nv.pve_node_name].filter(Boolean).join(' / ');
+        return label ? '\n所属节点：' + label : '';
+    } catch (_) { return ''; }
+}
+
 // 退款通知（开通失败共用）：站内信 + 邮件
 async function notifyProvisionFailed(opts) {
-    var { userId, resourceLabel, resourceName, orderNo, totalAmount, balanceAfterRefund, refundOrderNo, resourceType, notifyKey, title, failTitle } = opts;
+    var { userId, resourceLabel, resourceName, orderNo, totalAmount, balanceAfterRefund, refundOrderNo, resourceType, notifyKey, title, failTitle, pveNodeId } = opts;
     try {
         await db.messages.create({
             uid: userId, title: title,
@@ -96,7 +107,7 @@ async function notifyProvisionFailed(opts) {
                     balance_after: balanceAfterRefund.toFixed(2),
                     order_no: orderNo,
                     refund_order_no: refundOrderNo
-                });
+                }, { pveNodeId: pveNodeId });
             }
         }
     } catch (emailErr) { console.error('[provisioning] ' + resourceType + ' 退款邮件发送失败:', emailErr.message); }
@@ -342,7 +353,7 @@ async function provisionVm(opts) {
         await notifyProvisionFailed({
             userId: userId, resourceLabel: '虚拟机', resourceName: randomName, orderNo: orderNo,
             totalAmount: totalAmount, balanceAfterRefund: balanceAfterRefund, refundOrderNo: refundOrderNo,
-            resourceType: 'VM', notifyKey: 'notify_vm_refund', title: '虚拟机开通失败', failTitle: '虚拟机开通失败 - 已退款'
+            resourceType: 'VM', notifyKey: 'notify_vm_refund', title: '虚拟机开通失败', failTitle: '虚拟机开通失败 - 已退款', pveNodeId: targetNodeId
         });
         throw provErr;
     }
@@ -363,7 +374,7 @@ async function provisionVm(opts) {
     try {
         await db.messages.create({
             uid: userId, title: '服务器开通成功',
-            content: '您的虚拟机 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。',
+            content: '您的虚拟机 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。' + (await msgNodeTag(targetNodeId)),
             type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] VM 消息发送失败', e); }
@@ -375,7 +386,7 @@ async function provisionVm(opts) {
                 await sendTemplateEmail(user.email, 'server_provisioned', {
                     resource_name: randomName,
                     order_no: orderNo
-                });
+                }, { pveNodeId: targetNodeId });
             }
         }
     } catch (e) { console.error('[provisioning] VM 邮件发送失败', e); }
@@ -385,7 +396,7 @@ async function provisionVm(opts) {
         try {
             await db.messages.create({
                 uid: userId, title: '服务器账号信息',
-                content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + osTemplate.ciuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。',
+                content: '您的虚拟机 ' + randomName + ' 已开通。\n账号：' + osTemplate.ciuser + '\n密码：' + vmUpdateCfg.cipassword + '\n请尽快修改密码。' + (await msgNodeTag(targetNodeId)),
                 type: 2, send_type: 1
             });
         } catch (e) { console.error('[provisioning] VM 密码通知发送失败', e); }
@@ -398,7 +409,7 @@ async function provisionVm(opts) {
                         resource_name: randomName,
                         account: osTemplate.ciuser,
                         password: vmUpdateCfg.cipassword
-                    });
+                    }, { pveNodeId: targetNodeId });
                 }
             }
         } catch (e) { console.error('[provisioning] VM 密码邮件发送失败', e); }
@@ -598,7 +609,7 @@ async function provisionLxc(opts) {
         await notifyProvisionFailed({
             userId: userId, resourceLabel: '容器', resourceName: randomName, orderNo: orderNo,
             totalAmount: totalAmount, balanceAfterRefund: balanceAfterRefund, refundOrderNo: refundOrderNo,
-            resourceType: 'LXC', notifyKey: 'notify_lxc_refund', title: '容器开通失败', failTitle: '容器开通失败 - 已退款'
+            resourceType: 'LXC', notifyKey: 'notify_lxc_refund', title: '容器开通失败', failTitle: '容器开通失败 - 已退款', pveNodeId: targetNodeId
         });
         throw provErr;
     }
@@ -619,7 +630,7 @@ async function provisionLxc(opts) {
     try {
         await db.messages.create({
             uid: userId, title: '容器开通成功',
-            content: '您的容器 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。',
+            content: '您的容器 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。' + (await msgNodeTag(targetNodeId)),
             type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] LXC 消息发送失败', e); }
@@ -631,7 +642,7 @@ async function provisionLxc(opts) {
                 await sendTemplateEmail(user.email, 'lxc_provisioned_user', {
                     resource_name: randomName,
                     order_no: orderNo
-                });
+                }, { pveNodeId: targetNodeId });
             }
         }
     } catch (e) { console.error('[provisioning] LXC 邮件发送失败', e); }
@@ -664,7 +675,7 @@ async function provisionLxc(opts) {
         try {
             await db.messages.create({
                 uid: userId, title: '容器 root 密码',
-                content: '您的容器 ' + randomName + ' 的 root 密码已设置。\nRoot 账号：root\n密码：' + lxcPassword + '\n请尽快修改密码。',
+                content: '您的容器 ' + randomName + ' 的 root 密码已设置。\nRoot 账号：root\n密码：' + lxcPassword + '\n请尽快修改密码。' + (await msgNodeTag(targetNodeId)),
                 type: 2, send_type: 1
             });
         } catch (e) { console.error('[provisioning] LXC 密码通知发送失败', e); }
@@ -676,7 +687,7 @@ async function provisionLxc(opts) {
                     await sendTemplateEmail(pwdUser.email, 'lxc_root_password', {
                         resource_name: randomName,
                         password: lxcPassword
-                    });
+                    }, { pveNodeId: targetNodeId });
                 }
             }
         } catch (e) { console.error('[provisioning] LXC 密码邮件发送失败', e); }
@@ -830,7 +841,7 @@ async function adminProvisionVm(opts) {
     try {
         await db.messages.create({
             uid: userId, title: '服务器开通成功',
-            content: '您的虚拟机 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。到期时间：' + (expDate || '无'),
+            content: '您的虚拟机 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。到期时间：' + (expDate || '无') + (await msgNodeTag(targetNodeId)),
             type: 2, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] VM 消息发送失败', e); }
@@ -844,7 +855,7 @@ async function adminProvisionVm(opts) {
                     resource_name: randomName,
                     order_no: orderNo,
                     expire_time: expDate || '无'
-                });
+                }, { pveNodeId: targetNodeId });
             }
         }
     } catch (e) { console.error('[provisioning] VM 邮件发送失败', e); }
@@ -867,7 +878,7 @@ async function adminProvisionVm(opts) {
                         resource_name: randomName,
                         account: template.ciuser,
                         password: adminVmCfg.cipassword
-                    });
+                    }, { pveNodeId: targetNodeId });
                 }
             }
         } catch (e) { console.error('[provisioning] VM 密码邮件发送失败', e); }
@@ -1019,7 +1030,7 @@ async function adminProvisionLxc(opts) {
     try {
         await db.messages.create({
             uid: userId, title: '服务器开通成功',
-            content: '您的容器 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。到期时间：' + (expDate || '无'),
+            content: '您的容器 ' + randomName + ' 已开通成功。订单号：' + orderNo + '。到期时间：' + (expDate || '无') + (await msgNodeTag(targetNodeId)),
             type: 1, is_read: 0, send_type: 1
         });
     } catch (e) { console.error('[provisioning] LXC 消息发送失败', e); }
@@ -1033,7 +1044,7 @@ async function adminProvisionLxc(opts) {
                     resource_name: randomName,
                     order_no: orderNo,
                     expire_time: expDate || '无'
-                });
+                }, { pveNodeId: targetNodeId });
             }
         }
     } catch (e) { console.error('[provisioning] LXC 邮件发送失败', e); }
@@ -1071,7 +1082,7 @@ async function adminProvisionLxc(opts) {
                     await sendTemplateEmail(adminPwdUser.email, 'lxc_root_password', {
                         resource_name: randomName,
                         password: adminLxcPwd
-                    });
+                    }, { pveNodeId: targetNodeId });
                 }
             }
         } catch (e) { console.error('[provisioning] LXC 密码邮件发送失败', e); }

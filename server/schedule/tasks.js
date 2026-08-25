@@ -146,7 +146,7 @@ async function recoverProvisioningTasks() {
                                         resource_name: record.name || '',
                                         amount: refundAmount.toFixed(2),
                                         order_no: matchedOrder ? matchedOrder.order_no : ''
-                                    });
+                                    }, { pveNodeId: record.pve_node_id != null ? record.pve_node_id : null });
                                 }
                             }
                         } catch (emailErr) { console.error('[recovery] 退款邮件发送失败:', emailErr.message); }

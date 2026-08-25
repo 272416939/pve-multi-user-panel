@@ -69,4 +69,25 @@ async function attachOrderZoneLabels(rows) {
     return rows;
 }
 
-module.exports = { buildCnameByPveMap, getZoneLabelByPve, attachOrderZoneLabels };
+/**
+ * 资产节点的邮件/站内信变量：{ zone_name, pve_node_name }（未解析出时为空串，渲染端整行折叠）
+ * @param {number|null} pveNodeId
+ * @returns {Promise<{zone_name: string, pve_node_name: string}>}
+ */
+async function assetNodeVars(pveNodeId) {
+    if (pveNodeId == null) return { zone_name: '', pve_node_name: '' };
+    try {
+        const pn = await db.pveNodes.get(pveNodeId);
+        if (!pn) return { zone_name: '', pve_node_name: '' };
+        let zone = '';
+        if (pn.zone_id != null) {
+            const z = await db.zones.get(pn.zone_id);
+            zone = z ? z.name : '';
+        }
+        return { zone_name: zone || pn.name || '', pve_node_name: pn.name || '' };
+    } catch (_) {
+        return { zone_name: '', pve_node_name: '' };
+    }
+}
+
+module.exports = { buildCnameByPveMap, getZoneLabelByPve, attachOrderZoneLabels, assetNodeVars };

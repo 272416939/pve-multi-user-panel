@@ -320,7 +320,7 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
                     resource_id: ct_id,
                     expire_time: expiryStr,
                     renewal_price: renewal_price
-                });
+                }, { pveNodeId: newCt.pve_node_id });
             } catch (emailError) {
                 console.error(`发送 LXC 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
             }
@@ -576,7 +576,7 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
                         username: removedUser.username,
                         resource_name: removedCtInfo.name || 'CT ' + removedCtInfo.ct_id,
                         resource_id: removedCtInfo.ct_id
-                    });
+                    }, { pveNodeId: ct ? ct.pve_node_id : null });
                 } catch (emailError) {
                     console.error(`发送 LXC 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
                 }

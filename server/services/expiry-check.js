@@ -121,7 +121,7 @@ const checkExpiredVms = async () => {
                             resource_id: vm.vm_id,
                             expire_time: expDate.toLocaleString('zh-CN'),
                             renewal_price: vm.renewal_price
-                        });
+                        }, { pveNodeId: vm.pve_node_id });
                     }
 
                     await markReminderSent(vm.vm_id, days, today);
@@ -178,7 +178,7 @@ const checkExpiredVms = async () => {
                                     renewal_price: vm.renewal_price,
                                     reminder_count: dayNum,
                                     remaining_days: remainingDays
-                                });
+                                }, { pveNodeId: vm.pve_node_id });
                             }
                             await markReminderSent(vm.vm_id, 0, today);
                             await db.vms.reminders.add(vm.id, 0);
@@ -271,7 +271,7 @@ async function checkExpiredLxc() {
                                                 resource_id: ct.ct_id,
                                                 expire_time: expDate.toLocaleString('zh-CN'),
                                                 renewal_price: ct.renewal_price
-                                            });
+                                            }, { pveNodeId: ct.pve_node_id });
                                         }
                                     } catch (e) {
                                         console.error('发送 LXC 到期提醒邮件失败:', e.message);
@@ -310,7 +310,7 @@ async function checkExpiredLxc() {
                                             renewal_price: ct.renewal_price,
                                             reminder_count: dayNum,
                                             remaining_days: remainingDays
-                                        });
+                                        }, { pveNodeId: ct.pve_node_id });
                                     }
                                 } catch (e) {
                                     console.error('发送 LXC 到期续费邮件失败:', e.message);

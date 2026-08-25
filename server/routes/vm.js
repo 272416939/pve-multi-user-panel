@@ -349,7 +349,7 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
                     resource_id: vm_id,
                     expire_time: expiryStr,
                     renewal_price: renewal_price
-                });
+                }, { pveNodeId: newVm.pve_node_id });
             } catch (emailError) {
                 console.error(`发送 VM 开通邮件给 ${assignedUser.username} 失败:`, emailError.message);
             }
@@ -605,7 +605,7 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
                         username: removedUser.username,
                         resource_name: removedVmInfo.name || 'VM ' + removedVmInfo.vm_id,
                         resource_id: removedVmInfo.vm_id
-                    });
+                    }, { pveNodeId: vm ? vm.pve_node_id : null });
                 } catch (emailError) {
                     console.error(`发送 VM 移除邮件给 ${removedUser.username} 失败:`, emailError.message);
                 }
