@@ -365,14 +365,14 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes, no
  * @param {number} userId - 用户 ID
  * @returns {object} { imported: number, skipped: number }
  */
-async function importDisksForVm(vmId, userId) {
+async function importDisksForVm(vmId, userId, nodeId = null) {
   var imported = 0;
   var skipped = 0;
   try {
-    // 多节点：按 VM 行解析节点
-    var vmRow = await db.vms.getByVmid(vmId);
-    var nodeId = vmRow && vmRow.pve_node_id != null ? vmRow.pve_node_id : null;
-    var pve = await getPveClient(nodeId != null ? nodeId : null);
+    // 多节点：优先用调用方给定的节点，否则按 VM 行解析
+    var vmRow = await db.vms.getByVmid(vmId, nodeId != null ? nodeId : undefined);
+    var nodeId2 = vmRow && vmRow.pve_node_id != null ? vmRow.pve_node_id : nodeId;
+    var pve = await getPveClient(nodeId2 != null ? nodeId2 : null);
     var allSpecs = await db.diskSpecs.getAll();
     var allGroups = await db.storageGroups.getAll();
     var config = await pve.getVmConfig(vmId);

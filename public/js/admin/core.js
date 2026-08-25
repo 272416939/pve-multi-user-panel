@@ -334,9 +334,16 @@ watch($.user, function(u) {
                 $.loadSnapshotConfig(),
                 $.loadStorageList(),
                 $.loadBackupConfig(),
-                $.loadLxcTemplates(),
-                $.loadLxcContainers(),
-                $.loadUserLxcContainers()
+                // 多节点：先加载节点选项（默认选中第一个），再按所选节点拉 LXC 模板/存储/池
+                $.loadLxcNodeOptions()
+                    .catch(function(e) { console.error('加载 LXC 节点选项失败', e && e.message); })
+                    .then(function() {
+                        return Promise.all([
+                            $.loadLxcTemplates(),
+                            $.loadLxcContainers(),
+                            $.loadUserLxcContainers()
+                        ]);
+                    })
             ]);
         } catch (e) {
             console.error('加载管理员数据失败', e.message, e.stack);
@@ -348,11 +355,15 @@ watch($.user, function(u) {
 
     $.loadAssignData = async function() {
         try {
-            var vmData = await api('/pve/vms');
+            // 多节点：严格分步选择——按所选节点拉取池（后端必填校验 node_id）
+            var nodeId = ($.assignNodeId && $.assignNodeId.value) || '';
+            var vmData = await api('/pve/vms' + (nodeId ? '?node_id=' + encodeURIComponent(nodeId) : ''));
             $.availableVms.value = vmData.available || [];
             $.assignedVms.value = vmData.assigned || [];
         } catch (e) {
             console.error('加载分配数据失败', e);
+            $.availableVms.value = [];
+            $.assignedVms.value = [];
         }
     };
 
@@ -911,7 +922,10 @@ $.initDetailCharts = function() {
                 // 若直接 reject 会让 Promise.all 中断，导致下方日志中心/直达链接的数据加载永不执行
                 await Promise.all([
                     $.loadNavItems(),
-                    $.loadAssignData().catch(function(e) { console.error('加载分配数据失败', e && e.message); }),
+                    // 多节点：先加载节点选项（默认选中第一个），再按所选节点拉取待分配池
+                    $.loadAssignNodeOptions()
+                        .then(function() { return $.loadAssignData(); })
+                        .catch(function(e) { console.error('加载分配数据失败', e && e.message); }),
                     $.loadData(),
                     $.loadMacGroups().catch(function(e) { console.error('加载 MAC 分组失败', e && e.message); })
                 ]);

@@ -12,7 +12,7 @@
     $.userLxcContainers = ref([]);
     $.lxcLoading = ref(false);
     $.lxcForm = ref({ ostemplate: '', hostname: '', password: '', confirmPassword: '', storage: '', cores: 1, memory: 512, swap: 512, disk: 8, features: '', net0Bridge: 'vmbr0', net0Ip: '', net0Mac: '', net0Ip6: '', unprivileged: true, start: true });
-    $.lxcAssignForm = ref({ ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' });
+    $.lxcAssignForm = ref({ ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '', pve_node_id: '' });
     $.lxcPasswordForm = ref({ password: '', confirmPassword: '' });
     $.adminLxcPwdShowPwd = ref(false);
     $.lxcIpForm = Vue.ref({ ip_mode: 'static', ip: '' });
@@ -25,6 +25,10 @@
     $.destroyLxcConfirmText = ref('');
     $.availableLxc = ref([]);
     $.assignedLxc = ref([]);
+    // 多节点：节点选择（严格分步选择）——直开表单与分配池各自联动
+    $.lxcNodeOptions = ref([]);
+    $.lxcCreateNodeId = ref('');
+    $.lxcAssignNodeId = ref('');
 
     // LXC 快照
     $.lxcSnapshotVmId = ref(null);
@@ -48,6 +52,16 @@
     $.lxcBackupForm = ref({ storage: 'local', notes: '' });
 
     // ==================== computed ====================
+    // 当前所选节点名（直开/分配区标题旁展示）
+    $.lxcCreateNodeName = computed(function() {
+        var n = $.lxcNodeOptions.value.find(function(x) { return String(x.id) === String($.lxcCreateNodeId.value); });
+        return n ? n.name : '';
+    });
+    $.lxcAssignNodeName = computed(function() {
+        var n = $.lxcNodeOptions.value.find(function(x) { return String(x.id) === String($.lxcAssignNodeId.value); });
+        return n ? n.name : '';
+    });
+
     $.confirmLxcActionText = computed(function() {
         var msgs = {
             shutdown: window.__i18n.t('dash.lxc.shutdownHint'),
@@ -74,23 +88,67 @@
     });
 
     // ==================== 函数 ====================
+    // 多节点：节点选项加载（/admin/pve/nodes 同源），默认选中第一个启用节点
+    $.loadLxcNodeOptions = async function() {
+        try {
+            var res = await api('/admin/pve/nodes');
+            var nodes = (res && res.nodes) || [];
+            $.lxcNodeOptions.value = nodes.filter(function(n) { return n.enabled !== 0; });
+            if (!$.lxcCreateNodeId.value && $.lxcNodeOptions.value.length > 0) {
+                $.lxcCreateNodeId.value = String($.lxcNodeOptions.value[0].id);
+            }
+            if (!$.lxcAssignNodeId.value && $.lxcNodeOptions.value.length > 0) {
+                $.lxcAssignNodeId.value = String($.lxcNodeOptions.value[0].id);
+            }
+        } catch (e) {
+            console.error('加载 PVE 节点列表失败', e);
+        }
+    };
+
+    // 切节点（直开表单）：重载该节点模板/存储，清空已选模板与存储
+    watch($.lxcCreateNodeId, function(nv, ov) {
+        if (!nv || nv === ov) return;
+        $.lxcForm.value.ostemplate = '';
+        $.lxcForm.value.storage = '';
+        $.loadLxcTemplates();
+    });
+
+    // 切节点（分配池）：重置已选容器、重载该节点池 + 配对爱快 MAC 分组
+    watch($.lxcAssignNodeId, function(nv, ov) {
+        if (!nv || nv === ov) return;
+        $.lxcAssignForm.value.pve_node_id = nv;
+        $.lxcAssignForm.value.ct_id = '';
+        $.loadLxcContainers();
+        $.loadMacGroups(nv);
+    });
+
     $.loadLxcTemplates = async function() {
         try {
-            $.lxcTemplates.value = await api('/lxc/templates');
-            $.lxcStorageList.value = await api('/lxc/storages');
+            // 多节点：按直开表单所选节点拉取模板/存储
+            var nodeId = ($.lxcCreateNodeId && $.lxcCreateNodeId.value) || '';
+            var qs = nodeId ? '?node_id=' + encodeURIComponent(nodeId) : '';
+            $.lxcTemplates.value = await api('/lxc/templates' + qs);
+            $.lxcStorageList.value = await api('/lxc/storages' + qs);
         } catch (e) {
             console.error('加载 LXC 模板/存储失败', e);
+            $.lxcTemplates.value = [];
+            $.lxcStorageList.value = [];
         }
     };
 
     $.loadLxcContainers = async function() {
         try {
-            var data = await api('/pve/lxc');
+            // 多节点：严格分步选择——按分配区所选节点拉取池
+            var nodeId = ($.lxcAssignNodeId && $.lxcAssignNodeId.value) || '';
+            var data = await api('/pve/lxc' + (nodeId ? '?node_id=' + encodeURIComponent(nodeId) : ''));
             $.availableLxc.value = data.available || [];
             $.assignedLxc.value = data.assigned || [];
             $.lxcContainers.value = data.available || [];
         } catch (e) {
             console.error('加载 LXC 容器失败', e);
+            $.availableLxc.value = [];
+            $.assignedLxc.value = [];
+            $.lxcContainers.value = [];
         }
     };
 
@@ -117,9 +175,13 @@
             net0 += ',ip6=dhcp';
         }
         try {
+            if (!$.lxcCreateNodeId.value) {
+                return alert(window.__i18n.t('err.NODE_SELECT_REQUIRED'));
+            }
             await api('/lxc/create', {
                 method: 'POST',
                 body: JSON.stringify({
+                    pve_node_id: $.lxcCreateNodeId.value,
                     ostemplate: f.ostemplate,
                     hostname: f.hostname,
                     password: f.password,
@@ -144,12 +206,15 @@
 
     $.assignLxc = async function() {
         try {
+            if (!$.lxcAssignNodeId.value) {
+                return alert(window.__i18n.t('err.NODE_SELECT_REQUIRED'));
+            }
             var expDate = toLocalDateTimeStr($.lxcAssignForm.value.expiration_date);
             await api('/user/lxc', {
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.lxcAssignForm.value, { expiration_date: expDate }))
             });
-            $.lxcAssignForm.value = { ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' };
+            $.lxcAssignForm.value = { ct_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '', pve_node_id: $.lxcAssignNodeId.value };
             await $.loadLxcContainers();
             await $.loadUserLxcContainers();
         } catch (e) {

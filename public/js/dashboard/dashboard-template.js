@@ -120,6 +120,7 @@
                             <span v-else :class="vm.status && vm.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ vm.status && vm.status.status === 'running' ? t('dash.vm.running') : t('dash.vm.stopped') }}</span>
                         </div>
                         <div v-if="!vm._provisioning" class="vm-mobile-card-body">
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('admin.assetZone') }}</span><span class="vm-mobile-card-value">{{ vm.zone_name || '-' }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.privateIp') }}</span><span class="vm-mobile-card-value">{{ vm.ip || vm.dhcp_static_ip || '-' }}</span></div>
                             <div v-if="cnameDomain" class="vm-mobile-card-cname">
                                 <div class="vm-mobile-card-cname-toggle" @click="vm._cnameOpen = !vm._cnameOpen">
@@ -175,6 +176,7 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>{{ t('dash.vm.hostname') }}</th>
+                                    <th>{{ t('admin.assetZone') }}</th>
                                     <th>{{ t('dash.vm.account') }}</th>
                                     <th>{{ t('dash.vm.privateIp') }}</th>
                                     <th class="text-start">{{ t('dash.vm.cname') }}</th>
@@ -198,6 +200,7 @@
                                         </template>
                                         <template v-else>{{ vm.name || ('VM ' + vm.vm_id) }}</template>
                                     </td>
+                                    <td>{{ vm.zone_name || '-' }}</td>
                                     <td>{{ vm.config?.ciuser || t('dash.vm.noCloudInit') }}</td>
                                     <td>{{ vm.ip || vm.dhcp_static_ip || '-' }}</td>
                                     <td>
@@ -293,6 +296,7 @@
                             <span v-else :class="ct.status && ct.status.status === 'running' ? 'tag-run' : 'tag-stop'">{{ ct.status && ct.status.status === 'running' ? t('dash.vm.running') : t('dash.vm.stopped') }}</span>
                         </div>
                         <div v-if="!ct._provisioning" class="vm-mobile-card-body">
+                            <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('admin.assetZone') }}</span><span class="vm-mobile-card-value">{{ ct.zone_name || '-' }}</span></div>
                             <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.privateIp') }}</span><span class="vm-mobile-card-value">{{ ct.ip || ct.dhcp_static_ip || '-' }}</span></div>
                             <div v-if="cnameDomain" class="vm-mobile-card-cname">
                                 <div class="vm-mobile-card-cname-toggle" @click="ct._cnameOpen = !ct._cnameOpen">
@@ -347,6 +351,7 @@
                                 <tr>
                                     <th>ID</th>
                                     <th>{{ t('dash.lxc.name') }}</th>
+                                    <th>{{ t('admin.assetZone') }}</th>
                                     <th>{{ t('dash.vm.privateIp') }}</th>
                                     <th class="text-start">{{ t('dash.vm.cname') }}</th>
                                     <th>{{ t('dash.vm.config') }}</th>
@@ -369,6 +374,7 @@
                                         </template>
                                         <template v-else>{{ ct.name || ('CT ' + ct.ct_id) }}</template>
                                     </td>
+                                    <td>{{ ct.zone_name || '-' }}</td>
                                     <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>
                                     <td>
                                         <template v-if="cnameDomain && !ct._provisioning">

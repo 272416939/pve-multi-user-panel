@@ -12,14 +12,21 @@
                             <div class="card-body">
                                 <form @submit.prevent="createLxc" novalidate>
                                     <div class="row mb-3">
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
+                                            <label class="form-label">{{ t('admin.assetNode') }}</label>
+                                            <select class="form-select" v-model="lxcCreateNodeId" required>
+                                                <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
+                                                <option v-for="n in lxcNodeOptions" :key="n.id" :value="String(n.id)">{{ n.name }}</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
                                             <label class="form-label">{{ t('common.template') }}</label>
                                             <select class="form-select" v-model="lxcForm.ostemplate" required>
                                                 <option value="">{{ t('admin.pkg.pickTpl') }}</option>
                                                 <option v-for="tpl in lxcTemplates" :key="tpl.volid" :value="tpl.volid">{{ lxcTemplateLabel(tpl) }}</option>
                                             </select>
                                         </div>
-                                        <div class="col-md-6">
+                                        <div class="col-md-4">
                                             <label class="form-label">{{ t('admin.disk.storageLocation') }}</label>
                                             <select class="form-select" v-model="lxcForm.storage">
                                                 <option value="">{{ t('admin.disk.default') }}</option>
@@ -125,6 +132,13 @@
                             <div class="card-body">
                                 <form @submit.prevent="assignLxc" novalidate>
                                     <div class="row">
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">{{ t('admin.assetNode') }}</label>
+                                            <select class="form-select" v-model="lxcAssignNodeId" required>
+                                                <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
+                                                <option v-for="n in lxcNodeOptions" :key="n.id" :value="String(n.id)">{{ n.name }}</option>
+                                            </select>
+                                        </div>
                                         <div class="col-md-3 mb-3">
                                             <label class="form-label">{{ t('nav.containers') }}</label>
                                             <select class="form-select" v-model="lxcAssignForm.ct_id" required>
@@ -191,7 +205,7 @@
                         </div>
 
                         <div v-show="availableLxc.length > 0">
-                            <h5>{{ t('admin.lxc.pendingLabel') }}</h5>
+                            <h5>{{ t('admin.lxc.pendingLabel') }} <span v-if="lxcAssignNodeName" class="text-muted small">· {{ lxcAssignNodeName }}</span></h5>
                             <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
                                     <table class="table table-hover mb-0 table-align-center">
@@ -219,7 +233,7 @@
                         </div>
 
                         <div v-show="assignedLxc.length > 0">
-                            <h5>{{ t('admin.lxc.assignedLabel') }}</h5>
+                            <h5>{{ t('admin.lxc.assignedLabel') }} <span v-if="lxcAssignNodeName" class="text-muted small">· {{ lxcAssignNodeName }}</span></h5>
                             <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
                                     <table class="table table-hover mb-0 table-align-center">
@@ -279,6 +293,7 @@
                                     </template>
                                 </div>
                                 <div class="vm-mobile-card-body">
+                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('admin.assetZone') }}</span><span class="vm-mobile-card-value">{{ ct.zone_name || '-' }}</span></div>
                                     <div class="vm-mobile-card-row" v-if="ct.username"><span class="vm-mobile-card-label">{{ t('admin.osswitchlog.user') }}</span><span class="vm-mobile-card-value">{{ ct.username }}</span></div>
                                     <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.privateIp') }}</span><span class="vm-mobile-card-value">{{ ct.ip || ct.dhcp_static_ip || '-' }}</span></div>
                                     <div v-if="networkConfig.cname_domain" class="vm-mobile-card-cname">
@@ -329,6 +344,7 @@
                                         <thead>
                                             <tr>
                                                 <th>CTID</th>
+                                                <th>{{ t('admin.assetZone') }}</th>
                                                 <th>{{ t('admin.osswitchlog.user') }}</th>
                                                 <th>{{ t('dash.lxc.name') }}</th>
                                                 <th>{{ t('dash.vm.privateIp') }}</th>
@@ -344,6 +360,7 @@
                                         <tbody>
                                             <tr v-for="ct in userLxcContainers" :key="ct.id">
                                                 <td>{{ ct.ct_id }}</td>
+                                                <td>{{ ct.zone_name || '-' }}</td>
                                                 <td>{{ ct.username || '-' }}</td>
                                                 <td>{{ ct.name || ('CT ' + ct.ct_id) }}</td>
                                                 <td>{{ ct.ip || ct.dhcp_static_ip || '-' }}</td>

@@ -80,7 +80,7 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
         // 防止 A 节点租约覆盖 B 节点设备的静态 IP（旧实现仅默认节点却覆盖全网台账）
         const ikNodeRows = (await db.ikuaNodes.list()).filter(n => n.enabled !== 0);
         if (!ikNodeRows || ikNodeRows.length === 0) {
-            return res.status(400).json({ error: '未配置启用的爱快节点', code: 'IKUAI_NODE_NOT_FOUND' });
+            return res.status(400).json({ error: '节点不存在', code: 'IKUAI_NODE_NOT_FOUND' });
         }
 
         // PERF-05: 循环外一次性获取所有 VM/LXC 与节点配对关系，避免循环内全表查询（N+1）

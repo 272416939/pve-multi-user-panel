@@ -19,6 +19,8 @@ const { safeError } = require('../utils/safe-error');
 const { checkConfiguredRateLimit } = require('../middleware/rate-limiter');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
+// 多节点资产定位：ct_id 跨节点可重复，按归属/节点消歧（防越权与错节点操作）
+const { locateAssetRow, findEnabledNode } = require('../utils/locate-asset');
 // 单一来源：周期白名单统一走 constants（规范第七节）
 const { VALID_PERIODS } = require('../constants');
 
@@ -30,12 +32,18 @@ function isValidVmid(v) {
 // P2-H1② 修复：PVE LXC 列表需管理员权限（包含所有节点容器分配信息）
 router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        // 无单一资产上下文（跨节点列表）：回退默认节点
-        const pve = await getPveClient(null);
+        // 多节点：严格分步选择——必须指定节点，仅返回该节点资源；占用判定按 (节点, ct_id) 二元组
+        const node = await findEnabledNode(req.query.node_id);
+        if (!node) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const zoneRow = node.zone_id ? await db.zones.get(node.zone_id) : null;
+
+        const pve = await getPveClient(node.id);
         const containers = await pve.getLxcContainers();
 
         const assignedCts = await db.lxcContainers.getAll();
-        const assignedCtIds = new Set(assignedCts.map(ct => ct.ct_id));
+        const defaultNodeId = await db.pveNodes.getDefaultId();
+        const rowOnNode = (v) => (v.pve_node_id != null ? v.pve_node_id === node.id : node.id === defaultNodeId);
+        const assignedCtIds = new Set(assignedCts.filter(rowOnNode).map(ct => ct.ct_id));
 
         // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
         const allUsers = await db.users.getAll();
@@ -44,23 +52,30 @@ router.get('/pve/lxc', authMiddleware, adminMiddleware, async (req, res) => {
 
         const available = containers
             .filter(ct => !assignedCtIds.has(ct.vmid))
-            .sort((a, b) => b.vmid - a.vmid);
+            .sort((a, b) => b.vmid - a.vmid)
+            .map(ct => ({ ...ct, pve_node_id: node.id, pve_node_name: node.name, zone_name: zoneRow ? zoneRow.name : '' }));
 
         const assigned = containers
             .filter(ct => assignedCtIds.has(ct.vmid))
             .sort((a, b) => b.vmid - a.vmid)
             .map(ct => {
-                const assignment = assignedCts.find(a => a.ct_id === ct.vmid);
+                const assignment = assignedCts.find(a => rowOnNode(a) && a.ct_id === ct.vmid);
                 const user = assignment ? userMap[assignment.user_id] : null;
                 return {
                     ...ct,
                     name: assignment?.name || ct.name,
+                    pve_node_id: node.id,
+                    pve_node_name: node.name,
+                    zone_name: zoneRow ? zoneRow.name : '',
                     assigned_user: user ? user.username : null,
                     assignment_id: assignment ? assignment.id : null
                 };
             });
 
-        res.json({ available, assigned });
+        res.json({
+            node: { id: node.id, name: node.name, zone_name: zoneRow ? zoneRow.name : '' },
+            available, assigned
+        });
     } catch (error) {
         console.error('获取 LXC 容器列表错误:', error);
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });
@@ -181,21 +196,37 @@ router.get('/user/lxc', authMiddleware, async (req, res) => {
 
 router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-    const { ct_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id, monthly_price, quarterly_discount, yearly_discount } = req.body;
- 
+    const { ct_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id, monthly_price, quarterly_discount, yearly_discount, pve_node_id } = req.body;
+
     if (!ct_id || !user_id) {
         return res.status(400).json({ error: '请选择容器和用户', code: 'LXC_USER_REQUIRED' });
     }
- 
+
+    // 多节点：必须指定资产所在节点（严格分步选择），节点需存在且启用
+    const nodeRow = await findEnabledNode(pve_node_id);
+    if (!nodeRow) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+
     const parsedCtId = parseInt(ct_id);
     const parsedUserId = parseInt(user_id);
- 
+
     if (isNaN(parsedCtId) || isNaN(parsedUserId)) {
         return res.status(400).json({ error: '无效的容器或用户ID', code: 'INVALID_LXC_OR_USER_ID' });
     }
     // L-5 修复：ct_id 严格白名单校验
     if (!Number.isInteger(parsedCtId) || parsedCtId < 100 || parsedCtId > 999999999) {
         return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
+    }
+
+    // 多节点：核对该容器确实存在于所选节点
+    try {
+        const nodePve = await getPveClient(nodeRow.id);
+        const nodeCts = await nodePve.getLxcContainers();
+        if (!Array.isArray(nodeCts) || !nodeCts.some(c => c.vmid === parsedCtId)) {
+            return res.status(400).json({ error: '该节点上不存在此容器 (' + parsedCtId + ')', code: 'LXC_NOT_ON_NODE', params: [String(parsedCtId)] });
+        }
+    } catch (e) {
+        console.error('[lxc] 校验节点内容器存在性失败:', e.message);
+        return res.status(500).json({ error: safeError(e), code: 'LXC_NODE_CHECK_FAILED' });
     }
 
     // SEC-03: 价格/折扣参数服务端校验
@@ -215,10 +246,18 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
     }
  
     const existingCts = await db.lxcContainers.getAll();
-    if (existingCts.find(ct => ct.ct_id === parsedCtId && ct.user_id === parsedUserId)) {
+    // 多节点：查重按 (节点, ct_id) 作用域——他节点同号记录不受影响
+    const defaultNodeId = await db.pveNodes.getDefaultId();
+    const rowOnNode = (v) => (v.pve_node_id != null ? v.pve_node_id === nodeRow.id : nodeRow.id === defaultNodeId);
+    if (existingCts.find(ct => ct.ct_id === parsedCtId && rowOnNode(ct) && ct.user_id === parsedUserId)) {
         return res.status(400).json({ error: '该容器已分配给此用户', code: 'LXC_ALREADY_ASSIGNED' });
     }
- 
+    // 本节点旧记录（此前分配给其他用户）清理
+    var oldCts = existingCts.filter(function(c) { return c.ct_id === parsedCtId && rowOnNode(c); });
+    for (var oi = 0; oi < oldCts.length; oi++) {
+        await db.lxcContainers.delete(oldCts[oi].id);
+    }
+
     const newCt = await db.lxcContainers.create({
         ct_id: parsedCtId,
         user_id: parsedUserId,
@@ -228,7 +267,8 @@ router.post('/user/lxc', authMiddleware, adminMiddleware, async (req, res) => {
         renewal_period: validPeriod,
         monthly_price: String(parsedMonthlyPrice),
         quarterly_discount: String(parsedQDiscount),
-        yearly_discount: String(parsedYDiscount)
+        yearly_discount: String(parsedYDiscount),
+        pve_node_id: nodeRow.id
     });
  
     // MAC 分组同步
@@ -550,9 +590,12 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
-        const allCts = await db.lxcContainers.getAll();
-        const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        }
+        const ct = located.row;
 
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
@@ -614,9 +657,12 @@ router.post('/lxc/:vmid/shutdown', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
-        const allCts = await db.lxcContainers.getAll();
-        const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        }
+        const ct = located.row;
 
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
@@ -646,9 +692,12 @@ router.post('/lxc/:vmid/stop', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
-        const allCts = await db.lxcContainers.getAll();
-        const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        }
+        const ct = located.row;
 
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
@@ -678,9 +727,12 @@ router.post('/lxc/:vmid/reboot', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
-        const allCts = await db.lxcContainers.getAll();
-        const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        }
+        const ct = located.row;
 
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
@@ -712,9 +764,12 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
-        const allCts = await db.lxcContainers.getAll();
-        const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        }
+        const ct = located.row;
 
         // V-1 修复：统一权限模式 — 管理员可连接未分配容器进行运维
         if (!ct) {
@@ -751,7 +806,8 @@ router.post('/lxc/:vmid/vnc', authMiddleware, async (req, res) => {
         const sessionId = await consoleSession.createSession({
             type: 'vnc', subtype: 'lxc',
             vmid, userId: req.user.id,
-            node: result.node, port: result.port, ticket: result.ticket
+            node: result.node, port: result.port, ticket: result.ticket,
+            nodeId: ct ? ct.pve_node_id : null
         });
 
         const proxyUrl = `/vnc?session=${sessionId}`;
@@ -771,9 +827,12 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
-        const allCts = await db.lxcContainers.getAll();
-        const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        }
+        const ct = located.row;
 
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
@@ -829,9 +888,12 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的容器 ID', code: 'INVALID_LXC_ID' });
-        const allCts = await db.lxcContainers.getAll();
-        const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        }
+        const ct = located.row;
 
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
@@ -857,8 +919,10 @@ router.get('/lxc/:vmid/status', authMiddleware, async (req, res) => {
 router.get('/lxc/templates', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         var targetStorage = req.query.storage || '';
-        // 无单一资产上下文（全局模板/存储列表）：回退默认节点
-        const pve = await getPveClient(null);
+        // 多节点：按 ?node_id= 指定节点（严格分步选择），未传/无效返回 400
+        const node = await findEnabledNode(req.query.node_id);
+        if (!node) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const pve = await getPveClient(node.id);
         if (targetStorage) {
             var templates = await pve.getTemplates(targetStorage);
             return res.json(templates.map(function(t) { return Object.assign({}, t, { storage: targetStorage }); }));
@@ -881,8 +945,10 @@ router.get('/lxc/templates', authMiddleware, adminMiddleware, async (req, res) =
 
 router.get('/lxc/storages', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        // 无单一资产上下文（全局存储列表）：回退默认节点
-        const pve = await getPveClient(null);
+        // 多节点：按 ?node_id= 指定节点（严格分步选择），未传/无效返回 400
+        const node = await findEnabledNode(req.query.node_id);
+        if (!node) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const pve = await getPveClient(node.id);
         const storages = await pve.getLxcStorageList();
         res.json(storages.map(s => ({ id: s.storage, type: s.type, path: s.path, content: s.content })));
     } catch (error) {
@@ -898,9 +964,10 @@ router.post('/lxc/create', authMiddleware, adminMiddleware, async (req, res) => 
             return res.status(400).json({ error: '请选择模板', code: 'TEMPLATE_REQUIRED' });
         }
  
-        // 获取可用空闲 VMID（取当前最大 ID + 1）
-        // 无单一资产上下文（admin 直开新容器）：回退默认节点
-        const pve = await getPveClient(null);
+        // 多节点：必须指定节点（严格分步选择），取该节点的空闲 VMID
+        const node = await findEnabledNode(req.body.pve_node_id);
+        if (!node) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const pve = await getPveClient(node.id);
         const newVmid = await pve.getNextAvailableVmid();
         const rootfs = (storage || 'local') + ':' + (disk || 8);
         const params = {
@@ -950,9 +1017,12 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '密码需8-13位，包含大小写英文、数字和特殊字符', code: 'PASSWORD_RULE_8_13' });
         }
  
-        const allCts = await db.lxcContainers.getAll();
-        const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        }
+        const ct = located.row;
 
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
@@ -1047,9 +1117,12 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         }
 
         // 权限检查
-        const allCts = await db.lxcContainers.getAll();
-        const ct = allCts.find(c => c.ct_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        }
+        const ct = located.row;
         if (ct) {
             const isOwner = req.user.id === ct.user_id;
             if (!isOwner && !isAdmin) {

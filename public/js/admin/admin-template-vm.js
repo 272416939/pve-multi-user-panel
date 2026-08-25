@@ -33,6 +33,7 @@
                                     </template>
                                 </div>
                                 <div class="vm-mobile-card-body">
+                                    <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('admin.assetZone') }}</span><span class="vm-mobile-card-value">{{ vm.zone_name || '-' }}</span></div>
                                     <div class="vm-mobile-card-row" v-if="vm.username"><span class="vm-mobile-card-label">{{ t('admin.osswitchlog.user') }}</span><span class="vm-mobile-card-value">{{ vm.username }}</span></div>
                                     <div class="vm-mobile-card-row"><span class="vm-mobile-card-label">{{ t('dash.vm.privateIp') }}</span><span class="vm-mobile-card-value">{{ vm.ip || vm.dhcp_static_ip || '-' }}</span></div>
                                     <div v-if="networkConfig.cname_domain" class="vm-mobile-card-cname">
@@ -83,6 +84,7 @@
                                     <thead>
                                         <tr>
                                             <th>VMID</th>
+                                            <th>{{ t('admin.assetZone') }}</th>
                                             <th>{{ t('admin.osswitchlog.user') }}</th>
                                             <th>{{ t('dash.vm.hostname') }}</th>
                                             <th>{{ t('admin.vmpage.defaultUser') }}</th>
@@ -99,6 +101,7 @@
                                     <tbody>
                                         <tr v-for="vm in userVms" :key="vm.id">
                                             <td>{{ vm.vm_id }}</td>
+                                            <td>{{ vm.zone_name || '-' }}</td>
                                             <td>{{ vm.username || '-' }}</td>
                                             <td>{{ vm.name || ('VM ' + vm.vm_id) }}</td>
                                             <td>{{ vm.config?.ciuser || t('dash.vm.noCloudInit') }}</td>
@@ -187,6 +190,13 @@
                             <div class="card-body">
                                 <form @submit.prevent="assignVm" novalidate>
                                     <div class="row">
+                                        <div class="col-md-2 mb-3">
+                                            <label class="form-label">{{ t('admin.assetNode') }}</label>
+                                            <select class="form-select" v-model="assignNodeId" required>
+                                                <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
+                                                <option v-for="n in assignNodes" :key="n.id" :value="String(n.id)">{{ n.name }}</option>
+                                            </select>
+                                        </div>
                                         <div class="col-md-3 mb-3">
                                             <label class="form-label">{{ t('nav.vms') }}</label>
                                             <select class="form-select" v-model="assignForm.vm_id" required>
@@ -253,7 +263,7 @@
                         </div>
 
                         <div v-show="availableVms.length > 0">
-                            <h5>{{ t('admin.vmpage.pendingLabel') }}</h5>
+                            <h5>{{ t('admin.vmpage.pendingLabel') }} <span v-if="assignNodeName" class="text-muted small">· {{ assignNodeName }}</span></h5>
                             <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
                                     <table class="table table-hover mb-0 table-align-center">
@@ -281,7 +291,7 @@
                         </div>
 
                         <div v-show="assignedVms.length > 0">
-                            <h5>{{ t('admin.vmpage.assignedLabel') }}</h5>
+                            <h5>{{ t('admin.vmpage.assignedLabel') }} <span v-if="assignNodeName" class="text-muted small">· {{ assignNodeName }}</span></h5>
                             <div class="table-container mb-4" style="padding:12px;">
                                 <div class="table-responsive">
                                     <table class="table table-hover mb-0 table-align-center">

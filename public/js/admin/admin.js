@@ -14,7 +14,7 @@
     $.showCreateUser = ref(false);
     $.createUserForm = ref({ username: '', password: '', role: 'user', email: '', emailVerified: false });
     $.editUserForm = ref({ id: null, username: '', password: '', role: 'user', email: '', emailVerified: false, totp_enabled: false });
-    $.assignForm = ref({ vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' });
+    $.assignForm = ref({ vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '', pve_node_id: '' });
     $.smtpConfig = ref({ host: '', port: 587, secure: false, user: '', password: '', from: '', from_name: '', enabled: false });
     $.emailQueueStats = ref(null);
     $.reminderConfig = ref({ days1: 7, days2: 3, days3: 1 });
@@ -132,11 +132,11 @@
     $.cdkRedeemMessage = ref('');
     $.cdkVmDropdownOpen = ref(false);
 
-    // 爱快 MAC 分组列表
+    // 爱快 MAC 分组列表（多节点：可传 PVE 节点 id，按其配对爱快取分组）
     $.macGroups = ref([]);
-    $.loadMacGroups = async function() {
+    $.loadMacGroups = async function(nodeId) {
         try {
-            $.macGroups.value = await api('/ikuai/mac-groups');
+            $.macGroups.value = await api('/ikuai/mac-groups' + (nodeId ? '?node_id=' + encodeURIComponent(nodeId) : ''));
         } catch (e) {
             $.macGroups.value = [];
         }

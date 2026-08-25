@@ -1,14 +1,23 @@
 const { execute, queryOne, queryAll, mysqlNow, mysqlToday } = require('./db-core');
 
 // 虚拟机操作
+// 多节点：列表类查询统一 JOIN 带出 pve_node_name / zone_name（对齐套餐查询先例），前端零转换展示
+const VM_SELECT = 'SELECT v.*, pn.name AS pve_node_name, z.name AS zone_name FROM vms v ' +
+    'LEFT JOIN pve_nodes pn ON v.pve_node_id = pn.id ' +
+    'LEFT JOIN zones z ON pn.zone_id = z.id';
+const CT_SELECT = 'SELECT c.*, pn.name AS pve_node_name, z.name AS zone_name FROM lxc_containers c ' +
+    'LEFT JOIN pve_nodes pn ON c.pve_node_id = pn.id ' +
+    'LEFT JOIN zones z ON pn.zone_id = z.id';
+
+// 虚拟机操作
 const vms = {
-    getAll: () => queryAll('SELECT * FROM vms'),
-    getByUserId: (userId) => queryAll('SELECT * FROM vms WHERE user_id = ?', [userId]),
-    getById: (id) => queryOne('SELECT * FROM vms WHERE id = ?', [id]),
+    getAll: () => queryAll(VM_SELECT),
+    getByUserId: (userId) => queryAll(VM_SELECT + ' WHERE v.user_id = ?', [userId]),
+    getById: (id) => queryOne(VM_SELECT + ' WHERE v.id = ?', [parseInt(id)]),
     // nodeId 可选作用域：多节点后 vmid 不再全局唯一，已知节点时必须带第二参数
     getByVmid: (vmid, nodeId) => (nodeId != null
-        ? queryOne('SELECT * FROM vms WHERE vm_id = ? AND pve_node_id = ?', [parseInt(vmid), nodeId])
-        : queryOne('SELECT * FROM vms WHERE vm_id = ?', [parseInt(vmid)])),
+        ? queryOne(VM_SELECT + ' WHERE v.vm_id = ? AND v.pve_node_id = ?', [parseInt(vmid), nodeId])
+        : queryOne(VM_SELECT + ' WHERE v.vm_id = ?', [parseInt(vmid)])),
     create: async (vm) => {
         const [result] = await execute(
              `INSERT INTO vms (vm_id, user_id, name, expiration_date, renewal_price, renewal_period, monthly_price, quarterly_discount, yearly_discount, pve_upid, current_os_template_id, subnet_id, pve_node_id, created_at)
@@ -98,12 +107,12 @@ const vms = {
 
 // LXC 容器操作
 const lxcContainers = {
-    getAll: () => queryAll('SELECT * FROM lxc_containers'),
-    getByUserId: (userId) => queryAll('SELECT * FROM lxc_containers WHERE user_id = ?', [userId]),
-    getById: (id) => queryOne('SELECT * FROM lxc_containers WHERE id = ?', [id]),
+    getAll: () => queryAll(CT_SELECT),
+    getByUserId: (userId) => queryAll(CT_SELECT + ' WHERE c.user_id = ?', [userId]),
+    getById: (id) => queryOne(CT_SELECT + ' WHERE c.id = ?', [parseInt(id)]),
     getByCtId: (ctId, nodeId) => (nodeId != null
-        ? queryAll('SELECT * FROM lxc_containers WHERE ct_id = ? AND pve_node_id = ?', [ctId, nodeId])
-        : queryAll('SELECT * FROM lxc_containers WHERE ct_id = ?', [ctId])),
+        ? queryAll(CT_SELECT + ' WHERE c.ct_id = ? AND c.pve_node_id = ?', [ctId, nodeId])
+        : queryAll(CT_SELECT + ' WHERE c.ct_id = ?', [ctId])),
     findByUpid: (upid) => queryOne('SELECT * FROM lxc_containers WHERE pve_upid = ? LIMIT 1', [upid]),
     create: async (ct) => {
         const [result] = await execute(

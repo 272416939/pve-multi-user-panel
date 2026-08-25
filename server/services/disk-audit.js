@@ -16,7 +16,9 @@ const diskOps = require('./disk-ops');
 
 // ==================== 节点上下文解析 ====================
 // 按 VM 行解析节点 id（查不到行/字段为空时返回 null → 回退默认节点，兼容旧单节点数据）
-async function resolveNodeIdByVmid(vmid) {
+// 调用方已知节点时直接传 nodeId 跳过台账首行匹配（多节点同 vmid 消歧）
+async function resolveNodeIdByVmid(vmid, nodeId = null) {
+  if (nodeId != null) return nodeId;
   try {
     var row = await db.vms.getByVmid(vmid);
     if (row && row.pve_node_id != null) return row.pve_node_id;
@@ -28,12 +30,13 @@ async function resolveNodeIdByVmid(vmid) {
  * 获取 VM 当前的磁盘快照，并持久化到 vm_disk_snapshots 表
  * @param {number} vmId
  * @param {number} userId
+ * @param {number|null} [nodeId] - 已知资产节点时传入，避免跨节点同 vmid 首行误配
  * @returns {object} { pve_config, active_disk_vol_ids, system_vol_ids, known_slots }
  */
-async function takeDiskSnapshot(vmId, userId) {
+async function takeDiskSnapshot(vmId, userId, nodeId = null) {
   var config = null;
-  // 多节点：按 VM 行解析节点
-  var pve = await getPveClient(await resolveNodeIdByVmid(vmId));
+  // 多节点：优先用调用方给定的节点，否则按 VM 行解析
+  var pve = await getPveClient(await resolveNodeIdByVmid(vmId, nodeId));
   try {
     config = await pve.getVmConfig(vmId);
   } catch (e) {

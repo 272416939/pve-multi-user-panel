@@ -8,6 +8,8 @@ const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 const { safeError } = require('../utils/safe-error');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
+// 多节点资产定位：vmid/ctid 跨节点可重复，按归属消歧
+const { locateAssetRow } = require('../utils/locate-asset');
 
 
 // 快照名称格式：kz- 固定前缀 + 17 位随机 base62，总长 20 字符（符合 C-4 {2,20} 规则）
@@ -19,14 +21,12 @@ router.get('/lxc/:vmid/snapshots', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         const isAdmin = req.user.role === 'admin';
-        if (!isAdmin) {
-            const userCts = await db.lxcContainers.getByUserId(req.user.id);
-            const owned = userCts.some(c => c.ct_id === vmid);
-            if (!owned) return res.status(403).json({ error: '无权操作此容器', code: 'LXC_NO_PERM_2' });
-        }
 
-        // 多节点：按资产所在节点取客户端（未分配给任何用户时回退默认节点）
-        const pve = await getPveClient((await db.lxcContainers.getByCtId(vmid))[0]?.pve_node_id);
+        // 多节点：按归属消歧定位台账行取客户端（防跨节点同号首行误配；未分配行管理员可用）
+        const locatedCt = await locateAssetRow('lxc', vmid, { isAdmin: isAdmin, userId: req.user.id });
+        if (locatedCt.ambiguous) return res.status(409).json({ error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+        if (!locatedCt.row && !isAdmin) return res.status(403).json({ error: '无权操作此容器', code: 'LXC_NO_PERM_2' });
+        const pve = await getPveClient(locatedCt.row ? locatedCt.row.pve_node_id : null);
         const snapshots = await pve.getLxcSnapshots(vmid);
         const cfg = await db.snapshotConfig.get();
         const dailyCreate = await db.snapshotLogs.getDailyCount(req.user.id, 'create');
@@ -180,18 +180,14 @@ router.delete('/lxc/:vmid/snapshots/:snapname', authMiddleware, async (req, res)
 router.get('/vm/:vmid/snapshots', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
-        // 权限校验
+        // 权限校验（多节点：按归属消歧定位，未分配行仅管理员可用）
         const isAdmin = req.user.role === 'admin';
-        if (!isAdmin) {
-            const userVms = await db.vms.getByUserId(req.user.id);
-            const owned = userVms.some(v => v.vm_id == vmid);
-            if (!owned) {
-                return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
-            }
+        const locatedVm = await locateAssetRow('vm', vmid, { isAdmin: isAdmin, userId: req.user.id });
+        if (locatedVm.ambiguous) return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        if (!locatedVm.row && !isAdmin) {
+            return res.status(403).json({ error: '无权操作此虚拟机', code: 'VM_NO_PERM' });
         }
-
-        // 多节点：按资产所在节点取客户端（未分配给任何用户时回退默认节点）
-        const pve = await getPveClient((await db.vms.getByVmid(vmid))?.pve_node_id);
+        const pve = await getPveClient(locatedVm.row ? locatedVm.row.pve_node_id : null);
         const snapshots = await pve.getSnapshots(vmid);
         const cfg = await db.snapshotConfig.get();
         const dailyCreate = await db.snapshotLogs.getDailyCount(req.user.id, 'create');

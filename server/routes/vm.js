@@ -23,6 +23,8 @@ const { takeDiskSnapshot } = require('../services/disk-audit');
 const { importDisksForVm } = require('../services/disk-expiry-check');
 // 统一审计埋点（utils/audit-log.js 导出，route 内不复刻包装函数）
 const { auditAction } = require('../utils/audit-log');
+// 多节点资产定位：vmid 跨节点可重复，按归属/节点消歧（防越权与错节点操作）
+const { locateAssetRow, findEnabledNode } = require('../utils/locate-asset');
 
 // L-5 修复：vmid 严格白名单校验（规范 C-2，与 snapshot/backup 端点一致）
 function isValidVmid(v) {
@@ -32,13 +34,19 @@ function isValidVmid(v) {
 // P2-H1① 修复：PVE VM 列表需管理员权限（包含所有节点 VM 分配信息）
 router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        // 无单一资产上下文（跨节点列表）：回退默认节点
-        const pve = await getPveClient(null); // 按资产所在节点取客户端（无资产上下文，默认节点）
+        // 多节点：严格分步选择——必须指定节点，仅返回该节点资源；占用判定按 (节点, vmid) 二元组
+        const node = await findEnabledNode(req.query.node_id);
+        if (!node) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const zoneRow = node.zone_id ? await db.zones.get(node.zone_id) : null;
+
+        const pve = await getPveClient(node.id);
         const vms = await pve.getVms(req.query.template_only ? { templateOnly: true } : {});
-        
-        // 获取已分配的VMID
+
+        // 已分配判定限定在本节点（存量 NULL 节点行视为默认节点，与启动回填口径一致）
         const assignedVms = await db.vms.getAll();
-        const assignedVmIds = new Set(assignedVms.map(vm => vm.vm_id));
+        const defaultNodeId = await db.pveNodes.getDefaultId();
+        const rowOnNode = (v) => (v.pve_node_id != null ? v.pve_node_id === node.id : node.id === defaultNodeId);
+        const assignedVmIds = new Set(assignedVms.filter(rowOnNode).map(vm => vm.vm_id));
 
         // PERF-05: 循环外一次性获取所有用户，构建 userMap，避免 N+1 查询
         const allUsers = await db.users.getAll();
@@ -48,22 +56,27 @@ router.get('/pve/vms', authMiddleware, adminMiddleware, async (req, res) => {
         // 将虚拟机分为待分配和已分配，并按VMID降序排序
         const availableVms = vms
             .filter(vm => !assignedVmIds.has(vm.vmid))
-            .sort((a, b) => b.vmid - a.vmid);
-        
+            .sort((a, b) => b.vmid - a.vmid)
+            .map(vm => ({ ...vm, pve_node_id: node.id, pve_node_name: node.name, zone_name: zoneRow ? zoneRow.name : '' }));
+
         const assignedVmsWithUsers = vms
             .filter(vm => assignedVmIds.has(vm.vmid))
             .sort((a, b) => b.vmid - a.vmid)
             .map(vm => {
-                const assignment = assignedVms.find(a => a.vm_id === vm.vmid);
+                const assignment = assignedVms.find(a => rowOnNode(a) && a.vm_id === vm.vmid);
                 const user = assignment ? userMap[assignment.user_id] : null;
                 return {
                     ...vm,
+                    pve_node_id: node.id,
+                    pve_node_name: node.name,
+                    zone_name: zoneRow ? zoneRow.name : '',
                     assigned_user: user ? user.username : null,
                     assignment_id: assignment ? assignment.id : null
                 };
             });
-        
+
         res.json({
+            node: { id: node.id, name: node.name, zone_name: zoneRow ? zoneRow.name : '' },
             available: availableVms,
             assigned: assignedVmsWithUsers
         });
@@ -191,21 +204,37 @@ router.get('/user/vms', authMiddleware, async (req, res) => {
 
 router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-    const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id, monthly_price, quarterly_discount, yearly_discount } = req.body;
- 
+    const { vm_id, user_id, name, expiration_date, renewal_price, renewal_period, mac_group_id, monthly_price, quarterly_discount, yearly_discount, pve_node_id } = req.body;
+
     if (!vm_id || !user_id) {
         return res.status(400).json({ error: '请选择虚拟机和用户', code: 'VM_USER_REQUIRED' });
     }
- 
+
+    // 多节点：必须指定资产所在节点（严格分步选择），节点需存在且启用
+    const nodeRow = await findEnabledNode(pve_node_id);
+    if (!nodeRow) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+
     const parsedVmId = parseInt(vm_id);
     const parsedUserId = parseInt(user_id);
- 
+
     if (isNaN(parsedVmId) || isNaN(parsedUserId)) {
         return res.status(400).json({ error: '无效的虚拟机或用户ID', code: 'INVALID_VM_OR_USER_ID' });
     }
     // L-5 修复：vmid 严格白名单校验
     if (!Number.isInteger(parsedVmId) || parsedVmId < 100 || parsedVmId > 999999999) {
         return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
+    }
+
+    // 多节点：核对该 VM 确实存在于所选节点（防止把台账指到不存在的资产上）
+    try {
+        const nodePve = await getPveClient(nodeRow.id);
+        const nodeVms = await nodePve.getVms({});
+        if (!Array.isArray(nodeVms) || !nodeVms.some(v => v.vmid === parsedVmId)) {
+            return res.status(400).json({ error: '该节点上不存在此虚拟机 (' + parsedVmId + ')', code: 'VM_NOT_ON_NODE', params: [String(parsedVmId)] });
+        }
+    } catch (e) {
+        console.error('[vm] 校验节点内 VM 存在性失败:', e.message);
+        return res.status(500).json({ error: safeError(e), code: 'VM_NODE_CHECK_FAILED' });
     }
 
     // SEC-03: 价格/折扣参数服务端校验
@@ -225,19 +254,22 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
     }
  
     const existingVms = await db.vms.getAll();
-    if (existingVms.find(vm => vm.vm_id === parsedVmId && vm.user_id === parsedUserId)) {
+    // 多节点：查重/清理按 (节点, vmid) 作用域——他节点同号记录不受影响
+    const defaultNodeId = await db.pveNodes.getDefaultId();
+    const rowOnNode = (v) => (v.pve_node_id != null ? v.pve_node_id === nodeRow.id : nodeRow.id === defaultNodeId);
+    if (existingVms.find(vm => vm.vm_id === parsedVmId && rowOnNode(vm) && vm.user_id === parsedUserId)) {
         return res.status(400).json({ error: '该虚拟机已分配给此用户', code: 'VM_ALREADY_ASSIGNED' });
     }
 
-    // 如果该 VMID 之前已分配给其他用户，先清理旧记录并同步 legacy 磁盘 user_id
-    var oldVms = existingVms.filter(function(v) { return v.vm_id === parsedVmId; });
+    // 如果该 VMID 在本节点之前已分配给其他用户，先清理旧记录并同步 legacy 磁盘 user_id
+    var oldVms = existingVms.filter(function(v) { return v.vm_id === parsedVmId && rowOnNode(v); });
     for (var oi = 0; oi < oldVms.length; oi++) {
-        // 同步更新绑定在该 VM 上的 legacy 磁盘的 user_id
-        await db.disks.updateUserId(parsedVmId, parsedUserId);
+        // 同步更新绑定在该 VM 上的 legacy 磁盘的 user_id（限定本节点）
+        await db.disks.updateUserId(parsedVmId, parsedUserId, nodeRow.id);
         // 删除旧分配记录
         await db.vms.delete(oldVms[oi].id);
     }
- 
+
     const newVm = await db.vms.create({
         vm_id: parsedVmId,
         user_id: parsedUserId,
@@ -247,7 +279,8 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         renewal_period: validPeriod,
         monthly_price: String(parsedMonthlyPrice),
         quarterly_discount: String(parsedQDiscount),
-        yearly_discount: String(parsedYDiscount)
+        yearly_discount: String(parsedYDiscount),
+        pve_node_id: nodeRow.id
     });
     
     // MAC 分组同步
@@ -271,8 +304,8 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
         if (config && config.net0) {
             const macMatch = config.net0.match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (macMatch) {
-                // 如果 VM 已有 dhcp_static_ip，优先使用
-                const existingVm = (await db.vms.getAll()).find(v => v.vm_id === parsedVmId);
+                // 如果 VM 已有 dhcp_static_ip，优先使用（限定本节点记录）
+                const existingVm = (await db.vms.getAll()).find(v => v.vm_id === parsedVmId && v.pve_node_id === nodeRow.id);
                 const preferredIp = existingVm?.dhcp_static_ip || '';
                 const ip = await createDhcpStaticBinding('vm', parsedVmId, macMatch[0], preferredIp, null, { pveNodeId: newVm.pve_node_id });
                 if (ip) await db.vms.update(newVm.id, { dhcp_static_ip: ip });
@@ -324,12 +357,12 @@ router.post('/user/vms', authMiddleware, adminMiddleware, async (req, res) => {
 		    res.json(newVm);
 
 		    // 异步更新磁盘快照（不阻塞响应）
-		    takeDiskSnapshot(parsedVmId, parsedUserId).catch(function(err) {
+		    takeDiskSnapshot(parsedVmId, parsedUserId, nodeRow.id).catch(function(err) {
 		      console.error('[快照] VM ' + parsedVmId + ' 分配后快照创建失败:', err.message);
 		    });
 
 		    // 异步导入存量数据盘（不阻塞响应）
-	    importDisksForVm(parsedVmId, parsedUserId).catch(function(err) {
+	    importDisksForVm(parsedVmId, parsedUserId, nodeRow.id).catch(function(err) {
 	      console.error('[vm] VM 分配后导入存量数据盘失败:', err.message);
 	    });
 
@@ -586,9 +619,12 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
-        const allVms = await db.vms.getAll();
-        const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('vm', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        }
+        const vm = located.row;
 
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
@@ -650,9 +686,12 @@ router.post('/vm/:vmid/shutdown', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
-        const allVms = await db.vms.getAll();
-        const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('vm', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        }
+        const vm = located.row;
 
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
@@ -682,9 +721,12 @@ router.post('/vm/:vmid/stop', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
-        const allVms = await db.vms.getAll();
-        const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('vm', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        }
+        const vm = located.row;
 
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
@@ -714,9 +756,12 @@ router.post('/vm/:vmid/reboot', authMiddleware, async (req, res) => {
     try {
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
-        const allVms = await db.vms.getAll();
-        const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('vm', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        }
+        const vm = located.row;
 
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
@@ -748,9 +793,12 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
-        const allVms = await db.vms.getAll();
-        const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('vm', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        }
+        const vm = located.row;
 
         // V-1 修复：统一权限模式 — 管理员可连接未分配 VM 进行运维
         if (!vm) {
@@ -790,7 +838,8 @@ router.post('/vm/:vmid/vnc', authMiddleware, async (req, res) => {
         const sessionId = await consoleSession.createSession({
             type: 'vnc', subtype: 'qemu',
             vmid, userId: req.user.id,
-            node: result.node, port: result.port, ticket: result.ticket
+            node: result.node, port: result.port, ticket: result.ticket,
+            nodeId: vm ? vm.pve_node_id : null
         });
 
         // 返回代理页面 URL（只暴露 session ID，不含敏感参数）
@@ -811,9 +860,12 @@ router.get('/vm/:vmid/status', authMiddleware, async (req, res) => {
 
         const vmid = parseInt(req.params.vmid);
         if (!isValidVmid(vmid)) return res.status(400).json({ error: '无效的虚拟机 ID', code: 'INVALID_VM_ID' });
-        const allVms = await db.vms.getAll();
-        const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('vm', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        }
+        const vm = located.row;
 
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
@@ -875,9 +927,12 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
         }
 
         // 权限检查（用正确的查询方法）
-        const allVms = await db.vms.getAll();
-        const vmRecord = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('vm', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        }
+        const vmRecord = located.row;
         if (vmRecord) {
             const isOwner = req.user.id === vmRecord.user_id;
             if (!isOwner && !isAdmin) return res.status(403).json({ error: '无权限操作此虚拟机', code: 'VM_NO_PERM_2' });
@@ -1003,9 +1058,12 @@ router.post('/vm/:vmid/reset-password', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '密码需8-13位，包含大小写英文、数字和特殊字符', code: 'PASSWORD_RULE_8_13' });
         }
 
-        const allVms = await db.vms.getAll();
-        const vm = allVms.find(v => v.vm_id === vmid);
         const isAdmin = req.user.role === 'admin';
+        const located = await locateAssetRow('vm', vmid, { isAdmin: isAdmin, userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) {
+            return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        }
+        const vm = located.row;
 
         if (vm) {
             const isOwner = req.user.id === vm.user_id;
@@ -1049,20 +1107,38 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
         const destroyTargets = assignedVms.map(v => (v.name || 'VM ' + v.vm_id) + '(用户#' + v.user_id + ')').join('/');
         await auditAction(req, 'admin.vm.destroy', '销毁 VM ' + vmid + (destroyTargets ? ':' + destroyTargets : '') + (force ? '（强制）' : ''), { resourceType: 'vm' });
 
-        const pve = await getPveClient(assignedVms[0]?.pve_node_id); // 按资产所在节点取客户端
-
+        // 多节点：同 vmid 可能存在于多个节点——逐行按各自节点校验/清理/销毁，禁止只销毁首行
         if (!force) {
-            try {
-                const status = await pve.getVmStatus(vmid);
-                if (status && status.status === 'running') {
-                    return res.status(400).json({ error: '虚拟机正在运行，请先关机后再销毁', code: 'VM_RUNNING_DESTROY' });
+            for (const vm of assignedVms) {
+                try {
+                    const pveCheck = await getPveClient(vm.pve_node_id);
+                    const status = await pveCheck.getVmStatus(vmid);
+                    if (status && status.status === 'running') {
+                        return res.status(400).json({ error: '虚拟机正在运行，请先关机后再销毁', code: 'VM_RUNNING_DESTROY' });
+                    }
+                } catch (e) {
+                    console.warn(`[vm] 查询 ${vmid} 状态失败（继续执行销毁）:`, e.message);
                 }
-            } catch (e) {
-                console.warn(`[vm] 查询 ${vmid} 状态失败（继续执行销毁）:`, e.message);
             }
         }
 
+        // 无台账行时保留旧行为：按默认节点尝试销毁（PVE 直删后台账缺失的场景）
+        if (assignedVms.length === 0) {
+            try {
+                const pveDefault = await getPveClient(null);
+                await pveDefault.destroyVm(vmid);
+                console.log(`[vm] PVE 虚拟机 ${vmid} 已销毁（无台账行，默认节点）`);
+            } catch (e) {
+                console.error(`[vm] PVE 销毁 ${vmid} 失败:`, e.message);
+                return res.status(500).json({ error: safeError(e, 'PVE 操作失败'), code: 'INTERNAL_ERROR' });
+            }
+            return res.json({ message: '虚拟机已销毁' });
+        }
+
+        const defaultNodeId = await db.pveNodes.getDefaultId();
         for (const vm of assignedVms) {
+            const pve = await getPveClient(vm.pve_node_id); // 按本行资产所在节点取客户端
+            const diskOnNode = (d) => (d.pve_node_id != null ? d.pve_node_id === vm.pve_node_id : vm.pve_node_id == null || vm.pve_node_id === defaultNodeId);
             await db.vms.reminders.clear(vm.id);
             const ik = await getIkuaiClientForPve(vm.pve_node_id); // NAT 类操作按资产所在节点取爱快客户端
             try {
@@ -1086,11 +1162,11 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                     }
                 } catch (e) { console.error('VM MAC分组删除失败:', e.message); }
             }
-            // 检查该 VM 上是否有挂载的活跃数据盘（非 legacy）
+            // 检查该 VM 上是否有挂载的活跃数据盘（非 legacy；限定本节点，防误拦他节点同号 VM 的磁盘判断）
             try {
                 var boundDisks = await db.disks.getByBindVmid(vmid);
                 var activeDisks = boundDisks.filter(function(d) {
-                    return d.status === 'bound' && !d.is_legacy;
+                    return diskOnNode(d) && d.status === 'bound' && !d.is_legacy;
                 });
                 if (activeDisks.length > 0) {
                     return res.status(400).json({
@@ -1098,9 +1174,9 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                     });
                 }
             } catch (e) { console.error('[vm] 查询数据盘失败:', e.message); }
-            // 清理绑定在该 VM 上的所有磁盘台账记录（PVE 销毁时磁盘已被一并清理）
+            // 清理绑定在该 VM 上的所有磁盘台账记录（PVE 销毁时磁盘已被一并清理；限定本节点防跨节点误删）
             try {
-                await db.getPool().execute('DELETE FROM disks WHERE bind_vmid = ?', [vmid]);
+                await db.getPool().execute('DELETE FROM disks WHERE bind_vmid = ? AND pve_node_id = ?', [vmid, vm.pve_node_id != null ? vm.pve_node_id : defaultNodeId]);
             } catch (e) { console.error('清理磁盘记录失败:', e.message); }
             // 清理磁盘快照
             try {
@@ -1108,14 +1184,15 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                 console.log('[快照] VM ' + vmid + ' 磁盘快照已清理（销毁）');
             } catch (e) { console.error('清理磁盘快照失败:', e.message); }
             await db.vms.delete(vm.id);
-        }
 
-try {
-            await pve.destroyVm(vmid);
-            console.log(`[vm] PVE 虚拟机 ${vmid} 已销毁`);
-        } catch (e) {
-            console.error(`[vm] PVE 销毁 ${vmid} 失败:`, e.message);
-            return res.status(500).json({ error: safeError(e, 'PVE 操作失败'), code: 'INTERNAL_ERROR' });
+            // 销毁本行节点的 PVE 实例
+            try {
+                await pve.destroyVm(vmid);
+                console.log(`[vm] PVE 虚拟机 ${vmid} 已销毁（节点 #${vm.pve_node_id != null ? vm.pve_node_id : 'default'}）`);
+            } catch (e) {
+                console.error(`[vm] PVE 销毁 ${vmid} 失败:`, e.message);
+                return res.status(500).json({ error: safeError(e, 'PVE 操作失败'), code: 'INTERNAL_ERROR' });
+            }
         }
 
 	res.json({ message: '虚拟机已销毁' });
@@ -1137,7 +1214,9 @@ try {
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
             return res.status(400).json({ error: '无效的 VMID', code: 'INVALID_VMD' });
         }
-        const vm = await db.vms.getByVmid(vmid);
+        const located = await locateAssetRow('vm', vmid, { isAdmin: req.user.role === 'admin', userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        const vm = located.row;
         if (!vm) return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
         const isAdmin = req.user.role === 'admin';
         if (vm.user_id !== req.user.id && !isAdmin) {
@@ -1256,7 +1335,9 @@ try {
         const vmid = parseInt(req.params.vmid);
         const rateLimit = await checkConfiguredRateLimit('os_switch_status', 'ratelimit:os-switch-status:' + req.user.id);
         if (!rateLimit.allowed) return res.status(429).json({ error: '查询过于频繁', code: 'RATE_LIMITED_QUERY_BRIEF', retryAfter: rateLimit.retryAfter });
-        const vm = await db.vms.getByVmid(vmid);
+        const located = await locateAssetRow('vm', vmid, { isAdmin: req.user.role === 'admin', userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        const vm = located.row;
         if (!vm) return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
         if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });
@@ -1273,7 +1354,9 @@ try {
     // GET /vm/:vmid/switch-os/logs — 查询单 VM 切换日志（翻页，脱敏）
     router.get('/vm/:vmid/switch-os/logs', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
-        const vm = await db.vms.getByVmid(vmid);
+        const located = await locateAssetRow('vm', vmid, { isAdmin: req.user.role === 'admin', userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        const vm = located.row;
         if (!vm) return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
         if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });
@@ -1312,7 +1395,9 @@ try {
     // GET /vm/:vmid/switchable-os — 获取可切换 OS 列表
     router.get('/vm/:vmid/switchable-os', authMiddleware, async (req, res) => {
         const vmid = parseInt(req.params.vmid);
-        const vm = await db.vms.getByVmid(vmid);
+        const located = await locateAssetRow('vm', vmid, { isAdmin: req.user.role === 'admin', userId: req.user.id, nodeIdQuery: req.query.node_id });
+        if (located.ambiguous) return res.status(409).json({ error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' });
+        const vm = located.row;
         if (!vm) return res.status(404).json({ error: '虚拟机不存在', code: 'VM_NOT_FOUND' });
         if (vm.user_id !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({ error: '无权限', code: 'FORBIDDEN' });

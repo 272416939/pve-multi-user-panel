@@ -13,6 +13,9 @@
     $.editVmForm = ref({ id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, backup_storage: '', mac_group_id: '', status: null });
     $.availableVms = ref([]);
     $.assignedVms = ref([]);
+    // 多节点：分配区节点选择（严格分步选择——先选节点，待分配池/MAC 分组按节点联动）
+    $.assignNodes = ref([]);
+    $.assignNodeId = ref('');
 
     // 快照管理
     $.snapshotVmId = ref(null);
@@ -37,6 +40,12 @@
     $.backupLimits = ref({ current: 0, max_per_vm: 3, today_creates: 0, daily_limit: 3 });
 
     // ==================== computed ====================
+    // 当前所选分配节点名（池表格标题旁展示）
+    $.assignNodeName = computed(function() {
+        var n = $.assignNodes.value.find(function(x) { return String(x.id) === String($.assignNodeId.value); });
+        return n ? n.name : '';
+    });
+
     $.confirmActionText = computed(function() {
         var msgs = {
             shutdown: window.__i18n.t('dash.vm.shutdownHint'),
@@ -241,18 +250,46 @@
 
     $.assignVm = async function() {
         try {
+            if (!$.assignForm.value.pve_node_id) {
+                return alert(window.__i18n.t('err.NODE_SELECT_REQUIRED'));
+            }
             var expDate = toLocalDateTimeStr($.assignForm.value.expiration_date);
             await api('/user/vms', {
                 method: 'POST',
                 body: JSON.stringify(Object.assign({}, $.assignForm.value, { expiration_date: expDate }))
             });
-            $.assignForm.value = { vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '' };
+            $.assignForm.value = { vm_id: '', user_id: '', name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', monthly_price: '', quarterly_discount: '', yearly_discount: '', mac_group_id: '', pve_node_id: $.assignNodeId.value };
             $.loadData();
             $.loadAssignData();
         } catch (e) {
             alert(e.message);
         }
     };
+
+    // ==================== 分配区多节点联动 ====================
+    // 节点下拉选项（/admin/pve/nodes，与 OS 模板页同源）；默认选中第一个启用节点
+    $.loadAssignNodeOptions = async function() {
+        try {
+            var res = await api('/admin/pve/nodes');
+            var nodes = (res && res.nodes) || [];
+            $.assignNodes.value = nodes.filter(function(n) { return n.enabled !== 0; });
+            if (!$.assignNodeId.value && $.assignNodes.value.length > 0) {
+                $.assignNodeId.value = String($.assignNodes.value[0].id);
+                $.assignForm.value.pve_node_id = $.assignNodeId.value;
+            }
+        } catch (e) {
+            console.error('加载 PVE 节点列表失败', e);
+        }
+    };
+
+    // 切节点：重置已选 VM、重载该节点待分配池 + 该节点配对爱快的 MAC 分组
+    watch($.assignNodeId, function(nv, ov) {
+        if (!nv || nv === ov) return;
+        $.assignForm.value.pve_node_id = nv;
+        $.assignForm.value.vm_id = '';
+        $.loadAssignData();
+        $.loadMacGroups(nv);
+    });
 
     $.checkExpired = async function() {
         try {

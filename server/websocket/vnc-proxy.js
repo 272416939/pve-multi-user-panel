@@ -62,6 +62,8 @@ vncProxy.on('connection', async (clientWs, request) => {
     }
 
     const { node, vmid, port, ticket, type } = sessionData;
+    // 多节点：优先用会话建立时写入的资产节点（/vm|lxc/:vmid/vnc 已按归属消歧），无则回退台账首行
+    const sessionNodeId = sessionData.nodeId != null ? sessionData.nodeId : null;
     if (!node || !vmid || !port || !ticket) {
         clientWs.close(4000, '会话数据不完整');
         return;
@@ -73,18 +75,19 @@ vncProxy.on('connection', async (clientWs, request) => {
     const pveConfig = await require('../api/db').config.getPve();
     const strictTls = !!pveConfig.strict_tls;
 
-    // 多节点：按会话资源（vmid+type）查台账行，用其归属 PVE 节点解析客户端
-    // （会话建立处已做 vmid+isLxc+归属校验；此处查不到台账行时回退默认节点）
-    let devNode = null;
-    try {
-        if (type === 'lxc') {
-            const ctRows = await require('../api/db').lxcContainers.getByCtId(parseInt(vmid));
-            devNode = ctRows && ctRows.length > 0 ? ctRows[0].pve_node_id : null;
-        } else {
-            const vmRow = await require('../api/db').vms.getByVmid(parseInt(vmid));
-            devNode = vmRow ? vmRow.pve_node_id : null;
-        }
-    } catch (_) {}
+    // 多节点：解析客户端所用 PVE 节点（会话带 nodeId 优先；否则查台账行，查不到回退默认节点）
+    let devNode = sessionNodeId;
+    if (devNode == null) {
+        try {
+            if (type === 'lxc') {
+                const ctRows = await require('../api/db').lxcContainers.getByCtId(parseInt(vmid));
+                devNode = ctRows && ctRows.length > 0 ? ctRows[0].pve_node_id : null;
+            } else {
+                const vmRow = await require('../api/db').vms.getByVmid(parseInt(vmid));
+                devNode = vmRow ? vmRow.pve_node_id : null;
+            }
+        } catch (_) {}
+    }
     const pveApi = await getPveClient(devNode);
     // 确保 host/apiToken 已从节点配置加载（getter 读内存缓存）
     try { await pveApi.ensureConfig(); } catch (_) {}

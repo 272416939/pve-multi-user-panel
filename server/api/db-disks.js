@@ -163,7 +163,13 @@ const disks = {
     updateVolumeId: (id, volumeId) => execute('UPDATE disks SET volume_id = ?, updated_at = ? WHERE id = ?', [volumeId, mysqlNow(), parseInt(id)]),
     getExpiring: () => queryAll("SELECT * FROM disks WHERE status IN ('free','bound','grace') AND expire_time IS NOT NULL AND expire_time <= DATE_ADD(NOW(), INTERVAL 7 DAY)"),
     // 更新绑定到指定 VMID 的 legacy 磁盘的 user_id（VM 换绑时同步）
-    updateUserId: (vmid, userId) => execute('UPDATE disks SET user_id = ?, updated_at = ? WHERE bind_vmid = ? AND is_legacy = 1', [parseInt(userId), mysqlNow(), parseInt(vmid)])
+    // 多节点：nodeId 可选作用域——跨节点同 vmid 时不得误改他节点磁盘归属
+    updateUserId: (vmid, userId, nodeId) => {
+        const sql = 'UPDATE disks SET user_id = ?, updated_at = ? WHERE bind_vmid = ? AND is_legacy = 1' + (nodeId != null ? ' AND pve_node_id = ?' : '');
+        const args = [parseInt(userId), mysqlNow(), parseInt(vmid)];
+        if (nodeId != null) args.push(nodeId);
+        return execute(sql, args);
+    }
 };
 
 // 磁盘生命周期配置
