@@ -139,8 +139,10 @@ class PveApi {
   }
 
   // 只读缓存键：必须带节点作用域前缀（不同节点的 storages/vms/vmconfig 互不相同）
+  // 用构造时绑定的 this.nodeId 作前缀（_resolvedNodeId 要等 ensureConfig 才解析；
+  // 懒加载完成前求值会退化为 'x'，所有节点首批缓存互相串写——多节点 LXC 列表 500 根因）
   _ck(key) {
-    return 'n' + (this._resolvedNodeId != null ? this._resolvedNodeId : 'x') + ':' + key;
+    return 'n' + (this.nodeId != null ? this.nodeId : 'x') + ':' + key;
   }
 
   // 保存配置后刷新缓存
