@@ -33,6 +33,7 @@
             <div class="d-flex align-items-center mb-2">
               <span class="text-muted me-2" style="cursor:grab;font-size:16px;">⠿</span>
               <h6 class="card-title mb-0">{{ g.name }}</h6>
+              <span class="badge ms-auto" :class="g.zone_id ? 'bg-primary' : 'bg-secondary'">{{ g.zone_name || t('admin.disk.universal') }}</span>
             </div>
             <p class="text-muted small mb-2">{{ t('admin.disk.boundTypes') }}</p>
             <div>
@@ -242,6 +243,14 @@
           <label class="form-label">{{ t('admin.disk.groupName') }}</label>
           <input class="form-control" v-model="diskPage.storageGroupForm.value.name" :placeholder="t('admin.disk.groupNamePh')" maxlength="50">
         </div>
+        <div class="mb-3">
+          <label class="form-label">{{ t('admin.disk.groupZone') }}</label>
+          <select class="form-select" v-model="diskPage.storageGroupForm.value.zone_id">
+            <option value="">{{ t('admin.disk.universal') }}</option>
+            <option v-for="z in diskPage.groupZoneOptions.value" :key="z.id" :value="z.id">{{ z.region_name ? z.region_name + ' / ' : '' }}{{ z.name }}</option>
+          </select>
+          <div class="form-text">{{ t('admin.disk.groupZoneHint') }}</div>
+        </div>
       </div>
       <div class="modal-footer">
         <pv-button type="button" data-bs-dismiss="modal" variant="secondary" @click="diskPage.showStorageGroupModal.value = false">{{ t('common.cancel') }}</pv-button>
@@ -280,7 +289,7 @@
             <label class="form-label">{{ t('admin.disk.storageGroup') }}</label>
             <select class="form-select" v-model="diskPage.diskSpecForm.value.storage_group_id">
               <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
-              <option v-for="g in diskPage.storageGroups.value" :key="g.id" :value="g.id">{{ g.name }}</option>
+              <option v-for="g in diskPage.filteredStorageGroups.value" :key="g.id" :value="g.id">{{ g.name }}{{ g.zone_name ? ' (' + g.zone_name + ')' : ' (' + t('admin.disk.universal') + ')' }}</option>
             </select>
           </div>
           <div class="col-md-6">

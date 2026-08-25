@@ -110,8 +110,8 @@
         <div class="mb-3">
           <label class="form-label">{{ t('dash.disk.storageGroupRequired') }}</label>
           <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-sm" v-for="g in diskOptionsGroups" :key="g.id" :class="diskPurchaseForm.storage_group_id === g.id ? 'btn-primary' : 'btn-outline-secondary'" @click="diskPurchaseForm.storage_group_id = g.id; diskPurchaseForm.spec_id = ''; calcDiskPrice()">{{ g.name }}</button>
-            <span v-if="diskOptionsGroups.length === 0" class="text-muted small">{{ t('dash.disk.noStorageGroups') }}</span>
+            <button type="button" class="btn btn-sm" v-for="g in diskOptionsGroupsFiltered" :key="g.id" :class="diskPurchaseForm.storage_group_id === g.id ? 'btn-primary' : 'btn-outline-secondary'" @click="diskPurchaseForm.storage_group_id = g.id; diskPurchaseForm.spec_id = ''; calcDiskPrice()">{{ g.name }}</button>
+            <span v-if="diskOptionsGroupsFiltered.length === 0" class="text-muted small">{{ t('dash.disk.noStorageGroups') }}</span>
           </div>
         </div>
         <div class="mb-3">

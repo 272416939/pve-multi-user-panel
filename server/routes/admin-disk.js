@@ -60,6 +60,23 @@ async function validateDiskFormat(storagePool, diskFormat, nodeId) {
   return { ok: true, diskFormat: null };
 }
 
+// 规格保存校验：节点必填 + 分组存在 + 分组可用区与节点可用区一致（分组 zone_id 为空=通用，任意区可用）
+// 返回 null=通过；否则 { error, code, params? }
+async function validateSpecGroupZone(data) {
+  var nodeId = parseInt(data.pve_node_id);
+  if (!Number.isInteger(nodeId)) {
+    return { error: '请选择所属节点', code: 'PVE_NODE_REQUIRED' };
+  }
+  var node = await db.pveNodes.get(nodeId);
+  if (!node) return { error: '节点不存在', code: 'PVE_NODE_NOT_FOUND' };
+  var grp = await db.storageGroups.getById(data.storage_group_id);
+  if (!grp) return { error: '存储分组不存在', code: 'STORAGE_GROUP_NOT_FOUND' };
+  if (grp.zone_id != null && node.zone_id != null && Number(grp.zone_id) !== Number(node.zone_id)) {
+    return { error: '存储分组「' + grp.name + '」与所属节点「' + node.name + '」不在同一可用区', code: 'SPEC_GROUP_ZONE_MISMATCH', params: [grp.name, node.name] };
+  }
+  return null;
+}
+
 // ==================== PVE 存储列表（供规格弹窗存储位置下拉） ====================
 
 // 获取 PVE 所有存储及剩余容量（文档 3.3：下拉展示 PVE 所有存储及剩余容量）。多节点：可选 ?node_id= 指定节点
@@ -113,12 +130,21 @@ router.post('/storage-groups', authMiddleware, adminMiddleware, async (req, res)
     if (!name) return res.status(400).json({ error: '请输入分组名称', code: 'GROUP_NAME_REQUIRED' });
     if (name.length > 50) return res.status(400).json({ error: '分组名称不能超过 50 字符', code: 'GROUP_NAME_MAX_50' });
 
-    var group = await db.storageGroups.create({ name: name, sort_order: sortOrder });
+    // 可选绑定可用区（空=通用）
+    var zoneId = null;
+    if (req.body.zone_id !== undefined && req.body.zone_id !== null && req.body.zone_id !== '') {
+      zoneId = parseInt(req.body.zone_id);
+      if (!Number.isInteger(zoneId)) return res.status(400).json({ error: '无效的可用区 ID', code: 'ZONE_INVALID_ID' });
+      var z = await db.zones.get(zoneId);
+      if (!z) return res.status(400).json({ error: '可用区不存在', code: 'ZONE_NOT_FOUND' });
+    }
+
+    var group = await db.storageGroups.create({ name: name, sort_order: sortOrder, zone_id: zoneId });
     clearDiskCache();
     // 操作审计：创建存储分组
     try {
       const { auditLog } = require('../utils/audit-log');
-      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.storage-group.create', resourceType: 'storage-group', resourceId: group.id, details: '创建存储分组:' + name, req });
+      await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.storage-group.create', resourceType: 'storage-group', resourceId: group.id, details: '创建存储分组:' + name + (zoneId ? '(可用区#' + zoneId + ')' : '(通用)'), req });
     } catch (e) {}
     res.json(group);
   } catch (e) {
@@ -173,17 +199,27 @@ router.put('/storage-groups/:id', authMiddleware, adminMiddleware, async (req, r
     if (!name) return res.status(400).json({ error: '请输入分组名称', code: 'GROUP_NAME_REQUIRED' });
     if (name.length > 50) return res.status(400).json({ error: '分组名称不能超过 50 字符', code: 'GROUP_NAME_MAX_50' });
 
+    // 可选绑定可用区（空=通用；传值须存在）
+    var zoneId = null;
+    if (req.body.zone_id !== undefined && req.body.zone_id !== null && req.body.zone_id !== '') {
+      zoneId = parseInt(req.body.zone_id);
+      if (!Number.isInteger(zoneId)) return res.status(400).json({ error: '无效的可用区 ID', code: 'ZONE_INVALID_ID' });
+      var z = await db.zones.get(zoneId);
+      if (!z) return res.status(400).json({ error: '可用区不存在', code: 'ZONE_NOT_FOUND' });
+    }
+
     // 保存前取旧记录（审计 diff 用）
     var oldGroup = await db.storageGroups.getById(id);
     if (!oldGroup) return res.status(404).json({ error: '存储分组不存在', code: 'STORAGE_GROUP_NOT_FOUND' });
-    var group = await db.storageGroups.update(id, { name: name, sort_order: sortOrder });
+    var group = await db.storageGroups.update(id, { name: name, sort_order: sortOrder, zone_id: zoneId });
     clearDiskCache();
     // 操作审计：编辑存储分组（字段级 diff）
     try {
       const { auditLog } = require('../utils/audit-log');
       var changes = buildFieldDiff(oldGroup, group, [
         { key: 'name', label: '名称' },
-        { key: 'sort_order', label: '排序', num: true }
+        { key: 'sort_order', label: '排序', num: true },
+        { key: 'zone_id', label: '可用区', num: true }
       ]);
       if (changes.length) {
         await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.disk.storage-group.update', resourceType: 'storage-group', resourceId: id, details: '编辑存储分组；变更:' + changes.join(', '), req });
@@ -204,10 +240,13 @@ router.delete('/storage-groups/:id', authMiddleware, adminMiddleware, async (req
     var id = parseInt(req.params.id);
     if (!Number.isInteger(id) || id < 1) return res.status(400).json({ error: '无效的ID', code: 'INVALID_ID' });
 
-    // 检查是否有在用磁盘
-    var countResult = await db.storageGroups.countDisksByGroup(id);
-    if (countResult && countResult.cnt > 0) {
-      return res.status(400).json({ error: '该分组下仍有 ' + countResult.cnt + ' 个在用磁盘，请先迁移', code: 'GROUP_IN_USE', params: [countResult.cnt] });
+    // 引用拦截：在用磁盘 + 硬盘规格 双计数（挂有规格的分组删除会导致规格悬空）
+    var diskCountResult = await db.storageGroups.countDisksByGroup(id);
+    var diskCount = diskCountResult ? diskCountResult.cnt : 0;
+    var specCountResult = await db.storageGroups.countSpecsByGroup(id);
+    var specCount = specCountResult ? specCountResult.cnt : 0;
+    if (diskCount > 0 || specCount > 0) {
+      return res.status(400).json({ error: '该分组下仍有 ' + diskCount + ' 个在用磁盘、' + specCount + ' 个硬盘规格，请先迁移', code: 'GROUP_IN_USE', params: [diskCount, specCount] });
     }
 
     await db.storageGroups.delete(id);
@@ -256,6 +295,10 @@ router.post('/disk-specs', authMiddleware, adminMiddleware, async (req, res) => 
     var fmtResult = await validateDiskFormat(data.storage_pool.trim(), data.disk_format, data.pve_node_id);
     if (!fmtResult.ok) return res.status(400).json({ error: fmtResult.error , code: fmtResult.code });
 
+    // 分组/节点可用区一致性校验
+    var zoneCheck = await validateSpecGroupZone(data);
+    if (zoneCheck) return res.status(400).json({ error: zoneCheck.error, code: zoneCheck.code, params: zoneCheck.params });
+
     var spec = await db.diskSpecs.create({
       name: data.name.trim(),
       disk_type: data.disk_type,
@@ -302,6 +345,10 @@ router.put('/disk-specs/:id', authMiddleware, adminMiddleware, async (req, res) 
     // 校验磁盘格式与存储类型联动
     var fmtResult2 = await validateDiskFormat(data.storage_pool.trim(), data.disk_format, data.pve_node_id);
     if (!fmtResult2.ok) return res.status(400).json({ error: fmtResult2.error , code: fmtResult2.code });
+
+    // 分组/节点可用区一致性校验
+    var zoneCheck2 = await validateSpecGroupZone(data);
+    if (zoneCheck2) return res.status(400).json({ error: zoneCheck2.error, code: zoneCheck2.code, params: zoneCheck2.params });
 
     // 保存前取旧记录（审计 diff 用；资金面定价字段全量纳入）
     var oldSpec = await db.diskSpecs.getById(id);

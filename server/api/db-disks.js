@@ -1,18 +1,23 @@
 const { execute, queryOne, queryAll, mysqlNow } = require('./db-core');
 
-// 存储分组
+// 存储分组（可选绑定可用区：zone_id NULL=通用，所有可用区可用）
 const storageGroups = {
-    getAll: () => queryAll('SELECT * FROM storage_groups ORDER BY sort_order ASC, id ASC'),
+    getAll: () => queryAll(
+        'SELECT sg.*, z.name AS zone_name, r.name AS region_name ' +
+        'FROM storage_groups sg ' +
+        'LEFT JOIN zones z ON sg.zone_id = z.id ' +
+        'LEFT JOIN regions r ON z.region_id = r.id ' +
+        'ORDER BY sg.sort_order ASC, sg.id ASC'),
     getById: (id) => queryOne('SELECT * FROM storage_groups WHERE id = ?', [parseInt(id)]),
     create: async (data) => {
         const [result] = await execute(
-            'INSERT INTO storage_groups (name, sort_order) VALUES (?, ?)',
-            [data.name || '', parseInt(data.sort_order) || 0]
+            'INSERT INTO storage_groups (name, sort_order, zone_id) VALUES (?, ?, ?)',
+            [data.name || '', parseInt(data.sort_order) || 0, data.zone_id || null]
         );
         return queryOne('SELECT * FROM storage_groups WHERE id = ?', [result.insertId]);
     },
     update: async (id, updates) => {
-        const allowedColumns = ['name', 'sort_order'];
+        const allowedColumns = ['name', 'sort_order', 'zone_id'];
         for (const key of Object.keys(updates)) {
             if (!allowedColumns.includes(key)) delete updates[key];
         }
@@ -30,7 +35,8 @@ const storageGroups = {
         return queryOne('SELECT * FROM storage_groups WHERE id = ?', [parseInt(id)]);
     },
     delete: (id) => execute('DELETE FROM storage_groups WHERE id = ?', [parseInt(id)]),
-    countDisksByGroup: (groupId) => queryOne('SELECT COUNT(*) AS cnt FROM disks WHERE storage_group_id = ? AND status != ?', [parseInt(groupId), 'destroyed'])
+    countDisksByGroup: (groupId) => queryOne('SELECT COUNT(*) AS cnt FROM disks WHERE storage_group_id = ? AND status != ?', [parseInt(groupId), 'destroyed']),
+    countSpecsByGroup: (groupId) => queryOne('SELECT COUNT(*) AS cnt FROM disk_specs WHERE storage_group_id = ?', [parseInt(groupId)])
 };
 
 // 硬盘规格

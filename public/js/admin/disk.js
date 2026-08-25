@@ -43,7 +43,23 @@
 
   // ===== 存储分组管理 =====
   $.diskPage.storageGroups = ref([]);
-  $.diskPage.storageGroupForm = ref({ name: '', sort_order: 0 });
+  $.diskPage.storageGroupForm = ref({ name: '', sort_order: 0, zone_id: '' });
+  $.diskPage.groupZoneOptions = ref([]);   // 可用区列表（分组绑定可用区下拉用）
+  // 规格表单可选分组：通用分组 + 与所选节点同可用区的分组
+  $.diskPage.filteredStorageGroups = Vue.computed(function () {
+    var nid = $.diskPage.diskSpecForm.value.pve_node_id;
+    var node = null;
+    if (nid != null && nid !== '') {
+      var opts = $.diskPage.pveNodeOptions.value || [];
+      for (var i = 0; i < opts.length; i++) {
+        if (Number(opts[i].id) === Number(nid)) { node = opts[i]; break; }
+      }
+    }
+    return ($.diskPage.storageGroups.value || []).filter(function (g) {
+      // 通用分组恒可用；已绑区分组需与节点同区（节点未选时不过滤，由禁用态兜底）
+      return !g.zone_id || !node || !node.zone_id || Number(g.zone_id) === Number(node.zone_id);
+    });
+  });
   $.diskPage.editingStorageGroup = ref(null);
   $.diskPage.showStorageGroupModal = ref(false);
 
@@ -57,11 +73,21 @@
     }
   };
 
-  $.diskPage.openStorageGroupForm = function(group) {
+  $.diskPage.openStorageGroupForm = async function(group) {
     $.diskPage.editingStorageGroup.value = group;
+    // 加载可用区列表（分组可选绑定；空=通用）
+    try {
+      var optRes = await authFetch('/api/admin/pve/nodes/form-options');
+      var optData = await optRes.json();
+      $.diskPage.groupZoneOptions.value = (optData && optData.zones) || [];
+    } catch (e) {
+      console.error('[disk] 加载可用区列表失败:', e && e.message);
+      $.diskPage.groupZoneOptions.value = [];
+    }
     $.diskPage.storageGroupForm.value = {
       name: group ? group.name : '',
-      sort_order: group ? group.sort_order : 0
+      sort_order: group ? group.sort_order : 0,
+      zone_id: group && group.zone_id ? group.zone_id : ''
     };
     $.diskPage.showStorageGroupModal.value = true;
     $.bsModalShow('storageGroupModal');
@@ -88,12 +114,12 @@
 
       var res = await authFetchJson(url, {
         method: method,
-        body: JSON.stringify({ name: f.name.trim(), sort_order: sortOrder })
+        body: JSON.stringify({ name: f.name.trim(), sort_order: sortOrder, zone_id: f.zone_id ? parseInt(f.zone_id) : null })
       });
       var data = await res.json();
       if (!res.ok) return alert(data.error || window.__i18n.t('common.failed'));
       $.bsModalHide('storageGroupModal');
-      await $.diskPage.loadStorageGroups();
+      await Promise.all([$.diskPage.loadStorageGroups(), $.diskPage.loadDiskSpecs()]);
     } catch (e) {
       alert(window.__i18n.t('common.opFailedMsg') + e.message);
     }
@@ -246,6 +272,12 @@
     // 切节点时清空旧存储池（旧节点存储对该节点无效）
     $.diskPage.diskSpecForm.value.storage_pool = '';
     $.diskPage.diskSpecForm.value.disk_format = 'qcow2';
+    // 分组按可用区过滤后，若当前所选分组不在可选集内则清空
+    var gid = $.diskPage.diskSpecForm.value.storage_group_id;
+    if (gid) {
+      var ok = ($.diskPage.filteredStorageGroups.value || []).some(function (g) { return Number(g.id) === Number(gid); });
+      if (!ok) $.diskPage.diskSpecForm.value.storage_group_id = '';
+    }
     if (nid) {
       $.diskPage.loadPveStorages(nid);
     } else {

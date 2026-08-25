@@ -62,6 +62,15 @@
     });
   });
 
+  // 分组按钮按当前所选可用区过滤：只显示「该区下有可售规格」的分组（选区后空分组隐藏）
+  $.diskOptionsGroupsFiltered = computed(function() {
+    var zid = $.purchaseZone.value;
+    if (!zid) return $.diskOptionsGroups.value;
+    return ($.diskOptionsGroups.value || []).filter(function(g) {
+      return $.getSpecsByGroup(g.id).length > 0;
+    });
+  });
+
   // 获取 token 的辅助函数
   function getToken() {
     return localStorage.getItem(window.__storageKeys.TOKEN);

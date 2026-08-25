@@ -1090,6 +1090,8 @@ async function migrateSchema() {
     // NAT/私有网络挂爱快节点
     await safeAlter('port_forwards', 'ikuai_node_id', 'INT DEFAULT NULL');
     await safeAlter('subnets', 'ikuai_node_id', 'INT DEFAULT NULL');
+    // 存储分组可选绑定可用区（NULL=通用，所有可用区可用）
+    await safeAlter('storage_groups', 'zone_id', 'INT DEFAULT NULL');
 
     await safeAddIndex('vms', 'idx_vms_pve_node', 'pve_node_id, vm_id');
     await safeAddIndex('lxc_containers', 'idx_lxc_pve_node', 'pve_node_id, ct_id');
