@@ -18,6 +18,13 @@ window.__admin.osTemplatePage = (function () {
         allowed_package_ids: '', enabled: 1, status: 'active', pve_node_id: null
     });
     const saving = ref(false);
+    // 多节点：切节点联动重载该节点的模板候选/存储池（清空已选模板防跨节点脏值）
+    watch(function () { return formData.pve_node_id; }, function (nv, ov) {
+        if (nv === ov) return;
+        formData.template_vmid = '';
+        loadPveTemplates();
+        loadAllStorages();
+    });
     // 编辑/新增模式由 formData.id 判断（reactive 引用，模板可响应；
     // 曾用模块级 let editId 返回给模板，但对象字面量只拷贝原始值，永远为 null → 标题恒显"新增"）
     // 请求序号保护：PVE 模板配置异步加载只采纳最后一次请求，防止旧响应覆盖新打开的表单
@@ -38,9 +45,11 @@ window.__admin.osTemplatePage = (function () {
     }
 
     // 加载 PVE 模板 VM 列表（仅 template=1）
+    // 多节点：按表单所选节点拉取该节点的模板（后端必填校验 node_id），未选节点时清空候选
     async function loadPveTemplates() {
         try {
-            var data = await api('/pve/vms?template_only=1');
+            if (!formData.pve_node_id) { pveTemplateVms.value = []; return; }
+            var data = await api('/pve/vms?template_only=1&node_id=' + encodeURIComponent(formData.pve_node_id));
             if (data && data.available) {
                 pveTemplateVms.value = (data.available || []).concat(data.assigned || []);
             } else if (Array.isArray(data)) {
@@ -57,9 +66,11 @@ window.__admin.osTemplatePage = (function () {
     }
 
     // 加载 PVE 存储列表
+    // 多节点：存储池挂在所选节点上，未选节点时清空
     async function loadAllStorages() {
         try {
-            var data = await api('/admin/storages/all');
+            if (!formData.pve_node_id) { allStorages.value = []; return; }
+            var data = await api('/admin/storages/all?node_id=' + encodeURIComponent(formData.pve_node_id));
             allStorages.value = Array.isArray(data) ? data : (data && data.data ? data.data : []);
         } catch (e) {
             console.error('加载存储列表失败', e);
@@ -73,7 +84,8 @@ window.__admin.osTemplatePage = (function () {
         var seq = ++vmidConfigSeq;
         pveConfigLoading.value = true;
         try {
-            var res = await api('/admin/pve-template-config/' + newVmid);
+            // 多节点：预填配置必须取所选节点上的同名 VMID 配置
+            var res = await api('/admin/pve-template-config/' + newVmid + '?node_id=' + encodeURIComponent(formData.pve_node_id || ''));
             if (seq !== vmidConfigSeq) return; // 已有更新的请求/已打开新表单，丢弃过期响应
             if (res && res.success && res.data) {
                 var d = res.data;
@@ -108,9 +120,6 @@ window.__admin.osTemplatePage = (function () {
     function openForm(row) {
         // 使所有挂起的 PVE 配置请求失效，防止旧响应污染新打开的表单
         vmidConfigSeq++;
-        loadPveTemplates();
-        loadAllStorages();
-        loadNodeOptions();
         if (row) {
             Object.assign(formData, row);
         } else {
@@ -124,6 +133,10 @@ window.__admin.osTemplatePage = (function () {
                 else formData[k] = '';
             });
         }
+        // 多节点：候选列表按（已回填的）所选节点加载，须在表单赋值之后执行
+        loadPveTemplates();
+        loadAllStorages();
+        loadNodeOptions();
         formVisible.value = true;
         const el = document.getElementById('osTemplateFormModal');
         if (el) {

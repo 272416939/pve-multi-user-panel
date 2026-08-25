@@ -19,6 +19,17 @@ var provisioning = require('../services/provisioning');
 var vmPackageCache = cacheStore.create('vm_packages', FRONTEND_CACHE_TTL);
 var lxcPackageCache = cacheStore.create('lxc_packages', FRONTEND_CACHE_TTL);
 
+// 多节点：套餐必须绑定有效启用的 PVE 节点（防伪造值落库后开通阶段才炸）；无效时直接 400
+async function assertPackageNode(res, rawNodeId) {
+    const { findEnabledNode } = require('../utils/locate-asset');
+    var nodeRow = await findEnabledNode(rawNodeId);
+    if (!nodeRow) {
+        res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        return null;
+    }
+    return nodeRow;
+}
+
 // 操作审计统一封装（敏感写操作埋点，失败不影响主流程；规范十一）
 async function adminAudit(req, action, details) {
     try {
@@ -203,7 +214,9 @@ router.get('/vm-packages/:id/available-os-templates', authMiddleware, async (req
         if (!pkg) return res.status(404).json({ error: '套餐不存在', code: 'PKG_NOT_FOUND' });
 
         var allTemplates = await db.osTemplates.getEnabled();
+        // 多节点：仅返回与套餐同节点的 OS 模板（跨节点模板克隆必然失败）
         var available = allTemplates.filter(function(t) {
+            if (pkg.pve_node_id != null && t.pve_node_id !== pkg.pve_node_id) return false;
             if (!t.allowed_package_ids || t.allowed_package_ids.length === 0) return true;
             return t.allowed_package_ids.indexOf(pkg.id) !== -1;
         });
@@ -240,6 +253,7 @@ router.get('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, re
 
 router.post('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        if (!(await assertPackageNode(res, req.body.pve_node_id))) return;
         var r = await db.vmPackages.create(req.body);
         await vmPackageCache.del('all');
         // 操作审计：创建 VM 套餐
@@ -250,6 +264,8 @@ router.post('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, r
 
 router.put('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        // 多节点：改绑节点时校验目标节点有效
+        if (req.body.pve_node_id !== undefined && !(await assertPackageNode(res, req.body.pve_node_id))) return;
         // 先取旧记录（含模板/分组名），更新后取新记录，diff 输出字段级变更明细
         var oldPkg = await db.vmPackages.getById(parseInt(req.params.id));
         var r = await db.vmPackages.update(parseInt(req.params.id), req.body);
@@ -343,6 +359,7 @@ router.get('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, r
 
 router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        if (!(await assertPackageNode(res, req.body.pve_node_id))) return;
         var r = await db.lxcPackages.create(req.body);
         await lxcPackageCache.del('all');
         // 操作审计：创建 LXC 套餐
@@ -353,6 +370,8 @@ router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, 
 
 router.put('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        // 多节点：改绑节点时校验目标节点有效
+        if (req.body.pve_node_id !== undefined && !(await assertPackageNode(res, req.body.pve_node_id))) return;
         // 先取旧记录（含模板/分组名），更新后取新记录，diff 输出字段级变更明细
         var oldPkg = await db.lxcPackages.getById(parseInt(req.params.id));
         var r = await db.lxcPackages.update(parseInt(req.params.id), req.body);

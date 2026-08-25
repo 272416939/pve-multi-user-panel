@@ -71,13 +71,18 @@ const subnets = {
     },
     delete: (id) => execute('DELETE FROM subnets WHERE id = ?', [parseInt(id)]),
     // 已使用的 vlan_id 列表（创建子网分配 VLAN ID 用）
-    getUsedVlanIds: async () => {
-        const rows = await queryAll('SELECT vlan_id FROM subnets');
+    // 多节点：传 ikuaiNodeId 时仅统计该爱快节点的子网（不同节点可复用 VLAN ID）
+    getUsedVlanIds: async (ikuaiNodeId) => {
+        const rows = ikuaiNodeId != null
+            ? await queryAll('SELECT vlan_id FROM subnets WHERE ikuai_node_id = ?', [ikuaiNodeId])
+            : await queryAll('SELECT vlan_id FROM subnets');
         return rows.map(r => r.vlan_id);
     },
-    // 已使用的网关 IP 列表（创建子网分配网段用）
-    getUsedGateways: async () => {
-        const rows = await queryAll('SELECT gateway FROM subnets');
+    // 已使用的网关 IP 列表（创建子网分配网段用；节点作用域同上）
+    getUsedGateways: async (ikuaiNodeId) => {
+        const rows = ikuaiNodeId != null
+            ? await queryAll('SELECT gateway FROM subnets WHERE ikuai_node_id = ?', [ikuaiNodeId])
+            : await queryAll('SELECT gateway FROM subnets');
         return rows.map(r => r.gateway);
     },
     // 子网下绑定的设备数（删除子网时校验，>0 禁止删除）

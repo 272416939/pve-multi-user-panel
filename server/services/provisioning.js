@@ -40,8 +40,9 @@ function logPveError(e) {
 }
 
 // 私有网络：校验子网归属（用户下单必选；admin 代开可选）
+// expectedPveNodeId 可选：多节点同区校验——子网归属爱快须与设备 PVE 节点的配对爱快一致
 // 返回 { subnet } 或 { error }
-async function validateSubnetForUser(subnetId, userId, required) {
+async function validateSubnetForUser(subnetId, userId, required, expectedPveNodeId) {
     if (!subnetId || !Number.isInteger(subnetId) || subnetId <= 0) {
         if (required) return { error: '请选择网络（子网）后再购买', code: 'SUBNET_REQUIRED_PURCHASE' };
         return { subnet: null };
@@ -49,6 +50,14 @@ async function validateSubnetForUser(subnetId, userId, required) {
     const subnet = await db.subnets.getById(subnetId);
     if (!subnet) return { error: '子网不存在', code: 'SUBNET_NOT_FOUND' };
     if (subnet.user_id !== userId) return { error: '无权使用该子网', code: 'SUBNET_NO_PERM_USE_2' };
+    if (expectedPveNodeId != null) {
+        var effSubnetIk = subnet.ikuai_node_id != null ? subnet.ikuai_node_id : await db.ikuaNodes.getDefaultId();
+        var pn = await db.pveNodes.get(expectedPveNodeId);
+        var effDevIk = (pn && pn.ikuai_node_id != null) ? pn.ikuai_node_id : await db.ikuaNodes.getDefaultId();
+        if (effSubnetIk !== effDevIk) {
+            return { error: '该子网与所选套餐不在同一可用区，请改选同区子网', code: 'SUBNET_ZONE_MISMATCH' };
+        }
+    }
     return { subnet };
 }
 
@@ -139,12 +148,16 @@ async function provisionVm(opts) {
                 return { ok: false, status: 400, error: '该系统模板不适用于当前套餐', code: 'OS_TPL_PKG_MISMATCH' };
             }
         }
+        // 多节点：OS 模板必须与套餐同节点（克隆发生在套餐所在 PVE，跨节点模板必炸）
+        if (targetNodeId != null && osTemplate.pve_node_id !== targetNodeId) {
+            return { ok: false, status: 400, error: '该系统模板与虚拟机不在同一节点，无法切换', code: 'OS_TPL_NODE_MISMATCH' };
+        }
     } else {
         return { ok: false, status: 400, error: '请选择系统模板', code: 'OS_TEMPLATE_REQUIRED' };
     }
 
-    // 私有网络：新购必须选择并绑定子网（VLAN）
-    var subnetCheck = await validateSubnetForUser(subnetId, userId, true);
+    // 私有网络：新购必须选择并绑定子网（VLAN）；多节点同区校验
+    var subnetCheck = await validateSubnetForUser(subnetId, userId, true, targetNodeId);
     if (subnetCheck.error) return { ok: false, status: 400, error: subnetCheck.error };
     var subnet = subnetCheck.subnet;
 
@@ -447,8 +460,8 @@ async function provisionLxc(opts) {
 
     var finalMacGroupId = macGroupId || template.mac_group_id || null;
 
-    // 私有网络：新购必须选择并绑定子网（VLAN）
-    var subnetCheck = await validateSubnetForUser(subnetId, userId, true);
+    // 私有网络：新购必须选择并绑定子网（VLAN）；多节点同区校验
+    var subnetCheck = await validateSubnetForUser(subnetId, userId, true, targetNodeId);
     if (subnetCheck.error) return { ok: false, status: 400, error: subnetCheck.error };
     var subnet = subnetCheck.subnet;
 
@@ -699,11 +712,6 @@ async function adminProvisionVm(opts) {
     }
     if (!userId) return { ok: false, status: 400, error: '请选择用户', code: 'USER_REQUIRED' };
 
-    // 私有网络：admin 代开可选绑定子网（不传则以关机状态交付，用户开机时需先绑定子网）
-    var subnetCheck = await validateSubnetForUser(subnetId, userId, false);
-    if (subnetCheck.error) return { ok: false, status: 400, error: subnetCheck.error };
-    var subnet = subnetCheck.subnet;
-
     var pkg = await db.vmPackages.getById(packageId);
     if (!pkg) return { ok: false, status: 404, error: '套餐不存在', code: 'PKG_NOT_FOUND' };
 
@@ -715,6 +723,11 @@ async function adminProvisionVm(opts) {
     // 多节点：admin 代开同样按套餐所在节点（vm_packages.pve_node_id）开通
     var targetNodeId = pkg.pve_node_id;
     var pve = await getPveClient(targetNodeId);
+
+    // 私有网络：admin 代开可选绑定子网（多节点：需在取得套餐节点后做同区校验）
+    var subnetCheck = await validateSubnetForUser(subnetId, userId, false, targetNodeId);
+    if (subnetCheck.error) return { ok: false, status: 400, error: subnetCheck.error };
+    var subnet = subnetCheck.subnet;
 
     // 生成随机名
     var randomName = name || generateVmName();
@@ -888,11 +901,6 @@ async function adminProvisionLxc(opts) {
     }
     if (!userId) return { ok: false, status: 400, error: '请选择用户', code: 'USER_REQUIRED' };
 
-    // 私有网络：admin 代开可选绑定子网（不传则以关机状态交付，用户开机时需先绑定子网）
-    var subnetCheck = await validateSubnetForUser(subnetId, userId, false);
-    if (subnetCheck.error) return { ok: false, status: 400, error: subnetCheck.error };
-    var subnet = subnetCheck.subnet;
-
     var pkg = await db.lxcPackages.getById(packageId);
     if (!pkg) return { ok: false, status: 404, error: '套餐不存在', code: 'PKG_NOT_FOUND' };
 
@@ -904,6 +912,11 @@ async function adminProvisionLxc(opts) {
     // 多节点：admin 代开同样按套餐所在节点（lxc_packages.pve_node_id）开通
     var targetNodeId = pkg.pve_node_id;
     var pve = await getPveClient(targetNodeId);
+
+    // 私有网络：admin 代开可选绑定子网（多节点：需在取得套餐节点后做同区校验）
+    var subnetCheck2 = await validateSubnetForUser(subnetId, userId, false, targetNodeId);
+    if (subnetCheck2.error) return { ok: false, status: 400, error: subnetCheck2.error };
+    var subnet = subnetCheck2.subnet;
 
     var randomName = name || generateLxcName();
     var newVmid = await pve.getNextAvailableVmid();

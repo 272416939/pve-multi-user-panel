@@ -1243,6 +1243,10 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
                 return res.status(403).json({ error: '当前套餐不允许切换到该系统', code: 'PKG_OS_NOT_ALLOWED' });
             }
         }
+        // 多节点：OS 模板必须与 VM 同节点（否则克隆阶段在错误节点找模板盘）
+        if (vm.pve_node_id != null && osTemplate.pve_node_id !== vm.pve_node_id) {
+            return res.status(400).json({ error: '该系统模板与虚拟机不在同一节点，无法切换', code: 'OS_TPL_NODE_MISMATCH' });
+        }
         const pve = await getPveClient(vm.pve_node_id); // 按资产所在节点取客户端
         const vmStatus = await pve.getVmStatus(vmid);
         if (vmStatus.status !== 'stopped') {
@@ -1404,8 +1408,12 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
         }
         const allOsTemplates = await db.osTemplates.getEnabled();
         let filtered = allOsTemplates;
+        // 多节点：仅返回与 VM 同节点的 OS 模板（跨节点模板克隆必然失败）
+        if (vm.pve_node_id != null) {
+            filtered = filtered.filter(t => t.pve_node_id === vm.pve_node_id);
+        }
         if (vm.package_id) {
-            filtered = allOsTemplates.filter(t => {
+            filtered = filtered.filter(t => {
                 if (!t.allowed_package_ids) return true;
                 const allowed = t.allowed_package_ids.split(',').map(s => parseInt(s.trim())).filter(Number.isInteger);
                 return allowed.length === 0 || allowed.includes(vm.package_id);

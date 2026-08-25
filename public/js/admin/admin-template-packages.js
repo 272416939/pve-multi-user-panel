@@ -12,7 +12,7 @@
                         <div class="table-responsive">
                             <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
-                                    <tr><th class="drag-handle-th"></th><th>ID</th><th>{{ t('admin.pkg.nameShort') }}</th><th>{{ t('dash.groupPrefix') }}</th><th>{{ t('common.template') }}</th><th>CPU</th><th>{{ t('admin.common.memory') }}</th><th>{{ t('dash.renew.diskPrefix') }}</th><th>{{ t('user.order.periodMonth') }}</th><th>{{ t('admin.disk.quarterlyDiscount') }}</th><th>{{ t('admin.disk.yearlyDiscount') }}</th><th>{{ t('admin.pkg.stock') }}</th><th>{{ t('admin.pkg.sold') }}</th><th>{{ t('common.status') }}</th><th>{{ t('common.actions') }}</th></tr>
+                                    <tr><th class="drag-handle-th"></th><th>ID</th><th>{{ t('admin.pkg.nameShort') }}</th><th>{{ t('admin.assetZone') }}</th><th>{{ t('dash.groupPrefix') }}</th><th>{{ t('common.template') }}</th><th>CPU</th><th>{{ t('admin.common.memory') }}</th><th>{{ t('dash.renew.diskPrefix') }}</th><th>{{ t('user.order.periodMonth') }}</th><th>{{ t('admin.disk.quarterlyDiscount') }}</th><th>{{ t('admin.disk.yearlyDiscount') }}</th><th>{{ t('admin.pkg.stock') }}</th><th>{{ t('admin.pkg.sold') }}</th><th>{{ t('common.status') }}</th><th>{{ t('common.actions') }}</th></tr>
                                 </thead>
                                 <tbody @dragover="packagePage.handleContainerDragOver($event, 'vm')" @drop="packagePage.handleDropOnContainer($event, 'vm')">
                                     <tr v-for="p in packagePage.vmPackages.value" :key="p.id"
@@ -33,6 +33,7 @@
                                         </td>
                                         <td>{{ p.id }}</td>
                                         <td>{{ p.name }}</td>
+                                        <td>{{ p.zone_name || '-' }}</td>
                                         <td>{{ p.group_name || '-' }}</td>
                                         <td>
                                             <span v-if="p.template_name">{{ p.template_name }}</span>
@@ -55,7 +56,7 @@
                         </div>
                                         </td>
                                     </tr>
-                                    <tr v-if="packagePage.vmPackages.value.length === 0"><td colspan="14" class="text-center text-muted">{{ t('admin.pkg.empty') }}</td></tr>
+                                    <tr v-if="packagePage.vmPackages.value.length === 0"><td colspan="15" class="text-center text-muted">{{ t('admin.pkg.empty') }}</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -115,7 +116,7 @@
                         <div class="table-responsive">
                             <table class="table table-hover align-middle table-align-center">
                                 <thead class="table-light">
-                                    <tr><th class="drag-handle-th"></th><th>ID</th><th>{{ t('admin.pkg.nameShort') }}</th><th>{{ t('dash.groupPrefix') }}</th><th>{{ t('common.template') }}</th><th>CPU</th><th>{{ t('admin.common.memory') }}</th><th>Swap</th><th>{{ t('dash.renew.diskPrefix') }}</th><th>{{ t('user.order.periodMonth') }}</th><th>{{ t('admin.disk.quarterlyDiscount') }}</th><th>{{ t('admin.disk.yearlyDiscount') }}</th><th>{{ t('admin.pkg.stock') }}</th><th>{{ t('admin.pkg.sold') }}</th><th>{{ t('common.status') }}</th><th>{{ t('common.actions') }}</th></tr>
+                                    <tr><th class="drag-handle-th"></th><th>ID</th><th>{{ t('admin.pkg.nameShort') }}</th><th>{{ t('admin.assetZone') }}</th><th>{{ t('dash.groupPrefix') }}</th><th>{{ t('common.template') }}</th><th>CPU</th><th>{{ t('admin.common.memory') }}</th><th>Swap</th><th>{{ t('dash.renew.diskPrefix') }}</th><th>{{ t('user.order.periodMonth') }}</th><th>{{ t('admin.disk.quarterlyDiscount') }}</th><th>{{ t('admin.disk.yearlyDiscount') }}</th><th>{{ t('admin.pkg.stock') }}</th><th>{{ t('admin.pkg.sold') }}</th><th>{{ t('common.status') }}</th><th>{{ t('common.actions') }}</th></tr>
                                 </thead>
                                 <tbody @dragover="packagePage.handleContainerDragOver($event, 'lxc')" @drop="packagePage.handleDropOnContainer($event, 'lxc')">
                                     <tr v-for="p in packagePage.lxcPackages.value" :key="p.id"
@@ -134,7 +135,7 @@
                                                 @touchend="packagePage.handleTouchEnd($event)"
                                                 @touchcancel="packagePage.handleTouchEnd($event)">⠿</span>
                                         </td>
-                                        <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ p.group_name || '-' }}</td><td><span v-if="p.template_name">{{ p.template_name }}</span><span v-else class="text-secondary">{{ t('admin.pkg.tplDeleted') }}</span></td>
+                                        <td>{{ p.id }}</td><td>{{ p.name }}</td><td>{{ p.zone_name || '-' }}</td><td>{{ p.group_name || '-' }}</td><td><span v-if="p.template_name">{{ p.template_name }}</span><span v-else class="text-secondary">{{ t('admin.pkg.tplDeleted') }}</span></td>
                                         <td>{{ p.cores }}{{ t('dash.detail.coresSuffix') }}</td><td>{{ p.memory }}MB</td><td>{{ p.swap }}MB</td><td>{{ p.disk_size }}GB</td>
                                         <td>{{ p.monthly_price }}{{ t('common.currencyUnit') }}</td><td>{{ p.quarterly_discount || 0 }}%</td><td>{{ p.yearly_discount || 0 }}%</td>
                                         <td>{{ p.stock === -1 || p.stock === null ? t('dash.order.unlimited') : p.stock }}</td>
@@ -148,7 +149,7 @@
                         </div>
                     </td>
                                     </tr>
-                                    <tr v-if="packagePage.lxcPackages.value.length === 0"><td colspan="15" class="text-center text-muted">{{ t('admin.pkg.empty') }}</td></tr>
+                                    <tr v-if="packagePage.lxcPackages.value.length === 0"><td colspan="16" class="text-center text-muted">{{ t('admin.pkg.empty') }}</td></tr>
                                 </tbody>
                             </table>
                         </div>

@@ -13,7 +13,7 @@
                 <table id="osTemplateTable" class="table table-hover align-middle table-align-center">
                     <thead class="table-light">
                         <tr>
-                            <th class="drag-handle-th"></th><th>ID</th><th>{{ t('common.name') }}</th><th>{{ t('admin.ostemplate.osType') }}</th><th>{{ t('admin.ostemplate.osVersion') }}</th><th>{{ t('admin.ostemplate.pveTemplateVmid') }}</th><th>{{ t('admin.ostemplate.targetStorage') }}</th><th>{{ t('admin.ostemplate.diskFormat') }}</th><th>{{ t('common.status') }}</th><th>{{ t('common.actions') }}</th>
+                            <th class="drag-handle-th"></th><th>ID</th><th>{{ t('common.name') }}</th><th>{{ t('admin.assetNode') }}</th><th>{{ t('admin.ostemplate.osType') }}</th><th>{{ t('admin.ostemplate.osVersion') }}</th><th>{{ t('admin.ostemplate.pveTemplateVmid') }}</th><th>{{ t('admin.ostemplate.targetStorage') }}</th><th>{{ t('admin.ostemplate.diskFormat') }}</th><th>{{ t('common.status') }}</th><th>{{ t('common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody @dragover="osTemplatePage.handleContainerDragOver($event)" @drop="osTemplatePage.handleDropOnContainer($event)">
@@ -35,6 +35,7 @@
                             </td>
                             <td>{{ row.id }}</td>
                             <td>{{ row.name }}</td>
+                            <td>{{ row.pve_node_name || '-' }}</td>
                             <td>{{ row.os_type }}</td>
                             <td>{{ row.os_version }}</td>
                             <td>{{ row.template_vmid }}</td>

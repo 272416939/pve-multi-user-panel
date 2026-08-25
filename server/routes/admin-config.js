@@ -539,7 +539,12 @@ router.put('/admin/rate-limit/config', authMiddleware, adminMiddleware, async (r
 
 router.get('/admin/storages/all', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const storages = await pveApi.getAllStorages();
+        // 多节点：存储池挂在具体节点上，按 ?node_id= 取该节点存储（弃用旧全局 pve-api 单例）
+        const { findEnabledNode } = require('../utils/locate-asset');
+        const { getPveClient } = require('../api/pve-clients');
+        const node = await findEnabledNode(req.query.node_id);
+        if (!node) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const storages = await (await getPveClient(node.id)).getAllStorages();
         res.json(storages);
     } catch (e) {
         res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });

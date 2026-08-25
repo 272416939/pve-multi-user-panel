@@ -23,8 +23,12 @@ router.get('/admin/pve-template-config/:vmid', authMiddleware, adminMiddleware, 
         if (!Number.isInteger(vmid) || vmid < 100 || vmid > 999999999) {
             return res.status(400).json({ error: '无效的 VMID', code: 'INVALID_VMD' });
         }
-        // 多节点：可选 ?node_id= 指定预览节点，缺省=默认节点
-        var pve = await getPveClient(req.query.node_id ? parseInt(req.query.node_id) : null);
+        // 多节点：可选 ?node_id= 指定预览节点，缺省=默认节点（严格整数校验防 NaN 入 SQL）
+        var reqNodeId = parseInt(req.query.node_id);
+        if (req.query.node_id !== undefined && req.query.node_id !== '' && (!Number.isInteger(reqNodeId) || reqNodeId <= 0)) {
+            return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        }
+        var pve = await getPveClient(reqNodeId != null && !isNaN(reqNodeId) ? reqNodeId : null);
         const config = await pve.getVmConfig(vmid);
         if (!config) {
             return res.status(404).json({ error: 'PVE 模板不存在', code: 'PVE_TEMPLATE_NOT_FOUND' });

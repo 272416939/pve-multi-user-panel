@@ -199,9 +199,12 @@ const lxcContainers = {
     }
 };
 
+// 模板查询 JOIN 片段（多节点：带出 pve_node_name/zone_name 供 admin 列表展示）
+const NODE_ZONE_JOIN = ' LEFT JOIN pve_nodes pn ON t.pve_node_id = pn.id LEFT JOIN zones z ON pn.zone_id = z.id';
+
 // VM 模板操作
 const vmTemplates = {
-    getAll: () => queryAll('SELECT * FROM vm_templates ORDER BY id DESC'),
+    getAll: () => queryAll('SELECT t.*, pn.name AS pve_node_name, z.name AS zone_name FROM vm_templates t' + NODE_ZONE_JOIN + ' ORDER BY t.id DESC'),
     getById: (id) => queryOne('SELECT * FROM vm_templates WHERE id = ?', [id]),
     create: async (data) => {
         const [result] = await execute(
@@ -246,7 +249,7 @@ const vmTemplates = {
 
 // LXC 模板操作
 const lxcTemplates = {
-    getAll: () => queryAll('SELECT * FROM lxc_templates ORDER BY id DESC'),
+    getAll: () => queryAll('SELECT t.*, pn.name AS pve_node_name, z.name AS zone_name FROM lxc_templates t' + NODE_ZONE_JOIN + ' ORDER BY t.id DESC'),
     getById: (id) => queryOne('SELECT * FROM lxc_templates WHERE id = ?', [id]),
     create: async (data) => {
         const [result] = await execute(
@@ -290,9 +293,9 @@ const lxcTemplates = {
 
 // 可切换系统模板（os_templates）
 const osTemplates = {
-    getAll: () => queryAll('SELECT * FROM os_templates ORDER BY sort_order DESC, id DESC'),
+    getAll: () => queryAll('SELECT t.*, pn.name AS pve_node_name, z.name AS zone_name FROM os_templates t' + NODE_ZONE_JOIN + ' ORDER BY t.sort_order DESC, t.id DESC'),
     getById: (id) => queryOne('SELECT * FROM os_templates WHERE id = ?', [parseInt(id)]),
-    getEnabled: () => queryAll("SELECT * FROM os_templates WHERE enabled = 1 AND status = 'active' ORDER BY sort_order DESC, id DESC"),
+    getEnabled: () => queryAll("SELECT t.*, pn.name AS pve_node_name, z.name AS zone_name FROM os_templates t" + NODE_ZONE_JOIN + " WHERE t.enabled = 1 AND t.status = 'active' ORDER BY t.sort_order DESC, t.id DESC"),
     getByTemplateVmid: (vmid) => queryAll('SELECT * FROM os_templates WHERE template_vmid = ?', [parseInt(vmid)]),
     create: async (data) => {
         const [result] = await execute(

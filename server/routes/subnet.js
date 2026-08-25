@@ -232,9 +232,9 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         if (!iface) return res.status(400).json({ error: '所属接口未配置，请联系管理员', code: 'SUBNET_IFACE_NOT_CONFIGURED' });
         if (!ik.isConfigured()) return res.status(400).json({ error: '爱快未配置，无法创建子网', code: 'IKUAI_NOT_CONFIGURED' });
 
-        // 2. 已占用清单（DB 台账 + 爱快实际，双源合并防冲突）
-        const dbVlanIds = await db.subnets.getUsedVlanIds();
-        const dbGateways = await db.subnets.getUsedGateways();
+        // 2. 已占用清单（DB 台账 + 爱快实际，双源合并防冲突）；多节点：按本爱快节点作用域
+        const dbVlanIds = await db.subnets.getUsedVlanIds(ikNodeId);
+        const dbGateways = await db.subnets.getUsedGateways(ikNodeId);
         let ikuaiVlans = [];
         try {
             ikuaiVlans = await ik.getVlans();
@@ -520,6 +520,17 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         if (vm.subnet_id) {
             return res.status(400).json({ error: '该虚拟机已绑定子网，请先解绑后再绑定新的子网', code: 'VM_ALREADY_BOUND_SUBNET' });
         }
+        // 多节点同区校验：子网归属爱快必须与设备 PVE 节点配对的爱快一致（跨区 VLAN tag 无效）
+        try {
+            const devPn = vm.pve_node_id != null ? await db.pveNodes.get(vm.pve_node_id) : null;
+            const devIk = devPn && devPn.ikuai_node_id != null ? devPn.ikuai_node_id : await db.ikuaNodes.getDefaultId();
+            const subnetIk = subnet.ikuai_node_id != null ? subnet.ikuai_node_id : await db.ikuaNodes.getDefaultId();
+            if (subnetIk !== devIk) {
+                return res.status(400).json({ error: '该子网与虚拟机不在同一可用区，无法绑定', code: 'SUBNET_BIND_ZONE_MISMATCH' });
+            }
+        } catch (zoneErr) {
+            console.error('[subnet] 同区校验失败:', zoneErr.message);
+        }
 
         // PVE 网卡写入 VLAN tag（保留原 mac/bridge/model）
         // 多节点：按设备归属 PVE 节点解析客户端（查不到节点行回退默认）
@@ -590,6 +601,17 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         }
         if (ct.subnet_id) {
             return res.status(400).json({ error: '该容器已绑定子网，请先解绑后再绑定新的子网', code: 'LXC_ALREADY_BOUND_SUBNET' });
+        }
+        // 多节点同区校验：子网归属爱快必须与设备 PVE 节点配对的爱快一致（跨区 VLAN tag 无效）
+        try {
+            const ctPn = ct.pve_node_id != null ? await db.pveNodes.get(ct.pve_node_id) : null;
+            const devIk2 = ctPn && ctPn.ikuai_node_id != null ? ctPn.ikuai_node_id : await db.ikuaNodes.getDefaultId();
+            const subnetIk2 = subnet.ikuai_node_id != null ? subnet.ikuai_node_id : await db.ikuaNodes.getDefaultId();
+            if (subnetIk2 !== devIk2) {
+                return res.status(400).json({ error: '该子网与容器不在同一可用区，无法绑定', code: 'SUBNET_BIND_ZONE_MISMATCH_LXC' });
+            }
+        } catch (zoneErr) {
+            console.error('[subnet] 同区校验失败:', zoneErr.message);
         }
 
         // 多节点：按设备归属 PVE 节点解析客户端（查不到节点行回退默认）
