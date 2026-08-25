@@ -223,4 +223,69 @@ router.delete('/admin/zones/:id', authMiddleware, adminMiddleware, async (req, r
     }
 });
 
+// ==================== 拖拽排序 ====================
+
+// 地域拖拽排序：body { ids }（按展示顺序从前到后）
+router.post('/admin/regions/reorder', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const ids = req.body.ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ids 参数无效', code: 'IDS_INVALID' });
+        }
+        for (const id of ids) {
+            const n = parseInt(id);
+            if (!Number.isInteger(n) || n <= 0) {
+                return res.status(400).json({ error: 'id 必须为正整数', code: 'ID_POSITIVE_INT' });
+            }
+        }
+        // 幂等校验：ids 必须是 regions 表现有 id 的子集（防伪造/越权排序）
+        const existing = (await db.regions.list()).map(r => r.id);
+        const missing = ids.filter(id => !existing.includes(parseInt(id)));
+        if (missing.length > 0) {
+            return res.status(400).json({ error: '存在无效的地域 id', code: 'REGION_IDS_INVALID' });
+        }
+        await db.regions.batchUpdateSortOrder(ids);
+        await audit(req, 'admin.region.reorder', 'region', null, '调整地域排序 ' + ids.length + ' 个');
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[regions] 排序失败:', e.message);
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
+    }
+});
+
+// 可用区拖拽排序（限定同地域）：body { region_id, ids }——ids 为该地域内的展示顺序
+router.post('/admin/zones/reorder', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const regionId = parseInt(req.body.region_id);
+        if (!Number.isInteger(regionId) || regionId <= 0) {
+            return res.status(400).json({ error: '请选择有效的地域', code: 'REGION_SELECT_REQUIRED' });
+        }
+        const region = await db.regions.get(regionId);
+        if (!region) return res.status(404).json({ error: '地域不存在', code: 'REGION_NOT_FOUND' });
+        const ids = req.body.ids;
+        if (!Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ error: 'ids 参数无效', code: 'IDS_INVALID' });
+        }
+        for (const id of ids) {
+            const n = parseInt(id);
+            if (!Number.isInteger(n) || n <= 0) {
+                return res.status(400).json({ error: 'id 必须为正整数', code: 'ID_POSITIVE_INT' });
+            }
+        }
+        // 幂等校验：ids 必须全部属于该地域（防跨地域重排打乱分组）
+        const regionZones = await db.zones.getByRegion(regionId);
+        const validIds = new Set(regionZones.map(z => z.id));
+        const missing = ids.filter(id => !validIds.has(parseInt(id)));
+        if (missing.length > 0) {
+            return res.status(400).json({ error: '存在不属于该地域的可用区 id', code: 'ZONE_IDS_INVALID' });
+        }
+        await db.zones.batchUpdateSortOrder(regionId, ids);
+        await audit(req, 'admin.zone.reorder', 'zone', regionId, '调整可用区排序 ' + region.name + ' ' + ids.length + ' 个');
+        res.json({ success: true });
+    } catch (e) {
+        console.error('[zones] 排序失败:', e.message);
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
+    }
+});
+
 module.exports = router;

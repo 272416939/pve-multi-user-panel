@@ -45,6 +45,8 @@ const ADMIN_SUB_CATEGORIES = {
     'package-group': '套餐分组',
     template: '模板管理',
     'os-template': 'OS模板',
+    region: '地域管理',
+    zone: '可用区管理',
     'email-template': '邮件模板',
     i18n: '国际化',
     cdk: 'CDK管理',

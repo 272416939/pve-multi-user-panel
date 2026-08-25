@@ -85,6 +85,8 @@
                             <option value="backup">{{ t('admin.sub.backup') }}</option>
                             <option value="message">{{ t('admin.sub.message') }}</option>
                             <option value="network">{{ t('admin.sub.network') }}</option>
+                            <option value="region">{{ t('admin.sub.region') }}</option>
+                            <option value="zone">{{ t('admin.sub.zone') }}</option>
                             <option value="order">{{ t('admin.sub.order') }}</option>
                             <option value="log">{{ t('admin.sub.log') }}</option>
                             <option value="cache">{{ t('admin.sub.cache') }}</option>

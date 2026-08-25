@@ -4,7 +4,7 @@
     <!-- 地域管理（区域管理 → 地域） -->
     <div v-if="activeSection === 'regions'">
         <div class="module-header">
-            <h4 class="module-title">{{ t('nav.regionList') }}</h4>
+            <h4 class="module-title">{{ t('nav.regionList') }}</h4> <span class="text-muted small">{{ t('nodes.dragHint') }}</span>
             <div class="d-flex gap-2">
                 <pv-button variant="glass" size="lg" @click="regionsPage.openRegionModal()">{{ t('nodes.addRegion') }}</pv-button>
             </div>
@@ -17,16 +17,31 @@
                 <table class="table table-sm table-hover mb-0 table-align-center">
                     <thead>
                         <tr>
+                            <th class="drag-handle-th"></th>
                             <th>{{ t('common.name') }}</th>
+                            <th>{{ t('nodes.remark') }}</th>
                             <th>{{ t('nodes.sortOrder') }}</th>
                             <th>{{ t('nodes.zoneCount') }}</th>
                             <th>{{ t('nodes.assetOverview') }}</th>
                             <th>{{ t('common.actions') }}</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr v-for="r in regionsPage.regions.value" :key="r.id">
+                    <tbody class="drag-region-rows"
+                        @dragover="regionsPage.handleContainerDragOver($event, 'region')"
+                        @drop="regionsPage.handleDropOnContainer($event, 'region')">
+                        <tr v-for="r in regionsPage.regions.value" :key="r.id"
+                            :data-drag-id="r.id" data-drag-type="region"
+                            :class="{ 'row-dragging': regionsPage.dragState.draggingId === r.id && regionsPage.dragState.draggingType === 'region' }"
+                            @dragover="regionsPage.handleDragOver($event, r.id, 'region')"
+                            @dragleave="regionsPage.handleDragLeave($event)"
+                            @drop="regionsPage.handleDrop($event, r.id, 'region')">
+                            <td class="drag-handle-cell">
+                                <span class="drag-handle" draggable="true"
+                                    @dragstart="regionsPage.handleDragStart($event, r.id, 'region')"
+                                    @dragend="regionsPage.handleDragEnd()">⠿</span>
+                            </td>
                             <td>{{ r.name }}</td>
+                            <td class="text-start">{{ r.remark || '-' }}</td>
                             <td>{{ r.sort_order }}</td>
                             <td>{{ r.zone_count }}</td>
                             <td>
@@ -45,7 +60,7 @@
                             </td>
                         </tr>
                         <tr v-if="regionsPage.regions.value.length === 0">
-                            <td colspan="5" class="text-center text-muted">{{ t('nodes.empty') }}</td>
+                            <td colspan="8" class="text-center text-muted">{{ t('nodes.empty') }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -84,7 +99,7 @@
     <!-- 可用区管理（区域管理 → 可用区） -->
     <div v-if="activeSection === 'zones'">
         <div class="module-header">
-            <h4 class="module-title">{{ t('nav.zoneList') }}</h4>
+            <h4 class="module-title">{{ t('nav.zoneList') }}</h4> <span class="text-muted small">{{ t('nodes.dragHint') }}</span>
             <div class="d-flex gap-2">
                 <pv-button variant="glass" size="lg" @click="regionsPage.openZoneModal()">{{ t('nodes.addZone') }}</pv-button>
             </div>
@@ -97,7 +112,9 @@
                 <table class="table table-sm table-hover mb-0 table-align-center">
                     <thead>
                         <tr>
+                            <th class="drag-handle-th"></th>
                             <th>{{ t('common.name') }}</th>
+                            <th>{{ t('nodes.remark') }}</th>
                             <th>{{ t('nodes.belongRegion') }}</th>
                             <th>{{ t('nodes.pveNodeChips') }}</th>
                             <th>{{ t('nodes.relatedIkuai') }}</th>
@@ -105,9 +122,22 @@
                             <th>{{ t('common.actions') }}</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr v-for="z in regionsPage.zones.value" :key="z.id">
+                    <tbody class="drag-region-rows"
+                        @dragover="regionsPage.handleContainerDragOver($event, 'zone')"
+                        @drop="regionsPage.handleDropOnContainer($event, 'zone')">
+                        <tr v-for="z in regionsPage.zones.value" :key="z.id"
+                            :data-drag-id="z.id" data-drag-type="zone" :data-drag-region="z.region_id"
+                            :class="{ 'row-dragging': regionsPage.dragState.draggingId === z.id && regionsPage.dragState.draggingType === 'zone' }"
+                            @dragover="regionsPage.handleDragOver($event, z.id, 'zone')"
+                            @dragleave="regionsPage.handleDragLeave($event)"
+                            @drop="regionsPage.handleDrop($event, z.id, 'zone')">
+                            <td class="drag-handle-cell">
+                                <span class="drag-handle" draggable="true"
+                                    @dragstart="regionsPage.handleDragStart($event, z.id, 'zone')"
+                                    @dragend="regionsPage.handleDragEnd()">⠿</span>
+                            </td>
                             <td>{{ z.name }}</td>
+                            <td class="text-start">{{ z.remark || '-' }}</td>
                             <td>{{ z.region_name }}</td>
                             <td>
                                 <div class="d-flex flex-wrap gap-1" v-if="z.nodes && z.nodes.length">
@@ -132,7 +162,7 @@
                             </td>
                         </tr>
                         <tr v-if="regionsPage.zones.value.length === 0">
-                            <td colspan="6" class="text-center text-muted">{{ t('nodes.empty') }}</td>
+                            <td colspan="7" class="text-center text-muted">{{ t('nodes.empty') }}</td>
                         </tr>
                     </tbody>
                 </table>

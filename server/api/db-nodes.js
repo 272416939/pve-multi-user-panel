@@ -31,6 +31,14 @@ const regions = {
         [name, remark || '', sort_order || 0, id]
     ),
     remove: (id) => execute('DELETE FROM regions WHERE id = ?', [id]),
+    // 拖拽排序：数组靠前 → sort_order 更大 → 显示靠前（与 DESC 列表语义一致）
+    batchUpdateSortOrder: async (ids) => {
+        if (!Array.isArray(ids) || ids.length === 0) return;
+        const total = ids.length;
+        for (let i = 0; i < ids.length; i++) {
+            await execute('UPDATE regions SET sort_order = ? WHERE id = ?', [(total - i) * 10, parseInt(ids[i])]);
+        }
+    },
 };
 
 // ---------- 可用区 ----------
@@ -54,6 +62,14 @@ const zones = {
         [region_id, name, remark || '', sort_order || 0, id]
     ),
     remove: (id) => execute('DELETE FROM zones WHERE id = ?', [id]),
+    // 拖拽排序（限定同地域作用域，防跨地域重排打乱分组）
+    batchUpdateSortOrder: async (regionId, ids) => {
+        if (!Array.isArray(ids) || ids.length === 0) return;
+        const total = ids.length;
+        for (let i = 0; i < ids.length; i++) {
+            await execute('UPDATE zones SET sort_order = ? WHERE id = ? AND region_id = ?', [(total - i) * 10, parseInt(ids[i]), regionId]);
+        }
+    },
 };
 
 // ---------- 爱快节点 ----------

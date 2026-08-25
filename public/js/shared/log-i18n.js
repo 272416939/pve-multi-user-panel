@@ -22,6 +22,8 @@
         'package-group': 'admin.sub.packageGroup',
         template: 'admin.sub.template',
         'os-template': 'admin.sub.osTemplate',
+        region: 'admin.sub.region',
+        zone: 'admin.sub.zone',
         'email-template': 'admin.sub.emailTemplate',
         i18n: 'admin.sub.i18n',
         cdk: 'admin.sub.cdk',
