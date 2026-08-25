@@ -958,8 +958,10 @@ router.get('/lxc/storages', authMiddleware, adminMiddleware, async (req, res) =>
         // 多节点：按 ?node_id= 指定节点（严格分步选择），未传/无效返回 400
         const node = await findEnabledNode(req.query.node_id);
         if (!node) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        // ?content=：'vztmpl'=CT 模板来源存储（local 等）；缺省=rootdir（容器 rootfs 存储）
+        var contentFilter = req.query.content === 'vztmpl' ? 'vztmpl' : '';
         const pve = await getPveClient(node.id);
-        const storages = await pve.getLxcStorageList();
+        const storages = await pve.getLxcStorageList(contentFilter || undefined);
         res.json(storages.map(s => ({ id: s.storage, type: s.type, path: s.path, content: s.content })));
     } catch (error) {
         res.status(500).json({ error: safeError(error), code: 'INTERNAL_ERROR' });

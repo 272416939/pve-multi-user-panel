@@ -18,6 +18,7 @@
     tp.lxctemplateOstemplateList = ref([]);
     tp.lxctemplateStorageList = ref([]);
     tp.lxcStorages = ref([]);
+    tp.lxcTplStorages = ref([]);
     tp.lxcOstemplates = ref([]);
     tp.pveNodeOptions = ref([]);
 
@@ -30,11 +31,22 @@
 
     tp.loadLxcStorages = async function() {
         // 多节点：存储列表按表单所选节点拉取（后端必填校验），未选节点清空
+        // 本列表=rootdir 存储（容器 rootfs 用，「容器存储」下拉）；模板来源存储另走 loadLxcTplStorages
         try {
             var nid = tp.lxcTemplateForm.value.pve_node_id;
             if (!nid) { tp.lxcStorages.value = []; return; }
             tp.lxcStorages.value = await api('/lxc/storages?node_id=' + encodeURIComponent(nid));
         } catch (e) { tp.lxcStorages.value = []; }
+    };
+
+    // 多节点：CT 模板来源存储（content 含 vztmpl，如 local）——「模板存储」下拉专用；
+    // 与 rootdir 列表分离：local 是 iso,vztmpl,backup 不在 rootdir 过滤内，旧共用列表导致看不到已下载模板
+    tp.loadLxcTplStorages = async function() {
+        try {
+            var nid = tp.lxcTemplateForm.value.pve_node_id;
+            if (!nid) { tp.lxcTplStorages.value = []; return; }
+            tp.lxcTplStorages.value = await api('/lxc/storages?node_id=' + encodeURIComponent(nid) + '&content=vztmpl');
+        } catch (e) { tp.lxcTplStorages.value = []; }
     };
 
     tp.loadLxcOstemplates = async function(storage) {
@@ -129,6 +141,7 @@
         // 多节点：候选按（已回填的）所选节点加载，须在表单赋值之后执行
         tp.loadNodeOptions();
         tp.loadLxcStorages();
+        tp.loadLxcTplStorages();
         if (tp.lxcTemplateForm.value.storage) {
             tp.loadLxcOstemplates(tp.lxcTemplateForm.value.storage);
         }
@@ -177,6 +190,7 @@
             tp.lxcTemplateForm.value.ostemplate = '';
             tp.lxcOstemplates.value = [];
             tp.loadLxcStorages();
+            tp.loadLxcTplStorages();
         });
     };
     window.__admin.templatePage = tp;

@@ -1215,7 +1215,7 @@
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.modal.tplStorage') }}</label>
                                         <select class="form-select" v-model="templatePage.lxcTemplateForm.value.storage">
                                             <option value="">{{ t('admin.modal.selectStoragePool') }}</option>
-                                            <option v-for="s in templatePage.lxcStorages.value" :key="s.id" :value="s.id">{{ s.id }}</option>
+                                            <option v-for="s in templatePage.lxcTplStorages.value" :key="s.id" :value="s.id">{{ s.id }}</option>
                                         </select>
                                     </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.modal.ctStorage') }}</label>

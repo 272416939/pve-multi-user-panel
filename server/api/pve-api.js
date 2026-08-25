@@ -452,13 +452,18 @@ class PveApi {
     });
   }
 
-  async getLxcStorageList() {
-    return pveCache.get(this._ck('lxc-storages'), async () => {
+  // 存储列表（LXC 相关）：默认过滤 rootdir（容器 rootfs 用）；
+  // contentFilter='vztmpl' 时过滤含 vztmpl 的存储（CT 模板来源存储，如 local——rootdir 过滤会漏掉它）
+  async getLxcStorageList(contentFilter) {
+    return pveCache.get(this._ck('lxc-storages:' + (contentFilter || 'rootdir')), async () => {
       if (!this.node) {
         await this.detectNode();
       }
       const response = await this.axiosInstance.get(`${this.host}/api2/json/nodes/${this.node}/storage`);
       const storages = response.data.data || [];
+      if (contentFilter === 'vztmpl') {
+        return storages.filter(s => !s.content || s.content.split(',').includes('vztmpl'));
+      }
       // LXC 容器需要 rootdir 类型的存储
       return storages.filter(s => !s.content || s.content.split(',').includes('rootdir'));
     });

@@ -61,6 +61,7 @@ var App = {
         if (!$.templatePage.vmTemplateForm) $.templatePage.vmTemplateForm = Vue.ref({ id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20, network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', target_storage: 'local-lvm', clone_mode: 'full', cpu_affinity: '', description: '', status: 'active' });
         if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', ipv6_enabled: 1, ip6_mode: 'dhcp', ip6_addr: '', ip4_addr: '', unprivileged: 1, features: '', description: '', status: 'active' });
         if (!$.templatePage.lxcStorages) $.templatePage.lxcStorages = Vue.ref([]);
+        if (!$.templatePage.lxcTplStorages) $.templatePage.lxcTplStorages = Vue.ref([]);
         if (!$.templatePage.lxcOstemplates) $.templatePage.lxcOstemplates = Vue.ref([]);
         if (!$.packagePage) $.packagePage = {};
         if (!$.packagePage.vmPackages) $.packagePage.vmPackages = Vue.ref([]);
