@@ -128,7 +128,7 @@
         <div class="mb-3">
           <label class="form-label">{{ t('dash.disk.capacity') }} (GiB) <small class="text-muted">{{ t('dash.disk.range') }}{{ getSelectedSpecMin() }}-{{ getSelectedSpecMax() }} GiB</small></label>
           <div class="d-flex align-items-center gap-2">
-            <input class="form-control" type="range" v-model.number="diskPurchaseForm.capacity_gb" :min="getSelectedSpecMin()" :max="getSelectedSpecMax()" @input="calcDiskPrice" style="flex:1">
+            <input class="form-control" type="range" :key="diskPurchaseForm.spec_id" v-model.number="diskPurchaseForm.capacity_gb" :min="getSelectedSpecMin()" :max="getSelectedSpecMax()" @input="calcDiskPrice" style="flex:1">
             <input class="form-control" type="number" v-model.number="diskPurchaseForm.capacity_gb" :min="getSelectedSpecMin()" :max="getSelectedSpecMax()" @input="calcDiskPrice" style="width:100px">
           </div>
         </div>
