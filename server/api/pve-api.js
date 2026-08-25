@@ -51,7 +51,8 @@ function mapNodeRow(node) {
     ssh_user: node.ssh_user || 'root',
     ssh_password: node.ssh_password || '',
     strict_tls: !!node.strict_tls,
-    backup_storage: node.backup_storage || 'local'
+    backup_storage: node.backup_storage || 'local',
+    name: node.name || '' // 日志/告警节点标识用
   };
 }
 
@@ -92,8 +93,8 @@ class PveApi {
           rejectUnauthorized: strictTls
         });
         self._httpsAgentStrictTls = strictTls;
-        // 节点标识 + 全局去重：同一节点（含旧全局单例）只提示一次，多节点日志可区分
-        var tlsIdentity = (self.nodeId != null ? '节点#' + self.nodeId : '默认/旧单例') + ' ' + cfg.host;
+        // 节点标识（#id + 名称）+ 全局去重：同一节点（含旧全局单例）只提示一次，多节点日志可区分
+        var tlsIdentity = (self.nodeId != null ? '节点#' + self.nodeId + (cfg.name ? '(' + cfg.name + ')' : '') : '默认/旧单例') + ' ' + cfg.host;
         if (!_tlsWarned.has(tlsIdentity)) {
           _tlsWarned.add(tlsIdentity);
           if (strictTls) {
