@@ -1164,7 +1164,14 @@
                                             <option v-for="s in templatePage.allStorages.value" :key="s.storage" :value="s.storage">{{ s.storage }}{{ s.maxdisk ? ' (' + (s.maxdisk/1073741824).toFixed(0) + 'GB)' : '' }}</option>
                                         </select>
                                     </div>
-                                    <div class="col-md-6"><label class="form-label">{{ t('admin.lxc.bridge') }}</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.network_bridge"></div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">{{ t('admin.lxc.bridge') }}</label>
+                                        <select class="form-select" v-model="templatePage.vmTemplateForm.value.network_bridge"
+                                                :disabled="!templatePage.vmTemplateForm.value.pve_node_id || !templatePage.vmTemplateBridges.value.length">
+                                            <option value="">{{ t('admin.lxc.bridgePh') }}</option>
+                                            <option v-for="b in templatePage.vmTemplateBridges.value" :key="b" :value="b">{{ b }}</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.modal.cloneMode') }}</label>
                                         <select class="form-select" v-model="templatePage.vmTemplateForm.value.clone_mode">
                                             <option value="full">{{ t('admin.modal.fullClone') }}</option>
@@ -1234,7 +1241,14 @@
                                     <div class="col-md-3"><label class="form-label">{{ t('admin.hw.memMb') }}</label><input class="form-control" type="number" v-model="templatePage.lxcTemplateForm.value.memory"></div>
                                     <div class="col-md-3"><label class="form-label">Swap (MB)</label><input class="form-control" type="number" v-model="templatePage.lxcTemplateForm.value.swap"></div>
                                     <div class="col-md-3"><label class="form-label">{{ t('admin.hw.diskGb') }}</label><input class="form-control" type="number" v-model="templatePage.lxcTemplateForm.value.disk_size"></div>
-                                    <div class="col-md-6"><label class="form-label">{{ t('admin.templates.networkBridge') }}</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.network_bridge"></div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">{{ t('admin.templates.networkBridge') }}</label>
+                                        <select class="form-select" v-model="templatePage.lxcTemplateForm.value.network_bridge"
+                                                :disabled="!templatePage.lxcTemplateForm.value.pve_node_id || !templatePage.lxcTemplateBridges.value.length">
+                                            <option value="">{{ t('admin.lxc.bridgePh') }}</option>
+                                            <option v-for="b in templatePage.lxcTemplateBridges.value" :key="b" :value="b">{{ b }}</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.modal.netMode') }}</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.network_mode"><option value="dhcp">DHCP</option><option value="static">{{ t('admin.port.static') }}</option></select></div>
                                     <div class="col-md-6" v-if="templatePage.lxcTemplateForm.value.network_mode === 'static'">
                                         <label class="form-label">{{ t('admin.modal.ipv4Addr') }}</label>

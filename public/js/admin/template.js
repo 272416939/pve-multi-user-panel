@@ -20,6 +20,9 @@
     tp.lxctemplateStorageList = ref([]);
     tp.lxcStorages = ref([]);
     tp.lxcTplStorages = ref([]);
+    // 模板表单网桥下拉（按所选节点动态加载 PVE 实际网桥，替代自由输入）
+    tp.vmTemplateBridges = ref([]);
+    tp.lxcTemplateBridges = ref([]);
     // LXC 特性多选下拉（模板弹窗；技术枚举值存储为逗号串 'nesting=1,...'）
     tp.lxcFeatureOpen = ref(false);
     tp.lxcFeaturesSet = ref(new Set());
@@ -60,6 +63,22 @@
             if (!nid) { tp.lxcTplStorages.value = []; return; }
             tp.lxcTplStorages.value = await api('/lxc/storages?node_id=' + encodeURIComponent(nid) + '&content=vztmpl');
         } catch (e) { tp.lxcTplStorages.value = []; }
+    };
+
+    // 加载所选节点的网桥并回填到对应模板表单（无 vmbr0 回退首项）
+    tp.loadBridgesFor = async function(formRef, bridgesRef) {
+        var nid = formRef.value.pve_node_id;
+        if (!nid) { bridgesRef.value = []; return; }
+        try {
+            var list = await api('/admin/pve/bridges?node_id=' + encodeURIComponent(nid));
+            bridgesRef.value = Array.isArray(list) ? list : [];
+            if (bridgesRef.value.length && bridgesRef.value.indexOf(formRef.value.network_bridge) === -1) {
+                formRef.value.network_bridge = bridgesRef.value.indexOf('vmbr0') !== -1 ? 'vmbr0' : bridgesRef.value[0];
+            }
+        } catch (e) {
+            console.error('加载 PVE 网桥失败', e);
+            bridgesRef.value = [];
+        }
     };
 
     tp.loadLxcOstemplates = async function(storage) {
@@ -115,6 +134,7 @@
         tp.loadNodeOptions();
         tp.loadPveTemplateVms();
         tp.loadAllStorages();
+        tp.loadBridgesFor(tp.vmTemplateForm, tp.vmTemplateBridges);
         $.bsModalShow('vmTemplateModal');
     };
 
@@ -155,6 +175,7 @@
         tp.loadNodeOptions();
         tp.loadLxcStorages();
         tp.loadLxcTplStorages();
+        tp.loadBridgesFor(tp.lxcTemplateForm, tp.lxcTemplateBridges);
         if (tp.lxcTemplateForm.value.storage) {
             tp.loadLxcOstemplates(tp.lxcTemplateForm.value.storage);
         }
@@ -204,6 +225,7 @@
             tp.vmTemplateForm.value.template_vmid = '';
             tp.loadPveTemplateVms();
             tp.loadAllStorages();
+            tp.loadBridgesFor(tp.vmTemplateForm, tp.vmTemplateBridges);
         });
         Vue.watch(function() { return tp.lxcTemplateForm.value.pve_node_id; }, function(nv, ov) {
             if (nv === ov) return;
@@ -212,6 +234,7 @@
             tp.lxcOstemplates.value = [];
             tp.loadLxcStorages();
             tp.loadLxcTplStorages();
+            tp.loadBridgesFor(tp.lxcTemplateForm, tp.lxcTemplateBridges);
         });
     };
     window.__admin.templatePage = tp;

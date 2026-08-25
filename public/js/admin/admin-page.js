@@ -62,6 +62,8 @@ var App = {
         if (!$.templatePage.lxcTemplateForm) $.templatePage.lxcTemplateForm = Vue.ref({ id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512, swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp', ipv6_enabled: 1, ip6_mode: 'dhcp', ip6_addr: '', ip4_addr: '', unprivileged: 1, features: '', description: '', status: 'active' });
         if (!$.templatePage.lxcStorages) $.templatePage.lxcStorages = Vue.ref([]);
         if (!$.templatePage.lxcTplStorages) $.templatePage.lxcTplStorages = Vue.ref([]);
+        if (!$.templatePage.vmTemplateBridges) $.templatePage.vmTemplateBridges = Vue.ref([]);
+        if (!$.templatePage.lxcTemplateBridges) $.templatePage.lxcTemplateBridges = Vue.ref([]);
         if (!$.templatePage.lxcOstemplates) $.templatePage.lxcOstemplates = Vue.ref([]);
         // LXC 特性多选下拉兜底（modal 常驻渲染，template.js 未定义时也不崩）
         if (!$.templatePage.lxcFeatureOpen) $.templatePage.lxcFeatureOpen = Vue.ref(false);
