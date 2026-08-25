@@ -89,7 +89,18 @@
                                         </div>
                                         <div class="col-md-4">
                                             <label class="form-label">{{ t('admin.lxc.features') }}</label>
-                                            <input type="text" class="form-control" v-model="lxcForm.features" :placeholder="t('admin.lxc.featuresPh')">
+                                            <div class="lxc-feature-dropdown" :class="{ open: lxcFeatureOpen }">
+                                                <button type="button" class="form-control lxc-feature-trigger text-start" @click="toggleLxcFeatureDropdown()">
+                                                    <span v-if="lxcFeatureText">{{ lxcFeatureText }}</span>
+                                                    <span v-else class="text-muted">{{ t('admin.lxc.featuresPh') }}</span>
+                                                </button>
+                                                <div class="lxc-feature-menu">
+                                                    <label v-for="opt in lxcFeatureOptions" :key="opt" class="lxc-feature-item">
+                                                        <input type="checkbox" :checked="lxcFeaturesSet.has(opt)" @change="toggleLxcFeature(opt)">
+                                                        <span>{{ opt }}</span>
+                                                    </label>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="row mb-3">

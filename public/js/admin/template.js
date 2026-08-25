@@ -2,6 +2,7 @@
     var $ = window.__admin;
     var Vue = window.Vue;
     var ref = Vue.ref;
+    var computed = Vue.computed;
 
     $.templatePage = {};
     var tp = $.templatePage;
@@ -19,6 +20,18 @@
     tp.lxctemplateStorageList = ref([]);
     tp.lxcStorages = ref([]);
     tp.lxcTplStorages = ref([]);
+    // LXC 特性多选下拉（模板弹窗；技术枚举值存储为逗号串 'nesting=1,...'）
+    tp.lxcFeatureOpen = ref(false);
+    tp.lxcFeaturesSet = ref(new Set());
+    tp.lxcFeatureText = computed(function() {
+        return [...tp.lxcFeaturesSet.value].map(function(k) { return k + '=1'; }).join(',');
+    });
+    tp.toggleLxcFeatureDropdown = function() {
+        tp.lxcFeatureOpen.value = !tp.lxcFeatureOpen.value;
+    };
+    tp.toggleLxcFeature = function(opt) {
+        $.toggleLxcFeature(tp.lxcFeaturesSet, tp.lxcTemplateForm, 'features', opt);
+    };
     tp.lxcOstemplates = ref([]);
     tp.pveNodeOptions = ref([]);
 
@@ -145,6 +158,8 @@
         if (tp.lxcTemplateForm.value.storage) {
             tp.loadLxcOstemplates(tp.lxcTemplateForm.value.storage);
         }
+        // 特性多选：编辑回显存量值（新建为空）
+        $.syncLxcFeatureSet(tp.lxcFeaturesSet, tp.lxcTemplateForm, 'features');
         $.bsModalShow('lxcTemplateModal');
     };
 
@@ -171,6 +186,12 @@
     };
 
     $.initTemplate = function() {
+        // LXC 特性多选下拉：点击外部关闭
+        document.addEventListener('click', function(e) {
+            if (tp.lxcFeatureOpen.value && !(e.target && e.target.closest && e.target.closest('.lxc-feature-dropdown'))) {
+                tp.lxcFeatureOpen.value = false;
+            }
+        });
         Vue.watch(function() { return tp.lxcTemplateForm.value.storage; }, function(newVal) {
             tp.lxcOstemplates.value = [];
             if (newVal) {

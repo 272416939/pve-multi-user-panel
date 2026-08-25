@@ -142,6 +142,27 @@
         }
     };
 
+    // ==================== LXC 特性多选下拉（模板表单/直开容器表单共用）====================
+    // PVE lxc features 标准枚举（技术值，i18n 豁免）；存储格式保持逗号串 'nesting=1,keyctl=1' 与后端/直开创建兼容
+    $.lxcFeatureOptions = ['nesting', 'fuse', 'keyctl', 'mknod', 'mount', 'nfs', 'samba', 'cifs'];
+    // 勾选/取消：更新 setRef 并写回表单字段（逗号串）
+    $.toggleLxcFeature = function(setRef, formRef, formKey, opt) {
+        var s = new Set(setRef.value);
+        if (s.has(opt)) { s.delete(opt); } else { s.add(opt); }
+        setRef.value = s;
+        formRef.value[formKey] = [...s].map(function(k) { return k + '=1'; }).join(',');
+    };
+    // 从表单存量值解析已选特性（编辑回显/重置后同步；未知 k=v 段忽略）
+    $.syncLxcFeatureSet = function(setRef, formRef, formKey) {
+        var raw = formRef.value[formKey] || '';
+        var s = new Set();
+        String(raw).split(',').forEach(function(seg) {
+            var m = String(seg).trim().match(/^([a-zA-Z0-9_]+)=(\d+)$/);
+            if (m && $.lxcFeatureOptions.indexOf(m[1]) !== -1) s.add(m[1]);
+        });
+        setRef.value = s;
+    };
+
     // ==================== 函数 ====================
     // 用户管理
     // 请求序号保护：并发加载时仅采纳最后一次请求的结果，避免旧响应覆盖新列表

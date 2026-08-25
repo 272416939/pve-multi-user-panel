@@ -23,6 +23,24 @@
     $.lxcOpTimestamps = ref(new Map());
     $.editLxcForm = ref({ id: null, ct_id: null, name: '', expiration_date: '', renewal_price: '', renewal_period: 'month', user_id: null, mac_group_id: '', status: null });
     $.destroyLxcConfirmText = ref('');
+    // LXC 特性多选下拉（直开容器表单）
+    $.lxcFeatureOpen = ref(false);
+    $.lxcFeaturesSet = ref(new Set());
+    $.lxcFeatureText = computed(function() {
+        return [...$.lxcFeaturesSet.value].map(function(k) { return k + '=1'; }).join(',');
+    });
+    $.toggleLxcFeatureDropdown = function() {
+        $.lxcFeatureOpen.value = !$.lxcFeatureOpen.value;
+    };
+    $.toggleLxcFeature = function(opt) {
+        $.toggleLxcFeature($.lxcFeaturesSet, $.lxcForm, 'features', opt);
+    };
+    // 点击外部关闭
+    document.addEventListener('click', function(e) {
+        if ($.lxcFeatureOpen.value && !(e.target && e.target.closest && e.target.closest('.lxc-feature-dropdown'))) {
+            $.lxcFeatureOpen.value = false;
+        }
+    });
     $.availableLxc = ref([]);
     $.assignedLxc = ref([]);
     // 多节点：节点选择（严格分步选择）——直开表单与分配池各自联动
@@ -214,6 +232,7 @@
                 })
             });
             $.lxcForm.value = { ostemplate: '', hostname: '', password: '', confirmPassword: '', storage: '', cores: 1, memory: 512, swap: 512, disk: 8, features: '', net0Bridge: 'vmbr0', net0Ip: '', net0Mac: '', net0Ip6: '', unprivileged: true, start: true };
+            $.syncLxcFeatureSet($.lxcFeaturesSet, $.lxcForm, 'features');
             alert(window.__i18n.t('admin.lxc.createOkFull'));
             await $.loadLxcContainers();
         } catch (e) {

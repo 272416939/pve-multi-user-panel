@@ -1258,7 +1258,21 @@
                                         <input class="form-control" v-model="templatePage.lxcTemplateForm.value.ip6_addr" :placeholder="t('admin.lxc.ipv6Ph')">
                                     </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.modal.unprivileged') }}</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.unprivileged"><option :value="1">{{ t('common.yes') }}</option><option :value="0">{{ t('common.no') }}</option></select></div>
-                                    <div class="col-md-6"><label class="form-label">{{ t('admin.lxc.features') }}</label><input class="form-control" v-model="templatePage.lxcTemplateForm.value.features" placeholder="nesting=1,fuse=1"></div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">{{ t('admin.lxc.features') }}</label>
+                                        <div class="lxc-feature-dropdown" :class="{ open: templatePage.lxcFeatureOpen.value }">
+                                            <button type="button" class="form-control lxc-feature-trigger text-start" @click="templatePage.toggleLxcFeatureDropdown()">
+                                                <span v-if="templatePage.lxcFeatureText && templatePage.lxcFeatureText.value">{{ templatePage.lxcFeatureText.value }}</span>
+                                                <span v-else class="text-muted">{{ t('admin.lxc.featuresPh') }}</span>
+                                            </button>
+                                            <div class="lxc-feature-menu">
+                                                <label v-for="opt in templatePage.lxcFeatureOptions.value" :key="opt" class="lxc-feature-item">
+                                                    <input type="checkbox" :checked="templatePage.lxcFeaturesSet.value.has(opt)" @change="templatePage.toggleLxcFeature(opt)">
+                                                    <span>{{ opt }}</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('common.status') }}</label><select class="form-select" v-model="templatePage.lxcTemplateForm.value.status"><option value="active">{{ t('admin.common.enabled') }}</option><option value="inactive">{{ t('admin.common.disabled') }}</option></select></div>
                                     <div class="col-md-6"><label class="form-label">{{ t('pkg.node') }}</label>
                                         <select class="form-select" v-model="templatePage.lxcTemplateForm.value.pve_node_id">
