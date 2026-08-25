@@ -545,8 +545,10 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
             const config = await vmPve.getVmConfig(vmid);
             const macMatch = ((config && config.net0) || '').match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (macMatch) {
-                await removeDhcpStaticBinding('vm', vmid);
-                dhcpIp = await createDhcpStaticBinding('vm', vmid, macMatch[0], '', subnet);
+                // 多节点：DHCP 静态绑定必须落在子网归属的爱快节点上
+                const dhcpCtx = { ikuaiNodeId: subnet.ikuai_node_id };
+                await removeDhcpStaticBinding('vm', vmid, dhcpCtx);
+                dhcpIp = await createDhcpStaticBinding('vm', vmid, macMatch[0], '', subnet, dhcpCtx);
             }
         } catch (e) {
             console.error('[subnet] VM 绑定 DHCP 失败:', e.message);
@@ -612,8 +614,10 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
             const config = await ctPve.getLxcConfig(vmid);
             const macMatch = ((config && config.net0) || '').match(/[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}/);
             if (macMatch) {
-                await removeDhcpStaticBinding('lxc', vmid);
-                dhcpIp = await createDhcpStaticBinding('lxc', vmid, macMatch[0], '', subnet);
+                // 多节点：DHCP 静态绑定必须落在子网归属的爱快节点上
+                const dhcpCtx = { ikuaiNodeId: subnet.ikuai_node_id };
+                await removeDhcpStaticBinding('lxc', vmid, dhcpCtx);
+                dhcpIp = await createDhcpStaticBinding('lxc', vmid, macMatch[0], '', subnet, dhcpCtx);
             }
         } catch (e) {
             console.error('[subnet] LXC 绑定 DHCP 失败:', e.message);
@@ -666,7 +670,7 @@ router.post('/vm/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
             }
         }
 
-        try { await removeDhcpStaticBinding('vm', vmid); } catch (e) { console.error('[subnet] VM 解绑 DHCP 失败:', e.message); }
+        try { await removeDhcpStaticBinding('vm', vmid, subnet ? { ikuaiNodeId: subnet.ikuai_node_id } : undefined); } catch (e) { console.error('[subnet] VM 解绑 DHCP 失败:', e.message); }
         await db.vms.update(vm.id, { subnet_id: null, dhcp_static_ip: '' });
         if (subnet) await refreshSubnetAvailable(subnet);
         await auditAction(req, 'subnet.unbind.vm', 'VM ' + vmid + ' 解绑子网 ' + (subnet ? subnet.vlan_name : String(vm.subnet_id)), { resourceType: 'subnet', resourceId: vm.subnet_id });
@@ -709,7 +713,7 @@ router.post('/lxc/:vmid/unbind-subnet', authMiddleware, async (req, res) => {
             }
         }
 
-        try { await removeDhcpStaticBinding('lxc', vmid); } catch (e) { console.error('[subnet] LXC 解绑 DHCP 失败:', e.message); }
+        try { await removeDhcpStaticBinding('lxc', vmid, subnet ? { ikuaiNodeId: subnet.ikuai_node_id } : undefined); } catch (e) { console.error('[subnet] LXC 解绑 DHCP 失败:', e.message); }
         await db.lxcContainers.update(ct.id, { subnet_id: null, dhcp_static_ip: '' });
         if (subnet) await refreshSubnetAvailable(subnet);
         await auditAction(req, 'subnet.unbind.lxc', 'LXC ' + vmid + ' 解绑子网 ' + (subnet ? subnet.vlan_name : String(ct.subnet_id)), { resourceType: 'subnet', resourceId: ct.subnet_id });

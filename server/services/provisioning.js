@@ -283,7 +283,7 @@ async function provisionVm(opts) {
         await pve.updateVmConfig(newVmid, vmUpdateCfg);
 
         if (template.cpu_affinity) {
-            await setVmAffinity(newVmid, template.cpu_affinity);
+            await setVmAffinity(newVmid, template.cpu_affinity, targetNodeId);
         }
 
         var macCfg = null;
@@ -749,7 +749,7 @@ async function adminProvisionVm(opts) {
 
     // CPU 亲和性
     if (template.cpu_affinity) {
-        await setVmAffinity(newVmid, template.cpu_affinity);
+        await setVmAffinity(newVmid, template.cpu_affinity, targetNodeId);
     }
 
     // 创建分配记录

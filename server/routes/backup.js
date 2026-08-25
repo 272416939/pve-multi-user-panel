@@ -252,7 +252,7 @@ router.post('/lxc/:vmid/backups/:id/restore', authMiddleware, async (req, res) =
         // 异步执行 pct restore（不阻塞请求）
         (async () => {
             try {
-                const result = await restoreLxcBySSH(vmid, volid, backup.rootfs_storage);
+                const result = await restoreLxcBySSH(vmid, volid, backup.rootfs_storage, backup.pve_node_id);
                 if (result.code === 0) {
                     await db.restoreTasks.complete(restoreRecord.id);
                     console.log(`[LXC恢复SSH] 容器 ${vmid} 恢复完成`);

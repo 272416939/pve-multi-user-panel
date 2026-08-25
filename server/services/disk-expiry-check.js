@@ -279,29 +279,42 @@ async function checkExpiredDisks() {
 
 async function checkStorageCapacityAlert() {
   try {
-    // 无行上下文（仅存储池名）：回退默认节点查询（多节点下存储池名跨节点不唯一时由调用方/后续改造保证）
-    var pve = await getPveClient(null);
-    var storages = await pve.getAllStorages();
-    if (!storages || storages.length === 0) return;
+    // 多节点：逐个启用节点巡检存储池（存储池名跨节点不唯一，告警按 节点+池 去重并带节点名）
+    var nodes = await db.pveNodes.list();
+    var enabledNodes = (nodes || []).filter(function (n) { return n.enabled !== 0; });
+    if (enabledNodes.length === 0) return;
 
-    for (var i = 0; i < storages.length; i++) {
-      var s = storages[i];
-      var total = parseInt(s.total) || 0;
-      var used = parseInt(s.used) || 0;
-      if (total <= 0) continue;
-      var usedPct = Math.round((used / total) * 100);
-      if (usedPct >= 90) {
-        var today = todayStr();
-        var alertKey = 'disk:storage-alert:' + s.storage + ':' + today;
-        var redis = getRedisClient();
-        var alreadySent = false;
-        if (redis) {
-          try { alreadySent = (await redis.get(alertKey)) === '1'; } catch (e) {}
-        }
-        if (!alreadySent) {
-          await sendStorageAlertEmail(s, usedPct, total, used);
+    for (var ni = 0; ni < enabledNodes.length; ni++) {
+      var node = enabledNodes[ni];
+      var storages = null;
+      try {
+        var pve = await getPveClient(node.id);
+        storages = await pve.getAllStorages();
+      } catch (nodeErr) {
+        logger.error('[disk-expiry] 节点 #' + node.id + '(' + (node.name || '') + ') 存储巡检失败:', nodeErr.message);
+        continue;
+      }
+      if (!storages || storages.length === 0) continue;
+
+      for (var i = 0; i < storages.length; i++) {
+        var s = storages[i];
+        var total = parseInt(s.total) || 0;
+        var used = parseInt(s.used) || 0;
+        if (total <= 0) continue;
+        var usedPct = Math.round((used / total) * 100);
+        if (usedPct >= 90) {
+          var today = todayStr();
+          var alertKey = 'disk:storage-alert:' + node.id + ':' + s.storage + ':' + today;
+          var redis = getRedisClient();
+          var alreadySent = false;
           if (redis) {
-            try { await redis.setex(alertKey, 86400, '1'); } catch (e) {}
+            try { alreadySent = (await redis.get(alertKey)) === '1'; } catch (e) {}
+          }
+          if (!alreadySent) {
+            await sendStorageAlertEmail(s, usedPct, total, used, node.name || ('PVE#' + node.id));
+            if (redis) {
+              try { await redis.setex(alertKey, 86400, '1'); } catch (e) {}
+            }
           }
         }
       }
@@ -311,7 +324,7 @@ async function checkStorageCapacityAlert() {
   }
 }
 
-async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
+async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes, nodeName) {
   try {
     // 获取所有管理员
     var admins = await db.users.getPaginated({ role: 'admin', limit: 50, page: 1 });
@@ -331,7 +344,8 @@ async function sendStorageAlertEmail(storage, usedPct, totalBytes, usedBytes) {
             storage_name: storage.storage,
             used_pct: usedPct,
             used_tb: usedTb,
-            total_tb: totalTb
+            total_tb: totalTb,
+            pve_node_name: nodeName || ''
           });
         } catch (e) {}
       }
@@ -472,11 +486,10 @@ async function importExistingDisks() {
     // 清理范围：bound/grace/expired 状态的 legacy 磁盘（free 状态的可能是分离但卷仍在，不清理）
     var allDisks = await db.disks.getAll();
     var cleanedCount = 0;
-    var sshConfig = await getPveSshConfig();
     logger.debug('[disk-import] 孤立磁盘清理：开始检查，共 ' + allDisks.length + ' 条磁盘记录');
 
-    // 按存储池分组收集需要检查的卷，避免重复查询同一存储池
-    var storagePools = {};
+    // 多节点：先按磁盘所属节点分组、组内再按存储池分组——pvesm 必须在卷所在节点上执行
+    var nodePoolGroups = {}; // { [nodeKey]: { nodeId, pools: { poolName: [entries] } } }
     for (var d = 0; d < allDisks.length; d++) {
       var disk = allDisks[d];
       if (!disk.is_legacy) continue;
@@ -484,20 +497,36 @@ async function importExistingDisks() {
       var volParts = (disk.volume_id || '').split(':');
       if (volParts.length !== 2) continue;
       var pool = volParts[0];
-      if (!storagePools[pool]) storagePools[pool] = [];
-      storagePools[pool].push({ disk: disk, volumeId: disk.volume_id });
+      var nk = disk.pve_node_id != null ? String(disk.pve_node_id) : 'default';
+      if (!nodePoolGroups[nk]) nodePoolGroups[nk] = { nodeId: disk.pve_node_id, pools: {} };
+      if (!nodePoolGroups[nk].pools[pool]) nodePoolGroups[nk].pools[pool] = [];
+      nodePoolGroups[nk].pools[pool].push({ disk: disk, volumeId: disk.volume_id });
     }
 
-    // 逐个存储池查询所有卷，再比对台账
-    for (var poolName in storagePools) {
-      var entries = storagePools[poolName];
+    // 逐节点逐存储池查询所有卷，再比对台账
+    for (var groupKey in nodePoolGroups) {
+      var group = nodePoolGroups[groupKey];
+      var sshConfig = null;
       try {
-        if (!sshConfig.host || !sshConfig.password) continue;
+        sshConfig = await getPveSshConfig(group.nodeId);
+      } catch (sshErr) {
+        logger.warn('[disk-import] 节点 #' + groupKey + ' SSH 配置解析失败，跳过该节点清理:', sshErr.message);
+        continue;
+      }
+      if (!sshConfig.host || !sshConfig.password) continue;
 
-        // pvesm list <storage> 列出该存储所有卷
-        // 输出为表格格式，volume_id 是每行第一个字段（到第一个空格为止）
-        var cmd = 'pvesm list ' + poolName + ' 2>&1';
-        var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 600000, sshConfig.port);
+      for (var poolName in group.pools) {
+        var entries = group.pools[poolName];
+        try {
+          // C-1 加固：poolName 拼入 pvesm 命令前做白名单校验（防命令注入）
+          if (!/^[a-zA-Z0-9_-]+$/.test(poolName)) {
+            logger.warn('[disk-import] 存储池名非法，跳过:', JSON.stringify(poolName));
+            continue;
+          }
+          // pvesm list <storage> 列出该存储所有卷
+          // 输出为表格格式，volume_id 是每行第一个字段（到第一个空格为止）
+          var cmd = 'pvesm list ' + poolName + ' 2>&1';
+          var result = await execSSH(sshConfig.host, sshConfig.username, sshConfig.password, cmd, 600000, sshConfig.port);
         logger.debug('[disk-import] 存储池 ' + poolName + ' 卷列表 code=' + result.code +
           ' stdout=' + JSON.stringify(result.stdout));
 
@@ -534,7 +563,8 @@ async function importExistingDisks() {
       } catch (e) {
         logger.error('[disk-import] 检查存储池 ' + poolName + ' 失败:', e.message);
       }
-    }
+      } // end for poolName
+    } // end for nodePoolGroups
     if (cleanedCount > 0) {
       logger.info('[disk-import] 清理了 ' + cleanedCount + ' 个孤立 legacy 磁盘记录');
     }

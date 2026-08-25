@@ -76,51 +76,78 @@ router.get('/ikuai/interfaces', authMiddleware, adminMiddleware, async (req, res
 
 router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const ik = await getIkuaiClient(null); // 管理员全局同步：默认爱快节点
-        const bindings = await ik.getDhcpStaticBindings();
-        let updated = 0, skipped = 0, errors = 0;
+        // 多节点：逐个启用爱快节点拉取 DHCP 绑定，只回写「生效爱快=该节点」的设备，
+        // 防止 A 节点租约覆盖 B 节点设备的静态 IP（旧实现仅默认节点却覆盖全网台账）
+        const ikNodeRows = (await db.ikuaNodes.list()).filter(n => n.enabled !== 0);
+        if (!ikNodeRows || ikNodeRows.length === 0) {
+            return res.status(400).json({ error: '未配置启用的爱快节点', code: 'IKUAI_NODE_NOT_FOUND' });
+        }
 
-        // PERF-05: 循环外一次性获取所有 VM 和 LXC，构建 Map，避免循环内全表查询（N+1）
+        // PERF-05: 循环外一次性获取所有 VM/LXC 与节点配对关系，避免循环内全表查询（N+1）
         const allVms = await db.vms.getAll();
-        const vmByVmId = {};
-        allVms.forEach(v => { vmByVmId[v.vm_id] = v; });
         const allLxc = await db.lxcContainers.getAll();
-        const lxcByCtId = {};
-        allLxc.forEach(l => { lxcByCtId[l.ct_id] = l; });
+        const pveRows = await db.pveNodes.list();
+        const pairByPve = {};
+        pveRows.forEach(p => { pairByPve[p.id] = p.ikuai_node_id; });
+        const defaultIkId = await db.ikuaNodes.getDefaultId();
+        // 设备生效爱快节点：无节点归属或节点未配对爱快 → 默认爱快（与 getIkuaiClientForPve 兜底一致）
+        function effIkId(row) {
+            if (row.pve_node_id != null && pairByPve[row.pve_node_id] != null) return pairByPve[row.pve_node_id];
+            return defaultIkId;
+        }
 
-        for (const b of bindings) {
-            // comment 格式: VM-{id} 或 CT-{id}
-            const vmMatch = b.comment.match(/^VM-(\d+)$/);
-            const ctMatch = b.comment.match(/^CT-(\d+)$/);
+        let updated = 0, skipped = 0, errors = 0, total = 0;
 
-            if (!vmMatch && !ctMatch) {
-                skipped++;
+        for (const node of ikNodeRows) {
+            let bindings = [];
+            try {
+                const ik = await getIkuaiClient(node.id);
+                bindings = await ik.getDhcpStaticBindings();
+            } catch (e) {
+                console.error(`[sync-dhcp] 爱快节点 #${node.id}(${node.name || ''}) 拉取绑定失败:`, e.message);
+                errors++;
                 continue;
             }
+            total += bindings.length;
 
-            try {
-                if (vmMatch) {
-                    const vmId = parseInt(vmMatch[1]);
-                    const vm = vmByVmId[vmId];
-                    if (vm && vm.dhcp_static_ip !== b.ip) {
-                        await db.vms.update(vm.id, { dhcp_static_ip: b.ip });
-                        updated++;
-                    } else {
-                        skipped++;
-                    }
-                } else if (ctMatch) {
-                    const ctId = parseInt(ctMatch[1]);
-                    const ct = lxcByCtId[ctId];
-                    if (ct && ct.dhcp_static_ip !== b.ip) {
-                        await db.lxcContainers.update(ct.id, { dhcp_static_ip: b.ip });
-                        updated++;
-                    } else {
-                        skipped++;
-                    }
+            // 仅本节点可回写的台账（按生效爱快过滤后建索引；跨节点同 vmid 不串写）
+            const vmById = {};
+            allVms.forEach(v => { if (effIkId(v) === node.id) vmById[v.vm_id] = v; });
+            const ctById = {};
+            allLxc.forEach(l => { if (effIkId(l) === node.id) ctById[l.ct_id] = l; });
+
+            for (const b of bindings) {
+                // comment 格式: VM-{id} 或 CT-{id}
+                const vmMatch = b.comment.match(/^VM-(\d+)$/);
+                const ctMatch = b.comment.match(/^CT-(\d+)$/);
+
+                if (!vmMatch && !ctMatch) {
+                    skipped++;
+                    continue;
                 }
-            } catch (e) {
-                console.error(`[sync-dhcp] 更新 ${b.comment} 失败:`, e.message);
-                errors++;
+
+                try {
+                    if (vmMatch) {
+                        const vm = vmById[parseInt(vmMatch[1])];
+                        if (vm && vm.dhcp_static_ip !== b.ip) {
+                            await db.vms.update(vm.id, { dhcp_static_ip: b.ip });
+                            updated++;
+                        } else {
+                            skipped++;
+                        }
+                    } else if (ctMatch) {
+                        const ct = ctById[parseInt(ctMatch[1])];
+                        if (ct && ct.dhcp_static_ip !== b.ip) {
+                            await db.lxcContainers.update(ct.id, { dhcp_static_ip: b.ip });
+                            updated++;
+                        } else {
+                            skipped++;
+                        }
+                    }
+                } catch (e) {
+                    console.error(`[sync-dhcp] 更新 ${b.comment} 失败:`, e.message);
+                    errors++;
+                }
             }
         }
 

@@ -332,12 +332,12 @@ async function getAvailableDevNumber(vmid, bus) {
 }
 
 // 检查存储池剩余容量
-async function checkStorageCapacity(storage, requestedGb) {
+async function checkStorageCapacity(storage, requestedGb, nodeId = null) {
   var safeStorage = validateParam('storage', storage);
   var safeSize = validateParam('sizeGb', requestedGb);
   try {
-    // 无行上下文（仅存储池名）：回退默认节点查询（多节点下存储池名跨节点不唯一时由调用方保证）
-    var pve = await getPveClient(null);
+    // 多节点：存储池挂在规格绑定的 PVE 节点上，必须按该节点查询（调用方传 spec.pve_node_id）
+    var pve = await getPveClient(nodeId);
     var storageList = await pve.getAllStorages();
     var target = null;
     if (storageList && Array.isArray(storageList)) {

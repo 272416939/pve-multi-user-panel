@@ -26,12 +26,13 @@ async function deductBalance(userId, amount, dbInstance) {
   return require('../services/billing').deductBalance(userId, amount, dbInstance);
 }
 
-async function setVmAffinity(vmid, affinityValue) {
+async function setVmAffinity(vmid, affinityValue, nodeId = null) {
   // PVE API 对 affinity 参数有权限检查 bug（API Token 用户名带 realm 后缀 "@pam",
   // 但 PVE 比较的是裸 "root" 字符串），导致即使是 root 的 API Token 也无法设置 affinity。
   // 解决方法：通过 SSH 直接执行 qm set 命令绕过 API 层的权限检查。
+  // 多节点：必须 SSH 到 VM 所在节点（nodeId 由调用方从套餐/资产行解析）
   var { execSSH, getPveSshConfig } = require('../api/ssh-exec');
-  var sshConfig = await getPveSshConfig();
+  var sshConfig = await getPveSshConfig(nodeId);
   if (!sshConfig.host || !sshConfig.password) {
     throw new Error('SSH 配置不完整，无法设置 CPU 亲和性（请在面板管理后台 > 系统设置 > PVE节点设置 中配置）');
   }

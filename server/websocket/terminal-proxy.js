@@ -55,7 +55,7 @@ terminalProxy.on('connection', async (clientWs, request) => {
         return;
     }
 
-    const { vmid, userId, username } = sessionData;
+    const { vmid, userId, username, nodeId } = sessionData;
     if (!vmid) {
         clientWs.close(4008, '会话数据不完整');
         return;
@@ -64,7 +64,8 @@ terminalProxy.on('connection', async (clientWs, request) => {
     dbg(`[Terminal] 认证通过: user=${username}(${userId}) → LXC ${vmid}`);
 
     const { getPveSshConfig } = require('../api/ssh-exec');
-    const sshConfig = await getPveSshConfig();
+    // 多节点：SSH 必须连容器所在节点（nodeId 由 /lxc/:vmid/terminal 创建会话时写入）
+    const sshConfig = await getPveSshConfig(nodeId != null ? nodeId : null);
     if (!sshConfig.host || !sshConfig.password) {
         clientWs.close(1011, 'SSH 配置不完整：请在面板设置 PVE SSH 连接信息');
         return;

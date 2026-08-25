@@ -99,9 +99,10 @@ async function getPveSshConfig(nodeId = null) {
 
 /**
  * 通过 SSH 在 PVE 节点上执行 pct restore 命令（强制覆盖恢复 LXC 容器）
+ * @param {number|null} nodeId - 备份所属 PVE 节点 id（多节点：恢复必须 SSH 到备份所在节点）
  */
-async function restoreLxcBySSH(vmid, volid, storage) {
-    const sshConfig = await getPveSshConfig();
+async function restoreLxcBySSH(vmid, volid, storage, nodeId = null) {
+    const sshConfig = await getPveSshConfig(nodeId);
     const host = sshConfig.host;
     const username = sshConfig.username;
     const password = sshConfig.password;

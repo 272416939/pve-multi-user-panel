@@ -31,11 +31,15 @@ const { execSSH, getPveSshConfig } = require('../server/api/ssh-exec');
     (applyMode ? 'APPLY (实际清理)' : 'DRY-RUN (仅查询)'));
 
   // 查找所有已挂载但 VM 不存在的非 legacy 磁盘
+  // 多节点：JOIN 必须同时匹配节点（d.pve_node_id = v.pve_node_id），
+  // 否则跨节点同 vmid 会把「本节点已销毁、他节点恰好同号」的盘误判为仍存活（漏清），
+  // 或在安全模式下于错误节点上 pvesm 检查不到卷而误删台账
   const [rows] = await pool.execute(`
     SELECT d.id, d.volume_id, d.status, d.bind_vmid, d.is_legacy, d.disk_name,
-           d.storage_pool, d.capacity_gb
+           d.storage_pool, d.capacity_gb, d.pve_node_id
     FROM disks d
     LEFT JOIN vms v ON d.bind_vmid = v.vm_id
+      AND (d.pve_node_id IS NULL OR v.pve_node_id IS NULL OR v.pve_node_id = d.pve_node_id)
     WHERE d.bind_vmid IS NOT NULL
       AND v.vm_id IS NULL
       AND d.status = 'bound'
@@ -62,11 +66,8 @@ const { execSSH, getPveSshConfig } = require('../server/api/ssh-exec');
     }
   } else {
     // 安全模式：检查 PVE 卷是否存在
-    var sshConfig = await getPveSshConfig();
-    if (!sshConfig.host || !sshConfig.password) {
-      console.error('\n错误: SSH 配置不完整，无法检查 PVE 卷状态。若确认要清理请使用 --force 参数');
-      process.exit(1);
-    }
+    // 多节点：按磁盘所属节点解析 SSH（同节点复用），pvesm 必须在卷所在节点执行
+    const sshConfigCache = new Map(); // nodeKey -> sshConfig|null
 
     for (const disk of rows) {
       var volParts = (disk.volume_id || '').split(':');
@@ -75,6 +76,29 @@ const { execSSH, getPveSshConfig } = require('../server/api/ssh-exec');
         continue;
       }
       var storagePool = volParts[0];
+      if (!/^[a-zA-Z0-9_-]+$/.test(storagePool)) {
+        console.log('[跳过] disk.id=' + disk.id + ' 存储池名非法: ' + JSON.stringify(storagePool));
+        continue;
+      }
+
+      var diskNodeId = disk.pve_node_id != null ? disk.pve_node_id : null;
+      var nodeKey = String(diskNodeId);
+      var sshConfig;
+      if (sshConfigCache.has(nodeKey)) {
+        sshConfig = sshConfigCache.get(nodeKey);
+      } else {
+        try {
+          sshConfig = await getPveSshConfig(diskNodeId);
+        } catch (e) {
+          console.error('[跳过] 节点 #' + nodeKey + ' SSH 配置解析失败:', e.message);
+          sshConfig = null;
+        }
+        sshConfigCache.set(nodeKey, sshConfig);
+      }
+      if (!sshConfig || !sshConfig.host || !sshConfig.password) {
+        console.log('[跳过] disk.id=' + disk.id + ' 所在节点 #' + nodeKey + ' SSH 配置不完整（可用 --force 跳过检查）');
+        continue;
+      }
 
       // 检查 PVE 卷是否存在
       try {

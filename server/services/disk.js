@@ -46,8 +46,8 @@ async function purchaseDisk(opts) {
         return { ok: false, status: 400, error: '余额不足，需要 ' + totalAmount + ' 元', code: 'BALANCE_INSUFFICIENT', params: [totalAmount] };
     }
 
-    // 存储池容量检查
-    await diskOps.checkStorageCapacity(spec.storage_pool, capacityGb * quantity);
+    // 存储池容量检查（多节点：按硬盘规格绑定的 PVE 节点查询）
+    await diskOps.checkStorageCapacity(spec.storage_pool, capacityGb * quantity, spec.pve_node_id);
 
     // 计算到期时间
     var now = new Date();

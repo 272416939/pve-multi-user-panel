@@ -808,7 +808,8 @@ router.post('/lxc/:vmid/terminal', authMiddleware, async (req, res) => {
         // session 数据存服务端（5分钟 TTL，单次性），避免 token 在浏览器历史/日志/Referer 中泄露
         const sessionId = await consoleSession.createSession({
             type: 'terminal',
-            vmid, userId: req.user.id, username: req.user.username
+            vmid, userId: req.user.id, username: req.user.username,
+            nodeId: ct ? ct.pve_node_id : null
         });
 
         const proxyUrl = `/terminal?session=${sessionId}`;
@@ -974,8 +975,9 @@ router.post('/lxc/:vmid/reset-password', authMiddleware, async (req, res) => {
         }
  
         // C-3 最终修复：使用 stdin 管道传密码，彻底消除 shell 注入
+        // 多节点：SSH 必须连容器所在节点执行 lxc-attach
         const { getPveSshConfig } = require('../api/ssh-exec');
-        const sshConfig = await getPveSshConfig();
+        const sshConfig = await getPveSshConfig(ct ? ct.pve_node_id : null);
         if (!sshConfig.host) { return res.status(500).json({ error: 'SSH 配置不完整：请在面板设置 PVE SSH 连接信息', code: 'SSH_NOT_CONFIGURED' }); }
         if (!sshConfig.password) { return res.status(500).json({ error: 'SSH 配置不完整：请在面板设置 PVE SSH 密码', code: 'SSH_NO_PASSWORD' }); }
 
