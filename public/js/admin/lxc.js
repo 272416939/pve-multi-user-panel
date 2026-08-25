@@ -26,6 +26,8 @@
     // LXC 特性多选下拉（直开容器表单）
     $.lxcFeatureOpen = ref(false);
     $.lxcFeaturesSet = ref(new Set());
+    // 初始勾选同步：直开表单 features 默认 nesting=1，UI 勾选集合需一致（否则下拉无勾选显示）
+    $.syncLxcFeatureSet($.lxcFeaturesSet, $.lxcForm, 'features');
     $.lxcFeatureText = computed(function() {
         return [...$.lxcFeaturesSet.value].map(function(k) { return k + '=1'; }).join(',');
     });

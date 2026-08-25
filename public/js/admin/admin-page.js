@@ -78,6 +78,10 @@ var App = {
         if (!$.lxcFeatureOpen) $.lxcFeatureOpen = Vue.ref(false);
         if (!$.lxcFeaturesSet) $.lxcFeaturesSet = Vue.ref(new Set());
         if (!$.lxcFeatureText) $.lxcFeatureText = Vue.computed(function() { return ''; });
+        // 兜底：直开表单初始勾选同步（业务页正常加载时此处因 set 已存在被跳过）
+        if ($.lxcFeaturesSet && $.lxcForm && $.syncLxcFeatureSet) {
+            $.syncLxcFeatureSet($.lxcFeaturesSet, $.lxcForm, 'features');
+        }
         if (!$.packagePage) $.packagePage = {};
         if (!$.packagePage.vmPackages) $.packagePage.vmPackages = Vue.ref([]);
         if (!$.packagePage.lxcPackages) $.packagePage.lxcPackages = Vue.ref([]);
