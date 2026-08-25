@@ -90,15 +90,17 @@
                                         <div class="col-md-4">
                                             <label class="form-label">{{ t('admin.lxc.features') }}</label>
                                             <div class="lxc-feature-dropdown" :class="{ open: lxcFeatureOpen }">
-                                                <button type="button" class="form-control lxc-feature-trigger text-start" @click="toggleLxcFeatureDropdown()">
+                                                <div class="custom-select-trigger" @click="toggleLxcFeatureDropdown()">
                                                     <span v-if="lxcFeatureText">{{ lxcFeatureText }}</span>
-                                                    <span v-else class="text-muted">{{ t('admin.lxc.featuresPh') }}</span>
-                                                </button>
-                                                <div class="lxc-feature-menu">
-                                                    <label v-for="opt in lxcFeatureOptions" :key="opt" class="lxc-feature-item">
-                                                        <input type="checkbox" :checked="lxcFeaturesSet.has(opt)" @change="toggleDirectLxcFeature(opt)">
-                                                        <span>{{ opt }}</span>
-                                                    </label>
+                                                    <span v-else class="custom-select-placeholder">{{ t('admin.lxc.featuresPh') }}</span>
+                                                </div>
+                                                <div class="custom-select-dropdown lxc-feature-menu">
+                                                    <div v-for="opt in lxcFeatureOptions" :key="opt.name" class="option"
+                                                         :class="{ selected: lxcFeaturesSet.has(opt.name) }" :title="t(opt.descKey)"
+                                                         @click="toggleDirectLxcFeature(opt.name)">
+                                                        <span>{{ opt.name }}</span>
+                                                        <span class="lxc-feature-desc">{{ t(opt.descKey) }}</span>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>

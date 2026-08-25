@@ -149,7 +149,7 @@
             tp.lxcTemplateForm.value = { id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512,
                 swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp',
                 ipv6_enabled: 1, ip6_mode: 'dhcp', ip6_addr: '', ip4_addr: '',
-                unprivileged: 1, features: '', mac_group_id: '', description: '', status: 'active', pve_node_id: null };
+                unprivileged: 1, features: 'nesting=1', mac_group_id: '', description: '', status: 'active', pve_node_id: null };
         }
         // 多节点：候选按（已回填的）所选节点加载，须在表单赋值之后执行
         tp.loadNodeOptions();

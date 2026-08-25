@@ -66,7 +66,14 @@ var App = {
         // LXC 特性多选下拉兜底（modal 常驻渲染，template.js 未定义时也不崩）
         if (!$.templatePage.lxcFeatureOpen) $.templatePage.lxcFeatureOpen = Vue.ref(false);
         if (!$.templatePage.lxcFeaturesSet) $.templatePage.lxcFeaturesSet = Vue.ref(new Set());
-        if (!$.templatePage.lxcFeatureOptions) $.templatePage.lxcFeatureOptions = Vue.ref(['nesting', 'fuse', 'keyctl', 'mknod', 'mount', 'nfs', 'samba', 'cifs']);
+        if (!$.templatePage.lxcFeatureOptions) $.templatePage.lxcFeatureOptions = Vue.ref([
+            { name: 'nesting', descKey: 'admin.lxc.feat.nesting' }, { name: 'fuse', descKey: 'admin.lxc.feat.fuse' },
+            { name: 'keyctl', descKey: 'admin.lxc.feat.keyctl' }, { name: 'mknod', descKey: 'admin.lxc.feat.mknod' },
+            { name: 'mount', descKey: 'admin.lxc.feat.mount' }, { name: 'nfs', descKey: 'admin.lxc.feat.nfs' },
+            { name: 'samba', descKey: 'admin.lxc.feat.samba' }, { name: 'cifs', descKey: 'admin.lxc.feat.cifs' }
+        ]);
+        if (!$.lxcFeatureOptions) $.lxcFeatureOptions = Vue.ref([]);
+        if (!$.lxcFeatureDefaultSet) $.lxcFeatureDefaultSet = ['nesting'];
         if (!$.templatePage.lxcFeatureText) $.templatePage.lxcFeatureText = Vue.computed(function() { return ''; });
         if (!$.lxcFeatureOpen) $.lxcFeatureOpen = Vue.ref(false);
         if (!$.lxcFeaturesSet) $.lxcFeaturesSet = Vue.ref(new Set());

@@ -423,33 +423,21 @@ html[data-template="saas"] .dropdown-menu-table li a.disabled:hover { opacity: .
 .custom-select-text { overflow: hidden; text-overflow: ellipsis; }
 .custom-select-trigger .custom-select-placeholder { color: var(--text-secondary); }
 
-/* ===== 表单内「特性多选下拉」（LXC 模板/直开容器表单共用，弹窗内 absolute 定位）===== */
+/* ===== 表单内「特性多选下拉」（LXC 模板/直开容器表单共用）=====
+   视觉复用 select-glass 玻璃体系（trigger/.custom-select-dropdown/.option），
+   仅将弹层定位覆盖为弹窗内 absolute（fixed 弹层在 modal 内会脱离容器） */
 .lxc-feature-dropdown { position: relative; }
-.lxc-feature-trigger {
-    display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    cursor: pointer; padding-right: 30px;
-}
-.lxc-feature-trigger::after {
-    content: ''; position: absolute; top: 50%; right: 14px; width: 7px; height: 7px;
-    border-right: 2px solid var(--text-secondary); border-bottom: 2px solid var(--text-secondary);
-    transform: translateY(-70%) rotate(45deg); transition: transform .2s;
-}
-.lxc-feature-dropdown.open .lxc-feature-trigger::after { transform: translateY(-30%) rotate(-135deg); }
-.lxc-feature-menu {
-    display: none; position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1060;
-    max-height: 220px; overflow-y: auto; overscroll-behavior: contain;
-    background: var(--bg-modal); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-    border: 1px solid var(--border-color); border-radius: 10px;
-    box-shadow: var(--shadow-md); padding: 6px 0;
+.lxc-feature-dropdown .custom-select-trigger { width: 100%; }
+.lxc-feature-dropdown .lxc-feature-menu {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 1060;
+    max-height: 240px; overflow-y: auto; overscroll-behavior: contain;
 }
 .lxc-feature-dropdown.open .lxc-feature-menu { display: block; }
-.lxc-feature-item {
-    display: flex; align-items: center; gap: 8px; padding: 6px 12px; cursor: pointer;
-    font-size: 13px; color: var(--text-secondary);
+.lxc-feature-dropdown .option { line-height: 1.35; }
+.lxc-feature-desc {
+    display: block; font-size: 11.5px; color: var(--text-secondary);
+    opacity: .72; margin-top: 1px; white-space: normal; word-break: break-all;
 }
-.lxc-feature-item:hover { background: var(--bg-input); }
-.lxc-feature-item input[type="checkbox"] { margin: 0; flex-shrink: 0; }
 .custom-select-dropdown {
     display: none;
     position: fixed;

@@ -143,9 +143,21 @@
     };
 
     // ==================== LXC 特性多选下拉（模板表单/直开容器表单共用）====================
-    // PVE lxc features 标准枚举（技术值，i18n 豁免）；存储格式保持逗号串 'nesting=1,keyctl=1' 与后端/直开创建兼容
-    $.lxcFeatureOptions = ['nesting', 'fuse', 'keyctl', 'mknod', 'mount', 'nfs', 'samba', 'cifs'];
-    // 勾选/取消：更新 setRef 并写回表单字段（逗号串）
+    // PVE lxc features 标准枚举；name 为技术值（i18n 豁免），desc 走 i18n 词条 admin.lxc.feat.<name>
+    // 存储格式保持逗号串 'nesting=1,keyctl=1' 与后端/直开创建兼容
+    $.lxcFeatureOptions = [
+        { name: 'nesting', descKey: 'admin.lxc.feat.nesting' },
+        { name: 'fuse', descKey: 'admin.lxc.feat.fuse' },
+        { name: 'keyctl', descKey: 'admin.lxc.feat.keyctl' },
+        { name: 'mknod', descKey: 'admin.lxc.feat.mknod' },
+        { name: 'mount', descKey: 'admin.lxc.feat.mount' },
+        { name: 'nfs', descKey: 'admin.lxc.feat.nfs' },
+        { name: 'samba', descKey: 'admin.lxc.feat.samba' },
+        { name: 'cifs', descKey: 'admin.lxc.feat.cifs' }
+    ];
+    // nesting 默认勾选：不开启时容器内无法正常使用系统终端（嵌套虚拟化受限）
+    $.lxcFeatureDefaultSet = ['nesting'];
+    // 勾选/取消：更新 setRef 并写回表单字段（逗号串）；opt 为特性 name
     $.toggleLxcFeature = function(setRef, formRef, formKey, opt) {
         var s = new Set(setRef.value);
         if (s.has(opt)) { s.delete(opt); } else { s.add(opt); }
@@ -158,7 +170,7 @@
         var s = new Set();
         String(raw).split(',').forEach(function(seg) {
             var m = String(seg).trim().match(/^([a-zA-Z0-9_]+)=(\d+)$/);
-            if (m && $.lxcFeatureOptions.indexOf(m[1]) !== -1) s.add(m[1]);
+            if (m && $.lxcFeatureOptions.some(function(o) { return o.name === m[1]; })) s.add(m[1]);
         });
         setRef.value = s;
     };

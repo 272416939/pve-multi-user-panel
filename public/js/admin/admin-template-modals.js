@@ -1261,15 +1261,17 @@
                                     <div class="col-md-6">
                                         <label class="form-label">{{ t('admin.lxc.features') }}</label>
                                         <div class="lxc-feature-dropdown" :class="{ open: templatePage.lxcFeatureOpen.value }">
-                                            <button type="button" class="form-control lxc-feature-trigger text-start" @click="templatePage.toggleLxcFeatureDropdown()">
+                                            <div class="custom-select-trigger" @click="templatePage.toggleLxcFeatureDropdown()">
                                                 <span v-if="templatePage.lxcFeatureText && templatePage.lxcFeatureText.value">{{ templatePage.lxcFeatureText.value }}</span>
-                                                <span v-else class="text-muted">{{ t('admin.lxc.featuresPh') }}</span>
-                                            </button>
-                                            <div class="lxc-feature-menu">
-                                                <label v-for="opt in templatePage.lxcFeatureOptions.value" :key="opt" class="lxc-feature-item">
-                                                    <input type="checkbox" :checked="templatePage.lxcFeaturesSet.value.has(opt)" @change="templatePage.toggleLxcFeature(opt)">
-                                                    <span>{{ opt }}</span>
-                                                </label>
+                                                <span v-else class="custom-select-placeholder">{{ t('admin.lxc.featuresPh') }}</span>
+                                            </div>
+                                            <div class="custom-select-dropdown lxc-feature-menu">
+                                                <div v-for="opt in (templatePage.lxcFeatureOptions && templatePage.lxcFeatureOptions.value) || []" :key="opt.name"
+                                                     class="option" :class="{ selected: templatePage.lxcFeaturesSet && templatePage.lxcFeaturesSet.value.has(opt.name) }"
+                                                     :title="t(opt.descKey)" @click="templatePage.toggleLxcFeature(opt.name)">
+                                                    <span>{{ opt.name }}</span>
+                                                    <span class="lxc-feature-desc">{{ t(opt.descKey) }}</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
