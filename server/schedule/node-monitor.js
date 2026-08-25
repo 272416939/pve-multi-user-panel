@@ -169,7 +169,7 @@ async function bootCheckNodes() {
             const base = String(n.api_host || '').replace(/\/+$/, '');
             const r = base
                 ? await probeUrl(base + '/api2/json/access/version', !!n.strict_tls)
-                : { ok: false, error: '未配置 API 地址' };
+                : { ok: false, error: '未配置节点地址', code: 'NODE_ADDR_MISSING' };
             if (r.ok) {
                 pveOk++;
                 console.log('[节点] PVE#' + n.id + ' ' + n.name + ' (' + n.api_host + ') 连接正常 ' + r.latency_ms + 'ms');
@@ -181,7 +181,7 @@ async function bootCheckNodes() {
             const ver = (n.version || 'v3').toUpperCase();
             const r = n.host
                 ? await probeUrl(n.host, !!n.strict_tls)
-                : { ok: false, error: '未配置地址' };
+                : { ok: false, error: '未配置节点地址', code: 'NODE_ADDR_MISSING' };
             if (r.ok) {
                 ikOk++;
                 console.log('[节点] 爱快#' + n.id + ' ' + n.name + ' (' + n.host + ', ' + ver + ') 连接正常 ' + r.latency_ms + 'ms');

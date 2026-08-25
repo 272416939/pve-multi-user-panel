@@ -1092,6 +1092,10 @@ async function migrateSchema() {
     await safeAlter('subnets', 'ikuai_node_id', 'INT DEFAULT NULL');
     // 存储分组可选绑定可用区（NULL=通用，所有可用区可用）
     await safeAlter('storage_groups', 'zone_id', 'INT DEFAULT NULL');
+    // 磁盘台账 pve_node_id 存量回填（购买路径此前未写该列；按规格绑定的节点回填）
+    try {
+        await execute("UPDATE disks SET pve_node_id = (SELECT ds.pve_node_id FROM disk_specs ds WHERE ds.id = disks.spec_id) WHERE pve_node_id IS NULL AND spec_id IS NOT NULL");
+    } catch (_) {}
 
     await safeAddIndex('vms', 'idx_vms_pve_node', 'pve_node_id, vm_id');
     await safeAddIndex('lxc_containers', 'idx_lxc_pve_node', 'pve_node_id, ct_id');

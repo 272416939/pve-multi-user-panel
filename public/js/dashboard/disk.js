@@ -194,7 +194,7 @@
       capacity_gb: 100, disk_name: '',
       period: 'month', period_count: 1, quantity: 1, auto_renew: false
     };
-    $.purchaseZone.value = null;
+    $.purchaseZone.value = ($.diskPurchaseZones.value && $.diskPurchaseZones.value.length > 0) ? $.diskPurchaseZones.value[0].id : null; // 磁盘不可跨区，强制选定可用区（默认第一个）
     $.purchasePrice.value = 0;
     $.showCreateDiskModal.value = true;
     $.bsModalShow('createDiskModal');
@@ -262,7 +262,7 @@
         body: JSON.stringify({ vmid: parseInt(vmid) })
       });
       var data = await res.json();
-      if (!res.ok) { alert(data.error || window.__i18n.t('dash.disk.bindFailed')); return; }
+      if (!res.ok) { alert(window.translateApiError ? window.translateApiError(data) : (data.error || window.__i18n.t('dash.disk.bindFailed'))); return; }
       $.bsModalHide('bindDiskModal');
       alert(window.__i18n.tFormat('dash.disk.bindSuccess', data.bus, data.dev));
       await $.loadDisks();

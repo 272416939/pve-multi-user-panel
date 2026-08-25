@@ -42,6 +42,7 @@
               <th class="text-center">ID</th>
               <th>{{ t('common.name') }}</th>
               <th>{{ t('dash.disk.storageGroup') }}</th>
+              <th>{{ t('admin.disk.groupZone') }}</th>
               <th>{{ t('dash.disk.specName') }}</th>
               <th class="text-center">{{ t('common.type') }}</th>
               <th class="text-center">{{ t('dash.disk.capacity') }}</th>
@@ -58,6 +59,7 @@
               <td class="text-center">{{ disk.id }}</td>
             <td>{{ disk.disk_name || '-' }}<span v-if="disk.is_legacy" class="text-muted small ms-1">({{ t('dash.disk.followVm') }})</span></td>
             <td>{{ disk.group_name || '-' }}</td>
+            <td>{{ disk.zone_name || '-' }}</td>
             <td>{{ disk.spec_name || '-' }}</td>
             <td class="text-center"><span :class="getDiskTypeBadge(disk.disk_type)">{{ disk.disk_type }}</span></td>
             <td class="text-center">{{ disk.capacity_gb }} GiB</td>
@@ -83,7 +85,7 @@
             </td>
           </tr>
           <tr v-if="disks.length === 0">
-            <td colspan="12" class="text-center text-muted py-4">{{ t('dash.disk.empty') }}</td>
+            <td colspan="13" class="text-center text-muted py-4">{{ t('dash.disk.empty') }}</td>
           </tr>
         </tbody>
       </table>
@@ -103,9 +105,9 @@
         <div class="mb-3">
           <label class="form-label">{{ t('order.pickZone') }}</label>
           <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-sm" :class="!purchaseZone ? 'btn-primary' : 'btn-outline-secondary'" @click="purchaseZone = null; diskPurchaseForm.spec_id = ''; calcDiskPrice()">{{ t('common.all') }}</button>
-            <button type="button" class="btn btn-sm" v-for="z in diskPurchaseZones" :key="z.id" :class="Number(purchaseZone) === Number(z.id) ? 'btn-primary' : 'btn-outline-secondary'" @click="purchaseZone = z.id; diskPurchaseForm.spec_id = ''; calcDiskPrice()">{{ z.name }}</button>
+            <button type="button" class="btn btn-sm" v-for="z in diskPurchaseZones" :key="z.id" :class="Number(purchaseZone) === Number(z.id) ? 'btn-primary' : 'btn-outline-secondary'" @click="purchaseZone = z.id; diskPurchaseForm.storage_group_id = ''; diskPurchaseForm.spec_id = ''; calcDiskPrice()">{{ z.name }}</button>
           </div>
+          <div class="form-text">{{ t('dash.disk.zoneMountHint') }}</div>
         </div>
         <div class="mb-3">
           <label class="form-label">{{ t('dash.disk.storageGroupRequired') }}</label>

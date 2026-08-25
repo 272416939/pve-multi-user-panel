@@ -84,9 +84,9 @@ async function purchaseDisk(opts) {
 
             // 写入磁盘台账
             await conn.execute(
-                `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, disk_format, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-                [volId, thisDiskName, specId, userId, spec.storage_group_id, spec.storage_pool, spec.disk_type, spec.disk_format || null, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null]
+                `INSERT INTO disks (volume_id, disk_name, spec_id, user_id, storage_group_id, storage_pool, disk_type, disk_format, capacity_gb, status, price_per_gb, quarterly_discount, yearly_discount, auto_renew, expire_time, mbps_rd, mbps_rd_max, mbps_wr, mbps_wr_max, iops_rd, iops_rd_max, iops_wr, iops_wr_max, pve_node_id)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                [volId, thisDiskName, specId, userId, spec.storage_group_id, spec.storage_pool, spec.disk_type, spec.disk_format || null, capacityGb, 'free', spec.price_per_gb, spec.quarterly_discount || 0, spec.yearly_discount || 0, autoRenew, expireTime, spec.mbps_rd || null, spec.mbps_rd_max || null, spec.mbps_wr || null, spec.mbps_wr_max || null, spec.iops_rd || null, spec.iops_rd_max || null, spec.iops_wr || null, spec.iops_wr_max || null, spec.pve_node_id || null]
             );
             var [insertResult] = await conn.execute('SELECT LAST_INSERT_ID() as id');
             var newDiskId = insertResult[0].id;
@@ -219,6 +219,20 @@ async function bindDiskToVm(opts) {
     // legacy 磁盘不允许独立操作（随 VM 管理）
     if (disk.is_legacy) {
         return { ok: false, status: 403, error: 'legacy 磁盘随 VM 管理，不支持独立操作', code: 'DISK_LEGACY_VM' };
+    }
+
+    // 同可用区校验：磁盘存储对跨区节点不可见，跨区挂载必然失败
+    try {
+        var db = require('../api/db');
+        var diskNode = disk.pve_node_id != null ? await db.pveNodes.get(disk.pve_node_id) : null;
+        var vmNode = vm.pve_node_id != null ? await db.pveNodes.get(vm.pve_node_id) : null;
+        var diskZone = diskNode ? diskNode.zone_id : disk.pve_node_id;
+        var vmZone = vmNode ? vmNode.zone_id : vm.pve_node_id;
+        if (diskZone != null && vmZone != null && Number(diskZone) !== Number(vmZone)) {
+            return { ok: false, status: 400, error: '磁盘「' + (disk.disk_name || disk.volume_id) + '」与虚拟机「' + (vm.name || vm.vm_id) + '」不在同一可用区，无法挂载', code: 'DISK_VM_ZONE_MISMATCH', params: [disk.disk_name || disk.volume_id, vm.name || vm.vm_id] };
+        }
+    } catch (e) {
+        console.error('[disk bind] 可用区校验异常（放行由 PVE 层兜底）:', e.message);
     }
 
     // 文档 7.8：竞争条件防护 - SELECT ... FOR UPDATE 行锁 + 条件更新

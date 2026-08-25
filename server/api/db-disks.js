@@ -86,8 +86,29 @@ const diskSpecs = {
 // 磁盘资产台账
 const disks = {
     getById: (id) => queryOne('SELECT * FROM disks WHERE id = ?', [parseInt(id)]),
-    getByUserId: (userId) => queryAll('SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name FROM disks d LEFT JOIN users u ON d.user_id = u.id LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id LEFT JOIN disk_specs ds ON d.spec_id = ds.id WHERE d.user_id = ? ORDER BY d.id DESC', [parseInt(userId)]),
-    getAll: () => queryAll('SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name FROM disks d LEFT JOIN users u ON d.user_id = u.id LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id LEFT JOIN disk_specs ds ON d.spec_id = ds.id ORDER BY d.id DESC'),
+    // 磁盘台账列表（带可用区：磁盘所在节点的可用区，与绑定同区校验口径一致）
+    getByUserId: (userId) => queryAll(
+        'SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name, ' +
+        'z.name AS zone_name, r.name AS region_name ' +
+        'FROM disks d ' +
+        'LEFT JOIN users u ON d.user_id = u.id ' +
+        'LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id ' +
+        'LEFT JOIN disk_specs ds ON d.spec_id = ds.id ' +
+        'LEFT JOIN pve_nodes n ON d.pve_node_id = n.id ' +
+        'LEFT JOIN zones z ON n.zone_id = z.id ' +
+        'LEFT JOIN regions r ON z.region_id = r.id ' +
+        'WHERE d.user_id = ? ORDER BY d.id DESC', [parseInt(userId)]),
+    getAll: () => queryAll(
+        'SELECT d.*, u.username, sg.name AS group_name, ds.name AS spec_name, ' +
+        'z.name AS zone_name, r.name AS region_name ' +
+        'FROM disks d ' +
+        'LEFT JOIN users u ON d.user_id = u.id ' +
+        'LEFT JOIN storage_groups sg ON d.storage_group_id = sg.id ' +
+        'LEFT JOIN disk_specs ds ON d.spec_id = ds.id ' +
+        'LEFT JOIN pve_nodes n ON d.pve_node_id = n.id ' +
+        'LEFT JOIN zones z ON n.zone_id = z.id ' +
+        'LEFT JOIN regions r ON z.region_id = r.id ' +
+        'ORDER BY d.id DESC'),
     getByVolumeId: (volId) => queryOne('SELECT * FROM disks WHERE volume_id = ?', [volId]),
     // 查询绑定到指定 VMID 的所有磁盘
     getByBindVmid: (vmid) => queryAll('SELECT * FROM disks WHERE bind_vmid = ?', [parseInt(vmid)]),
