@@ -267,26 +267,28 @@
     };
 
     // ==================== 分配区多节点联动 ====================
-    // 节点下拉选项（/admin/pve/nodes，与 OS 模板页同源）；默认选中第一个启用节点
+    // 节点下拉选项（/admin/pve/nodes，与 OS 模板页同源）；严格分步：不预选，未选择时不加载任何候选
     $.loadAssignNodeOptions = async function() {
         try {
             var res = await api('/admin/pve/nodes');
             var nodes = (res && res.nodes) || [];
             $.assignNodes.value = nodes.filter(function(n) { return n.enabled !== 0; });
-            if (!$.assignNodeId.value && $.assignNodes.value.length > 0) {
-                $.assignNodeId.value = String($.assignNodes.value[0].id);
-                $.assignForm.value.pve_node_id = $.assignNodeId.value;
-            }
         } catch (e) {
             console.error('加载 PVE 节点列表失败', e);
         }
     };
 
-    // 切节点：重置已选 VM、重载该节点待分配池 + 该节点配对爱快的 MAC 分组
+    // 切节点：重置已选 VM、重载该节点待分配池 + 该节点配对爱快的 MAC 分组；清空选择则清空全部候选
     watch($.assignNodeId, function(nv, ov) {
-        if (!nv || nv === ov) return;
-        $.assignForm.value.pve_node_id = nv;
+        if (nv === ov) return;
+        $.assignForm.value.pve_node_id = nv || '';
         $.assignForm.value.vm_id = '';
+        if (!nv) {
+            $.availableVms.value = [];
+            $.assignedVms.value = [];
+            $.macGroups.value = [];
+            return;
+        }
         $.loadAssignData();
         $.loadMacGroups(nv);
     });

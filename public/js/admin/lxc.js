@@ -88,45 +88,56 @@
     });
 
     // ==================== 函数 ====================
-    // 多节点：节点选项加载（/admin/pve/nodes 同源），默认选中第一个启用节点
+    // 多节点：节点选项加载（/admin/pve/nodes 同源）；严格分步：不预选，未选择时不加载任何候选
     $.loadLxcNodeOptions = async function() {
         try {
             var res = await api('/admin/pve/nodes');
             var nodes = (res && res.nodes) || [];
             $.lxcNodeOptions.value = nodes.filter(function(n) { return n.enabled !== 0; });
-            if (!$.lxcCreateNodeId.value && $.lxcNodeOptions.value.length > 0) {
-                $.lxcCreateNodeId.value = String($.lxcNodeOptions.value[0].id);
-            }
-            if (!$.lxcAssignNodeId.value && $.lxcNodeOptions.value.length > 0) {
-                $.lxcAssignNodeId.value = String($.lxcNodeOptions.value[0].id);
-            }
         } catch (e) {
             console.error('加载 PVE 节点列表失败', e);
         }
     };
 
-    // 切节点（直开表单）：重载该节点模板/存储，清空已选模板与存储
+    // 切节点（直开表单）：重载该节点模板/存储，清空已选模板与存储；清空选择则清空候选
     watch($.lxcCreateNodeId, function(nv, ov) {
-        if (!nv || nv === ov) return;
+        if (nv === ov) return;
         $.lxcForm.value.ostemplate = '';
         $.lxcForm.value.storage = '';
+        if (!nv) {
+            $.lxcTemplates.value = [];
+            $.lxcStorageList.value = [];
+            return;
+        }
         $.loadLxcTemplates();
     });
 
-    // 切节点（分配池）：重置已选容器、重载该节点池 + 配对爱快 MAC 分组
+    // 切节点（分配池）：重置已选容器、重载该节点池 + 配对爱快 MAC 分组；清空选择则清空全部候选
     watch($.lxcAssignNodeId, function(nv, ov) {
-        if (!nv || nv === ov) return;
-        $.lxcAssignForm.value.pve_node_id = nv;
+        if (nv === ov) return;
+        $.lxcAssignForm.value.pve_node_id = nv || '';
         $.lxcAssignForm.value.ct_id = '';
+        if (!nv) {
+            $.availableLxc.value = [];
+            $.assignedLxc.value = [];
+            $.lxcContainers.value = [];
+            $.macGroups.value = [];
+            return;
+        }
         $.loadLxcContainers();
         $.loadMacGroups(nv);
     });
 
     $.loadLxcTemplates = async function() {
         try {
-            // 多节点：按直开表单所选节点拉取模板/存储
+            // 多节点：按直开表单所选节点拉取模板/存储；未选节点不请求，直接清空
             var nodeId = ($.lxcCreateNodeId && $.lxcCreateNodeId.value) || '';
-            var qs = nodeId ? '?node_id=' + encodeURIComponent(nodeId) : '';
+            if (!nodeId) {
+                $.lxcTemplates.value = [];
+                $.lxcStorageList.value = [];
+                return;
+            }
+            var qs = '?node_id=' + encodeURIComponent(nodeId);
             $.lxcTemplates.value = await api('/lxc/templates' + qs);
             $.lxcStorageList.value = await api('/lxc/storages' + qs);
         } catch (e) {
@@ -138,9 +149,15 @@
 
     $.loadLxcContainers = async function() {
         try {
-            // 多节点：严格分步选择——按分配区所选节点拉取池
+            // 多节点：严格分步选择——按分配区所选节点拉取池；未选节点不请求，直接清空
             var nodeId = ($.lxcAssignNodeId && $.lxcAssignNodeId.value) || '';
-            var data = await api('/pve/lxc' + (nodeId ? '?node_id=' + encodeURIComponent(nodeId) : ''));
+            if (!nodeId) {
+                $.availableLxc.value = [];
+                $.assignedLxc.value = [];
+                $.lxcContainers.value = [];
+                return;
+            }
+            var data = await api('/pve/lxc?node_id=' + encodeURIComponent(nodeId));
             $.availableLxc.value = data.available || [];
             $.assignedLxc.value = data.assigned || [];
             $.lxcContainers.value = data.available || [];

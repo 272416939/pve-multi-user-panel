@@ -345,7 +345,7 @@ watch($.user, function(u) {
                 $.loadSnapshotConfig(),
                 $.loadStorageList(),
                 $.loadBackupConfig(),
-                // 多节点：先加载节点选项（默认选中第一个），再按所选节点拉 LXC 模板/存储/池
+                // 多节点：先加载节点选项（不预选），LXC 模板/存储/池由节点 watch 驱动（严格分步）
                 $.loadLxcNodeOptions()
                     .catch(function(e) { console.error('加载 LXC 节点选项失败', e && e.message); })
                     .then(function() {
@@ -365,10 +365,15 @@ watch($.user, function(u) {
     };
 
     $.loadAssignData = async function() {
+        // 多节点：严格分步——未选节点时不请求，直接清空候选（防 400 噪音与脏数据残留）
+        var nodeId = ($.assignNodeId && $.assignNodeId.value) || '';
+        if (!nodeId) {
+            $.availableVms.value = [];
+            $.assignedVms.value = [];
+            return;
+        }
         try {
-            // 多节点：严格分步选择——按所选节点拉取池（后端必填校验 node_id）
-            var nodeId = ($.assignNodeId && $.assignNodeId.value) || '';
-            var vmData = await api('/pve/vms' + (nodeId ? '?node_id=' + encodeURIComponent(nodeId) : ''));
+            var vmData = await api('/pve/vms?node_id=' + encodeURIComponent(nodeId));
             $.availableVms.value = vmData.available || [];
             $.assignedVms.value = vmData.assigned || [];
         } catch (e) {
@@ -933,13 +938,13 @@ $.initDetailCharts = function() {
                 // 若直接 reject 会让 Promise.all 中断，导致下方日志中心/直达链接的数据加载永不执行
                 await Promise.all([
                     $.loadNavItems(),
-                    // 多节点：先加载节点选项（默认选中第一个），再按所选节点拉取待分配池
+                    // 多节点：先加载节点选项（不预选），分配池由节点 watch 驱动（严格分步）
                     $.loadAssignNodeOptions()
                         .then(function() { return $.loadAssignData(); })
                         .catch(function(e) { console.error('加载分配数据失败', e && e.message); }),
                     $.loadData(),
-                    $.loadOverviewZones(),
-                    $.loadMacGroups().catch(function(e) { console.error('加载 MAC 分组失败', e && e.message); })
+                    $.loadOverviewZones()
+                    // MAC 分组改由分配区节点 watch 驱动（未选节点不显示任何分组）
                 ]);
                 // 日志中心数据加载独立于 expandSections 块：即使上方初始化接口异常，
                 // 直达 ?section=logs 的日志也必须加载（规范第四节：刷新/直达路径显式加载）
