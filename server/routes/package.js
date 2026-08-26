@@ -30,6 +30,24 @@ async function assertPackageNode(res, rawNodeId) {
     return nodeRow;
 }
 
+// 多节点：套餐节点唯一真源=所选模板（开通按套餐节点路由 + OS 模板同节点校验，前后端必须一致）。
+// 创建/更新时服务端强制取模板的 pve_node_id 落库（不信任前端提交值），模板须存在且启用。
+// kind: 'vm' | 'lxc'；返回 { node } 或 null（已写响应）
+async function resolvePackageNodeFromTemplate(res, kind, templateId) {
+    var tpl = await db[kind === 'vm' ? 'vmTemplates' : 'lxcTemplates'].getById(parseInt(templateId) || 0);
+    if (!tpl) {
+        res.status(400).json({ error: '关联模板不存在', code: 'LINKED_TEMPLATE_NOT_FOUND' });
+        return null;
+    }
+    if (tpl.status !== 'active') {
+        res.status(400).json({ error: '关联模板已停用', code: 'LINKED_TEMPLATE_DISABLED' });
+        return null;
+    }
+    var node = await assertPackageNode(res, tpl.pve_node_id);
+    if (!node) return null;
+    return { node: node, tpl: tpl };
+}
+
 // 操作审计统一封装（敏感写操作埋点，失败不影响主流程；规范十一）
 async function adminAudit(req, action, details) {
     try {
@@ -253,21 +271,32 @@ router.get('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, re
 
 router.post('/admin/vm-packages', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        if (!(await assertPackageNode(res, req.body.pve_node_id))) return;
+        // 节点真源=模板：强制取模板的 pve_node_id 落库（含模板存在/启用校验），不信任前端提交值
+        var resolved = await resolvePackageNodeFromTemplate(res, 'vm', req.body.template_id);
+        if (!resolved) return;
+        req.body.pve_node_id = resolved.node.id;
         var r = await db.vmPackages.create(req.body);
         await vmPackageCache.del('all');
         // 操作审计：创建 VM 套餐
         await adminAudit(req, 'admin.package.create', '创建VM套餐:' + packageSpec(req.body));
         res.json(r);
-    } catch (e) { res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' }); }
+    } catch (e) {
+        console.error('[package] VM 套餐创建失败:', e.message);
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
+    }
 });
 
 router.put('/admin/vm-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        // 多节点：改绑节点时校验目标节点有效
-        if (req.body.pve_node_id !== undefined && !(await assertPackageNode(res, req.body.pve_node_id))) return;
+        // 节点真源=模板：换绑模板时强制按模板节点落库，不信任前端提交的 pve_node_id；
+        // 部分更新（补货只传 stock，无 template_id）按旧套餐模板解析
+        var oldPkgForNode = await db.vmPackages.getById(parseInt(req.params.id));
+        var effTplId = req.body.template_id !== undefined ? req.body.template_id : (oldPkgForNode && oldPkgForNode.template_id);
+        var resolved = await resolvePackageNodeFromTemplate(res, 'vm', effTplId);
+        if (!resolved) return;
+        req.body.pve_node_id = resolved.node.id;
         // 先取旧记录（含模板/分组名），更新后取新记录，diff 输出字段级变更明细
-        var oldPkg = await db.vmPackages.getById(parseInt(req.params.id));
+        var oldPkg = oldPkgForNode;
         var r = await db.vmPackages.update(parseInt(req.params.id), req.body);
         await vmPackageCache.del('all');
         // 操作审计：更新 VM 套餐（补货/编辑共用，记录完整规格与具体变更数量）
@@ -359,7 +388,10 @@ router.get('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, r
 
 router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        if (!(await assertPackageNode(res, req.body.pve_node_id))) return;
+        // 节点真源=模板：强制取模板的 pve_node_id 落库（含模板存在/启用校验），不信任前端提交值
+        var resolved = await resolvePackageNodeFromTemplate(res, 'lxc', req.body.template_id);
+        if (!resolved) return;
+        req.body.pve_node_id = resolved.node.id;
         var r = await db.lxcPackages.create(req.body);
         await lxcPackageCache.del('all');
         // 操作审计：创建 LXC 套餐
@@ -370,10 +402,15 @@ router.post('/admin/lxc-packages', authMiddleware, adminMiddleware, async (req, 
 
 router.put('/admin/lxc-packages/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        // 多节点：改绑节点时校验目标节点有效
-        if (req.body.pve_node_id !== undefined && !(await assertPackageNode(res, req.body.pve_node_id))) return;
+        // 节点真源=模板：换绑模板时强制按模板节点落库，不信任前端提交的 pve_node_id；
+        // 部分更新（补货只传 stock，无 template_id）按旧套餐模板解析
+        var oldPkgForNode = await db.lxcPackages.getById(parseInt(req.params.id));
+        var effTplId = req.body.template_id !== undefined ? req.body.template_id : (oldPkgForNode && oldPkgForNode.template_id);
+        var resolved = await resolvePackageNodeFromTemplate(res, 'lxc', effTplId);
+        if (!resolved) return;
+        req.body.pve_node_id = resolved.node.id;
         // 先取旧记录（含模板/分组名），更新后取新记录，diff 输出字段级变更明细
-        var oldPkg = await db.lxcPackages.getById(parseInt(req.params.id));
+        var oldPkg = oldPkgForNode;
         var r = await db.lxcPackages.update(parseInt(req.params.id), req.body);
         await lxcPackageCache.del('all');
         // 操作审计：更新 LXC 套餐（补货/编辑共用，记录完整规格与具体变更数量）

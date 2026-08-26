@@ -220,7 +220,7 @@
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.tpl.vm') }}</label>
                                         <select class="form-select" v-model="packagePage.vmPackageForm.value.template_id">
                                             <option value="">{{ t('admin.pkg.pickTpl') }}</option>
-                                            <option v-for="t in packagePage.vmTemplateOptions.value" :key="t.id" :value="t.id">{{ t.name || ('VM ' + t.vmid) }}</option>
+                                            <option v-for="t in packagePage.vmTemplateOptions.value" :key="t.id" :value="t.id">{{ t.name }}{{ t.pve_node_name ? ' (' + t.pve_node_name + ')' : '' }}</option>
                                         </select>
                                     </div>
                                     <!-- 核心配置 -->
@@ -243,10 +243,7 @@
                                         </select>
                                     </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('pkg.node') }}</label>
-                                        <select class="form-select" v-model="packagePage.vmPackageForm.value.pve_node_id">
-                                            <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
-                                            <option v-for="n in packagePage.pveNodeOptions.value" :key="n.id" :value="n.id">{{ n.name }}{{ n.zone_name ? ' (' + n.zone_name + ')' : '' }}</option>
-                                        </select>
+                                        <input class="form-control" readonly :value="packagePage.vmPkgNodeDisplay()" :title="t('admin.pkg.nodeFromTplTitle')">
                                     </div>
                                     <!-- 状态 -->
                                     <div class="col-md-6"><label class="form-label">{{ t('common.status') }}</label><select class="form-select" v-model="packagePage.vmPackageForm.value.status"><option value="active">{{ t('admin.common.enabled') }}</option><option value="inactive">{{ t('admin.common.disabled') }}</option></select></div>
@@ -275,7 +272,7 @@
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.tpl.lxc') }}</label>
                                         <select class="form-select" v-model="packagePage.lxcPackageForm.value.template_id">
                                             <option value="">{{ t('admin.pkg.pickTpl') }}</option>
-                                            <option v-for="t in packagePage.lxcTemplateOptions.value" :key="t.id" :value="t.id">{{ t.name || ('LXC ' + t.vmid) }}</option>
+                                            <option v-for="t in packagePage.lxcTemplateOptions.value" :key="t.id" :value="t.id">{{ t.name }}{{ t.pve_node_name ? ' (' + t.pve_node_name + ')' : '' }}</option>
                                         </select>
                                     </div>
                                     <!-- 核心配置 -->
@@ -299,10 +296,7 @@
                                         </select>
                                     </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('pkg.node') }}</label>
-                                        <select class="form-select" v-model="packagePage.lxcPackageForm.value.pve_node_id">
-                                            <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
-                                            <option v-for="n in packagePage.pveNodeOptions.value" :key="n.id" :value="n.id">{{ n.name }}{{ n.zone_name ? ' (' + n.zone_name + ')' : '' }}</option>
-                                        </select>
+                                        <input class="form-control" readonly :value="packagePage.lxcPkgNodeDisplay()" :title="t('admin.pkg.nodeFromTplTitle')">
                                     </div>
                                     <!-- 状态 -->
                                     <div class="col-md-6"><label class="form-label">{{ t('common.status') }}</label><select class="form-select" v-model="packagePage.lxcPackageForm.value.status"><option value="active">{{ t('admin.common.enabled') }}</option><option value="inactive">{{ t('admin.common.disabled') }}</option></select></div>

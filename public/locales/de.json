@@ -707,6 +707,8 @@
   "admin.pkg.newLxcPlan": "Neues LXC-Paket",
   "admin.pkg.newVmPlan": "Neues VM-Paket",
   "admin.pkg.noGroup": "Keine Gruppe",
+  "admin.pkg.nodeFromTplPh": "Wird nach Vorlagenauswahl automatisch eingefügt",
+  "admin.pkg.nodeFromTplTitle": "Der Knoten wird durch die gewählte Vorlage bestimmt; zum Ändern bitte die Vorlage bearbeiten",
   "admin.pkg.notFound": "Paket nicht gefunden",
   "admin.pkg.pickTpl": "Vorlage wählen",
   "admin.pkg.planCount": "Pakete",

@@ -707,6 +707,8 @@
   "admin.pkg.newLxcPlan": "New LXC Plan",
   "admin.pkg.newVmPlan": "New VM Plan",
   "admin.pkg.noGroup": "No group",
+  "admin.pkg.nodeFromTplPh": "Auto-filled after selecting a template",
+  "admin.pkg.nodeFromTplTitle": "Node is determined by the selected template; to change it, edit the template node",
   "admin.pkg.notFound": "Plan not found",
   "admin.pkg.pickTpl": "Select a template",
   "admin.pkg.planCount": "Plans",

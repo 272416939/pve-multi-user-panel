@@ -707,6 +707,8 @@
   "admin.pkg.newLxcPlan": "Nouveau plan LXC",
   "admin.pkg.newVmPlan": "Nouveau plan VM",
   "admin.pkg.noGroup": "Sans groupe",
+  "admin.pkg.nodeFromTplPh": "Renseigné automatiquement après sélection du modèle",
+  "admin.pkg.nodeFromTplTitle": "Le nœud est déterminé par le modèle sélectionné ; pour le modifier, éditez le modèle",
   "admin.pkg.notFound": "Plan introuvable",
   "admin.pkg.pickTpl": "Choisissez un modèle",
   "admin.pkg.planCount": "Nombre de plans",

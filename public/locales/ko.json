@@ -707,6 +707,8 @@
   "admin.pkg.newLxcPlan": "신규 LXC 플랜",
   "admin.pkg.newVmPlan": "신규 VM 플랜",
   "admin.pkg.noGroup": "그룹 없음",
+  "admin.pkg.nodeFromTplPh": "템플릿 선택 후 자동 입력",
+  "admin.pkg.nodeFromTplTitle": "노드는 선택한 템플릿에 따라 결정됩니다. 변경하려면 템플릿을 수정하세요",
   "admin.pkg.notFound": "플랜이 없습니다",
   "admin.pkg.pickTpl": "템플릿을 선택하세요",
   "admin.pkg.planCount": "플랜 수",

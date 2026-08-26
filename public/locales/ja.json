@@ -707,6 +707,8 @@
   "admin.pkg.newLxcPlan": "LXCプランを新規作成",
   "admin.pkg.newVmPlan": "VMプランを新規作成",
   "admin.pkg.noGroup": "グループなし",
+  "admin.pkg.nodeFromTplPh": "テンプレート選択後に自動入力",
+  "admin.pkg.nodeFromTplTitle": "ノードは選択したテンプレートで決まります。変更するにはテンプレート側を編集してください",
   "admin.pkg.notFound": "プランが存在しません",
   "admin.pkg.pickTpl": "テンプレートを選択",
   "admin.pkg.planCount": "プラン数",

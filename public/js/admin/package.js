@@ -51,21 +51,23 @@
     };
 
     // 新建套餐：选中模板后自动带入模板配置（CPU/内存/磁盘，LXC 含 Swap），名称为空时带入模板名；
+    // 节点唯一真源=模板（套餐侧只读展示）：选模板同步带出模板的 pve_node_id；
     // 编辑（表单有 id）不动表单已有值——套餐实际售卖配置不回退成模板值
     Vue.watch(function() { return $.vmPackageForm.value.template_id; }, function(nv) {
         if ($.vmPackageForm.value.id) return;
-        if (!nv) return;
+        if (!nv) { $.vmPackageForm.value.pve_node_id = null; return; }
         var tpl = $.vmTemplateOptions.value.find(function(t) { return String(t.id) === String(nv); });
         if (!tpl) return;
         var f = $.vmPackageForm.value;
         f.cores = tpl.cores || 0;
         f.memory = tpl.memory || 0;
         f.disk_size = tpl.disk_size || 0;
+        f.pve_node_id = tpl.pve_node_id || null;
         if (!f.name) f.name = tpl.name || '';
     });
     Vue.watch(function() { return $.lxcPackageForm.value.template_id; }, function(nv) {
         if ($.lxcPackageForm.value.id) return;
-        if (!nv) return;
+        if (!nv) { $.lxcPackageForm.value.pve_node_id = null; return; }
         var tpl = $.lxcTemplateOptions.value.find(function(t) { return String(t.id) === String(nv); });
         if (!tpl) return;
         var f = $.lxcPackageForm.value;
@@ -73,6 +75,7 @@
         f.memory = tpl.memory || 0;
         f.swap = tpl.swap || 0;
         f.disk_size = tpl.disk_size || 0;
+        f.pve_node_id = tpl.pve_node_id || null;
         if (!f.name) f.name = tpl.name || '';
     });
 
@@ -107,6 +110,15 @@
 
     $.duplicateVmPackage = function(p) {
         $.openVmPackageForm(p, true);
+    };
+
+    // 套餐表单节点只读展示：节点真源=所选模板（编辑/复制回显也按模板选项取，保证与真源一致）
+    $.vmPkgNodeDisplay = function() {
+        var f = $.vmPackageForm.value;
+        var tpl = $.vmTemplateOptions.value.find(function(t) { return String(t.id) === String(f.template_id); });
+        if (tpl && tpl.pve_node_name) return tpl.pve_node_name;
+        if (tpl && tpl.pve_node_id) return '#' + tpl.pve_node_id;
+        return f.pve_node_name || window.__i18n.t('admin.pkg.nodeFromTplPh');
     };
 
     $.saveVmPackage = async function() {
@@ -153,6 +165,14 @@
 
     $.duplicateLxcPackage = function(p) {
         $.openLxcPackageForm(p, true);
+    };
+
+    $.lxcPkgNodeDisplay = function() {
+        var f = $.lxcPackageForm.value;
+        var tpl = $.lxcTemplateOptions.value.find(function(t) { return String(t.id) === String(f.template_id); });
+        if (tpl && tpl.pve_node_name) return tpl.pve_node_name;
+        if (tpl && tpl.pve_node_id) return '#' + tpl.pve_node_id;
+        return f.pve_node_name || window.__i18n.t('admin.pkg.nodeFromTplPh');
     };
 
     $.saveLxcPackage = async function() {

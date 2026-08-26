@@ -707,6 +707,8 @@
   "admin.pkg.newLxcPlan": "新建 LXC 套餐",
   "admin.pkg.newVmPlan": "新建 VM 套餐",
   "admin.pkg.noGroup": "无分组",
+  "admin.pkg.nodeFromTplPh": "选择模板后自动带出",
+  "admin.pkg.nodeFromTplTitle": "节点由所选模板决定，如需变更请修改模板的所属节点",
   "admin.pkg.notFound": "套餐不存在",
   "admin.pkg.pickTpl": "请选择模板",
   "admin.pkg.planCount": "套餐数量",
