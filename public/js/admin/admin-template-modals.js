@@ -1155,6 +1155,13 @@
                             <div class="modal-body">
                                 <div class="row g-3">
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.modal.tplName') }}</label><input class="form-control" v-model="templatePage.vmTemplateForm.value.name"></div>
+                                    <div class="col-md-6"><label class="form-label">{{ t('admin.ostemplate.pveTemplateVm') }}</label>
+                                        <select class="form-select" v-model="templatePage.vmTemplateForm.value.template_vmid"
+                                                :disabled="!templatePage.vmTemplateForm.value.pve_node_id">
+                                            <option value="">{{ templatePage.vmTemplateForm.value.pve_node_id ? t('admin.ostemplate.selectVmPlaceholder') : t('admin.ostemplate.vmNodeFirst') }}</option>
+                                            <option v-for="v in templatePage.pveTemplateVms.value" :key="v.vmid" :value="v.vmid">{{ v.name || ('VM ' + v.vmid) }} ({{ v.vmid }})</option>
+                                        </select>
+                                    </div>
                                     <div class="col-md-6"><label class="form-label">{{ t('admin.modal.sysDiskGb') }}</label><input class="form-control" type="number" v-model.number="templatePage.vmTemplateForm.value.disk_size" min="5" max="500"></div>
                                     <div class="col-md-4"><label class="form-label">{{ t('admin.hw.cpuCores') }}</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.cores"></div>
                                     <div class="col-md-4"><label class="form-label">{{ t('admin.hw.memMb') }}</label><input class="form-control" type="number" v-model="templatePage.vmTemplateForm.value.memory"></div>
