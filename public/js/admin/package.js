@@ -50,6 +50,32 @@
         try { $.lxcTemplateOptions.value = await api('/admin/lxc-templates'); } catch (e) {}
     };
 
+    // 新建套餐：选中模板后自动带入模板配置（CPU/内存/磁盘，LXC 含 Swap），名称为空时带入模板名；
+    // 编辑（表单有 id）不动表单已有值——套餐实际售卖配置不回退成模板值
+    Vue.watch(function() { return $.vmPackageForm.value.template_id; }, function(nv) {
+        if ($.vmPackageForm.value.id) return;
+        if (!nv) return;
+        var tpl = $.vmTemplateOptions.value.find(function(t) { return String(t.id) === String(nv); });
+        if (!tpl) return;
+        var f = $.vmPackageForm.value;
+        f.cores = tpl.cores || 0;
+        f.memory = tpl.memory || 0;
+        f.disk_size = tpl.disk_size || 0;
+        if (!f.name) f.name = tpl.name || '';
+    });
+    Vue.watch(function() { return $.lxcPackageForm.value.template_id; }, function(nv) {
+        if ($.lxcPackageForm.value.id) return;
+        if (!nv) return;
+        var tpl = $.lxcTemplateOptions.value.find(function(t) { return String(t.id) === String(nv); });
+        if (!tpl) return;
+        var f = $.lxcPackageForm.value;
+        f.cores = tpl.cores || 0;
+        f.memory = tpl.memory || 0;
+        f.swap = tpl.swap || 0;
+        f.disk_size = tpl.disk_size || 0;
+        if (!f.name) f.name = tpl.name || '';
+    });
+
     $.loadVmPackageGroups = async function() {
         try { $.vmPackageGroups.value = await api('/admin/package-groups?type=vm'); } catch (e) {}
     };
