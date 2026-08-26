@@ -744,11 +744,25 @@ async function adminProvisionVm(opts) {
     var randomName = name || generateVmName();
     var newVmid = await pve.getNextAvailableVmid();
 
+    // 克隆源：VM 套餐模板的 template_vmid 为遗留字段（新表单不再填写，存量 vmid=0），
+    // 与用户下单同语义——回落到套餐默认 OS 模板（os_templates，同节点约束）
+    var cloneSourceVmid = template.template_vmid;
+    var cloneStorage = template.target_storage || undefined;
+    var cloneMode = template.clone_mode || 'full';
+    if (!cloneSourceVmid) {
+        var defOsTpl = pkg.default_os_template_id ? await db.osTemplates.getById(pkg.default_os_template_id) : null;
+        if (!defOsTpl || defOsTpl.status !== 'active') {
+            return { ok: false, status: 400, error: '该套餐未配置默认系统模板，无法代开', code: 'ADMIN_PROV_OS_TPL_MISSING' };
+        }
+        cloneSourceVmid = defOsTpl.template_vmid;
+        cloneStorage = defOsTpl.target_storage || cloneStorage;
+    }
+
     // Clone VM
-    var upid = await pve.cloneVm(template.template_vmid, newVmid, {
+    var upid = await pve.cloneVm(cloneSourceVmid, newVmid, {
         name: randomName,
-        storage: template.target_storage || undefined,
-        clone_mode: template.clone_mode || 'full'
+        storage: cloneStorage,
+        clone_mode: cloneMode
     });
     await pve.waitForTask(upid);
 

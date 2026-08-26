@@ -10,25 +10,6 @@ async function tplNode(rawNodeId) {
     return findEnabledNode(rawNodeId);
 }
 
-// 校验模板 VMID 真实存在于该节点且为模板类型（防伪造 VMID 落库后开通阶段才炸）
-async function assertTemplateVmidOnNode(res, nodeId, vmid) {
-    try {
-        const { getPveClient } = require('../api/pve-clients');
-        var pv = await getPveClient(nodeId);
-        var list = await pv.getVms({});
-        var tv = parseInt(vmid);
-        var hit = Array.isArray(list) && list.find(function (v) { return v.vmid === tv && v.template === 1; });
-        if (!hit) {
-            res.status(400).json({ error: '该节点上不存在此模板虚拟机 ({0})', code: 'TPL_VMID_NOT_ON_NODE', params: [String(vmid)] });
-            return false;
-        }
-        return true;
-    } catch (e) {
-        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
-        return false;
-    }
-}
-
 // VM 模板列表
 router.get('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -42,10 +23,9 @@ router.get('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, r
 // VM 模板创建
 router.post('/admin/vm-templates', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        // 多节点：节点必填校验 + 模板 VMID 必须真实存在于该节点
+        // 多节点：节点必填校验（template_vmid 为遗留字段不再强校验——克隆源已改由系统模板提供，用户下单自选）
         var nodeRow = await tplNode(req.body.pve_node_id);
         if (!nodeRow) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
-        if (!(await assertTemplateVmidOnNode(res, nodeRow.id, req.body.template_vmid))) return;
         var { mac_group_id = '' } = req.body;
         var t = await db.vmTemplates.create({ ...req.body, mac_group_id });
         // 操作审计：创建 VM 模板
@@ -81,14 +61,11 @@ var VM_TEMPLATE_DIFF_FIELDS = [
 
 router.put('/admin/vm-templates/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        // 多节点：改绑节点或改模板 VMID 时，按生效值组合校验（节点有效 + VMID 在该节点为模板）
+        // 多节点：改绑节点时校验节点有效（template_vmid 为遗留字段不再强校验，见 POST 注释）
         var oldT = await db.vmTemplates.getById(parseInt(req.params.id));
-        if (req.body.pve_node_id !== undefined || req.body.template_vmid !== undefined) {
-            var effNodeRaw = req.body.pve_node_id !== undefined ? req.body.pve_node_id : (oldT && oldT.pve_node_id);
-            var effVmid = req.body.template_vmid !== undefined ? req.body.template_vmid : (oldT && oldT.template_vmid);
-            var nodeRow = await tplNode(effNodeRaw);
+        if (req.body.pve_node_id !== undefined) {
+            var nodeRow = await tplNode(req.body.pve_node_id);
             if (!nodeRow) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
-            if (!(await assertTemplateVmidOnNode(res, nodeRow.id, effVmid))) return;
         }
         var { mac_group_id = '' } = req.body;
         // 保存前取旧记录（审计 diff 用）

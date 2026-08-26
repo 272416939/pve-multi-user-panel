@@ -159,10 +159,6 @@
 
     tp.saveVmTemplate = async function() {
         var f = tp.vmTemplateForm.value;
-        // 模板 VM 必选（后端强校验模板 VMID 真实存在于所选节点，空值提交必 400）
-        if (!f.pve_node_id || f.template_vmid === '' || f.template_vmid === null || f.template_vmid === undefined) {
-            return alert(window.__i18n.t('admin.tplpage.pickVmFirst'));
-        }
         var body = JSON.stringify(f);
         try {
             if (f.id) {
