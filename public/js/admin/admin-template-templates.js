@@ -32,6 +32,7 @@
                                         <td>
                                             <div class="d-flex gap-2">
                                                 <pv-button @click="templatePage.openVmTemplateForm(row)" variant="outline">{{ t('common.edit') }}</pv-button>
+                                                <pv-button @click="templatePage.duplicateVmTemplate(row)" variant="outline">{{ t('common.copy') }}</pv-button>
                                                 <pv-button @click="templatePage.deleteVmTemplate(row.id)" variant="outline-danger">{{ t('common.delete') }}</pv-button>
                                             </div>
                                         </td>
@@ -71,6 +72,7 @@
                                         <td>
                                             <div class="d-flex gap-2">
                                                 <pv-button @click="templatePage.openLxcTemplateForm(row)" variant="outline">{{ t('common.edit') }}</pv-button>
+                                                <pv-button @click="templatePage.duplicateLxcTemplate(row)" variant="outline">{{ t('common.copy') }}</pv-button>
                                                 <pv-button @click="templatePage.deleteLxcTemplate(row.id)" variant="outline-danger">{{ t('common.delete') }}</pv-button>
                                             </div>
                                         </td>

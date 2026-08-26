@@ -1149,7 +1149,7 @@
                     <div class="modal-dialog modal-lg modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ templatePage.vmTemplateForm.value.id ? t('admin.tplpage.editVmTpl') : t('admin.tplpage.newVmTpl') }}</h5>
+                                <h5 class="modal-title">{{ templatePage.vmTemplateForm.value.id ? t('admin.tplpage.editVmTpl') : (templatePage.vmTplDup.value ? t('admin.tplpage.copyVmTpl') : t('admin.tplpage.newVmTpl')) }}</h5>
                                 <pv-button type="button" variant="close" @click="bsModalHide('vmTemplateModal')"></pv-button>
                             </div>
                             <div class="modal-body">
@@ -1213,7 +1213,7 @@
                     <div class="modal-dialog modal-lg modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ templatePage.lxcTemplateForm.value.id ? t('admin.tplpage.editLxcTpl') : t('admin.tplpage.newLxcTpl') }}</h5>
+                                <h5 class="modal-title">{{ templatePage.lxcTemplateForm.value.id ? t('admin.tplpage.editLxcTpl') : (templatePage.lxcTplDup.value ? t('admin.tplpage.copyLxcTpl') : t('admin.tplpage.newLxcTpl')) }}</h5>
                                 <pv-button type="button" variant="close" data-bs-dismiss="modal" @click="bsModalHide('lxcTemplateModal')"></pv-button>
                             </div>
                             <div class="modal-body">

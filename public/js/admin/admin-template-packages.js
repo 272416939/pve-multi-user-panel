@@ -51,6 +51,7 @@
                                         <td>
                                             <div class="d-flex gap-2">
                             <pv-button @click="packagePage.openVmPackageForm(p)" variant="outline">{{ t('common.edit') }}</pv-button>
+                            <pv-button @click="packagePage.duplicateVmPackage(p)" variant="outline">{{ t('common.copy') }}</pv-button>
                             <pv-button @click="packagePage.restockVmPackage(p)" variant="outline">{{ t('admin.pkg.restock') }}</pv-button>
                             <pv-button @click="packagePage.deleteVmPackage(p.id)" variant="outline">{{ t('common.delete') }}</pv-button>
                         </div>
@@ -144,6 +145,7 @@
                                         <td>
                         <div class="d-flex gap-2">
                             <pv-button @click="packagePage.openLxcPackageForm(p)" variant="outline">{{ t('common.edit') }}</pv-button>
+                            <pv-button @click="packagePage.duplicateLxcPackage(p)" variant="outline">{{ t('common.copy') }}</pv-button>
                             <pv-button @click="packagePage.restockLxcPackage(p)" variant="outline">{{ t('admin.pkg.restock') }}</pv-button>
                             <pv-button @click="packagePage.deleteLxcPackage(p.id)" variant="outline">{{ t('common.delete') }}</pv-button>
                         </div>
@@ -208,7 +210,7 @@
                     <div class="modal-dialog modal-lg modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ packagePage.vmPackageForm.value.id ? t('admin.pkg.editVmPlan') : t('admin.pkg.newVmPlan') }}</h5>
+                                <h5 class="modal-title">{{ packagePage.vmPackageForm.value.id ? t('admin.pkg.editVmPlan') : (packagePage.vmPkgDup.value ? t('admin.pkg.copyVmPlan') : t('admin.pkg.newVmPlan')) }}</h5>
                                 <pv-button type="button" variant="close" data-bs-dismiss="modal"></pv-button>
                             </div>
                             <div class="modal-body">
@@ -263,7 +265,7 @@
                     <div class="modal-dialog modal-lg modal-dialog-centered">
                         <div class="modal-content">
                             <div class="modal-header">
-                                <h5 class="modal-title">{{ packagePage.lxcPackageForm.value.id ? t('admin.pkg.editLxcPlan') : t('admin.pkg.newLxcPlan') }}</h5>
+                                <h5 class="modal-title">{{ packagePage.lxcPackageForm.value.id ? t('admin.pkg.editLxcPlan') : (packagePage.lxcPkgDup.value ? t('admin.pkg.copyLxcPlan') : t('admin.pkg.newLxcPlan')) }}</h5>
                                 <pv-button type="button" variant="close" data-bs-dismiss="modal"></pv-button>
                             </div>
                             <div class="modal-body">

@@ -37,6 +37,12 @@
     };
     tp.lxcOstemplates = ref([]);
     tp.pveNodeOptions = ref([]);
+    // 复制模式标记（弹窗标题三态：编辑/复制/新建）
+    tp.vmTplDup = ref(false);
+    tp.lxcTplDup = ref(false);
+    // 表单回填期标志：open 表单同步赋值期间挂起 pve_node_id watch，
+    // 防止编辑/复制打开表单时回填的节点触发「清空 template_vmid/storage/ostemplate」联动
+    tp._formHydrating = false;
 
     tp.loadNodeOptions = async function() {
         try {
@@ -120,10 +126,18 @@
         try { tp.lxcTemplates.value = await api('/admin/lxc-templates'); } catch (e) {}
     };
 
-    tp.openVmTemplateForm = function(t) {
+    tp.openVmTemplateForm = function(t, isDuplicate) {
+        tp.vmTplDup.value = !!isDuplicate;
+        tp._formHydrating = true;
         if (t) {
             tp.vmTemplateForm.value = Object.assign({}, t);
             tp.vmTemplateForm.value.mac_group_id = t.mac_group_id || '';
+            if (isDuplicate) {
+                // 复制：走新建分支，名称加后缀、状态重置停用，其余字段原样预填
+                tp.vmTemplateForm.value.id = null;
+                tp.vmTemplateForm.value.name = (t.name || '') + window.__i18n.t('common.duplicateSuffix');
+                tp.vmTemplateForm.value.status = 'inactive';
+            }
         } else {
             tp.vmTemplateForm.value = { id: null, name: '', template_vmid: '', cores: 1, memory: 1024, disk_size: 20,
                 network_bridge: 'vmbr0', network_model: 'virtio', os_type: '', ciuser: '',
@@ -135,7 +149,12 @@
         tp.loadPveTemplateVms();
         tp.loadAllStorages();
         tp.loadBridgesFor(tp.vmTemplateForm, tp.vmTemplateBridges);
+        Vue.nextTick(function() { tp._formHydrating = false; });
         $.bsModalShow('vmTemplateModal');
+    };
+
+    tp.duplicateVmTemplate = function(t) {
+        tp.openVmTemplateForm(t, true);
     };
 
     tp.saveVmTemplate = async function() {
@@ -160,11 +179,19 @@
         } catch (e) { alert(e.message); }
     };
 
-    tp.openLxcTemplateForm = function(t) {
+    tp.openLxcTemplateForm = function(t, isDuplicate) {
+        tp.lxcTplDup.value = !!isDuplicate;
+        tp._formHydrating = true;
         if (t) {
             tp.lxcTemplateForm.value = Object.assign({}, t);
             tp.lxcTemplateForm.value.rootfs_storage = t.rootfs_storage || 'local-lvm';
             tp.lxcTemplateForm.value.mac_group_id = t.mac_group_id || '';
+            if (isDuplicate) {
+                // 复制：走新建分支，名称加后缀、状态重置停用，其余字段原样预填
+                tp.lxcTemplateForm.value.id = null;
+                tp.lxcTemplateForm.value.name = (t.name || '') + window.__i18n.t('common.duplicateSuffix');
+                tp.lxcTemplateForm.value.status = 'inactive';
+            }
         } else {
             tp.lxcTemplateForm.value = { id: null, name: '', ostemplate: '', storage: '', rootfs_storage: 'local-lvm', cores: 1, memory: 512,
                 swap: 512, disk_size: 8, network_bridge: 'vmbr0', network_mode: 'dhcp',
@@ -181,7 +208,12 @@
         }
         // 特性多选：编辑回显存量值（新建为空）
         $.syncLxcFeatureSet(tp.lxcFeaturesSet, tp.lxcTemplateForm, 'features');
+        Vue.nextTick(function() { tp._formHydrating = false; });
         $.bsModalShow('lxcTemplateModal');
+    };
+
+    tp.duplicateLxcTemplate = function(t) {
+        tp.openLxcTemplateForm(t, true);
     };
 
     tp.saveLxcTemplate = async function() {
@@ -222,6 +254,7 @@
         // 多节点：切节点联动——VM 模板表单重载模板候选/存储；LXC 模板表单重载存储并清空已选
         Vue.watch(function() { return tp.vmTemplateForm.value.pve_node_id; }, function(nv, ov) {
             if (nv === ov) return;
+            if (tp._formHydrating) return; // 回填期跳过：open 表单预置节点不触发清空
             tp.vmTemplateForm.value.template_vmid = '';
             tp.loadPveTemplateVms();
             tp.loadAllStorages();
@@ -229,6 +262,7 @@
         });
         Vue.watch(function() { return tp.lxcTemplateForm.value.pve_node_id; }, function(nv, ov) {
             if (nv === ov) return;
+            if (tp._formHydrating) return; // 回填期跳过：open 表单预置节点不触发清空
             tp.lxcTemplateForm.value.storage = '';
             tp.lxcTemplateForm.value.ostemplate = '';
             tp.lxcOstemplates.value = [];

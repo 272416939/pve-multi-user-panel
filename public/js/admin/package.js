@@ -20,6 +20,9 @@
     $.pveNodeOptions = Vue.ref([]);
     $.vmGroupForm = Vue.ref({ id: null, name: '', type: 'vm', sort_order: 0 });
     $.lxcGroupForm = Vue.ref({ id: null, name: '', type: 'lxc', sort_order: 0 });
+    // 复制模式标记（弹窗标题三态：编辑/复制/新建）
+    $.vmPkgDup = Vue.ref(false);
+    $.lxcPkgDup = Vue.ref(false);
 
     $.loadNodeOptions = async function() {
         try {
@@ -54,12 +57,19 @@
         try { $.lxcPackageGroups.value = await api('/admin/package-groups?type=lxc'); } catch (e) {}
     };
 
-    $.openVmPackageForm = function(p) {
+    $.openVmPackageForm = function(p, isDuplicate) {
+        $.vmPkgDup.value = !!isDuplicate;
         if (p) {
             $.vmPackageForm.value = Object.assign({}, p);
             var f = $.vmPackageForm.value;
             // 兼容旧数据：null/undefined 视为不限量(-1)
             f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : -1);
+            if (isDuplicate) {
+                // 复制：走新建分支，名称加后缀、状态重置停用（防误购），其余字段原样预填
+                f.id = null;
+                f.name = (p.name || '') + window.__i18n.t('common.duplicateSuffix');
+                f.status = 'inactive';
+            }
         } else {
             $.vmPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, disk_size: 0,
                 monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1,
@@ -67,6 +77,10 @@
         }
         $.loadNodeOptions();
         $.loadVmTemplateOptions().then(function() { admin.bsModalShow('vmPackageModal'); });
+    };
+
+    $.duplicateVmPackage = function(p) {
+        $.openVmPackageForm(p, true);
     };
 
     $.saveVmPackage = async function() {
@@ -89,12 +103,19 @@
         try { await api('/admin/vm-packages/' + id, { method: 'DELETE' }); await $.loadVmPackages(); } catch (e) { alert(e.message); }
     };
 
-    $.openLxcPackageForm = function(p) {
+    $.openLxcPackageForm = function(p, isDuplicate) {
+        $.lxcPkgDup.value = !!isDuplicate;
         if (p) {
             $.lxcPackageForm.value = Object.assign({}, p);
             var f = $.lxcPackageForm.value;
             // 兼容旧数据：null/undefined 视为不限量(-1)
             f.stock = (p.stock !== undefined && p.stock !== null ? p.stock : -1);
+            if (isDuplicate) {
+                // 复制：走新建分支，名称加后缀、状态重置停用（防误购），其余字段原样预填
+                f.id = null;
+                f.name = (p.name || '') + window.__i18n.t('common.duplicateSuffix');
+                f.status = 'inactive';
+            }
         } else {
             $.lxcPackageForm.value = { id: null, name: '', template_id: '', cores: 0, memory: 0, swap: 0, disk_size: 0,
                 monthly_price: 0, quarterly_price: 0, yearly_price: 0, description: '', status: 'active', stock: -1,
@@ -102,6 +123,10 @@
         }
         $.loadNodeOptions();
         $.loadLxcTemplateOptions().then(function() { admin.bsModalShow('lxcPackageModal'); });
+    };
+
+    $.duplicateLxcPackage = function(p) {
+        $.openLxcPackageForm(p, true);
     };
 
     $.saveLxcPackage = async function() {
