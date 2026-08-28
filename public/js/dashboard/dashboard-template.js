@@ -465,6 +465,8 @@
                             <tr>
                                 <th>ID</th>
                                 <th>{{ t('dash.subnet.network') }}</th>
+                                <th>{{ t('admin.assetZone') }}</th>
+                                <th>{{ t('admin.assetNode') }}</th>
                                 <th>{{ t('dash.subnet.gateway') }}</th>
                                 <th>{{ t('dash.subnet.addrPool') }}</th>
                                 <th>{{ t('dash.subnet.servers') }}</th>
@@ -479,6 +481,8 @@
                                 <td>
                                     <span class="text-primary">{{ s.vlan_name }}</span>
                                 </td>
+                                <td>{{ s.zone_name || '-' }}</td>
+                                <td>{{ s.pve_node_name || '-' }}</td>
                                 <td>{{ s.gateway }} / {{ s.netmask }}</td>
                                 <td>{{ s.addr_pool }}</td>
                                 <td>
@@ -496,7 +500,7 @@
                                 </td>
                             </tr>
                             <tr v-if="subnets.length === 0">
-                                <td colspan="8" class="text-center text-muted py-4">{{ t('dash.subnet.noSubnet') }}</td>
+                                <td colspan="10" class="text-center text-muted py-4">{{ t('dash.subnet.noSubnet') }}</td>
                             </tr>
                         </tbody>
                     </table>

@@ -108,6 +108,11 @@ var App = {
         if (!$.lxcForwardTotal) $.lxcForwardTotal = Vue.ref(0);
         if (!$.isEditingForward) $.isEditingForward = Vue.ref(false);
         if (!$.showForwardModal) $.showForwardModal = Vue.ref(false);
+        // 多节点：端口转发/私有网络的节点下拉与筛选（弹窗常驻渲染，缺失时模板会崩）
+        if (!$.forwardNodeOptions) $.forwardNodeOptions = Vue.ref([]);
+        if (!$.forwardFilterNodeId) $.forwardFilterNodeId = Vue.ref('');
+        if (!$.privateSubnetNodeId) $.privateSubnetNodeId = Vue.ref('');
+        if (!$.forwardConfig) $.forwardConfig = Vue.ref({ max_per_user: 10, port_range_start: 50000, port_range_end: 60000, used: 0, remaining: 10 });
         if (!$.redisConfig) $.redisConfig = Vue.ref({ host: '', port: 6379, password: '', db: 0, prefix: 'pve:' });
         if (!$.redisConfigSaving) $.redisConfigSaving = Vue.ref(false);
         if (!$.redisTesting) $.redisTesting = Vue.ref(false);
@@ -239,8 +244,12 @@ app.component('port-forward-list', {
         <div>\
 <div class="module-header">\
 	                <h4 class="module-title">{{ t(\'dash.port.mgmtTitle\') }}</h4>\
-	                <div class="d-flex align-items-center gap-2">\
-	                    <select class="form-select form-select-sm" style="width:auto" v-model="forwardFilterType" @change="filterForward">\
+		                <div class="d-flex align-items-center gap-2">\
+		                    <select class="form-select form-select-sm" style="width:auto" v-model="forwardFilterNodeId" @change="onForwardNodeFilterChange">\
+		                        <option value="">{{ t(\'admin.assetNode\') }}：{{ t(\'common.all\') }}</option>\
+		                        <option v-for="n in forwardNodeOptions" :key="n.id" :value="String(n.id)">{{ n.name }}{{ n.zone_name ? \' (\' + n.zone_name + \')\' : \'\' }}</option>\
+		                    </select>\
+		                    <select class="form-select form-select-sm" style="width:auto" v-model="forwardFilterType" @change="filterForward">\
 	                        <option value="all">{{ t(\'common.all\') }}</option>\
 	                        <option value="vm">VM</option>\
 	                        <option value="lxc">LXC</option>\
@@ -262,6 +271,8 @@ app.component('port-forward-list', {
                             <th>{{ t(\'admin.fwd.idx\') }}</th>\
                             <th>{{ t(\'common.name\') }}</th>\
                             <th>{{ t(\'common.type\') }}</th>\
+                            <th>{{ t(\'admin.assetZone\') }}</th>\
+                            <th>{{ t(\'admin.assetNode\') }}</th>\
                             <th>{{ t(\'dash.port.targetIp\') }}</th>\
                             <th>{{ t(\'dash.port.internalPort\') }}</th>\
                             <th>{{ t(\'dash.port.externalPort\') }}</th>\
@@ -281,6 +292,8 @@ app.component('port-forward-list', {
                                 <span v-else-if="rule.type === \'lxc\'" class="badge bg-info">LXC</span>\
                                 <span v-else class="badge bg-secondary">{{ t(\'admin.port.generic\') }}</span>\
                             </td>\
+                            <td>{{ rule.zone_name || \'-\' }}</td>\
+                            <td>{{ rule.pve_node_name || \'-\' }}</td>\
                             <td>{{ rule.ip }}</td>\
                             <td>{{ rule.internal_port }}</td>\
                             <td>{{ rule.external_port }}</td>\
@@ -329,6 +342,11 @@ app.component('port-forward-list', {
         forwardSearchText: {
             get() { return $.forwardSearchText ? $.forwardSearchText.value : ''; },
             set(val) { if ($.forwardSearchText) $.forwardSearchText.value = val; }
+        },
+        forwardNodeOptions() { return $.forwardNodeOptions ? $.forwardNodeOptions.value : []; },
+        forwardFilterNodeId: {
+            get() { return $.forwardFilterNodeId ? $.forwardFilterNodeId.value : ''; },
+            set(val) { if ($.forwardFilterNodeId) $.forwardFilterNodeId.value = val; }
         }
     },
     methods: {
@@ -336,6 +354,7 @@ app.component('port-forward-list', {
             var defaultType = ($.user.value && $.user.value.role === 'admin') ? 'general' : 'vm';
             $.openAddForward(defaultType);
         },
+        onForwardNodeFilterChange() { $.onForwardNodeFilterChange(); },
         batchDelete() { $.batchDeleteForwards(); },
         toggleAll(e) { $.toggleSelectAllForwards(e); },
         filterForward() {
@@ -357,16 +376,13 @@ app.component('port-forward-list', {
                 name: rule.name, ip: rule.ip,
                 internal_port: rule.internal_port,
                 external_port: rule.external_port,
-                protocol: rule.protocol
+                protocol: rule.protocol,
+                // 多节点：回填规则归属节点（general 可改，设备类型只读展示）
+                pve_node_id: rule.pve_node_id != null ? String(rule.pve_node_id) : ''
             });
-            // general 类型无需加载设备列表
-            if (rule.type !== 'general') {
-                api('/port-forwards/extract-ips').then(function(devices) {
-                    $.availableDevices.value = (devices || []).filter(function(d) { return d.type === rule.type; });
-                }).catch(function(e) { console.error('加载设备列表失败:', e); });
-            } else {
-                $.availableDevices.value = [];
-            }
+            if ($.forwardNodeOptions.value.length === 0) $.loadForwardNodeOptions();
+            // 按规则自身归属节点加载设备（否则筛选下拉为其他节点时，原设备不在候选里、下拉显示空白）
+            $.loadForwardDevices(rule.type, rule.pve_node_id);
             $.showForwardModal.value = true;
             $.bsModalShow('forwardModal');
         },
@@ -381,6 +397,10 @@ app.component('private-network-list', {
             <div class="module-header">\
                 <h4 class="module-title">{{ t(\'admin.net.privateTitle\') }}</h4>\
                 <div class="d-flex align-items-center gap-2">\
+                    <select class="form-select form-select-sm" style="width:auto" v-model="privateSubnetNodeId" @change="onPrivateSubnetNodeChange">\
+                        <option value="">{{ t(\'admin.assetNode\') }}：{{ t(\'common.all\') }}</option>\
+                        <option v-for="n in forwardNodeOptions" :key="n.id" :value="String(n.id)">{{ n.name }}{{ n.zone_name ? \' (\' + n.zone_name + \')\' : \'\' }}</option>\
+                    </select>\
                     <input type="text" class="form-control form-control-sm" style="width:240px" v-model="privateSubnetSearch" :placeholder="t(\'admin.net.searchPh\')" @input="onPrivateSubnetSearch">\
                 </div>\
             </div>\
@@ -395,6 +415,8 @@ app.component('private-network-list', {
                             <th>{{ t(\'admin.net.owner\') }}</th>\
                             <th>VLAN ID</th>\
                             <th>{{ t(\'admin.net.name\') }}</th>\
+                            <th>{{ t(\'admin.assetZone\') }}</th>\
+                            <th>{{ t(\'admin.assetNode\') }}</th>\
                             <th>{{ t(\'admin.net.gatewayMask\') }}</th>\
                             <th>{{ t(\'admin.net.pool\') }}</th>\
                             <th>{{ t(\'admin.net.availIp\') }}</th>\
@@ -409,6 +431,8 @@ app.component('private-network-list', {
                             <td>{{ s.username || \'-\' }}</td>\
                             <td><span class="badge bg-primary">{{ s.vlan_id }}</span></td>\
                             <td><span class="text-primary">{{ s.vlan_name }}</span></td>\
+                            <td>{{ s.zone_name || \'-\' }}</td>\
+                            <td>{{ s.pve_node_name || \'-\' }}</td>\
                             <td>{{ s.gateway }} / {{ s.netmask }}</td>\
                             <td>{{ s.addr_pool }}</td>\
                             <td>{{ s.available }}</td>\
@@ -440,10 +464,16 @@ app.component('private-network-list', {
         privateSubnetSearch: {
             get() { return $.privateSubnetSearch ? $.privateSubnetSearch.value : ''; },
             set(val) { if ($.privateSubnetSearch) $.privateSubnetSearch.value = val; }
+        },
+        forwardNodeOptions() { return $.forwardNodeOptions ? $.forwardNodeOptions.value : []; },
+        privateSubnetNodeId: {
+            get() { return $.privateSubnetNodeId ? $.privateSubnetNodeId.value : ''; },
+            set(val) { if ($.privateSubnetNodeId) $.privateSubnetNodeId.value = val; }
         }
     },
     methods: {
         onPrivateSubnetSearch() { $.onPrivateSubnetSearch(); },
+        onPrivateSubnetNodeChange() { $.onPrivateSubnetNodeChange(); },
         setPrivateSubnetPage(p) { if (p >= 1) $.privateSubnetPage.value = p; }
     }
 });

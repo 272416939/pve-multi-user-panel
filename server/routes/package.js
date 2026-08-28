@@ -151,6 +151,22 @@ router.get('/user/zones', authMiddleware, async (req, res) => {
     }
 });
 
+// 用户端：可选节点列表（供新建子网等需要落到具体 PVE 节点的场景；仅启用且已配对爱快的节点）
+// 与 /user/zones 的区别：子网 = 该节点上级爱快的 VLAN，粒度必须到节点，只给可用区会导致
+// 一区多节点时无法确定落哪台爱快
+router.get('/user/nodes', authMiddleware, async (req, res) => {
+    try {
+        const dbAll = require('../api/db');
+        const nodes = await dbAll.pveNodes.list();
+        const result = nodes
+            .filter(n => n.enabled !== 0 && n.ikuai_node_id != null)
+            .map(n => ({ id: n.id, name: n.name, zone_id: n.zone_id, zone_name: n.zone_name || '', region_name: n.region_name || '' }));
+        res.json({ nodes: result });
+    } catch (e) {
+        res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
+    }
+});
+
 // 用户端：获取按分组归类的套餐列表
 router.get('/package-groups', authMiddleware, async (req, res) => {
     try {

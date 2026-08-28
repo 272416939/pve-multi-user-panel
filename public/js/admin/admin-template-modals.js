@@ -1339,16 +1339,24 @@
                                     <label class="form-label">{{ t('admin.port.selectDevice') }}</label>
                                     <select class="form-select" v-model="forwardForm.vm_id" v-if="forwardForm.type === 'vm'" @change="selectDevice">
                                         <option :value="null">{{ t('admin.port.selectVmOpt') }}</option>
-                                        <option v-for="d in availableDevices" :key="d.device_id" :value="d.device_id">
-                                            {{ d.name }} - {{ d.ip || t('admin.port.ipUnknown') }}
+                                        <option v-for="d in availableDevices" :key="d.type + '-' + d.pve_node_id + '-' + d.device_id" :value="d.device_id">
+                                            {{ d.name }} - {{ d.ip || t('admin.port.ipUnknown') }}{{ d.pve_node_name ? ' (' + d.pve_node_name + ')' : '' }}
                                         </option>
                                     </select>
                                     <select class="form-select" v-model="forwardForm.ct_id" v-else @change="selectDevice">
                                         <option :value="null">{{ t('admin.port.selectCtOpt') }}</option>
-                                        <option v-for="d in availableDevices" :key="d.device_id" :value="d.device_id">
-                                            {{ d.name }} - {{ d.ip || t('admin.port.ipUnknown') }}
+                                        <option v-for="d in availableDevices" :key="d.type + '-' + d.pve_node_id + '-' + d.device_id" :value="d.device_id">
+                                            {{ d.name }} - {{ d.ip || t('admin.port.ipUnknown') }}{{ d.pve_node_name ? ' (' + d.pve_node_name + ')' : '' }}
                                         </option>
                                     </select>
+                                </div>
+                                <div class="mb-3" v-if="userRole === 'admin'">
+                                    <label class="form-label">{{ t('admin.assetNode') }} <span class="text-danger" v-if="forwardForm.type === 'general'">*</span></label>
+                                    <select class="form-select" v-model="forwardForm.pve_node_id" :disabled="forwardForm.type !== 'general'">
+                                        <option value="">{{ forwardForm.type === 'general' ? t('admin.disk.pleaseSelect') : t('dash.port.autoFillAfterPick') }}</option>
+                                        <option v-for="n in forwardNodeOptions" :key="n.id" :value="String(n.id)">{{ n.name }}{{ n.zone_name ? ' (' + n.zone_name + ')' : '' }}</option>
+                                    </select>
+                                    <small class="text-muted">{{ forwardForm.type === 'general' ? t('admin.port.nodeHintGeneral') : t('admin.port.nodeHintDevice') }}</small>
                                 </div>
                                 <div class="mb-3" v-if="forwardForm.type === 'general'">
                                     <div class="alert alert-info small">{{ t('admin.port.genericHint') }}</div>
@@ -1381,7 +1389,7 @@
                                             <pv-button type="button" @click="randomPort" variant="outline">{{ t('dash.port.random') }}</pv-button>
                                             <pv-button type="button" @click="checkPortConflict" variant="outline">{{ t('admin.port.check') }}</pv-button>
                                         </div>
-                                        <small class="text-muted">{{ t('admin.port.availableRange') }} <span v-if="userRole === 'admin'">{{ t('admin.port.fullRange') }}</span><span v-else>{{ networkConfig.port_range_start }}-{{ networkConfig.port_range_end }}</span></small>
+                                        <small class="text-muted">{{ t('admin.port.availableRange') }} <span v-if="userRole === 'admin'">{{ t('admin.port.fullRange') }}</span><span v-else>{{ forwardConfig.port_range_start }}-{{ forwardConfig.port_range_end }}</span></small>
                                         <div v-if="checkResult === true" class="text-success small">{{ t('admin.port.free') }}</div>
                                         <div v-else-if="checkResult === false" class="text-danger small">{{ t('admin.port.taken') }}</div>
                                     </div>
@@ -1470,7 +1478,7 @@
                                                 <input type="number" class="form-control" :class="{ 'is-invalid': deviceCheckResult === false }" v-model.number="deviceForm.external_port" min="1" max="65535">
                                                 <pv-button type="button" @click="randomDevicePort" variant="outline">{{ t('dash.port.random') }}</pv-button>
                                             </div>
-                                            <small class="text-muted">{{ t('admin.port.availableRange') }} {{ networkConfig.port_range_start }}-{{ networkConfig.port_range_end }}</small>
+                                            <small class="text-muted">{{ t('admin.port.availableRange') }} {{ forwardConfig.port_range_start }}-{{ forwardConfig.port_range_end }}</small>
                                         </div>
                                     </div>
                                     <div class="d-flex justify-content-end gap-2">

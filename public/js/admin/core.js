@@ -1097,10 +1097,12 @@ $.initDetailCharts = function() {
                 }
                 // 刷新后停留在端口转发管理时主动加载数据
                 if ($.activeSection.value === 'port-forward') {
+                    $.loadForwardNodeOptions();
                     $.loadForwardRules('all');
                 }
                 // 刷新后停留在私有网络管理时主动加载数据
                 if ($.activeSection.value === 'private-network') {
+                    $.loadForwardNodeOptions();
                     $.loadPrivateSubnets();
                 }
                 // 刷新后停留在 i18n 管理时主动加载数据
@@ -1188,9 +1190,11 @@ $.initDetailCharts = function() {
             url.searchParams.set('section', val);
             history.replaceState({}, '', url);
             if (val === 'port-forward') {
+                $.loadForwardNodeOptions();
                 $.loadForwardRules('all');
             }
             if (val === 'private-network') {
+                $.loadForwardNodeOptions();
                 $.loadPrivateSubnets();
             }
             // 安全防护·限速设置：点击侧边栏进入时加载（activeTabSecurity 默认即 ratelimit，

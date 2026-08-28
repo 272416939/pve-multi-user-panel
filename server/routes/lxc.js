@@ -530,13 +530,15 @@ router.delete('/user/lxc/:id', authMiddleware, adminMiddleware, async (req, res)
     // 级联清理端口转发
     try {
         const ik = await getIkuaiClientForPve(ct ? ct.pve_node_id : null); // NAT 类操作按资产所在节点取爱快客户端
-        const lxcForwards = await db.portForwards.getByCtId(removedCtInfo?.ct_id || ctId);
+        // 多节点：按节点作用域取/删规则，否则会连带清掉其他节点同号容器的转发
+        const fwNodeId = ct ? ct.pve_node_id : null;
+        const lxcForwards = await db.portForwards.getByCtId(removedCtInfo?.ct_id || ctId, fwNodeId);
         for (const fw of lxcForwards) {
             if (fw.ikuai_id) {
                 try { ik.deletePortForward(fw.ikuai_id); } catch (e) {}
             }
         }
-        await db.portForwards.deleteByDevice('lxc', removedCtInfo?.ct_id || ctId);
+        await db.portForwards.deleteByDevice('lxc', removedCtInfo?.ct_id || ctId, fwNodeId);
     } catch (e) { console.error('清理端口转发失败:', e.message); }
     // 清理 DHCP 静态绑定
     if (ct && ct.ct_id) {
@@ -647,7 +649,7 @@ router.post('/lxc/:vmid/start', authMiddleware, async (req, res) => {
                             // 端口转发同步：IP 变化时重建规则（绑定后首次开机/绑定丢失恢复场景）
                             if (newIp !== ct.dhcp_static_ip) {
                                 try {
-                                    await rebuildPortForwardsForDevice('lxc', vmid, newIp);
+                                    await rebuildPortForwardsForDevice('lxc', vmid, newIp, ct.pve_node_id);
                                 } catch (pfErr) { console.error('[lxc.start] 同步端口转发失败:', pfErr.message); }
                             }
                         }
@@ -1329,7 +1331,7 @@ router.post('/lxc/:vmid/reset-ip', authMiddleware, async (req, res) => {
         // 更新端口转发规则中的 IP
         if (newIp) {
             try {
-                const rules = await db.portForwards.getByCtId(vmid);
+                const rules = await db.portForwards.getByCtId(vmid, ct ? ct.pve_node_id : null);
                 for (const rule of rules) {
                     await db.portForwards.update(rule.id, { ip: newIp });
                     // 同步更新 ikuai 端口映射（支持多接口，新格式下数组只有一个元素，interface 字段为逗号分隔值）
@@ -1397,13 +1399,13 @@ router.post('/lxc/:vmid/destroy', authMiddleware, adminMiddleware, async (req, r
             const ik = await getIkuaiClientForPve(ct.pve_node_id); // NAT 类操作按资产所在节点取爱快客户端
             // 级联清理端口转发
             try {
-                const lxcForwards = await db.portForwards.getByCtId(ct.ct_id);
+                const lxcForwards = await db.portForwards.getByCtId(ct.ct_id, ct.pve_node_id);
                 for (const fw of lxcForwards) {
                     if (fw.ikuai_id) {
                         try { ik.deletePortForward(fw.ikuai_id); } catch (e) {}
                     }
                 }
-                await db.portForwards.deleteByDevice('lxc', ct.ct_id);
+                await db.portForwards.deleteByDevice('lxc', ct.ct_id, ct.pve_node_id);
             } catch (e) { console.error('清理端口转发失败:', e.message); }
             // 清理 DHCP 静态绑定
             if (ct && ct.ct_id) {

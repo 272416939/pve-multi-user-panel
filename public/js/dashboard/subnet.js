@@ -11,17 +11,33 @@
     $.subnetRefreshing = ref(false);
     // 子网配额（创建弹窗展示已用/上限，admin max=0 不限）
     $.subnetQuota = ref({ used: 0, max: 0 });
-    // 新建子网所属可用区/节点下拉（来源 /api/user/zones；后端当前按默认爱快节点创建，见报告）
-    $.subnetZones = ref([]);
-    $.subnetZoneId = ref(null);
+    // 新建子网所属节点下拉（来源 /api/user/nodes，按可用区分组展示）
+    // 子网 = 该节点上级爱快的 VLAN，粒度必须到节点：一区多节点时仅给可用区无法确定落哪台爱快
+    $.subnetNodes = ref([]);
+    $.subnetNodeId = ref('');
 
-    $.loadSubnetZones = async function() {
+    // 按可用区分组（模板用 optgroup 渲染；可用区名缺失归到「-」组）
+    $.subnetNodeGroups = Vue.computed(function() {
+        var groups = [];
+        var byZone = {};
+        $.subnetNodes.value.forEach(function(n) {
+            var key = n.zone_name || '-';
+            if (!byZone[key]) {
+                byZone[key] = { zone_name: key, nodes: [] };
+                groups.push(byZone[key]);
+            }
+            byZone[key].nodes.push(n);
+        });
+        return groups;
+    });
+
+    $.loadSubnetNodes = async function() {
         try {
-            var res = await api('/user/zones');
-            $.subnetZones.value = (res && res.zones) || [];
+            var res = await api('/user/nodes');
+            $.subnetNodes.value = (res && res.nodes) || [];
         } catch (e) {
-            console.error('加载可用区失败', e);
-            $.subnetZones.value = [];
+            console.error('加载节点列表失败', e);
+            $.subnetNodes.value = [];
         }
     };
     // 绑定子网弹窗状态
@@ -74,17 +90,19 @@
     $.openCreateSubnet = function() {
         // 打开弹窗时刷新配额（已用/上限），保证提示最新
         $.loadSubnetQuota();
-        // 重新加载可用区 + 重置选中（默认不指定 = 后端默认节点）
-        $.loadSubnetZones();
-        $.subnetZoneId.value = null;
+        // 重新加载节点 + 重置选中（不预选，必须显式选择）
+        $.loadSubnetNodes();
+        $.subnetNodeId.value = '';
         $.bsModalShow('createSubnetModal');
     };
 
     $.createSubnet = async function() {
         if ($.subnetCreating.value) return;
+        // 节点必选：后端也强校验，前端先拦一道给出可读提示
+        if (!$.subnetNodeId.value) return alert(window.__i18n.t('dash.subnet.nodeRequired'));
         $.subnetCreating.value = true;
         try {
-            await api('/subnets', { method: 'POST', body: { node_id: $.subnetZoneId.value } });
+            await api('/subnets', { method: 'POST', body: { node_id: $.subnetNodeId.value } });
             $.bsModalHide('createSubnetModal');
             await $.loadSubnets();
             alert(window.__i18n.t('dash.subnet.created'));

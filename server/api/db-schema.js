@@ -1090,6 +1090,10 @@ async function migrateSchema() {
     // NAT/私有网络挂爱快节点
     await safeAlter('port_forwards', 'ikuai_node_id', 'INT DEFAULT NULL');
     await safeAlter('subnets', 'ikuai_node_id', 'INT DEFAULT NULL');
+    // NAT/私有网络同时挂 PVE 节点：爱快节点可被多个 PVE 节点共用，仅存爱快 ID 无法回推所属节点/可用区，
+    // 列表展示与「general 类型转发（无关联设备）」的节点归属都必须靠这一列
+    await safeAlter('port_forwards', 'pve_node_id', 'INT DEFAULT NULL');
+    await safeAlter('subnets', 'pve_node_id', 'INT DEFAULT NULL');
     // 存储分组可选绑定可用区（NULL=通用，所有可用区可用）
     await safeAlter('storage_groups', 'zone_id', 'INT DEFAULT NULL');
     // 磁盘台账 pve_node_id 存量回填（购买路径此前未写该列；按规格绑定的节点回填）
@@ -1103,6 +1107,8 @@ async function migrateSchema() {
     await safeAddIndex('backups', 'idx_backups_pve_node', 'pve_node_id');
     await safeAddIndex('port_forwards', 'idx_port_forwards_iknode', 'ikuai_node_id');
     await safeAddIndex('subnets', 'idx_subnets_iknode', 'ikuai_node_id');
+    await safeAddIndex('port_forwards', 'idx_port_forwards_pve_node', 'pve_node_id');
+    await safeAddIndex('subnets', 'idx_subnets_pve_node', 'pve_node_id');
 
     await migrateRegionNodes();
 }
@@ -1225,6 +1231,36 @@ async function migrateRegionNodes() {
         if (firstIk) {
             try { await execute('UPDATE port_forwards SET ikuai_node_id = ? WHERE ikuai_node_id IS NULL', [firstIk]); } catch (_) {}
             try { await execute('UPDATE subnets SET ikuai_node_id = ? WHERE ikuai_node_id IS NULL', [firstIk]); } catch (_) {}
+        }
+        // 端口转发/子网的 pve_node_id 存量回填：优先从关联设备取（最准确），
+        // 其次按爱快归属反查唯一配对的 PVE 节点，最后才回落首个节点
+        try {
+            await execute(
+                `UPDATE port_forwards pf SET pf.pve_node_id = (
+                    SELECT v.pve_node_id FROM vms v LEFT JOIN pve_nodes n ON v.pve_node_id = n.id
+                    WHERE v.vm_id = pf.vm_id AND (pf.ikuai_node_id IS NULL OR n.ikuai_node_id = pf.ikuai_node_id)
+                    ORDER BY v.id ASC LIMIT 1)
+                 WHERE pf.pve_node_id IS NULL AND pf.type = 'vm' AND pf.vm_id IS NOT NULL`);
+        } catch (_) {}
+        try {
+            await execute(
+                `UPDATE port_forwards pf SET pf.pve_node_id = (
+                    SELECT c.pve_node_id FROM lxc_containers c LEFT JOIN pve_nodes n ON c.pve_node_id = n.id
+                    WHERE c.ct_id = pf.ct_id AND (pf.ikuai_node_id IS NULL OR n.ikuai_node_id = pf.ikuai_node_id)
+                    ORDER BY c.id ASC LIMIT 1)
+                 WHERE pf.pve_node_id IS NULL AND pf.type = 'lxc' AND pf.ct_id IS NOT NULL`);
+        } catch (_) {}
+        for (const t of ['port_forwards', 'subnets']) {
+            try {
+                await execute(
+                    `UPDATE ${t} x SET x.pve_node_id = (
+                        SELECT n.id FROM pve_nodes n WHERE n.ikuai_node_id = x.ikuai_node_id
+                        ORDER BY n.sort_order DESC, n.id ASC LIMIT 1)
+                     WHERE x.pve_node_id IS NULL AND x.ikuai_node_id IS NOT NULL`);
+            } catch (_) {}
+            if (firstPve) {
+                try { await execute(`UPDATE ${t} SET pve_node_id = ? WHERE pve_node_id IS NULL`, [firstPve]); } catch (_) {}
+            }
         }
 
         // 多节点：vm_disk_snapshots 主键从裸 vm_id 迁移为 (pve_node_id, vm_id)，防跨节点同 vmid 撞键

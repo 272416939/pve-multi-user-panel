@@ -108,16 +108,16 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
         let updated = 0, skipped = 0, errors = 0, total = 0;
 
         for (const node of ikNodeRows) {
-            let bindings = [];
+            let nodeBindings = [];
             try {
                 const ik = await getIkuaiClient(node.id);
-                bindings = await ik.getDhcpStaticBindings();
+                nodeBindings = await ik.getDhcpStaticBindings();
             } catch (e) {
                 console.error(`[sync-dhcp] 爱快节点 #${node.id}(${node.name || ''}) 拉取绑定失败:`, e.message);
                 errors++;
                 continue;
             }
-            total += bindings.length;
+            total += nodeBindings.length;
 
             // 仅本节点可回写的台账（按生效爱快过滤后建索引；跨节点同 vmid 不串写）
             const vmById = {};
@@ -125,7 +125,7 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
             const ctById = {};
             allLxc.forEach(l => { if (effIkId(l) === node.id) ctById[l.ct_id] = l; });
 
-            for (const b of bindings) {
+            for (const b of nodeBindings) {
                 // comment 格式: VM-{id} 或 CT-{id}
                 const vmMatch = b.comment.match(/^VM-(\d+)$/);
                 const ctMatch = b.comment.match(/^CT-(\d+)$/);
@@ -166,7 +166,7 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
             const { auditLog } = require('../utils/audit-log');
             await auditLog({ userId: req.user.id, username: req.user.username, action: 'admin.network.sync-dhcp', resourceType: 'network', details: '同步DHCP绑定:更新 ' + updated + ' 条,跳过 ' + skipped + ',错误 ' + errors, req });
         } catch (e) {}
-        res.json({ updated, skipped, errors, total: bindings.length });
+        res.json({ updated, skipped, errors, total });
     } catch (e) {
         res.status(500).json({ error: safeError(e), code: 'INTERNAL_ERROR' });
     }
@@ -175,6 +175,14 @@ router.post('/ikuai/sync-dhcp-bindings', authMiddleware, adminMiddleware, async 
 router.get('/port-forwards', authMiddleware, async (req, res) => {
     try {
         const { type, vm_id, ct_id, search } = req.query;
+        // 多节点：?node_id= 按所属 PVE 节点筛选（空=全部，管理员需要跨节点总览端口占用）
+        let filterNodeId = null;
+        if (req.query.node_id !== undefined && req.query.node_id !== '') {
+            const { findEnabledNode } = require('../utils/locate-asset');
+            const nodeRow = await findEnabledNode(req.query.node_id);
+            if (!nodeRow) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+            filterNodeId = nodeRow.id;
+        }
         let rules;
         if (req.user.role === 'admin') {
             if (type) rules = await db.portForwards.getByType(type);
@@ -182,6 +190,9 @@ router.get('/port-forwards', authMiddleware, async (req, res) => {
         } else {
             rules = await db.portForwards.getByUserId(req.user.id);
             if (type) rules = rules.filter(r => r.type === type);
+        }
+        if (filterNodeId != null) {
+            rules = rules.filter(r => Number(r.pve_node_id) === Number(filterNodeId));
         }
         // 搜索过滤：按 IP、内网端口、外网端口、名称匹配
         if (search && search.trim()) {
@@ -220,6 +231,9 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
         // general 类型强制 vm_id/ct_id 为 null
         const finalVmId = type === 'vm' ? (vm_id || null) : null;
         const finalCtId = type === 'lxc' ? (ct_id || null) : null;
+        // 设备类型必须指定设备（与 PUT 端点一致；否则下方节点定位无从下手）
+        if (type === 'vm' && !finalVmId) return res.status(400).json({ error: 'VM 类型必须指定虚拟机', code: 'REF_TYPE_VM_REQUIRED' });
+        if (type === 'lxc' && !finalCtId) return res.status(400).json({ error: 'LXC 类型必须指定容器', code: 'REF_TYPE_LXC_REQUIRED' });
         // 基础合法性校验：端口物理范围（TCP/UDP 端口为 16 位无符号整数），对所有用户（含管理员）生效
         if (internal_port < 1 || internal_port > 65535 || external_port < 1 || external_port > 65535) {
             return res.status(400).json({ error: '端口必须在 1-65535 之间', code: 'PORT_RANGE_1_65535' });
@@ -230,37 +244,38 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             return res.status(400).json({ error: '无效的 IP 地址格式', code: 'INVALID_IP_FORMAT' });
         }
 
-        // 新增：校验目标资源归属（general 类型 vm_id/ct_id 均为 null，天然跳过）
-        if (finalVmId && !isAdmin) {
-            const userVms = await db.vms.getByUserId(req.user.id);
-            const ownedVm = userVms.find(v => v.vm_id == finalVmId);
-            if (!ownedVm) {
-                return res.status(403).json({ error: '无权为此虚拟机创建转发规则', code: 'FORWARD_VM_NO_PERM' });
-            }
-            // M-2 修复：到期资源拦截（端口转发属于资源使用）
-            if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
-            }
-        }
-        if (finalCtId && !isAdmin) {
-            const userCts = await db.lxcContainers.getByUserId(req.user.id);
-            const ownedCt = userCts.find(c => c.ct_id == finalCtId);
-            if (!ownedCt) {
-                return res.status(403).json({ error: '无权为此容器创建转发规则', code: 'FORWARD_LXC_NO_PERM' });
-            }
-            // M-2 修复：到期资源拦截（端口转发属于资源使用）
-            if (ownedCt.expiration_date && new Date(ownedCt.expiration_date) < new Date()) {
-                return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
-            }
-        }
-        // 多节点：加载关联资产行确定归属 PVE 节点 → 配对爱快节点（general 无设备回退默认）
+        // 多节点：定位关联设备行 → 归属 PVE 节点 → 配对爱快节点
+        // 设备类型的节点唯一真源是设备台账行（不信任前端提交值）；general 无设备，节点必须由前端显式指定
+        const { locateAssetRow, findEnabledNode } = require('../utils/locate-asset');
         let devNode = null;
-        if (finalVmId) {
-            const vmRow = await db.vms.getByVmid(finalVmId);
-            devNode = vmRow ? vmRow.pve_node_id : null;
-        } else if (finalCtId) {
-            const ctRows = await db.lxcContainers.getByCtId(finalCtId);
-            devNode = ctRows && ctRows.length > 0 ? ctRows[0].pve_node_id : null;
+        if (type === 'general') {
+            const genNode = await findEnabledNode(req.body.pve_node_id);
+            if (!genNode) return res.status(400).json({ error: '请先选择转发规则所属节点', code: 'FORWARD_NODE_REQUIRED' });
+            devNode = genNode.id;
+        } else {
+            const located = await locateAssetRow(type, parseInt(type === 'vm' ? finalVmId : finalCtId), {
+                isAdmin, userId: req.user.id, nodeIdQuery: req.body.pve_node_id
+            });
+            if (located.ambiguous) {
+                return res.status(409).json(type === 'vm'
+                    ? { error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' }
+                    : { error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+            }
+            const devRow = located.row;
+            if (!devRow) {
+                return res.status(type === 'vm' ? 403 : 403).json({
+                    error: type === 'vm' ? '无权为此虚拟机创建转发规则' : '无权为此容器创建转发规则',
+                    code: type === 'vm' ? 'FORWARD_VM_NO_PERM' : 'FORWARD_LXC_NO_PERM'
+                });
+            }
+            // M-2 修复：到期资源拦截（端口转发属于资源使用；管理员不受限）
+            if (!isAdmin && devRow.expiration_date && new Date(devRow.expiration_date) < new Date()) {
+                return res.status(403).json({
+                    error: type === 'vm' ? '虚拟机已到期，请先续费' : '容器已到期，请先续费',
+                    code: type === 'vm' ? 'VM_EXPIRED_RENEW' : 'LXC_EXPIRED_RENEW'
+                });
+            }
+            devNode = devRow.pve_node_id;
         }
         const ikNodeId = await resolvePairedIkNodeId(devNode);
         const ik = await getIkuaiClient(ikNodeId);
@@ -282,7 +297,8 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
             }
         }
 
-        const existing = await db.portForwards.getByExternalPort(external_port);
+        // 外网端口唯一性按爱快节点分域：不同爱快各有独立 WAN，同一端口可复用（历史无归属记录一并计入）
+        const existing = await db.portForwards.getByExternalPort(external_port, ikNodeId);
         if (existing.length > 0) {
             return res.status(400).json({ error: '外网端口已被占用，请更换', code: 'EXT_PORT_TAKEN' });
         }
@@ -297,12 +313,13 @@ router.post('/port-forwards', authMiddleware, async (req, res) => {
                 console.error('[端口转发] ikuai 端口检查失败:', e.message);
             }
         }
-        // 先写入本地（ikuai_node_id 记录规则归属爱快节点，多节点对账/删除按此路由）
+        // 先写入本地（pve_node_id/ikuai_node_id 记录规则归属，多节点列表展示/对账/删除按此路由）
         const rule = await db.portForwards.create({
             type, vm_id: finalVmId, ct_id: finalCtId,
             name: finalName, ip, internal_port, external_port,
             protocol: finalProtocol, sync_status: 'pending',
-            ikuai_node_id: ikNodeId
+            ikuai_node_id: ikNodeId,
+            pve_node_id: devNode
         });
         // 同步到 ikuai（一条规则支持多外网接口，interface 字段传逗号分隔值）
         try {
@@ -392,34 +409,42 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
         if (effectiveType === 'vm' && !effectiveVmId) return res.status(400).json({ error: 'VM 类型必须指定虚拟机', code: 'REF_TYPE_VM_REQUIRED' });
         if (effectiveType === 'lxc' && !effectiveCtId) return res.status(400).json({ error: 'LXC 类型必须指定容器', code: 'REF_TYPE_LXC_REQUIRED' });
 
-        // V3-03 修复：目标资源归属校验（与 POST 端点一致，防止普通用户将转发指向他人资源）
-        if (req.user.role !== 'admin') {
-            if (effectiveVmId) {
-                const ownedVm = (await db.vms.getByUserId(req.user.id)).find(v => v.vm_id == effectiveVmId);
-                if (!ownedVm) return res.status(403).json({ error: '无权为此虚拟机创建转发规则', code: 'FORWARD_VM_NO_PERM' });
-                // M-2 修复：到期资源拦截（端口转发编辑属于资源使用）
-                if (ownedVm.expiration_date && new Date(ownedVm.expiration_date) < new Date()) {
-                    return res.status(403).json({ error: '虚拟机已到期，请先续费', code: 'VM_EXPIRED_RENEW' });
-                }
-            }
-            if (effectiveCtId) {
-                const ownedCt = (await db.lxcContainers.getByUserId(req.user.id)).find(c => c.ct_id == effectiveCtId);
-                if (!ownedCt) return res.status(403).json({ error: '无权为此容器创建转发规则', code: 'FORWARD_LXC_NO_PERM' });
-                // M-2 修复：到期资源拦截（端口转发编辑属于资源使用）
-                if (ownedCt.expiration_date && new Date(ownedCt.expiration_date) < new Date()) {
-                    return res.status(403).json({ error: '容器已到期，请先续费', code: 'LXC_EXPIRED_RENEW' });
-                }
-            }
-        }
-
-        // 多节点：按生效设备归属解析配对爱快节点（general/查不到行时沿用原规则归属）
+        // 多节点：定位生效设备行 → 归属 PVE 节点（设备类型的节点唯一真源是台账行）；
+        // general 类型允许前端改节点，未传则沿用原规则归属
+        const { locateAssetRow, findEnabledNode } = require('../utils/locate-asset');
         let effDevNode = null;
-        if (effectiveType === 'vm' && effectiveVmId) {
-            const vmRow = await db.vms.getByVmid(effectiveVmId);
-            effDevNode = vmRow ? vmRow.pve_node_id : null;
-        } else if (effectiveType === 'lxc' && effectiveCtId) {
-            const ctRows = await db.lxcContainers.getByCtId(effectiveCtId);
-            effDevNode = ctRows && ctRows.length > 0 ? ctRows[0].pve_node_id : null;
+        if (effectiveType === 'general') {
+            if (req.body.pve_node_id !== undefined && req.body.pve_node_id !== '' && req.body.pve_node_id !== null) {
+                const genNode = await findEnabledNode(req.body.pve_node_id);
+                if (!genNode) return res.status(400).json({ error: '请先选择转发规则所属节点', code: 'FORWARD_NODE_REQUIRED' });
+                effDevNode = genNode.id;
+            } else {
+                effDevNode = existing.pve_node_id != null ? existing.pve_node_id : null;
+            }
+        } else {
+            const located = await locateAssetRow(effectiveType, parseInt(effectiveType === 'vm' ? effectiveVmId : effectiveCtId), {
+                isAdmin: req.user.role === 'admin', userId: req.user.id, nodeIdQuery: req.body.pve_node_id
+            });
+            if (located.ambiguous) {
+                return res.status(409).json(effectiveType === 'vm'
+                    ? { error: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' }
+                    : { error: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' });
+            }
+            const devRow = located.row;
+            if (!devRow) {
+                return res.status(403).json({
+                    error: effectiveType === 'vm' ? '无权为此虚拟机创建转发规则' : '无权为此容器创建转发规则',
+                    code: effectiveType === 'vm' ? 'FORWARD_VM_NO_PERM' : 'FORWARD_LXC_NO_PERM'
+                });
+            }
+            // M-2 修复：到期资源拦截（端口转发编辑属于资源使用；管理员不受限）
+            if (req.user.role !== 'admin' && devRow.expiration_date && new Date(devRow.expiration_date) < new Date()) {
+                return res.status(403).json({
+                    error: effectiveType === 'vm' ? '虚拟机已到期，请先续费' : '容器已到期，请先续费',
+                    code: effectiveType === 'vm' ? 'VM_EXPIRED_RENEW' : 'LXC_EXPIRED_RENEW'
+                });
+            }
+            effDevNode = devRow.pve_node_id;
         }
         const ikNodeId = effDevNode != null ? await resolvePairedIkNodeId(effDevNode) : (existing.ikuai_node_id || null);
         const ik = await getIkuaiClient(ikNodeId);
@@ -434,10 +459,11 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             // 普通用户检查端口范围；管理员不受此限制
             if (req.user.role !== 'admin') {
                 if (external_port < config.port_range_start || external_port > config.port_range_end) {
-                    return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内` });
+                    return res.status(400).json({ error: `外网端口必须在 ${config.port_range_start}-${config.port_range_end} 范围内`, code: 'PORT_OUT_OF_RANGE', params: [config.port_range_start, config.port_range_end] });
                 }
             }
-            const conflict = (await db.portForwards.getByExternalPort(external_port)).filter(r => r.id !== id);
+            // 唯一性按爱快节点分域（同 POST 端点）
+            const conflict = (await db.portForwards.getByExternalPort(external_port, ikNodeId)).filter(r => r.id !== id);
             if (conflict.length > 0) return res.status(400).json({ error: '外网端口已被占用，请更换', code: 'EXT_PORT_TAKEN' });
         }
         // 检测端口/IP/协议/类型/设备 ID 变更，需要同步爱快（类型或设备 ID 变化会导致 ikuai comment 变化；协议变化必须同步，否则面板与爱快协议分叉）
@@ -519,8 +545,9 @@ router.put('/port-forwards/:id', authMiddleware, async (req, res) => {
             if (vm_id !== undefined) updates.vm_id = existing.type === 'vm' ? vm_id : null;
             if (ct_id !== undefined) updates.ct_id = existing.type === 'lxc' ? ct_id : null;
         }
-        // 多节点：规则归属爱快节点随生效设备落库（update 白名单已含 ikuai_node_id）
+        // 多节点：规则归属节点随生效设备落库（update 白名单已含 ikuai_node_id / pve_node_id）
         updates.ikuai_node_id = ikNodeId;
+        updates.pve_node_id = effDevNode;
         if (!needIkuaiSync) updates.sync_status = existing.sync_status;
         else {
             updates.sync_status = newIkuaiIds.length > 0 ? 'synced' : 'failed';
@@ -610,6 +637,18 @@ router.post('/port-forwards/batch-delete', authMiddleware, adminMiddleware, asyn
     }
 });
 
+// 多节点：把 ?node_id=（PVE 节点）解析为配对爱快节点 ID；未传时回落默认爱快节点（兼容单节点调用）
+// 返回 { ikNodeId } 或 { error }，由调用方统一 400
+async function resolveIkNodeFromQuery(nodeIdRaw) {
+    if (nodeIdRaw === undefined || nodeIdRaw === '' || nodeIdRaw === null) {
+        return { ikNodeId: await db.ikuaNodes.getDefaultId() };
+    }
+    const { findEnabledNode } = require('../utils/locate-asset');
+    const nodeRow = await findEnabledNode(nodeIdRaw);
+    if (!nodeRow) return { error: true };
+    return { ikNodeId: await resolvePairedIkNodeId(nodeRow.id) };
+}
+
 router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
     try {
         // SEC-02: 代理外部 API（ikuai）端点加速率限制，防止滥用导致外部系统 DoS
@@ -618,11 +657,13 @@ router.get('/port-forwards/random-port', authMiddleware, async (req, res) => {
         if (!rateLimitResult.allowed) {
             return res.status(429).json({ error: '查询过于频繁，请稍后再试', code: 'RATE_LIMITED_QUERY', retryAfter: rateLimitResult.retryAfter });
         }
-        const portRangeStart = parseInt(await db.config.getIkuaiSetting('forward:port_range_start')) || 50000;
-        const portRangeEnd = parseInt(await db.config.getIkuaiSetting('forward:port_range_end')) || 60000;
-        // 多节点：随机分配按爱快节点作用域避免与该节点已有规则冲突（端点无设备上下文，取默认爱快节点；
-        // 历史未落 ikuai_node_id 的存量规则视同默认节点一并计入占用）
-        const ikNodeId = await db.ikuaNodes.getDefaultId();
+        // 多节点：随机分配按 ?node_id= 指定节点的爱快作用域（端口段配置与占用判断都随节点走；
+        // 历史未落 ikuai_node_id 的存量规则视同该节点一并计入占用）
+        const resolved = await resolveIkNodeFromQuery(req.query.node_id);
+        if (resolved.error) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const ikNodeId = resolved.ikNodeId;
+        const portRangeStart = parseInt(await db.config.getIkuaiSetting('forward:port_range_start', ikNodeId)) || 50000;
+        const portRangeEnd = parseInt(await db.config.getIkuaiSetting('forward:port_range_end', ikNodeId)) || 60000;
         const ik = await getIkuaiClient(ikNodeId);
         const usedPorts = new Set((await db.portForwards.getUsedPorts())
             .filter(r => ikNodeId == null || r.ikuai_node_id == null || Number(r.ikuai_node_id) === Number(ikNodeId))
@@ -664,12 +705,12 @@ router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
         if (!port || port < 1 || port > 65535) {
             return res.status(400).json({ error: '无效端口', code: 'INVALID_PORT' });
         }
-        // 多节点：占用查询按爱快节点作用域（端点无设备上下文，取默认爱快节点；
-        // 历史未落 ikuai_node_id 的存量规则视同默认节点一并计入占用）
-        const ikNodeId = await db.ikuaNodes.getDefaultId();
+        // 多节点：占用查询按 ?node_id= 指定节点的爱快作用域（历史未落 ikuai_node_id 的存量规则一并计入）
+        const resolved = await resolveIkNodeFromQuery(req.query.node_id);
+        if (resolved.error) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const ikNodeId = resolved.ikNodeId;
         const ik = await getIkuaiClient(ikNodeId);
-        const existing = (await db.portForwards.getByExternalPort(port))
-            .filter(r => ikNodeId == null || r.ikuai_node_id == null || Number(r.ikuai_node_id) === Number(ikNodeId));
+        const existing = (await db.portForwards.getByExternalPort(port, ikNodeId));
         if (existing.length > 0) {
             return res.json({ available: false });
         }
@@ -689,12 +730,16 @@ router.get('/port-forwards/check-port', authMiddleware, async (req, res) => {
 
 router.get('/port-forwards/config', authMiddleware, async (req, res) => {
     try {
-        const maxPerUser = parseInt(await db.config.getIkuaiSetting('forward:max_per_user')) || 10;
+        // 多节点：端口段/限额随爱快节点独立配置，按 ?node_id= 读取该节点作用域（缺省=默认爱快）
+        const resolved = await resolveIkNodeFromQuery(req.query.node_id);
+        if (resolved.error) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+        const ikNodeId = resolved.ikNodeId;
+        const maxPerUser = parseInt(await db.config.getIkuaiSetting('forward:max_per_user', ikNodeId)) || 10;
         const totalCount = await db.portForwards.getCountByUserId(req.user.id);
         res.json({
             max_per_user: maxPerUser,
-            port_range_start: parseInt(await db.config.getIkuaiSetting('forward:port_range_start')) || 50000,
-            port_range_end: parseInt(await db.config.getIkuaiSetting('forward:port_range_end')) || 60000,
+            port_range_start: parseInt(await db.config.getIkuaiSetting('forward:port_range_start', ikNodeId)) || 50000,
+            port_range_end: parseInt(await db.config.getIkuaiSetting('forward:port_range_end', ikNodeId)) || 60000,
             used: totalCount,
             remaining: Math.max(0, maxPerUser - totalCount)
         });
@@ -711,8 +756,20 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
 
         const devices = [];
         const isAdmin = req.user.role === 'admin';
-        const myVms = isAdmin ? await db.vms.getAll() : await db.vms.getByUserId(req.user.id);
-        const myCts = isAdmin ? await db.lxcContainers.getAll() : await db.lxcContainers.getByUserId(req.user.id);
+        // 多节点：?node_id= 可按所属 PVE 节点过滤（管理端选定节点后只列该节点设备，避免跨节点同 vmid 混淆）
+        let filterNodeId = null;
+        if (req.query.node_id !== undefined && req.query.node_id !== '') {
+            const { findEnabledNode } = require('../utils/locate-asset');
+            const nodeRow = await findEnabledNode(req.query.node_id);
+            if (!nodeRow) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+            filterNodeId = nodeRow.id;
+        }
+        let myVms = isAdmin ? await db.vms.getAll() : await db.vms.getByUserId(req.user.id);
+        let myCts = isAdmin ? await db.lxcContainers.getAll() : await db.lxcContainers.getByUserId(req.user.id);
+        if (filterNodeId != null) {
+            myVms = myVms.filter(v => Number(v.pve_node_id) === Number(filterNodeId));
+            myCts = myCts.filter(c => Number(c.pve_node_id) === Number(filterNodeId));
+        }
         // 多节点：DHCP 租约/LAN IP 按设备配对的爱快节点懒加载缓存（同节点只拉一次）
         const leaseCacheByIk = new Map();
         async function getLeaseEntry(ikNodeId) {
@@ -764,7 +821,10 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
             }
             devices.push({
                 type: 'vm', device_id: vm.vm_id, name: vm.name || 'VM ' + vm.vm_id,
-                ip, mac: '', user: user?.username || ''
+                ip, mac: '', user: user?.username || '',
+                pve_node_id: vm.pve_node_id || null,
+                pve_node_name: vm.pve_node_name || '',
+                zone_name: vm.zone_name || ''
             });
         }
         for (const ct of myCts) {
@@ -794,7 +854,10 @@ router.get('/port-forwards/extract-ips', authMiddleware, async (req, res) => {
             }
             devices.push({
                 type: 'lxc', device_id: ct.ct_id, name: ct.name || 'CT ' + ct.ct_id,
-                ip, user: user?.username || ''
+                ip, user: user?.username || '',
+                pve_node_id: ct.pve_node_id || null,
+                pve_node_name: ct.pve_node_name || '',
+                zone_name: ct.zone_name || ''
             });
         }
         res.json(devices);

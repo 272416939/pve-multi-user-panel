@@ -18,6 +18,7 @@
                     <thead>
                         <tr>
                             <th>{{ t('common.name') }}</th>
+                            <th>{{ t('nodes.belongRegion') }}</th>
                             <th>{{ t('nodes.belongZone') }}</th>
                             <th>{{ t('nodes.apiHost') }}</th>
                             <th>{{ t('nodes.tlsStatus') }}</th>
@@ -29,6 +30,7 @@
                     <tbody>
                         <tr v-for="n in pveNodesPage.nodes.value" :key="n.id">
                             <td>{{ n.name }}</td>
+                            <td>{{ n.region_name || '-' }}</td>
                             <td>{{ n.zone_name || '-' }}</td>
                             <td>{{ n.api_host }}</td>
                             <td><span :class="n.strict_tls ? 'text-success' : 'text-muted'">{{ n.strict_tls ? '√' : '×' }}</span></td>
@@ -47,7 +49,7 @@
                             </td>
                         </tr>
                         <tr v-if="pveNodesPage.nodes.value.length === 0">
-                            <td colspan="7" class="text-center text-muted">{{ t('nodes.empty') }}</td>
+                            <td colspan="8" class="text-center text-muted">{{ t('nodes.empty') }}</td>
                         </tr>
                     </tbody>
                 </table>

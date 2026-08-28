@@ -110,16 +110,19 @@ async function deleteIkuaiRuleStrict(rule) {
 
 // 设备 IP 变化后，重建其全部端口转发规则（爱快删旧建新 + DB 回写新 IP）
 // 绑定子网 / 开机兜底重绑时调用；解绑不删规则（重绑时自动更新闭环）
+// 多节点：pveNodeId 已知时必须传入（调用方多已持有设备行），跨节点同 vmid 才不会串改
 // 返回成功处理的规则条数（失败不影响其他规则与主流程）
-async function rebuildPortForwardsForDevice(type, vmid, newIp) {
+async function rebuildPortForwardsForDevice(type, vmid, newIp, pveNodeId) {
     // 多节点：先查设备行得归属 PVE 节点 → 配对爱快节点（查不到行/未配对回退默认爱快）
-    let devNode = null;
-    try {
-        const devRow = type === 'vm'
-            ? await db.vms.getByVmid(vmid)
-            : (await db.lxcContainers.getByCtId(vmid))[0];
-        devNode = devRow ? devRow.pve_node_id : null;
-    } catch (_) {}
+    let devNode = pveNodeId != null ? pveNodeId : null;
+    if (devNode == null) {
+        try {
+            const devRow = type === 'vm'
+                ? await db.vms.getByVmid(vmid)
+                : (await db.lxcContainers.getByCtId(vmid))[0];
+            devNode = devRow ? devRow.pve_node_id : null;
+        } catch (_) {}
+    }
     let ikNodeId = null;
     if (devNode != null) {
         const pn = await db.pveNodes.get(devNode);
@@ -129,7 +132,9 @@ async function rebuildPortForwardsForDevice(type, vmid, newIp) {
     if (!newIp || !ik.isConfigured()) return 0;
     let rules = [];
     try {
-        rules = type === 'vm' ? await db.portForwards.getByVmId(vmid) : await db.portForwards.getByCtId(vmid);
+        rules = type === 'vm'
+            ? await db.portForwards.getByVmId(vmid, devNode)
+            : await db.portForwards.getByCtId(vmid, devNode);
     } catch (e) {
         console.error('[port-forward-sync] 查询设备转发规则失败:', e.message);
         return 0;
@@ -169,12 +174,13 @@ async function rebuildPortForwardsForDevice(type, vmid, newIp) {
             } catch (e) {
                 console.error(`[port-forward-sync] 重建规则 ${rule.id} 到接口 ${ifaceStr} 失败:`, e.message);
             }
-            // 3. DB 回写新 IP 与同步状态（ikuai_node_id 一并落库，保持规则与设备配对一致）
+            // 3. DB 回写新 IP 与同步状态（节点归属一并落库，保持规则与设备配对一致）
             await db.portForwards.update(rule.id, {
                 ip: newIp,
                 ikuai_id: stringifyIkuaiIds(newIkuaiIds),
                 sync_status: syncStatus,
-                ikuai_node_id: ikNodeId
+                ikuai_node_id: ikNodeId,
+                pve_node_id: devNode
             });
             rebuilt++;
             console.log(`[port-forward-sync] 规则 ${rule.id} IP ${rule.ip} → ${newIp}（${syncStatus}）`);

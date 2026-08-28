@@ -27,7 +27,7 @@
     $.forwardForm = reactive({
         id: null, type: 'vm', vm_id: null, ct_id: null,
         name: '', ip: '', internal_port: null, external_port: null,
-        protocol: 'tcp'
+        protocol: 'tcp', pve_node_id: ''
     });
     $.isEditingForward = ref(false);
     $.selectedForwardIds = ref([]);
@@ -37,9 +37,12 @@
     $.checkResult = ref(null);
     $.forwardFilterType = ref('all');
     $.forwardSearchText = ref('');
+    // 多节点：可选 PVE 节点（表单选节点 + 列表按节点筛选，''=全部）
+    $.forwardNodeOptions = ref([]);
+    $.forwardFilterNodeId = ref('');
 
     // 设备端口转发弹窗
-    $.deviceModal = reactive({ device: { deviceId: null, type: 'vm', name: '', ip: '' } });
+    $.deviceModal = reactive({ device: { deviceId: null, type: 'vm', name: '', ip: '', pve_node_id: null } });
     $.deviceRules = ref([]);
     $.showDeviceForm = ref(false);
     $.forwardConfig = ref({ max_per_user: 10, port_range_start: 50000, port_range_end: 60000, used: 0, remaining: 10 });
@@ -59,6 +62,8 @@
     $.privateSubnetSearch = ref('');
     $.privateSubnetPage = ref(1);
     $.privateSubnetPageSize = 20;
+    // 多节点：按所属 PVE 节点筛选（''=全部）
+    $.privateSubnetNodeId = ref('');
 
     // ==================== computed ====================
     $.paginatedForwardRules = computed(function() {
@@ -174,59 +179,26 @@
         if ($.cnameEntries.value.length === 0) $.cnameEntries.value.push({ label: '', domain: '' });
     };
 
-    $.saveNetworkConfig = async function() {
+    // 节点级网络配置（外网接口/端口段/DHCP/VLAN）已迁至「爱快节点」表单，按爱快节点作用域读写
+    // （admin-ikuai-nodes.js）。原 saveNetworkConfig / syncDhcpBindings / refreshIfaceList 走的是
+    // 不带 node_id 的全局端点，多节点下只会命中默认节点，语义已失效且模板早无引用，故移除。
+    // loadNetworkConfig 保留：VM/LXC 列表的 CNAME 列仍用它做站点级兜底展示。
+
+    // 多节点：可选 PVE 节点下拉（统一数据源 /admin/pve/nodes，只留启用节点）
+    $.loadForwardNodeOptions = async function() {
         try {
-            // 将 cnameEntries 拼接回 cname_domain 逗号分隔字符串
-            // 新格式: label||.domain（|| 分隔，避免与域名中的 . 冲突）
-            $.networkConfig.cname_domain = $.cnameEntries.value
-                .map(function(e) { return (e.label || '').trim() + '||' + (e.domain || '').trim(); })
-                .filter(function(s) { return s.replace(/\|\|/g, '').trim(); })
-                .join(',');
-            await api('/admin/ikuai/network-config', { method: 'PUT', body: $.networkConfig });
-            alert(window.__i18n.t('settings.saved'));
-            $.parseCnameEntries();
-        } catch (e) { alert(window.__i18n.t('common.saveFailedMsg') + e.message); }
-    };
-
-    // 外网接口下拉框：判断接口是否已选中
-    $.isWanInterfaceSelected = function(ifaceName) {
-        if (!ifaceName) return false;
-        var current = ($.networkConfig.wan_interface || '').trim();
-        if (!current) return false;
-        var ifaces = current.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
-        return ifaces.indexOf(ifaceName) >= 0;
-    };
-
-    // 外网接口下拉框：切换选中状态（已选则取消，未选则追加）
-    $.toggleWanInterface = function(ifaceName) {
-        if (!ifaceName) return;
-        var current = ($.networkConfig.wan_interface || '').trim();
-        var ifaces = current ? current.split(',').map(function(s) { return s.trim(); }).filter(Boolean) : [];
-        var idx = ifaces.indexOf(ifaceName);
-        if (idx >= 0) {
-            ifaces.splice(idx, 1); // 已存在则移除
-        } else {
-            ifaces.push(ifaceName); // 不存在则追加
+            var res = await api('/admin/pve/nodes');
+            var nodes = (res && res.nodes) || [];
+            $.forwardNodeOptions.value = nodes.filter(function(n) { return n.enabled !== 0; });
+        } catch (e) {
+            console.error('加载节点列表失败:', e);
+            $.forwardNodeOptions.value = [];
         }
-        $.networkConfig.wan_interface = ifaces.join(',');
     };
 
-    $.syncDhcpBindings = async function() {
-        if (!await window.customConfirm(window.__i18n.t('admin.net.syncConfirm'))) return;
-        try {
-            var res = await api('/ikuai/sync-dhcp-bindings', { method: 'POST' });
-            alert(window.__i18n.t('admin.net.syncDone1') + res.updated + window.__i18n.t('admin.net.syncSkip') + res.skipped + window.__i18n.t('admin.net.syncErr') + res.errors + window.__i18n.t('common.countUnit'));
-        } catch (e) { alert(window.__i18n.t('admin.net.syncFail') + e.message); }
-    };
-
-    $.refreshIfaceList = async function() {
-        try {
-            var list = await api('/ikuai/interfaces');
-            $.ifaceList.value = list || [];
-            $.ifaceUpdateTime.value = new Date().toLocaleString();
-            // 刷新后重新加载配置（接口可能被自动修正）
-            await $.loadNetworkConfig();
-        } catch (e) { alert(window.__i18n.t('admin.net.ifListFail') + e.message); }
+    // 端口转发规则当前生效的节点（表单选中优先；筛选下拉次之），用于按节点作用域取端口段/占用
+    $.currentForwardNodeId = function() {
+        return $.forwardForm.pve_node_id || $.forwardFilterNodeId.value || '';
     };
 
     // 端口转发
@@ -235,8 +207,11 @@
         try {
             var search = ($.forwardSearchText.value || '').trim();
             var url = '/port-forwards';
-            if (type && type !== 'all') url += '?type=' + type;
-            if (search) url += (url.indexOf('?') > -1 ? '&' : '?') + 'search=' + encodeURIComponent(search);
+            var qs = [];
+            if (type && type !== 'all') qs.push('type=' + type);
+            if (search) qs.push('search=' + encodeURIComponent(search));
+            if ($.forwardFilterNodeId.value) qs.push('node_id=' + encodeURIComponent($.forwardFilterNodeId.value));
+            if (qs.length > 0) url += '?' + qs.join('&');
             var rules = await api(url);
             $.forwardRules.value = rules || [];
             // 获取当前用户数量
@@ -250,13 +225,22 @@
         finally { $.forwardRulesLoading.value = false; }
     };
 
+    // 节点筛选变更：重置页码后重载（与类型/搜索筛选同源）
+    $.onForwardNodeFilterChange = function() {
+        $.forwardPage.value = 1;
+        $.loadForwardRules($.forwardFilterType.value);
+    };
+
     // 私有网络列表（管理员视角）
     $.loadPrivateSubnets = async function() {
         $.privateSubnetsLoading.value = true;
         try {
             var search = ($.privateSubnetSearch.value || '').trim();
             var url = '/admin/subnets';
-            if (search) url += '?search=' + encodeURIComponent(search);
+            var qs = [];
+            if (search) qs.push('search=' + encodeURIComponent(search));
+            if ($.privateSubnetNodeId.value) qs.push('node_id=' + encodeURIComponent($.privateSubnetNodeId.value));
+            if (qs.length > 0) url += '?' + qs.join('&');
             var list = await api(url);
             $.privateSubnets.value = list || [];
             // 页码修正
@@ -271,21 +255,35 @@
         $.loadPrivateSubnets();
     };
 
+    $.onPrivateSubnetNodeChange = function() {
+        $.privateSubnetPage.value = 1;
+        $.loadPrivateSubnets();
+    };
+
+    // 设备列表按指定节点过滤（nodeId 省略时用筛选下拉值；均为空=全部，管理员可跨节点总览）
+    $.loadForwardDevices = async function(type, nodeId) {
+        if (type === 'general') {
+            $.availableDevices.value = [];
+            return;
+        }
+        try {
+            var nid = nodeId !== undefined && nodeId !== null && nodeId !== '' ? nodeId : $.forwardFilterNodeId.value;
+            var url = '/port-forwards/extract-ips';
+            if (nid) url += '?node_id=' + encodeURIComponent(nid);
+            var devices = await api(url);
+            $.availableDevices.value = (devices || []).filter(function(d) { return d.type === type; });
+        } catch (e) { console.error('加载设备列表失败:', e); }
+    };
+
     $.onForwardTypeChange = function() {
         var type = $.forwardForm.type;
         $.forwardForm.vm_id = null;
         $.forwardForm.ct_id = null;
         $.forwardForm.ip = '';
         $.checkResult.value = null;
-        if (type !== 'general') {
-            try {
-                api('/port-forwards/extract-ips').then(function(devices) {
-                    $.availableDevices.value = (devices || []).filter(function(d) { return d.type === type; });
-                }).catch(function(e) { console.error('加载设备列表失败:', e); });
-            } catch (e) { console.error('加载设备列表失败:', e); }
-        } else {
-            $.availableDevices.value = [];
-        }
+        // 节点归属：general 由管理员显式选（沿用筛选值作默认）；设备类型由所选设备带出，先清空
+        $.forwardForm.pve_node_id = type === 'general' ? ($.forwardFilterNodeId.value || '') : '';
+        $.loadForwardDevices(type);
     };
 
     $.openAddForward = async function(type) {
@@ -299,17 +297,11 @@
         $.forwardForm.internal_port = null;
         $.forwardForm.external_port = null;
         $.forwardForm.protocol = 'tcp';
+        $.forwardForm.pve_node_id = $.forwardForm.type === 'general' ? ($.forwardFilterNodeId.value || '') : '';
         $.checkResult.value = null;
         $.selectedForwardIds.value = [];
-        // general 类型无需加载设备列表
-        if ($.forwardForm.type !== 'general') {
-            try {
-                var devices = await api('/port-forwards/extract-ips');
-                $.availableDevices.value = (devices || []).filter(function(d) { return d.type === $.forwardForm.type; });
-            } catch (e) { console.error('加载设备列表失败:', e); }
-        } else {
-            $.availableDevices.value = [];
-        }
+        if ($.forwardNodeOptions.value.length === 0) await $.loadForwardNodeOptions();
+        await $.loadForwardDevices($.forwardForm.type);
         $.showForwardModal.value = true;
         $.bsModalShow('forwardModal');
     };
@@ -322,12 +314,17 @@
         if (device) {
             $.forwardForm.ip = device.ip;
             $.forwardForm.name = device.name;
+            // 设备类型的节点唯一真源是设备台账（表单只读展示，后端同样强制取设备行节点）
+            $.forwardForm.pve_node_id = device.pve_node_id != null ? String(device.pve_node_id) : '';
         }
     };
 
     $.randomPort = async function() {
         try {
-            var res = await api('/port-forwards/random-port');
+            var url = '/port-forwards/random-port';
+            var nid = $.currentForwardNodeId();
+            if (nid) url += '?node_id=' + encodeURIComponent(nid);
+            var res = await api(url);
             $.forwardForm.external_port = res.port;
             $.checkResult.value = null;
         } catch (e) { alert(e.message); }
@@ -336,7 +333,10 @@
     $.checkPortConflict = async function() {
         if (!$.forwardForm.external_port) return;
         try {
-            var res = await api('/port-forwards/check-port?port=' + $.forwardForm.external_port);
+            var url = '/port-forwards/check-port?port=' + $.forwardForm.external_port;
+            var nid = $.currentForwardNodeId();
+            if (nid) url += '&node_id=' + encodeURIComponent(nid);
+            var res = await api(url);
             $.checkResult.value = res.available;
         } catch (e) { $.checkResult.value = null; }
     };
@@ -345,6 +345,7 @@
         // 校验
         if ($.forwardForm.type === 'vm' && !$.forwardForm.vm_id) return alert(window.__i18n.t('admin.pickVm'));
         if ($.forwardForm.type === 'lxc' && !$.forwardForm.ct_id) return alert(window.__i18n.t('admin.port.pickCt'));
+        if ($.forwardForm.type === 'general' && !$.forwardForm.pve_node_id) return alert(window.__i18n.t('err.FORWARD_NODE_REQUIRED'));
         if (!$.forwardForm.ip) return alert(window.__i18n.t('dash.port.targetIpRequired'));
         if (!$.forwardForm.internal_port) return alert(window.__i18n.t('dash.port.internalRequired'));
         if (!$.forwardForm.external_port) return alert(window.__i18n.t('dash.port.externalRequired'));
@@ -363,7 +364,9 @@
                 ip: $.forwardForm.ip,
                 internal_port: $.forwardForm.internal_port,
                 external_port: $.forwardForm.external_port,
-                protocol: $.forwardForm.protocol
+                protocol: $.forwardForm.protocol,
+                // 多节点：general 由此字段定节点；设备类型后端强制取设备行节点，此值仅作跨节点同 vmid 消歧
+                pve_node_id: $.forwardForm.pve_node_id || null
             };
             if ($.isEditingForward.value && $.forwardForm.id) {
                 await api('/port-forwards/' + $.forwardForm.id, { method: 'PUT', body: body });
@@ -406,25 +409,33 @@
     $.openDeviceForward = async function(device, type) {
         $.showDeviceForm.value = false; // 重置为列表页，避免上次关闭时停留在表单页
         $.editingDeviceRuleId.value = null;
+        // 多节点：记录设备所属节点，规则过滤与端口段/占用查询都按此节点作用域
+        var devNodeId = device.pve_node_id != null ? device.pve_node_id : null;
         $.deviceModal.device = {
             deviceId: type === 'vm' ? device.vm_id : device.ct_id,
             type: type,
             name: device.name || '',
-            ip: device.ip || ''
+            ip: device.ip || '',
+            pve_node_id: devNodeId
         };
         $.deviceRules.value = [];
         try {
+            var nodeQs = devNodeId != null ? '?node_id=' + encodeURIComponent(devNodeId) : '';
             var results = await Promise.all([
-                api('/port-forwards'),
-                api('/port-forwards/extract-ips'),
-                api('/port-forwards/config')
+                api('/port-forwards' + nodeQs),
+                api('/port-forwards/extract-ips' + nodeQs),
+                api('/port-forwards/config' + nodeQs)
             ]);
             var rules = results[0];
             var ips = results[1];
             var cfg = results[2];
+            // 跨节点同 vmid：设备节点已知时必须同时比对节点，否则会混入他节点同号设备的规则
             $.deviceRules.value = (rules || []).filter(function(r) {
-                return (type === 'vm' && r.vm_id === device.vm_id) ||
+                var idMatch = (type === 'vm' && r.vm_id === device.vm_id) ||
                        (type === 'lxc' && r.ct_id === device.ct_id);
+                if (!idMatch) return false;
+                if (devNodeId == null || r.pve_node_id == null) return true;
+                return Number(r.pve_node_id) === Number(devNodeId);
             });
             // 获取设备 IP
             var deviceIp = (ips || []).find(function(d) { return d.type === type && d.device_id === (type === 'vm' ? device.vm_id : device.ct_id); });
@@ -478,7 +489,9 @@
                 ip: ip,
                 internal_port: $.deviceForm.internal_port,
                 external_port: $.deviceForm.external_port,
-                protocol: $.deviceForm.protocol
+                protocol: $.deviceForm.protocol,
+                // 跨节点同 vmid 消歧（后端仍以设备台账行的节点为准）
+                pve_node_id: $.deviceModal.device.pve_node_id != null ? $.deviceModal.device.pve_node_id : null
             };
             if ($.editingDeviceRuleId.value) {
                 await api('/port-forwards/' + $.editingDeviceRuleId.value, { method: 'PUT', body: body });
@@ -486,12 +499,16 @@
                 await api('/port-forwards', { method: 'POST', body: body });
             }
             $.editingDeviceRuleId.value = null;
-            var rules = await api('/port-forwards');
+            var devNodeQs = $.deviceModal.device.pve_node_id != null ? '?node_id=' + encodeURIComponent($.deviceModal.device.pve_node_id) : '';
+            var rules = await api('/port-forwards' + devNodeQs);
             $.deviceRules.value = (rules || []).filter(function(r) {
-                return ($.deviceModal.device.type === 'vm' && r.vm_id === $.deviceModal.device.deviceId) ||
+                var idMatch = ($.deviceModal.device.type === 'vm' && r.vm_id === $.deviceModal.device.deviceId) ||
                        ($.deviceModal.device.type === 'lxc' && r.ct_id === $.deviceModal.device.deviceId);
+                if (!idMatch) return false;
+                if ($.deviceModal.device.pve_node_id == null || r.pve_node_id == null) return true;
+                return Number(r.pve_node_id) === Number($.deviceModal.device.pve_node_id);
             });
-            var cfg = await api('/port-forwards/config');
+            var cfg = await api('/port-forwards/config' + devNodeQs);
             $.forwardConfig.value = cfg || $.forwardConfig.value;
             $.showDeviceForm.value = false;
         } catch (e) { alert(e.error || e.message); }
@@ -513,7 +530,8 @@
         try {
             await api('/port-forwards/' + rule.id, { method: 'DELETE' });
             $.deviceRules.value = $.deviceRules.value.filter(function(r) { return r.id !== rule.id; });
-            var cfg = await api('/port-forwards/config');
+            var delNodeQs = $.deviceModal.device.pve_node_id != null ? '?node_id=' + encodeURIComponent($.deviceModal.device.pve_node_id) : '';
+            var cfg = await api('/port-forwards/config' + delNodeQs);
             $.forwardConfig.value = cfg || $.forwardConfig.value;
         } catch (e) {
             alert(window.__i18n.t('common.deleteFailedMsg') + e.message);
@@ -525,7 +543,9 @@
 
     $.randomDevicePort = async function() {
         try {
-            var res = await api('/port-forwards/random-port');
+            var url = '/port-forwards/random-port';
+            if ($.deviceModal.device.pve_node_id != null) url += '?node_id=' + encodeURIComponent($.deviceModal.device.pve_node_id);
+            var res = await api(url);
             $.deviceForm.external_port = res.port;
             $.deviceCheckResult.value = null;
         } catch (e) { alert(e.message); }

@@ -36,6 +36,12 @@ async function syncPortForwardsForNode(n) {
     const ownsRule = (r) => (r.ikuai_node_id != null
         ? Number(r.ikuai_node_id) === Number(n.id)
         : (defIkNodeId != null && Number(n.id) === Number(defIkNodeId)));
+    // 导入规则的 PVE 节点归属：本爱快唯一配对一个 PVE 节点时可确定，多个配对留 null（无从判断）
+    let importPveNodeId = null;
+    try {
+        const paired = (await db.pveNodes.list()).filter(p => Number(p.ikuai_node_id) === Number(n.id));
+        if (paired.length === 1) importPveNodeId = paired[0].id;
+    } catch (_) {}
 
     const ikuaiRules = await ik.getPortForwards();
     if (!ikuaiRules.length) {
@@ -92,7 +98,7 @@ async function syncPortForwardsForNode(n) {
                         if (macMatch) mac = macMatch[0].toLowerCase();
                         ip = findIpByMac(mac);
                     } catch (e) {}
-                    if (ip) ipToDevice.set(ip, { type: 'vm', device_id: vm.vm_id, name: vm.name || 'VM ' + vm.vm_id });
+                    if (ip) ipToDevice.set(ip, { type: 'vm', device_id: vm.vm_id, name: vm.name || 'VM ' + vm.vm_id, pve_node_id: vm.pve_node_id || null });
                 } else {
                     const ct = item.device;
                     let ip = '';
@@ -108,7 +114,7 @@ async function syncPortForwardsForNode(n) {
                             }
                         }
                     } catch (e) {}
-                    if (ip) ipToDevice.set(ip, { type: 'lxc', device_id: ct.ct_id, name: ct.name || 'CT ' + ct.ct_id });
+                    if (ip) ipToDevice.set(ip, { type: 'lxc', device_id: ct.ct_id, name: ct.name || 'CT ' + ct.ct_id, pve_node_id: ct.pve_node_id || null });
                 }
             } catch (e) {
                 console.error('[ikuai-sync] 设备配置获取失败:', item.device.id || item.device.vm_id || item.device.ct_id, e.message);
@@ -124,7 +130,9 @@ async function syncPortForwardsForNode(n) {
                 type: dev.type,
                 vm_id: dev.type === 'vm' ? dev.device_id : null,
                 ct_id: dev.type === 'lxc' ? dev.device_id : null,
-                name: dev.name || localRule.name
+                name: dev.name || localRule.name,
+                // 多节点：关联到设备后，节点归属以设备台账为准（原先可能是回填的近似值）
+                pve_node_id: dev.pve_node_id != null ? dev.pve_node_id : localRule.pve_node_id
             });
             reassociated++;
         }
@@ -144,7 +152,7 @@ async function syncPortForwardsForNode(n) {
             continue;
         }
         const comment = rule.comment || rule.remark || '';
-        let deviceType = null, deviceId = null, deviceName = '';
+        let deviceType = null, deviceId = null, deviceName = '', devicePveNodeId = null;
         const vmMatch = comment.match(/_VM(\d+)/i);
         const ctMatch = comment.match(/_CT(\d+)/i);
         if (vmMatch) {
@@ -160,6 +168,19 @@ async function syncPortForwardsForNode(n) {
             deviceType = dev.type;
             deviceId = dev.device_id;
             deviceName = dev.name;
+            devicePveNodeId = dev.pve_node_id != null ? dev.pve_node_id : null;
+        }
+        // comment 只带设备编号不带节点，跨节点同 vmid 时按本爱快作用域定位设备行
+        if (devicePveNodeId == null && deviceType && deviceId != null) {
+            try {
+                const rows = deviceType === 'vm'
+                    ? (await db.vms.getAll()).filter(v => v.vm_id === deviceId)
+                    : (await db.lxcContainers.getAll()).filter(c => c.ct_id === deviceId);
+                const inNode = importPveNodeId != null
+                    ? rows.filter(r => Number(r.pve_node_id) === Number(importPveNodeId))
+                    : rows;
+                if (inNode.length === 1) devicePveNodeId = inNode[0].pve_node_id;
+            } catch (_) {}
         }
         try {
             await db.portForwards.create({
@@ -175,6 +196,8 @@ async function syncPortForwardsForNode(n) {
                 source: 'ikuai_sync',
                 sync_status: 'synced',
                 ikuai_node_id: n.id,
+                // 优先设备行的真实节点，退回本爱快唯一配对的 PVE 节点（多配对时 null，列表显示 '-'）
+                pve_node_id: devicePveNodeId != null ? devicePveNodeId : importPveNodeId,
                 ikuai_id: JSON.stringify([{ interface: rule.interface || '', id: String(rule.id || rule._id || '') }])
             });
             imported++;

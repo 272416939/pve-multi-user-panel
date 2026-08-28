@@ -68,6 +68,10 @@ var App = {
             if (!$.bindSubnetForm) $.bindSubnetForm = Vue.ref({ subnet_id: 0 });
             if (!$.bindSubnetCurrentSubnet) $.bindSubnetCurrentSubnet = Vue.ref(null);
             if (!$.bindSubnetSubmitting) $.bindSubnetSubmitting = Vue.ref(false);
+            // 新建子网节点下拉（弹窗常驻渲染，状态必须兜底，否则 subnet.js 缺失时模板报错）
+            if (!$.subnetNodes) $.subnetNodes = Vue.ref([]);
+            if (!$.subnetNodeId) $.subnetNodeId = Vue.ref('');
+            if (!$.subnetNodeGroups) $.subnetNodeGroups = Vue.computed(function() { return []; });
             $.initCore();
             $.initVm();
             $.initLxc();

@@ -545,13 +545,15 @@ router.delete('/user/vms/:id', authMiddleware, adminMiddleware, async (req, res)
     // 级联清理端口转发
     try {
         const ik = await getIkuaiClientForPve(vm ? vm.pve_node_id : null);
-        const vmForwards = await db.portForwards.getByVmId(removedVmInfo?.vm_id || vmId);
+        // 多节点：按节点作用域取/删规则，否则会连带清掉其他节点同号 VM 的转发
+        const fwNodeId = vm ? vm.pve_node_id : null;
+        const vmForwards = await db.portForwards.getByVmId(removedVmInfo?.vm_id || vmId, fwNodeId);
         for (const fw of vmForwards) {
             if (fw.ikuai_id) {
                 try { ik.deletePortForward(fw.ikuai_id); } catch (e) {}
             }
         }
-        await db.portForwards.deleteByDevice('vm', removedVmInfo?.vm_id || vmId);
+        await db.portForwards.deleteByDevice('vm', removedVmInfo?.vm_id || vmId, fwNodeId);
     } catch (e) { console.error('清理端口转发失败:', e.message); }
     // 清理 DHCP 静态绑定
     if (vm && vm.vm_id) {
@@ -676,7 +678,7 @@ router.post('/vm/:vmid/start', authMiddleware, async (req, res) => {
                             // 端口转发同步：IP 变化时重建规则（绑定后首次开机/绑定丢失恢复场景）
                             if (newIp !== vm.dhcp_static_ip) {
                                 try {
-                                    await rebuildPortForwardsForDevice('vm', vmid, newIp);
+                                    await rebuildPortForwardsForDevice('vm', vmid, newIp, vm.pve_node_id);
                                 } catch (pfErr) { console.error('[vm.start] 同步端口转发失败:', pfErr.message); }
                             }
                         }
@@ -1011,7 +1013,7 @@ router.post('/vm/:vmid/reset-ip', authMiddleware, async (req, res) => {
         if (finalIp) {
             try {
                 const ik = await getIkuaiClientForPve(vmRecord ? vmRecord.pve_node_id : null); // NAT 类操作按资产所在节点取爱快客户端
-                const rules = await db.portForwards.getByVmId(vmid);
+                const rules = await db.portForwards.getByVmId(vmid, vmRecord ? vmRecord.pve_node_id : null);
                 for (const rule of rules) {
                     await db.portForwards.update(rule.id, { ip: finalIp });
                     if (rule.ikuai_id) {
@@ -1152,13 +1154,13 @@ router.post('/vm/:vmid/destroy', authMiddleware, adminMiddleware, async (req, re
             await db.vms.reminders.clear(vm.id);
             const ik = await getIkuaiClientForPve(vm.pve_node_id); // NAT 类操作按资产所在节点取爱快客户端
             try {
-                const vmForwards = await db.portForwards.getByVmId(vm.vm_id);
+                const vmForwards = await db.portForwards.getByVmId(vm.vm_id, vm.pve_node_id);
                 for (const fw of vmForwards) {
                     if (fw.ikuai_id) {
                         try { await ik.deletePortForward(fw.ikuai_id); } catch (e) {}
                     }
                 }
-                await db.portForwards.deleteByDevice('vm', vm.vm_id);
+                await db.portForwards.deleteByDevice('vm', vm.vm_id, vm.pve_node_id);
             } catch (e) { console.error('清理端口转发失败:', e.message); }
             if (vm && vm.vm_id) {
                 removeDhcpStaticBinding('vm', vm.vm_id, { pveNodeId: vm.pve_node_id });

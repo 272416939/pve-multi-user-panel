@@ -230,7 +230,7 @@ async function verifyAndSyncMac(vmid, oldMac, logId, nodeId) {
 
     // 3. 端口转发同步
     try {
-        await db.portForwards.updateMacByVmid(vmid, newMac);
+        await db.portForwards.updateMacByVmid(vmid, newMac, nodeId != null ? nodeId : null);
         syncResult.port_forwards.ok = true;
     } catch (e) {
         syncResult.port_forwards.error = e.message;

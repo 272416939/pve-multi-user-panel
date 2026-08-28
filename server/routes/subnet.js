@@ -83,14 +83,55 @@ async function refreshSubnetAvailable(subnet) {
     }
 }
 
+// 子网与设备是否同区（绑定前置校验）
+// 优先按 PVE 节点的 zone_id 比对（子网 pve_node_id 已落库后最准确）；
+// 任一侧缺节点归属（历史数据）时回退比对配对爱快节点——VLAN tag 只在同一台爱快上生效
+async function isSubnetDeviceSameZone(subnet, devNodeId) {
+    async function zoneOf(nodeId) {
+        if (nodeId == null) return null;
+        try {
+            const n = await db.pveNodes.get(nodeId);
+            return n ? n.zone_id : null;
+        } catch (_) { return null; }
+    }
+    const subnetZone = await zoneOf(subnet.pve_node_id);
+    const devZone = await zoneOf(devNodeId);
+    if (subnetZone != null && devZone != null) return Number(subnetZone) === Number(devZone);
+    // 回退：配对爱快比对（null 归一到默认爱快，与 getIkuaiClientForPve 兜底一致）
+    const defaultIk = await db.ikuaNodes.getDefaultId();
+    async function ikOf(nodeId, ownIk) {
+        if (ownIk != null) return ownIk;
+        if (nodeId != null) {
+            try {
+                const n = await db.pveNodes.get(nodeId);
+                if (n && n.ikuai_node_id != null) return n.ikuai_node_id;
+            } catch (_) {}
+        }
+        return defaultIk;
+    }
+    const subnetIk = await ikOf(subnet.pve_node_id, subnet.ikuai_node_id);
+    const devIk = await ikOf(devNodeId, null);
+    return Number(subnetIk) === Number(devIk);
+}
+
 // 校验设备归属 + 关机状态，返回 { record, status } 或 { error }
 // opts.allowRunning = true 时允许运行中操作（管理员绑定子网特权）
 async function checkDeviceAccess(req, type, vmid, opts) {
-    const record = type === 'vm'
-        ? (await db.vms.getAll()).find(v => v.vm_id === vmid)
-        : (await db.lxcContainers.getAll()).find(c => c.ct_id === vmid);
+    // 多节点：vmid 跨节点可重复，统一走 locateAssetRow（普通用户强制归属过滤，多命中要求带节点消歧）
+    const { locateAssetRow } = require('../utils/locate-asset');
+    const located = await locateAssetRow(type, vmid, {
+        isAdmin: req.user.role === 'admin',
+        userId: req.user.id,
+        nodeIdQuery: (req.body && req.body.node_id) || req.query.node_id
+    });
+    if (located.ambiguous) {
+        return { error: type === 'lxc'
+            ? { status: 409, message: '该容器编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_CTID' }
+            : { status: 409, message: '该编号在多个节点均存在，请指定所在节点后操作', code: 'AMBIGUOUS_VMID' } };
+    }
+    const record = located.row;
     if (!record) {
-        return { error: { status: 404, message: (type === 'vm' ? '虚拟机' : '容器') + '不存在' } };
+        return { error: { status: 404, message: (type === 'vm' ? '虚拟机' : '容器') + '不存在', code: type === 'vm' ? 'VM_NOT_FOUND' : 'LXC_NOT_FOUND' } };
     }
     if (req.user.role !== 'admin' && record.user_id !== req.user.id) {
         return { error: { status: 403, message: '无权限操作此' + (type === 'vm' ? '虚拟机' : '容器') } };
@@ -147,6 +188,8 @@ router.get('/subnets', authMiddleware, async (req, res) => {
                 available: s.available,
                 vm_count: vmCount[s.id] || 0,
                 lxc_count: ctCount[s.id] || 0,
+                pve_node_name: s.pve_node_name || '',
+                zone_name: s.zone_name || '',
                 created_at: s.created_at
             };
         });
@@ -162,7 +205,16 @@ router.get('/admin/subnets', authMiddleware, adminMiddleware, async (req, res) =
         const search = (req.query.search || '').trim();
         if (search.length > 50) return res.status(400).json({ error: '搜索关键词过长', code: 'KEYWORD_TOO_LONG' });
 
-        const list = await db.subnets.getAllWithOwner(search || undefined);
+        // 多节点：?node_id= 按所属 PVE 节点筛选（空=全部，管理员需要跨节点总览）
+        let filterNodeId = null;
+        if (req.query.node_id !== undefined && req.query.node_id !== '') {
+            const { findEnabledNode } = require('../utils/locate-asset');
+            const nodeRow = await findEnabledNode(req.query.node_id);
+            if (!nodeRow) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+            filterNodeId = nodeRow.id;
+        }
+
+        const list = await db.subnets.getAllWithOwner(search || undefined, filterNodeId);
 
         // 绑定设备统计（一次查询避免 N+1）
         const counts = await db.subnets.getBoundCounts();
@@ -182,6 +234,8 @@ router.get('/admin/subnets', authMiddleware, adminMiddleware, async (req, res) =
                 interface: s.interface,
                 vm_count: counts.vm[s.id] || 0,
                 lxc_count: counts.lxc[s.id] || 0,
+                pve_node_name: s.pve_node_name || '',
+                zone_name: s.zone_name || '',
                 created_at: s.created_at
             };
         });
@@ -199,17 +253,13 @@ router.post('/subnets', authMiddleware, async (req, res) => {
         return res.status(429).json({ error: '创建子网过于频繁，请稍后再试', code: 'RATE_LIMITED_SUBNET_CREATE', retryAfter: rateLimitResult.retryAfter });
         }
     // 每用户子网数量上限（普通用户受限，管理员不限，与端口转发 max_per_user 一致）
-    // 多节点：请求可指定所属 PVE 节点 node_id → 解析其配对的上级爱快节点；缺省=默认爱快节点
-    let ikNodeId = null;
-    const reqNodeId = req.body && req.body.node_id ? parseInt(req.body.node_id) : null;
-    if (reqNodeId != null) {
-        const pn = await db.pveNodes.get(reqNodeId);
-        if (!pn) return res.status(400).json({ error: '所属 PVE 节点不存在', code: 'PVE_NODE_BELONG_NOT_FOUND' });
-        ikNodeId = pn.ikuai_node_id;
-        if (!ikNodeId) return res.status(400).json({ error: '该 PVE 节点未配置关联爱快节点', code: 'IKUAI_PAIR_MISSING' });
-    } else {
-        ikNodeId = await db.ikuaNodes.getDefaultId();
-    }
+    // 多节点：必须显式指定所属 PVE 节点 node_id（子网 = 该节点上级爱快的 VLAN，缺省落默认节点会导致
+    // 用户选了 A 区却把 VLAN 建到 B 区的爱快上，之后绑定设备必被同区校验拒绝）
+    const { findEnabledNode } = require('../utils/locate-asset');
+    const pveNode = await findEnabledNode(req.body && req.body.node_id);
+    if (!pveNode) return res.status(400).json({ error: '请先选择有效的节点', code: 'NODE_SELECT_REQUIRED' });
+    const ikNodeId = pveNode.ikuai_node_id;
+    if (!ikNodeId) return res.status(400).json({ error: '该 PVE 节点未配置关联爱快节点', code: 'IKUAI_PAIR_MISSING' });
     if (req.user.role !== 'admin') {
         const maxPerUser = parseInt(await db.config.getIkuaiSetting('vlan:max_per_user', ikNodeId)) || 5;
         if (maxPerUser > 0) {
@@ -325,7 +375,8 @@ router.post('/subnets', authMiddleware, async (req, res) => {
             available,
             ikuai_vlan_id: ikuaiVlanId,
             ikuai_dhcp_id: dhcpId,
-            ikuai_node_id: ikNodeId
+            ikuai_node_id: ikNodeId,
+            pve_node_id: pveNode.id
         });
 
         await auditAction(req, 'subnet.create', '创建子网 ' + vlanName + ' (VLAN ' + vlanId + ', 网关 ' + gw + ', 地址池 ' + addrPool + ')', { resourceType: 'subnet', resourceId: subnet.id });
@@ -520,12 +571,9 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         if (vm.subnet_id) {
             return res.status(400).json({ error: '该虚拟机已绑定子网，请先解绑后再绑定新的子网', code: 'VM_ALREADY_BOUND_SUBNET' });
         }
-        // 多节点同区校验：子网归属爱快必须与设备 PVE 节点配对的爱快一致（跨区 VLAN tag 无效）
+        // 多节点同区校验：子网与设备必须在同一可用区（跨区 VLAN tag 无效）
         try {
-            const devPn = vm.pve_node_id != null ? await db.pveNodes.get(vm.pve_node_id) : null;
-            const devIk = devPn && devPn.ikuai_node_id != null ? devPn.ikuai_node_id : await db.ikuaNodes.getDefaultId();
-            const subnetIk = subnet.ikuai_node_id != null ? subnet.ikuai_node_id : await db.ikuaNodes.getDefaultId();
-            if (subnetIk !== devIk) {
+            if (!await isSubnetDeviceSameZone(subnet, vm.pve_node_id)) {
                 return res.status(400).json({ error: '该子网与虚拟机不在同一可用区，无法绑定', code: 'SUBNET_BIND_ZONE_MISMATCH' });
             }
         } catch (zoneErr) {
@@ -570,7 +618,7 @@ router.post('/vm/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         // 设备 IP 已更换：同步重建端口转发（爱快删旧建新 + DB 回写新 IP）
         let rebuiltCount = 0;
         if (dhcpIp) {
-            rebuiltCount = await rebuildPortForwardsForDevice('vm', vmid, dhcpIp);
+            rebuiltCount = await rebuildPortForwardsForDevice('vm', vmid, dhcpIp, vm.pve_node_id);
         }
         await auditAction(req, 'subnet.bind.vm', 'VM ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : '') + (rebuiltCount > 0 ? ', 更新端口转发 ' + rebuiltCount + ' 条' : ''), { resourceType: 'subnet', resourceId: subnetId });
         res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId, port_forwards_rebuilt: rebuiltCount });
@@ -602,12 +650,9 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         if (ct.subnet_id) {
             return res.status(400).json({ error: '该容器已绑定子网，请先解绑后再绑定新的子网', code: 'LXC_ALREADY_BOUND_SUBNET' });
         }
-        // 多节点同区校验：子网归属爱快必须与设备 PVE 节点配对的爱快一致（跨区 VLAN tag 无效）
+        // 多节点同区校验：子网与设备必须在同一可用区（跨区 VLAN tag 无效）
         try {
-            const ctPn = ct.pve_node_id != null ? await db.pveNodes.get(ct.pve_node_id) : null;
-            const devIk2 = ctPn && ctPn.ikuai_node_id != null ? ctPn.ikuai_node_id : await db.ikuaNodes.getDefaultId();
-            const subnetIk2 = subnet.ikuai_node_id != null ? subnet.ikuai_node_id : await db.ikuaNodes.getDefaultId();
-            if (subnetIk2 !== devIk2) {
+            if (!await isSubnetDeviceSameZone(subnet, ct.pve_node_id)) {
                 return res.status(400).json({ error: '该子网与容器不在同一可用区，无法绑定', code: 'SUBNET_BIND_ZONE_MISMATCH_LXC' });
             }
         } catch (zoneErr) {
@@ -650,7 +695,7 @@ router.post('/lxc/:vmid/bind-subnet', authMiddleware, async (req, res) => {
         // 设备 IP 已更换：同步重建端口转发（爱快删旧建新 + DB 回写新 IP）
         let rebuiltCount = 0;
         if (dhcpIp) {
-            rebuiltCount = await rebuildPortForwardsForDevice('lxc', vmid, dhcpIp);
+            rebuiltCount = await rebuildPortForwardsForDevice('lxc', vmid, dhcpIp, ct.pve_node_id);
         }
         await auditAction(req, 'subnet.bind.lxc', 'LXC ' + vmid + ' 绑定子网 ' + subnet.vlan_name + ' (VLAN ' + subnet.vlan_id + ')' + (dhcpIp ? ', 分配IP ' + dhcpIp : '') + (rebuiltCount > 0 ? ', 更新端口转发 ' + rebuiltCount + ' 条' : ''), { resourceType: 'subnet', resourceId: subnetId });
         res.json({ message: '绑定成功', dhcp_static_ip: dhcpIp, subnet_id: subnetId, port_forwards_rebuilt: rebuiltCount });

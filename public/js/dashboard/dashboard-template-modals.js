@@ -933,11 +933,14 @@
                 <span v-else class="text-muted small">{{ t('dash.subnet.adminUnlimited') }}</span>
             </div>
             <div class="mb-3">
-                <label class="form-label">{{ t('nodes.belongZone') }}</label>
-                <select class="form-select" v-model="subnetZoneId">
+                <label class="form-label">{{ t('admin.assetNode') }} <span class="text-danger">*</span></label>
+                <select class="form-select" v-model="subnetNodeId" required>
                     <option value="">{{ t('admin.disk.pleaseSelect') }}</option>
-                    <option v-for="z in subnetZones" :key="z.id" :value="z.id">{{ z.name }}{{ z.region_name ? ' (' + z.region_name + ')' : '' }}</option>
+                    <optgroup v-for="g in subnetNodeGroups" :key="g.zone_name" :label="g.zone_name">
+                        <option v-for="n in g.nodes" :key="n.id" :value="String(n.id)">{{ n.name }}</option>
+                    </optgroup>
                 </select>
+                <div class="form-text text-muted">{{ t('dash.subnet.nodeHint') }}</div>
             </div>
             <div v-if="subnetQuota.max > 0 && subnetQuota.used >= subnetQuota.max" class="alert alert-warning py-2 small mb-3">
                 {{ t('dash.subnet.limitReached') }}
