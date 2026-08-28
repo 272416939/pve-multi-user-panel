@@ -2165,6 +2165,7 @@
   "err.VLAN_EXHAUSTED": "VLAN ID 已用尽（上限 4090），请联系管理员调整起始值",
   "err.VLAN_IFNAME_INVALID": "VLAN 接口名格式无效（仅字母数字_.:-，≤32字符）",
   "err.VLAN_NAME_GEN_FAILED": "VLAN 名称生成失败，请重试",
+  "err.VLAN_PARENT_IS_VLAN": "VLAN 父接口不能选择已有的 VLAN 子接口，请选择物理 LAN 接口",
   "err.VLAN_START_INT": "VLANID 开始范围必须是 2~4090 的整数",
   "err.VLAN_START_RANGE": "VLANID 开始范围必须在 2~4090 之间",
   "err.VLAN_TAG_REMOVE_FAILED": "移除 VLAN 标记失败: {0}",

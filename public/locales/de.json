@@ -2165,6 +2165,7 @@
   "err.VLAN_EXHAUSTED": "VLAN-IDs erschöpft (max. 4090). Administrator bitten, Start anzupassen.",
   "err.VLAN_IFNAME_INVALID": "Ungültiger VLAN-Interface-Name (alphanumerisch _.:-, ≤32 Zeichen).",
   "err.VLAN_NAME_GEN_FAILED": "VLAN-Name konnte nicht generiert werden.",
+  "err.VLAN_PARENT_IS_VLAN": "Die VLAN-Elternschnittstelle darf keine bestehende VLAN-Unterschnittstelle sein; wählen Sie eine physische LAN-Schnittstelle",
   "err.VLAN_START_INT": "VLAN-ID-Start muss eine ganze Zahl von 2-4090 sein.",
   "err.VLAN_START_RANGE": "VLAN-ID-Start muss zwischen 2 und 4090 liegen.",
   "err.VLAN_TAG_REMOVE_FAILED": "VLAN-Tag konnte nicht entfernt werden: {0}",

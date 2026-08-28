@@ -220,7 +220,7 @@
                                 <label class="form-label">{{ t('settings.network.vlanIface') }}</label>
                                 <select class="form-select" v-model="ikuaiNodesPage.networkForm.vlan_interface">
                                     <option value="">{{ t('nodes.selectIface') }}</option>
-                                    <option v-for="iface in ikuaiNodesPage.interfaces.value" :key="iface.name" :value="iface.name">{{ iface.name }}</option>
+                                    <option v-for="iface in ikuaiNodesPage.vlanParentList.value" :key="iface.name" :value="iface.name">{{ iface.name }}</option>
                                 </select>
                             </div>
                             <div class="col-md-3">

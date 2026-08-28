@@ -2165,6 +2165,7 @@
   "err.VLAN_EXHAUSTED": "VLAN ID가 소진되었습니다(최대 4090). 관리자에게 시작 값 조정을 요청하세요.",
   "err.VLAN_IFNAME_INVALID": "유효하지 않은 VLAN 인터페이스 이름입니다(영숫자_.:-만, 32자 이하).",
   "err.VLAN_NAME_GEN_FAILED": "VLAN 이름 생성에 실패했습니다. 다시 시도하세요.",
+  "err.VLAN_PARENT_IS_VLAN": "VLAN 상위 인터페이스로 기존 VLAN 하위 인터페이스를 선택할 수 없습니다. 물리 LAN 인터페이스를 선택하세요",
   "err.VLAN_START_INT": "VLAN ID 시작 값은 2~4090의 정수여야 합니다.",
   "err.VLAN_START_RANGE": "VLAN ID 시작 값은 2~4090 사이여야 합니다.",
   "err.VLAN_TAG_REMOVE_FAILED": "VLAN 태그 제거 실패: {0}",

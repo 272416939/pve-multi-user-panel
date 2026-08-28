@@ -94,16 +94,17 @@
         return $.forwardRules.value.slice(start, start + $.forwardPageSize);
     });
 
-    // 仅显示 LAN 类型接口供 DHCP 选择（若没有 LAN 类型，降级显示全部接口兜底）
+    // 仅显示 LAN 类型接口供 DHCP 选择（若没有 LAN 类型，降级显示全部非 VLAN 接口兜底）
+    // VLAN 子接口（面板自建 vlan_VPC*）不是物理口，任何父接口/转发源下拉都要排除
     $.lanInterfaceList = computed(function() {
         var lan = $.ifaceList.value.filter(function(i) { return i.type === 'lan'; });
-        return lan.length > 0 ? lan : $.ifaceList.value;
+        return lan.length > 0 ? lan : $.ifaceList.value.filter(function(i) { return i.type !== 'vlan'; });
     });
 
     // 仅显示 WAN 类型接口供端口转发选择
     $.wanInterfaceList = computed(function() {
         var wan = $.ifaceList.value.filter(function(i) { return i.type === 'wan'; });
-        return wan.length > 0 ? wan : $.ifaceList.value;
+        return wan.length > 0 ? wan : $.ifaceList.value.filter(function(i) { return i.type !== 'vlan'; });
     });
 
     // ==================== 函数 ====================

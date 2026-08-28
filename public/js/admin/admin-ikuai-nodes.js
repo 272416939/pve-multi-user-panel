@@ -36,9 +36,20 @@ window.__admin.ikuaiNodesPage = (function () {
     });
 
     // 外网接口下拉（多选）：仅显示 WAN 类型接口，无 WAN 时回退全部（与旧版一致）
+    // 回退也要排除 VLAN 子接口——它们不是物理外网口，不能作为转发源
     var wanInterfaceList = computed(function () {
         var wan = interfaces.value.filter(function (i) { return i.type === 'wan'; });
-        return wan.length > 0 ? wan : interfaces.value;
+        if (wan.length > 0) return wan;
+        return interfaces.value.filter(function (i) { return i.type !== 'vlan'; });
+    });
+
+    // VLAN 父接口下拉：只能选物理 LAN，必须排除已有 VLAN 子接口
+    // （面板自建的 vlan_VPC* 子网若被当父接口，会在爱快上嵌套 VLAN 导致子网不可用）
+    // 枚举不到 LAN 时回退非 VLAN 项，避免下拉全空无法配置
+    var vlanParentList = computed(function () {
+        var lan = interfaces.value.filter(function (i) { return i.type === 'lan'; });
+        if (lan.length > 0) return lan;
+        return interfaces.value.filter(function (i) { return i.type !== 'vlan'; });
     });
 
     // CNAME 域名行编辑列表（存储格式 label||.domain 逗号分隔，与既有 cname 校验/展示兼容）
@@ -483,6 +494,7 @@ window.__admin.ikuaiNodesPage = (function () {
         cnameEntries: cnameEntries,
         wanIfaceText: wanIfaceText,
         wanInterfaceList: wanInterfaceList,
+        vlanParentList: vlanParentList,
         load: load,
         loadNodes: loadNodes,
         loadStop: stopPoll,

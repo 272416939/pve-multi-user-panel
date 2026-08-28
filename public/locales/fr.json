@@ -2165,6 +2165,7 @@
   "err.VLAN_EXHAUSTED": "VLAN épuisés (max 4090). Demandez à l'admin d'ajuster le début.",
   "err.VLAN_IFNAME_INVALID": "Nom d'interface VLAN invalide (alphanum. _.:-, ≤32).",
   "err.VLAN_NAME_GEN_FAILED": "Échec de génération du nom VLAN. Réessayez.",
+  "err.VLAN_PARENT_IS_VLAN": "L'interface parente VLAN ne peut pas être une sous-interface VLAN existante ; choisissez une interface LAN physique",
   "err.VLAN_START_INT": "Début VLAN : entier entre 2 et 4090.",
   "err.VLAN_START_RANGE": "Le début VLAN doit être entre 2 et 4090.",
   "err.VLAN_TAG_REMOVE_FAILED": "Échec de suppression du tag VLAN : {0}",

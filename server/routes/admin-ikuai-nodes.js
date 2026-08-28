@@ -166,6 +166,29 @@ async function runTest(res, params) {
     }
 }
 
+// VLAN 父接口不得是设备上已有的 VLAN 子接口（VLAN 不能嵌套，选中后建子网必失败）。
+// 走静态路径按表单凭据枚举，best-effort：枚举失败（网络/权限）不阻断保存。
+// 返回 true=已响应 400，调用方须直接 return。
+async function rejectNestedVlanIface(res, params, vlanIface) {
+    var name = String(vlanIface || '').trim();
+    if (!name) return false;
+    try {
+        const { IkuaiApi } = require('../api/ikuai-api');
+        var probe = new IkuaiApi(null);
+        var names = await probe.getVlanNamesWith(params);
+        if (Array.isArray(names) && names.indexOf(name) > -1) {
+            res.status(400).json({
+                error: 'VLAN 父接口不能选择已有的 VLAN 子接口，请选择物理 LAN 接口',
+                code: 'VLAN_PARENT_IS_VLAN'
+            });
+            return true;
+        }
+    } catch (e) {
+        console.error('[ikuai-nodes] VLAN 父接口校验跳过（枚举失败）:', e.message);
+    }
+    return false;
+}
+
 // 表单当前值测试（未保存即可测；不落库不写审计）
 router.post('/admin/ikuai/nodes/test', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -336,6 +359,7 @@ router.post('/admin/ikuai/nodes', authMiddleware, adminMiddleware, async (req, r
         // 强制测试门禁：失败直接 400 阻断保存
         var result = await runTest(res, p);
         if (!result.ok) return;
+        if (await rejectNestedVlanIface(res, p, (netCheck.value || {}).vlan_interface)) return;
         const id = await db.ikuaNodes.create({
             name: base.value.name, version: base.value.version, host: base.value.host,
             username: p.username, password: p.version === 'v3' ? p.password : '',
@@ -381,6 +405,7 @@ router.put('/admin/ikuai/nodes/:id', authMiddleware, adminMiddleware, async (req
         }
         var result = await runTest(res, p);
         if (!result.ok) return;
+        if (await rejectNestedVlanIface(res, p, (netCheck.value || {}).vlan_interface)) return;
         await db.ikuaNodes.update(id, {
             name: base.value.name, version: base.value.version, host: base.value.host,
             username: p.username, password: p.password, api_key: p.api_key,

@@ -2165,6 +2165,7 @@
   "err.VLAN_EXHAUSTED": "VLAN IDs exhausted (max 4090). Ask the administrator to adjust the start.",
   "err.VLAN_IFNAME_INVALID": "Invalid VLAN interface name (alphanumeric _.:- only, ≤32 chars).",
   "err.VLAN_NAME_GEN_FAILED": "Failed to generate a VLAN name. Please retry.",
+  "err.VLAN_PARENT_IS_VLAN": "The VLAN parent interface cannot be an existing VLAN sub-interface; choose a physical LAN interface",
   "err.VLAN_START_INT": "VLAN ID start must be an integer from 2 to 4090.",
   "err.VLAN_START_RANGE": "VLAN ID start must be between 2 and 4090.",
   "err.VLAN_TAG_REMOVE_FAILED": "Failed to remove VLAN tag: {0}",

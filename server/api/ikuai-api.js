@@ -216,6 +216,31 @@ class IkuaiApi {
         return { leaseCount: total };
     }
 
+    // 按传入配置枚举已有 VLAN 子接口名（静态路径，与 testConnectionWith 同模式：不落库、不动客户端缓存）
+    // 用途：节点保存前校验「VLAN 父接口」不是已有 VLAN 子接口（VLAN 不能嵌套）
+    // 失败抛错，由调用方决定是否放行（best-effort 校验不应阻断保存）
+    async getVlanNamesWith({ host, username, password, api_key, version, strict_tls }) {
+        if (!host) throw new Error('爱快地址未填写');
+        if (version === 'v4') {
+            if (!api_key) throw new Error('V4 模式需要填写 API Token');
+            var { IkuaiV4Api } = require('./ikuai-v4');
+            var impl = new IkuaiV4Api({ host, token: api_key, insecure: !strict_tls, debug: process.env.DEBUG === 'true' });
+            return (await impl.getVlans()).map(v => v.vlan_name).filter(Boolean);
+        }
+        if (!username || !password) throw new Error('用户名与密码未填写');
+        var { IKuaiClient } = await import('../sdk/ikuai-sdk/ikuai-sdk.mjs');
+        var client = new IKuaiClient(host, { debug: process.env.DEBUG === 'true', insecure: !strict_tls });
+        await client.login(username, password);
+        // 静态路径走裸 client.call，返回的是完整信封 { Result, ErrMsg, Data }（_call 才会拆 Data）
+        var resp = await client.call('vlan', 'show', { TYPE: 'data,total', limit: '0,1000', ORDER_BY: '', ORDER: '' });
+        if (resp && resp.Result !== undefined && resp.Result !== 30000) {
+            throw new Error(resp.ErrMsg || ('Result=' + resp.Result));
+        }
+        var payload = (resp && resp.Data !== undefined) ? resp.Data : resp;
+        var list = (payload && Array.isArray(payload.data)) ? payload.data : (Array.isArray(payload) ? payload : []);
+        return list.map(item => item.vlan_name).filter(Boolean);
+    }
+
     async getPortForwards() {
         if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getPortForwards();
         const data = await this._call('dnat', 'show', { TYPE: 'data,total', limit: '0,9999', ORDER_BY: 'id', ORDER: '', orderType: '' });
@@ -313,6 +338,16 @@ class IkuaiApi {
         if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getInterfaces();
         const interfaces = [];
         const seen = new Set();
+        // 已有 VLAN 子接口名（面板自建子网即 vlan_VPC*）：下方从 DHCP 租约/静态绑定提取的
+        // interface 字段对这些子网就是 VLAN 名，必须标记 type='vlan' 与物理 LAN 区分，
+        // 否则会出现在「VLAN 父接口」下拉里被选中，导致爱快上嵌套 VLAN
+        const vlanNames = new Set();
+        try {
+            (await this.getVlans()).forEach(v => { if (v.vlan_name) vlanNames.add(v.vlan_name); });
+        } catch (e) {
+            console.error('[ikuai] 获取 VLAN 名称集失败（接口类型标记降级）:', e.message);
+        }
+        const lanType = (name) => (vlanNames.has(name) ? 'vlan' : 'lan');
 
         // 1. 获取 WAN 接口（来自 dnat 端口转发可用的外网接口）
         try {
@@ -354,7 +389,7 @@ class IkuaiApi {
                         name: iface,
                         ip: '',
                         status: '已连接',
-                        type: 'lan',
+                        type: lanType(iface),
                         gateway: '',
                         comment: 'DHCP'
                     });
@@ -381,7 +416,7 @@ class IkuaiApi {
                         name: iface,
                         ip: '',
                         status: '已连接',
-                        type: 'lan',
+                        type: lanType(iface),
                         gateway: '',
                         comment: 'DHCP'
                     });
@@ -406,7 +441,7 @@ class IkuaiApi {
                             name: name,
                             ip: '',
                             status: '已连接',
-                            type: 'lan',
+                            type: lanType(name),
                             gateway: '',
                             comment: comment || 'VLAN'
                         });
@@ -417,7 +452,17 @@ class IkuaiApi {
             console.error('[ikuai] 从 VLAN 接口枚举获取接口失败:', e.message);
         }
 
-        console.log(`[ikuai] 获取到 ${interfaces.length} 个接口 (WAN: ${interfaces.filter(i=>i.type==='wan').length}, LAN: ${interfaces.filter(i=>i.type==='lan').length})`);
+        // 3.6 已有 VLAN 子接口补全（上面各源都没枚举到时也要出现在列表里，
+        //    供「已选父接口是否仍存在」类校验参考；type='vlan' 保证不进父接口下拉）
+        vlanNames.forEach(name => {
+            if (!seen.has(name)) {
+                seen.add(name);
+                interfaces.push({ name: name, ip: '', status: '已连接', type: 'vlan', gateway: '', comment: 'VLAN' });
+            }
+        });
+
+        const cnt = (t) => interfaces.filter(i => i.type === t).length;
+        console.log(`[ikuai] 获取到 ${interfaces.length} 个接口 (WAN: ${cnt('wan')}, LAN: ${cnt('lan')}, VLAN: ${cnt('vlan')})`);
         return interfaces;
     }
 
@@ -444,14 +489,23 @@ class IkuaiApi {
     }
 
     // VLAN 可用父接口枚举（vlan show TYPE interface，与爱快后台 VLAN 下拉同源）
-    // 失败回退：dhcp 服务端 + 现有 vlan 的接口并集（best-effort，空数组表示不可枚举）
+    // 失败回退：dhcp 服务端 + 现有 vlan 的父接口并集（best-effort，空数组表示不可枚举）
+    // 两条路径都必须排除已有 VLAN 子接口名：VLAN 不能嵌套，且面板自建子网的 DHCP 服务端
+    // 接口正是 vlan_VPC*，不排除会被当成可用父接口
     async getVlanInterfaces() {
         if ((await this.ensureConfig())?.version === 'v4') return (await this._v4Api()).getVlanInterfaces();
+        let vlanNames = new Set();
+        try {
+            (await this.getVlans()).forEach(v => { if (v.vlan_name) vlanNames.add(v.vlan_name); });
+        } catch (_) {}
         try {
             const data = await this._call('vlan', 'show', { TYPE: 'interface' });
             const list = data?.interface || [];
             if (Array.isArray(list) && list.length > 0) {
-                return list.map(item => (Array.isArray(item) ? item[0] : String(item))).filter(Boolean);
+                const names = list
+                    .map(item => (Array.isArray(item) ? item[0] : String(item)))
+                    .filter(name => name && !vlanNames.has(name));
+                if (names.length > 0) return names;
             }
         } catch (e) {
             console.error('[ikuai] 获取 VLAN 可用接口失败:', e.message);
@@ -460,8 +514,8 @@ class IkuaiApi {
             const servers = await this.getDhcpServers();
             const vlans = await this.getVlans();
             const set = new Set();
-            servers.forEach(s => { if (s.interface) set.add(s.interface); });
-            vlans.forEach(v => { if (v.interface) set.add(v.interface); });
+            servers.forEach(s => { if (s.interface && !vlanNames.has(s.interface)) set.add(s.interface); });
+            vlans.forEach(v => { if (v.interface && !vlanNames.has(v.interface)) set.add(v.interface); });
             return [...set];
         } catch (e) {
             return [];

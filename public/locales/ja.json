@@ -2165,6 +2165,7 @@
   "err.VLAN_EXHAUSTED": "VLAN IDが枯渇しました（上限4090）。管理者に開始値調整を依頼してください。",
   "err.VLAN_IFNAME_INVALID": "無効なVLANインターフェース名です（英数字_.:-のみ、32文字以下）。",
   "err.VLAN_NAME_GEN_FAILED": "VLAN名の生成に失敗しました。再試行してください。",
+  "err.VLAN_PARENT_IS_VLAN": "VLAN の親インターフェースに既存の VLAN サブインターフェースは指定できません。物理 LAN インターフェースを選択してください",
   "err.VLAN_START_INT": "VLAN ID開始値は2〜4090の整数である必要があります。",
   "err.VLAN_START_RANGE": "VLAN ID開始値は2〜4090の間である必要があります。",
   "err.VLAN_TAG_REMOVE_FAILED": "VLANタグの削除に失敗: {0}",

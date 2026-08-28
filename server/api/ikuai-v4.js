@@ -168,6 +168,7 @@ class IkuaiV4Api {
 
     // ===== 接口枚举 =====
     // WAN=wan-config data[].name；LAN=lan-config data[].name；VLAN=network/vlan data[].vlan_name
+    // VLAN 条目标记 type='vlan' 与物理 LAN 区分：VLAN 是子接口，不能再作为新建 VLAN 的父接口
     async getInterfaces() {
         const api = await this._api();
         const interfaces = [];
@@ -198,11 +199,12 @@ class IkuaiV4Api {
         }
         try {
             const vlans = await this._listAll('/network/vlan', { totalKey: 'total', dataKey: 'data' });
-            vlans.forEach(v => push(v.vlan_name, 'lan', v.ip_addr || '', 'VLAN'));
+            vlans.forEach(v => push(v.vlan_name, 'vlan', v.ip_addr || '', 'VLAN'));
         } catch (e) {
             console.error('[ikuai-v4] 获取VLAN接口失败:', e.message);
         }
-        console.log(`[ikuai-v4] 获取到 ${interfaces.length} 个接口 (WAN: ${interfaces.filter(i => i.type === 'wan').length}, LAN: ${interfaces.filter(i => i.type === 'lan').length})`);
+        const cnt = (t) => interfaces.filter(i => i.type === t).length;
+        console.log(`[ikuai-v4] 获取到 ${interfaces.length} 个接口 (WAN: ${cnt('wan')}, LAN: ${cnt('lan')}, VLAN: ${cnt('vlan')})`);
         return interfaces;
     }
 
@@ -221,6 +223,7 @@ class IkuaiV4Api {
     }
 
     // VLAN 可用父接口 = LAN 接口（lan-config data[].name）；失败回退现有 vlan 父接口 + dhcp 服务接口并集
+    // 回退路径必须排除已有 VLAN 子接口名（VLAN 不能嵌套，面板自建子网的 DHCP 服务端接口正是 vlan_VPC*）
     async getVlanInterfaces() {
         const api = await this._api();
         try {
@@ -233,9 +236,10 @@ class IkuaiV4Api {
         try {
             const set = new Set();
             const vlans = await this._listAll('/network/vlan', { totalKey: 'total', dataKey: 'data' });
-            vlans.forEach(v => { if (v.interface) set.add(v.interface); });
+            const vlanNames = new Set(vlans.map(v => v.vlan_name).filter(Boolean));
+            vlans.forEach(v => { if (v.interface && !vlanNames.has(v.interface)) set.add(v.interface); });
             const servers = await this.getDhcpServers();
-            servers.forEach(s => { if (s.interface) set.add(s.interface); });
+            servers.forEach(s => { if (s.interface && !vlanNames.has(s.interface)) set.add(s.interface); });
             return [...set];
         } catch (e) {
             return [];
