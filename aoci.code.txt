@@ -1,0 +1,478 @@
+#AOCI-CODE-VOLUME: 1
+
+===E:/code/pve管理面板/===
+.env.example[FC7T]: F:提供全部运行时环境变量样例与说明（端口、MySQL、JWT、AES 加密密钥、站点域名、CORS、时区、更新源、调试开关） | R:code:.gitignore | A:部署者,dotenv | S:MySQL 5.7+ 必填且不再支持 SQLite；ENCRYPTION_KEY 一旦写入加密数据即不可更换，否则 PVE 密码/API Token/SMTP 密码等历史密文无法解密；TRUST_PROXY 仅在可信反向代理后开启
+.gitattributes[FG2T]: F:强制所有文本以 LF 检出并禁止 autocrlf 重写，使 AOCI 基线字节指纹在 Windows 与 Linux 上保持一致 | R:- | A:git | S:文本一律 eol=lf，二进制自动识别不受影响；删除本文件会让整仓指纹被判为 Stale
+.gitignore[FG3T]: F:排除环境密钥、JWT 密钥、上传头像、遗留 data/、node_modules、本地测试与开发文档、日志与备份文件 | R:- | A:git | S:.env 与 package-lock.json 不推送；docs/test 本地专用
+AGENTS.md[SG7S]: F:承载 AOCI 仓库认知合同：认知建立、压缩恢复、维护收尾规则与 MCP 工具入口 | R:code:aoci.txt,code:aoci.meta.txt,code:aoci.code.txt,code:README.md | A:AI Agent | S:aoci:begin/end 区块由 aoci init 生成，手改会与正式 Volume 身份不一致；合同本体不复制专项流程，机器事实以 aoci_rules、Guide 与工具 Schema 为准
+CHANGELOG.md[SG4L]: F:逐版本记录变更，3.4.0 以全站 i18n 七语言为主题（41 提交、123 文件 +22305/-3751） | R:code:README.md,code:package.json | A:维护者与升级者 | S:版本号须与 package.json 同步递增；破坏性升级单列说明
+LICENSE[SG2T]: F:声明 MIT 许可证条款：允许商用与修改，需保留版权声明与免责声明 | R:- | A:开源合规 | S:-
+README.md[SG7L]: F:说明面板功能清单、快速开始、环境变量与 PVE Token 权限、项目结构、VNC/终端/WebSocket 架构、使用说明与宝塔部署 | R:code:package.json,code:.env.example,code:server/server.js | A:部署者与使用者 | S:依赖 Node 18+、MySQL 5.7+ 与 Vue 3；PVE API Token 权限不足会导致克隆与状态读取失败；公共截图目录 docs/ 已 gitignore
+package.json[FV7T]: F:声明 pve-multi-user-panel v3.4.0 的依赖清单与 start/dev/test 脚本，main 指向 server/server.js | R:code:server/server.js | A:npm,node | S:test 走 mocha --recursive test/**/*.test.js；同时保留原生 bcrypt 与 bcryptjs 双实现；依赖升级需同时更新 package-lock.json
+
+===E:/code/pve管理面板/public/===
+cache-version.json[FZ4T]: F:记录前端静态资源缓存版本号 v=259，服务端读取后以 ?cv= 查询串注入全部静态链接 | R:code:server/server.js,code:views/pages/admin.ejs | A:浏览器缓存 | S:必须为正整数且只增不减；改前端静态资源后须递增，否则命中旧缓存
+index.html[EU5T]: F:站点启动跳转页，只加载共享样式与 js/index-redirect.js，用旋转指示器占位后按登录态跳转 | R:code:public/js/index-redirect.js | A:浏览器入口 | S:页面不含业务逻辑，跳转策略与失败兜底全部由 index-redirect.js 决定
+robots.txt[FZ4T]: F:声明全站禁止搜索引擎抓取 | R:- | A:爬虫 | S:管理面板含登录入口，禁止收录是安全基线
+
+===E:/code/pve管理面板/public/components/===
+pv-badge.js[CU5T]: F:定义 Web Component pv-badge，按 variant（success/warning/danger/info）渲染浅底描边徽标，样式封装在 shadow DOM | R:- | A:pv-badge | S:颜色取自 --color-* 变量并用 color-mix 调透明度，变量缺失时回退 Bootstrap 色值
+pv-button.js[CU6T]: F:定义 Vue 全局组件 pv-button，用 render 输出 button.pv-btn.pv-btn-{variant}，并包装 Vue.createApp 自动注册 | R:code:public/shared/css/pv-buttons.css | A:pv-button | S:type=submit 走 form.requestSubmit 而非原生提交；带 data-bs-dismiss=modal 且无默认插槽时强制 close 变体；不设 inheritAttrs，让 $attrs 透传到 button
+pv-card.js[CU5S]: F:定义 Web Component pv-card，渲染标题栏与内容插槽，collapsible 时提供折叠箭头交互 | R:- | A:pv-card | S:title 经本文档内 escapeHtml 转义后再拼入 shadow DOM；折叠用 display 切换实现，隐藏不销毁内容
+pv-dropdown.js[CU4S]: F:定义 Web Component pv-dropdown，trigger/menu 双插槽下拉，支持点击外部关闭且同时只有一个展开 | R:- | A:pv-dropdown | S:open() 先遍历所有 pv-dropdown 关闭其它实例；document 点击监听在 disconnectedCallback 必须解绑
+pv-modal.js[CU5M]: F:定义 Web Component pv-modal，提供 open()/close()、size(sm/md/lg) 与冒泡的 pv-modal-close 事件 | R:- | A:pv-modal | S:打开置 body overflow=hidden，close 必须复原；点遮罩关闭而内容区 stopPropagation；宿主为 display:contents，样式全部在 shadow DOM 内
+pv-pagination.js[CU6T]: F:定义 Vue 全局组件 pv-pagination，内置 ±2 页码窗口、省略号、每页条数与跳页，向父级抛 change 与 page-size-change | R:code:public/components/pv-button.js | A:pv-pagination | S:页面只维护 total/page/pageSize 三个状态，翻页逻辑由组件收敛；文案走 t()/tFormat() 国际化，无自有 CSS
+pv-table.js[CU5S]: F:定义 Web Component pv-table，用 setColumns/setData 渲染表头表体，支持 striped/hover/sm 与空态行 | R:- | A:pv-table | S:仅直接取值的字段做 escapeHtml，col.render 返回的 HTML 原样插入，用户数据必须由 render 自行转义，否则构成 XSS
+pv-toast.js[CU4S]: F:定义 Web Component pv-toast，show(message,type,duration) 按 success/error/warning/info 渲染带内联 SVG 图标的右上角通知 | R:- | A:pv-toast | S:show 会清空上一条定时器并复用同一节点；图标与配色同样取自 --color-* 变量
+
+===E:/code/pve管理面板/public/css/===
+admin.css[CU4M]: F:管理后台样式：移动端 VM 卡片、总览子 Tab、模块标题、状态徽标、详情弹窗、表格操作按钮组、拖拽排序与消息红点动画 | R:code:public/css/dashboard.css,code:public/shared/css/pv-buttons.css | A:管理后台页面 | S:移动端卡片类名与 dashboard.css 共用，改动需同步；按钮与表单样式已移交 shared/css
+dashboard.css[CU4L]: F:用户 dashboard 样式：移动端 VM 卡片、总览图表栅格、套餐卡片与 768/480px 断点响应式 | R:code:public/css/admin.css | A:用户端 dashboard | S:768px 下单列、769 至 1024px 套餐两列；卡片类名与 admin.css 相同
+login.css[CU4M]: F:登录页样式，定义 :root 与 [data-theme=light] 两套 --login-* 变量并驱动登录卡片、输入框与按钮 | R:code:public/shared/css/tokens.css | A:登录页 | S:变量前缀固定 --login-*；亮色主题须重定义同名变量，否则继承暗色值
+user-center.css[CU4M]: F:用户中心样式：药丸 Tab/Pills、玻璃态表格与 Badge、消息列表卡片、侧栏未读红点、充值扫码弹窗与通知设置 | R:code:public/shared/css/components.css | A:用户中心页 | S:通知分组折叠样式在 shared/css/components.css，此处仅页面级覆盖
+
+===E:/code/pve管理面板/public/js/admin/===
+admin-i18n.js[AU7L]: F:管理端 i18n 管理页逻辑：语言注册表、分组元数据与分页词条拉取、词条覆盖编辑与批量保存 | R:code:server/routes/admin-i18n.js,code:public/js/shared/i18n.js,code:public/js/admin/admin-page.js | A:i18nPage | S:PAGE_CHUNK=200 控制分组展开分页，SAVE_BATCH=500 必须与后端单次保存上限一致；状态以 ref/reactive 定义后整体展开到 window.__admin 供模板引用
+admin-ikuai-nodes.js[AU6L]: F:爱快节点管理页逻辑：节点列表、v3 版本选择、外网接口多选、网络参数与 CNAME 域名行编辑、连通性测试 | R:code:server/routes/admin-ikuai-nodes.js,code:public/js/admin/admin-page.js | A:ikuaiNodesPage | S:外网接口下拉只列 WAN 类型并排除 VLAN 子接口，无 WAN 时才回退全部接口；表单按版本 v3 切换字段集
+admin-logs.js[AU6M]: F:日志中心页逻辑：操作/后台/登录/系统切换四类日志各自独立筛选、分页、CSV 导出、单条与批量删除及清空 | R:code:server/routes/admin-logs.js,code:public/components/pv-pagination.js | A:window.__admin | S:tab 必须过 LOG_TAB_WHITELIST 白名单校验；系统切换 tab 不持久化，旧链接只经 __legacyOsSwitchTab 当前会话生效；每页条数存 localStorage
+admin-page.js[AU7L]: F:管理端主页面脚本：在 setup 前挂载到期时间与忙碌徽标等全局工具函数，定义端口转发与私有网络列表 Vue 组件及底部 DOM 工具 | R:code:public/js/admin/admin.js,code:public/js/admin/core.js | A:window.__admin | S:工具函数先于 setup 挂到 window.__admin，模板编译期必须可直接引用；忙碌态徽标文案走 window.__i18n.t()
+admin-pve-nodes.js[AU6M]: F:PVE 节点管理页逻辑：节点 CRUD、存储列表加载与连通性测试，并复用全局快照/备份策略配置 | R:code:server/routes/admin-pve-nodes.js,code:public/js/admin/admin-page.js | A:pveNodesPage | S:底部快照与备份策略必须复用 $.snapshotConfig/$.backupConfigForm 与对应 load/save，不要在页面内另行实现
+admin-regions.js[AU5M]: F:地域与可用区管理页逻辑：两组 CRUD、按当前 section 选择性加载、列表拖拽排序 | R:code:server/routes/admin-regions.js | A:regionsPage | S:可用区拖拽排序仅允许同一地域内；load() 依据 activeSection 决定拉地域还是可用区，watch 与 onMounted 共用该入口
+admin-template-base.js[AU5M]: F:管理端模板分片之一：固定页头（品牌、主题切换、消息红点、用户菜单）与可折叠侧边栏导航 | R:code:public/js/admin/admin-template.js | A:window.__adminTemplateParts | S:模板以 window.__adminTemplateParts.push 追加，admin-template.js 用 join 拼接，片段顺序决定最终页面结构
+admin-template-cdk-messages.js[AU5M]: F:管理端模板分片：CDK 批量生成/导出/清理表单与消息管理区块 | R:code:public/js/admin/admin-template.js,code:public/js/admin/admin-page.js | A:window.__adminTemplateParts | S:同样以 push 追加，依赖 admin.js 暴露的 cdkForm、cdkTotal 等状态；生成数量上限 1000 且在指定用户时禁用
+admin-template-disk.js[AU6L]: F:管理端硬盘设置模板：存储分组、硬盘规格、生命周期配置与数据盘列表四块结构与表单 | R:code:public/js/admin/disk.js | A:disk-settings | S:只用 Vue {{ }} 插值渲染数据，禁止改 v-html（CSP 合规）；diskPage 属性是 ref，模板须以 .value 访问
+admin-template-finance.js[AU5S]: F:财务页模板：按 activeTab 在交易流水与订单两块之间切换，含筛选与分页结构 | R:code:public/js/admin/admin.js | A:finance | S:流水与订单共用一套筛选组件，切换 tab 不重置对端状态
+admin-template-i18n.js[AU5M]: F:i18n 管理页模板：语言注册表、分组词条编辑框、待翻译进度与顶部保存/重置操作栏 | R:code:public/js/admin/admin-i18n.js | A:i18nPage | S:交互全部走 i18nPage 暴露的 ref 与方法，模板内不得直接读写 localStorage
+admin-template-ikuai-nodes.js[AU5M]: F:爱快节点管理模板：节点表格、新建/编辑弹窗、外网接口多选与 CNAME 域名行编辑 | R:code:public/js/admin/admin-ikuai-nodes.js | A:ikuaiNodesPage | S:表单字段随 v3 版本分支渲染，字段名必须与服务端校验同源
+admin-template-logs.js[AU6M]: F:日志中心模板：四类日志 tab、筛选栏、表格、分页条与导出/删除/清空操作组 | R:code:public/js/admin/admin-logs.js,code:public/components/pv-pagination.js | A:logs | S:系统切换 tab 复用同一详情弹窗；导出入口仅对操作/后台/登录日志开放
+admin-template-lxc.js[AU6L]: F:LXC 容器管理模板：容器列表、分配换绑、快照/备份/销毁弹窗与直开容器表单 | R:code:public/js/admin/lxc.js | A:lxc | S:features 多选与 net0 网络字段必须与后端 LXC 创建参数命名一致
+admin-template-modals.js[AU7L]: F:管理端全部弹窗定义：用户、VM、LXC 编辑与密码/IP 重置、快照、备份、CDK、模板、端口转发与自定义确认框 | R:code:public/js/admin/admin.js,code:public/js/admin/lxc.js,code:public/js/admin/admin-page.js | A:createUserModal,customPromptModal | S:弹窗 id 被各页 JS 按 id 直接操作，改名需全仓同步；v-if 控制的非 Bootstrap 弹窗须走 z-index 监听
+admin-template-os-switch-logs.js[AU4T]: F:系统切换日志模板片段，作为日志中心内的一块补充表格 | R:code:public/js/admin/admin-template-logs.js | A:os-switch | S:旧链接 ?section=os-switch-logs 由 core.js 映射到 logs，不再独立成页
+admin-template-os.js[AU5S]: F:OS 模板管理模板：系统模板列表、上传表单与系统切换模板配置区 | R:code:public/js/admin/os-template.js | A:templates-os | S:-
+admin-template-overview.js[AU5S]: F:总览页模板：统计卡片、资源趋势图表容器与概览区块布局 | R:code:public/js/admin/core.js | A:overview | S:-
+admin-template-packages.js[AU6M]: F:套餐管理模板：VM/LXC 套餐卡片、新建与编辑弹窗、拖拽排序与上下架操作 | R:code:public/js/admin/package.js | A:packages | S:套餐卡片拖拽顺序即展示顺序，提交后需重新拉取列表校准
+admin-template-port-forward.js[AU4T]: F:端口转发页模板片段，只挂载 port-forward-list 组件 | R:code:public/js/admin/admin-page.js | A:port-forward | S:片段仅一行组件引用，列表与筛选逻辑全部在 admin-page.js 内定义
+admin-template-private-network.js[AU4T]: F:私有网络页模板片段，只挂载 private-network-list 组件 | R:code:public/js/admin/admin-page.js | A:private-network | S:片段仅一行组件引用，列表逻辑全部在 admin-page.js 内定义
+admin-template-pve-nodes.js[AU5M]: F:PVE 节点管理模板：节点表格、新建/编辑弹窗、存储选择与底部快照/备份策略配置 | R:code:public/js/admin/admin-pve-nodes.js | A:pveNodesPage | S:底部策略区复用全局快照与备份配置状态，勿在模板内新建同名字段
+admin-template-regions.js[AU5M]: F:地域与可用区管理模板：两套列表、编辑表单与拖拽排序手柄 | R:code:public/js/admin/admin-regions.js | A:regionsPage | S:可用区拖拽仅在所属地域内生效，跨地域拖放应被拒绝
+admin-template-security.js[AU4T]: F:安全防护模板片段：限速设置分区入口与规则说明区块 | R:code:public/js/admin/admin.js | A:security | S:-
+admin-template-settings.js[AU7L]: F:系统设置模板：站点、SMTP、支付、UApiPro、Redis、限速与其他设置 Tab 的完整表单 | R:code:public/js/admin/admin.js,code:public/js/admin/network.js | A:settings | S:爱快/PVE/快照备份已迁到独立节点管理页，core.js 会清除这些旧 tab 残留值并回退 smtp
+admin-template-templates.js[AU5T]: F:模板管理页模板：VM/LXC 模板列表与创建、删除操作区 | R:code:public/js/admin/template.js | A:templates | S:-
+admin-template-update.js[AU5S]: F:系统更新页模板：当前版本、远端版本检查结果与在线更新操作按钮 | R:code:public/js/admin/update.js | A:system-update | S:-
+admin-template-users.js[AU5T]: F:用户管理模板：用户表格、关键字/角色筛选、分页与新建/编辑/删除入口 | R:code:public/js/admin/admin.js | A:users | S:-
+admin-template-vm.js[AU6M]: F:VM 管理模板：虚拟机列表、分配换绑、快照/备份/销毁与编辑入口 | R:code:public/js/admin/vm.js | A:vms | S:忙碌态（备份/恢复/切换中）行必须走 vmBusyBlock 拦截操作，不能只靠按钮 disabled
+admin-template.js[AU4T]: F:模板装配器：把 window.__adminTemplateParts 全部片段 join 后注入 #appTemplate | R:code:public/js/admin/admin-template-base.js | A:appTemplate | S:只做纯拼接，不做 div 配平 hack；片段 push 顺序决定最终页面结构
+admin.js[AU8L]: F:管理端通用业务逻辑：用户与 VM 分配、SMTP 与邮件模板、快照备份配置、限速设置与系统切换日志 | R:code:public/js/admin/core.js,code:public/js/admin/admin-page.js | A:initAdmin | S:状态全部挂到 window.__admin 供模板直接引用；非 Bootstrap 弹窗需注册 z-index 监听；initAdmin 只由 core.js 的初始化链调用
+core.js[AU8L]: F:管理端核心：会话与导航状态、总览统计、详情弹窗、二级菜单、z-index 管理与 initCore 初始化链 | R:code:public/js/admin/admin.js,code:public/js/admin/admin-page.js | A:initCore | S:initCore 统一驱动各页 init 并判空；os-switch-logs 旧链接映射为 logs 且不写 localStorage，避免污染默认 tab
+disk.js[AU7L]: F:管理端硬盘设置逻辑：存储分组 CRUD 与拖拽排序、硬盘规格、生命周期配置、数据盘列表与编辑弹窗 | R:code:public/js/admin/admin-template-disk.js,code:server/routes/admin-disk.js | A:diskPage | S:diskPage 是普通对象、其属性为 ref，模板必须 .value 访问；token 每次从 localStorage 现取，不能缓存到模块变量
+lxc.js[AU7L]: F:管理端 LXC 逻辑：容器列表、模板直开创建、分配换绑、密码与 IP 重置、快照与备份 | R:code:server/routes/lxc.js,code:public/js/admin/admin-template-lxc.js | A:initLxc | S:分配与创建表单字段需与后端 LXC 参数一一对应；IP 重置含静态/DHCP 两种模式，校验失败须保留输入
+network.js[AU6L]: F:管理端网络配置逻辑：端口转发范围、WAN 接口选择、CNAME 域名、VLAN 网段与配置加载保存 | R:code:server/routes/network.js,code:public/js/admin/admin-template-settings.js | A:initNetwork | S:networkConfig 为 reactive 对象而非 ref，模板直接取属性；端口区间与 VLAN 参数需通过后端校验
+os-template.js[AU6L]: F:管理端 OS 模板页逻辑：模板列表、PVE 模板 VM 下拉、上传/删除与桌面+触屏拖拽排序 | R:code:public/js/admin/admin-template-os.js,code:server/routes/admin-os-template.js | A:osTemplatePage | S:拖拽复用 package.js 的桌面+触屏双实现；PVE 模板 VM 下拉需先加载 PVE 模板配置，加载中禁用表单
+package.js[AU7L]: F:套餐逻辑：VM/LXC 套餐表单、分组、库存与排序，含桌面+移动端统一拖拽引擎 | R:code:public/js/admin/admin-template-packages.js,code:server/routes/package.js | A:vmPackageForm,lxcPackageForm | S:拖拽引擎被套餐与分组共用，改动同时影响两处；文件暴露 __PKG_JS_VERSION 便于定位缓存旧版本
+template.js[AU6M]: F:模板管理逻辑：VM/LXC 模板表单、克隆模式与网络配置、列表增删改 | R:code:public/js/admin/admin-template-templates.js,code:server/routes/template.js | A:templatePage | S:表单默认值即后端最低要求（clone_mode=full、unprivileged=1），改默认值需与后端校验同步
+update.js[AU4T]: F:系统更新逻辑：版本检查、更新源选择与在线更新执行状态位 | R:code:public/js/admin/admin-template-update.js | A:checkUpdate | S:更新源默认 gitee，失败回退 github；执行更新期间需保持 updateExecuting 锁防止重复触发
+vm.js[AU8L]: F:管理端 VM 逻辑：虚拟机列表、分配换绑、快照与备份、编辑、重置密码与 IP、分配区多节点联动 | R:code:public/js/admin/admin-template-vm.js,code:server/routes/vm.js | A:initVm | S:vmOpTimestamps 记录操作冷却，防重复点击压垮 PVE；分配区按所选节点联动模板与套餐，切节点需重载可选项
+
+===E:/code/pve管理面板/public/js/===
+app-version.js[EU3T]: F:读取 /api/version 并把版本号写入 #appVersion 与 #currentVersion 元素 | R:code:public/js/shared.js | A:appVersion,currentVersion | S:无 token 直接 return，不发请求；请求失败静默忽略，不阻断页面
+index-redirect.js[EU5T]: F:站点入口跳转：带 resetPassword 参数去登录页并保留参数，已登录去 dashboard，否则去 login | R:code:public/index.html | A:location.replace | S:重置密码参数必须原样透传，不能被普通登录跳转吞掉
+login-page.js[EU8L]: F:登录页 Vue 应用：账号密码与 2FA 登录、注册、找回密码、强制改密流程及设备信息采集 | R:code:public/js/login-template.js,code:server/routes/auth.js | A:createApp | S:强制改密必须校验当前密码；前端强度规则须与后端一致（大小写字母+特殊字符），否则提交被 400；改密成功后本地会话失效
+login-template.js[EU6S]: F:登录页模板：登录、注册、找回密码与强制改密四种视图的表单结构 | R:code:public/js/login-page.js | A:appTemplate | S:视图由 showResetPassword 等状态切换，模板本身不承载业务判断
+shared-dialog-templates.js[CU6T]: F:三端共享弹窗模板的单一来源（自定义 Alert/Confirm 等），以 window.__sharedDialogTemplates 输出 | R:code:public/js/admin/admin-template-modals.js,code:public/js/dashboard/dashboard-template-modals.js | A:__sharedDialogTemplates | S:必须在各端弹窗模板文件之前加载，否则注入顺序导致共享弹窗缺失
+shared.js[CG8L]: F:全站前端运行时：api() 封装、token 校验与续期、错误码翻译、限速倒计时、强制改密与会话失效跳转 | R:code:public/js/shared/api-paths.js,code:public/js/shared/i18n.js | A:api,ensureValidToken,translateApiError | S:登录页内禁止再次跳转，否则 403 形成页面循环；REFRESH_TOKEN 不经 api() 需调用处手动拼 /api；429 统一拼接剩余等待秒数
+terminal-keyboard.js[AU5T]: F:网页终端快捷键处理：Ctrl+Shift+C / Ctrl+Insert 复制选中，Ctrl+Shift+V / Shift+Insert 粘贴，其余按键透传 xterm | R:code:public/js/terminal-standalone.js | A:handleTerminalKeydown | S:Ctrl+Shift+C 不等于 Ctrl+C，绝不能发送 \x03 中断；处理器返回 false 才阻止 xterm 默认行为
+terminal-shortcuts-help.js[AU4T]: F:生成网页终端快捷键说明的 HTML 片段，供终端页帮助弹窗渲染 | R:code:public/js/terminal-standalone.js | A:getShortcutsHelpHTML | S:UMD 导出，Node 测试环境无 __i18n 时回退 key 文本
+terminal-standalone.js[EU6S]: F:独立终端页启动逻辑：等待 i18n 就绪、建立 WebSocket、转发输入与 resize、挂载快捷键说明弹窗 | R:code:public/js/terminal-keyboard.js,code:public/js/terminal-shortcuts-help.js | A:whenI18nReady | S:启动前最多等 3 秒让 i18n 就绪，超时后兜底继续；终端尺寸通过 PVE xtermjs 的 resize 消息下发
+theme-init.js[CU5T]: F:首屏主题初始化：读 localStorage theme 与 prefers-color-scheme，写入 data-theme 与 color-scheme meta | R:code:public/shared/css/theme.css | A:data-theme | S:必须内联同步执行，否则首屏主题闪烁；移动端触摸后要延迟 blur，避免 focus 残留导致遮罩不消失
+user-center-page.js[EU8L]: F:用户中心 Vue 应用：资料与安全、2FA、通知偏好、钱包充值与订单、站内信、备忘录等全部页面状态与逻辑 | R:code:public/js/user-center-template.js,code:public/js/shared.js | A:createApp | S:DOMPurify 必须在 setup 内暴露，Vue 模板表达式不查全局变量；pending order 要持久化，手机端支付后被系统重建页面仍能续上
+user-center-template.js[EU7L]: F:用户中心页面模板：以 innerHTML 注入 #appTemplate，含侧边栏子导航 Teleport 与资料/安全/钱包/消息各区块 | R:code:public/js/user-center-page.js | A:appTemplate | S:模板整体赋给 innerHTML，脚本顺序必须是 Vue 与 DOMPurify 先就绪；通知图标走 DOMPurify 净化后插入
+
+===E:/code/pve管理面板/public/js/dashboard/===
+core.js[AU8L]: F:用户端核心：用户信息、Tab 与 section 懒加载、详情弹窗、Teleport 下拉、z-index 管理与非 Bootstrap 弹窗监听 | R:code:public/js/dashboard/dashboard-page.js,code:public/js/shared.js | A:window.__dashboard | S:下拉必须 Teleport 到 body 以免被表格 overflow 裁剪，关闭时需清理；section 懒加载统一注册在 switchSection 内，不要再 monkey-patch
+dashboard-page.js[AU6S]: F:用户端装配器：join __dashboardTemplateParts 注入 #appTemplate，并在 setup 前挂载到期时间等全局工具函数 | R:code:public/js/dashboard/dashboard-template.js | A:appTemplate | S:工具函数必须先于 Vue setup 定义，否则模板编译期取不到；装配顺序与 admin 端一致
+dashboard-template-modals.js[AU7L]: F:用户端弹窗模板合集：编辑虚拟机、快照、备份、下单、子网绑定与系统切换等，统一 Teleport 到 body | R:code:public/js/dashboard/vm.js,code:public/js/dashboard/disk.js | A:editVmModal | S:Teleport 弹窗关闭时必须同步清理下拉与选中态，否则下次打开残留上次数据
+dashboard-template.js[AU7L]: F:用户端主模板片段：总览、VM/LXC、硬盘、日志、消息等 section 的布局与表格结构 | R:code:public/js/dashboard/core.js | A:activeSection | S:各 section 以 v-show 切换以保留页面状态，懒加载与切换逻辑由 core.js 统一注册
+disk-template.js[AU6M]: F:用户硬盘管理模板：硬盘列表与购买、挂载、扩容、续费、销毁弹窗结构 | R:code:public/js/dashboard/disk.js | A:disk | S:只用 {{ }} 插值渲染数据，禁止 v-html（CSP 合规）；模板中 ref 自动解包，disks 直接当数组用
+disk.js[AU7L]: F:用户硬盘逻辑：规格与分组、可用区筛选、购买挂载扩容续费销毁及配额状态 | R:code:public/js/dashboard/disk-template.js,code:server/routes/disk.js | A:window.__dashboard | S:分组按钮按所选可用区过滤，只显示该区有可售规格的分组；模板内 ref 自动解包，逻辑层才用 .value
+forward.js[AU5S]: F:用户端端口转发逻辑：当前设备上下文、规则列表与新增/编辑/删除操作 | R:code:server/routes/network.js | A:initForward | S:initForward 无特殊生命周期逻辑；切换设备时整体重载规则，不复用上一设备的列表
+log-template.js[AU4S]: F:用户日志页模板：刷新/导出按钮与操作日志、登录日志两个 tab 表格 | R:code:public/js/dashboard/log.js | A:logs | S:-
+log.js[AU5M]: F:用户日志逻辑：操作与登录日志分页加载、tab 切换、导出与请求序号保护 | R:code:public/js/dashboard/log-template.js,code:public/components/pv-pagination.js | A:window.__dashboard | S:请求序号保护防止旧响应覆盖新数据；分页逻辑由 pv-pagination 收敛，页面只维护 total/page/pageSize
+lxc.js[AU7L]: F:用户 LXC 逻辑：容器列表与开通中占位合并、密码/IP 重置、快照与备份、操作冷却 | R:code:server/routes/lxc.js,code:public/js/dashboard/vm.js | A:window.__dashboard | S:_provisioning 记录表示 PVE 开通未完成，需与 DB 记录去重后展示；冷却期防止重复点击导致 PVE 卡死
+message.js[AU4T]: F:用户站内消息逻辑：消息列表、类型筛选与当前消息详情 | R:code:server/routes/message.js | A:initMessage | S:initMessage 无特殊生命周期逻辑；已读状态变更后需同步刷新顶部未读角标
+os-switch.js[AU5S]: F:用户系统切换逻辑：可选系统模板列表、发起切换、进度轮询与列表刷新 | R:code:public/js/dashboard/vm.js | A:osSwitch | S:切换后立即刷新列表锁定操作并开始轮询；轮询超过 5 分钟自动停止，失败不抛错
+subnet.js[AU6M]: F:用户私有网络子网逻辑：子网增删、配额展示、可用 IP 批量刷新与绑定设备 | R:code:server/routes/subnet.js | A:window.__dashboard | S:子网必须绑定到具体节点，同区多节点时只选可用区无法确定落哪台爱快；可用 IP 走批量接口一次拉取，禁止逐子网轮询
+vm.js[AU8L]: F:用户 VM 逻辑：虚拟机列表与详情、CDK 兑换、快照与备份、重置密码与 IP、操作冷却 | R:code:public/js/dashboard/dashboard-template-modals.js,code:server/routes/vm.js | A:window.__dashboard | S:Teleport 到 body 的下拉不会随 modal 隐藏，关闭时必须清理；重置 IP 的随机模式取自绑定子网 IP 池
+
+===E:/code/pve管理面板/public/js/shared/===
+api-paths.js[CC6T]: F:API 路径常量单一来源，经 window.__apiPaths 引用，常量本身不含 /api 前缀 | R:code:public/js/shared.js | A:__apiPaths | S:api() 会自动补 /api 前缀，常量不得自带；REFRESH_TOKEN 例外须调用处手动加前缀；用户管理真实路径是 /api/users 而非 /admin/users
+i18n-user-init.js[CL6T]: F:登录后拉取用户语言偏好并调用 setLocale，触发全站响应式重渲染（含 data-i18n 静态元素） | R:code:public/js/shared/i18n.js | A:applyUserLocale | S:未登录或请求失败时静默保持站点默认语言；Vue 异步挂载需 800ms 兜底重试，否则首屏语言不生效
+i18n.js[CL8M]: F:前端 i18n 核心：t()/tFormat()、七语言注册表、缺失 key 回退 zh-CN、覆盖语言走 /api/i18n/locale 服务端合并 | R:code:public/js/shared/i18n-user-init.js,code:server/services/i18n.js,code:public/locales/zh-CN.json | A:t,tFormat,setLocale | S:public/locales/*.json 是只读基线永不写入；系统语言白名单须与 server/constants.js SYSTEM_LOCALES 同步；服务端合并缓存 60s，写后以 cache:reload 失效
+log-i18n.js[CL5T]: F:日志操作分类与后台子分类标识到 i18n key 的单一映射，供三端日志表格渲染 | R:code:public/js/shared/i18n.js,code:server/routes/log.js | A:catKey | S:禁止各页面 JS 拷贝本映射；未知标识返回空串，由模板兜底显示后端原文
+select-glass.js[CU7M]: F:把原生 select.form-select 无侵入包裹为玻璃下拉：重建选项、弹层挂 body、监听 DOM 变化与选中值回填 | R:code:public/shared/css/components.css,code:public/js/shared.js | A:build,buildAll | S:原生 select 必须留在 DOM 且透明隐藏，改用 display:none 会跳过 HTML5 required 校验；弹层必须挂 document.body，否则被 modal 的 backdrop-filter 降级；拦截 selectedIndex setter 才能同步 Vue 回填文本
+storage-keys.js[CC6T]: F:localStorage 键名常量单一来源，经 window.__storageKeys 引用（token、refresh、各页 tab 与主题等） | R:code:public/js/shared.js | A:__storageKeys | S:键名只允许在此定义，禁止页面内硬编码；必须在 shared.js 之后加载
+
+===E:/code/pve管理面板/public/locales/===
+de.json[FL6L]: F:德语词典，与 zh-CN 保持完整相同的 key 集合 | R:code:public/js/shared/i18n.js | A:__i18n | S:key 集合必须与 zh-CN 一致；只读基线，不允许运行时写入
+en.json[FL7L]: F:英文词典，与 zh-CN 保持完整相同的 key 集合，用于英文界面渲染 | R:code:public/js/shared/i18n.js | A:__i18n | S:key 集合必须与 zh-CN 完全一致，缺失项会回退中文；只读基线，覆盖统一走数据库覆盖表
+fr.json[FL6L]: F:法语词典，与 zh-CN 保持完整相同的 key 集合 | R:code:public/js/shared/i18n.js | A:__i18n | S:key 集合必须与 zh-CN 一致；只读基线，不允许运行时写入
+ja.json[FL6L]: F:日语词典，与 zh-CN 保持完整相同的 key 集合 | R:code:public/js/shared/i18n.js | A:__i18n | S:key 集合必须与 zh-CN 一致；只读基线，不允许运行时写入
+ko.json[FL6L]: F:韩语词典，与 zh-CN 保持完整相同的 key 集合 | R:code:public/js/shared/i18n.js | A:__i18n | S:key 集合必须与 zh-CN 一致；只读基线，不允许运行时写入
+zh-CN.json[FL8L]: F:简体中文词典（中文原文→i18n key 映射，约 2170 词条），作为全站母本与缺失 key 的回退来源 | R:code:public/js/shared/i18n.js | A:__i18n | S:只读基线文件，禁止运行时写入；新增 key 必须七种语言同步补齐，否则回退到本文件
+zh-TW.json[FL6L]: F:繁体中文词典，与 zh-CN 保持完整相同的 key 集合 | R:code:public/js/shared/i18n.js,code:public/locales/zh-CN.json | A:__i18n | S:key 集合必须与 zh-CN 一致；用词为台湾用语，不要与简体母本混写
+
+===E:/code/pve管理面板/public/novnc/.github/ISSUE_TEMPLATE/===
+bug_report.md[SQ2T]: F:noVNC 上游 Issue 模板：缺陷描述、复现步骤与环境信息字段 | R:- | A:上游贡献者 | S:-
+config.yml[FQ1T]: F:noVNC 上游 Issue 模板配置：关闭空白 Issue 并指向 Google Groups 讨论区 | R:- | A:上游维护者 | S:-
+feature_request.md[SQ2T]: F:noVNC 上游功能建议 Issue 模板 | R:- | A:上游贡献者 | S:-
+
+===E:/code/pve管理面板/public/novnc/.github/workflows/===
+deploy.yml[OV2T]: F:noVNC 上游 GitHub Actions 发布流水线：构建并发布产物 | R:- | A:上游 CI | S:仅在上游仓库生效，本项目内置副本不参与发布
+lint.yml[XQ2T]: F:noVNC 上游 ESLint 检查流水线 | R:- | A:上游 CI | S:作用于 public/novnc 目录自身，不覆盖项目自有前端代码
+test.yml[TQ2T]: F:noVNC 上游单元测试流水线（多 Node 版本矩阵） | R:- | A:上游 CI | S:与本项目根目录 mocha 测试互不相关，勿混用
+translate.yml[XL2T]: F:noVNC 上游翻译同步流水线，从 po 文件生成 locale 资源 | R:code:public/novnc/app/locale/README | A:上游 CI | S:locale 目录为自动生成物，手工修改会在上游流程中被覆盖
+
+===E:/code/pve管理面板/public/novnc/===
+.gitignore[FG2T]: F:忽略 noVNC 自身的编译产物、测试数据与依赖目录 | R:- | A:git | S:仅作用于 public/novnc 子树，不影响仓库根策略
+AUTHORS[SL2T]: F:记录 noVNC 上游维护者与贡献者名单 | R:- | A:上游维护者 | S:-
+LICENSE.txt[SL3T]: F:声明 noVNC 及其核心库采用 MPL 2.0，并说明各子目录的许可边界 | R:- | A:合规审查 | S:核心库为 MPL 2.0，与项目自身 MIT 不同；分发时必须保留本许可与 AUTHORS
+README.md[SL4M]: F:noVNC 上游说明：HTML VNC 客户端库与示例应用的功能、用法与集成方式 | R:code:public/novnc/LICENSE.txt | A:集成方 | S:本项目以内置副本方式使用，升级需整体替换并回归 VNC 控制台
+eslint.config.mjs[XQ3S]: F:noVNC 的 ESLint 扁平配置，含浏览器与 Node 环境全局变量 | R:- | A:上游 CI | S:仅约束 public/novnc 自身，不影响项目主体 lint 规则
+karma.conf.js[TQ3T]: F:Karma 测试运行器配置，含自建 Safari 启动器与浏览器矩阵 | R:- | A:上游测试 | S:Safari 启动器依赖 /usr/bin/open，仅 macOS 可用
+package.json[FV3T]: F:声明 @novnc/novnc 1.5.0 包、browser 入口与构建测试脚本 | R:code:package.json | A:npm | S:与根 package.json 独立，内置副本不参与根依赖安装；升级需整体替换并回归 VNC 控制台
+vnc.html[LU6M]: F:noVNC 完整示例页面：控制栏、连接面板、状态提示与快捷键设置 | R:code:public/novnc/app/ui.js | A:上游示例 | S:本项目 VNC 控制台走 views/pages/vnc.ejs 自建页面，本文件仅作参考
+vnc_lite.html[LU4S]: F:noVNC 精简示例页面，只保留画布与最小状态提示 | R:code:public/novnc/core/rfb.js | A:上游示例 | S:仅演示库的最小接入方式，不用于生产
+
+===E:/code/pve管理面板/public/novnc/app/===
+error-handler.js[LR2T]: F:noVNC 应用的全局错误处理：捕获未处理异常与 Promise 拒绝并展示错误面板 | R:- | A:window.onerror | S:-
+localization.js[FL5M]: F:noVNC 本地化工具：解析浏览器语言、按需加载 locale 字典，提供 _() 与 l10n.get() 翻译入口 | R:code:public/novnc/app/locale/zh_CN.json | A:l10n | S:locale 目录内 JSON 均为自动生成；新增语言需同时在支持列表注册，否则静默回退英文
+ui.js[LU7L]: F:noVNC 应用界面总控：界面初始化、剪贴板同步、连接状态展示与快捷键与手势绑定 | R:code:public/novnc/app/localization.js,code:public/novnc/app/webutil.js | A:UI | S:依赖 core/rfb.js 的连接事件驱动状态；层级与交互顺序须与 base.css 的 z-index 约定一致
+webutil.js[LR5M]: F:noVNC Web 工具层：日志级别初始化、URL 参数与 storage 读写、浏览器与输入设备能力探测 | R:code:public/novnc/core/util/logging.js | A:initLogging | S:日志级别来自 URL 参数，生产暴露会放大控制台输出
+
+===E:/code/pve管理面板/public/novnc/app/locale/===
+README[SZ1T]: F:声明该目录下的语言文件由 po 文件自动生成、禁止手工修改 | R:- | A:上游维护者 | S:手工改动会被上游翻译流水线覆盖
+cs.json[FL2T]: F:noVNC 内置捷克语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+de.json[FL2T]: F:noVNC 内置德语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+el.json[FL2T]: F:noVNC 内置希腊语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+es.json[FL2T]: F:noVNC 内置西班牙语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+fr.json[FL2T]: F:noVNC 内置法语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+it.json[FL2T]: F:noVNC 内置意大利语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+ja.json[FL2T]: F:noVNC 内置日语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+ko.json[FL2T]: F:noVNC 内置韩语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+nl.json[FL2T]: F:noVNC 内置荷兰语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+pl.json[FL2T]: F:noVNC 内置波兰语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+pt_BR.json[FL2T]: F:noVNC 内置巴西葡萄牙语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+ru.json[FL2T]: F:noVNC 内置俄语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+sv.json[FL2T]: F:noVNC 内置瑞典语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+tr.json[FL2T]: F:noVNC 内置土耳其语界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+zh_CN.json[FL2T]: F:noVNC 内置简体中文界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+zh_TW.json[FL2T]: F:noVNC 内置繁体中文界面翻译字典，由上游 po 流程自动生成 | R:code:public/novnc/app/localization.js | A:l10n | S:自动生成文件，手工修改会被上游翻译流水线覆盖
+
+===E:/code/pve管理面板/public/novnc/app/sounds/===
+CREDITS[SL1T]: F:记录 noVNC 提示音素材来源与 CC-BY 3.0 署名要求 | R:- | A:合规审查 | S:CC-BY 要求保留署名，移除本文件即违反许可
+
+===E:/code/pve管理面板/public/novnc/app/styles/===
+base.css[LU4L]: F:noVNC 基础样式与 z-index 分层定义（主屏 0、控制栏 10 等）及深色主题变量 | R:code:public/novnc/app/styles/input.css | A:noVNC UI | S:z-index 分层是硬约定，覆盖样式时不要打乱层级，否则弹层会被画布遮挡
+input.css[LU3M]: F:noVNC 输入类控件统一样式（input/button/select/textarea 的字体、尺寸与焦点态） | R:code:public/novnc/app/styles/base.css | A:noVNC UI | S:本文件为 2-Clause BSD 许可，与核心库 MPL 2.0 不同
+
+===E:/code/pve管理面板/public/novnc/core/===
+base64.js[KG4S]: F:整数数组与 Base64 字符串互转工具（源自 Mozilla string-base64 实现） | R:code:public/novnc/core/util/logging.js | A:encode,decode | S:用于 VNC 协议字段编解码，不处理 Unicode 文本
+deflator.js[LN3T]: F:基于 vendor/pako 的 zlib 压缩封装，维护跨调用压缩流状态 | R:code:public/novnc/core/inflator.js | A:Deflator | S:vendor 目录为第三方 pako 副本，升级需整体替换
+display.js[LN6L]: F:画布渲染层：消费解码结果绘制到 canvas，处理像素格式、缩放与 resize | R:code:public/novnc/core/base64.js,code:public/novnc/core/decoders/raw.js | A:Display | S:缩放与 CSS 尺寸由容器决定，直接改 canvas 尺寸会破坏坐标换算
+encodings.js[FN4T]: F:RFB 编码号常量表（Raw/CopyRect/RRE/Hextile/Tight/ZRLE 等） | R:code:public/novnc/core/rfb.js | A:encodings | S:数值必须与 RFB 协议定义一致，改动会破坏解码协商
+inflator.js[LN3T]: F:基于 vendor/pako 的 zlib 解压封装，支持流复位 | R:- | A:Inflate | S:vendor 目录为第三方 pako 副本；解压失败必须报错而非静默返回半帧
+ra2.js[LS5M]: F:RA2/RA2ne 安全认证实现：AES-EAX 加密通道与计数器握手 | R:code:public/novnc/core/crypto/crypto.js | A:RA2Cipher | S:计数器必须随每个报文递增，重放或回绕会导致认证失败
+rfb.js[LN8L]: F:RFB 协议客户端核心：握手与安全认证协商、编码协商、帧缓冲更新解析与输入事件下发 | R:code:public/novnc/core/display.js,code:public/novnc/core/encodings.js,code:public/novnc/core/input/keyboard.js | A:RFB | S:安全类型与编码协商顺序由服务端决定，客户端只能按通告顺序降级；本项目经 WebSocket 代理接入，URL 与凭据由外层页面提供
+websock.js[IN7M]: F:WebSocket 高性能缓冲封装：接收队列缓冲、二进制与文本模式切换以及发送排队 | R:code:public/novnc/core/rfb.js | A:Websock | S:onmessage 只作通知，数据必须从接收队列按需取；本项目经 WebSocket 代理转发到 PVE
+
+===E:/code/pve管理面板/public/novnc/core/crypto/===
+aes.js[LS5S]: F:实现 AES-ECB 与 AES-EAX 加解密，提供与 WebCrypto 对齐的 importKey/encrypt/decrypt 接口 | R:code:public/novnc/core/crypto/crypto.js | A:AESECBCipher,AESEAXCipher | S:仅供 VNC 协议兼容使用，不得用于业务数据加密
+bigint.js[KG4T]: F:BigInt 模幂运算与字节数组/BigInt 互转工具 | R:code:public/novnc/core/crypto/dh.js | A:modPow | S:modPow 采用平方-乘快速幂，传入 e=0 时返回 1，调用方需自行校验参数
+crypto.js[LS6T]: F:LegacyCrypto 统一入口：把 AES/DES/RSA/DH/MD5 等非 SubtleCrypto 算法封装为兼容 WebCrypto 的接口 | R:code:public/novnc/core/crypto/aes.js,code:public/novnc/core/crypto/des.js,code:public/novnc/core/crypto/dh.js | A:LegacyCrypto | S:仅在浏览器缺少原生算法时启用，属 VNC 老旧协议兼容层，不得用于新业务加密
+des.js[LS5M]: F:DES-CBC 与 DES-ECB 实现（移植自 Flashlight VNC / Acme.Crypto） | R:code:public/novnc/core/crypto/crypto.js | A:DESCBCCipher,DESECBCipher | S:DES 已不安全，只为 VNC 认证兼容保留；修改后需回归 VeNCrypt/Tight 认证
+dh.js[LS4T]: F:Diffie-Hellman 公钥封装，复用 bigint 模幂完成密钥交换 | R:code:public/novnc/core/crypto/bigint.js | A:DHPublicKey | S:仅实现 VNC 所需的 DH 子集，不覆盖完整 WebCrypto DH 语义
+md5.js[KS4T]: F:对字节数组做 MD5 哈希并返回字节结果，供 VNC 认证流程使用 | R:code:public/novnc/core/crypto/crypto.js | A:MD5 | S:MD5 仅用于协议兼容，不得用于密码或完整性校验
+rsa.js[KS5S]: F:RSA 密钥导入导出与加解密实现，基于 bigint 模幂，供 VeNCrypt 等强认证使用 | R:code:public/novnc/core/crypto/bigint.js,code:public/novnc/core/base64.js | A:RSACipher | S:私钥操作依赖 extractable 标志，导出前必须显式允许；不得用于业务侧密钥管理
+
+===E:/code/pve管理面板/public/novnc/core/decoders/===
+copyrect.js[LN3T]: F:CopyRect 编码解码器：把已渲染区域整块复制到新位置 | R:code:public/novnc/core/encodings.js | A:CopyRectDecoder | S:数据不足时返回 false 等待更多字节，不能抛错中断连接
+hextile.js[LN4S]: F:Hextile 编码解码器：按 16x16 瓦片逐个还原背景色与前景瓦片 | R:code:public/novnc/core/encodings.js | A:HextileDecoder | S:瓦片边界与子编码标志位必须严格按 RFB 规范解析，错位会导致整屏花屏
+jpeg.js[LN4S]: F:JPEG 编码解码器，解析量化表与 Huffman 表并交浏览器解码 | R:code:public/novnc/core/encodings.js | A:JPEGDecoder | S:RealVNC 会跨矩形复用表格，必须缓存而不能每次重建
+raw.js[LN3T]: F:Raw 编码解码器：直接读取未压缩像素数据 | R:code:public/novnc/core/encodings.js | A:RawDecoder | S:按扫描行累积，行数未满时返回 false 等待后续数据
+rre.js[LN3T]: F:RRE 编码解码器：背景色加若干子矩形还原画面 | R:code:public/novnc/core/encodings.js | A:RREDecoder | S:子矩形数量来自数据流，需按剩余字节数校验避免越界
+tight.js[LN5M]: F:Tight 编码解码器：处理填充/拷贝/调色板与 zlib 流压缩的矩形 | R:code:public/novnc/core/inflator.js,code:public/novnc/core/encodings.js | A:TightDecoder | S:压缩流按连接持久复用到下一个矩形，重置时机错误会导致解压失败
+tightpng.js[LN3T]: F:TightPNG 变体解码器：复用 Tight 解码并处理 PNG 子矩形 | R:code:public/novnc/core/decoders/tight.js | A:TightPNGDecoder | S:PNG 分支不参与 zlib 流复用，不能与 Tight 状态混用
+zrle.js[LN4S]: F:ZRLE 编码解码器：64x64 瓦片 + zlib 解压还原 | R:code:public/novnc/core/inflator.js,code:public/novnc/core/encodings.js | A:ZRLEDecoder | S:瓦片固定 64x64，末行末列需按实际宽高裁剪
+
+===E:/code/pve管理面板/public/novnc/core/input/===
+domkeytable.js[LN4M]: F:HTML key 值到 X11 keysym 的特殊键映射表（无法用 Unicode 码点表达的键） | R:code:public/novnc/core/input/keysym.js | A:DOMKeyTable | S:新增键值需同时确认 keysym 定义，错配会发错键
+fixedkeys.js[LN4S]: F:物理按键 keyCode 到 key value 的兜底映射，覆盖跨布局不变的键 | R:code:public/novnc/core/input/util.js | A:fixedkeys | S:只收录跨布局稳定的键，布局相关键必须走 code 映射
+gesturehandler.js[LU6L]: F:触摸手势识别：单击/双击/三击/拖拽/长按的位标志与状态机 | R:code:public/novnc/core/input/keyboard.js | A:GestureHandler | S:手势与拖拽阈值来自 util/browser 的 dragThreshold，不同平台须一致
+keyboard.js[LU5M]: F:键盘事件处理器：把浏览器键盘事件转换为 RFB 按键/释放事件并维护按键状态 | R:code:public/novnc/core/input/util.js | A:Keyboard | S:组合键与输入法状态需跟随焦点，失焦时必须释放所有按键避免粘键
+keysym.js[LN5L]: F:X11 keysym 常量表，供键盘映射与键值换算使用 | R:code:public/novnc/core/input/keysymdef.js | A:KeyTable | S:数值必须与 X11 keysymdef.h 一致，不可自行增删改值
+keysymdef.js[LN4L]: F:Unicode 码点到 keysym 的自动生成映射表及查询函数 | R:code:public/novnc/core/input/keysym.js | A:keysyms | S:标注为自动生成，禁止手工编辑；重生成需上游脚本
+util.js[LN4S]: F:键盘映射工具：归一化 code/key、处理旧浏览器差异并换算 keysym | R:code:public/novnc/core/input/keysym.js,code:public/novnc/core/input/fixedkeys.js | A:getKeycode | S:旧浏览器 code 为空时必须回退到 key 或 keyCode 路径
+vkeys.js[LN3S]: F:Windows 虚拟键码到 HTML key code 的映射表 | R:code:public/novnc/core/input/util.js | A:vkeys | S:仅供旧版 IE/Edge 兼容路径使用
+xtscancodes.js[LN4S]: F:HTML code 到 XT 扫描码的自动生成映射表 | R:code:public/novnc/core/input/util.js | A:xtscancodes | S:自动生成文件，表头记录 keymaps.csv 校验和，禁止手改
+
+===E:/code/pve管理面板/public/novnc/core/util/===
+browser.js[LN4S]: F:浏览器能力探测：触摸设备、光标 URI 支持、拖拽阈值与平台判定 | R:- | A:isTouchDevice,dragThreshold | S:探测结果被手势与光标模块依赖，改动会影响全平台交互手感
+cursor.js[LN4M]: F:远端光标渲染，在不支持光标 URI 或触屏设备上降级为自绘光标 | R:code:public/novnc/core/util/browser.js | A:Cursor | S:降级分支在触屏设备强制启用，不要试图用 CSS 光标覆盖
+element.js[LN3T]: F:HTML 元素坐标换算工具（客户端坐标转元素内坐标） | R:- | A:clientToElement | S:基于 getBoundingClientRect，滚动容器内需保证坐标基准一致
+events.js[LG4S]: F:跨浏览器事件工具：阻止默认行为、阻止冒泡与获取页面/元素坐标 | R:- | A:stopEvent | S:坐标换算同时兼容 page 与 client 坐标，触屏事件需取 touches 首项
+eventtarget.js[LG3T]: F:EventTargetMixin：为任意类混入 addEventListener/removeEventListener/dispatchEvent | R:- | A:EventTargetMixin | S:与 DOM EventTarget 语义一致，单个监听器异常不应中断其它监听器
+int.js[LG3T]: F:32 位有符号与无符号整数换算工具 | R:- | A:toUnsigned32bit,toSigned32bit | S:RFB 协议字段为有符号 32 位，换算错误会导致坐标溢出
+logging.js[LG4T]: F:分级日志工具，支持按级别开关并把日志写入控制台 | R:- | A:Log | S:日志级别可由 URL 参数抬高，生产环境暴露会产生大量输出
+strings.js[LG3T]: F:UTF-8 编解码工具，解码时可选按 Latin-1 容错 | R:- | A:encodeUTF8,decodeUTF8 | S:容错模式仅用于服务端不规范输出，默认必须严格 UTF-8
+
+===E:/code/pve管理面板/public/novnc/docs/===
+API-internal.md[SN3T]: F:noVNC 内部模块说明（渲染、输入、网络等），并声明其 API 不保证稳定 | R:code:public/novnc/docs/API.md | A:集成方 | S:内部 API 随时可变，本项目只应依赖公开 RFB 接口
+API.md[SN5L]: F:noVNC 公开 API 文档：RFB 对象的连接、认证、事件与参数约定 | R:code:public/novnc/core/rfb.js | A:集成方 | S:公开 API 变更需与内置副本升级同步，页面侧调用点也要回归
+EMBEDDING.md[SN4S]: F:说明如何嵌入并部署带完整界面的 noVNC 应用 | R:code:public/novnc/docs/LIBRARY.md | A:部署者 | S:应用模式附带自有 UI，本项目只用核心库，不部署该应用
+LIBRARY.md[SN3T]: F:说明如何把 noVNC 作为 JS 库集成进自建 VNC 客户端 | R:code:public/novnc/docs/API.md | A:集成方 | S:库模式只暴露 RFB 对象，UI 需自行实现
+LICENSE.BSD-2-Clause[SL2T]: F:BSD 2-Clause 许可全文，覆盖 noVNC 的样式等部分文件 | R:- | A:合规审查 | S:样式与部分工具文件使用该许可，与核心库 MPL 2.0 不同
+LICENSE.BSD-3-Clause[SL2T]: F:BSD 3-Clause 许可全文 | R:- | A:合规审查 | S:-
+LICENSE.MPL-2.0[SL3M]: F:Mozilla Public License 2.0 全文，覆盖 noVNC 核心库 | R:code:public/novnc/LICENSE.txt | A:合规审查 | S:MPL 要求修改核心库文件时以同许可公开，分发须附带全文
+LICENSE.OFL-1.1[SL2T]: F:SIL Open Font License 1.1 全文，覆盖随附字体资源 | R:- | A:合规审查 | S:OFL 要求保留字体名称与版权声明，不得单独售卖字体
+flash_policy.txt[SZ1T]: F:旧版 Flash 套接字策略文件服务的手工配置示例 | R:- | A:历史文档 | S:仅存历史参考，现代部署不再需要
+links[SZ1T]: F:整理 RFB 协议、TightPNG 与画布兼容性等外部参考链接 | R:- | A:维护者 | S:-
+notes[SZ1T]: F:记录 inflator 的重建步骤（pako + browserify） | R:code:public/novnc/core/inflator.js | A:维护者 | S:重建后产物必须整体替换 core/inflator.js
+novnc_proxy.1[SZ2T]: F:novnc_proxy 命令行工具的 man 手册页 | R:- | A:运维 | S:本项目使用自建 WebSocket 代理，不依赖该工具
+rfb_notes[SN3S]: F:RFB 协议报文结构笔记：版本协商、认证类型、编码与更新消息字段 | R:code:public/novnc/core/rfb.js | A:协议实现者 | S:属开发者笔记而非规范，冲突时以 RFB 官方协议为准
+
+===E:/code/pve管理面板/public/novnc/po/===
+Makefile[OL3T]: F:翻译构建脚本：由 po 文件生成 app/locale 下的 JSON 并维护 LINGUAS 语言列表 | R:code:public/novnc/app/locale/zh_CN.json | A:gettext | S:新增语言须同时改 LINGUAS 与运行期支持列表，否则生成物不可加载
+cs.po[FL2M]: F:noVNC 捷克语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+de.po[FL2M]: F:noVNC 德语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+el.po[FL2M]: F:noVNC 希腊语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+es.po[FL2M]: F:noVNC 西班牙语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+fr.po[FL2M]: F:noVNC 法语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+it.po[FL2M]: F:noVNC 意大利语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+ja.po[FL2M]: F:noVNC 日语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+ko.po[FL2M]: F:noVNC 韩语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+nl.po[FL2M]: F:noVNC 荷兰语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+noVNC.pot[FL2M]: F:gettext 模板文件，抽取 noVNC 界面英文原文供各语言翻译 | R:code:public/novnc/po/Makefile | A:gettext | S:由 xgettext-html 生成，禁止手工编辑；新增原文需重新抽取
+pl.po[FL2M]: F:noVNC 波兰语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+po2js[XL3T]: F:gettext .po 到 noVNC JSON 字典的转换脚本，供 Makefile 调用 | R:code:public/novnc/po/Makefile | A:make update-js | S:输出路径与 app/locale 一一对应，改目录结构会同时影响生成与加载
+pt_BR.po[FL2M]: F:noVNC 巴西葡萄牙语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+ru.po[FL2M]: F:noVNC 俄语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+sv.po[FL2M]: F:noVNC 瑞典语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+tr.po[FL2M]: F:noVNC 土耳其语 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+xgettext-html[XL3S]: F:从 HTML 中抽取 data-i18n 等标记文本的 gettext 解析脚本 | R:code:public/novnc/po/noVNC.pot | A:make update-pot | S:仅识别上游约定的标记形式，自定义属性不会被抽取
+zh_CN.po[FL2M]: F:noVNC 简体中文 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+zh_TW.po[FL2M]: F:noVNC 繁体中文 gettext 翻译源文件 | R:code:public/novnc/po/Makefile | A:翻译者 | S:改完须经 po/Makefile 重新生成对应 JSON，不能只改 JSON
+
+===E:/code/pve管理面板/public/novnc/snap/hooks/===
+configure[OV2T]: F:snap 配置变更钩子：重启 noVNC 服务使新配置生效 | R:code:public/novnc/snap/snapcraft.yaml | A:snapd | S:-
+
+===E:/code/pve管理面板/public/novnc/snap/local/===
+svc_wrapper.sh[OV2T]: F:snap 服务包装脚本：从 snapctl 读取服务配置并逐个启动 websockify 实例 | R:code:public/novnc/snap/hooks/configure | A:snapd | S:服务数量与监听端口完全由 snapctl get services 决定，脚本不做默认值兜底
+
+===E:/code/pve管理面板/public/novnc/snap/===
+snapcraft.yaml[OV2T]: F:noVNC 的 snap 打包定义：基础镜像、应用与守护服务声明 | R:code:public/novnc/snap/local/svc_wrapper.sh | A:snapcraft | S:仅上游发布使用，本项目不通过 snap 部署
+
+===E:/code/pve管理面板/public/novnc/utils/===
+README.md[SZ3T]: F:说明 websockify 已拆分为独立项目，novnc_proxy 会按需下载 | R:code:public/novnc/utils/novnc_proxy | A:集成方 | S:本项目已有自建 WebSocket 代理，无需安装 websockify
+b64-to-binary.pl[XG2T]: F:把带格式的 Base64 数据块转换成二进制字面量的 Perl 小工具 | R:- | A:维护者 | S:仅用于生成内嵌资源，运行需要 MIME::Base64 模块
+convert.js[XL3S]: F:构建辅助脚本：把 ES 模块源码转换为可直接引用的产物并整理 lib 目录 | R:- | A:node | S:依赖 commander 与 fs-extra，仅在开发环境使用
+genkeysymdef.js[XG3S]: F:从 X11 keysymdef.h 生成 core/input/keysymdef.js 映射表 | R:code:public/novnc/core/input/keysymdef.js | A:node | S:生成物标注禁止手改，重新生成会覆盖手工修正
+novnc_proxy[OV3M]: F:启动脚本：按需下载 websockify，再同时拉起 WebSocket 代理与静态文件服务 | R:code:public/novnc/utils/README.md | A:部署者 | S:需要 Python 环境与网络下载；本项目改用自建代理，不使用该脚本
+u2x11[XG2T]: F:把 keysymdef.h 中 U+ 注释条目转换为 JS 片段 | R:code:public/novnc/core/input/keysymdef.js | A:维护者 | S:可能产生重复属性，需人工去重后再入库
+validate[TQ2T]: F:上游静态校验脚本：检查 HTML/CSS/JS 规范与增量提交范围 | R:- | A:CI | S:依赖系统 node 与 git，仅在开发与 CI 环境使用
+
+===E:/code/pve管理面板/public/novnc/vendor/pako/===
+LICENSE[SL1T]: F:pako 压缩库的 MIT 许可全文 | R:- | A:合规审查 | S:分发时须保留该许可声明
+README.md[SL2T]: F:说明 vendor 内 pako 是 1.0.3 的 ES 模块化改造版，已裁剪未使用部分 | R:- | A:维护者 | S:为定制裁剪版，不能直接用上游包覆盖
+
+===E:/code/pve管理面板/public/novnc/vendor/pako/lib/utils/===
+common.js[LG3T]: F:pako 通用工具：缓冲区裁剪与字符串转换辅助 | R:- | A:shrinkBuf | S:属第三方裁剪副本，修改后会与上游补丁冲突
+
+===E:/code/pve管理面板/public/novnc/vendor/pako/lib/zlib/===
+adler32.js[LG3T]: F:zlib 校验和算法 adler32 实现 | R:- | A:adler32 | S:校验和必须与 zlib 定义一致，否则对端拒绝数据流
+constants.js[LG3T]: F:zlib flush 模式与状态、策略常量表 | R:- | A:Z_NO_FLUSH | S:数值必须与 zlib 头文件一致，改动会破坏压缩流兼容
+crc32.js[LG3T]: F:zlib 校验和算法 crc32 实现（不预生成查表，按位计算） | R:- | A:crc32 | S:校验和必须与 zlib 定义一致，否则对端拒绝 gzip 流
+deflate.js[KG5L]: F:zlib DEFLATE 压缩主实现：滑动窗口、哈夫曼编码与匹配查找状态机 | R:code:public/novnc/vendor/pako/lib/zlib/trees.js,code:public/novnc/vendor/pako/lib/zlib/adler32.js | A:deflate | S:状态机与 zlib 逐字节兼容，任何性能优化都可能产生对端无法解压的流
+gzheader.js[LG2T]: F:gzip 文件头结构定义（文本标志、修改时间、操作系统字段等） | R:- | A:GZheader | S:字段顺序与宽度固定，不可调整
+inffast.js[KG4M]: F:inflate 快速解压路径：一次性解出多字节的加速状态机 | R:code:public/novnc/vendor/pako/lib/zlib/inflate.js | A:inflate_fast | S:状态码必须与 inflate.js 的定义保持同步
+inflate.js[KG6L]: F:zlib INFLATE 解压主实现：流状态、字典与校验和校验 | R:code:public/novnc/vendor/pako/lib/zlib/inffast.js,code:public/novnc/vendor/pako/lib/zlib/inftrees.js | A:inflate | S:必须与 deflate 成对使用；解压失败要返回错误码而非静默输出半帧
+inftrees.js[KG4M]: F:构建解压用的哈夫曼查找表 | R:code:public/novnc/vendor/pako/lib/zlib/inflate.js | A:inflate_table | S:码长上限 MAXBITS=15，超限必须判为数据错误
+messages.js[LG2T]: F:zlib 错误码到英文描述文本的映射表 | R:- | A:messages | S:新增错误码必须同时补文案，否则日志只显示数字
+trees.js[KG4L]: F:压缩端哈夫曼树构建、码长统计与树描述写出 | R:code:public/novnc/vendor/pako/lib/zlib/deflate.js | A:trees | S:码长与块类型编码须严格按 DEFLATE 规范，错一位整流失效
+zstream.js[LG3T]: F:zlib 流状态对象定义（输入输出缓冲、窗口、校验值等字段） | R:code:public/novnc/vendor/pako/lib/zlib/deflate.js | A:ZStream | S:字段语义对应 zlib 的 z_stream，改动会破坏 deflate 与 inflate 协作
+
+===E:/code/pve管理面板/public/shared/css/===
+components.css[CU8L]: F:三端共享组件样式：玻璃卡片、表格、表单控件、Badge、通知分组折叠与自定义下拉玻璃态 | R:code:public/shared/css/tokens.css | A:admin,dashboard,user-center | S:与 admin.css、user-center.css 存在覆盖关系，页面级规则优先；通用组件样式只在此维护
+layout.css[CU7S]: F:全局重置与页面骨架布局：header、sidebar、主内容区栅格与移动端断点 | R:code:public/shared/css/tokens.css | A:全部页面 | S:布局尺寸改动会同时影响三端页面，改前需回归三端首屏
+pv-buttons.css[CU7L]: F:PV 按钮样式体系：按 class 提供 primary/outline/glass/close 等变体与尺寸，禁止 inline style | R:code:public/components/pv-button.js | A:pv-button | S:变体 class 名与 pv-button 组件的 variant 取值一一对应，改名需同步组件
+template-saas.css[CU6L]: F:SAAS 企业风模板覆盖层：扁平浅色、细边框、紧凑密度的腾讯云控制台风格 | R:code:public/shared/css/tokens.css | A:data-template | S:只做覆盖不做结构，启用由 html[data-template] 决定；新增覆盖须同时兼容亮暗主题
+theme.css[CU6S]: F:明暗主题覆盖规则：btn-close 图标滤镜、表单控件与图标在 light 主题下的适配 | R:code:public/shared/css/tokens.css | A:data-theme | S:每条适配都依赖 [data-theme] 属性，新组件若硬编码深色会在此处失配
+tokens.css[CU8T]: F:双主题 CSS 变量单一来源：--color-*、--bg-*、--border-*、--shadow-* 等语义变量定义 | R:- | A:全部页面 | S:变量名是全站契约，改名会同时影响三端页面与 shadow DOM 组件；亮暗两套必须成对定义
+
+===E:/code/pve管理面板/scripts/===
+clean-orphan-disks.js[XD6S]: F:运维脚本：清理台账中 bind_vmid 指向已删除 VM 的非 legacy 孤立磁盘记录 | R:code:server/api/db-disks.js | A:node | S:直接写库的修复脚本，执行前必须备份；只处理可证明孤立的记录，legacy 磁盘跳过
+fix-dir-volume-id.js[XD5T]: F:修复脚本：补全 DIR 存储磁盘记录里 volume_id 缺失的子路径 | R:code:server/api/db-disks.js | A:node | S:只修格式可确定的记录，无法解析的保持原样并打印，执行前备份
+fix-refresh-token-timezone.js[XD5T]: F:修复脚本：纠正 refresh_tokens 表 created_at 与 expires_at 的 +8 小时时区偏差 | R:code:server/utils/token-store.js | A:node | S:历史遗留数据修复，需先确认影响行数；修复后新写入由应用层保证本地时区
+
+===E:/code/pve管理面板/server/api/===
+db-backup.js[PD7M]: F:数据访问层：快照与备份配置读写、备份记录与恢复进度的持久化操作 | R:code:server/api/db-core.js | A:snapshotConfig | S:所有 SQL 必须走 db-core 封装，时间字段用 mysqlNow/mysqlToday 生成
+db-billing.js[PD7S]: F:数据访问层：套餐、订单、交易流水与余额的查询与更新 | R:code:server/api/db-core.js | A:packages,orders | S:套餐查询统一带出所属 PVE 节点、可用区与地域，否则前端区域筛选与分配联动失效；金额与余额变更须在事务内完成
+db-config.js[PC7M]: F:数据访问层：系统配置读写（SMTP、到期与提醒、快照备份、支付、Redis、限速等键值配置） | R:code:server/api/db-core.js | A:config | S:配置按 key 存取，新增键必须同时提供默认值；敏感值在业务层用 AES-256-GCM 加密后再落库
+db-core.js[PG8T]: F:MySQL 连接池单例与执行封装：execute/queryOne/queryAll 及 mysqlNow/mysqlToday 本地时间工具 | R:code:server/api/db.js | A:execute,queryOne,queryAll,mysqlNow | S:日期统一按 Asia/Shanghai 本地墙钟写入并格式化为 YYYY-MM-DD HH:MM:SS，禁止直接 toISOString 入库，否则出现 8 小时偏差
+db-disks.js[PD7M]: F:数据访问层：存储分组（可绑定可用区）、磁盘规格、用户磁盘与挂载关系 | R:code:server/api/db-core.js | A:storageGroups,diskSpecs | S:存储分组 zone_id 为 NULL 表示通用（所有可用区可用），查询必须兼容 NULL 语义
+db-email-templates.js[PD5T]: F:邮件模板表的数据访问：按 key 读取与保存模板内容 | R:code:server/api/db-core.js,code:server/constants/email-templates.js | A:emailTemplates | S:默认模板由 constants/email-templates.js 在 initDb 时以 INSERT IGNORE 初始化，禁止覆盖用户已编辑内容
+db-i18n.js[PD7T]: F:数据访问层：i18n_languages 语言注册表与 i18n_entries 词条覆盖的读写 | R:code:server/api/db-core.js,code:server/services/i18n.js | A:i18n | S:显示值 = 覆盖 ??（key 在快照内 ? 快照值 : 复制源系统语言当前值）；覆盖写空串等于删行恢复基线
+db-ip.js[PD6T]: F:IP 归属地持久化缓存表读写，命中 30 天内的行则免外呼 | R:code:server/api/db-core.js | A:ipLocations | S:过期行视为未命中，TTL 由查询条件过滤，不依赖定时清理任务
+db-messaging.js[PD7L]: F:数据访问层：站内信、操作审计日志，并集中定义审计分类白名单与分类名称映射 | R:code:server/api/db-core.js,code:server/routes/log.js | A:AUDIT_CATEGORIES | S:action 前缀到分类的映射与分类 SQL 条件只在此维护，路由层必须 require 复用，禁止拷贝副本
+db-network.js[PD7S]: F:端口转发规则数据访问，列表统一 JOIN 出 PVE 节点名、可用区名与爱快节点名 | R:code:server/api/db-core.js | A:portForwards | S:列表查询必须 JOIN 带出名称字段供前端零转换展示，新增字段需同步 SELECT 常量
+db-nodes.js[PD7M]: F:区域域数据访问：地域、可用区、PVE 节点与爱快节点，敏感连接字段 AES 加密存储 | R:code:server/api/db-core.js,code:server/utils/crypto-utils.js | A:regions,zones,pveNodes,ikuaiNodes | S:列表查询不取密文列只返回 has_xxx 标记；单条 get 才解密并由路由层 maskSecret；默认节点解析走 30s 内存缓存，增删改后必须 clearDefaultCache
+db-orders.js[PD7M]: F:CDK 兑换码、订单与充值记录的数据访问 | R:code:server/api/db-core.js | A:cdk,orders | S:CDK 列表须 JOIN 出创建者、使用者、目标用户与已用 VM；兑换与订单状态变更必须在事务内完成
+db-schema.js[PD8L]: F:数据库初始化：建表、迁移、默认配置、限速默认键与默认管理员的生成 | R:code:server/api/db-core.js,code:server/constants.js | A:initDb | S:建表与迁移必须幂等（IF NOT EXISTS 与缺列补充）；默认管理员密码随机生成且只在控制台显示一次；限速默认键由 RATE_LIMIT_RULES 程序化生成
+db-subnets.js[PD7S]: F:私有网络子网台账数据访问（VLAN + DHCP 服务端 + 网段） | R:code:server/api/db-core.js | A:subnets | S:一个子网等于爱快一个 VLAN 接口 + 一个 DHCP 服务端 + 一个 /24 网段，三者必须同时创建与删除
+db-users.js[PD7M]: F:用户表数据访问：分页筛选查询、创建、资料与状态更新 | R:code:server/api/db-core.js | A:users | S:分页 limit 上限 200；关键字查询必须走参数化 LIKE 拼接参数，不能拼字符串
+db-vms.js[PD7L]: F:虚拟机与 LXC 容器数据访问，列表统一 JOIN 出节点名与可用区名 | R:code:server/api/db-core.js | A:vms,containers | S:VM 与 CT 的 SELECT 常量必须各自维护，新增多节点字段要同时补两处，否则列表缺列
+db.js[PG8S]: F:数据库模块聚合入口：组装 db-core、db-schema 与各业务域模块，导出形状与拆分前一致 | R:code:server/api/db-core.js,code:server/api/db-schema.js | A:initDb | S:路由与服务只 require 本文件；新增业务域必须在此挂载，否则调用方取不到对应对象
+ikuai-api.js[IN8L]: F:爱快 V3 门面客户端：配置惰性从面板数据库加载（60 秒缓存）并按 version 分发到 V3/V4 实现 | R:code:server/api/db.js,code:server/api/ikuai-v4.js | A:IkuaiApi | S:配置不读 .env 而是惰性读 DB 并缓存 60 秒，保存配置后必须 reloadConfig 才生效；无节点时回退旧全局配置键
+ikuai-clients.js[IN6T]: F:爱快多节点客户端工厂：按节点或按 PVE 配对关系返回缓存的客户端实例 | R:code:server/api/ikuai-api.js | A:getIkuaiClient,getIkuaiClientForPve | S:端口转发、DHCP、VLAN、MAC 分组等 NAT 操作必须经 getIkuaiClientForPve 路由到资源所在节点的上级爱快；节点配置变更须 invalidate 缓存
+ikuai-v4.js[IN7L]: F:爱快 V4 REST 客户端封装（/api/v4.0/ + Bearer Token），与 V3 门面同名同签名 | R:code:server/api/ikuai-api.js | A:IkuaiApiV4 | S:列表响应键名有三种形态需兼容；vlan_name 允许下划线；DNAT 与 DHCP 静态绑定创建后需按 rowid 反查
+pve-api.js[IN8L]: F:PVE REST API 封装：节点、虚拟机、容器、存储、任务与状态查询，含 30 秒只读缓存 | R:code:server/utils/cache-store.js | A:PveApi | S:只读结果缓存 30 秒，任何写操作后必须清对应缓存；TLS 告警按节点去重只提示一次
+pve-clients.js[IN6T]: F:PVE 多节点客户端工厂：按节点返回缓存的 PveApi 实例并支持失效 | R:code:server/api/pve-api.js | A:getPveClient | S:节点配置增删改后必须调用 invalidatePveClient，否则继续使用旧凭据
+redis.js[PG5T]: F:按环境变量创建 ioredis 客户端，未配置 Redis 时返回 null | R:code:server/utils/cache-store.js | A:getRedis | S:未配置 REDIS_HOST 必须返回 null 由调用方降级到内存；日志里的密码必须打码
+ssh-exec.js[IN7M]: F:基于 ssh2 在 PVE 节点上执行命令，返回 stdout/stderr/退出码并带超时控制 | R:- | A:execSSH | S:凭据不得拼进命令字符串；调用方必须做 vmid 白名单校验；默认超时 10 分钟，失败要明确 reject
+
+===E:/code/pve管理面板/server/config/===
+multer.js[MU6T]: F:文件上传配置：磁盘存储到项目 images 目录并生成随机文件名 | R:- | A:storage | S:images 目录不存在时自动创建；文件名必须随机化，避免覆盖与路径穿越
+
+===E:/code/pve管理面板/server/===
+constants.js[CG8M]: F:全局共享常量单一来源：计费周期、磁盘类型、订单与支付、邮件模板分类、限速规则与前端缓存 TTL | R:- | A:VALID_PERIODS,RATE_LIMIT_RULES,FRONTEND_CACHE_TTL | S:常量与白名单只在此定义，业务文件禁止拷贝；MAX_PERIOD_COUNT=99 用于防日期溢出
+server.js[EG9L]: F:应用入口：线程池扩容、Express 与 EJS 装配、WebSocket 升级、路由与中间件挂载、数据库初始化与定时任务启动 | R:code:server/api/db.js,code:server/schedule/tasks.js | A:app | S:UV_THREADPOOL_SIZE 必须在任何异步任务创建前设置；WS 升级需与 HTTP 端口共用；启动必须先 initDb 再注册定时任务，失败即退出
+
+===E:/code/pve管理面板/server/constants/===
+email-templates.js[FM7L]: F:邮件模板注册表：code、名称、分类、主题与正文字段的默认模板定义 | R:code:server/api/db-email-templates.js,code:server/services/email-template.js | A:EMAIL_TEMPLATES | S:initDb 时 INSERT IGNORE 不覆盖管理员修改；运行时 DB 缺失回退本注册表保证邮件必达；code 必须与 sendTemplateEmail 调用点一致
+
+===E:/code/pve管理面板/server/middleware/===
+auth.js[MI9S]: F:JWT 认证与管理员权限中间件：签名校验、黑名单、用户禁用与设备校验，带多级缓存 | R:code:server/utils/token.js,code:server/api/redis.js | A:authMiddleware,adminMiddleware | S:算法固定 HS256 不得改为 none；设备校验 60s、用户状态 30s、黑名单按剩余有效期缓存；活跃时间写入节流 60s 防止每请求写库
+rate-limiter.js[MS7S]: F:统一限速中间件：Redis 与内存双模式，配置 60 秒缓存并支持热失效 | R:code:server/api/redis.js,code:server/constants.js | A:checkConfiguredRateLimit | S:配置读取失败必须降级为「全开启 + 注册表默认值」，不能因配置故障裸奔；保存配置后调用 invalidateRateLimitCache 立即生效
+
+===E:/code/pve管理面板/server/queue/===
+email-queue.js[MM7M]: F:邮件异步队列：BullMQ + Redis 入队与进程内 Worker 消费，失败降级同步发送 | R:code:server/utils/email.js | A:enqueueEmail | S:BullMQ 不支持 ioredis 的 keyPrefix，必须用无前缀独立连接并把前缀交给 BullMQ prefix；maxRetriesPerRequest 必须为 null；Redis 不可用直接同步发送保证邮件不丢
+
+===E:/code/pve管理面板/server/routes/===
+admin-config.js[EC8L]: F:管理端系统配置路由：站点、SMTP、到期提醒、快照备份、支付、Redis、限速与在线更新 | R:code:server/api/db.js,code:server/middleware/auth.js | A:router | S:全部端点走 authMiddleware + adminMiddleware；敏感字段用 maskSecret 与 AES 加密；错误统一经 safeError 脱敏
+admin-disk.js[EB7L]: F:管理端硬盘路由：存储分组、硬盘规格、生命周期配置、磁盘列表与导入 | R:code:server/services/disk-expiry-check.js,code:server/constants.js | A:router | S:磁盘类型白名单统一取 constants 的 DISK_TYPES；写操作后必须清前端缓存（FRONTEND_CACHE_TTL）
+admin-email-template.js[EM6M]: F:邮件模板管理路由：列表、保存、恢复默认、预览与测试发送 | R:code:server/constants/email-templates.js,code:server/services/email-template.js | A:router | S:更新审计用 buildFieldDiff 依据 DB 新旧状态生成，禁止从请求体拼接；写后必须失效模板与邮件外壳缓存
+admin-i18n.js[EL6M]: F:i18n 管理端路由：自定义语言增删改、词条查看、覆盖批量保存与恢复默认 | R:code:server/services/i18n.js,code:server/api/db-i18n.js | A:router | S:存储为 DB 单轨，语言文件永不写入；写路径必须经过 i18n_op 限速与管理员校验
+admin-ikuai-nodes.js[EN7L]: F:爱快节点管理路由：节点连接信息 CRUD、网络四组设置、外网接口与连通性测试 | R:code:server/api/ikuai-clients.js,code:server/api/db.js | A:router | S:连接信息 AES 加密存 ikuai_nodes；网络设置按 ikuai:<nodeId>:<key> 作用域存；改配置后必须 invalidateIkuaiClient 使实例重建
+admin-logs.js[EO7M]: F:admin 全站日志路由：操作与登录日志的全局视图、筛选、导出、删除与清空 | R:code:server/api/db-messaging.js,code:server/middleware/auth.js | A:router | S:数据范围为全站不锁 req.user.id（与用户端 log.js 互补）；管理员删除与清空本身也会写审计 admin.log.*
+admin-os-template.js[EB6L]: F:管理员 OS 模板管理与系统切换日志路由 | R:code:server/constants.js,code:server/api/pve-clients.js | A:router | S:模板状态白名单统一取 constants 的 TEMPLATE_STATUS；日期参数校验复用 utils/date.js，禁止本地拷贝
+admin-pve-nodes.js[EN7M]: F:PVE 节点管理路由：节点 CRUD、连通性测试与快照/备份策略读写 | R:code:server/middleware/auth.js,code:server/api/db.js | A:router | S:连接信息加密存 pve_nodes，回显必须经 maskSecret；测试失败用 friendlyTestError 输出可读原因
+admin-regions.js[EB6M]: F:地域与可用区 CRUD 路由，含排序与启用状态维护 | R:code:server/api/db-nodes.js | A:router | S:删除地域前必须确认其下无可用区与节点，否则会留下孤儿引用
+admin-user.js[EI7M]: F:用户管理路由：创建、编辑、改密、禁用/启用、余额调整与订单生成 | R:code:server/middleware/auth.js,code:server/api/db-users.js | A:router | S:改密或禁用后必须同时 invalidateUserActiveCache 与 clearDeviceCache，否则旧会话仍有效
+admin-wallet.js[EB6S]: F:管理端全平台交易流水查询与导出路由 | R:code:server/api/db-billing.js | A:router | S:导出 CSV 必须走 utils/csv 统一转义，防止公式注入
+auth.js[EI8L]: F:认证路由：登录、注册、2FA 校验、找回密码、刷新 token 与会话策略判定 | R:code:server/utils/token.js,code:server/middleware/auth.js | A:router | S:JWT 算法固定 HS256；勾选「7 天免登录」为固定倒计时不顺延，未勾选则 2 小时无操作退出；密码强度校验必须前后端一致
+backup.js[EB7L]: F:虚拟机与容器的备份、恢复路由，含 LXC SSH 恢复与进度查询 | R:code:server/services/backup-polling.js,code:server/api/ssh-exec.js | A:router | S:备份与恢复为异步任务，进度必须交给 services/backup-polling 轮询；LXC 恢复依赖节点 SSH 配置存在
+cdk.js[EB6M]: F:CDK 兑换码路由：批量生成、列表查询、兑换与清理 | R:code:server/services/cdk.js,code:server/utils/cdk-generator.js | A:router | S:兑换与批量生成下沉到 services/cdk；兑换必须在事务内扣减并防重复使用
+disk.js[EB6M]: F:用户侧数据盘路由：购买、挂载、卸载、扩容、续费与销毁 | R:code:server/services/disk.js,code:server/middleware/auth.js | A:router | S:必须同时做 checkDiskOwnership/checkVmOwnership 与 SQL WHERE user_id 双重隔离；业务编排在 services/disk 不在路由
+i18n.js[EL5T]: F:i18n 公开端点：语言列表与按 code 返回合并后的翻译内容，无需鉴权 | R:code:server/services/i18n.js | A:router | S:code 必须经注册表白名单解析，禁止直接拼文件路径（防路径穿越）；译文本身不含敏感信息才允许公开
+ikuai.js[EN5T]: F:爱快 MAC 分组查询路由，支持按 node_id 解析所属爱快节点 | R:code:server/api/ikuai-clients.js | A:router | S:缺省 node_id 时回退默认爱快节点，多节点环境必须显式传节点以免查错设备
+log.js[EO6M]: F:用户端日志路由：本人操作与登录日志的查询、导出与清空 | R:code:server/api/db-messaging.js,code:server/middleware/auth.js | A:router | S:数据范围锁死 req.user.id；审计分类映射一律引自 db-messaging，禁止本地拷贝
+lxc.js[EB8L]: F:LXC 容器路由：列表与状态、模板创建、分配换绑、密码与 IP 重置、快照备份与销毁 | R:code:server/services/status-cache.js,code:server/api/pve-clients.js | A:router | S:客户端一律按资产所属节点获取；状态读写经 services/status-cache；PVE 调用必须走 _applyRate 限速
+message.js[EM6S]: F:站内信路由：列表、已读、删除与未读数推送 | R:code:server/websocket/push-proxy.js,code:server/utils/message-sanitize.js | A:router | S:未读缓存走 cache-store 保证多实例一致；未读变化后必须 pushUnreadCount 推送；标题与正文必须经净化函数
+network.js[EN8L]: F:网络路由：端口转发规则、DHCP 静态绑定、ikuai 同步与网络配置读写 | R:code:server/services/port-forward-sync.js,code:server/api/ikuai-clients.js | A:router | S:ikuai_id 的解析与序列化唯一来源是 services/port-forward-sync，禁止另写；规则变更需同步爱快 DNAT
+package.js[EB7L]: F:套餐与订购路由：套餐 CRUD、下单开通与库存管理 | R:code:server/services/provisioning.js | A:router | S:路由只做参数校验、归属校验与响应组装，开通编排在 services/provisioning
+snapshot.js[EB7M]: F:快照路由：VM 与 LXC 快照的创建、回滚、删除与配额校验 | R:code:server/api/pve-clients.js,code:server/utils/audit-log.js | A:router | S:审计统一走 utils/audit-log 的 auditAction，路由内不得复刻包装函数；配额校验以数据库配置为准而非前端
+subnet.js[EN7L]: F:私有网络子网路由：子网创建删除、可用 IP 查询、设备绑定与端口转发重建 | R:code:server/services/dhcp.js,code:server/services/port-forward-sync.js | A:router | S:创建或删除子网必须同步爱快 VLAN、DHCP 服务端并重建绑定设备的端口转发，三者不可只做一半
+template.js[EB5S]: F:VM 与 LXC 模板管理路由：列表、创建、编辑与删除 | R:code:server/api/db.js,code:server/utils/locate-asset.js | A:router | S:模板必须绑定启用中的 PVE 节点，无可用节点时必须拒绝写入
+user-settings.js[EU5S]: F:用户通知设置路由：邮件通知类型与界面语言偏好的读写 | R:code:server/middleware/auth.js | A:router | S:只允许操作 req.user.id 本人的记录；字段必须走白名单，未知字段直接忽略
+user.js[EI7L]: F:用户中心路由：资料与密码、2FA 绑定、设备管理、头像上传、备忘录与推送 ticket | R:code:server/middleware/auth.js,code:server/utils/token-store.js | A:router | S:2FA 依赖 otplib 校验且仅允许本人操作；头像上传必须校验类型与落盘路径，禁止任意写入
+vm.js[EB8L]: F:虚拟机路由：列表与状态、分配换绑、开关机、重置密码与 IP、CDK 兑换与销毁 | R:code:server/services/status-cache.js,code:server/api/pve-clients.js | A:router | S:客户端一律按资产所属节点获取；状态经 services/status-cache；PVE 调用必须走 _applyRate 限速，避免打崩节点
+wallet.js[EB7M]: F:钱包路由：充值下单、支付回调、续费、余额与交易流水查询 | R:code:server/services/payment.js,code:server/services/billing.js | A:router | S:支付编排在 services/payment、计费在 services/billing；回调必须先验签再入账，且回调必须幂等防重复入账
+
+===E:/code/pve管理面板/server/schedule/===
+node-monitor.js[RO6S]: F:节点连通性监测任务：30 秒探测启用的爱快与 PVE 节点并回写延迟与最近成功时间 | R:code:server/api/db.js | A:schedule | S:只做轻量探测不登录（爱快任意 HTTP 响应即存活、PVE 401 也算可达），否则会刷爆登录日志；完整鉴权测试走管理端手动按钮
+tasks.js[RW7M]: F:定时任务注册中心：到期检查与提醒、磁盘到期巡检、备份恢复轮询续跑与爱快规则同步 | R:code:server/services/expiry-check.js,code:server/services/backup-polling.js | A:schedule | S:进程启动时必须 resume 仍在运行的备份轮询；单个任务异常必须被捕获，不能终止进程或阻塞其它任务
+
+===E:/code/pve管理面板/server/sdk/ikuai-sdk/===
+ikuai-sdk-v4.mjs[LN6S]: F:爱快 V4 SDK：基于 HTTPS REST 与 Bearer 令牌的薄传输层，不含业务逻辑 | R:code:server/api/ikuai-v4.js | A:IKuaiClientV4 | S:V4 仅支持 HTTPS，http 入口对 /api/v4.0 直接 403；令牌在爱快设备设置的个人 API 令牌处生成
+ikuai-sdk.mjs[LN6M]: F:爱快 V3 SDK：封装登录、签名与 API 调用的薄传输层 | R:code:server/api/ikuai-api.js | A:IKuaiClient | S:只做传输与登录态维护，业务语义在上层 ikuai-api，禁止在此堆业务判断
+
+===E:/code/pve管理面板/server/sdk/pay/===
+constants.js[FC5T]: F:支付方式常量与中文名称映射（支付宝、微信、QQ、银联、PayPal 等） | R:code:server/sdk/pay/index.js | A:PAY_TYPES | S:支付方式标识必须与支付网关回调字段一致，新增渠道需同步网关适配
+index.js[LI7S]: F:支付网关 SDK 门面：按 V1（MD5）与 V2（RSA）组装客户端并导出下单、查询、退款接口 | R:code:server/sdk/pay/sign.js,code:server/sdk/pay/v2.js | A:createPayClient | S:V1 与 V2 签名算法不同，切换版本必须同时切换密钥；SDK 只做协议不做业务，订单状态由 services/payment 决定
+sign.js[LS6T]: F:支付签名工具：过滤空值与签名位后拼接待签串，提供 MD5/RSA 签名与验签 | R:- | A:buildSignStr,rsaVerify | S:签名必须排除 sign 与 sign_type 字段；空字符串也必须剔除，否则与网关计算结果不一致
+v2.js[LI6T]: F:支付 V2 客户端：RSA 签名下的下单、查询、退款与商户信息接口 | R:code:server/sdk/pay/sign.js,code:server/sdk/pay/constants.js | A:PayClientV2 | S:必须验签后再采信网关响应；金额单位与字段名以网关文档为准，不能沿用 V1 习惯
+
+===E:/code/pve管理面板/server/services/===
+backup-polling.js[RW7L]: F:备份与恢复进度轮询服务：查询 PVE 任务状态、落库完成标记并在结束后触发通知与磁盘对账 | R:code:server/services/status-cache.js,code:server/services/disk-audit.js | A:startBackupPolling | S:进程重启后必须 resume 未完成的轮询，否则任务永远停在「进行中」；完成后要设置宽限窗口避免瞬时状态回跳
+billing.js[AB7M]: F:计费服务：余额扣款、余额续费、周期金额计算与账单通知 | R:code:server/api/db-billing.js | A:deductBalance | S:扣款与续期必须在同一事务内完成，余额不足要先拒绝再改状态，禁止先开通后扣钱
+cdk.js[AB6M]: F:CDK 业务服务：用户兑换、管理端批量生成、码唯一性保证与通知 | R:code:server/utils/cdk-generator.js | A:redeemCdk | S:兑换必须在事务内校验未使用并写入使用者，重复提交要幂等拒绝；批量生成需去重码
+dhcp.js[AN6M]: F:DHCP 静态绑定工具与子网 IP 池计算（地址池判定、随机未占用 IP 选取、绑定增删） | R:code:server/api/ikuai-clients.js | A:isIpInAddrPool,pickUnusedStaticIp | S:IP 比较必须转整数而非字符串；选 IP 要排除网关、广播与已绑定地址，LXC 不走该路径
+disk-audit.js[AD7M]: F:备份恢复后的磁盘对账审计：按设备槽位比对 PVE 与台账，修复丢失记录并清理幽灵盘 | R:code:server/services/disk-ops.js | A:auditAfterRestore | S:按 bind_bus+bind_dev 槽位匹配而非 volume_id（qmrestore --force 会重生成卷名）；永不对 dev=0 系统盘槽位做任何操作
+disk-expiry-check.js[AD8L]: F:磁盘到期巡检：到期预警、宽限期、停机分离、保留期与销毁回收全流程 | R:code:server/services/disk-ops.js,code:server/services/email-template.js | A:checkExpiredDisks | S:永不强制拔运行中虚拟机的盘，必须先关机再分离；LXC 全程跳过；每个阶段只前进一步，失败不回退已发通知
+disk-ops.js[AD7L]: F:磁盘 PVE 与 SSH 命令层：创建、绑定、解绑、扩容、销毁磁盘及卷名校验 | R:code:server/api/ssh-exec.js,code:server/api/pve-clients.js | A:createDisk,destroyDisk | S:只做命令封装不做业务判断；节点必须按资产所属动态获取；命令参数须经白名单校验防注入
+disk.js[AB8L]: F:磁盘生命周期业务：购买、挂载、卸载、扩容、续费、销毁与自动续费开关（含事务与通知） | R:code:server/services/disk-ops.js,code:server/utils/with-transaction.js | A:purchaseDisk | S:金额计算与台账写入必须在同一事务；卸载后先托管到中转 VM 再允许销毁，避免卷被连带删除
+email-template.js[AM7M]: F:邮件模板渲染引擎：模板读取（DB 优先、常量注册表兜底）、变量替换、套共享外壳并发送 | R:code:server/constants/email-templates.js,code:server/utils/email.js | A:renderTemplate,sendTemplateEmail | S:save/restore 后必须 invalidateTemplateCache；验证码与重置类邮件必须 sync 同步发送，通知类才入队
+expiry-check.js[AW7M]: F:到期检查服务：识别到期 VM/LXC、自动关机、发送提醒并按已发记录去重 | R:code:server/api/pve-clients.js | A:checkExpiredVms | S:轮询需并发保护（isCheckingExpired），提醒去重状态要持久化，进程重启后从 DB 恢复
+holding-vm.js[AD6M]: F:游离数据盘中转 VM 托管服务：把卸载的盘 moveDisk 到常驻中转 VM 保护数据 | R:code:server/services/disk-ops.js | A:holdingVm | S:默认中转 VMID 为 9999；槽位 scsi1-30 与 unused0-9 用尽后才考虑新建中转 VM，不得复用到系统盘槽位
+i18n.js[AL8L]: F:i18n 语言服务：语言注册与解析、覆盖与快照合并、缓存与主动失效 | R:code:server/api/db-i18n.js,code:public/locales/zh-CN.json | A:resolveLocale,getDictionary | S:自定义语言显示值 = 覆盖 ??（key 在快照内 ? 快照值 : 复制源文件当前值）；语言文件永不写入；缓存失效必须跟随写操作
+ikuai-sync.js[AN6M]: F:爱快规则同步服务：从爱快读取 DNAT 规则并回写端口转发台账，处理差异与审计 | R:code:server/services/port-forward-sync.js | A:syncPortForwardsFromIkuai | S:删除规则必须走 deleteIkuaiRuleStrict，同步冲突要落审计而不是静默覆盖
+ip-location.js[AI6M]: F:IP 归属地查询服务（UApiPro）：外呼带 API Key，失败降级，结果三层缓存 | R:code:server/api/db-ip.js,code:server/api/redis.js | A:lookupIpLocation | S:三层缓存为 Redis 7 天、数据库 30 天、最后外呼，未命中才计费；HTTP 失败必须静默降级不影响登录
+node-context.js[AG6T]: F:多节点上下文解析：由资产行的 pve_node_id 解析所属 PVE 节点、可用区与配对爱快的 CNAME 后缀 | R:code:server/api/db.js | A:resolveCnameSuffixByPveNode | S:未配对爱快或解析失败的行必须回退默认爱快作用域，否则他区资产后缀错误
+os-switch.js[AD7L]: F:系统切换业务流程：按阶段校验、备份、重装、重建配置并记录切换日志 | R:code:server/services/disk-ops.js,code:server/utils/disk-validation.js | A:osSwitch | S:所有外部参数必须经 validateParam 白名单校验；阶段失败需保留中间状态供日志与重试，不能跳阶段
+payment.js[AB7M]: F:支付业务：充值下单、回调验签入账与订单状态推进 | R:code:server/sdk/pay/index.js,code:server/api/db-billing.js | A:createRecharge | S:notify 与 return 共用同一入账核心，回调必须验签且幂等，重复通知不得重复加余额
+port-forward-sync.js[AN6S]: F:端口转发同步服务：解析 ikuai_id、重建绑定设备的规则并严格删除爱快规则 | R:code:server/services/dhcp.js | A:parseIkuaiIds,rebuildPortForwardsForDevice | S:ikuai_id 兼容旧字符串与新 JSON 数组两种格式，解析与序列化只此一处；删除失败要抛错交上层审计
+profile-cache.js[AR5T]: F:GET /user/profile 响应缓存与跨模块失效入口 | R:code:server/constants.js | A:invalidateProfile | S:TTL 取 FRONTEND_CACHE_TTL；任何改写 users 可缓存字段的路径都必须调用 invalidateProfile；balance 允许脏值，余额展示直查 DB
+provisioning.js[AB8L]: F:VM/LXC 开通业务：扣款、克隆/创建、DHCP 与端口转发、模板写入与通知，含失败退款 | R:code:server/services/billing.js,code:server/services/dhcp.js | A:provisionVm | S:扣款成功但开通失败必须退款并留审计；节点必须按套餐或资产归属获取；开通中记录需与 DB 台账去重
+redis-admin.js[AO5S]: F:Redis 运维服务：配置热更新、连通性测试与一键清缓存 | R:code:server/api/redis.js | A:redisAdmin | S:热更新后必须重建客户端实例，旧连接不显式断开会泄漏；清缓存的范围要按前缀限定
+release-check.js[AO6M]: F:版本检查服务：通过 GitHub 与 Gitee 双源查询最新版本，失败静默降级 | R:code:server/api/db.js | A:checkRelease | S:国内环境优先 Gitee、海外回退 GitHub；网络失败只能降级提示，不能阻塞管理页
+status-cache.js[AR7T]: F:VM/LXC 实时状态缓存读写，以及备份恢复完成后的宽限窗口合并 | R:code:server/websocket/push-proxy.js | A:getStatusCache,markBackupRestoreComplete | S:宽限窗口内 PVE 可能仍报瞬时 running，必须继续合并为 backup 状态，否则界面会闪现运行中
+system-update.js[AO6S]: F:系统在线更新服务：git fetch/reset 拉取代码、安装依赖并重启进程 | R:code:server/services/release-check.js | A:executeUpdate | S:执行前必须确认工作区无本地改动，否则 reset 会丢失；重启前要给出响应，避免请求悬挂
+
+===E:/code/pve管理面板/server/utils/===
+audit-diff.js[CO5T]: F:更新类操作的字段级 diff 工具：由 DB 新旧记录生成变更明细，无变化则不写审计 | R:code:server/api/db-messaging.js | A:buildFieldDiff | S:审计详情必须来自 DB 新旧状态，禁止从请求体拼接；叶子层工具不得引入顶层依赖
+audit-log.js[CO6T]: F:敏感操作审计日志写入：登录、余额、销毁、删除等动作统一埋点，异步写库且失败不阻断主流程 | R:code:server/api/db-messaging.js | A:auditLog | S:utils 属叶子层，不得顶层 require api/db，必须在函数内懒加载
+cache-store.js[CG8M]: F:通用缓存工具：Redis 优先、内存回退，统一 get/set/del/clear 与按命名空间清理 | R:code:server/api/redis.js | A:create | S:同一命名空间可能跨实例共享，清理必须按前缀而非整体 flush，否则会误删其它模块缓存
+cdk-generator.js[CG5T]: F:生成分段式 CDK 兑换码，字符集剔除易混淆字符 | R:code:server/services/cdk.js | A:generateCdkCode | S:唯一性由数据库约束与调用方重试保证，生成器本身不查重
+cname-validate.js[CV5T]: F:CNAME 域名配置校验纯函数：拆分多条目、校验 label 与域名并兼容旧存储格式 | R:code:public/js/admin/network.js | A:validateCnameDomain | S:拆分与归一化规则必须与前端 parseCnameEntries 保持一致，否则前后端解析结果不同
+console-session.js[CS7S]: F:控制台与终端会话存储：用不透明 session id 替代 URL 中的 ticket/token 等敏感参数 | R:code:server/utils/cache-store.js | A:createConsoleSession | S:session id 必须 256 位熵且一次性消费；数据存 Redis 内存回退，过期必须自动失效
+crypto-utils.js[CS8T]: F:AES-256-GCM 加解密与密钥打码工具，用于 PVE/爱快/SMTP 等敏感配置 | R:- | A:encrypt,decrypt,maskSecret | S:优先使用 ENCRYPTION_KEY，缺失才由 JWT_SECRET 经 PBKDF2 派生；换钥后历史密文无法解密，必须与 JWT 密钥分离
+csv.js[CC5T]: F:CSV 字段转义：引号包裹与内部引号转义，并防公式注入 | R:- | A:escapeCsvField | S:以 = + - @ 或制表符回车开头的字段必须加单引号前缀，否则 Excel/WPS 会当公式执行
+date.js[CG5T]: F:把日期格式化为本地墙钟时间 YYYY-MM-DD HH:MM:SS，兼容 MySQL DATETIME | R:- | A:formatLocalDate | S:禁止用 toISOString 的结果直接入库（UTC），否则与站点本地时间相差 8 小时
+debug.js[CG3T]: F:按 DEBUG 环境变量开启的调试日志函数 | R:- | A:dbg | S:仅在 DEBUG=true 时输出，生产必须保持静默避免日志泄露
+disk-billing.js[CG6T]: F:磁盘计费纯函数：购买、续费与扩容金额计算 | R:code:server/utils/order-utils.js | A:calculateDiskAmount | S:纯函数不得依赖 api/services 层；周期换算统一走 constants，禁止本地定义月数表
+disk-validation.js[CA6S]: F:磁盘参数校验纯函数：类型与格式白名单、卷名安全校验、系统盘判定 | R:code:server/constants.js | A:validateParam,inferDiskFormat | S:白名单取 constants 的 DISK_TYPES/DISK_FORMATS；判断不出是否系统盘时必须保守拒绝操作
+email-validate.js[CV6T]: F:全站唯一的邮箱格式校验函数，收紧到 SMTP 可接受范围 | R:- | A:isValidEmail | S:必须拒绝末尾带句点的地址，否则 SMTP 在 RCPT TO 阶段直接 500 拒收
+email.js[CM7M]: F:邮件基础层：SMTP transporter 缓存与重建、站点名解析、邮件外壳参数与发送入口 | R:code:server/queue/email-queue.js | A:sendEmail | S:utils 属叶子层，db 必须函数内懒加载；SMTP 配置变更后必须重置 transporter 缓存；发送失败不得关闭整池
+friendly-test-error.js[CM5T]: F:把测试连接类错误转换为可操作的中文原因（超时/拒绝/解析失败/认证失败） | R:code:server/utils/safe-error.js | A:friendlyTestError | S:只用于管理员自测端点，普通业务错误仍必须用 safeError 防泄露
+locate-asset.js[CG7T]: F:多节点资产定位：由 vmid/ctid 结合用户与节点范围定位台账行 | R:code:server/api/db-vms.js | A:findEnabledNode | S:vmid 只在单节点内唯一，必须按用户与节点范围定位，不能取「任意首行」，否则越权或路由到错误节点
+log-format.js[CO5T]: F:日志详情与 CSV 展示文本的统一组装，供用户端与管理端日志路由共用 | R:code:server/utils/csv.js | A:formatLogDetail | S:两端必须复用同一实现，禁止各写一份导致导出字段不一致
+logger.js[CO6T]: F:统一日志工具：覆盖 console 方法并加时间戳与中文级别前缀 | R:- | A:console | S:必须保留原始 console 引用避免递归；前缀格式是全站日志检索依赖
+message-sanitize.js[CS6T]: F:站内信标题与正文的服务端净化，纵深防御存储型 XSS | R:- | A:sanitizeTitle,sanitizeMessageContent | S:净化必须幂等（db-messaging 创建路径会再次调用）；前端插值只是第一道防线，入库净化不可省略
+order-utils.js[CG6T]: F:订单工具：按周期月数、数量与折扣计算金额，并生成订单号 | R:code:server/constants.js | A:calculateAmount,generateOrderNo | S:周期月数映射统一取 constants 的 getPeriodMonths，禁止在业务文件重复定义
+password-hash.js[CS8T]: F:统一密码哈希与校验：bcrypt cost=12，兼容旧 SHA256 格式并在登录时懒升级 | R:- | A:hashPassword,verifyPassword | S:登录成功后必须把旧格式就地升级为 bcrypt；不得新写入 SHA256 格式
+pve-rate.js[CG5T]: F:把 PVE 返回的累计计数（网络/磁盘）换算成区间速率 | R:- | A:_applyRate | S:无计数字段时原样返回，不得伪造速率；计数器回绕需按区间差值处理
+random-name.js[CG4T]: F:生成随机虚拟机/容器名称与随机短 ID | R:- | A:generateVmName | S:使用 crypto.randomBytes 而非 Math.random，避免可预测重名
+safe-error.js[CS7T]: F:统一错误脱敏：生产环境返回通用文案，DEBUG 模式返回脱敏后的详细信息 | R:code:server/utils/friendly-test-error.js | A:safeError | S:所有对外错误必须经此函数，禁止把 e.message 直接回传前端
+session-policy.js[CI6T]: F:会话策略纯函数：按 remember 计算活跃截止时间与免登录期限 | R:code:server/utils/token.js | A:computeSessionDeadlineMs | S:remember=1 为登录起算的 7 天固定倒计时且刷新不顺延，超期后转 2 小时无操作退出；remember=0 直接 2 小时无操作退出
+site-url.js[CC5T]: F:解析站点基础 URL：优先环境变量 SITE_URL，去尾斜杠 | R:- | A:getSiteUrl | S:未配置时返回 null 且禁止从请求头取 host（防 Host 注入），调用方需处理空值
+token-store.js[CS7S]: F:验证码与找回密码 token 的统一存储，Redis 优先、数据库回退 | R:code:server/api/redis.js | A:saveToken,consumeToken | S:utils 叶子层，db 必须函数内懒加载；token 必须一次性消费并在过期后自动失效
+token.js[CI8T]: F:JWT 与密钥工具：密钥加载（环境变量或本地 .jwt-secret）、访问与刷新 token 签发及校验辅助 | R:- | A:generateToken,JWT_SECRET | S:算法固定 HS256；密钥必须保持稳定，更换会导致全部会话失效；本文件不得顶层 require db（会形成循环依赖）
+username-blacklist.js[CI4T]: F:禁止注册的敏感用户名黑名单列表 | R:- | A:isUsernameBlacklisted | S:新增运营或系统保留名必须同步加入，否则可注册出仿冒管理员账号
+with-transaction.js[CP7T]: F:MySQL 事务封装：从连接池取连接、开启事务、提交或回滚并释放连接 | R:code:server/api/db-core.js | A:withTransaction | S:回调抛出异常必须回滚并释放连接，任何路径都不能泄漏连接，否则连接池会被耗尽
+
+===E:/code/pve管理面板/server/websocket/===
+push-proxy.js[RN8L]: F:统一状态推送 WebSocket：连接鉴权、订阅管理、实时监控数据与未读数/备份进度推送 | R:code:server/services/status-cache.js,code:server/utils/pve-rate.js | A:pushToUser,pushUnreadCount | S:必须限制并发连接数；状态读写只经 services/status-cache，PVE 累计计数必须经 _applyRate 换算成速率再推
+terminal-proxy.js[RN7S]: F:LXC xterm.js 终端 WebSocket 代理：校验一次性会话后建立 SSH PTY 并双向转发 | R:code:server/api/ssh-exec.js,code:server/utils/console-session.js | A:createTerminalPty | S:并发连接上限 200 防止打满节点 SSH；session id 一次性消费，过期或已用即拒绝
+vnc-proxy.js[RN8L]: F:VNC WebSocket 代理：会话校验、向 PVE 申请 vncproxy ticket 并双向转发 RFB 流 | R:code:server/api/pve-clients.js,code:server/utils/console-session.js | A:vncProxy | S:ticket 只允许服务端持有，前端仅拿不透明 session id；客户端必须按会话资源归属节点获取，不能用默认节点
+
+===E:/code/pve管理面板/views/pages/===
+admin.ejs[EU7T]: F:管理后台页面骨架：主题与模板变量注入、CSP nonce、i18n 预初始化与前端脚本装配顺序 | R:code:public/js/admin/core.js | A:appTemplate | S:html 先挂 i18n-pending 隐藏再揭示以防 FOUC；所有静态资源必须带 ?cv=cacheVersion 避免旧缓存
+dashboard.ejs[EU7T]: F:用户 dashboard 页面骨架：主题模板变量、i18n 预初始化与前端脚本装配 | R:code:public/js/dashboard/core.js | A:appTemplate | S:脚本顺序要求 shared.js 先于各页脚本；静态资源带 ?cv=cacheVersion
+login.ejs[EU6T]: F:登录页骨架：登录/注册/找回密码三态共用页面与脚本装配 | R:code:public/js/login-page.js | A:appTemplate | S:登录页内不得再做 403 跳转，否则形成页面循环刷新
+terminal.ejs[EU6T]: F:独立终端页骨架：加载 xterm 相关脚本与终端启动逻辑 | R:code:public/js/terminal-standalone.js | A:appTemplate | S:页面依赖一次性会话 id 连接，过期需回退重新打开终端
+user-center.ejs[EU6T]: F:用户中心页面骨架：模板变量、i18n 初始化与 DOMPurify、Vue 脚本装配 | R:code:public/js/user-center-page.js | A:appTemplate | S:DOMPurify 必须先于页面脚本加载，否则通知图标渲染报错
+vnc.ejs[EU8M]: F:VNC 控制台页：加载 noVNC 库、建立 WebSocket、提供工具栏与密码输入交互 | R:code:public/novnc/core/rfb.js,code:server/websocket/vnc-proxy.js | A:RFB | S:必须先用一次性会话 id 换取连接再实例化 RFB，不能把 ticket 写进 URL；noVNC 路径固定在 public/novnc
+
+===E:/code/pve管理面板/views/partials/===
+header.ejs[EU6T]: F:三端统一顶栏：品牌、侧栏开关、主题切换、消息红点与用户菜单 | R:code:public/js/shared/i18n.js | A:page-header | S:红点呼吸动画内联在 partial 中，改动需同步 admin 与 dashboard 两处引用
+sidebar-admin.ejs[EU6T]: F:管理端侧边栏导航，用 Vue 指令驱动展开、选中态与二级菜单 | R:code:public/js/admin/core.js | A:switchSection | S:菜单项与路由 section 名必须一一对应，改名需同步模板片段 v-if 判断
+sidebar-dashboard.ejs[EU5T]: F:用户端侧边栏导航，用 data-i18n 属性做静态文案翻译 | R:code:public/js/dashboard/core.js | A:data-section | S:静态文案依赖 data-i18n 属性，新增菜单必须同时补三种语言的 key
+sidebar-user-center.ejs[EU4T]: F:用户中心侧边栏导航，包含跳转仪表盘的入口与子导航锚点 | R:code:public/js/user-center-template.js | A:sidebarNav | S:子导航由页面 Teleport 注入，静态项与锚点 id 必须与页面区块对应
